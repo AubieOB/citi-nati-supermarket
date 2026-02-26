@@ -21,6 +21,7 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    minify: 'terser',
+    minify: 'esbuild',
+    chunkSizeWarningLimit: 1000,
   },
 });
