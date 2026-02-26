@@ -1,0 +1,20 @@
+-- AlterTable
+ALTER TABLE "Order" ADD COLUMN     "salesDayId" INTEGER;
+
+-- CreateTable
+CREATE TABLE "SalesDay" (
+    "id" SERIAL NOT NULL,
+    "date" TIMESTAMP(3) NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'OPEN',
+    "openedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "closedAt" TIMESTAMP(3),
+    "totalSales" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "totalOrders" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "SalesDay_pkey" PRIMARY KEY ("id")
+);
+
+-- AddForeignKey
+ALTER TABLE "Order" ADD CONSTRAINT "Order_salesDayId_fkey" FOREIGN KEY ("salesDayId") REFERENCES "SalesDay"("id") ON DELETE SET NULL ON UPDATE CASCADE;

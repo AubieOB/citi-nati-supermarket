@@ -1,0 +1,274 @@
+require('dotenv').config();
+const crypto = require('crypto');
+const axios = require('axios');
+const { PrismaClient } = require('@prisma/client');
+const { emitNewOrder } = require('../utils/socket');
+const { notifyPaymentSuccess, notifyOrderPlaced } = require('../utils/messageService');
+const { sendOrderConfirmationEmail, sendPaymentConfirmationEmail } = require('../utils/emailService');
+
+const prisma = new PrismaClient();
+
+const initializePayment = async (req, res) => {
+  try {
+    // Get orderId from request body
+    const { orderId } = req.body;
+    const userId = req.user.userId;
+
+    if (!orderId) {
+      return res.status(400).json({
+        error: 'Order ID is required',
+      });
+    }
+
+    // Find order and ensure it belongs to authenticated user
+    const order = await prisma.order.findUnique({
+      where: { id: parseInt(orderId) },
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        error: 'Order not found',
+      });
+    }
+
+    if (order.userId !== userId) {
+      return res.status(403).json({
+        error: 'Access denied - order does not belong to you',
+      });
+    }
+
+    // Check if order is already paid
+    if (order.paymentStatus === 'PAID') {
+      return res.status(400).json({
+        error: 'Order already paid',
+      });
+    }
+
+    // Check that order is in PENDING_PAYMENT status
+    if (order.status !== 'PENDING_PAYMENT') {
+      return res.status(400).json({
+        error: 'Order is not in pending payment status',
+      });
+    }
+
+    // Generate unique reference
+    const paymentReference = `ORDER_${order.id}_${Date.now()}`;
+
+    // Get user details for email
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, name: true }
+    });
+
+    console.log('[Payment] Initializing Paychangu payment for order:', order.id);
+
+    try {
+      // Validate environment variables
+      if (!process.env.PAYCHANGU_SECRET_KEY) {
+        console.error('[Payment] PAYCHANGU_SECRET_KEY is missing from environment variables');
+        return res.status(500).json({
+          error: 'Payment gateway not configured - missing secret key'
+        });
+      }
+
+      // Call actual Paychangu API with correct field names
+      const response = await axios.post(
+        'https://api.paychangu.com/payment',
+        {
+          amount: order.total.toString(),
+          currency: 'MWK',
+          email: user.email,
+          phone_number: order.phone,
+          first_name: user.name.split(' ')[0],
+          last_name: user.name.split(' ')[1] || '',
+          reference: paymentReference,
+          callback_url: `${process.env.FRONTEND_URL || 'http://localhost:3001'}/payment-success?reference=${paymentReference}`,
+          description: `Order #${order.id} - Citi-Nati Supermarket`
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.PAYCHANGU_SECRET_KEY}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      console.log('[Payment] FULL PAYCHANGU RESPONSE:', JSON.stringify(response.data, null, 2));
+
+      // Safely extract checkout URL from possible structures
+      const checkoutUrl =
+        response.data?.checkout_url ||
+        response.data?.data?.checkout_url ||
+        response.data?.authorization_url ||
+        response.data?.data?.authorization_url ||
+        response.data?.link ||
+        response.data?.data?.link;
+
+      if (!checkoutUrl) {
+        console.error('[Payment] Checkout URL missing in Paychangu response');
+        console.error('[Payment] Response keys:', Object.keys(response.data));
+        return res.status(500).json({
+          error: 'No checkout URL received from Paychangu',
+          rawResponse: response.data
+        });
+      }
+
+      console.log('[Payment] Checkout URL extracted:', checkoutUrl);
+
+      // Store payment reference in order
+      await prisma.order.update({
+        where: { id: order.id },
+        data: {
+          paymentReference
+        }
+      });
+
+      return res.status(200).json({
+        checkoutUrl,
+        orderId: order.id,
+        amount: order.total,
+        reference: paymentReference
+      });
+
+    } catch (apiError) {
+      console.error('[Payment] Paychangu API Error:', apiError.response?.data || apiError.message);
+      
+      // Return user-friendly error message
+      return res.status(500).json({
+        error: 'Failed to initialize payment. Please try again.',
+        details: process.env.NODE_ENV === 'development' ? apiError.message : undefined
+      });
+    }
+
+  } catch (err) {
+    console.error('[Payment] Error initializing payment:', err);
+    return res.status(500).json({
+      error: 'Server error while initializing payment',
+    });
+  }
+};
+
+const handleWebhook = async (req, res) => {
+  try {
+    // Read signature from headers
+    const signature = req.headers['x-paychangu-signature'];
+
+    // If signature missing, return 200 (Paychangu expects 200 OK)
+    if (!signature) {
+      console.warn('[Webhook] Missing signature - may be test webhook');
+      return res.sendStatus(200);
+    }
+
+    // Generate HMAC using webhook secret
+    const generatedSignature = crypto
+      .createHmac('sha256', process.env.PAYCHANGU_WEBHOOK_SECRET)
+      .update(JSON.stringify(req.body))
+      .digest('hex');
+
+    // Compare signatures
+    if (generatedSignature !== signature) {
+      console.error('[Webhook] Invalid signature - potential security issue');
+      return res.sendStatus(200); // Return 200 to acknowledge but don't process
+    }
+
+    // Read event details from request body
+    const { status, reference } = req.body;
+
+    console.log(`[Webhook] Processing payment: reference=${reference}, status=${status}`);
+
+    // Only process successful payments
+    if (status !== 'success') {
+      console.log(`[Webhook] Payment not successful: ${status}`);
+      return res.sendStatus(200);
+    }
+
+    // Find order by payment reference
+    const order = await prisma.order.findFirst({
+      where: { paymentReference: reference }
+    });
+
+    if (!order) {
+      console.error(`[Webhook] Order not found for reference: ${reference}`);
+      return res.sendStatus(200);
+    }
+
+    // Prevent duplicate processing
+    if (order.paymentStatus === 'PAID') {
+      console.log(`[Webhook] Order ${order.id} already marked as PAID`);
+      return res.sendStatus(200);
+    }
+
+    // Update order - transaction to ensure atomicity
+    const updatedOrder = await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        paymentStatus: 'PAID',
+        status: 'PENDING'  // Change from PENDING_PAYMENT to PENDING (awaiting admin confirmation)
+      },
+      include: {
+        items: {
+          include: {
+            product: true
+          }
+        },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      }
+    });
+
+    console.log(`[Webhook] Order ${order.id} payment confirmed. Broadcasting to admin_room`);
+
+    // Emit new order event to admins (NOW that payment is confirmed)
+    emitNewOrder(updatedOrder);
+
+    // Create admin notifications
+    await notifyPaymentSuccess(updatedOrder);
+    const itemCount = updatedOrder.items?.length || 0;
+    await notifyOrderPlaced(updatedOrder, itemCount);
+
+    // Send emails to customer
+    try {
+      // Send order confirmation email
+      await sendOrderConfirmationEmail(
+        updatedOrder.user.email,
+        updatedOrder.user.name,
+        updatedOrder,
+        updatedOrder.items.map(item => item.product)
+      );
+
+      // Send payment confirmation email
+      await sendPaymentConfirmationEmail(
+        updatedOrder.user.email,
+        updatedOrder.user.name,
+        {
+          orderId: updatedOrder.id,
+          amount: updatedOrder.total,
+          currency: 'MWK',
+          method: 'Paychangu',
+          date: new Date(),
+          reference: reference,
+          status: 'COMPLETED',
+        }
+      );
+
+      console.log(`[Email] ✅ Order and payment confirmation emails sent to ${updatedOrder.user.email}`);
+    } catch (emailErr) {
+      console.error(`[Email] ❌ Failed to send emails for order ${order.id}:`, emailErr.message);
+      // Don't fail the webhook if emails fail - order is already paid
+    }
+
+    return res.sendStatus(200);
+
+  } catch (err) {
+    console.error('Error handling webhook:', err);
+    // Always return 200 to Paychangu (they retry if we don't acknowledge)
+    return res.sendStatus(200);
+  }
+};
+
+module.exports = { initializePayment, handleWebhook };

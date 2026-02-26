@@ -1,0 +1,196 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                      String   @id @default(uuid())
+  name                    String
+  email                   String   @unique
+  passwordHash            String
+  role                    String   @default("user")
+  isActive                Boolean  @default(true)
+  emailVerified           Boolean  @default(false)
+  verificationCode        String?
+  verificationCodeExpiry  DateTime?
+  passwordResetCode       String?
+  passwordResetCodeExpiry DateTime?
+  cart                    Cart?
+  orders                  Order[]
+  supportTickets          SupportTicket[]
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+model Product {
+  id               Int        @id @default(autoincrement())
+  name             String
+  price            Float
+  originalPrice    Float?
+  discountPrice    Float?
+  isOnSale         Boolean    @default(false)
+  stock            Int
+  category         String
+  expiryDate       DateTime?
+  image            String?
+  cartItems        CartItem[]
+  orderItems       OrderItem[]
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+}
+
+model Cart {
+  id        Int      @id @default(autoincrement())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+model CartItem {
+  id        Int     @id @default(autoincrement())
+  cartId    Int
+  cart      Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId Int
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int
+  price     Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Order {
+  id              Int      @id @default(autoincrement())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items           OrderItem[]
+  total           Float
+  status          String   @default("PENDING")
+  deliveryAddress String
+  houseNumber     String
+  phone           String?
+  latitude        Float?
+  longitude       Float?
+  paymentStatus   String   @default("PENDING")
+  paymentReference String?
+  driverId        String?
+  driver          Driver?  @relation("DriverOrders", fields: [driverId], references: [id])
+  salesDayId      Int?
+  salesDay        SalesDay? @relation(fields: [salesDayId], references: [id], onDelete: SetNull)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  orderId   Int
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId Int
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int
+  price     Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Driver {
+  id             String   @id @default(uuid())
+  name           String
+  phone          String?  @unique
+  email          String?  @unique
+  assignedOrders Order[]  @relation("DriverOrders")
+  createdAt      DateTime @default(now())
+}
+
+model SalesDay {
+  id          Int      @id @default(autoincrement())
+  date        DateTime
+  status      String   @default("OPEN")
+  openedAt    DateTime @default(now())
+  closedAt    DateTime?
+  totalSales  Float    @default(0)
+  totalOrders Int      @default(0)
+  orders      Order[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model SupportTicket {
+  id        Int       @id @default(autoincrement())
+  subject   String
+  message   String
+  status    String    @default("OPEN")
+  priority  String    @default("MEDIUM")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  replies   TicketReply[]
+}
+
+model TicketReply {
+  id          Int      @id @default(autoincrement())
+  message     String
+  createdAt   DateTime @default(now())
+
+  ticketId    Int
+  ticket      SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  senderId    String
+  attachments TicketAttachment[]
+}
+
+model TicketAttachment {
+  id        Int      @id @default(autoincrement())
+  fileName  String
+  fileUrl   String
+  fileSize  Int
+  mimeType  String
+  createdAt DateTime @default(now())
+
+  replyId   Int
+  reply     TicketReply @relation(fields: [replyId], references: [id], onDelete: Cascade)
+}
+
+model TicketReadStatus {
+  id        Int     @id @default(autoincrement())
+  ticketId  Int
+  userId    String
+  lastRead  DateTime @default(now()) @updatedAt
+
+  @@unique([ticketId, userId])
+}
+
+model AdminMessage {
+  id        Int      @id @default(autoincrement())
+  type      String   // new_user, payment_success, order_placed, order_completed, payment_failed, driver_assigned, system
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PendingUser {
+  id                      String   @id @default(uuid())
+  name                    String
+  email                   String   @unique
+  passwordHash            String
+  verificationCode        String
+  verificationCodeExpiry  DateTime
+  createdAt               DateTime @default(now())
+}
+
+model PasswordReset {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  resetCode String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
