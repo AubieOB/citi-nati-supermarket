@@ -189,7 +189,7 @@ const ResetPassword = () => {
                 }}>
                   New Password
                 </label>
-                <div style={{ position: 'relative' }}>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={newPassword}
@@ -198,7 +198,7 @@ const ResetPassword = () => {
                     style={{
                       width: '100%',
                       padding: '0.75rem',
-                      paddingRight: '2.5rem',
+                      paddingRight: '48px',
                       border: '1px solid #ddd',
                       borderRadius: '4px',
                       fontSize: '1rem',
@@ -210,7 +210,7 @@ const ResetPassword = () => {
                     onClick={() => setShowPassword(!showPassword)}
                     style={{
                       position: 'absolute',
-                      right: '0.75rem',
+                      right: '8px',
                       top: '50%',
                       transform: 'translateY(-50%)',
                       backgroundColor: 'transparent',
@@ -218,6 +218,12 @@ const ResetPassword = () => {
                       cursor: 'pointer',
                       color: '#5B4B8A',
                       fontSize: '1rem',
+                      padding: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minWidth: '44px',
+                      minHeight: '44px'
                     }}
                   >
                     <i className={`fas fa-eye${showPassword ? '-slash' : ''}`}></i>
@@ -238,7 +244,7 @@ const ResetPassword = () => {
                 }}>
                   Confirm Password
                 </label>
-                <div style={{ position: 'relative' }}>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                   <input
                     type={showConfirm ? 'text' : 'password'}
                     value={confirmPassword}
@@ -247,7 +253,7 @@ const ResetPassword = () => {
                     style={{
                       width: '100%',
                       padding: '0.75rem',
-                      paddingRight: '2.5rem',
+                      paddingRight: '48px',
                       border: '1px solid #ddd',
                       borderRadius: '4px',
                       fontSize: '1rem',
@@ -259,7 +265,7 @@ const ResetPassword = () => {
                     onClick={() => setShowConfirm(!showConfirm)}
                     style={{
                       position: 'absolute',
-                      right: '0.75rem',
+                      right: '8px',
                       top: '50%',
                       transform: 'translateY(-50%)',
                       backgroundColor: 'transparent',
@@ -267,6 +273,12 @@ const ResetPassword = () => {
                       cursor: 'pointer',
                       color: '#5B4B8A',
                       fontSize: '1rem',
+                      padding: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minWidth: '44px',
+                      minHeight: '44px'
                     }}
                   >
                     <i className={`fas fa-eye${showConfirm ? '-slash' : ''}`}></i>

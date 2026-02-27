@@ -145,7 +145,7 @@ const Login = () => {
               <label className="form__label" htmlFor="password">
                 Password
               </label>
-              <div style={{ position: 'relative' }}>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                 <input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
@@ -153,6 +153,7 @@ const Login = () => {
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  style={{ paddingRight: '48px' }}
                   required
                 />
                 <button
@@ -168,7 +169,12 @@ const Login = () => {
                     cursor: 'pointer',
                     color: '#666',
                     fontSize: '18px',
-                    padding: '0'
+                    padding: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: '44px',
+                    minHeight: '44px'
                   }}
                   title={showPassword ? 'Hide password' : 'Show password'}
                 >
