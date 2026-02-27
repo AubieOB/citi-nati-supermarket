@@ -374,7 +374,7 @@ const Header = () => {
             )}
 
             {/* Avatar + Email Popup for mobile */}
-            <div style={{ padding: '1rem' }}>
+            <div ref={popupRef} style={{ padding: '1rem', position: 'relative' }}>
               <div
                 onClick={(e) => {
                   e.stopPropagation();
@@ -408,6 +408,8 @@ const Header = () => {
                     borderRadius: '4px',
                     marginTop: '10px',
                     textAlign: 'center',
+                    zIndex: 1001,
+                    position: 'relative',
                   }}
                 >
                   {/* User Name */}
@@ -435,7 +437,10 @@ const Header = () => {
                     {user.email}
                   </div>
                   <button
-                    onClick={handleLogout}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleLogout();
+                    }}
                     style={{
                       width: '100%',
                       padding: '8px 12px',
@@ -446,6 +451,8 @@ const Header = () => {
                       cursor: 'pointer',
                       fontSize: '14px',
                       fontWeight: '500',
+                      pointerEvents: 'auto',
+                      WebkitTouchCallout: 'auto',
                     }}
                   >
                     Logout
