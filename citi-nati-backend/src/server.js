@@ -244,11 +244,11 @@ async function start() {
     // Auth routes
     app.use('/api/auth', authRoutes);
 
-    // Admin routes
-    app.use('/api/admin', adminRoutes);
-
-    // Admin Bootstrap routes (one-time admin creation for free tier)
+    // Admin Bootstrap routes (one-time admin creation for free tier) - MUST come before protected admin routes
     app.use('/api/admin', adminBootstrapRoutes);
+
+    // Admin routes (protected)
+    app.use('/api/admin', adminRoutes);
 
     // Admin Messages routes
     app.use('/api/admin/messages', adminMessagesRoutes);
