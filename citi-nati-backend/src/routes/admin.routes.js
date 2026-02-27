@@ -79,12 +79,72 @@ router.get('/users', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
 
     res.json({
       success: true,
+      users: users,
       data: users,
       total: users.length
     });
   } catch (err) {
     console.error('Get users error:', err);
     res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+/**
+ * PUT /api/admin/users/:userId/role
+ * Update user role (user, admin, driver)
+ * Protected: Admin only
+ */
+router.put('/users/:userId/role', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { role } = req.body;
+
+    if (!['user', 'admin', 'driver'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+
+    const user = await prisma.user.update({
+      where: { id: parseInt(userId) },
+      data: { role },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        createdAt: true,
+      }
+    });
+
+    res.json({ success: true, user });
+  } catch (err) {
+    console.error('Update user role error:', err);
+    res.status(500).json({ error: 'Failed to update user role' });
+  }
+});
+
+/**
+ * DELETE /api/admin/users/:userId
+ * Delete user from system
+ * Protected: Admin only
+ */
+router.delete('/users/:userId', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const userIdInt = parseInt(userId);
+
+    // Prevent deleting self
+    if (userIdInt === req.user.id) {
+      return res.status(400).json({ error: 'Cannot delete your own account' });
+    }
+
+    await prisma.user.delete({
+      where: { id: userIdInt }
+    });
+
+    res.json({ success: true, message: 'User deleted' });
+  } catch (err) {
+    console.error('Delete user error:', err);
+    res.status(500).json({ error: 'Failed to delete user' });
   }
 });
 
