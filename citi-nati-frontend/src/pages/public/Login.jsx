@@ -145,7 +145,12 @@ const Login = () => {
               <label className="form__label" htmlFor="password">
                 Password
               </label>
-              <div style={{ position: 'relative', overflow: 'visible' }}>
+              <div style={{ 
+                position: 'relative', 
+                overflow: 'visible',
+                width: '100%',
+                zIndex: 1
+              }}>
                 <input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
@@ -153,7 +158,11 @@ const Login = () => {
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  style={{ paddingRight: '50px' }}
+                  style={{ 
+                    paddingRight: '50px',
+                    width: '100%',
+                    pointerEvents: 'auto'
+                  }}
                   required
                 />
                 <button

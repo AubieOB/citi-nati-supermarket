@@ -853,6 +853,9 @@ input, textarea, select {
 
 .form__group {
   margin-bottom: 1.5rem;
+  width: 100%;
+  position: relative;
+  z-index: 1;
 }
 
 .form__label {
@@ -873,6 +876,10 @@ input, textarea, select {
   background-color: #f5f5f5;
   overflow: visible;
   box-sizing: border-box;
+  pointer-events: auto;
+  cursor: text;
+  position: relative;
+  z-index: 1;
 }
 
 .form__input:focus,
@@ -975,6 +982,47 @@ input, textarea, select {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
+.auth-page__container .form {
+  width: 100%;
+}
+
+.auth-page__container .form__group {
+  margin-bottom: 1.5rem;
+  width: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+.auth-page__container .form__label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.auth-page__container .form__input,
+.auth-page__container .form__textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 16px;
+  background-color: #f5f5f5;
+  pointer-events: auto;
+  cursor: text;
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+}
+
+.auth-page__container .form__input:focus,
+.auth-page__container .form__textarea:focus {
+  outline: none;
+  background-color: #fff;
+  box-shadow: 0 4px 12px rgba(91, 75, 138, 0.2);
+}
+
 @media (max-width: 600px) {
   .auth-page {
     padding: 1rem;
@@ -984,6 +1032,19 @@ input, textarea, select {
   .auth-page__container {
     padding: 1.5rem;
     max-width: 100%;
+  }
+
+  .auth-page__container .form__group {
+    margin-bottom: 1.2rem;
+  }
+
+  .auth-page__container .form__input,
+  .auth-page__container .form__textarea {
+    font-size: 16px;
+    padding: 0.85rem;
+    min-height: 44px;
+    pointer-events: auto;
+    cursor: text;
   }
 
   .auth-page__title {
@@ -1547,21 +1608,31 @@ input, textarea, select {
   .form__textarea,
   .form__select {
     padding: 0.75rem 0.5rem;
-    font-size: 0.9rem;
+    font-size: 16px;
     width: 100%;
     min-height: 44px;
     padding-right: 50px;
     box-sizing: border-box;
+    pointer-events: auto;
+    cursor: text;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
   }
 
   .form__group {
     margin-bottom: 1rem;
+    position: relative;
+    z-index: 1;
+    width: 100%;
   }
 
-  /* Ensure wrapper divs allow button visibility */
+  /* Ensure wrapper divs don't block input */
   .form__group > div {
     position: relative;
     overflow: visible !important;
+    z-index: 1;
+    width: 100%;
   }
 
   /* Password/checkbox buttons - Full interactivity */
@@ -1576,6 +1647,17 @@ input, textarea, select {
     height: 20px !important;
     pointer-events: auto;
     cursor: pointer;
+  }
+
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  textarea,
+  select {
+    pointer-events: auto !important;
+    cursor: text !important;
+    -webkit-user-select: text !important;
+    user-select: text !important;
   }
 
   /* Auth form password toggle button */
@@ -1599,6 +1681,7 @@ input, textarea, select {
     width: 24px !important;
     height: 24px !important;
     cursor: pointer;
+    pointer-events: auto !important;
   }
 
   /* Tables */

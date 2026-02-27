@@ -200,7 +200,12 @@ const Register = () => {
               <label className="form__label" htmlFor="password">
                 Password
               </label>
-              <div style={{ position: 'relative', overflow: 'visible' }}>
+              <div style={{ 
+                position: 'relative', 
+                overflow: 'visible',
+                width: '100%',
+                zIndex: 1
+              }}>
                 <input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
@@ -209,7 +214,11 @@ const Register = () => {
                   placeholder="Enter password"
                   value={formData.password}
                   onChange={handleChange}
-                  style={{ paddingRight: '50px' }}
+                  style={{ 
+                    paddingRight: '50px',
+                    width: '100%',
+                    pointerEvents: 'auto'
+                  }}
                   required
                 />
                 <button
@@ -251,7 +260,12 @@ const Register = () => {
               <label className="form__label" htmlFor="confirmPassword">
                 Confirm Password
               </label>
-              <div style={{ position: 'relative', overflow: 'visible' }}>
+              <div style={{ 
+                position: 'relative', 
+                overflow: 'visible',
+                width: '100%',
+                zIndex: 1
+              }}>
                 <input
                   id="confirmPassword"
                   type={showConfirmPassword ? 'text' : 'password'}
@@ -260,7 +274,11 @@ const Register = () => {
                   placeholder="Confirm password"
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  style={{ paddingRight: '50px' }}
+                  style={{ 
+                    paddingRight: '50px',
+                    width: '100%',
+                    pointerEvents: 'auto'
+                  }}
                   required
                 />
                 <button
