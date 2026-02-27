@@ -1,0 +1,8 @@
+services:
+  - type: static
+    name: citi-nati-frontend
+    buildCommand: cd citi-nati-frontend && npm install && npm run build
+    staticPublishPath: citi-nati-frontend/dist
+    routes:
+      - path: /*
+        destination: /index.html
