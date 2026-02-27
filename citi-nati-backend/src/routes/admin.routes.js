@@ -12,10 +12,10 @@
 const express = require('express');
 const { verifyToken } = require('../middleware/auth.middleware');
 const { verifyAdmin } = require('../middleware/admin.middleware');
-const { getAllOrders, getOrderById } = require('../controllers/order.controller');
-const { getAllUsers, updateUserRole, deleteUser } = require('../controllers/users.controller');
+const { PrismaClient } = require('@prisma/client');
 
 const router = express.Router();
+const prisma = new PrismaClient();
 
 /**
  * GET /api/admin/test
@@ -35,39 +35,82 @@ router.get('/test', verifyToken, verifyAdmin, (req, res) => {
 });
 
 /**
- * GET /api/admin/orders
- * Get all orders in the system
+ * GET /api/admin/dashboard
+ * Admin dashboard statistics
  * Protected: Admin only
  */
-router.get('/orders', verifyToken, verifyAdmin, getAllOrders);
-
-/**
- * GET /api/admin/orders/:id
- * Get specific order by ID
- * Protected: Admin only
- */
-router.get('/orders/:id', verifyToken, verifyAdmin, getOrderById);
+router.get('/dashboard', verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const totalUsers = await prisma.user.count();
+    const totalOrders = await prisma.order.count();
+    
+    res.json({
+      success: true,
+      data: {
+        totalUsers,
+        totalOrders,
+      }
+    });
+  } catch (err) {
+    console.error('Dashboard error:', err);
+    res.status(500).json({ error: 'Failed to fetch dashboard data' });
+  }
+});
 
 /**
  * GET /api/admin/users
  * Get all users in the system
  * Protected: Admin only
  */
-router.get('/users', verifyToken, verifyAdmin, getAllUsers);
+router.get('/users', verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isActive: true,
+        emailVerified: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json({
+      success: true,
+      data: users,
+      total: users.length
+    });
+  } catch (err) {
+    console.error('Get users error:', err);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
 
 /**
- * PUT /api/admin/users/:id/role
- * Update user role
+ * GET /api/admin/orders
+ * Get all orders in the system
  * Protected: Admin only
- * Body: { role: "user" | "admin" }
  */
-router.put('/users/:id/role', verifyToken, verifyAdmin, updateUserRole);
+router.get('/orders', verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const orders = await prisma.order.findMany({
+      include: {
+        user: { select: { id: true, name: true, email: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
 
-/**
- * DELETE /api/admin/users/:id
- * Delete user account
- * Protected: Admin only
- */
-router.delete('/users/:id', verifyToken, verifyAdmin, deleteUser);
+    res.json({
+      success: true,
+      data: orders,
+      total: orders.length
+    });
+  } catch (err) {
+    console.error('Get orders error:', err);
+    res.status(500).json({ error: 'Failed to fetch orders' });
+  }
+});
 
 module.exports = router;
