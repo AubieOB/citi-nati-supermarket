@@ -191,7 +191,6 @@ input, textarea, select {
   padding: 8px;
   min-width: 44px;
   min-height: 44px;
-  display: flex;
   align-items: center;
   justify-content: center;
   -webkit-touch-callout: none;
@@ -257,6 +256,24 @@ input, textarea, select {
 body.menu-open {
   overflow: hidden !important;
   height: 100vh;
+}
+
+/* ========================
+   RESPONSIVE - DESKTOP
+   ======================== */
+
+@media (min-width: 769px) {
+  .header__hamburger {
+    display: none !important;
+  }
+
+  .header__mobile-menu {
+    display: none !important;
+  }
+
+  .header__nav {
+    display: flex !important;
+  }
 }
 
 /* ========================
