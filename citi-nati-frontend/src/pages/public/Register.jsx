@@ -285,7 +285,7 @@ const Register = () => {
             </div>
 
             {/* Terms and Conditions Checkbox */}
-            <div className="form__group" style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+            <div className="form__group" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minHeight: '24px' }}>
               <input
                 id="agreedToTerms"
                 type="checkbox"
@@ -293,14 +293,16 @@ const Register = () => {
                 checked={formData.agreedToTerms}
                 onChange={handleChange}
                 style={{
-                  marginTop: '0.25rem',
                   cursor: 'pointer',
                   width: '18px',
                   height: '18px',
-                  accentColor: '#5B4B8A'
+                  minWidth: '18px',
+                  minHeight: '18px',
+                  accentColor: '#5B4B8A',
+                  flexShrink: 0
                 }}
               />
-              <label htmlFor="agreedToTerms" style={{ fontSize: '0.9rem', color: '#555', cursor: 'pointer' }}>
+              <label htmlFor="agreedToTerms" style={{ fontSize: '0.9rem', color: '#555', cursor: 'pointer', margin: 0 }}>
                 I agree to the{' '}
                 <Link to="/terms" style={{ color: '#5B4B8A', textDecoration: 'none', fontWeight: '500' }}>
                   terms and conditions
