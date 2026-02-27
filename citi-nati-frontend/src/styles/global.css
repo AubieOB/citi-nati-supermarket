@@ -864,6 +864,10 @@ input, textarea, select {
   margin-bottom: 0.5rem;
   font-weight: 600;
   color: #333;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
 }
 
 .form__input,
@@ -931,6 +935,13 @@ input, textarea, select {
 
   .form__group {
     margin-bottom: 1.2rem;
+  }
+
+  .form__label {
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: default;
   }
 
   .form__input,
@@ -1003,6 +1014,10 @@ input, textarea, select {
   margin-bottom: 0.5rem;
   font-weight: 600;
   color: #333;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
 }
 
 .auth-page__container .form__input,
@@ -1041,6 +1056,13 @@ input, textarea, select {
 
   .auth-page__container .form__group {
     margin-bottom: 1.2rem;
+  }
+
+  .auth-page__container .form__label {
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: default;
   }
 
   .auth-page__container .form__input,
@@ -1626,6 +1648,13 @@ input, textarea, select {
     touch-action: auto;
     user-select: text;
     -webkit-user-select: text;
+  }
+
+  .form__label {
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: default;
   }
 
   .form__group {
