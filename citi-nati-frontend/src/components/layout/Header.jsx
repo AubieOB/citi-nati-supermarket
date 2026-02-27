@@ -29,15 +29,20 @@ const Header = () => {
   // Close account popup when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
+      // Don't close if clicking the logout button
+      if (event.target.getAttribute?.('data-logout') === 'true' || event.target.closest('[data-logout="true"]')) {
+        return;
+      }
+
       if (popupRef.current && !popupRef.current.contains(event.target)) {
         setShowEmailPopup(false);
       }
     };
 
     if (showEmailPopup) {
-      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('click', handleClickOutside);
       return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
+        document.removeEventListener('click', handleClickOutside);
       };
     }
   }, [showEmailPopup]);
@@ -299,9 +304,11 @@ const Header = () => {
 
                   {/* Logout Button in Popup */}
                   <button
+                    data-logout="true"
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
+                      e.stopImmediatePropagation();
                       handleLogout();
                     }}
                     style={{
