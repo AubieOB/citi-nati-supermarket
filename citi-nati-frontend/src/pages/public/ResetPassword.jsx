@@ -207,10 +207,19 @@ const ResetPassword = () => {
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowPassword(!showPassword);
+                    }}
+                    onTouchEnd={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowPassword(!showPassword);
+                    }}
                     style={{
                       position: 'absolute',
-                      right: '4px',
+                      right: '6px',
                       top: '50%',
                       transform: 'translateY(-50%)',
                       backgroundColor: 'transparent',
@@ -218,12 +227,14 @@ const ResetPassword = () => {
                       cursor: 'pointer',
                       color: '#5B4B8A',
                       fontSize: '1rem',
-                      padding: '8px 10px',
-                      display: 'flex',
+                      padding: '10px 12px',
+                      display: 'inline-flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      minWidth: 'auto',
-                      minHeight: '44px'
+                      zIndex: 10,
+                      pointerEvents: 'auto',
+                      userSelect: 'none',
+                      WebkitUserSelect: 'none'
                     }}
                   >
                     <i className={`fas fa-eye${showPassword ? '-slash' : ''}`}></i>
@@ -262,10 +273,19 @@ const ResetPassword = () => {
                   />
                   <button
                     type="button"
-                    onClick={() => setShowConfirm(!showConfirm)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowConfirm(!showConfirm);
+                    }}
+                    onTouchEnd={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowConfirm(!showConfirm);
+                    }}
                     style={{
                       position: 'absolute',
-                      right: '4px',
+                      right: '6px',
                       top: '50%',
                       transform: 'translateY(-50%)',
                       backgroundColor: 'transparent',
@@ -273,12 +293,14 @@ const ResetPassword = () => {
                       cursor: 'pointer',
                       color: '#5B4B8A',
                       fontSize: '1rem',
-                      padding: '8px 10px',
-                      display: 'flex',
+                      padding: '10px 12px',
+                      display: 'inline-flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      minWidth: 'auto',
-                      minHeight: '44px'
+                      zIndex: 10,
+                      pointerEvents: 'auto',
+                      userSelect: 'none',
+                      WebkitUserSelect: 'none'
                     }}
                   >
                     <i className={`fas fa-eye${showConfirm ? '-slash' : ''}`}></i>
