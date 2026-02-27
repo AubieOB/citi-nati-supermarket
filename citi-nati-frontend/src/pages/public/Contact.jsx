@@ -83,7 +83,7 @@ const Contact = () => {
           <p style={{ color: '#666' }}>We'd love to hear from you. Get in touch with us today.</p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3rem', marginBottom: '3rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '3rem', marginBottom: '3rem' }}>
           {/* Contact Information */}
           <div>
             <h2 style={{ marginBottom: '1.5rem' }}>Get In Touch</h2>
