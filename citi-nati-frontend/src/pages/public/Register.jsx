@@ -200,7 +200,7 @@ const Register = () => {
               <label className="form__label" htmlFor="password">
                 Password
               </label>
-              <div style={{ position: 'relative' }}>
+              <div style={{ position: 'relative', width: '100%', display: 'block' }}>
                 <input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
@@ -209,44 +209,34 @@ const Register = () => {
                   placeholder="Enter password"
                   value={formData.password}
                   onChange={handleChange}
-                  style={{ paddingRight: '52px', width: '100%', boxSizing: 'border-box' }}
+                  style={{
+                    width: '100%',
+                    paddingRight: '50px',
+                    boxSizing: 'border-box'
+                  }}
                   required
                 />
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setShowPassword(!showPassword);
-                  }}
-                  onTouchEnd={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setShowPassword(!showPassword);
-                  }}
+                <span
+                  onClick={() => setShowPassword(!showPassword)}
                   style={{
                     position: 'absolute',
-                    right: '6px',
+                    right: '12px',
                     top: '50%',
                     transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
                     cursor: 'pointer',
                     color: '#666',
                     fontSize: '18px',
-                    padding: '10px 12px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 10,
-                    pointerEvents: 'auto',
+                    padding: '6px',
                     userSelect: 'none',
-                    WebkitUserSelect: 'none'
+                    WebkitUserSelect: 'none',
+                    pointerEvents: 'auto'
                   }}
+                  role="button"
+                  tabIndex="0"
                   title={showPassword ? 'Hide password' : 'Show password'}
                 >
                   <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
-                </button>
+                </span>
               </div>
             </div>
 
@@ -254,7 +244,7 @@ const Register = () => {
               <label className="form__label" htmlFor="confirmPassword">
                 Confirm Password
               </label>
-              <div style={{ position: 'relative' }}>
+              <div style={{ position: 'relative', width: '100%', display: 'block' }}>
                 <input
                   id="confirmPassword"
                   type={showConfirmPassword ? 'text' : 'password'}
@@ -263,44 +253,34 @@ const Register = () => {
                   placeholder="Confirm password"
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  style={{ paddingRight: '52px', width: '100%', boxSizing: 'border-box' }}
+                  style={{
+                    width: '100%',
+                    paddingRight: '50px',
+                    boxSizing: 'border-box'
+                  }}
                   required
                 />
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setShowConfirmPassword(!showConfirmPassword);
-                  }}
-                  onTouchEnd={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setShowConfirmPassword(!showConfirmPassword);
-                  }}
+                <span
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   style={{
                     position: 'absolute',
-                    right: '6px',
+                    right: '12px',
                     top: '50%',
                     transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
                     cursor: 'pointer',
                     color: '#666',
                     fontSize: '18px',
-                    padding: '10px 12px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 10,
-                    pointerEvents: 'auto',
+                    padding: '6px',
                     userSelect: 'none',
-                    WebkitUserSelect: 'none'
+                    WebkitUserSelect: 'none',
+                    pointerEvents: 'auto'
                   }}
+                  role="button"
+                  tabIndex="0"
                   title={showConfirmPassword ? 'Hide password' : 'Show password'}
                 >
                   <i className={`fas ${showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
-                </button>
+                </span>
               </div>
             </div>
 

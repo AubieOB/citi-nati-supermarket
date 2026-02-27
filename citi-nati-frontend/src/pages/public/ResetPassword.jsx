@@ -189,7 +189,7 @@ const ResetPassword = () => {
                 }}>
                   New Password
                 </label>
-                <div style={{ position: 'relative' }}>
+                <div style={{ position: 'relative', width: '100%', display: 'block' }}>
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={newPassword}
@@ -198,47 +198,34 @@ const ResetPassword = () => {
                     style={{
                       width: '100%',
                       padding: '0.75rem',
-                      paddingRight: '52px',
+                      paddingRight: '50px',
                       border: '1px solid #ddd',
                       borderRadius: '4px',
                       fontSize: '1rem',
                       boxSizing: 'border-box',
                     }}
                   />
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setShowPassword(!showPassword);
-                    }}
-                    onTouchEnd={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setShowPassword(!showPassword);
-                    }}
+                  <span
+                    onClick={() => setShowPassword(!showPassword)}
                     style={{
                       position: 'absolute',
-                      right: '6px',
+                      right: '12px',
                       top: '50%',
                       transform: 'translateY(-50%)',
-                      backgroundColor: 'transparent',
-                      border: 'none',
                       cursor: 'pointer',
                       color: '#5B4B8A',
-                      fontSize: '1rem',
-                      padding: '10px 12px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      zIndex: 10,
-                      pointerEvents: 'auto',
+                      fontSize: '18px',
+                      padding: '6px',
                       userSelect: 'none',
-                      WebkitUserSelect: 'none'
+                      WebkitUserSelect: 'none',
+                      pointerEvents: 'auto'
                     }}
+                    role="button"
+                    tabIndex="0"
+                    title={showPassword ? 'Hide password' : 'Show password'}
                   >
                     <i className={`fas fa-eye${showPassword ? '-slash' : ''}`}></i>
-                  </button>
+                  </span>
                 </div>
                 <p style={{ fontSize: '0.85rem', color: '#999', marginTop: '0.5rem' }}>
                   At least 6 characters, with uppercase, lowercase, and numbers
@@ -255,7 +242,7 @@ const ResetPassword = () => {
                 }}>
                   Confirm Password
                 </label>
-                <div style={{ position: 'relative' }}>
+                <div style={{ position: 'relative', width: '100%', display: 'block' }}>
                   <input
                     type={showConfirm ? 'text' : 'password'}
                     value={confirmPassword}
@@ -264,47 +251,34 @@ const ResetPassword = () => {
                     style={{
                       width: '100%',
                       padding: '0.75rem',
-                      paddingRight: '52px',
+                      paddingRight: '50px',
                       border: '1px solid #ddd',
                       borderRadius: '4px',
                       fontSize: '1rem',
                       boxSizing: 'border-box',
                     }}
                   />
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setShowConfirm(!showConfirm);
-                    }}
-                    onTouchEnd={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setShowConfirm(!showConfirm);
-                    }}
+                  <span
+                    onClick={() => setShowConfirm(!showConfirm)}
                     style={{
                       position: 'absolute',
-                      right: '6px',
+                      right: '12px',
                       top: '50%',
                       transform: 'translateY(-50%)',
-                      backgroundColor: 'transparent',
-                      border: 'none',
                       cursor: 'pointer',
                       color: '#5B4B8A',
-                      fontSize: '1rem',
-                      padding: '10px 12px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      zIndex: 10,
-                      pointerEvents: 'auto',
+                      fontSize: '18px',
+                      padding: '6px',
                       userSelect: 'none',
-                      WebkitUserSelect: 'none'
+                      WebkitUserSelect: 'none',
+                      pointerEvents: 'auto'
                     }}
+                    role="button"
+                    tabIndex="0"
+                    title={showConfirm ? 'Hide password' : 'Show password'}
                   >
                     <i className={`fas fa-eye${showConfirm ? '-slash' : ''}`}></i>
-                  </button>
+                  </span>
                 </div>
               </div>
 
