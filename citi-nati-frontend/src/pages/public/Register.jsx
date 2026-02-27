@@ -224,7 +224,13 @@ const Register = () => {
                     cursor: 'pointer',
                     color: '#666',
                     fontSize: '18px',
-                    padding: '0'
+                    padding: '8px 12px',
+                    minWidth: '44px',
+                    minHeight: '44px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 10
                   }}
                   title={showPassword ? 'Hide password' : 'Show password'}
                 >
@@ -261,7 +267,13 @@ const Register = () => {
                     cursor: 'pointer',
                     color: '#666',
                     fontSize: '18px',
-                    padding: '0'
+                    padding: '8px 12px',
+                    minWidth: '44px',
+                    minHeight: '44px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 10
                   }}
                   title={showConfirmPassword ? 'Hide password' : 'Show password'}
                 >

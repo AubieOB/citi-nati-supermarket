@@ -249,6 +249,7 @@ input, textarea, select {
 
   .header__mobile-menu {
     gap: 1rem;
+    z-index: 1000;
   }
 
   .header__mobile-menu .header__link {
@@ -267,6 +268,8 @@ input, textarea, select {
     padding: 12px 16px !important;
     pointer-events: auto;
     cursor: pointer;
+    z-index: 1001 !important;
+    position: relative;
   }
 
   h1 {
@@ -920,6 +923,25 @@ input, textarea, select {
   .form__textarea {
     font-size: 16px;
     padding: 0.85rem;
+    min-height: 44px;
+  }
+
+  /* Password visibility toggle button - Mobile */
+  input[type="password"] + button,
+  input[type="text"] + button {
+    padding: 8px 12px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+    pointer-events: auto !important;
+    cursor: pointer !important;
+  }
+
+  /* Checkbox styling for mobile */
+  input[type="checkbox"] {
+    width: 20px !important;
+    height: 20px !important;
+    min-width: 20px !important;
+    cursor: pointer;
   }
 }
 
@@ -959,6 +981,7 @@ input, textarea, select {
 
   .auth-page__container {
     padding: 1.5rem;
+    max-width: 100%;
   }
 
   .auth-page__title {
@@ -1405,7 +1428,8 @@ input, textarea, select {
   .form__textarea,
   .form__select {
     padding: 0.75rem;
-    font-size: 0.95rem;
+    font-size: 16px;
+    min-height: 44px;
   }
 
   /* Cards */
@@ -1500,10 +1524,40 @@ input, textarea, select {
     padding: 0.75rem 0.5rem;
     font-size: 0.9rem;
     width: 100%;
+    min-height: 44px;
   }
 
   .form__group {
     margin-bottom: 1rem;
+  }
+
+  /* Auth form password toggle button - Mobile friendly */
+  .auth-page__container input[type="password"] + button,
+  .auth-page__container input[type="text"] + button {
+    padding: 8px 12px !important;
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    right: 8px !important;
+    pointer-events: auto !important;
+  }
+
+  /* Auth form checkbox - Better touch target */
+  .auth-page__container input[type="checkbox"] {
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 24px !important;
+    min-height: 24px !important;
+    cursor: pointer;
+  }
+
+  /* Form label for checkbox - Better spacing */
+  .auth-page__container .form__group label {
+    padding-left: 8px;
   }
 
   /* Tables */
