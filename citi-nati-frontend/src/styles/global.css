@@ -856,6 +856,7 @@ input, textarea, select {
   width: 100%;
   position: relative;
   z-index: 1;
+  touch-action: auto;
 }
 
 .form__label {
@@ -880,6 +881,10 @@ input, textarea, select {
   cursor: text;
   position: relative;
   z-index: 1;
+  touch-action: auto;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
 }
 
 .form__input:focus,
@@ -1618,6 +1623,9 @@ input, textarea, select {
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
+    touch-action: auto;
+    user-select: text;
+    -webkit-user-select: text;
   }
 
   .form__group {
@@ -1625,6 +1633,7 @@ input, textarea, select {
     position: relative;
     z-index: 1;
     width: 100%;
+    touch-action: auto;
   }
 
   /* Ensure wrapper divs don't block input */
@@ -1633,12 +1642,13 @@ input, textarea, select {
     overflow: visible !important;
     z-index: 1;
     width: 100%;
+    touch-action: auto;
   }
 
   /* Password/checkbox buttons - Full interactivity */
   .form__group button[type="button"] {
     pointer-events: auto !important;
-    touch-action: manipulation;
+    touch-action: auto;
     z-index: 100 !important;
   }
 
@@ -1647,6 +1657,7 @@ input, textarea, select {
     height: 20px !important;
     pointer-events: auto;
     cursor: pointer;
+    touch-action: auto;
   }
 
   input[type="text"],
@@ -1658,6 +1669,7 @@ input, textarea, select {
     cursor: text !important;
     -webkit-user-select: text !important;
     user-select: text !important;
+    touch-action: auto !important;
   }
 
   /* Auth form password toggle button */
@@ -1673,7 +1685,7 @@ input, textarea, select {
     transform: translateY(-50%) !important;
     right: 8px !important;
     pointer-events: auto !important;
-    touch-action: manipulation;
+    touch-action: auto;
   }
 
   /* Auth form checkbox - Better touch target */
@@ -1682,6 +1694,7 @@ input, textarea, select {
     height: 24px !important;
     cursor: pointer;
     pointer-events: auto !important;
+    touch-action: auto;
   }
 
   /* Tables */

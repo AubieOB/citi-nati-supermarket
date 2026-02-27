@@ -176,6 +176,8 @@ const Register = () => {
                 placeholder="John Doe"
                 value={formData.name}
                 onChange={handleChange}
+                onTouchStart={(e) => e.target.focus()}
+                autoComplete="name"
                 required
               />
             </div>
@@ -192,6 +194,8 @@ const Register = () => {
                 placeholder="your@email.com"
                 value={formData.email}
                 onChange={handleChange}
+                onTouchStart={(e) => e.target.focus()}
+                autoComplete="email"
                 required
               />
             </div>
@@ -204,7 +208,8 @@ const Register = () => {
                 position: 'relative', 
                 overflow: 'visible',
                 width: '100%',
-                zIndex: 1
+                zIndex: 1,
+                touchAction: 'auto'
               }}>
                 <input
                   id="password"
@@ -214,10 +219,13 @@ const Register = () => {
                   placeholder="Enter password"
                   value={formData.password}
                   onChange={handleChange}
+                  onTouchStart={(e) => e.target.focus()}
+                  autoComplete="new-password"
                   style={{ 
                     paddingRight: '50px',
                     width: '100%',
-                    pointerEvents: 'auto'
+                    pointerEvents: 'auto',
+                    touchAction: 'auto'
                   }}
                   required
                 />
@@ -264,7 +272,8 @@ const Register = () => {
                 position: 'relative', 
                 overflow: 'visible',
                 width: '100%',
-                zIndex: 1
+                zIndex: 1,
+                touchAction: 'auto'
               }}>
                 <input
                   id="confirmPassword"
@@ -274,10 +283,13 @@ const Register = () => {
                   placeholder="Confirm password"
                   value={formData.confirmPassword}
                   onChange={handleChange}
+                  onTouchStart={(e) => e.target.focus()}
+                  autoComplete="new-password"
                   style={{ 
                     paddingRight: '50px',
                     width: '100%',
-                    pointerEvents: 'auto'
+                    pointerEvents: 'auto',
+                    touchAction: 'auto'
                   }}
                   required
                 />

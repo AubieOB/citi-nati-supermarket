@@ -137,6 +137,8 @@ const Login = () => {
                 placeholder="your@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onTouchStart={(e) => e.target.focus()}
+                autoComplete="email"
                 required
               />
             </div>
@@ -149,7 +151,8 @@ const Login = () => {
                 position: 'relative', 
                 overflow: 'visible',
                 width: '100%',
-                zIndex: 1
+                zIndex: 1,
+                touchAction: 'auto'
               }}>
                 <input
                   id="password"
@@ -158,10 +161,13 @@ const Login = () => {
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  onTouchStart={(e) => e.target.focus()}
+                  autoComplete="current-password"
                   style={{ 
                     paddingRight: '50px',
                     width: '100%',
-                    pointerEvents: 'auto'
+                    pointerEvents: 'auto',
+                    touchAction: 'auto'
                   }}
                   required
                 />
