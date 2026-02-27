@@ -16,6 +16,20 @@ const Modal = ({
 }) => {
   if (!isOpen) return null;
 
+  // Prevent body scroll when modal is open
+  if (typeof document !== 'undefined') {
+    document.body.style.overflow = 'hidden';
+  }
+
+  // Cleanup on unmount
+  React.useEffect(() => {
+    return () => {
+      if (typeof document !== 'undefined') {
+        document.body.style.overflow = 'unset';
+      }
+    };
+  }, []);
+
   const getIcon = () => {
     switch (type) {
       case 'error':
@@ -47,7 +61,7 @@ const Modal = ({
 
   return (
     <>
-      {/* Overlay */}
+      {/* Overlay - Blocks interaction outside modal */}
       <div
         style={{
           position: 'fixed',
@@ -59,9 +73,17 @@ const Modal = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 1000,
+          zIndex: 999,
+          pointerEvents: 'auto',
+          WebkitTouchCallout: 'none',
+          WebkitUserSelect: 'none',
         }}
-        onClick={onCancel}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (onCancel) onCancel();
+        }}
+        role="presentation"
       />
 
       {/* Modal */}
@@ -74,14 +96,20 @@ const Modal = ({
           backgroundColor: '#fff',
           borderRadius: '12px',
           boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)',
-          zIndex: 1001,
+          zIndex: 1000,
           maxWidth: '500px',
           width: '90%',
           maxHeight: '70vh',
           overflow: 'auto',
           animation: 'modalSlideIn 0.3s ease',
+          pointerEvents: 'auto',
         }}
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+        }}
+        role="dialog"
+        aria-modal="true"
       >
         <style>{`
           @keyframes modalSlideIn {

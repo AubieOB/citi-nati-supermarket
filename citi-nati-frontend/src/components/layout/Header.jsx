@@ -55,14 +55,29 @@ const Header = () => {
     };
 
     if (menuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+      // Add menu-open class to body to prevent scrolling
+      document.body.classList.add('menu-open');
+      
+      // Use both touchstart and click to handle mobile and desktop
+      document.addEventListener('touchstart', handleClickOutside, true);
+      document.addEventListener('click', handleClickOutside, true);
       return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
+        document.body.classList.remove('menu-open');
+        document.removeEventListener('touchstart', handleClickOutside, true);
+        document.removeEventListener('click', handleClickOutside, true);
       };
+    } else {
+      // Ensure menu-open class is removed when menu closes
+      document.body.classList.remove('menu-open');
     }
   }, [menuOpen]);
 
-  const toggleMenu = () => {
+  const toggleMenu = (e) => {
+    // Prevent event bubbling when opening menu
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
     setMenuOpen(!menuOpen);
   };
 
@@ -317,7 +332,20 @@ const Header = () => {
       </nav>
 
       {/* Mobile Hamburger */}
-      <div className={`header__hamburger ${menuOpen ? 'header__hamburger--open' : ''}`} onClick={toggleMenu}>
+      <div 
+        className={`header__hamburger ${menuOpen ? 'header__hamburger--open' : ''}`} 
+        onClick={toggleMenu}
+        role="button"
+        tabIndex="0"
+        aria-label="Toggle menu"
+        aria-expanded={menuOpen}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggleMenu(e);
+          }
+        }}
+      >
         <span></span>
         <span></span>
         <span></span>
