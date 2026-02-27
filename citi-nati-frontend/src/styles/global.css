@@ -213,8 +213,8 @@ input, textarea, select {
   left: 0;
   right: 0;
   width: 100%;
-  align-items: center;
-  text-align: center;
+  align-items: flex-start;
+  text-align: left;
   max-height: 0;
   overflow: hidden;
   opacity: 0;
@@ -224,7 +224,7 @@ input, textarea, select {
 
 .header__mobile-menu--open {
   display: flex;
-  max-height: 500px;
+  max-height: 800px;
   opacity: 1;
   transform: translateY(0);
 }
@@ -248,6 +248,13 @@ input, textarea, select {
 
   .header__mobile-menu {
     gap: 1rem;
+  }
+
+  .header__mobile-menu .header__link {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    display: block;
+    border-bottom: 1px solid #f0f0f0;
   }
 
   .header__logo {
@@ -280,6 +287,12 @@ input, textarea, select {
   .header__hamburger span {
     width: 20px;
     height: 2.5px;
+  }
+
+  .header__mobile-menu .header__link {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-size: 0.95rem;
   }
 
   h1 {
