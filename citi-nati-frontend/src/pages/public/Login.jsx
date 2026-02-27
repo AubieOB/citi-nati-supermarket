@@ -153,7 +153,7 @@ const Login = () => {
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  style={{ paddingRight: '48px' }}
+                  style={{ paddingRight: '52px' }}
                   required
                 />
                 <button
@@ -161,7 +161,7 @@ const Login = () => {
                   onClick={() => setShowPassword(!showPassword)}
                   style={{
                     position: 'absolute',
-                    right: '12px',
+                    right: '4px',
                     top: '50%',
                     transform: 'translateY(-50%)',
                     background: 'none',
@@ -169,11 +169,11 @@ const Login = () => {
                     cursor: 'pointer',
                     color: '#666',
                     fontSize: '18px',
-                    padding: '8px',
+                    padding: '8px 10px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    minWidth: '44px',
+                    minWidth: 'auto',
                     minHeight: '44px'
                   }}
                   title={showPassword ? 'Hide password' : 'Show password'}

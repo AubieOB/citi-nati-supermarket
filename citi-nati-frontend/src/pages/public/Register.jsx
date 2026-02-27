@@ -209,7 +209,7 @@ const Register = () => {
                   placeholder="Enter password"
                   value={formData.password}
                   onChange={handleChange}
-                  style={{ paddingRight: '48px' }}
+                  style={{ paddingRight: '52px' }}
                   required
                 />
                 <button
@@ -217,7 +217,7 @@ const Register = () => {
                   onClick={() => setShowPassword(!showPassword)}
                   style={{
                     position: 'absolute',
-                    right: '12px',
+                    right: '4px',
                     top: '50%',
                     transform: 'translateY(-50%)',
                     background: 'none',
@@ -225,11 +225,11 @@ const Register = () => {
                     cursor: 'pointer',
                     color: '#666',
                     fontSize: '18px',
-                    padding: '8px',
+                    padding: '8px 10px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    minWidth: '44px',
+                    minWidth: 'auto',
                     minHeight: '44px'
                   }}
                   title={showPassword ? 'Hide password' : 'Show password'}
@@ -252,7 +252,7 @@ const Register = () => {
                   placeholder="Confirm password"
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  style={{ paddingRight: '48px' }}
+                  style={{ paddingRight: '52px' }}
                   required
                 />
                 <button
@@ -260,7 +260,7 @@ const Register = () => {
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   style={{
                     position: 'absolute',
-                    right: '12px',
+                    right: '4px',
                     top: '50%',
                     transform: 'translateY(-50%)',
                     background: 'none',
@@ -268,11 +268,11 @@ const Register = () => {
                     cursor: 'pointer',
                     color: '#666',
                     fontSize: '18px',
-                    padding: '8px',
+                    padding: '8px 10px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    minWidth: '44px',
+                    minWidth: 'auto',
                     minHeight: '44px'
                   }}
                   title={showConfirmPassword ? 'Hide password' : 'Show password'}

@@ -198,7 +198,7 @@ const ResetPassword = () => {
                     style={{
                       width: '100%',
                       padding: '0.75rem',
-                      paddingRight: '48px',
+                      paddingRight: '52px',
                       border: '1px solid #ddd',
                       borderRadius: '4px',
                       fontSize: '1rem',
@@ -210,7 +210,7 @@ const ResetPassword = () => {
                     onClick={() => setShowPassword(!showPassword)}
                     style={{
                       position: 'absolute',
-                      right: '8px',
+                      right: '4px',
                       top: '50%',
                       transform: 'translateY(-50%)',
                       backgroundColor: 'transparent',
@@ -218,11 +218,11 @@ const ResetPassword = () => {
                       cursor: 'pointer',
                       color: '#5B4B8A',
                       fontSize: '1rem',
-                      padding: '8px',
+                      padding: '8px 10px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      minWidth: '44px',
+                      minWidth: 'auto',
                       minHeight: '44px'
                     }}
                   >
@@ -253,7 +253,7 @@ const ResetPassword = () => {
                     style={{
                       width: '100%',
                       padding: '0.75rem',
-                      paddingRight: '48px',
+                      paddingRight: '52px',
                       border: '1px solid #ddd',
                       borderRadius: '4px',
                       fontSize: '1rem',
@@ -265,7 +265,7 @@ const ResetPassword = () => {
                     onClick={() => setShowConfirm(!showConfirm)}
                     style={{
                       position: 'absolute',
-                      right: '8px',
+                      right: '4px',
                       top: '50%',
                       transform: 'translateY(-50%)',
                       backgroundColor: 'transparent',
@@ -273,11 +273,11 @@ const ResetPassword = () => {
                       cursor: 'pointer',
                       color: '#5B4B8A',
                       fontSize: '1rem',
-                      padding: '8px',
+                      padding: '8px 10px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      minWidth: '44px',
+                      minWidth: 'auto',
                       minHeight: '44px'
                     }}
                   >
