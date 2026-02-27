@@ -77,10 +77,10 @@ router.get('/users', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
 
+    // Return in expected format for frontend
     res.json({
       success: true,
       users: users,
-      data: users,
       total: users.length
     });
   } catch (err) {
@@ -115,9 +115,16 @@ router.put('/users/:userId/role', verifyTokenMiddleware, verifyAdmin, async (req
       }
     });
 
-    res.json({ success: true, user });
+    res.json({ 
+      success: true, 
+      user,
+      message: `User role updated to ${role}`
+    });
   } catch (err) {
     console.error('Update user role error:', err);
+    if (err.code === 'P2025') {
+      return res.status(404).json({ error: 'User not found' });
+    }
     res.status(500).json({ error: 'Failed to update user role' });
   }
 });
@@ -158,7 +165,7 @@ router.get('/orders', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
     const orders = await prisma.order.findMany({
       include: {
         user: { select: { id: true, name: true, email: true } },
-        driver: { select: { id: true, name: true, email: true } },
+        driver: { select: { id: true, name: true, phone: true } },
         items: { include: { product: true } }
       },
       orderBy: { createdAt: 'desc' }
@@ -167,7 +174,6 @@ router.get('/orders', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
     res.json({
       success: true,
       orders: orders,
-      data: orders,
       total: orders.length
     });
   } catch (err) {
@@ -189,7 +195,7 @@ router.get('/orders/:orderId', verifyTokenMiddleware, verifyAdmin, async (req, r
       where: { id: parseInt(orderId) },
       include: {
         user: { select: { id: true, name: true, email: true } },
-        driver: { select: { id: true, name: true, email: true } },
+        driver: { select: { id: true, name: true, phone: true } },
         items: { include: { product: true } }
       }
     });
