@@ -200,7 +200,7 @@ const Register = () => {
               <label className="form__label" htmlFor="password">
                 Password
               </label>
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <div style={{ position: 'relative' }}>
                 <input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
@@ -243,7 +243,7 @@ const Register = () => {
               <label className="form__label" htmlFor="confirmPassword">
                 Confirm Password
               </label>
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <div style={{ position: 'relative' }}>
                 <input
                   id="confirmPassword"
                   type={showConfirmPassword ? 'text' : 'password'}

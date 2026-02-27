@@ -189,7 +189,7 @@ const ResetPassword = () => {
                 }}>
                   New Password
                 </label>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <div style={{ position: 'relative' }}>
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={newPassword}
@@ -244,7 +244,7 @@ const ResetPassword = () => {
                 }}>
                   Confirm Password
                 </label>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <div style={{ position: 'relative' }}>
                   <input
                     type={showConfirm ? 'text' : 'password'}
                     value={confirmPassword}
