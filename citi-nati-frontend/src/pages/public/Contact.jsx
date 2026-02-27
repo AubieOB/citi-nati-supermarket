@@ -106,7 +106,7 @@ const Contact = () => {
             <div style={{ marginBottom: '2rem' }}>
               <h3 style={{ color: '#333', marginBottom: '0.5rem' }}>Business Hours</h3>
               <p style={{ color: '#666' }}>
-                Monday - Friday: 7:00 AM - 9 PM<br />
+                Monday - Friday: 7:00 AM - 9:00 PM<br />
                 Saturday: 9:00 AM - 6:00 PM<br />
                 Sunday: 10:00 AM - 4:00 PM
               </p>
@@ -202,7 +202,7 @@ const Contact = () => {
                     boxSizing: 'border-box',
                     opacity: loading ? 0.6 : 1
                   }}
-                  placeholder="(555) 123-4567"
+                  placeholder="(265) 991234567"
                 />
               </div>
 
