@@ -138,9 +138,9 @@ const Header = () => {
         <img 
           src={logo} 
           alt="Citi-Nati Logo" 
-          style={{ height: '60px', marginLeft: '0', marginRight: '0.1rem', verticalAlign: 'middle' }}
+          style={{ height: 'clamp(40px, 8vw, 60px)', marginLeft: '0', marginRight: '0.1rem', verticalAlign: 'middle' }}
         />
-        <span style={{ display: 'flex', alignItems: 'center', gap: '0' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '0', fontSize: 'clamp(14px, 3vw, 20px)', whiteSpace: 'nowrap' }}>
           <span style={{ color: '#5B4B8A', fontWeight: '700' }}>Citi</span>
           <span style={{ color: '#2D8659', fontWeight: '700' }}>-Nati Supermarket</span>
         </span>
@@ -204,7 +204,10 @@ const Header = () => {
               onMouseLeave={() => setShowAccountLabel(false)}
             >
               <div
-                onClick={() => setShowEmailPopup(!showEmailPopup)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowEmailPopup(!showEmailPopup);
+                }}
                 style={{
                   width: '40px',
                   height: '40px',
@@ -219,6 +222,7 @@ const Header = () => {
                   fontWeight: 'bold',
                   position: 'relative',
                   transition: 'transform 0.2s ease',
+                  pointerEvents: 'auto',
                 }}
                 onMouseEnter={(e) => {
                   e.target.style.transform = 'scale(1.1)';
@@ -254,6 +258,7 @@ const Header = () => {
               {/* Email Popup with Logout - Shows on click only */}
               {showEmailPopup && (
                 <div
+                  onClick={(e) => e.stopPropagation()}
                   style={{
                     position: 'absolute',
                     top: '50px',
@@ -265,6 +270,7 @@ const Header = () => {
                     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
                     zIndex: 1000,
                     minWidth: '220px',
+                    pointerEvents: 'auto',
                   }}
                 >
                   {/* User Name */}
@@ -293,7 +299,11 @@ const Header = () => {
 
                   {/* Logout Button in Popup */}
                   <button
-                    onClick={handleLogout}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleLogout();
+                    }}
                     style={{
                       width: '100%',
                       padding: '8px 12px',
@@ -305,6 +315,7 @@ const Header = () => {
                       fontSize: '14px',
                       fontWeight: '500',
                       transition: 'background-color 0.2s ease',
+                      pointerEvents: 'auto',
                     }}
                     onMouseEnter={(e) => {
                       e.target.style.backgroundColor = '#e82860';
@@ -466,6 +477,7 @@ const Header = () => {
                   </div>
                   <button
                     onClick={(e) => {
+                      e.preventDefault();
                       e.stopPropagation();
                       handleLogout();
                     }}
