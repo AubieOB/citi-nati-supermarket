@@ -871,6 +871,8 @@ input, textarea, select {
   font-size: 1rem;
   transition: box-shadow 0.3s ease;
   background-color: #f5f5f5;
+  overflow: visible;
+  box-sizing: border-box;
 }
 
 .form__input:focus,
@@ -1423,13 +1425,36 @@ input, textarea, select {
     font-size: 0.95rem;
   }
 
-  /* Forms */
+  /* Password input wrapper - ensure absolute button is visible */
+  .form__group > div[style*="position: relative"] {
+    overflow: visible !important;
+  }
+
+  /* Password input wrapper on all screens */
+  .form__group div {
+    overflow: visible;
+  }
+
   .form__input,
-  .form__textarea,
-  .form__select {
-    padding: 0.75rem;
+  .form__textarea {
     font-size: 16px;
+    padding: 0.75rem;
     min-height: 44px;
+    padding-right: 50px;
+    box-sizing: border-box;
+  }
+
+  /* Ensure password wrapper doesn't clip button */
+  .form__group > div {
+    position: relative;
+    overflow: visible;
+  }
+
+  /* Password toggle button styling */
+  .form__group button[type="button"] {
+    pointer-events: auto !important;
+    touch-action: manipulation;
+    z-index: 100;
   }
 
   /* Cards */
@@ -1525,18 +1550,40 @@ input, textarea, select {
     font-size: 0.9rem;
     width: 100%;
     min-height: 44px;
+    padding-right: 50px;
+    box-sizing: border-box;
   }
 
   .form__group {
     margin-bottom: 1rem;
   }
 
-  /* Auth form password toggle button - Mobile friendly */
+  /* Ensure wrapper divs allow button visibility */
+  .form__group > div {
+    position: relative;
+    overflow: visible !important;
+  }
+
+  /* Password/checkbox buttons - Full interactivity */
+  .form__group button[type="button"] {
+    pointer-events: auto !important;
+    touch-action: manipulation;
+    z-index: 100 !important;
+  }
+
+  input[type="checkbox"] {
+    width: 20px !important;
+    height: 20px !important;
+    pointer-events: auto;
+    cursor: pointer;
+  }
+
+  /* Auth form password toggle button */
   .auth-page__container input[type="password"] + button,
   .auth-page__container input[type="text"] + button {
-    padding: 8px 12px !important;
-    min-width: 44px;
-    min-height: 44px;
+    padding: 10px !important;
+    width: 44px !important;
+    height: 44px !important;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1544,20 +1591,14 @@ input, textarea, select {
     transform: translateY(-50%) !important;
     right: 8px !important;
     pointer-events: auto !important;
+    touch-action: manipulation;
   }
 
   /* Auth form checkbox - Better touch target */
   .auth-page__container input[type="checkbox"] {
     width: 24px !important;
     height: 24px !important;
-    min-width: 24px !important;
-    min-height: 24px !important;
     cursor: pointer;
-  }
-
-  /* Form label for checkbox - Better spacing */
-  .auth-page__container .form__group label {
-    padding-left: 8px;
   }
 
   /* Tables */

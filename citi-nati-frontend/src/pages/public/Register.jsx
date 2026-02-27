@@ -200,7 +200,7 @@ const Register = () => {
               <label className="form__label" htmlFor="password">
                 Password
               </label>
-              <div style={{ position: 'relative' }}>
+              <div style={{ position: 'relative', overflow: 'visible' }}>
                 <input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
@@ -209,14 +209,20 @@ const Register = () => {
                   placeholder="Enter password"
                   value={formData.password}
                   onChange={handleChange}
+                  style={{ paddingRight: '50px' }}
                   required
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowPassword(!showPassword);
+                  }}
+                  onTouchStart={(e) => e.preventDefault()}
                   style={{
                     position: 'absolute',
-                    right: '12px',
+                    right: '8px',
                     top: '50%',
                     transform: 'translateY(-50%)',
                     background: 'none',
@@ -224,13 +230,15 @@ const Register = () => {
                     cursor: 'pointer',
                     color: '#666',
                     fontSize: '18px',
-                    padding: '8px 12px',
-                    minWidth: '44px',
-                    minHeight: '44px',
+                    padding: '10px',
+                    width: '44px',
+                    height: '44px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    zIndex: 10
+                    zIndex: 100,
+                    pointerEvents: 'auto',
+                    touchAction: 'manipulation'
                   }}
                   title={showPassword ? 'Hide password' : 'Show password'}
                 >
@@ -243,7 +251,7 @@ const Register = () => {
               <label className="form__label" htmlFor="confirmPassword">
                 Confirm Password
               </label>
-              <div style={{ position: 'relative' }}>
+              <div style={{ position: 'relative', overflow: 'visible' }}>
                 <input
                   id="confirmPassword"
                   type={showConfirmPassword ? 'text' : 'password'}
@@ -252,14 +260,20 @@ const Register = () => {
                   placeholder="Confirm password"
                   value={formData.confirmPassword}
                   onChange={handleChange}
+                  style={{ paddingRight: '50px' }}
                   required
                 />
                 <button
                   type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowConfirmPassword(!showConfirmPassword);
+                  }}
+                  onTouchStart={(e) => e.preventDefault()}
                   style={{
                     position: 'absolute',
-                    right: '12px',
+                    right: '8px',
                     top: '50%',
                     transform: 'translateY(-50%)',
                     background: 'none',
@@ -267,13 +281,15 @@ const Register = () => {
                     cursor: 'pointer',
                     color: '#666',
                     fontSize: '18px',
-                    padding: '8px 12px',
-                    minWidth: '44px',
-                    minHeight: '44px',
+                    padding: '10px',
+                    width: '44px',
+                    height: '44px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    zIndex: 10
+                    zIndex: 100,
+                    pointerEvents: 'auto',
+                    touchAction: 'manipulation'
                   }}
                   title={showConfirmPassword ? 'Hide password' : 'Show password'}
                 >
