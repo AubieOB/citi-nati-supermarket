@@ -7,16 +7,17 @@ const {
   getSalesDayHistory,
   exportSaleDayCSV
 } = require('../controllers/sales.controller');
-const { verifyTokenMiddleware, authorizeRoles } = require('../middleware/auth.middleware');
+const { verifyTokenMiddleware } = require('../middleware/auth.middleware');
+const { verifyAdmin } = require('../middleware/admin.middleware');
 
 const router = express.Router();
 
-// All routes require authentication and ADMIN role
+// All routes require authentication and ADMIN role via verifyAdmin middleware
 // POST /api/sales/start - Start a new sales day
 router.post(
   '/start',
   verifyTokenMiddleware,
-  authorizeRoles('admin'),
+  verifyAdmin,
   startSalesDay
 );
 
@@ -24,7 +25,7 @@ router.post(
 router.post(
   '/end',
   verifyTokenMiddleware,
-  authorizeRoles('admin'),
+  verifyAdmin,
   endSalesDay
 );
 
@@ -32,7 +33,7 @@ router.post(
 router.get(
   '/current',
   verifyTokenMiddleware,
-  authorizeRoles('admin'),
+  verifyAdmin,
   getCurrentSalesDay
 );
 
@@ -40,7 +41,7 @@ router.get(
 router.get(
   '/history',
   verifyTokenMiddleware,
-  authorizeRoles('admin'),
+  verifyAdmin,
   getSalesDayHistory
 );
 
@@ -48,7 +49,7 @@ router.get(
 router.get(
   '/:id',
   verifyTokenMiddleware,
-  authorizeRoles('admin'),
+  verifyAdmin,
   getSalesDayById
 );
 
@@ -56,7 +57,7 @@ router.get(
 router.get(
   '/:id/export',
   verifyTokenMiddleware,
-  authorizeRoles('admin'),
+  verifyAdmin,
   exportSaleDayCSV
 );
 

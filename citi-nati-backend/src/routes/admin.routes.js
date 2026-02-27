@@ -157,19 +157,51 @@ router.get('/orders', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
   try {
     const orders = await prisma.order.findMany({
       include: {
-        user: { select: { id: true, name: true, email: true } }
+        user: { select: { id: true, name: true, email: true } },
+        driver: { select: { id: true, name: true, email: true } },
+        items: { include: { product: true } }
       },
       orderBy: { createdAt: 'desc' }
     });
 
     res.json({
       success: true,
+      orders: orders,
       data: orders,
       total: orders.length
     });
   } catch (err) {
     console.error('Get orders error:', err);
     res.status(500).json({ error: 'Failed to fetch orders' });
+  }
+});
+
+/**
+ * GET /api/admin/orders/:orderId
+ * Get single order details
+ * Protected: Admin only
+ */
+router.get('/orders/:orderId', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    
+    const order = await prisma.order.findUnique({
+      where: { id: parseInt(orderId) },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        driver: { select: { id: true, name: true, email: true } },
+        items: { include: { product: true } }
+      }
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    res.json({ success: true, order });
+  } catch (err) {
+    console.error('Get order error:', err);
+    res.status(500).json({ error: 'Failed to fetch order' });
   }
 });
 
