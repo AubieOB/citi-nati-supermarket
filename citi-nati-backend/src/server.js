@@ -6,6 +6,7 @@ const { Server } = require('socket.io');
 const { PrismaClient } = require('@prisma/client');
 const authRoutes = require('./routes/auth.routes');
 const adminRoutes = require('./routes/admin.routes');
+const adminBootstrapRoutes = require('./routes/admin.bootstrap');
 const adminMessagesRoutes = require('./routes/admin-messages.routes');
 const productsRoutes = require('./routes/products.routes');
 const cartRoutes = require('./routes/cart.routes');
@@ -245,6 +246,9 @@ async function start() {
 
     // Admin routes
     app.use('/api/admin', adminRoutes);
+
+    // Admin Bootstrap routes (one-time admin creation for free tier)
+    app.use('/api/admin', adminBootstrapRoutes);
 
     // Admin Messages routes
     app.use('/api/admin/messages', adminMessagesRoutes);

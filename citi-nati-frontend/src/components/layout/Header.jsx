@@ -29,19 +29,23 @@ const Header = () => {
   // Close account popup when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      // Don't close if clicking the logout button
-      if (event.target.getAttribute?.('data-logout') === 'true' || event.target.closest('[data-logout="true"]')) {
-        return;
-      }
-
-      if (popupRef.current && !popupRef.current.contains(event.target)) {
+      // Check if click is inside the popup
+      const isInsidePopup = popupRef.current && popupRef.current.contains(event.target);
+      
+      // Only close if clicking outside the popup
+      if (!isInsidePopup) {
         setShowEmailPopup(false);
       }
     };
 
     if (showEmailPopup) {
-      document.addEventListener('click', handleClickOutside);
+      // Add small delay to ensure popup is rendered before listener activates
+      const timerId = setTimeout(() => {
+        document.addEventListener('click', handleClickOutside);
+      }, 0);
+      
       return () => {
+        clearTimeout(timerId);
         document.removeEventListener('click', handleClickOutside);
       };
     }
@@ -305,12 +309,7 @@ const Header = () => {
                   {/* Logout Button in Popup */}
                   <button
                     data-logout="true"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      e.stopImmediatePropagation();
-                      handleLogout();
-                    }}
+                    onClick={handleLogout}
                     style={{
                       width: '100%',
                       padding: '8px 12px',
