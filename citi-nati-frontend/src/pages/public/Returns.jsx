@@ -11,7 +11,7 @@ const Returns = () => {
           <p style={{ color: '#666' }}>Learn about our return and refund policy.</p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '3rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem', marginBottom: '3rem' }}>
           {/* Return Policy */}
           <div>
             <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem', color: '#333' }}>Return Policy</h2>

@@ -190,7 +190,7 @@ const AdminDrivers = () => {
                 name="name"
                 value={formData.name}
                 onChange={handleFormChange}
-                placeholder="John Doe"
+                placeholder="Aubrey Banda"
                 style={{
                   width: '100%',
                   padding: '0.75rem',
@@ -210,7 +210,7 @@ const AdminDrivers = () => {
                   name="email"
                   value={formData.email}
                   onChange={handleFormChange}
-                  placeholder="driver@example.com"
+                  placeholder="driver@email.com"
                   style={{
                     width: '100%',
                     padding: '0.75rem',
@@ -269,7 +269,7 @@ const AdminDrivers = () => {
                 name="phone"
                 value={formData.phone}
                 onChange={handleFormChange}
-                placeholder="+265999999999"
+                placeholder="+265991234567"
                 style={{
                   width: '100%',
                   padding: '0.75rem',

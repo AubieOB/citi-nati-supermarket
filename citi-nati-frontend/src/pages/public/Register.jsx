@@ -173,7 +173,7 @@ const Register = () => {
                 type="text"
                 name="name"
                 className="form__input"
-                placeholder="John Doe"
+                placeholder="Aubrey Banda"
                 value={formData.name}
                 onChange={handleChange}
                 required

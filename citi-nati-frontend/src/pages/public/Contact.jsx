@@ -95,19 +95,19 @@ const Contact = () => {
 
             <div style={{ marginBottom: '2rem' }}>
               <h3 style={{ color: '#333', marginBottom: '0.5rem' }}>Phone</h3>
-              <p style={{ color: '#666' }}>(555) 123-4567</p>
+              <p style={{ color: '#666' }}>(265) 888857188</p>
             </div>
 
             <div style={{ marginBottom: '2rem' }}>
               <h3 style={{ color: '#333', marginBottom: '0.5rem' }}>Address</h3>
-              <p style={{ color: '#666' }}>123 Market Street<br />City, State 12345<br />Malawi</p>
+              <p style={{ color: '#666' }}>Citi-Nati Supermarket<br />PO Box 32334 Chichiri, Blantyre 3<br />Malawi</p>
             </div>
 
             <div style={{ marginBottom: '2rem' }}>
               <h3 style={{ color: '#333', marginBottom: '0.5rem' }}>Business Hours</h3>
               <p style={{ color: '#666' }}>
-                Monday - Friday: 8:00 AM - 6:00 PM<br />
-                Saturday: 9:00 AM - 5:00 PM<br />
+                Monday - Friday: 7:00 AM - 9 PM<br />
+                Saturday: 9:00 AM - 6:00 PM<br />
                 Sunday: 10:00 AM - 4:00 PM
               </p>
             </div>

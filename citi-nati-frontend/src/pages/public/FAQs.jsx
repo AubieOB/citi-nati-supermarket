@@ -9,52 +9,52 @@ const FAQs = () => {
     {
       id: 1,
       question: 'How do I place an order?',
-      answer: 'Browse our products page, add items to your cart, and proceed to checkout. Sign in or create an account to complete your purchase.'
+      answer: 'Browsing is simple: go to our Products page, select your items and add them to your cart. Once done, proceed to checkout. You can either sign in to an existing account or create a new one to complete your purchase.'
     },
     {
       id: 2,
       question: 'What is the delivery time?',
-      answer: 'We deliver orders within 24 hours for most locations. Delivery times may vary based on your location and order size.'
+      answer: 'We deliver most orders within 24 hours. Exact delivery times depend on your location and the size of your order.'
     },
     {
       id: 3,
       question: 'Do you offer same-day delivery?',
-      answer: 'Yes! Orders placed before 12:00 PM can be delivered the same day in selected areas. Check your location at checkout.'
+      answer: 'Yes! Orders placed before 6:00 PM can be delivered the same day, subject to location and product availability.'
     },
     {
       id: 4,
       question: 'What payment methods do you accept?',
-      answer: 'We accept credit cards, debit cards, mobile money, and bank transfers. All payments are processed securely.'
+      answer: 'We accept credit cards, debit cards, mobile money (Airtel Money & TNM Mpamba), and bank transfers. All transactions are secure.'
     },
     {
       id: 5,
       question: 'Can I modify my order after placing it?',
-      answer: 'Orders can be modified within 1 hour of placement. Contact our customer service team immediately if you need to make changes.'
+      answer: 'Unfortunately, orders cannot be modified once placed. Please review all details carefully before confirming your purchase.'
     },
     {
       id: 6,
       question: 'What is your refund policy?',
-      answer: 'We offer full refunds for defective or damaged products. Refunds are processed within 3-5 business days of return approval.'
+      answer: 'We issue full refunds for defective or damaged items. Refunds are processed within 3–5 business days after approval and inspection.'
     },
     {
       id: 7,
       question: 'How can I track my order?',
-      answer: 'You can track your order in real-time through your account dashboard after placing an order.'
+      answer: 'Track your order in real-time through your account dashboard under "My Orders" after you place an order.'
     },
     {
       id: 8,
       question: 'Do you deliver to remote areas?',
-      answer: 'We deliver to most areas in the city. Check our delivery coverage map during checkout to confirm delivery to your location.'
+      answer: 'We deliver to most areas in the city. Check our delivery map during checkout to see if we serve your location.'
     },
     {
       id: 9,
       question: 'What should I do if my order arrives damaged?',
-      answer: 'Contact our customer service immediately with photos of the damaged items. We will arrange a replacement or refund.'
+      answer: 'Contact us immediately with photos of the damaged items. We will arrange a replacement or refund right away.'
     },
     {
       id: 10,
       question: 'Is there a minimum order value?',
-      answer: 'Minimum order value is MWK 500. This helps us ensure efficient delivery and service quality.'
+      answer: 'Yes, the minimum order is MWK 10,000. This ensures we can deliver efficiently while maintaining quality service.'
     }
   ];
 
@@ -70,7 +70,7 @@ const FAQs = () => {
           <p style={{ color: '#666' }}>Find answers to common questions about our services.</p>
         </div>
 
-        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+        <div style={{ maxWidth: '800px', margin: '0 auto', fontSize: 'clamp(0.9rem, 2vw, 1rem)' }}>
           {faqs.map((faq) => (
             <div
               key={faq.id}
