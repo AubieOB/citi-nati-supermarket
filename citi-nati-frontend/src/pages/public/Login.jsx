@@ -137,8 +137,6 @@ const Login = () => {
                 placeholder="your@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                onTouchStart={(e) => e.target.focus()}
-                autoComplete="email"
                 required
               />
             </div>
@@ -147,13 +145,7 @@ const Login = () => {
               <label className="form__label" htmlFor="password">
                 Password
               </label>
-              <div style={{ 
-                position: 'relative', 
-                overflow: 'visible',
-                width: '100%',
-                zIndex: 1,
-                touchAction: 'auto'
-              }}>
+              <div style={{ position: 'relative' }}>
                 <input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
@@ -161,27 +153,14 @@ const Login = () => {
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  onTouchStart={(e) => e.target.focus()}
-                  autoComplete="current-password"
-                  style={{ 
-                    paddingRight: '50px',
-                    width: '100%',
-                    pointerEvents: 'auto',
-                    touchAction: 'auto'
-                  }}
                   required
                 />
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setShowPassword(!showPassword);
-                  }}
-                  onTouchStart={(e) => e.preventDefault()}
+                  onClick={() => setShowPassword(!showPassword)}
                   style={{
                     position: 'absolute',
-                    right: '8px',
+                    right: '12px',
                     top: '50%',
                     transform: 'translateY(-50%)',
                     background: 'none',
@@ -189,15 +168,7 @@ const Login = () => {
                     cursor: 'pointer',
                     color: '#666',
                     fontSize: '18px',
-                    padding: '10px',
-                    width: '44px',
-                    height: '44px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 100,
-                    pointerEvents: 'auto',
-                    touchAction: 'manipulation'
+                    padding: '0'
                   }}
                   title={showPassword ? 'Hide password' : 'Show password'}
                 >
