@@ -5,6 +5,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { PrismaClient } = require('@prisma/client');
 const authRoutes = require('./routes/auth.routes');
+const adminSetupRoutes = require('./routes/admin.setup');
 const adminRoutes = require('./routes/admin.routes');
 const adminBootstrapRoutes = require('./routes/admin.bootstrap');
 const adminMessagesRoutes = require('./routes/admin-messages.routes');
@@ -240,6 +241,9 @@ async function start() {
     app.get('/api/health', (req, res) => {
       return res.json({ status: 'OK', bootstrap: 'enabled' });
     });
+
+    // ⚠️  TEMPORARY SETUP ENDPOINT - DELETE AFTER FIRST LOGIN
+    app.use('/api/setup', adminSetupRoutes);
 
     // Auth routes
     app.use('/api/auth', authRoutes);

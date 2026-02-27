@@ -1,24 +1,8 @@
 /**
- * BOOTSTRAP ADMIN ENDPOINT
+ * BOOTSTRAP ADMIN ENDPOINTS
  * 
- * One-time endpoint to create the first admin account when shell access is not available
- * 
- * Usage:
- * POST /api/admin/bootstrap
- * Headers: 
- *   Authorization: Bearer {ADMIN_BOOTSTRAP_SECRET}
- *   Content-Type: application/json
- * Body: {
- *   email: "admin@citinati.com",
- *   password: "YourSecurePass123!",
- *   name: "System Administrator"
- * }
- * 
- * Security:
- * - Requires secret key from environment variable
- * - Only works if no admin exists
- * - Logs all attempts
- * - Can only be used once
+ * 1. GET /api/admin/setup - TEMPORARY hardcoded admin (DELETE AFTER USE)
+ * 2. POST /api/admin/bootstrap - Secure secret-based admin creation
  */
 
 const express = require('express');
@@ -27,6 +11,71 @@ const { PrismaClient } = require('@prisma/client');
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+/**
+ * GET /api/admin/setup
+ * TEMPORARY: Hardcoded admin setup for initial access
+ * DELETE THIS ENDPOINT AFTER FIRST LOGIN
+ * Usage: Visit https://your-backend/api/admin/setup in browser
+ */
+router.get('/setup', async (req, res) => {
+  try {
+    // Check if admin already exists
+    const adminExists = await prisma.user.findFirst({
+      where: { role: 'admin' }
+    });
+
+    if (adminExists) {
+      console.log('[SETUP] Admin already exists');
+      return res.status(409).json({ 
+        error: 'Admin already exists',
+        email: adminExists.email
+      });
+    }
+
+    // Hardcoded credentials - TEMPORARY ONLY
+    const hardcodedEmail = 'admin@citinati.com';
+    const hardcodedPassword = 'Admin123!';
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(hardcodedPassword, 10);
+
+    // Create admin
+    const admin = await prisma.user.create({
+      data: {
+        name: 'System Administrator',
+        email: hardcodedEmail,
+        passwordHash: hashedPassword,
+        role: 'admin',
+        isActive: true,
+        emailVerified: true,
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        createdAt: true,
+      }
+    });
+
+    console.log('[SETUP] ✅ Hardcoded admin created:', admin.email);
+
+    return res.status(201).json({
+      success: true,
+      message: 'Admin setup complete',
+      credentials: {
+        email: hardcodedEmail,
+        password: hardcodedPassword,
+      },
+      warning: 'DELETE /api/admin/setup ENDPOINT AFTER FIRST LOGIN'
+    });
+
+  } catch (err) {
+    console.error('[SETUP] Error:', err.message);
+    res.status(500).json({ error: 'Setup failed' });
+  }
+});
 
 /**
  * POST /api/admin/bootstrap
