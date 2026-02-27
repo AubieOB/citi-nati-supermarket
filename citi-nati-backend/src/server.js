@@ -238,7 +238,7 @@ async function start() {
 
     // Health route
     app.get('/api/health', (req, res) => {
-      return res.json({ status: 'OK' });
+      return res.json({ status: 'OK', bootstrap: 'enabled' });
     });
 
     // Auth routes
