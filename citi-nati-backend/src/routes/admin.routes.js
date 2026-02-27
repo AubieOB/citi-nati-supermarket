@@ -10,7 +10,7 @@
  */
 
 const express = require('express');
-const { verifyToken } = require('../middleware/auth.middleware');
+const { verifyTokenMiddleware } = require('../middleware/auth.middleware');
 const { verifyAdmin } = require('../middleware/admin.middleware');
 const { PrismaClient } = require('@prisma/client');
 
@@ -22,7 +22,7 @@ const prisma = new PrismaClient();
  * Simple test endpoint to verify admin access
  * Returns success if user is authenticated admin
  */
-router.get('/test', verifyToken, verifyAdmin, (req, res) => {
+router.get('/test', verifyTokenMiddleware, verifyAdmin, (req, res) => {
   return res.json({ 
     success: true,
     message: 'Admin access granted',
@@ -39,7 +39,7 @@ router.get('/test', verifyToken, verifyAdmin, (req, res) => {
  * Admin dashboard statistics
  * Protected: Admin only
  */
-router.get('/dashboard', verifyToken, verifyAdmin, async (req, res) => {
+router.get('/dashboard', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
   try {
     const totalUsers = await prisma.user.count();
     const totalOrders = await prisma.order.count();
@@ -62,7 +62,7 @@ router.get('/dashboard', verifyToken, verifyAdmin, async (req, res) => {
  * Get all users in the system
  * Protected: Admin only
  */
-router.get('/users', verifyToken, verifyAdmin, async (req, res) => {
+router.get('/users', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
   try {
     const users = await prisma.user.findMany({
       select: {
@@ -93,7 +93,7 @@ router.get('/users', verifyToken, verifyAdmin, async (req, res) => {
  * Get all orders in the system
  * Protected: Admin only
  */
-router.get('/orders', verifyToken, verifyAdmin, async (req, res) => {
+router.get('/orders', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
   try {
     const orders = await prisma.order.findMany({
       include: {
