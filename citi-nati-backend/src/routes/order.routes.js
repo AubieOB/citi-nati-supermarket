@@ -1,5 +1,5 @@
 const express = require('express');
-const { createOrder, updateOrderStatus, assignDriverToOrder, getUserOrders, getOrderById, getOrderByReference, getReceipt } = require('../controllers/order.controller');
+const { createOrder, updateOrderStatus, assignDriverToOrder, getUserOrders, getOrderById, getOrderByReference, checkPaymentStatus, getReceipt } = require('../controllers/order.controller');
 const { verifyTokenMiddleware } = require('../middleware/auth.middleware');
 const { verifyAdmin } = require('../middleware/admin.middleware');
 
@@ -7,6 +7,9 @@ const router = express.Router();
 
 // GET /api/orders - Get current user's orders (requires authentication)
 router.get('/', verifyTokenMiddleware, getUserOrders);
+
+// GET /api/orders/payment-check/:reference - Quick payment status check for polling (lightweight)
+router.get('/payment-check/:reference', verifyTokenMiddleware, checkPaymentStatus);
 
 // GET /api/orders/by-reference/:reference - Get order by payment reference (authenticated users)
 router.get('/by-reference/:reference', verifyTokenMiddleware, getOrderByReference);

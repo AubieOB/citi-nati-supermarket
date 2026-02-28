@@ -50,8 +50,8 @@ const PaymentSuccess = () => {
         
         setMessage('Verifying payment with server...');
 
-        // Call backend to fetch order by reference
-        const response = await api.get(`/orders/by-reference/${reference}`);
+        // Call backend to check payment status (lightweight endpoint)
+        const response = await api.get(`/orders/payment-check/${reference}`);
         
         if (response.data.order) {
           const order = response.data.order;
@@ -61,15 +61,32 @@ const PaymentSuccess = () => {
             setStatus('success');
             setMessage('✓ Payment confirmed! Redirecting to order tracking...');
             
-            // Redirect after brief delay
-            setTimeout(() => {
-              navigate('/my-orders', {
-                state: {
-                  orderId: order.id,
-                  message: 'Payment successful! Your order has been confirmed.',
-                }
-              });
-            }, 2000);
+            // Fetch full order details before redirecting
+            try {
+              const fullOrderResponse = await api.get(`/orders/by-reference/${reference}`);
+              const fullOrder = fullOrderResponse.data.order;
+              
+              // Redirect after brief delay
+              setTimeout(() => {
+                navigate('/my-orders', {
+                  state: {
+                    orderId: fullOrder.id,
+                    message: 'Payment successful! Your order has been confirmed.',
+                  }
+                });
+              }, 1500);
+            } catch (err) {
+              console.warn('Could not fetch full order details:', err);
+              // Still redirect even if full details fail
+              setTimeout(() => {
+                navigate('/my-orders', {
+                  state: {
+                    orderId: order.id,
+                    message: 'Payment successful! Your order has been confirmed.',
+                  }
+                });
+              }, 1500);
+            }
           } else if (order.paymentStatus === 'PENDING') {
             // Payment still processing, retry
             if (currentAttempt < MAX_POLL_ATTEMPTS) {

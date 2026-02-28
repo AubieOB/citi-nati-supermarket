@@ -231,38 +231,42 @@ const handleWebhook = async (req, res) => {
     const itemCount = updatedOrder.items?.length || 0;
     await notifyOrderPlaced(updatedOrder, itemCount);
 
-    // Send emails to customer
-    try {
-      // Send order confirmation email
-      await sendOrderConfirmationEmail(
-        updatedOrder.user.email,
-        updatedOrder.user.name,
-        updatedOrder,
-        updatedOrder.items.map(item => item.product)
-      );
+    // Return 200 immediately to Paychangu - don't wait for emails
+    res.sendStatus(200);
 
-      // Send payment confirmation email
-      await sendPaymentConfirmationEmail(
-        updatedOrder.user.email,
-        updatedOrder.user.name,
-        {
-          orderId: updatedOrder.id,
-          amount: updatedOrder.total,
-          currency: 'MWK',
-          method: 'Paychangu',
-          date: new Date(),
-          reference: reference,
-          status: 'COMPLETED',
-        }
-      );
+    // Send emails asynchronously in background (don't block the response)
+    // Wrap in setImmediate to prevent blocking
+    setImmediate(async () => {
+      try {
+        // Send order confirmation email
+        await sendOrderConfirmationEmail(
+          updatedOrder.user.email,
+          updatedOrder.user.name,
+          updatedOrder,
+          updatedOrder.items.map(item => item.product)
+        );
 
-      console.log(`[Email] ✅ Order and payment confirmation emails sent to ${updatedOrder.user.email}`);
-    } catch (emailErr) {
-      console.error(`[Email] ❌ Failed to send emails for order ${order.id}:`, emailErr.message);
-      // Don't fail the webhook if emails fail - order is already paid
-    }
+        // Send payment confirmation email
+        await sendPaymentConfirmationEmail(
+          updatedOrder.user.email,
+          updatedOrder.user.name,
+          {
+            orderId: updatedOrder.id,
+            amount: updatedOrder.total,
+            currency: 'MWK',
+            method: 'Paychangu',
+            date: new Date(),
+            reference: reference,
+            status: 'COMPLETED',
+          }
+        );
 
-    return res.sendStatus(200);
+        console.log(`[Email] ✅ Background: Order and payment confirmation emails sent to ${updatedOrder.user.email}`);
+      } catch (emailErr) {
+        console.error(`[Email] ❌ Background: Failed to send emails for order ${order.id}:`, emailErr.message);
+        // Non-blocking - errors here don't matter as order is already confirmed
+      }
+    });
 
   } catch (err) {
     console.error('Error handling webhook:', err);

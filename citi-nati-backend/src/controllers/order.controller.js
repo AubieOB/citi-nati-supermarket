@@ -613,6 +613,66 @@ const getOrderByReference = async (req, res) => {
 };
 
 /**
+ * Quick payment status check for polling
+ * Lightweight endpoint - only returns payment status, no full includes
+ * Used during payment confirmation polling to reduce response time
+ */
+const checkPaymentStatus = async (req, res) => {
+  try {
+    const { reference } = req.params;
+    const userId = req.user.userId;
+    const startTime = Date.now();
+
+    if (!reference) {
+      return res.status(400).json({
+        error: 'Payment reference is required',
+      });
+    }
+
+    // Lightweight query - only get essential fields
+    const order = await prisma.order.findFirst({
+      where: { paymentReference: reference },
+      select: {
+        id: true,
+        userId: true,
+        paymentStatus: true,
+        status: true,
+        total: true,
+        createdAt: true,
+      },
+    });
+
+    const queryTime = Date.now() - startTime;
+    console.log(`[PAYMENT CHECK] Reference: ${reference}, Query time: ${queryTime}ms, Status: ${order?.paymentStatus || 'NOT_FOUND'}`);
+
+    if (!order) {
+      return res.status(404).json({
+        error: 'Order not found',
+      });
+    }
+
+    // Verify the order belongs to the authenticated user
+    if (order.userId !== userId) {
+      return res.status(403).json({
+        error: 'Access denied',
+      });
+    }
+
+    return res.status(200).json({
+      order: {
+        id: order.id,
+        paymentStatus: order.paymentStatus,
+        status: order.status,
+      },
+      responseTime: queryTime,
+    });
+  } catch (err) {
+    console.error('[PAYMENT CHECK ERROR]:', err);
+    return res.status(500).json({ error: 'Failed to check payment status' });
+  }
+};
+
+/**
  * Get receipt for an order
  * Used for receipt download after order delivery
  */
@@ -944,4 +1004,4 @@ const getReceipt = async (req, res) => {
   }
 };
 
-module.exports = { createOrder, updateOrderStatus, assignDriverToOrder, getUserOrders, getAllOrders, getOrderById, getOrderByReference, getReceipt };
+module.exports = { createOrder, updateOrderStatus, assignDriverToOrder, getUserOrders, getAllOrders, getOrderById, getOrderByReference, checkPaymentStatus, getReceipt };
