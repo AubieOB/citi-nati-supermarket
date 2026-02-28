@@ -14,7 +14,7 @@ router.post(
   '/',
   verifyTokenMiddleware,
   verifyAdmin,
-  uploadProductImage.single('image'),
+  uploadProductImage,
   createProduct
 );
 
@@ -26,7 +26,7 @@ router.put(
   '/:id',
   verifyTokenMiddleware,
   verifyAdmin,
-  uploadProductImage.single('image'),
+  uploadProductImage,
   updateProduct
 );
 
