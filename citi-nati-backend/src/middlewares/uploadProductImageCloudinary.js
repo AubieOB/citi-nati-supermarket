@@ -22,10 +22,13 @@ if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !pr
 // Configure Cloudinary storage for multer
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
-  params: {
-    folder: 'citi-nati-products', // Create products folder in Cloudinary
-    resource_type: 'auto',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+  params: async (req, file, cb) => {
+    cb(null, {
+      folder: 'citi-nati-products',
+      resource_type: 'auto',
+      allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+      format: 'auto', // Auto-detect format or convert to webp
+    });
   },
 });
 
@@ -51,7 +54,7 @@ const uploadProductImage = multer({
   },
 });
 
-// Wrap multer to add logging
+// Wrap multer to add logging and normalize response
 const uploadWithLogging = (req, res, next) => {
   console.log('[CLOUDINARY MIDDLEWARE] Starting file upload processing...');
   uploadProductImage.single('image')(req, res, (err) => {
@@ -61,12 +64,19 @@ const uploadWithLogging = (req, res, next) => {
     }
     
     if (req.file) {
+      console.log('[CLOUDINARY UPLOAD] 📧 Raw req.file object:', req.file);
+      
+      // Normalize multer-storage-cloudinary response to standard format
+      // multer-storage-cloudinary returns: path, filename, size, mimetype, encoding
+      req.file.secure_url = req.file.path;      // Cloudinary URL
+      req.file.public_id = req.file.filename;   // Cloudinary public ID
+      
       console.log('[CLOUDINARY UPLOAD] ✅ File uploaded successfully:', {
         originalname: req.file.originalname,
         secure_url: req.file.secure_url,
         public_id: req.file.public_id,
         size: req.file.size,
-        format: req.file.format
+        mimetype: req.file.mimetype
       });
     } else {
       console.log('[CLOUDINARY UPLOAD] ℹ️ No file provided (optional upload)');
