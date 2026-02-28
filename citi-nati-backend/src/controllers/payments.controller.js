@@ -82,7 +82,7 @@ const initializePayment = async (req, res) => {
           phone_number: order.phone,
           first_name: user.name.split(' ')[0],
           last_name: user.name.split(' ')[1] || '',
-          reference: paymentReference,
+          tx_ref: paymentReference,  // Use tx_ref (not reference) - Paychangu will echo this back in webhook
           callback_url: `${process.env.FRONTEND_URL || process.env.RENDER_EXTERNAL_URL_FRONTEND || 'http://localhost:3001'}/payment-success?reference=${paymentReference}`,
           description: `Order #${order.id} - Citi-Nati Supermarket`
         },
