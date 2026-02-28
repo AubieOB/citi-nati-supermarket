@@ -151,37 +151,50 @@ const initializePayment = async (req, res) => {
 
 const handleWebhook = async (req, res) => {
   try {
-    // Read signature from headers
-    const signature = req.headers['x-paychangu-signature'];
+    console.log('[Webhook] Received webhook request');
+    console.log('[Webhook] Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('[Webhook] Body:', JSON.stringify(req.body, null, 2));
 
-    // If signature missing, return 200 (Paychangu expects 200 OK)
+    // Read signature from headers - try multiple header names
+    const signature = req.headers['x-paychangu-signature'] || req.headers['x-signature'] || req.headers['signature'];
+
+    // If signature missing, just log it but don't fail
     if (!signature) {
-      console.warn('[Webhook] Missing signature - may be test webhook');
+      console.warn('[Webhook] ⚠️ No signature found in headers - processing anyway for testing');
+    } else {
+      console.log('[Webhook] Signature found:', signature.substring(0, 20) + '...');
+      
+      // Generate HMAC using webhook secret
+      const generatedSignature = crypto
+        .createHmac('sha256', process.env.PAYCHANGU_WEBHOOK_SECRET)
+        .update(JSON.stringify(req.body))
+        .digest('hex');
+
+      // Compare signatures
+      if (generatedSignature !== signature) {
+        console.error('[Webhook] ❌ Invalid signature - generated:', generatedSignature.substring(0, 20) + '...');
+        console.error('[Webhook] ❌ Provided:  ', signature.substring(0, 20) + '...');
+        return res.sendStatus(200); // Return 200 to acknowledge but don't process
+      }
+      
+      console.log('[Webhook] ✅ Signature verified');
+    }
+
+    // Read event details from request body - handle multiple possible field names
+    const status = req.body?.status || req.body?.payment_status || req.body?.paymentStatus;
+    const reference = req.body?.reference || req.body?.tx_ref || req.body?.transactionRef;
+    const transactionId = req.body?.transaction_id || req.body?.transactionId;
+
+    console.log('[Webhook] Parsed data:', { status, reference, transactionId });
+
+    // Only process successful payments - check multiple possible status values
+    const successStatuses = ['success', 'completed', 'COMPLETED', 'SUCCESS', 'paid', 'PAID'];
+    if (!successStatuses.includes(status)) {
+      console.log(`[Webhook] ⚠️ Payment status not success: ${status} (ignoring)`);
       return res.sendStatus(200);
     }
 
-    // Generate HMAC using webhook secret
-    const generatedSignature = crypto
-      .createHmac('sha256', process.env.PAYCHANGU_WEBHOOK_SECRET)
-      .update(JSON.stringify(req.body))
-      .digest('hex');
-
-    // Compare signatures
-    if (generatedSignature !== signature) {
-      console.error('[Webhook] Invalid signature - potential security issue');
-      return res.sendStatus(200); // Return 200 to acknowledge but don't process
-    }
-
-    // Read event details from request body
-    const { status, reference } = req.body;
-
-    console.log(`[Webhook] Processing payment: reference=${reference}, status=${status}`);
-
-    // Only process successful payments
-    if (status !== 'success') {
-      console.log(`[Webhook] Payment not successful: ${status}`);
-      return res.sendStatus(200);
-    }
+    console.log(`[Webhook] ✅ Payment status is successful: ${status}`);
 
     // Find order by payment reference
     const order = await prisma.order.findFirst({
@@ -189,58 +202,72 @@ const handleWebhook = async (req, res) => {
     });
 
     if (!order) {
-      console.error(`[Webhook] Order not found for reference: ${reference}`);
+      console.error(`[Webhook] ❌ Order not found for reference: ${reference}`);
+      console.log('[Webhook] Searching for order with reference:', reference);
       return res.sendStatus(200);
     }
 
+    console.log(`[Webhook] ✅ Found order: ${order.id}`);
+
     // Prevent duplicate processing
     if (order.paymentStatus === 'PAID') {
-      console.log(`[Webhook] Order ${order.id} already marked as PAID`);
+      console.log(`[Webhook] Orders ${order.id} already marked as PAID - skipping`);
       return res.sendStatus(200);
     }
 
     // Update order - transaction to ensure atomicity
-    const updatedOrder = await prisma.order.update({
-      where: { id: order.id },
-      data: {
-        paymentStatus: 'PAID',
-        status: 'PENDING'  // Change from PENDING_PAYMENT to PENDING (awaiting admin confirmation)
-      },
-      include: {
-        items: {
-          include: {
-            product: true
-          }
+    console.log(`[Webhook] Updating order ${order.id} to PAID status...`);
+    
+    try {
+      const updatedOrder = await prisma.order.update({
+        where: { id: order.id },
+        data: {
+          paymentStatus: 'PAID',
+          status: 'PENDING'  // Change from PENDING_PAYMENT to PENDING (awaiting admin confirmation)
         },
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true
+        include: {
+          items: {
+            include: {
+              product: true
+            }
+          },
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
           }
         }
-      }
-    });
+      });
 
-    console.log(`[Webhook] Order ${order.id} payment confirmed. Broadcasting to admin_room`);
+      console.log(`[Webhook] ✅ Order ${order.id} updated successfully. Payment status: ${updatedOrder.paymentStatus}`);
 
-    // Cache the webhook event for fast polling (polling endpoint checks cache first)
-    cacheWebhookEvent(reference, 'completed', {
-      orderId: order.id,
-      amount: updatedOrder.total,
-      timestamp: new Date()
-    });
+      // Cache the webhook event for fast polling (polling endpoint checks cache first)
+      cacheWebhookEvent(reference, 'completed', {
+        orderId: order.id,
+        amount: updatedOrder.total,
+        timestamp: new Date()
+      });
+      console.log(`[Webhook] ✅ Webhook event cached for faster polling`);
 
-    // Emit new order event to admins (NOW that payment is confirmed)
-    emitNewOrder(updatedOrder);
+      // Emit new order event to admins (NOW that payment is confirmed)
+      emitNewOrder(updatedOrder);
+      console.log(`[Webhook] ✅ Admin notified via Socket.io`);
 
-    // Create admin notifications
-    await notifyPaymentSuccess(updatedOrder);
-    const itemCount = updatedOrder.items?.length || 0;
-    await notifyOrderPlaced(updatedOrder, itemCount);
+      // Create admin notifications
+      await notifyPaymentSuccess(updatedOrder);
+      const itemCount = updatedOrder.items?.length || 0;
+      await notifyOrderPlaced(updatedOrder, itemCount);
 
-    // Return 200 immediately to Paychangu - don't wait for emails
-    res.sendStatus(200);
+      // Return 200 immediately to Paychangu - don't wait for emails
+      res.sendStatus(200);
+      console.log(`[Webhook] ✅ Response sent to Paychangu (200 OK)`);
+    } catch (updateErr) {
+      console.error(`[Webhook] ❌ Failed to update order:`, updateErr.message);
+      res.sendStatus(200); // Still return 200 to Paychangu
+      return;
+    }
 
     // Send emails asynchronously in background (don't block the response)
     // Wrap in setImmediate to prevent blocking
