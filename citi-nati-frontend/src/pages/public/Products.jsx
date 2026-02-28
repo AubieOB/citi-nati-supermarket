@@ -360,23 +360,27 @@ const Products = () => {
             </button>
           )}
         </div>
+      </Container>
 
-        {/* PRODUCTS GRID */}
+      {/* PRODUCTS GRID - FULL WIDTH SECTION */}
+      <div className="products-grid-wrapper">
         {filteredProducts.length === 0 ? (
-          <div style={{
-            textAlign: 'center',
-            padding: '2rem',
-            backgroundColor: '#f8f9fa',
-            borderRadius: '8px'
-          }}>
-            <i className="fas fa-inbox" style={{ fontSize: '3rem', color: '#ccc', marginBottom: '1rem' }}></i>
-            <p style={{ color: '#666', fontSize: '1.1rem' }}>
-              {searchInput || selectedCategory || onSaleOnly 
-                ? 'No products match your filters. Try adjusting your search.'
-                : 'No products available at the moment.'
-              }
-            </p>
-          </div>
+          <Container>
+            <div style={{
+              textAlign: 'center',
+              padding: '2rem',
+              backgroundColor: '#f8f9fa',
+              borderRadius: '8px'
+            }}>
+              <i className="fas fa-inbox" style={{ fontSize: '3rem', color: '#ccc', marginBottom: '1rem' }}></i>
+              <p style={{ color: '#666', fontSize: '1.1rem' }}>
+                {searchInput || selectedCategory || onSaleOnly 
+                  ? 'No products match your filters. Try adjusting your search.'
+                  : 'No products available at the moment.'
+                }
+              </p>
+            </div>
+          </Container>
         ) : (
           <div className="products-grid">
             {filteredProducts.map((product) => {
@@ -497,7 +501,7 @@ const Products = () => {
             })}
           </div>
         )}
-      </Container>
+      </div>
       <Modal
         isOpen={modal.isOpen}
         title={modal.title}
