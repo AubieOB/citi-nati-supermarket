@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const axios = require('axios');
 const { emitNewOrder, emitOrderAssigned, emitOrderStatusUpdated, emitOrderUpdated, emitOrderUpdatedToAdminAndCustomer } = require('../utils/socket');
 const { notifyDriverAssigned, notifyOrderCompleted } = require('../utils/messageService');
 const { sendDriverAssignedEmail, sendDeliveryStatusEmail } = require('../utils/emailService');
@@ -614,7 +615,7 @@ const getOrderByReference = async (req, res) => {
 
 /**
  * Quick payment status check for polling
- * Lightweight endpoint - only returns payment status, no full includes
+ * Lightweight endpoint - verifies payment with Paychangu API if needed
  * Used during payment confirmation polling to reduce response time
  */
 const checkPaymentStatus = async (req, res) => {
@@ -630,7 +631,7 @@ const checkPaymentStatus = async (req, res) => {
     }
 
     // Lightweight query - only get essential fields
-    const order = await prisma.order.findFirst({
+    let order = await prisma.order.findFirst({
       where: { paymentReference: reference },
       select: {
         id: true,
@@ -642,10 +643,10 @@ const checkPaymentStatus = async (req, res) => {
       },
     });
 
-    const queryTime = Date.now() - startTime;
-    console.log(`[PAYMENT CHECK] Reference: ${reference}, Query time: ${queryTime}ms, Status: ${order?.paymentStatus || 'NOT_FOUND'}`);
+    const dbQueryTime = Date.now() - startTime;
 
     if (!order) {
+      console.log(`[PAYMENT CHECK] Reference not found: ${reference}`);
       return res.status(404).json({
         error: 'Order not found',
       });
@@ -658,13 +659,80 @@ const checkPaymentStatus = async (req, res) => {
       });
     }
 
+    // If payment still pending, query Paychangu directly to check actual status
+    if (order.paymentStatus === 'PENDING') {
+      try {
+        const verifyStartTime = Date.now();
+        
+        console.log(`[PAYMENT CHECK] Payment pending, verifying with Paychangu: ${reference}`);
+        
+        // Query Paychangu API to verify payment status
+        const paychanguResponse = await axios.get(
+          `https://api.paychangu.com/get_transaction?reference=${reference}`,
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.PAYCHANGU_SECRET_KEY}`,
+            }
+          }
+        );
+
+        const paychanguStatus = paychanguResponse.data?.status || paychanguResponse.data?.data?.status;
+        const verifyTime = Date.now() - verifyStartTime;
+
+        console.log(`[PAYMENT CHECK] Paychangu verification took ${verifyTime}ms, status: ${paychanguStatus}`);
+
+        // If Paychangu says payment is successful, update database immediately
+        if (paychanguStatus === 'completed' || paychanguStatus === 'success' || paychanguStatus === 'COMPLETED') {
+          console.log(`[PAYMENT CHECK] Payment confirmed via Paychangu API for ${reference}, updating database`);
+          
+          // Update order payment status
+          order = await prisma.order.update({
+            where: { id: order.id },
+            data: {
+              paymentStatus: 'PAID',
+              status: 'PENDING'
+            },
+            select: {
+              id: true,
+              userId: true,
+              paymentStatus: true,
+              status: true,
+              total: true,
+            }
+          });
+
+          // Emit notification for admin
+          try {
+            const { emitNewOrder } = require('../utils/socket');
+            const fullOrder = await prisma.order.findUnique({
+              where: { id: order.id },
+              include: {
+                items: { include: { product: true } },
+                user: { select: { id: true, name: true, email: true } }
+              }
+            });
+            emitNewOrder(fullOrder);
+          } catch (socketErr) {
+            console.warn('[PAYMENT CHECK] Could not emit socket event:', socketErr.message);
+          }
+        }
+      } catch (paychanguErr) {
+        // Log but don't fail - Paychangu might be temporarily unreachable
+        console.warn(`[PAYMENT CHECK] Paychangu verification failed: ${paychanguErr.message}`);
+        // Continue with database status
+      }
+    }
+
+    const totalTime = Date.now() - startTime;
+    console.log(`[PAYMENT CHECK] Reference: ${reference}, DB: ${dbQueryTime}ms, Total: ${totalTime}ms, Status: ${order.paymentStatus}`);
+
     return res.status(200).json({
       order: {
         id: order.id,
         paymentStatus: order.paymentStatus,
         status: order.status,
       },
-      responseTime: queryTime,
+      responseTime: totalTime,
     });
   } catch (err) {
     console.error('[PAYMENT CHECK ERROR]:', err);
