@@ -309,7 +309,6 @@ const handleWebhook = async (req, res) => {
       res.sendStatus(200); // Still return 200 to Paychangu
       return;
     }
-    });
 
   } catch (err) {
     console.error('Error handling webhook:', err);
