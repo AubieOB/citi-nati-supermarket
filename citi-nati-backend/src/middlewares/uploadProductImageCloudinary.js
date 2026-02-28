@@ -22,12 +22,10 @@ if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !pr
 // Configure Cloudinary storage for multer
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
-  params: (req, file, cb) => {
-    cb(null, {
-      folder: 'citi-nati-products',
-      resource_type: 'auto',
-      allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
-    });
+  params: {
+    folder: 'citi-nati-products',
+    resource_type: 'auto',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
   },
 });
 
