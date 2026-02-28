@@ -4,6 +4,8 @@ const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
 const { PrismaClient } = require('@prisma/client');
+const fs = require('fs');
+const path = require('path');
 const authRoutes = require('./routes/auth.routes');
 const adminSetupRoutes = require('./routes/admin.setup');
 const adminRoutes = require('./routes/admin.routes');
@@ -22,6 +24,20 @@ const prisma = new PrismaClient();
 
 async function start() {
   try {
+    // Ensure upload directories exist
+    const uploadDirs = [
+      path.join(__dirname, '..', 'uploads'),
+      path.join(__dirname, '..', 'uploads', 'products'),
+      path.join(__dirname, '..', 'uploads', 'tickets')
+    ];
+
+    uploadDirs.forEach(dir => {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+        console.log('[STARTUP] Created upload directory:', dir);
+      }
+    });
+
     // Log DATABASE_URL for verification
     console.log('DATABASE_URL:', process.env.DATABASE_URL ? `Connected to: ${process.env.DATABASE_URL.split('@')[1] || 'local'}` : 'NOT SET');
     
