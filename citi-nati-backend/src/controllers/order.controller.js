@@ -3,6 +3,7 @@ const axios = require('axios');
 const { emitNewOrder, emitOrderAssigned, emitOrderStatusUpdated, emitOrderUpdated, emitOrderUpdatedToAdminAndCustomer } = require('../utils/socket');
 const { notifyDriverAssigned, notifyOrderCompleted } = require('../utils/messageService');
 const { sendDriverAssignedEmail, sendDeliveryStatusEmail } = require('../utils/emailService');
+const { isPaymentConfirmedInCache } = require('../utils/webhookCache');
 
 const prisma = new PrismaClient();
 
@@ -659,67 +660,47 @@ const checkPaymentStatus = async (req, res) => {
       });
     }
 
-    // If payment still pending, query Paychangu directly to check actual status
+    // If payment still pending, check webhook cache for recent confirmation
     if (order.paymentStatus === 'PENDING') {
-      try {
-        const verifyStartTime = Date.now();
+      // Check if webhook was recently received and cached
+      const cachedStatus = isPaymentConfirmedInCache(reference);
+      
+      if (cachedStatus === 'completed') {
+        console.log(`[PAYMENT CHECK] ✅ Webhook found in cache for ${reference}, updating database immediately`);
         
-        console.log(`[PAYMENT CHECK] Payment pending, verifying with Paychangu: ${reference}`);
-        
-        // Query Paychangu API to verify payment status
-        const paychanguResponse = await axios.get(
-          `https://api.paychangu.com/get_transaction?reference=${reference}`,
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.PAYCHANGU_SECRET_KEY}`,
-            }
+        // Update order to PAID based on cached webhook
+        order = await prisma.order.update({
+          where: { id: order.id },
+          data: {
+            paymentStatus: 'PAID',
+            status: 'PENDING'
+          },
+          select: {
+            id: true,
+            userId: true,
+            paymentStatus: true,
+            status: true,
+            total: true,
           }
-        );
+        });
 
-        const paychanguStatus = paychanguResponse.data?.status || paychanguResponse.data?.data?.status;
-        const verifyTime = Date.now() - verifyStartTime;
-
-        console.log(`[PAYMENT CHECK] Paychangu verification took ${verifyTime}ms, status: ${paychanguStatus}`);
-
-        // If Paychangu says payment is successful, update database immediately
-        if (paychanguStatus === 'completed' || paychanguStatus === 'success' || paychanguStatus === 'COMPLETED') {
-          console.log(`[PAYMENT CHECK] Payment confirmed via Paychangu API for ${reference}, updating database`);
-          
-          // Update order payment status
-          order = await prisma.order.update({
+        // Emit notification for admin
+        try {
+          const { emitNewOrder: emitNewOrderFunc } = require('../utils/socket');
+          const fullOrder = await prisma.order.findUnique({
             where: { id: order.id },
-            data: {
-              paymentStatus: 'PAID',
-              status: 'PENDING'
-            },
-            select: {
-              id: true,
-              userId: true,
-              paymentStatus: true,
-              status: true,
-              total: true,
+            include: {
+              items: { include: { product: true } },
+              user: { select: { id: true, name: true, email: true } }
             }
           });
-
-          // Emit notification for admin
-          try {
-            const { emitNewOrder } = require('../utils/socket');
-            const fullOrder = await prisma.order.findUnique({
-              where: { id: order.id },
-              include: {
-                items: { include: { product: true } },
-                user: { select: { id: true, name: true, email: true } }
-              }
-            });
-            emitNewOrder(fullOrder);
-          } catch (socketErr) {
-            console.warn('[PAYMENT CHECK] Could not emit socket event:', socketErr.message);
-          }
+          emitNewOrderFunc(fullOrder);
+        } catch (socketErr) {
+          console.warn('[PAYMENT CHECK] Could not emit socket event:', socketErr.message);
         }
-      } catch (paychanguErr) {
-        // Log but don't fail - Paychangu might be temporarily unreachable
-        console.warn(`[PAYMENT CHECK] Paychangu verification failed: ${paychanguErr.message}`);
-        // Continue with database status
+      } else {
+        // Webhook not in cache yet - still waiting
+        console.log(`[PAYMENT CHECK] Webhook not cached yet for ${reference} - polling will retry`);
       }
     }
 

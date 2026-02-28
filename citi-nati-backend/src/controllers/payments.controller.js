@@ -5,6 +5,7 @@ const { PrismaClient } = require('@prisma/client');
 const { emitNewOrder } = require('../utils/socket');
 const { notifyPaymentSuccess, notifyOrderPlaced } = require('../utils/messageService');
 const { sendOrderConfirmationEmail, sendPaymentConfirmationEmail } = require('../utils/emailService');
+const { cacheWebhookEvent } = require('../utils/webhookCache');
 
 const prisma = new PrismaClient();
 
@@ -222,6 +223,13 @@ const handleWebhook = async (req, res) => {
     });
 
     console.log(`[Webhook] Order ${order.id} payment confirmed. Broadcasting to admin_room`);
+
+    // Cache the webhook event for fast polling (polling endpoint checks cache first)
+    cacheWebhookEvent(reference, 'completed', {
+      orderId: order.id,
+      amount: updatedOrder.total,
+      timestamp: new Date()
+    });
 
     // Emit new order event to admins (NOW that payment is confirmed)
     emitNewOrder(updatedOrder);
