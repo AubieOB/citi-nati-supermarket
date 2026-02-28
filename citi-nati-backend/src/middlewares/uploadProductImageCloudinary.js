@@ -53,6 +53,7 @@ const uploadProductImage = multer({
 
 // Wrap multer to add logging
 const uploadWithLogging = (req, res, next) => {
+  console.log('[CLOUDINARY MIDDLEWARE] Starting file upload processing...');
   uploadProductImage.single('image')(req, res, (err) => {
     if (err) {
       console.error('[CLOUDINARY UPLOAD] ❌ Upload error:', err.message);
@@ -61,14 +62,14 @@ const uploadWithLogging = (req, res, next) => {
     
     if (req.file) {
       console.log('[CLOUDINARY UPLOAD] ✅ File uploaded successfully:', {
-        filename: req.file.originalname,
+        originalname: req.file.originalname,
         secure_url: req.file.secure_url,
         public_id: req.file.public_id,
         size: req.file.size,
         format: req.file.format
       });
     } else {
-      console.log('[CLOUDINARY UPLOAD] No file provided (optional)');
+      console.log('[CLOUDINARY UPLOAD] ℹ️ No file provided (optional upload)');
     }
     
     next();

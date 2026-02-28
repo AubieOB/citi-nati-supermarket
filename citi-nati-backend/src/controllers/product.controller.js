@@ -289,8 +289,20 @@ const updateProduct = async (req, res) => {
     if (req.body.category !== undefined && req.body.category !== '') {
       updateData.category = req.body.category;
     }
+    
+    // Debug: Log file info before processing
     if (req.file) {
+      console.log('[PRODUCT UPDATE] 📸 Image file received:', {
+        originalname: req.file.originalname,
+        secure_url: req.file.secure_url,
+        public_id: req.file.public_id,
+        size: req.file.size,
+        format: req.file.format
+      });
       updateData.image = req.file.secure_url; // Cloudinary URL
+      console.log('[PRODUCT UPDATE] ✅ Image URL set to:', updateData.image);
+    } else {
+      console.log('[PRODUCT UPDATE] ⚠️ No image file in request (optional)');
     }
 
     // Handle expiryDate
@@ -333,6 +345,15 @@ const updateProduct = async (req, res) => {
     const updatedProduct = await prisma.product.update({
       where: { id },
       data: updateData,
+    });
+
+    // Debug: Log what was actually saved to database
+    console.log('[PRODUCT UPDATE] ✅ Product updated in database:', {
+      id: updatedProduct.id,
+      name: updatedProduct.name,
+      imageSavedToDB: updatedProduct.image,
+      imageIsCloudinary: updatedProduct.image?.startsWith('http'),
+      updatedFields: Object.keys(updateData)
     });
 
     // Notify if stock was updated and is now low (10 or below) or out of stock
