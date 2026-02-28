@@ -109,6 +109,16 @@ router.put('/users/:userId/role', verifyTokenMiddleware, verifyAdmin, async (req
       return res.status(400).json({ error: 'Cannot change your own role' });
     }
 
+    // Get the user first to access their details
+    const userBefore = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!userBefore) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Update user role
     const user = await prisma.user.update({
       where: { id: userId },
       data: { role },
@@ -121,6 +131,24 @@ router.put('/users/:userId/role', verifyTokenMiddleware, verifyAdmin, async (req
       }
     });
 
+    // If changing role TO driver, ensure Driver record exists
+    if (role === 'driver' && userBefore.role !== 'driver') {
+      const existingDriver = await prisma.driver.findUnique({
+        where: { email: user.email }
+      });
+
+      if (!existingDriver) {
+        await prisma.driver.create({
+          data: {
+            name: user.name,
+            email: user.email,
+            phone: null // Can be updated later
+          }
+        });
+        console.log('[ADMIN] Created Driver record for user:', { userId, email: user.email });
+      }
+    }
+
     console.log('[ADMIN] User role updated:', { userId, newRole: role, admin: req.user.email });
     res.json({ 
       success: true, 
@@ -132,7 +160,7 @@ router.put('/users/:userId/role', verifyTokenMiddleware, verifyAdmin, async (req
     if (err.code === 'P2025') {
       return res.status(404).json({ error: 'User not found' });
     }
-    res.status(500).json({ error: 'Failed to update user role' });
+    res.status(500).json({ error: 'Failed to update user role', details: err.message });
   }
 });
 
