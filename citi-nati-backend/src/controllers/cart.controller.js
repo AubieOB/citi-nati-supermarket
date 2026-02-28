@@ -161,7 +161,7 @@ const updateCartItem = async (req, res) => {
     // Validate quantity is not negative
     if (quantityInt < 0) {
       return res.status(400).json({
-        error: 'Quantity cannot be negative',
+        error: 'Quantity cannot be negative. To remove this item, set quantity to 0 or use the Remove button.',
       });
     }
 

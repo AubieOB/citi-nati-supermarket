@@ -117,7 +117,13 @@ const Cart = () => {
       // Convert to integer
       const quantity = parseInt(newQuantity);
 
-      // 5️⃣ VALIDATE: Use cartValidation before API call
+      // Handle invalid input (empty field, NaN, etc)
+      if (isNaN(quantity)) {
+        showError('Invalid Input', 'Please enter a valid number');
+        return;
+      }
+
+      // 5️⃣ VALIDATE: Check if quantity is negative
       if (quantity < 0) {
         showError('Invalid Quantity', 'Quantity cannot be negative');
         return;
@@ -278,24 +284,29 @@ const Cart = () => {
                       value={item.quantity}
                       onChange={(e) => handleQuantityChange(item.productId, e.target.value)}
                       disabled={updating}
+                      className="cart-quantity-input"
                       style={{
-                        width: '60px',
-                        padding: '0.5rem',
-                        border: 'none',
+                        width: '70px',
+                        padding: '0.5rem 0.25rem',
+                        border: '2px solid #e0e0e0',
                         borderRadius: '4px',
                         opacity: updating ? 0.6 : 1,
                         backgroundColor: '#f5f5f5',
-                        transition: 'box-shadow 0.3s ease, background-color 0.3s ease',
-                        cursor: updating ? 'not-allowed' : 'text'
+                        transition: 'box-shadow 0.3s ease, background-color 0.3s ease, border-color 0.3s ease',
+                        cursor: updating ? 'not-allowed' : 'text',
+                        fontSize: '1rem',
+                        textAlign: 'center'
                       }}
                       onFocus={(e) => {
                         if (!updating) {
                           e.target.style.backgroundColor = '#fff';
+                          e.target.style.borderColor = '#5b4b8a';
                           e.target.style.boxShadow = '0 4px 12px rgba(91, 75, 138, 0.2)';
                         }
                       }}
                       onBlur={(e) => {
                         e.target.style.backgroundColor = '#f5f5f5';
+                        e.target.style.borderColor = '#e0e0e0';
                         e.target.style.boxShadow = 'none';
                       }}
                     />

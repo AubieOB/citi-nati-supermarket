@@ -1679,3 +1679,57 @@ body.menu-open {
     padding: 4rem 2rem;
   }
 }
+
+/* ===========================
+   CART QUANTITY INPUT STYLING
+   Show spinners on all devices
+   =========================== */
+
+/* Show number input spinners (visible by default on desktop, hidden by default on mobile) */
+.cart-quantity-input::-webkit-outer-spin-button,
+.cart-quantity-input::-webkit-inner-spin-button {
+  -webkit-appearance: inner-spin-button !important;
+  display: inline-block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+/* Style the spinner buttons */
+.cart-quantity-input::-webkit-inner-spin-button,
+.cart-quantity-input::-webkit-outer-spin-button {
+  width: 24px;
+  padding: 0 4px;
+  position: relative;
+}
+
+/* Mozilla Firefox styling */
+.cart-quantity-input {
+  -moz-appearance: textfield; /* Remove default spinners */
+}
+
+.cart-quantity-input::-webkit-outer-spin-button,
+.cart-quantity-input::-webkit-inner-spin-button {
+  -webkit-appearance: inner-spin-button !important;
+  display: inline !important;
+}
+
+/* Increase clickable area for mobile */
+@media (max-width: 768px) {
+  .cart-quantity-input {
+    font-size: 16px; /* Prevents mobile zoom on focus */
+    width: 80px !important;
+    padding: 0.75rem 0.5rem !important;
+    height: 44px; /* Touch-friendly size */
+  }
+
+  .cart-quantity-input::-webkit-outer-spin-button,
+  .cart-quantity-input::-webkit-inner-spin-button {
+    display: inline-block !important;
+    -webkit-appearance: inner-spin-button !important;
+    opacity: 1 !important;
+    width: 28px;
+    height: 22px;
+    margin-left: 2px;
+  }
+}`
