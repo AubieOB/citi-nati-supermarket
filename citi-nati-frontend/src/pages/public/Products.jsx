@@ -413,9 +413,25 @@ const Products = () => {
                         src={product.imageUrl} 
                         alt={product.name}
                         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        crossOrigin="anonymous"
+                        onLoad={() => console.log(`[PRODUCT IMAGE] ✅ Loaded: ${product.name}`)}
+                        onError={(e) => {
+                          console.error(`[PRODUCT IMAGE] ❌ Failed to load image for ${product.name}:`, product.imageUrl);
+                          e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23f0f0f0" width="200" height="200"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999" font-family="Arial"%3EImage Error%3C/text%3E%3C/svg%3E';
+                        }}
                       />
                     ) : (
-                      <span style={{ color: '#999' }}>No Image</span>
+                      <div style={{ 
+                        width: '100%', 
+                        height: '100%', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        backgroundColor: '#f0f0f0',
+                        color: '#999'
+                      }}>
+                        <i className="fas fa-image" style={{ fontSize: '2rem', color: '#ccc' }}></i>
+                      </div>
                     )}
                   </div>
 

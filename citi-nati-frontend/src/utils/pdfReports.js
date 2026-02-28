@@ -82,9 +82,9 @@ export const generateSummaryReportPDF = (salesDays, dateRange = {}) => {
   const opt = {
     margin: 10,
     filename: `sales-summary-${new Date().toISOString().split('T')[0]}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2 },
-    jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+    image: { type: 'png', quality: 1.0 },
+    html2canvas: { scale: 3, logging: false, useCORS: true, backgroundColor: '#ffffff' },
+    jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4', compress: true }
   };
 
   html2pdf().set(opt).from(element).save();
@@ -170,9 +170,9 @@ export const generateProductSalesReportPDF = (productSales, salesDays, dateRange
   const opt = {
     margin: 10,
     filename: `sales-by-product-${new Date().toISOString().split('T')[0]}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2 },
-    jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+    image: { type: 'png', quality: 1.0 },
+    html2canvas: { scale: 3, logging: false, useCORS: true, backgroundColor: '#ffffff' },
+    jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4', compress: true }
   };
 
   html2pdf().set(opt).from(element).save();
@@ -248,9 +248,9 @@ export const generateDetailedReportPDF = (salesDays, dateRange = {}) => {
   const opt = {
     margin: 10,
     filename: `sales-detailed-${new Date().toISOString().split('T')[0]}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2 },
-    jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+    image: { type: 'png', quality: 1.0 },
+    html2canvas: { scale: 3, logging: false, useCORS: true, backgroundColor: '#ffffff' },
+    jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4', compress: true }
   };
 
   html2pdf().set(opt).from(element).save();
@@ -331,9 +331,9 @@ export const generateDriverReportPDF = (drivers, dateRange = {}) => {
   const opt = {
     margin: 10,
     filename: `driver-performance-${new Date().toISOString().split('T')[0]}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2 },
-    jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+    image: { type: 'png', quality: 1.0 },
+    html2canvas: { scale: 3, logging: false, useCORS: true, backgroundColor: '#ffffff' },
+    jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4', compress: true }
   };
 
   html2pdf().set(opt).from(element).save();
@@ -416,9 +416,9 @@ export const generateDriverSalesReportPDF = (drivers, dateRange = {}) => {
   const opt = {
     margin: 10,
     filename: `sales-by-driver-${new Date().toISOString().split('T')[0]}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2 },
-    jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+    image: { type: 'png', quality: 1.0 },
+    html2canvas: { scale: 3, logging: false, useCORS: true, backgroundColor: '#ffffff' },
+    jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4', compress: true }
   };
 
   html2pdf().set(opt).from(element).save();
@@ -468,7 +468,7 @@ export const generateOrderReceiptPDF = (order) => {
       <div style="text-align: center; margin-bottom: 30px; border-bottom: 3px solid #2D8659; padding-bottom: 20px;">
         <h1 style="margin: 0; color: #2D8659; font-size: 24px;">Citi-Nati Supermarket</h1>
         <p style="margin: 5px 0 0 0; color: #999; font-size: 12px; font-style: italic;">Your Trusted Supermarket</p>
-        <p style="margin: 10px 0 0 0; color: #999; font-size: 11px;">Phone: +265 1 234 567 | Email: info@citinati.com</p>
+        <p style="margin: 10px 0 0 0; color: #999; font-size: 11px;">Phone: +265 888857188 | Email: info@citinati.com</p>
       </div>
 
       <!-- Receipt Title -->
@@ -566,9 +566,9 @@ export const generateOrderReceiptPDF = (order) => {
   const opt = {
     margin: 5,
     filename: `receipt-order-${order.id}-${new Date().toISOString().split('T')[0]}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2 },
-    jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+    image: { type: 'png', quality: 1.0 },
+    html2canvas: { scale: 3, logging: false, useCORS: true, backgroundColor: '#ffffff' },
+    jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4', compress: true }
   };
 
   html2pdf().set(opt).from(element).save();

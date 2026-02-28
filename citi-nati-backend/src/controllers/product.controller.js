@@ -20,13 +20,24 @@ const formatProduct = (product, req, includeDiscountSuggestion = false) => {
     finalPrice = product.discountPrice;
   }
 
+  // Handle image URL with better logging
+  let imageUrl = null;
+  if (product.image) {
+    if (product.image.startsWith('http')) {
+      imageUrl = product.image; // Cloudinary URL - already full URL
+    } else {
+      imageUrl = `${req.protocol}://${req.get('host')}/${product.image}`; // Local path - construct URL
+    }
+    if (!imageUrl) {
+      console.warn(`[PRODUCT FORMAT] ⚠️ Image URL could not be generated for product ${product.id}`);
+    }
+  } else {
+    console.warn(`[PRODUCT FORMAT] ⚠️ Product ${product.id} (${product.name}) has no image`);
+  }
+
   const formatted = {
     ...product,
-    imageUrl: product.image
-      ? product.image.startsWith('http')
-        ? product.image // Cloudinary URL - already full URL
-        : `${req.protocol}://${req.get('host')}/${product.image}` // Local path - construct URL
-      : null,
+    imageUrl,
     expiryStatus,
     finalPrice
   };
@@ -70,6 +81,18 @@ const createProduct = async (req, res) => {
       });
     }
 
+    // Debug: Log file upload info
+    if (req.file) {
+      console.log('[PRODUCT CREATE] Image uploaded to Cloudinary:', {
+        secure_url: req.file.secure_url,
+        public_id: req.file.public_id,
+        size: req.file.size,
+        format: req.file.format
+      });
+    } else {
+      console.log('[PRODUCT CREATE] ⚠️ No image file provided');
+    }
+
     // Prepare product data
     const productData = {
       name: name.trim(),
@@ -79,6 +102,12 @@ const createProduct = async (req, res) => {
       image: req.file ? req.file.secure_url : null, // Cloudinary URL
       expiryDate: expiryDate ? new Date(expiryDate) : null
     };
+
+    console.log('[PRODUCT CREATE] Product data prepared:', {
+      name: productData.name,
+      image: productData.image ? 'URL set' : 'No image',
+      price: productData.price
+    });
 
     // Handle originalPrice (optional)
     if (originalPrice) {
@@ -104,6 +133,12 @@ const createProduct = async (req, res) => {
       data: productData,
     });
 
+    console.log('[PRODUCT CREATE] ✅ Product created in database:', {
+      id: product.id,
+      name: product.name,
+      hasImage: !!product.image
+    });
+
     // Notify if stock is low (10 or below) or out of stock
     if (product.stock <= 10) {
       await notifyLowStock(product);
@@ -117,9 +152,10 @@ const createProduct = async (req, res) => {
       product: formattedProduct,
     });
   } catch (err) {
-    console.error('Error creating product:', err);
+    console.error('[PRODUCT CREATE] ❌ Error creating product:', err.message);
     return res.status(500).json({
       error: 'Server error while creating product',
+      details: err.message
     });
   }
 };
@@ -158,6 +194,12 @@ const getProducts = async (req, res) => {
       },
     });
 
+    // Debug logging
+    console.log(`[PRODUCTS FETCH] Retrieved ${products.length} products`);
+    const productsWithImages = products.filter(p => p.image).length;
+    const productsWithoutImages = products.filter(p => !p.image).length;
+    console.log(`[PRODUCTS FETCH] With images: ${productsWithImages}, Without images: ${productsWithoutImages}`);
+
     // Map over products and format with computed fields
     const productsWithFormatted = products.map((product) =>
       formatProduct(product, req, false)
@@ -165,9 +207,14 @@ const getProducts = async (req, res) => {
 
     return res.status(200).json({
       products: productsWithFormatted,
+      _debug: {
+        total: productsWithFormatted.length,
+        withImages: productsWithImages,
+        withoutImages: productsWithoutImages
+      }
     });
   } catch (err) {
-    console.error('Error fetching products:', err);
+    console.error('[PRODUCTS FETCH ERROR]:', err);
     return res.status(500).json({
       error: 'Server error while fetching products',
     });

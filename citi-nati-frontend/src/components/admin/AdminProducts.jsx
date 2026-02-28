@@ -159,6 +159,13 @@ const AdminProducts = () => {
       formPayload.append('stock', String(parseInt(formData.stock)));
       formPayload.append('category', formData.category.trim());
       
+      console.log('[ADMIN PRODUCTS] 📋 Submitting product form:', {
+        name: formData.name.trim(),
+        hasImage: !!imageFile,
+        fileName: imageFile?.name,
+        fileSize: imageFile?.size
+      });
+      
       // Optional: expiry date
       if (formData.expiryDate) {
         formPayload.append('expiryDate', formData.expiryDate);
@@ -174,24 +181,34 @@ const AdminProducts = () => {
       
       if (imageFile) {
         formPayload.append('image', imageFile);
+        console.log('[ADMIN PRODUCTS] 📸 Image included:', {
+          size: imageFile.size,
+          type: imageFile.type,
+          name: imageFile.name
+        });
+      } else {
+        console.log('[ADMIN PRODUCTS] ⚠️ No image provided - using existing or creating without');
       }
 
       if (editingId) {
+        console.log('[ADMIN PRODUCTS] ✏️ Updating product:', editingId);
         await api.put(`/products/${editingId}`, formPayload, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
         showSuccess('Success', `Product "${formData.name.trim()}" updated successfully`);
       } else {
+        console.log('[ADMIN PRODUCTS] ➕ Creating new product');
         await api.post('/products', formPayload, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
         showSuccess('Success', `Product "${formData.name.trim()}" created successfully`);
       }
 
+      console.log('[ADMIN PRODUCTS] ✅ Product saved successfully');
       await fetchProducts();
       resetForm();
     } catch (err) {
-      console.error('Error saving product:', err);
+      console.error('[ADMIN PRODUCTS] ❌ Error saving product:', err);
       setFormError(err.response?.data?.error || 'Failed to save product');
     } finally {
       setIsSubmitting(false);

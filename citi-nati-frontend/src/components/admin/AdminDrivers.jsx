@@ -190,7 +190,7 @@ const AdminDrivers = () => {
                 name="name"
                 value={formData.name}
                 onChange={handleFormChange}
-                placeholder="Aubrey Banda"
+                placeholder="Your full name"
                 style={{
                   width: '100%',
                   padding: '0.75rem',
