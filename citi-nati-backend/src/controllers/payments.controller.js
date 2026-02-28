@@ -270,44 +270,45 @@ const handleWebhook = async (req, res) => {
       // Return 200 immediately to Paychangu - don't wait for emails
       res.sendStatus(200);
       console.log(`[Webhook] ✅ Response sent to Paychangu (200 OK)`);
+
+      // Send emails asynchronously in background (don't block the response)
+      // Wrap in setImmediate to prevent blocking
+      setImmediate(async () => {
+        try {
+          // Send order confirmation email
+          await sendOrderConfirmationEmail(
+            updatedOrder.user.email,
+            updatedOrder.user.name,
+            updatedOrder,
+            updatedOrder.items.map(item => item.product)
+          );
+
+          // Send payment confirmation email
+          await sendPaymentConfirmationEmail(
+            updatedOrder.user.email,
+            updatedOrder.user.name,
+            {
+              orderId: updatedOrder.id,
+              amount: updatedOrder.total,
+              currency: 'MWK',
+              method: 'Paychangu',
+              date: new Date(),
+              reference: reference,
+              status: 'COMPLETED',
+            }
+          );
+
+          console.log(`[Email] ✅ Background: Order and payment confirmation emails sent to ${updatedOrder.user.email}`);
+        } catch (emailErr) {
+          console.error(`[Email] ❌ Background: Failed to send emails for order ${order.id}:`, emailErr.message);
+          // Non-blocking - errors here don't matter as order is already confirmed
+        }
+      });
     } catch (updateErr) {
       console.error(`[Webhook] ❌ Failed to update order:`, updateErr.message);
       res.sendStatus(200); // Still return 200 to Paychangu
       return;
     }
-
-    // Send emails asynchronously in background (don't block the response)
-    // Wrap in setImmediate to prevent blocking
-    setImmediate(async () => {
-      try {
-        // Send order confirmation email
-        await sendOrderConfirmationEmail(
-          updatedOrder.user.email,
-          updatedOrder.user.name,
-          updatedOrder,
-          updatedOrder.items.map(item => item.product)
-        );
-
-        // Send payment confirmation email
-        await sendPaymentConfirmationEmail(
-          updatedOrder.user.email,
-          updatedOrder.user.name,
-          {
-            orderId: updatedOrder.id,
-            amount: updatedOrder.total,
-            currency: 'MWK',
-            method: 'Paychangu',
-            date: new Date(),
-            reference: reference,
-            status: 'COMPLETED',
-          }
-        );
-
-        console.log(`[Email] ✅ Background: Order and payment confirmation emails sent to ${updatedOrder.user.email}`);
-      } catch (emailErr) {
-        console.error(`[Email] ❌ Background: Failed to send emails for order ${order.id}:`, emailErr.message);
-        // Non-blocking - errors here don't matter as order is already confirmed
-      }
     });
 
   } catch (err) {

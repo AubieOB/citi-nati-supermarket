@@ -39,7 +39,7 @@ const login = async (req, res) => {
     console.log(`[AUTH] ✅ Login successful for: ${email}`);
 
     // Generate JWT token
-    const token = generateToken(user.id, user.role);
+    const token = generateToken(user.id, user.role, user.email);
 
     return res.json({
       token,
@@ -404,7 +404,7 @@ const resetPassword = async (req, res) => {
     await prisma.passwordReset.delete({ where: { id: resetRecord.id } });
 
     // Generate JWT token for automatic login
-    const token = generateToken(updatedUser.id, updatedUser.role);
+    const token = generateToken(updatedUser.id, updatedUser.role, updatedUser.email);
 
     return res.json({
       message: 'Password reset successful. You are now logged in.',
@@ -455,7 +455,7 @@ const googleAuth = async (req, res) => {
       // User exists - log them in
       console.log(`[AUTH] ✅ Google user found, logging in: ${email}`);
 
-      const jwtToken = generateToken(user.id, user.role);
+      const jwtToken = generateToken(user.id, user.role, user.email);
 
       return res.json({
         token: jwtToken,
@@ -493,7 +493,7 @@ const googleAuth = async (req, res) => {
     // Notify admin
     await notifyNewUserRegistration(newUser);
 
-    const jwtToken = generateToken(newUser.id, newUser.role);
+    const jwtToken = generateToken(newUser.id, newUser.role, newUser.email);
 
     return res.status(201).json({
       message: 'User registered and logged in successfully',
