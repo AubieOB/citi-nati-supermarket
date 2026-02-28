@@ -124,7 +124,9 @@ const getCart = async (req, res) => {
       price: item.price,
       subtotal: item.quantity * item.price,
       imageUrl: item.product.image
-        ? `${req.protocol}://${req.get('host')}/${item.product.image}`
+        ? item.product.image.startsWith('http')
+          ? item.product.image // Cloudinary URL
+          : `${req.protocol}://${req.get('host')}/${item.product.image}`
         : null,
     }));
 
@@ -221,7 +223,9 @@ const updateCartItem = async (req, res) => {
       price: updatedItem.price,
       subtotal: updatedItem.quantity * updatedItem.price,
       imageUrl: updatedItem.product.image
-        ? `${req.protocol}://${req.get('host')}/${updatedItem.product.image}`
+        ? updatedItem.product.image.startsWith('http')
+          ? updatedItem.product.image // Cloudinary URL
+          : `${req.protocol}://${req.get('host')}/${updatedItem.product.image}`
         : null,
     };
 

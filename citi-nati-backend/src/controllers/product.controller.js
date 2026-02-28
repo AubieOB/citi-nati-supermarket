@@ -23,7 +23,9 @@ const formatProduct = (product, req, includeDiscountSuggestion = false) => {
   const formatted = {
     ...product,
     imageUrl: product.image
-      ? `${req.protocol}://${req.get('host')}/${product.image}`
+      ? product.image.startsWith('http')
+        ? product.image // Cloudinary URL - already full URL
+        : `${req.protocol}://${req.get('host')}/${product.image}` // Local path - construct URL
       : null,
     expiryStatus,
     finalPrice
@@ -74,7 +76,7 @@ const createProduct = async (req, res) => {
       price: parsedPrice,
       stock: parsedStock,
       category: category.trim(),
-      image: req.file ? req.file.path.replace(/\\/g, '/') : null,
+      image: req.file ? req.file.secure_url : null, // Cloudinary URL
       expiryDate: expiryDate ? new Date(expiryDate) : null
     };
 
@@ -241,7 +243,7 @@ const updateProduct = async (req, res) => {
       updateData.category = req.body.category;
     }
     if (req.file) {
-      updateData.image = req.file.path.replace(/\\/g, '/');
+      updateData.image = req.file.secure_url; // Cloudinary URL
     }
 
     // Handle expiryDate
