@@ -11,9 +11,11 @@ const verifyAdmin = (req, res, next) => {
 
   // Check if user has admin role (case-insensitive check, but route expects lowercase)
   if (req.user.role !== "admin") {
+    console.warn('[ADMIN_AUTH] Access denied - user role is:', req.user.role, 'email:', req.user.email);
     return res.status(403).json({ message: "Access denied. Admin only." });
   }
 
+  console.log('[ADMIN_AUTH] Admin verified:', { id: req.user.id, email: req.user.email });
   // User is admin, proceed to next middleware/controller
   next();
 };

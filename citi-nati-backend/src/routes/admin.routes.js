@@ -59,12 +59,13 @@ router.get('/dashboard', verifyTokenMiddleware, verifyAdmin, async (req, res) =>
 
 /**
  * GET /api/admin/users
- * Get all users in the system
+ * Get all active users in the system
  * Protected: Admin only
  */
 router.get('/users', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
   try {
     const users = await prisma.user.findMany({
+      where: { isActive: true },
       select: {
         id: true,
         name: true,
@@ -103,8 +104,13 @@ router.put('/users/:userId/role', verifyTokenMiddleware, verifyAdmin, async (req
       return res.status(400).json({ error: 'Invalid role' });
     }
 
+    // Prevent changing own role
+    if (userId === req.user.id) {
+      return res.status(400).json({ error: 'Cannot change your own role' });
+    }
+
     const user = await prisma.user.update({
-      where: { id: parseInt(userId) },
+      where: { id: userId },
       data: { role },
       select: {
         id: true,
@@ -115,6 +121,7 @@ router.put('/users/:userId/role', verifyTokenMiddleware, verifyAdmin, async (req
       }
     });
 
+    console.log('[ADMIN] User role updated:', { userId, newRole: role, admin: req.user.email });
     res.json({ 
       success: true, 
       user,
@@ -131,27 +138,43 @@ router.put('/users/:userId/role', verifyTokenMiddleware, verifyAdmin, async (req
 
 /**
  * DELETE /api/admin/users/:userId
- * Delete user from system
+ * Soft delete user from system (marks as inactive)
  * Protected: Admin only
  */
 router.delete('/users/:userId', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
   try {
     const { userId } = req.params;
-    const userIdInt = parseInt(userId);
 
     // Prevent deleting self
-    if (userIdInt === req.user.id) {
+    if (userId === req.user.id) {
       return res.status(400).json({ error: 'Cannot delete your own account' });
     }
 
-    await prisma.user.delete({
-      where: { id: userIdInt }
+    // Soft delete - mark as inactive instead of hard delete
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { isActive: false },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        isActive: true,
+        role: true
+      }
     });
 
-    res.json({ success: true, message: 'User deleted' });
+    console.log('[ADMIN] User soft deleted:', { userId, email: user.email, admin: req.user.email });
+    res.json({ 
+      success: true, 
+      message: 'User deactivated',
+      user
+    });
   } catch (err) {
     console.error('Delete user error:', err);
-    res.status(500).json({ error: 'Failed to delete user' });
+    if (err.code === 'P2025') {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.status(500).json({ error: 'Failed to delete user', details: err.message });
   }
 });
 

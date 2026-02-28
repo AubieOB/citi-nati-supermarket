@@ -14,9 +14,11 @@ const startSalesDay = async (req, res) => {
     });
 
     if (existingOpenDay) {
+      console.log('[SALES] Sales day already open:', existingOpenDay.id);
       return res.status(400).json({
         message: 'Sales day already open',
-        openedAt: existingOpenDay.openedAt
+        openedAt: existingOpenDay.openedAt,
+        salesDayId: existingOpenDay.id
       });
     }
 
@@ -29,14 +31,14 @@ const startSalesDay = async (req, res) => {
       }
     });
 
-    console.log('[SALES] New sales day started:', newDay.id);
+    console.log('[SALES] New sales day started:', { id: newDay.id, openedAt: newDay.openedAt });
     res.json({
       message: 'Sales day started',
       salesDay: newDay
     });
   } catch (err) {
     console.error('[SALES] Error starting sales day:', err);
-    res.status(500).json({ message: 'Failed to start sales day' });
+    res.status(500).json({ message: 'Failed to start sales day', error: err.message });
   }
 };
 

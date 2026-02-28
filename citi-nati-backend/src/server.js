@@ -22,6 +22,9 @@ const prisma = new PrismaClient();
 
 async function start() {
   try {
+    // Log DATABASE_URL for verification
+    console.log('DATABASE_URL:', process.env.DATABASE_URL ? `Connected to: ${process.env.DATABASE_URL.split('@')[1] || 'local'}` : 'NOT SET');
+    
     // Connect to the database before starting the server
     await prisma.$connect();
     console.log('Connected to the database via Prisma');
@@ -226,6 +229,7 @@ async function start() {
         if (!origin || allowedOrigins.includes(origin)) {
           callback(null, true);
         } else {
+          console.warn('[CORS] Rejected origin:', origin);
           callback(new Error('Not allowed by CORS'));
         }
       },
@@ -234,6 +238,7 @@ async function start() {
       allowedHeaders: ['Content-Type', 'Authorization']
     };
     
+    console.log('[CORS] Allowed origins:', allowedOrigins);
     app.use(cors(corsOptions));
     app.use('/uploads', express.static('uploads'));
 

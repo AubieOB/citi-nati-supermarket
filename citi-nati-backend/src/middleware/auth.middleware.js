@@ -14,6 +14,7 @@ const verifyTokenMiddleware = (req, res, next) => {
   }
 
   req.user = decoded;
+  console.log('[AUTH] Token verified for user:', { id: req.user.id, role: req.user.role, email: req.user.email });
   next();
 };
 

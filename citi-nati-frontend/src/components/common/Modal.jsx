@@ -14,21 +14,18 @@ const Modal = ({
   confirmButtonColor = null,
   children
 }) => {
-  if (!isOpen) return null;
-
   // Prevent body scroll when modal is open
-  if (typeof document !== 'undefined') {
-    document.body.style.overflow = 'hidden';
-  }
-
-  // Cleanup on unmount
   React.useEffect(() => {
-    return () => {
-      if (typeof document !== 'undefined') {
+    if (isOpen && typeof document !== 'undefined') {
+      document.body.style.overflow = 'hidden';
+      
+      return () => {
         document.body.style.overflow = 'unset';
-      }
-    };
-  }, []);
+      };
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
 
   const getIcon = () => {
     switch (type) {

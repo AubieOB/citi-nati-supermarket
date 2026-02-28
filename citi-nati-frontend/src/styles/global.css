@@ -9,8 +9,9 @@
 }
 
 html, body {
-  height: 100%;
+  height: auto;
   width: 100%;
+  overflow-y: auto;
 }
 
 body {
@@ -254,8 +255,7 @@ input, textarea, select {
 
 /* Prevent body scroll when mobile menu is open */
 body.menu-open {
-  overflow: hidden !important;
-  height: 100vh;
+  overflow: hidden;
 }
 
 /* ========================
