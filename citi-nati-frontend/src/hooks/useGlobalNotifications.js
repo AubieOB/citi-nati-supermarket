@@ -22,7 +22,24 @@ export const useGlobalNotifications = () => {
     notifySuccess(`📦 New order assigned: #${order.id}`, 5000);
   }, []);
 
+  /**
+   * Handle order status updates for ADMIN
+   * Play sound for any driver status changes
+   */
   const handleOrderUpdate = useCallback((order) => {
+    console.log('[GLOBAL_NOTIFICATIONS] Order update received:', order.id, 'status:', order.status);
+    
+    // For admin: Play sound for driver status updates (IN_TRANSIT, DELIVERED, etc)
+    if (order.status === 'IN_TRANSIT') {
+      notifyInfo(`🚚 Order #${order.id} is in transit!`, 5000);
+    } else if (order.status === 'DELIVERED') {
+      notifySuccess(`✅ Order #${order.id} has been delivered!`, 5000);
+    } else if (order.status === 'FAILED') {
+      notifyInfo(`❌ Order #${order.id} delivery failed`, 5000);
+    }
+  }, []);
+
+  const handleCustomerOrderUpdate = useCallback((order) => {
     console.log('[GLOBAL_NOTIFICATIONS] Customer: Order update received:', order.id, order.status);
 
     if (order.status === 'ASSIGNED') {
@@ -56,13 +73,16 @@ export const useGlobalNotifications = () => {
 
       // Set up listeners based on role
       if (user.role === 'admin') {
+        // Admin listens to: new orders, order assignments, AND driver status updates
         socket.on('newOrder', handleNewOrder);
-        console.log('[GLOBAL_NOTIFICATIONS] Admin: newOrder listener registered');
+        socket.on('orderAssigned', handleOrderAssigned);
+        socket.on('orderUpdated', handleOrderUpdate); // Listen for driver status updates
+        console.log('[GLOBAL_NOTIFICATIONS] Admin: All order listeners registered (newOrder, orderAssigned, orderUpdated)');
       } else if (user.role === 'driver') {
         socket.on('orderAssigned', handleOrderAssigned);
         console.log('[GLOBAL_NOTIFICATIONS] Driver: orderAssigned listener registered');
       } else if (user.role === 'user') {
-        socket.on('orderUpdated', handleOrderUpdate);
+        socket.on('orderUpdated', handleCustomerOrderUpdate);
         console.log('[GLOBAL_NOTIFICATIONS] Customer: orderUpdated listener registered');
       }
 
@@ -71,10 +91,10 @@ export const useGlobalNotifications = () => {
         console.log('[GLOBAL_NOTIFICATIONS] Cleaning up listeners');
         socket.off('newOrder', handleNewOrder);
         socket.off('orderAssigned', handleOrderAssigned);
-        socket.off('orderUpdated', handleOrderUpdate);
+        socket.off('orderUpdated', user.role === 'admin' ? handleOrderUpdate : handleCustomerOrderUpdate);
       };
     } catch (err) {
       console.error('[GLOBAL_NOTIFICATIONS] Error:', err);
     }
-  }, [user?.id, user?.role, handleNewOrder, handleOrderAssigned, handleOrderUpdate]);
+  }, [user?.id, user?.role, handleNewOrder, handleOrderAssigned, handleOrderUpdate, handleCustomerOrderUpdate]);
 };

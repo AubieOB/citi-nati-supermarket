@@ -5,6 +5,7 @@ import { formatMWK } from '../../utils/currency.js';
 import OrderDetailsModal from './OrderDetailsModal.jsx';
 import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
+import { notifySuccess, notifyError } from '../../utils/notifications.js';
 
 /**
  * 📋 ADMIN ORDERS MANAGEMENT
@@ -59,7 +60,7 @@ const AdminOrders = () => {
       setIsDetailsOpen(true);
     } catch (err) {
       console.error('Error fetching order details:', err);
-      showError('Error', err.response?.data?.error || 'Failed to load order details');
+      notifyError(`Failed to load order details: ${err.response?.data?.error || 'Unknown error'}`, 4000);
     } finally {
       setDetailsLoading(false);
     }
@@ -86,9 +87,20 @@ const AdminOrders = () => {
       setUpdatingStatus(orderId);
       await api.put(`/orders/${orderId}/status`, { status: newStatus });
       await fetchOrders();
+      
+      // Show success notification with sound
+      if (newStatus === 'IN_TRANSIT') {
+        notifySuccess(`🚚 Order #${orderId} is now in transit!`, 4000);
+      } else if (newStatus === 'DELIVERED') {
+        notifySuccess(`✅ Order #${orderId} delivered!`, 4000);
+      } else if (newStatus === 'CANCELLED') {
+        notifySuccess(`❌ Order #${orderId} cancelled`, 4000);
+      } else {
+        notifySuccess(`Order #${orderId} status updated to ${newStatus}`, 4000);
+      }
     } catch (err) {
       console.error('Error updating status:', err);
-      showError('Error', err.response?.data?.error || 'Failed to update order status');
+      notifyError(`Failed to update order status: ${err.response?.data?.error || 'Unknown error'}`, 4000);
     } finally {
       setUpdatingStatus(null);
     }
@@ -107,10 +119,10 @@ const AdminOrders = () => {
         try {
           await api.put(`/orders/${orderId}/assign-driver`, { driverId });
           await fetchOrders();
-          showSuccess('Success', `Driver ${driverName} assigned successfully`);
+          notifySuccess(`📦 ${driverName} assigned to order #${orderId}!`, 4000);
         } catch (err) {
           console.error('Error assigning driver:', err);
-          showError('Error', err.response?.data?.error || 'Failed to assign driver');
+          notifyError(`Failed to assign driver: ${err.response?.data?.error || 'Unknown error'}`, 4000);
         }
       }
     );

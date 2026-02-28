@@ -102,11 +102,12 @@ export const notifyInfo = (message, duration = 3000) => {
 };
 
 /**
- * Show error notification (no sound)
+ * Show error notification WITH SOUND
  * @param {string} message - The notification message
  * @param {number} duration - Duration in milliseconds (default: 4000)
  */
 export const notifyError = (message, duration = 4000) => {
+  playNotificationSound();
   toast.error(message, { duration });
 };
 
