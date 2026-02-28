@@ -11,9 +11,36 @@ import '../../styles/global.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 
 /**
- * 🔔 PLAY NOTIFICATION SOUND
+ * 🔔 PLAY NOTIFICATION SOUND (with file + Web Audio fallback)
  */
-const playNotificationBeep = () => {
+const playNotificationBeep = async () => {
+  try {
+    // Try file-based audio first
+    const audio = new Audio('/classic-door-bell.wav');
+    audio.volume = 0.8;
+    
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => {
+          console.log('[SupportDashboard] ✅ Notification sound played');
+        })
+        .catch(() => {
+          // Fallback to Web Audio API beep
+          console.log('[SupportDashboard] ⚠️ File audio blocked, using beep fallback');
+          playWebAudioBeep();
+        });
+    }
+  } catch (err) {
+    console.warn('[SupportDashboard] Audio initialization failed:', err.message);
+    playWebAudioBeep();
+  }
+};
+
+/**
+ * Web Audio API fallback beep
+ */
+const playWebAudioBeep = () => {
   try {
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
     const osc = audioContext.createOscillator();
@@ -26,8 +53,9 @@ const playNotificationBeep = () => {
     gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
     osc.start(audioContext.currentTime);
     osc.stop(audioContext.currentTime + 0.1);
+    console.log('[SupportDashboard] ✅ Beep played using Web Audio API');
   } catch (e) {
-    console.warn('Sound notification disabled');
+    console.warn('[SupportDashboard] Sound notification disabled:', e.message);
   }
 };
 

@@ -34,20 +34,55 @@ const DriverDashboard = () => {
   }, []);
 
   /**
-   * Play notification sound
+   * Fallback beep using Web Audio API
+   */
+  const playFallbackBeep = useCallback(() => {
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      
+      osc.connect(gain);
+      gain.connect(audioContext.destination);
+      osc.frequency.value = 800;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+      
+      osc.start(audioContext.currentTime);
+      osc.stop(audioContext.currentTime + 0.15);
+      
+      console.log('[Driver] ✅ Fallback beep played');
+    } catch (err) {
+      console.warn('[Driver] Beep failed:', err.message);
+    }
+  }, []);
+
+  /**
+   * Play notification sound with fallback
    */
   const playSound = useCallback(() => {
     try {
-      const audio = new Audio();
-      audio.src = '/notification.wav';
-      audio.volume = 0.5;
-      audio.play().catch(() => {
-        // Browser might have autoplay restrictions - ignore
-      });
+      const audio = new Audio('/classic-door-bell.wav');
+      audio.volume = 0.8; // Increased volume for better audibility
+      
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log('[Driver] ✅ Notification sound played');
+          })
+          .catch((err) => {
+            console.warn('[Driver] ⚠️ Audio playback blocked:', err.message);
+            // Fallback to beep if audio blocked
+            playFallbackBeep();
+          });
+      }
     } catch (err) {
-      // Ignore audio errors
+      console.error('[Driver] Audio error:', err.message);
+      playFallbackBeep();
     }
-  }, []);
+  }, [playFallbackBeep]);
 
   /**
    * Fetch driver's assigned orders
