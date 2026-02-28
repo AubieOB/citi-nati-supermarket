@@ -233,9 +233,8 @@ const Products = () => {
       <div className="products-grid-wrapper">
         {/* Header Section */}
         <div className="products-header">
-          <div style={{ 
-            marginBottom: '1.5rem'
-          }}>
+          {/* Left: Title and Description */}
+          <div className="products-header__left">
             <h1 style={{ 
               marginBottom: '0.5rem', 
               fontSize: 'clamp(1.5rem, 4vw, 2rem)', 
@@ -250,7 +249,7 @@ const Products = () => {
             </p>
           </div>
 
-          {/* FILTERS SECTION */}
+          {/* Right: FILTERS SECTION */}
           <div style={{
             backgroundColor: '#fff',
             padding: '1rem',
