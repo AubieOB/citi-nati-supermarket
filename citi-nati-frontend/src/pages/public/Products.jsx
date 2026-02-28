@@ -229,65 +229,87 @@ const Products = () => {
 
   return (
     <div className="page products-page">
-      <Container>
-        <div style={{ 
-          marginTop: '2rem', 
-          marginBottom: '2rem',
-          '@media (max-width: 480px)': {
-            marginTop: '1rem',
-            marginBottom: '1rem'
-          }
-        }}>
-          <h1 style={{ 
-            marginBottom: '0.5rem', 
-            fontSize: 'clamp(1.5rem, 4vw, 2rem)', 
-            color: '#5B4B8A' 
-          }}>Our Products</h1>
-          <p style={{ 
-            color: '#666', 
-            margin: 0,
-            fontSize: 'clamp(0.9rem, 3vw, 1rem)'
-          }}>
-            Browse our selection of fresh groceries and essentials
-          </p>
-        </div>
-
-        {/* FILTERS SECTION */}
-        <div style={{
-          backgroundColor: '#fff',
-          padding: '1rem',
-          borderRadius: '8px',
-          marginBottom: '2rem',
-          marginTop: '1rem',
-          display: 'flex',
-          gap: '0.75rem',
-          alignItems: 'center',
-          flexWrap: 'nowrap',
-          overflowX: 'auto',
-          whiteSpace: 'nowrap',
-          paddingBottom: '0.5rem'
-        }}
-        className="products-filters"
-        >
-          {/* Search Input */}
+      {/* PRODUCTS GRID - FULL WIDTH SECTION */}
+      <div className="products-grid-wrapper">
+        {/* Header Section */}
+        <div className="products-header">
           <div style={{ 
-            flex: '0 0 auto',
-            maxWidth: '300px',
-            minWidth: '160px'
+            marginBottom: '1.5rem'
           }}>
-            <input
-              type="text"
-              placeholder="Search products..."
-              value={searchInput}
-              onChange={handleSearchChange}
+            <h1 style={{ 
+              marginBottom: '0.5rem', 
+              fontSize: 'clamp(1.5rem, 4vw, 2rem)', 
+              color: '#5B4B8A' 
+            }}>Our Products</h1>
+            <p style={{ 
+              color: '#666', 
+              margin: 0,
+              fontSize: 'clamp(0.9rem, 3vw, 1rem)'
+            }}>
+              Browse our selection of fresh groceries and essentials
+            </p>
+          </div>
+
+          {/* FILTERS SECTION */}
+          <div style={{
+            backgroundColor: '#fff',
+            padding: '1rem',
+            borderRadius: '8px',
+            display: 'flex',
+            gap: '0.75rem',
+            alignItems: 'center',
+            flexWrap: 'nowrap',
+            overflowX: 'auto',
+            whiteSpace: 'nowrap',
+            paddingBottom: '0.5rem'
+          }}
+          className="products-filters"
+          >
+            {/* Search Input */}
+            <div style={{ 
+              flex: '0 0 auto',
+              maxWidth: '300px',
+              minWidth: '160px'
+            }}>
+              <input
+                type="text"
+                placeholder="Search products..."
+                value={searchInput}
+                onChange={handleSearchChange}
+                style={{
+                  width: '100%',
+                  padding: '0.6rem 1rem',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontSize: '0.95rem',
+                  boxSizing: 'border-box',
+                  backgroundColor: '#f5f5f5',
+                  transition: 'box-shadow 0.3s ease, background-color 0.3s ease'
+                }}
+                onFocus={(e) => {
+                  e.target.style.backgroundColor = '#fff';
+                  e.target.style.boxShadow = '0 4px 12px rgba(91, 75, 138, 0.2)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.backgroundColor = '#f5f5f5';
+                  e.target.style.boxShadow = 'none';
+                }}
+              />
+            </div>
+
+            {/* Category Filter */}
+            <select
+              value={selectedCategory}
+              onChange={handleCategoryChange}
               style={{
-                width: '100%',
-                padding: '0.6rem 1rem',
+                padding: '0.6rem 0.75rem',
                 border: 'none',
                 borderRadius: '4px',
                 fontSize: '0.95rem',
-                boxSizing: 'border-box',
                 backgroundColor: '#f5f5f5',
+                cursor: 'pointer',
+                flex: '0 0 auto',
+                minWidth: '140px',
                 transition: 'box-shadow 0.3s ease, background-color 0.3s ease'
               }}
               onFocus={(e) => {
@@ -298,89 +320,58 @@ const Products = () => {
                 e.target.style.backgroundColor = '#f5f5f5';
                 e.target.style.boxShadow = 'none';
               }}
-            />
-          </div>
-
-          {/* Category Filter */}
-          <select
-            value={selectedCategory}
-            onChange={handleCategoryChange}
-            style={{
-              padding: '0.6rem 0.75rem',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '0.95rem',
-              backgroundColor: '#f5f5f5',
-              cursor: 'pointer',
-              flex: '0 0 auto',
-              minWidth: '140px',
-              transition: 'box-shadow 0.3s ease, background-color 0.3s ease'
-            }}
-            onFocus={(e) => {
-              e.target.style.backgroundColor = '#fff';
-              e.target.style.boxShadow = '0 4px 12px rgba(91, 75, 138, 0.2)';
-            }}
-            onBlur={(e) => {
-              e.target.style.backgroundColor = '#f5f5f5';
-              e.target.style.boxShadow = 'none';
-            }}
-          >
-            <option value="">All Categories</option>
-            {categories.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
-
-          {/* Clear Filters Button */}
-          {(searchInput || selectedCategory) && (
-            <button
-              onClick={() => {
-                setSearchInput('');
-                if (selectedCategory || onSaleOnly) {
-                  const newParams = new URLSearchParams();
-                  setSearchParams(newParams);
-                }
-              }}
-              style={{
-                padding: '0.6rem 1rem',
-                backgroundColor: '#f0f0f0',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '0.95rem',
-                color: '#333',
-                whiteSpace: 'nowrap',
-                flex: '0 0 auto',
-                transition: 'all 0.2s'
-              }}
-              onMouseOver={(e) => e.target.style.backgroundColor = '#e0e0e0'}
-              onMouseOut={(e) => e.target.style.backgroundColor = '#f0f0f0'}
             >
-              Clear
-            </button>
-          )}
-        </div>
-      </Container>
+              <option value="">All Categories</option>
+              {categories.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
 
-      {/* PRODUCTS GRID - FULL WIDTH SECTION */}
-      <div className="products-grid-wrapper">
+            {/* Clear Filters Button */}
+            {(searchInput || selectedCategory) && (
+              <button
+                onClick={() => {
+                  setSearchInput('');
+                  if (selectedCategory || onSaleOnly) {
+                    const newParams = new URLSearchParams();
+                    setSearchParams(newParams);
+                  }
+                }}
+                style={{
+                  padding: '0.6rem 1rem',
+                  backgroundColor: '#f0f0f0',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '0.95rem',
+                  color: '#333',
+                  whiteSpace: 'nowrap',
+                  flex: '0 0 auto',
+                  transition: 'all 0.2s'
+                }}
+                onMouseOver={(e) => e.target.style.backgroundColor = '#e0e0e0'}
+                onMouseOut={(e) => e.target.style.backgroundColor = '#f0f0f0'}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
         {filteredProducts.length === 0 ? (
-          <Container>
-            <div style={{
-              textAlign: 'center',
-              padding: '2rem',
-              backgroundColor: '#f8f9fa',
-              borderRadius: '8px'
-            }}>
-              <i className="fas fa-inbox" style={{ fontSize: '3rem', color: '#ccc', marginBottom: '1rem' }}></i>
-              <p style={{ color: '#666', fontSize: '1.1rem' }}>
-                {searchInput || selectedCategory || onSaleOnly 
-                  ? 'No products match your filters. Try adjusting your search.'
-                  : 'No products available at the moment.'
-                }
-              </p>
-            </div>
-          </Container>
+          <div style={{
+            textAlign: 'center',
+            padding: '2rem',
+            backgroundColor: '#f8f9fa',
+            borderRadius: '8px'
+          }}>
+            <i className="fas fa-inbox" style={{ fontSize: '3rem', color: '#ccc', marginBottom: '1rem' }}></i>
+            <p style={{ color: '#666', fontSize: '1.1rem' }}>
+              {searchInput || selectedCategory || onSaleOnly 
+                ? 'No products match your filters. Try adjusting your search.'
+                : 'No products available at the moment.'
+              }
+            </p>
+          </div>
         ) : (
           <div className="products-grid">
             {filteredProducts.map((product) => {

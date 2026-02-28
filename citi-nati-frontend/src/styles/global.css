@@ -1036,13 +1036,22 @@ body.menu-open {
    ======================== */
 
 .products-page {
-  padding: 2rem 0;
+  padding: 0;
 }
 
 .products-grid-wrapper {
   width: 100%;
   padding: 2rem 2rem;
   background-color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.products-header {
+  width: 100%;
+  max-width: 1200px;
+  margin-bottom: 2rem;
 }
 
 @media (max-width: 768px) {
@@ -1059,9 +1068,12 @@ body.menu-open {
 
 .products-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 280px));
   gap: 1.5rem;
   margin: 0;
+  width: 100%;
+  max-width: 100%;
+  justify-content: center;
 }
 
 .products-filters {
@@ -1072,54 +1084,6 @@ body.menu-open {
   overflow-x: auto;
   white-space: nowrap;
   padding-bottom: 0.5rem;
-}
-
-/* Very large screens: 5 columns */
-@media (min-width: 1920px) {
-  .products-grid {
-    grid-template-columns: repeat(5, 1fr);
-    gap: 1.5rem;
-  }
-}
-
-/* Large screens: 4 columns */
-@media (min-width: 1440px) and (max-width: 1919px) {
-  .products-grid {
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1.5rem;
-  }
-}
-
-/* Laptop: 3-4 columns */
-@media (min-width: 1024px) and (max-width: 1439px) {
-  .products-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1.5rem;
-  }
-}
-
-/* Tablet landscape: 2-3 columns */
-@media (min-width: 768px) and (max-width: 1023px) {
-  .products-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1.25rem;
-  }
-}
-
-/* Tablet portrait: 2 columns */
-@media (min-width: 481px) and (max-width: 767px) {
-  .products-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
-  }
-}
-
-/* Mobile: 1 column */
-@media (max-width: 480px) {
-  .products-grid {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-  }
 }
 
 .product-card {
