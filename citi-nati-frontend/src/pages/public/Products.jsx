@@ -406,7 +406,7 @@ const Products = () => {
                       <img 
                         src={product.imageUrl} 
                         alt={product.name}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                         crossOrigin="anonymous"
                         onLoad={() => console.log(`[PRODUCT IMAGE] ✅ Loaded: ${product.name}`)}
                         onError={(e) => {
