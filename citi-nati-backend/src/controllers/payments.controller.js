@@ -572,8 +572,8 @@ const handleWebhook = async (req, res) => {
 
     res.sendStatus(200);
     return;
-  } catch (err) {
-    console.error('[Webhook] Error handling webhook:', err);
+  } catch (txErr) {
+    console.error('[Webhook] ❌ Unexpected error in webhook handler:', txErr.message);
     // Always return 200 to Paychangu (they retry if we don't acknowledge)
     return res.sendStatus(200);
   }
