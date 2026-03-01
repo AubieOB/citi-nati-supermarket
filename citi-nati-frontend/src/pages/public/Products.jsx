@@ -444,16 +444,16 @@ const Products = () => {
                         <div>
                           {/* Original Price (Crossed Out) */}
                           <div style={{
-                            fontSize: '0.95rem',
+                            fontSize: window.innerWidth <= 480 ? '0.8rem' : '0.95rem',
                             color: '#666',
                             textDecoration: 'line-through',
-                            marginBottom: '0.35rem',
+                            marginBottom: '0.25rem',
                             fontWeight: '500'
                           }}>
                             {formatMWK(product.originalPrice)}
                           </div>
                           {/* Discount Price (Primary) */}
-                          <div className="product-card__price" style={{ color: '#ff6b6b', fontWeight: 'bold', fontSize: '1.2rem' }}>
+                          <div className="product-card__price" style={{ color: '#ff6b6b', fontWeight: 'bold', fontSize: window.innerWidth <= 480 ? '1rem' : '1.2rem' }}>
                             {formatMWK(product.finalPrice)}
                           </div>
                         </div>

@@ -842,7 +842,7 @@ const AdminProducts = () => {
                             fontSize: '0.8rem',
                             fontWeight: '600'
                           }}>
-                            Save {discountPct}%
+                            {discountPct}% off
                           </span>
                         )}
                       </div>
