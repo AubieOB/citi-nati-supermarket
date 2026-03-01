@@ -659,7 +659,7 @@ const checkPaymentStatus = async (req, res) => {
       if (cachedStatus === 'completed') {
         console.log(`[PAYMENT CHECK] ✅ Webhook found in cache for ${reference}, updating database immediately`);
         
-        // 🔒 ATOMIC TRANSACTION: Validate stock and decrement atomically
+        // 🔒 PESSIMISTIC LOCKING: Atomic UPDATE validates and decrements stock in ONE operation
         try {
           const result = await prisma.$transaction(async (tx) => {
             // 1️⃣ Fetch order with all items
@@ -675,48 +675,43 @@ const checkPaymentStatus = async (req, res) => {
               throw new Error('Order not found in transaction');
             }
 
-            // 2️⃣ Fetch all products referenced in order
-            const productIds = orderWithItems.items.map(item => item.productId);
-            const products = await tx.product.findMany({
-              where: { id: { in: productIds } }
-            });
-
-            // 3️⃣ Validate all products exist
-            if (products.length !== productIds.length) {
-              throw new Error('One or more products not found');
-            }
-
-            // 4️⃣ Validate stock for ALL items before any decrement
+            // 2️⃣ For each item, use ATOMIC UPDATE to validate and decrement stock in ONE operation
+            // This prevents race conditions: UPDATE will fail if stock is insufficient
+            const updatedProducts = [];
             for (const item of orderWithItems.items) {
-              const product = products.find(p => p.id === item.productId);
-              if (!product) {
-                throw new Error(`Product ${item.productId} not found`);
-              }
-              if (product.stock < item.quantity) {
-                throw new Error(
-                  `Insufficient stock for product. Available: ${product.stock}, Requested: ${item.quantity}`
-                );
+              try {
+                // ATOMIC: Check stock < required AND decrement in same operation via raw SQL
+                const [updated] = await tx.$queryRaw`
+                  UPDATE "Product"
+                  SET stock = stock - ${item.quantity}
+                  WHERE id = ${item.productId} AND stock >= ${item.quantity}
+                  RETURNING id, stock, price
+                `;
+
+                if (!updated) {
+                  // If UPDATE returned no rows, stock was insufficient
+                  const currentProduct = await tx.product.findUnique({
+                    where: { id: item.productId },
+                    select: { stock: true, name: true }
+                  });
+                  throw new Error(
+                    `Insufficient stock for product ${item.productId}. Available: ${currentProduct?.stock || 0}, Requested: ${item.quantity}`
+                  );
+                }
+
+                updatedProducts.push({
+                  id: Number(updated.id),
+                  stock: Number(updated.stock),
+                  price: Number(updated.price)
+                });
+                console.log(`[PAYMENT CHECK] ✅ Atomic UPDATE succeeded for product ${item.productId}: stock reduced to ${updated.stock}`);
+              } catch (err) {
+                console.error(`[PAYMENT CHECK] ❌ Atomic UPDATE failed for product ${item.productId}:`, err.message);
+                throw err;
               }
             }
 
-            // 5️⃣ Decrement stock for ALL items atomically
-            const decrementPromises = [];
-            for (const item of orderWithItems.items) {
-              decrementPromises.push(
-                tx.product.update({
-                  where: { id: item.productId },
-                  data: {
-                    stock: {
-                      decrement: item.quantity,
-                    },
-                  },
-                })
-              );
-              console.log(`[PAYMENT CHECK] 📦 Decrementing stock for product ${item.productId}: ${item.quantity} units`);
-            }
-            await Promise.all(decrementPromises);
-
-            // 6️⃣ Update order to PAID (atomically with stock decrement)
+            // 3️⃣ Update order to PAID (all stock decrements succeeded)
             const updatedOrder = await tx.order.update({
               where: { id: order.id },
               data: {
@@ -729,7 +724,7 @@ const checkPaymentStatus = async (req, res) => {
               }
             });
 
-            console.log(`[PAYMENT CHECK] ✅ Atomic transaction completed: Order ${order.id} confirmed, stock decremented`);
+            console.log(`[PAYMENT CHECK] ✅ Atomic transaction completed: Order ${order.id} confirmed, stock decremented. Final stocks: ${updatedProducts.map(p => `${p.id}:${p.stock}`).join(', ')}`);
             return updatedOrder;
           });
 
