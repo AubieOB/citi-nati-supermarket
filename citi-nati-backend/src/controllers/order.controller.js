@@ -97,7 +97,7 @@ const createOrder = async (req, res) => {
         },
       });
 
-      // Create OrderItems and update product stock
+      // Create OrderItems (do NOT decrement stock yet - wait for payment confirmation)
       for (const item of itemsData) {
         // Create OrderItem
         await tx.orderItem.create({
@@ -108,16 +108,7 @@ const createOrder = async (req, res) => {
             price: item.cartItem.price,
           },
         });
-
-        // Decrement product stock
-        await tx.product.update({
-          where: { id: item.cartItem.productId },
-          data: {
-            stock: {
-              decrement: item.cartItem.quantity,
-            },
-          },
-        });
+        // NOTE: Stock will be decremented AFTER payment is confirmed
       }
 
       // Delete all cart items
@@ -668,6 +659,12 @@ const checkPaymentStatus = async (req, res) => {
       if (cachedStatus === 'completed') {
         console.log(`[PAYMENT CHECK] ✅ Webhook found in cache for ${reference}, updating database immediately`);
         
+        // Get order items and products for stock decrement
+        const orderItems = await prisma.orderItem.findMany({
+          where: { orderId: order.id },
+          include: { product: true }
+        });
+        
         // Update order to PAID based on cached webhook
         order = await prisma.order.update({
           where: { id: order.id },
@@ -683,13 +680,26 @@ const checkPaymentStatus = async (req, res) => {
             total: true,
           }
         });
+        
+        // NOW decrement stock after payment is confirmed
+        for (const item of orderItems) {
+          console.log(`[PAYMENT CHECK] 📦 Decrementing stock for product ${item.productId}: ${item.quantity} units`);
+          await prisma.product.update({
+            where: { id: item.productId },
+            data: {
+              stock: {
+                decrement: item.quantity,
+              },
+            },
+          });
+        }
 
         // Emit notification for admin
         try {
           const { emitNewOrder: emitNewOrderFunc } = require('../utils/socket');
           const fullOrder = await prisma.order.findUnique({
             where: { id: order.id },
-            include: {
+            include:{
               items: { include: { product: true } },
               user: { select: { id: true, name: true, email: true } }
             }
