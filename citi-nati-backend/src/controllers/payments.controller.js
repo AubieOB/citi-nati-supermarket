@@ -10,51 +10,66 @@ const { cacheWebhookEvent } = require('../utils/webhookCache');
 const prisma = new PrismaClient();
 
 /**
- * Verify payment with Paychangu API
- * Returns { success: bool, orderId: int, amount: number }
+ * Verify payment with Paychangu - extract orderId from reference
+ * Paychangu should send back tx_ref (what we sent) in the webhook
  */
-const verifyPaychanguPayment = async (transactionReference) => {
+const verifyPaychanguPayment = async (transactionReference, transactionId) => {
   try {
-    if (!transactionReference) {
-      throw new Error('Transaction reference is required');
+    if (!transactionReference && !transactionId) {
+      throw new Error('Transaction reference or transaction ID is required');
     }
 
-    // For webhook: we trust Paychangu's signature verification
-    // But in a real implementation, you could make a callback to Paychangu API to verify
-    // For now, we rely on webhook crypto signature validation
+    console.log('[Payment Verification] Verifying payment with ref:', transactionReference, 'txId:', transactionId);
     
-    console.log('[Payment Verification] Processing transaction reference:', transactionReference);
-    
-    // Parse the reference to extract orderId
-    // Reference format: ORDER_{orderId}_{timestamp}
-    const parts = transactionReference.split('_');
-    if (parts.length < 2 || parts[0] !== 'ORDER') {
-      throw new Error('Invalid transaction reference format');
-    }
-    
-    const orderId = parseInt(parts[1]);
-    if (isNaN(orderId)) {
-      throw new Error('Could not extract valid order ID from reference');
+    let orderId = null;
+
+    // Try to extract orderId from our tx_ref format: ORDER_{orderId}_{timestamp}
+    if (transactionReference) {
+      const parts = transactionReference.split('_');
+      if (parts.length >= 2 && parts[0] === 'ORDER') {
+        const parsed = parseInt(parts[1]);
+        if (!isNaN(parsed)) {
+          orderId = parsed;
+          console.log('[Payment Verification] ✅ Extracted orderId from tx_ref:', orderId);
+        }
+      }
     }
 
-    // Fetch order to get authorized amount
-    const order = await prisma.order.findUnique({
-      where: { id: orderId }
-    });
+    // If we have orderId, verify the order exists
+    if (orderId) {
+      const order = await prisma.order.findUnique({
+        where: { id: orderId }
+      });
 
-    if (!order) {
-      throw new Error(`Order ${orderId} not found`);
+      if (order) {
+        console.log('[Payment Verification] ✅ Order found:', orderId);
+        return {
+          success: true,
+          orderId: orderId,
+          amount: order.total
+        };
+      }
     }
 
-    console.log('[Payment Verification] ✅ Paychangu payment verified for order', orderId);
-    
-    return {
-      success: true,
-      orderId: orderId,
-      amount: order.total
-    };
+    // Fallback: Try querying by paymentReference if parsing failed
+    if (transactionReference) {
+      const order = await prisma.order.findFirst({
+        where: { paymentReference: transactionReference }
+      });
+
+      if (order) {
+        console.log('[Payment Verification] ✅ Found order by paymentReference:', order.id);
+        return {
+          success: true,
+          orderId: order.id,
+          amount: order.total
+        };
+      }
+    }
+
+    throw new Error(`Could not find order for reference: ${transactionReference}`);
   } catch (err) {
-    console.error('[Payment Verification] ❌ Paychangu verification failed:', err.message);
+    console.error('[Payment Verification] ❌ Verification failed:', err.message);
     return {
       success: false,
       error: err.message
@@ -315,8 +330,8 @@ const handleWebhook = async (req, res) => {
 
     console.log(`[Webhook] ✅ Payment status is successful: ${status}`);
 
-    // 1️⃣ Verify payment
-    const verification = await verifyPaychanguPayment(reference);
+    // 1️⃣ Verify payment (pass both reference and transactionId)
+    const verification = await verifyPaychanguPayment(reference, transactionId);
     if (!verification.success) {
       console.error('[Webhook] ❌ Payment verification failed:', verification.error);
       return res.sendStatus(200);
@@ -478,7 +493,7 @@ const handleWebhook = async (req, res) => {
     try {
       // Fetch order details for refund
       const order = await prisma.order.findUnique({
-        where: { id: verification.orderId },
+        where: { id: orderId },
         include: {
           user: { select: { id: true, name: true, email: true } }
         }
