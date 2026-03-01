@@ -385,18 +385,18 @@ const Products = () => {
                   {product.isOnSale && (
                     <div style={{
                       position: 'absolute',
-                      top: '10px',
-                      right: '10px',
+                      top: window.innerWidth <= 480 ? '5px' : '10px',
+                      right: window.innerWidth <= 480 ? '5px' : '10px',
                       backgroundColor: '#ff6b6b',
                       color: 'white',
-                      padding: '0.5rem 0.75rem',
+                      padding: window.innerWidth <= 480 ? '0.35rem 0.5rem' : '0.5rem 0.75rem',
                       borderRadius: '4px',
-                      fontSize: '0.85rem',
+                      fontSize: window.innerWidth <= 480 ? '0.75rem' : '0.85rem',
                       fontWeight: 'bold',
                       zIndex: 10,
                       boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
                     }}>
-                      Save {discountPercent}%
+                      {discountPercent}% off
                     </div>
                   )}
 
