@@ -1140,9 +1140,7 @@ body.menu-open {
 
 .product-card__image {
   width: 100%;
-  height: auto;
-  min-height: 180px;
-  max-height: 250px;
+  height: 200px;
   background-color: #f0f0f0;
   display: flex;
   align-items: center;
@@ -1198,8 +1196,7 @@ body.menu-open {
 
 @media (max-width: 480px) {
   .product-card__image {
-    min-height: 140px;
-    max-height: 180px;
+    height: 160px;
   }
 
   .product-card__content {
