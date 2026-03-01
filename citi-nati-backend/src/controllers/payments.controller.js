@@ -641,11 +641,6 @@ const handleWebhook = async (req, res) => {
     clearTimeout(timeoutHandle);
     res.sendStatus(200);
     return;
-  } catch (err) {
-    console.error('[Webhook] ❌ Error in webhook handler:', err.message);
-    clearTimeout(timeoutHandle);
-    // Always return 200 to Paychangu to prevent retries
-    return res.sendStatus(200);
   }
 };
 
