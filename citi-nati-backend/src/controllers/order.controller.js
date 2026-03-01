@@ -659,54 +659,103 @@ const checkPaymentStatus = async (req, res) => {
       if (cachedStatus === 'completed') {
         console.log(`[PAYMENT CHECK] ✅ Webhook found in cache for ${reference}, updating database immediately`);
         
-        // Get order items and products for stock decrement
-        const orderItems = await prisma.orderItem.findMany({
-          where: { orderId: order.id },
-          include: { product: true }
-        });
-        
-        // Update order to PAID based on cached webhook
-        order = await prisma.order.update({
-          where: { id: order.id },
-          data: {
-            paymentStatus: 'PAID',
-            status: 'PENDING'
-          },
-          select: {
-            id: true,
-            userId: true,
-            paymentStatus: true,
-            status: true,
-            total: true,
-          }
-        });
-        
-        // NOW decrement stock after payment is confirmed
-        for (const item of orderItems) {
-          console.log(`[PAYMENT CHECK] 📦 Decrementing stock for product ${item.productId}: ${item.quantity} units`);
-          await prisma.product.update({
-            where: { id: item.productId },
-            data: {
-              stock: {
-                decrement: item.quantity,
-              },
-            },
-          });
-        }
-
-        // Emit notification for admin
+        // 🔒 ATOMIC TRANSACTION: Validate stock and decrement atomically
         try {
-          const { emitNewOrder: emitNewOrderFunc } = require('../utils/socket');
-          const fullOrder = await prisma.order.findUnique({
-            where: { id: order.id },
-            include:{
-              items: { include: { product: true } },
-              user: { select: { id: true, name: true, email: true } }
+          const result = await prisma.$transaction(async (tx) => {
+            // 1️⃣ Fetch order with all items
+            const orderWithItems = await tx.order.findUnique({
+              where: { id: order.id },
+              include: { 
+                items: true,
+                user: { select: { id: true, name: true, email: true } }
+              },
+            });
+
+            if (!orderWithItems) {
+              throw new Error('Order not found in transaction');
             }
+
+            // 2️⃣ Fetch all products referenced in order
+            const productIds = orderWithItems.items.map(item => item.productId);
+            const products = await tx.product.findMany({
+              where: { id: { in: productIds } }
+            });
+
+            // 3️⃣ Validate all products exist
+            if (products.length !== productIds.length) {
+              throw new Error('One or more products not found');
+            }
+
+            // 4️⃣ Validate stock for ALL items before any decrement
+            for (const item of orderWithItems.items) {
+              const product = products.find(p => p.id === item.productId);
+              if (!product) {
+                throw new Error(`Product ${item.productId} not found`);
+              }
+              if (product.stock < item.quantity) {
+                throw new Error(
+                  `Insufficient stock for product. Available: ${product.stock}, Requested: ${item.quantity}`
+                );
+              }
+            }
+
+            // 5️⃣ Decrement stock for ALL items atomically
+            const decrementPromises = [];
+            for (const item of orderWithItems.items) {
+              decrementPromises.push(
+                tx.product.update({
+                  where: { id: item.productId },
+                  data: {
+                    stock: {
+                      decrement: item.quantity,
+                    },
+                  },
+                })
+              );
+              console.log(`[PAYMENT CHECK] 📦 Decrementing stock for product ${item.productId}: ${item.quantity} units`);
+            }
+            await Promise.all(decrementPromises);
+
+            // 6️⃣ Update order to PAID (atomically with stock decrement)
+            const updatedOrder = await tx.order.update({
+              where: { id: order.id },
+              data: {
+                paymentStatus: 'PAID',
+                status: 'PENDING'
+              },
+              include: {
+                items: { include: { product: true } },
+                user: { select: { id: true, name: true, email: true } }
+              }
+            });
+
+            console.log(`[PAYMENT CHECK] ✅ Atomic transaction completed: Order ${order.id} confirmed, stock decremented`);
+            return updatedOrder;
           });
-          emitNewOrderFunc(fullOrder);
-        } catch (socketErr) {
-          console.warn('[PAYMENT CHECK] Could not emit socket event:', socketErr.message);
+
+          // Emit notification for admin (outside transaction)
+          try {
+            const { emitNewOrder: emitNewOrderFunc } = require('../utils/socket');
+            emitNewOrderFunc(result);
+            console.log(`[PAYMENT CHECK] 📢 Socket event emitted for order ${result.id}`);
+          } catch (socketErr) {
+            console.warn('[PAYMENT CHECK] Could not emit socket event:', socketErr.message);
+          }
+
+          order = {
+            id: result.id,
+            userId: result.userId,
+            paymentStatus: result.paymentStatus,
+            status: result.status,
+            total: result.total,
+          };
+
+        } catch (txErr) {
+          console.error(`[PAYMENT CHECK] 🚨 Atomic transaction failed:`, txErr.message);
+          return res.status(400).json({
+            error: txErr.message || 'Failed to confirm payment and process order',
+            code: 'PAYMENT_CONFIRMATION_FAILED'
+          });
         }
       } else {
         // Webhook not in cache yet - still waiting
