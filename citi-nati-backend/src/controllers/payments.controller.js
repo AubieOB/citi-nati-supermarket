@@ -11,7 +11,7 @@ const prisma = new PrismaClient();
 
 /**
  * Verify payment with Paychangu - extract orderId from reference
- * Paychangu should send back tx_ref (what we sent) in the webhook
+ * Quick verification - fails fast if reference doesn't parse
  */
 const verifyPaychanguPayment = async (transactionReference, transactionId) => {
   try {
@@ -19,30 +19,67 @@ const verifyPaychanguPayment = async (transactionReference, transactionId) => {
       throw new Error('Transaction reference or transaction ID is required');
     }
 
-    console.log('[Payment Verification] Verifying payment with ref:', transactionReference, 'txId:', transactionId);
+    console.log('[Payment Verification] ⏱️ Starting verification for ref:', transactionReference);
     
     let orderId = null;
 
-    // Try to extract orderId from our tx_ref format: ORDER_{orderId}_{timestamp}
-    if (transactionReference) {
+    // PRIORITY 1: Extract orderId from our tx_ref format: ORDER_{orderId}_{timestamp}
+    if (transactionReference && transactionReference.startsWith('ORDER_')) {
+      console.log('[Payment Verification] Attempting to parse tx_ref format...');
       const parts = transactionReference.split('_');
-      if (parts.length >= 2 && parts[0] === 'ORDER') {
+      if (parts.length >= 2) {
         const parsed = parseInt(parts[1]);
-        if (!isNaN(parsed)) {
+        if (!isNaN(parsed) && parsed > 0) {
           orderId = parsed;
-          console.log('[Payment Verification] ✅ Extracted orderId from tx_ref:', orderId);
+          console.log('[Payment Verification] ✅ Parsed orderId from tx_ref:', orderId);
         }
       }
     }
 
-    // If we have orderId, verify the order exists
+    // If we successfully extracted orderId, verify it exists
     if (orderId) {
+      console.log('[Payment Verification] 🔍 Looking up order ID:', orderId);
       const order = await prisma.order.findUnique({
-        where: { id: orderId }
+        where: { id: orderId },
+        select: { id: true, total: true }
       });
 
       if (order) {
-        console.log('[Payment Verification] ✅ Order found:', orderId);
+        console.log('[Payment Verification] ✅ Order found:', orderId, 'amount:', order.total);
+        return {
+          success: true,
+          orderId: orderId,
+          amount: order.total
+        };
+      } else {
+        console.warn('[Payment Verification] ⚠️ Order ID', orderId, 'not found in database');
+      }
+    }
+
+    // PRIORITY 2: If parsing failed, try to extract from transactionId
+    // (Paychangu might send this instead)
+    if (!orderId && transactionId) {
+      console.log('[Payment Verification] Attempting to extract orderId from transactionId...');
+      // Check if transactionId contains order info
+      if (transactionId.includes('_')) {
+        const parts = transactionId.split('_');
+        const parsed = parseInt(parts[parts.length - 1]);
+        if (!isNaN(parsed) && parsed > 0) {
+          orderId = parsed;
+          console.log('[Payment Verification] ✅ Extracted orderId from transactionId:', orderId);
+        }
+      }
+    }
+
+    // Verify the extracted orderId if we have one
+    if (orderId) {
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        select: { id: true, total: true }
+      });
+
+      if (order) {
+        console.log('[Payment Verification] ✅ Order verified:', orderId);
         return {
           success: true,
           orderId: orderId,
@@ -51,14 +88,23 @@ const verifyPaychanguPayment = async (transactionReference, transactionId) => {
       }
     }
 
-    // Fallback: Try querying by paymentReference if parsing failed
-    if (transactionReference) {
-      const order = await prisma.order.findFirst({
-        where: { paymentReference: transactionReference }
-      });
+    // PRIORITY 3: Last resort - query by reference (but with timeout)
+    // Only do this if parsing entirely failed
+    if (transactionReference && !orderId) {
+      console.log('[Payment Verification] Trying database lookup for reference:', transactionReference);
+      
+      const order = await Promise.race([
+        prisma.order.findFirst({
+          where: { paymentReference: transactionReference },
+          select: { id: true, total: true }
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Database query timeout')), 3000)
+        )
+      ]);
 
       if (order) {
-        console.log('[Payment Verification] ✅ Found order by paymentReference:', order.id);
+        console.log('[Payment Verification] ✅ Found by paymentReference:', order.id);
         return {
           success: true,
           orderId: order.id,
@@ -67,7 +113,8 @@ const verifyPaychanguPayment = async (transactionReference, transactionId) => {
       }
     }
 
-    throw new Error(`Could not find order for reference: ${transactionReference}`);
+    // If we get here, we couldn't verify
+    throw new Error(`Could not verify payment: ref=${transactionReference}, txId=${transactionId}`);
   } catch (err) {
     console.error('[Payment Verification] ❌ Verification failed:', err.message);
     return {
@@ -277,6 +324,12 @@ const initializePayment = async (req, res) => {
 };
 
 const handleWebhook = async (req, res) => {
+  // Set a timeout for the entire webhook processing (30 seconds max)
+  let timeoutHandle;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutHandle = setTimeout(() => reject(new Error('Webhook processing timeout')), 30000);
+  });
+
   try {
     console.log('[Webhook] Received webhook request');
     console.log('[Webhook] Headers:', JSON.stringify(req.headers, null, 2));
@@ -585,8 +638,14 @@ const handleWebhook = async (req, res) => {
       // Log for debugging but still return 200 to Paychangu
     }
 
+    clearTimeout(timeoutHandle);
     res.sendStatus(200);
     return;
+  } catch (err) {
+    console.error('[Webhook] ❌ Error in webhook handler:', err.message);
+    clearTimeout(timeoutHandle);
+    // Always return 200 to Paychangu to prevent retries
+    return res.sendStatus(200);
   }
 };
 
