@@ -15,14 +15,14 @@ import '@fortawesome/fontawesome-free/css/all.min.css';
 /**
  * 🛒 CHECKOUT PAGE
  * 
- * Contract-compliant checkout flow:
+ * Contract-compliant checkout flow with stock validation:
  * 1. Verify user is authenticated
- * 2. Fetch cart from backend (trust backend, not local state)
- * 3. Collect only allowed fields: deliveryAddress, houseNumber, latitude (optional), longitude (optional)
- * 4. Validate using orderValidation.validateCreate()
- * 5. Submit to POST /api/orders
- * 6. Show confirmation with order ID and total
- * 7. Clear cart and redirect
+ * 2. Fetch cart from backend
+ * 3. Validate stock for all products BEFORE submission
+ * 4. Collect delivery information
+ * 5. Validate all data
+ * 6. Submit to POST /api/orders
+ * 7. Redirect to payment gateway
  */
 
 const CheckoutContent = () => {
@@ -46,6 +46,11 @@ const CheckoutContent = () => {
   const [cart, setCart] = useState(null);
   const [cartLoading, setCartLoading] = useState(true);
   const [cartError, setCartError] = useState(null);
+
+  // Stock validation state
+  const [backendProducts, setBackendProducts] = useState({});
+  const [outOfStockItems, setOutOfStockItems] = useState([]);
+  const [isValidatingStock, setIsValidatingStock] = useState(false);
 
   // Success state
   const [orderCreated, setOrderCreated] = useState(null);
@@ -71,6 +76,68 @@ const CheckoutContent = () => {
 
     fetchCart();
   }, []);
+
+  // Validate stock availability
+  const validateStockAvailability = async (cartItems) => {
+    if (!cartItems || cartItems.length === 0) {
+      setOutOfStockItems([]);
+      return true;
+    }
+
+    try {
+      setIsValidatingStock(true);
+      const productIds = cartItems.map(item => item.productId);
+      
+      // Fetch latest product data from backend
+      const response = await api.get(`/products`, {
+        params: {
+          ids: productIds.join(',')
+        }
+      });
+
+      const products = response.data.products || [];
+      const productsMap = {};
+      products.forEach(p => {
+        productsMap[p.id] = p;
+      });
+      setBackendProducts(productsMap);
+
+      // Validate stock for each cart item
+      const unavailableItems = [];
+      cartItems.forEach(item => {
+        const product = productsMap[item.productId];
+        if (!product) {
+          unavailableItems.push({
+            ...item,
+            reason: 'Product not found',
+            availableStock: 0
+          });
+        } else if (item.quantity > product.stock) {
+          unavailableItems.push({
+            ...item,
+            reason: 'Insufficient stock',
+            availableStock: product.stock
+          });
+        }
+      });
+
+      setOutOfStockItems(unavailableItems);
+      return unavailableItems.length === 0;
+    } catch (err) {
+      console.error('Error validating stock:', err);
+      showWarning('Stock Check', 'Unable to verify product availability. Please try again.');
+      return false;
+    } finally {
+      setIsValidatingStock(false);
+    }
+  };
+
+  // Validate stock on cart changes
+  useEffect(() => {
+    if (cart && cart.items.length > 0) {
+      validateStockAvailability(cart.items);
+    }
+  }, [cart?.items.length]);
 
   // Handle input change
   const handleChange = (e) => {
@@ -115,6 +182,13 @@ const CheckoutContent = () => {
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // 🔒 SECTION 4: Final stock check before submission
+    const stockValid = await validateStockAvailability(cart?.items || []);
+    if (!stockValid || outOfStockItems.length > 0) {
+      showError('Stock Unavailable', 'One or more items are out of stock. Please adjust your cart.');
+      return;
+    }
 
     // Validate form data
     const validation = validateOrderCreate(formData);
@@ -175,7 +249,9 @@ const CheckoutContent = () => {
   // Check if Place Order button should be disabled
   const isPlaceOrderDisabled = 
     isSubmitting || 
-    cartLoading || 
+    cartLoading ||
+    isValidatingStock ||
+    outOfStockItems.length > 0 ||
     !cart || 
     cart.items.length === 0 ||
     orderCreated !== null;
@@ -197,6 +273,51 @@ const CheckoutContent = () => {
             textAlign: 'center',
           }}>
             Verifying your session...
+          </div>
+        )}
+
+        {/* 🔒 Out-of-Stock Alert */}
+        {outOfStockItems.length > 0 && (
+          <div style={{
+            backgroundColor: '#fff3cd',
+            color: '#856404',
+            padding: '1.5rem',
+            borderRadius: '4px',
+            marginBottom: '1.5rem',
+            borderLeft: '4px solid #ffc107',
+          }}>
+            <h3 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '1rem' }}>
+              <i className="fas fa-exclamation-triangle" style={{marginRight: '0.5rem', color: '#ff9800'}}></i>
+              Stock Check Failed
+            </h3>
+            <div style={{ marginBottom: '1rem' }}>
+              <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem' }}>
+                The following items are not fully available:
+              </p>
+              {outOfStockItems.map((item, idx) => (
+                <div key={idx} style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.5)',
+                  padding: '0.75rem',
+                  marginBottom: idx < outOfStockItems.length - 1 ? '0.5rem' : 0,
+                  borderRadius: '4px',
+                  borderLeft: '3px solid #ff6b6b',
+                }}>
+                  <p style={{ margin: '0 0 0.25rem 0', fontWeight: '600' }}>
+                    {item.name}
+                  </p>
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#333' }}>
+                    {item.reason === 'Insufficient stock'
+                      ? `You requested ${item.quantity}, but only ${item.availableStock} available`
+                      : `Product not found in stock`
+                    }
+                  </p>
+                </div>
+              ))}
+            </div>
+            <p style={{ margin: '1rem 0 0 0', fontSize: '0.85rem', color: '#666' }}>
+              <i className="fas fa-info-circle" style={{marginRight: '0.5rem'}}></i>
+              Please update your cart and try again
+            </p>
           </div>
         )}
 
@@ -449,31 +570,62 @@ const CheckoutContent = () => {
                 {/* Cart Items */}
                 <div style={{ marginBottom: '1.5rem' }}>
                   <h3 style={{ marginBottom: '1rem', fontSize: '1rem', color: '#333' }}>Items</h3>
-                  {cart.items.map((item, index) => (
-                    <div
-                      key={index}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginBottom: '0.75rem',
-                        paddingBottom: '0.75rem',
-                        borderBottom: index < cart.items.length - 1 ? '1px solid #eee' : 'none',
-                      }}
-                    >
-                      <div>
-                        <p style={{ margin: '0', fontWeight: '500', color: '#333' }}>
-                          {item.name}
-                        </p>
-                        <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem', color: '#666' }}>
-                          Qty: {item.quantity} × {formatMWK(item.price)}
-                        </p>
+                  {cart.items.map((item, index) => {
+                    const itemOutOfStock = outOfStockItems.find(x => x.productId === item.productId);
+                    const isUnavailable = !!itemOutOfStock;
+                    
+                    return (
+                      <div
+                        key={index}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start',
+                          marginBottom: '0.75rem',
+                          paddingBottom: '0.75rem',
+                          borderBottom: index < cart.items.length - 1 ? '1px solid #eee' : 'none',
+                          opacity: isUnavailable ? 0.6 : 1,
+                          backgroundColor: isUnavailable ? 'rgba(255, 107, 107, 0.05)' : 'transparent',
+                          padding: isUnavailable ? '0.75rem' : 0,
+                          borderRadius: isUnavailable ? '4px' : 0,
+                          borderLeft: isUnavailable ? '3px solid #ff6b6b' : 'none',
+                        }}
+                      >
+                        <div style={{ flex: 1 }}>
+                          <p style={{ 
+                            margin: '0', 
+                            fontWeight: '500', 
+                            color: isUnavailable ? '#666' : '#333',
+                            textDecoration: isUnavailable ? 'line-through' : 'none',
+                          }}>
+                            {item.name}
+                          </p>
+                          <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem', color: '#666' }}>
+                            Qty: {item.quantity} × {formatMWK(item.price)}
+                          </p>
+                          {isUnavailable && (
+                            <p style={{ 
+                              margin: '0.5rem 0 0 0', 
+                              fontSize: '0.8rem', 
+                              color: '#ff6b6b',
+                              fontWeight: '600',
+                            }}>
+                              <i className="fas fa-exclamation-circle" style={{marginRight: '0.3rem'}}></i>
+                              Only {itemOutOfStock.availableStock} available (need {item.quantity})
+                            </p>
+                          )}
+                        </div>
+                        <span style={{ 
+                          fontWeight: '600', 
+                          color: isUnavailable ? '#999' : '#2D8659',
+                          whiteSpace: 'nowrap',
+                          marginLeft: '1rem',
+                        }}>
+                          {formatMWK(item.subtotal)}
+                        </span>
                       </div>
-                      <span style={{ fontWeight: '600', color: '#2D8659' }}>
-                        {formatMWK(item.subtotal)}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* Total */}
