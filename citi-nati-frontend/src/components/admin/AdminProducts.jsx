@@ -819,35 +819,35 @@ const AdminProducts = () => {
                     <td style={{ padding: '1rem', fontWeight: '500' }}>{product.name}</td>
                     <td style={{ padding: '1rem', fontSize: '0.9rem', color: '#666' }}>{product.category}</td>
                     <td style={{ padding: '1rem' }}>
-                      <div>
+                      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                         {product.isOnSale && product.discountPrice && product.originalPrice && (
-                          <span style={{ textDecoration: 'line-through', color: '#666', marginRight: '0.5rem', fontWeight: '500', fontSize: '0.95rem' }}>
+                          <span style={{ textDecoration: 'line-through', color: '#666', fontWeight: '500', fontSize: '0.8rem' }}>
                             {formatMWK(product.originalPrice)}
                           </span>
                         )}
                         <span style={{ 
                           color: product.isOnSale ? '#ff6b6b' : '#2D8659', 
                           fontWeight: '600',
-                          fontSize: product.isOnSale ? '1.1rem' : '1rem'
+                          fontSize: '0.95rem'
                         }}>
                           {formatMWK(finalPrice)}
                         </span>
                         {discountPct && (
                           <span style={{ 
-                            marginLeft: '0.5rem', 
                             padding: '0.2rem 0.5rem',
                             backgroundColor: '#ff6b6b',
                             color: '#fff',
                             borderRadius: '4px',
-                            fontSize: '0.8rem',
-                            fontWeight: '600'
+                            fontSize: '0.75rem',
+                            fontWeight: '600',
+                            whiteSpace: 'nowrap'
                           }}>
                             {discountPct}% off
                           </span>
                         )}
                       </div>
                       {product.isOnSale && (
-                        <div style={{ fontSize: '0.8rem', color: '#ff6b6b', marginTop: '0.25rem' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#ff6b6b', marginTop: '0.25rem' }}>
                           🏷 On Sale
                         </div>
                       )}
@@ -878,36 +878,43 @@ const AdminProducts = () => {
                         <span style={{ color: '#999' }}>—</span>
                       )}
                     </td>
-                    <td style={{ padding: '1rem', textAlign: 'center' }}>
-                      <button
-                        onClick={() => handleEdit(product)}
-                        style={{
-                          padding: '0.5rem 0.8rem',
-                          marginRight: '0.5rem',
-                          backgroundColor: '#007bff',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '0.85rem',
-                        }}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(product.id)}
-                        style={{
-                          padding: '0.5rem 0.8rem',
-                          backgroundColor: '#dc3545',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '0.85rem',
-                        }}
-                      >
-                        Delete
-                      </button>
+                    <td style={{ padding: '1rem', textAlign: 'center', minWidth: '160px' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                        <button
+                          onClick={() => handleEdit(product)}
+                          style={{
+                            padding: '0.4rem 0.6rem',
+                            backgroundColor: '#007bff',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '0.8rem',
+                            fontWeight: '500',
+                            flex: '1',
+                            minWidth: '60px',
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(product.id)}
+                          style={{
+                            padding: '0.4rem 0.6rem',
+                            backgroundColor: '#dc3545',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '0.8rem',
+                            fontWeight: '500',
+                            flex: '1',
+                            minWidth: '60px',
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
