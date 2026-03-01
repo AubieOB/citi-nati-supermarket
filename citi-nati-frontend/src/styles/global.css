@@ -1064,6 +1064,17 @@ body.menu-open {
   max-width: 600px;
 }
 
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 280px));
+  gap: 1.5rem;
+  margin: 0;
+  width: 100%;
+  padding: 0 2rem;
+  box-sizing: border-box;
+  justify-content: center;
+}
+
 @media (max-width: 768px) {
   .products-grid-wrapper {
     padding: 1.5rem 1rem;
@@ -1097,21 +1108,10 @@ body.menu-open {
   }
 
   .products-grid {
-    padding: 0;
+    padding: 0 !important;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 0.5rem;
   }
-}
-
-.products-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 280px));
-  gap: 1.5rem;
-  margin: 0;
-  width: 100%;
-  padding: 0 2rem;
-  box-sizing: border-box;
-  justify-content: center;
 }
 
 .products-filters {
