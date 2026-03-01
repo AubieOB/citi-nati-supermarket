@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import Container from '../../components/ui/Container.jsx';
 import Button from '../../components/ui/Button.jsx';
 import api from '../../utils/api.js';
+import { getSocket } from '../../utils/socket.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useCart } from '../../context/CartContext.jsx';
 import { formatMWK } from '../../utils/currency.js';
@@ -105,6 +106,63 @@ const Products = () => {
 
     setFilteredProducts(filtered);
   }, [searchInput, products]);
+
+  /**
+   * Listen for real-time stock updates from other users' purchases
+   * Updates product stock and price immediately when received
+   */
+  useEffect(() => {
+    try {
+      const socket = getSocket();
+      
+      if (!socket) {
+        console.log('[PRODUCTS] Socket not available yet');
+        return;
+      }
+
+      const handleStockUpdate = ({ productId, newStock, newPrice }) => {
+        console.log('[PRODUCTS] 📊 Stock update received:', { productId, newStock, newPrice });
+        
+        // Update the products list with new stock
+        setProducts(prevProducts =>
+          prevProducts.map(product =>
+            product.id === productId
+              ? {
+                  ...product,
+                  stock: newStock,
+                  ...(newPrice !== null && { price: newPrice }),
+                }
+              : product
+          )
+        );
+
+        // Also update filtered products to ensure UI reflects changes
+        setFilteredProducts(prevFiltered =>
+          prevFiltered.map(product =>
+            product.id === productId
+              ? {
+                  ...product,
+                  stock: newStock,
+                  ...(newPrice !== null && { price: newPrice }),
+                }
+              : product
+          )
+        );
+      };
+
+      // Listen for stock updates
+      socket.on('stock_update', handleStockUpdate);
+      console.log('[PRODUCTS] 🔌 Socket listener attached for stock_update events');
+
+      // Cleanup: remove listener on component unmount
+      return () => {
+        socket.off('stock_update', handleStockUpdate);
+        console.log('[PRODUCTS] 🔌 Socket listener removed');
+      };
+    } catch (err) {
+      console.warn('[PRODUCTS] Error setting up stock update listener:', err.message);
+    }
+  }, []);
 
   /**
    * Calculate discount percentage

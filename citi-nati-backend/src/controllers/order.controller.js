@@ -735,9 +735,18 @@ const checkPaymentStatus = async (req, res) => {
 
           // Emit notification for admin (outside transaction)
           try {
-            const { emitNewOrder: emitNewOrderFunc } = require('../utils/socket');
+            const { emitNewOrder: emitNewOrderFunc, emitMultipleStockUpdates } = require('../utils/socket');
             emitNewOrderFunc(result);
             console.log(`[PAYMENT CHECK] 📢 Socket event emitted for order ${result.id}`);
+
+            // 7️⃣ Emit real-time stock updates to all connected clients
+            const updatedProducts = result.items.map(item => ({
+              id: item.product.id,
+              stock: item.product.stock,
+              price: item.product.price,
+            }));
+            emitMultipleStockUpdates(updatedProducts);
+            console.log(`[PAYMENT CHECK] 📊 Stock updates emitted for ${updatedProducts.length} products`);
           } catch (socketErr) {
             console.warn('[PAYMENT CHECK] Could not emit socket event:', socketErr.message);
           }

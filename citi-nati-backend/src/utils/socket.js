@@ -160,10 +160,61 @@ const emitOrderStatusUpdated = (order) => {
   emitOrderUpdated(order);
 };
 
+/**
+ * Emit stock update event to all connected clients
+ * Called when:
+ * 1. An order payment is confirmed (stock decremented)
+ * 2. Admin updates product inventory
+ */
+const emitStockUpdate = (productId, newStock, newPrice = null) => {
+  try {
+    if (global.io) {
+      const stockUpdateData = {
+        productId,
+        newStock,
+      };
+
+      // Include price if it was updated
+      if (newPrice !== null) {
+        stockUpdateData.newPrice = newPrice;
+      }
+
+      // Broadcast to all connected clients
+      global.io.emit('stock_update', stockUpdateData);
+      console.log(`[Socket.io] Stock update emitted:`, stockUpdateData);
+    }
+  } catch (err) {
+    console.error('Error emitting stock_update event:', err.message);
+  }
+};
+
+/**
+ * Emit bulk stock updates for multiple products
+ * Used when processing multi-product orders
+ */
+const emitMultipleStockUpdates = (products) => {
+  try {
+    if (global.io && Array.isArray(products)) {
+      for (const product of products) {
+        global.io.emit('stock_update', {
+          productId: product.id,
+          newStock: product.stock,
+          newPrice: product.price || null,
+        });
+      }
+      console.log(`[Socket.io] ${products.length} stock updates emitted`);
+    }
+  } catch (err) {
+    console.error('Error emitting multiple stock_update events:', err.message);
+  }
+};
+
 module.exports = {
   emitNewOrder,
   emitOrderAssigned,
   emitOrderStatusUpdated,
   emitOrderUpdated,
   emitOrderUpdatedToAdminAndCustomer,
+  emitStockUpdate,
+  emitMultipleStockUpdates,
 };
