@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 
 
 const Modal = ({ 
@@ -14,8 +14,11 @@ const Modal = ({
   confirmButtonColor = null,
   children
 }) => {
+  const confirmBtnRef = useRef(null);
+  const cancelBtnRef = useRef(null);
+
   // Prevent body scroll when modal is open
-  React.useEffect(() => {
+  useEffect(() => {
     if (isOpen && typeof document !== 'undefined') {
       document.body.style.overflow = 'hidden';
       
@@ -24,6 +27,36 @@ const Modal = ({
       };
     }
   }, [isOpen]);
+
+  // Handle keyboard events
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        confirmBtnRef.current?.click();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        onCancel?.();
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        // Move focus to cancel button
+        if (showCancelButton) {
+          cancelBtnRef.current?.focus();
+        }
+      } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        // Move focus to confirm button
+        confirmBtnRef.current?.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    confirmBtnRef.current?.focus();
+    
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onCancel, showCancelButton]);
 
   if (!isOpen) return null;
 
@@ -190,6 +223,7 @@ const Modal = ({
         >
           {showCancelButton && (
             <button
+              ref={cancelBtnRef}
               onClick={onCancel}
               style={{
                 padding: '0.625rem 1.25rem',
@@ -215,6 +249,7 @@ const Modal = ({
             </button>
           )}
           <button
+            ref={confirmBtnRef}
             onClick={async () => {
               try {
                 await onConfirm?.();
