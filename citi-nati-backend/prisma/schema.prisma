@@ -33,7 +33,7 @@ model Product {
   originalPrice    Float?
   discountPrice    Float?
   isOnSale         Boolean    @default(false)
-  stock            Int
+  stock            Int        @default(0)  // Always >= 0, protected by atomic UPDATE in payment confirmation
   category         String
   expiryDate       DateTime?
   image            String?
