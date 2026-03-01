@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Button from '../ui/Button.jsx';
 import api from '../../utils/api.js';
 import { formatMWK } from '../../utils/currency.js';
@@ -23,6 +23,7 @@ const AdminProducts = () => {
   
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const formSectionRef = useRef(null);
   const [formData, setFormData] = useState({
     name: '',
     price: '',
@@ -227,6 +228,10 @@ const AdminProducts = () => {
     });
     setEditingId(product.id);
     setShowForm(true);
+    // Scroll to edit form on next render
+    setTimeout(() => {
+      formSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
   const handleDelete = async (id) => {
@@ -274,13 +279,16 @@ const AdminProducts = () => {
     <div>
       {/* Create/Edit Form */}
       {showForm && (
-        <div style={{
-          backgroundColor: '#f8f9fa',
-          padding: '1.5rem',
-          borderRadius: '8px',
-          marginBottom: '2rem',
-          borderLeft: '4px solid #5B4B8A',
-        }}>
+        <div
+          ref={formSectionRef}
+          style={{
+            backgroundColor: '#f8f9fa',
+            padding: '1.5rem',
+            borderRadius: '8px',
+            marginBottom: '2rem',
+            borderLeft: '4px solid #5B4B8A',
+          }}
+        >
           <h3 style={{ marginBottom: '1rem', color: '#5B4B8A' }}>
             {editingId ? 'Edit Product' : 'Create New Product'}
           </h3>
@@ -297,7 +305,17 @@ const AdminProducts = () => {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '1rem' }}>
+          <form 
+            onSubmit={handleSubmit} 
+            onKeyDown={(e) => {
+              // Support Enter key on large screens
+              if (e.key === 'Enter' && window.innerWidth >= 768) {
+                e.preventDefault();
+                handleSubmit(e);
+              }
+            }}
+            style={{ display: 'grid', gap: '1rem' }}
+          >
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>

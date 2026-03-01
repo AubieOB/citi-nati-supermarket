@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import Layout from './components/layout/Layout.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
+import ScrollToTop from './components/ScrollToTop.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 import { initSocket, identifySocket } from './utils/socket.js';
 import { useGlobalNotifications } from './hooks/useGlobalNotifications.js';
@@ -123,6 +124,7 @@ function App() {
       <>
         <Toaster position="top-right" />
         <Router>
+          <ScrollToTop />
           <Layout>
             <AppInner />
           </Layout>
