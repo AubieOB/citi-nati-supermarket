@@ -345,6 +345,75 @@ const sendDeliveryStatusEmail = async (email, userName, orderDetails, status) =>
   }
 };
 
+/**
+ * Send Refund Notification Email
+ * Sent when payment is refunded due to order fulfillment failure
+ */
+const sendRefundNotificationEmail = async (email, userName, refundDetails) => {
+  try {
+    console.log('[EMAIL] Attempting to send refund notification email to:', email);
+
+    const formattedAmount = refundDetails.amount ? `MWK ${refundDetails.amount.toLocaleString()}` : 'N/A';
+    const refundId = refundDetails.refundId || 'Processing';
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: #5B4B8A; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+          <h1 style="color: white; margin: 0;">Citi-Nati Supermarket</h1>
+        </div>
+        <div style="padding: 30px; background-color: #f9f9f9;">
+          <h2 style="color: #d32f2f;">Order Refund Processed</h2>
+          <p style="color: #666;">Hi ${userName},</p>
+          <p style="color: #666; font-size: 16px; line-height: 1.6;">
+            Unfortunately, we were unable to complete your order after payment was processed. We have automatically refunded your payment.
+          </p>
+          
+          <div style="background-color: #ffebee; padding: 15px; border-left: 4px solid #d32f2f; border-radius: 4px; margin: 20px 0;">
+            <p style="color: #c62828; font-size: 14px; margin: 0 0 10px 0;"><strong>⚠️ Refund Details</strong></p>
+            <p style="color: #666; font-size: 13px; margin: 0 0 10px 0;">
+              <strong>Reason:</strong> ${refundDetails.reason || 'Product unavailable'}
+            </p>
+          </div>
+
+          <div style="background-color: #fff; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #e0e0e0;">
+            <p style="color: #999; font-size: 12px; margin: 0;"><strong>Order ID:</strong> #${refundDetails.orderId}</p>
+            <p style="color: #999; font-size: 12px; margin: 5px 0;"><strong>Refund Amount:</strong> ${formattedAmount}</p>
+            <p style="color: #999; font-size: 12px; margin: 5px 0;"><strong>Refund ID:</strong> ${refundId}</p>
+            <p style="color: #999; font-size: 12px; margin: 5px 0;"><strong>Processed:</strong> ${refundDetails.timestamp ? new Date(refundDetails.timestamp).toLocaleString() : 'Today'}</p>
+          </div>
+
+          <div style="background-color: #e3f2fd; padding: 15px; border-left: 4px solid #1976d2; border-radius: 4px; margin: 20px 0;">
+            <p style="color: #0d47a1; font-size: 14px; margin: 0 0 10px 0;"><strong>ℹ️ What Happens Next</strong></p>
+            <ul style="color: #666; font-size: 13px; margin: 0; padding-left: 20px;">
+              <li style="margin: 5px 0;">The refund has been initiated with Paychangu</li>
+              <li style="margin: 5px 0;">Funds should appear in your account within 3-5 business days</li>
+              <li style="margin: 5px 0;">Please don't attempt to place the same order until stock is confirmed available</li>
+              <li style="margin: 5px 0;">Feel free to contact us if you have any questions</li>
+            </ul>
+          </div>
+
+          <p style="color: #666; font-size: 14px;">
+            We apologize for the inconvenience and appreciate your patience. We're constantly working to improve our inventory management to prevent this from happening in the future.
+          </p>
+
+          <p style="color: #666; font-size: 14px;">
+            Thank you for choosing Citi-Nati Supermarket!
+          </p>
+        </div>
+        <div style="background-color: #f0f0f0; padding: 20px; text-align: center; border-radius: 0 0 8px 8px; font-size: 12px; color: #999;">
+          <p style="margin: 0;">© 2026 Citi-Nati Supermarket. All rights reserved.</p>
+          <p style="margin: 5px 0 0 0;">If you have questions, contact support.</p>
+        </div>
+      </div>
+    `;
+
+    return await sendEmail(email, 'Payment Refunded - Order #' + refundDetails.orderId, html);
+  } catch (err) {
+    console.error('[EMAIL] ❌ Error in sendRefundNotificationEmail:', err.message);
+    return { success: false, error: err.message };
+  }
+};
+
 module.exports = {
   sendEmail,
   sendVerificationEmail,
@@ -353,4 +422,5 @@ module.exports = {
   sendPaymentConfirmationEmail,
   sendDriverAssignedEmail,
   sendDeliveryStatusEmail,
+  sendRefundNotificationEmail,
 };

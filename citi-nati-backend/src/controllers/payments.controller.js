@@ -4,7 +4,7 @@ const axios = require('axios');
 const { PrismaClient } = require('@prisma/client');
 const { emitNewOrder, emitMultipleStockUpdates } = require('../utils/socket');
 const { notifyPaymentSuccess, notifyOrderPlaced } = require('../utils/messageService');
-const { sendOrderConfirmationEmail, sendPaymentConfirmationEmail } = require('../utils/emailService');
+const { sendOrderConfirmationEmail, sendPaymentConfirmationEmail, sendRefundNotificationEmail } = require('../utils/emailService');
 const { cacheWebhookEvent } = require('../utils/webhookCache');
 
 const prisma = new PrismaClient();
@@ -13,7 +13,7 @@ const prisma = new PrismaClient();
  * Verify payment with Paychangu API
  * Returns { success: bool, orderId: int, amount: number }
  */
-const verifyPayjangoPayment = async (transactionReference) => {
+const verifyPaychanguPayment = async (transactionReference) => {
   try {
     if (!transactionReference) {
       throw new Error('Transaction reference is required');
@@ -46,7 +46,7 @@ const verifyPayjangoPayment = async (transactionReference) => {
       throw new Error(`Order ${orderId} not found`);
     }
 
-    console.log('[Payment Verification] ✅ Payment verified for order', orderId);
+    console.log('[Payment Verification] ✅ Paychangu payment verified for order', orderId);
     
     return {
       success: true,
@@ -54,10 +54,69 @@ const verifyPayjangoPayment = async (transactionReference) => {
       amount: order.total
     };
   } catch (err) {
-    console.error('[Payment Verification] ❌ Verification failed:', err.message);
+    console.error('[Payment Verification] ❌ Paychangu verification failed:', err.message);
     return {
       success: false,
       error: err.message
+    };
+  }
+};
+
+/**
+ * Initiate refund with Paychangu API
+ * Called when order fulfillment fails after payment (e.g., insufficient stock)
+ */
+const refundPaychanguPayment = async ({ transactionId, amount, reason }) => {
+  try {
+    if (!transactionId || !amount) {
+      throw new Error('Transaction ID and amount are required for refund');
+    }
+
+    console.log(`[Refund] Initiating refund: transaction=${transactionId}, amount=${amount}, reason=${reason}`);
+
+    // Call Paychangu refund API
+    console.log('[Refund] Initiating Paychangu refund for amount:', amount);
+    const response = await axios.post(
+      'https://api.paychangu.com/refund',
+      {
+        transaction_id: transactionId,
+        amount: amount.toString(),
+        reason: reason || 'Automatic refund - order could not be fulfilled'
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.PAYCHANGU_SECRET_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    console.log('[Refund] Paychangu response:', JSON.stringify(response.data, null, 2));
+
+    const refundSuccess = response.data?.status === 'success' || response.data?.success === true;
+    
+    if (refundSuccess) {
+      console.log(`[Refund] ✅ Refund successful: ${response.data?.refund_id || 'ID not provided'}`);
+      return {
+        success: true,
+        refundId: response.data?.refund_id,
+        amount: amount,
+        message: 'Refund processed successfully'
+      };
+    } else {
+      console.warn('[Refund] ⚠️ Refund API returned non-success status:', response.data?.status);
+      return {
+        success: false,
+        message: response.data?.message || 'Refund status unknown',
+        response: response.data
+      };
+    }
+  } catch (err) {
+    console.error('[Refund] ❌ API error:', err.response?.data || err.message);
+    return {
+      success: false,
+      error: err.message,
+      message: 'Failed to process refund with Paychangu API'
     };
   }
 };
@@ -257,7 +316,7 @@ const handleWebhook = async (req, res) => {
     console.log(`[Webhook] ✅ Payment status is successful: ${status}`);
 
     // 1️⃣ Verify payment
-    const verification = await verifyPayjangoPayment(reference);
+    const verification = await verifyPaychanguPayment(reference);
     if (!verification.success) {
       console.error('[Webhook] ❌ Payment verification failed:', verification.error);
       return res.sendStatus(200);
@@ -412,9 +471,105 @@ const handleWebhook = async (req, res) => {
 
   } catch (txErr) {
     console.error('[Webhook] ❌ Transaction error:', txErr.message);
-    // If transaction fails (e.g., insufficient stock), we still return 200 to Paychangu
-    // The payment WAS successful, but we couldn't fulfill the order
-    // Admin will need to handle this exception manually
+    
+    // Payment WAS successful but order fulfillment failed (e.g., insufficient stock)
+    // We MUST refund the customer automatically
+    
+    try {
+      // Fetch order details for refund
+      const order = await prisma.order.findUnique({
+        where: { id: verification.orderId },
+        include: {
+          user: { select: { id: true, name: true, email: true } }
+        }
+      });
+
+      if (order && (txErr.message.includes('Insufficient stock') || txErr.message.includes('Products'))) {
+        console.log(`[Webhook] 💰 Attempting automatic refund for order ${order.id}...`);
+
+        // Call Paychangu to refund
+        const refundResult = await refundPaychanguPayment({
+          transactionId: req.body.transaction_id || req.body.transactionId,
+          amount: order.total,
+          reason: `Automatic refund: ${txErr.message}`
+        });
+
+        if (refundResult.success) {
+          // Mark order as refunded
+          console.log(`[Webhook] ✅ Refund successful (ID: ${refundResult.refundId})`);
+          
+          await prisma.order.update({
+            where: { id: order.id },
+            data: {
+              paymentStatus: 'REFUNDED',
+              status: 'CANCELLED',
+              notes: `Automatic refund: ${txErr.message} (Refund ID: ${refundResult.refundId})`
+            }
+          });
+
+          // Send refund email asynchronously
+          setImmediate(async () => {
+            try {
+              await sendRefundNotificationEmail(
+                order.user.email,
+                order.user.name,
+                {
+                  orderId: order.id,
+                  amount: order.total,
+                  reason: txErr.message,
+                  refundId: refundResult.refundId,
+                  timestamp: new Date()
+                }
+              );
+              console.log(`[Email] ✅ Background: Refund notification sent to ${order.user.email}`);
+            } catch (emailErr) {
+              console.error(`[Email] ❌ Failed to send refund email:`, emailErr.message);
+            }
+          });
+
+          console.log(`[Webhook] ✅ Order ${order.id} marked as REFUNDED`);
+        } else {
+          // Refund API call failed - need manual intervention
+          console.error(`[Webhook] ❌ Automatic refund failed: ${refundResult.message}`);
+          
+          // Update order with refund pending status
+          await prisma.order.update({
+            where: { id: order.id },
+            data: {
+              paymentStatus: 'REFUND_PENDING',
+              status: 'PENDING',
+              notes: `Manual refund required: ${txErr.message} (API Error: ${refundResult.message})`
+            }
+          });
+
+          // Alert admin immediately
+          console.log(`[Alert] 🚨 MANUAL REFUND REQUIRED FOR ORDER ${order.id}`);
+          console.log(`[Alert] Transaction ID: ${req.body.transaction_id || 'unknown'}`);
+          console.log(`[Alert] Amount: ${order.total}`);
+          console.log(`[Alert] Reason: ${txErr.message}`);
+          console.log(`[Alert] Customer: ${order.user.email}`);
+
+          // Optional: Send admin notification (implement notifyAdminRefundRequired if using message service)
+          try {
+            const { notifyAdminRefundRequired } = require('../utils/messageService');
+            await notifyAdminRefundRequired({
+              orderId: order.id,
+              amount: order.total,
+              error: txErr.message,
+              transactionId: req.body.transaction_id || 'unknown'
+            });
+          } catch (notifyErr) {
+            console.warn('[Notify] Could not send admin notification:', notifyErr.message);
+          }
+        }
+      } else {
+        console.warn('[Webhook] Not attempting refund - order not found or error type not refundable');
+      }
+    } catch (refundErr) {
+      console.error('[Webhook] 🚨 Error during refund attempt:', refundErr.message);
+      // Log for debugging but still return 200 to Paychangu
+    }
+
     res.sendStatus(200);
     return;
   } catch (err) {
@@ -424,4 +579,4 @@ const handleWebhook = async (req, res) => {
   }
 };
 
-module.exports = { initializePayment, handleWebhook, verifyPayjangoPayment };
+module.exports = { initializePayment, handleWebhook, verifyPaychanguPayment, refundPaychanguPayment };
