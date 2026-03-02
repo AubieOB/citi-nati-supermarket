@@ -138,14 +138,16 @@ const refundPaychanguPayment = async ({ transactionId, amount, reason }) => {
 
     // Call Paychangu refund API
     console.log('[Refund] Initiating Paychangu refund for amount:', amount);
-    const response = await axios.post(
+    
+    // Paychangu refund endpoint uses GET (not POST)
+    const response = await axios.get(
       'https://api.paychangu.com/refund',
       {
-        transaction_id: transactionId,
-        amount: amount.toString(),
-        reason: reason || 'Automatic refund - order could not be fulfilled'
-      },
-      {
+        params: {
+          transaction_id: transactionId,
+          amount: amount.toString(),
+          reason: reason || 'Automatic refund - order could not be fulfilled'
+        },
         headers: {
           Authorization: `Bearer ${process.env.PAYCHANGU_SECRET_KEY}`,
           'Content-Type': 'application/json'
