@@ -1,6 +1,5 @@
 import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AccountAvatar from '../../components/common/AccountAvatar.jsx';
 import toast from 'react-hot-toast';
 import AdminProducts from '../../components/admin/AdminProducts.jsx';
 import AdminOrders from '../../components/admin/AdminOrders.jsx';
@@ -125,15 +124,14 @@ const AdminDashboard = () => {
           ))}
         </div>
 
-        {/* Sidebar Footer - Home & Avatar */}
+        {/* Sidebar Footer - Home Button */}
         <div style={{
           padding: '1rem 1.5rem',
           borderTop: '1px solid #e0e0e0',
           backgroundColor: '#fff',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '1rem',
+          justifyContent: 'center',
           flexShrink: 0
         }}>
           {/* Home Link */}
@@ -165,9 +163,6 @@ const AdminDashboard = () => {
             <i className="fas fa-home" style={{ fontSize: '1rem' }}></i>
             <span>Home</span>
           </button>
-
-          {/* Account Avatar with Logout */}
-          <AccountAvatar bgColor="#5B4B8A" size="40px" fontSize="16px" />
         </div>
       </div>
 
