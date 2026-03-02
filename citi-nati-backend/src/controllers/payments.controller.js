@@ -378,6 +378,7 @@ const handleWebhook = async (req, res) => {
     const successStatuses = ['success', 'completed', 'COMPLETED', 'SUCCESS', 'paid', 'PAID'];
     if (!successStatuses.includes(status)) {
       console.log(`[Webhook] ⚠️ Payment status not success: ${status} (ignoring)`);
+      clearTimeout(timeoutHandle);
       return res.sendStatus(200);
     }
 
@@ -387,6 +388,7 @@ const handleWebhook = async (req, res) => {
     const verification = await verifyPaychanguPayment(reference, transactionId);
     if (!verification.success) {
       console.error('[Webhook] ❌ Payment verification failed:', verification.error);
+      clearTimeout(timeoutHandle);
       return res.sendStatus(200);
     }
 
@@ -502,6 +504,7 @@ const handleWebhook = async (req, res) => {
 
     // Return 200 immediately to Paychangu - don't wait for emails
     res.sendStatus(200);
+    clearTimeout(timeoutHandle);
     console.log(`[Webhook] ✅ Response sent to Paychangu (200 OK)`);
 
     // Send emails asynchronously in background (don't block the response)
