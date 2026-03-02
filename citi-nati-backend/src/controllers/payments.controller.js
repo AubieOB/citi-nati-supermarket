@@ -140,8 +140,9 @@ const refundPaychanguPayment = async ({ transactionId, amount, reason }) => {
     console.log('[Refund] Initiating Paychangu refund for amount:', amount);
     
     // Paychangu refund endpoint uses GET (not POST)
+    // Note: endpoint is /refunds (plural), not /refund
     const response = await axios.get(
-      'https://api.paychangu.com/refund',
+      'https://api.paychangu.com/refunds',
       {
         params: {
           transaction_id: transactionId,
