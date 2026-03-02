@@ -1030,19 +1030,26 @@ const getRefundPendingOrders = async (req, res) => {
 
     return res.status(200).json({
       count: orders.length,
-      refunds: orders.map(order => ({
-        id: order.id,
-        userId: order.user.id,
-        customerName: order.user.name,
-        customerEmail: order.user.email,
-        amount: order.total,
-        items: order.items,
-        status: order.paymentStatus,
-        notes: order.notes,
-        paymentReference: order.paymentReference,
-        createdAt: order.createdAt,
-        updatedAt: order.updatedAt
-      }))
+      refunds: orders.map(order => {
+        // Extract Paychangu transaction ID from notes if available
+        const notesMatch = order.notes?.match(/Paychangu Ref: ([^\n]+)/);
+        const transactionId = notesMatch ? notesMatch[1].trim() : 'unknown';
+        
+        return {
+          id: order.id,
+          userId: order.user.id,
+          customerName: order.user.name,
+          customerEmail: order.user.email,
+          amount: order.total,
+          items: order.items,
+          status: order.paymentStatus,
+          notes: order.notes,
+          paymentReference: order.paymentReference,
+          transactionId: transactionId,
+          createdAt: order.createdAt,
+          updatedAt: order.updatedAt
+        }
+      })
     });
   } catch (err) {
     console.error('Error fetching refund pending orders:', err);

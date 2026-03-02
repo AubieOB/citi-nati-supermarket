@@ -259,6 +259,17 @@ const AdminRefunds = () => {
                   <strong>Payment Reference:</strong> <code>{refund.paymentReference}</code>
                 </p>
                 <p style={{ margin: '0.25rem 0', color: '#666' }}>
+                  <i className="fas fa-hashtag" style={{ marginRight: '0.5rem', width: '16px' }}></i>
+                  <strong>Transaction ID:</strong> <code style={{ 
+                    backgroundColor: '#fff',
+                    padding: '0.25rem 0.5rem',
+                    borderRadius: '3px',
+                    border: '1px solid #e0e0e0',
+                    color: '#d32f2f',
+                    fontWeight: '600'
+                  }}>{refund.transactionId || refund.paymentReference}</code>
+                </p>
+                <p style={{ margin: '0.25rem 0', color: '#666' }}>
                   <i className="fas fa-tag" style={{ marginRight: '0.5rem', width: '16px' }}></i>
                   <strong>Status:</strong> {refund.status}
                 </p>
