@@ -48,8 +48,8 @@
     top: 1rem;
     left: 1rem;
     z-index: 101;
-    background-color: #5B4B8A;
-    color: white;
+    background-color: transparent;
+    color: #5B4B8A;
     width: 44px;
     height: 44px;
     border-radius: 4px;
@@ -61,7 +61,7 @@
   }
 
   .admin-hamburger:active {
-    background-color: #4a3a7a;
+    background-color: transparent;
   }
 
   .admin-sidebar {
