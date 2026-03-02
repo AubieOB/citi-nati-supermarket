@@ -561,8 +561,9 @@ const handleWebhook = async (req, res) => {
         console.log(`[Webhook] 💰 Attempting automatic refund for order ${order.id}...`);
 
         // Call Paychangu to refund
+        // Use Paychangu's reference as transactionId (req.body.reference is their transaction ID)
         const refundResult = await refundPaychanguPayment({
-          transactionId: req.body.transaction_id || req.body.transactionId,
+          transactionId: req.body.reference || req.body.transaction_id || req.body.transactionId,
           amount: order.total,
           reason: `Automatic refund: ${txErr.message}`
         });
@@ -617,23 +618,10 @@ const handleWebhook = async (req, res) => {
 
           // Alert admin immediately
           console.log(`[Alert] 🚨 MANUAL REFUND REQUIRED FOR ORDER ${order.id}`);
-          console.log(`[Alert] Transaction ID: ${req.body.transaction_id || 'unknown'}`);
+          console.log(`[Alert] Transaction ID: ${req.body.reference || 'unknown'}`);
           console.log(`[Alert] Amount: ${order.total}`);
           console.log(`[Alert] Reason: ${txErr.message}`);
           console.log(`[Alert] Customer: ${order.user.email}`);
-
-          // Optional: Send admin notification (implement notifyAdminRefundRequired if using message service)
-          try {
-            const { notifyAdminRefundRequired } = require('../utils/messageService');
-            await notifyAdminRefundRequired({
-              orderId: order.id,
-              amount: order.total,
-              error: txErr.message,
-              transactionId: req.body.transaction_id || 'unknown'
-            });
-          } catch (notifyErr) {
-            console.warn('[Notify] Could not send admin notification:', notifyErr.message);
-          }
         }
       } else {
         console.warn('[Webhook] Not attempting refund - order not found or error type not refundable');
