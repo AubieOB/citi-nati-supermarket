@@ -457,7 +457,6 @@ const handleWebhook = async (req, res) => {
         data: {
           paymentStatus: 'PAID',
           status: 'PENDING',
-          paidAt: new Date(),
           paymentReference: reference
         },
         include: {
