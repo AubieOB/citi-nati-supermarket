@@ -1791,19 +1791,7 @@ body.menu-open {
 
   .cart-quantity-input::-webkit-outer-spin-button,
   .cart-quantity-input::-webkit-inner-spin-button {
-    display: inline-block !important;
-    -webkit-appearance: inner-spin-button !important;
-    opacity: 1 !important;
-    width: 28px;
-    height: 22px;
-    margin-left: 2px;
-  }
-}
-
-/* Driver Dashboard Mobile Responsive - Center button content */
-@media (max-width: 768px) {
-  button:has(.fa-home) {
-    padding: 0.75rem 1rem !important;
+    display: inline-block !important;      
     justify-content: center;
   }
 }

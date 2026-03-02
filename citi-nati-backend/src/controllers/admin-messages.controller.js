@@ -2,6 +2,30 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 /**
+ * Deduplication cache to prevent duplicate notifications
+ */
+const messageDeduplicationCache = new Map();
+const MESSAGE_DEDUP_TTL = 5000; // 5 seconds
+
+/**
+ * Check if message was recently created (deduplication)
+ */
+const isMessageDuplicate = (type, title, message) => {
+  const key = `${type}:${title}:${message}`;
+  if (messageDeduplicationCache.has(key)) {
+    console.log('[ADMIN_MSG] Duplicate detected, skipping:', key.substring(0, 50));
+    return true;
+  }
+  
+  messageDeduplicationCache.set(key, true);
+  setTimeout(() => {
+    messageDeduplicationCache.delete(key);
+  }, MESSAGE_DEDUP_TTL);
+  
+  return false;
+};
+
+/**
  * Get all admin messages with optional filtering
  */
 const getMessages = async (req, res) => {
@@ -109,6 +133,12 @@ const deleteAllMessages = async (req, res) => {
  */
 const createMessage = async (type, title, message) => {
   try {
+    // Check for duplicates
+    if (isMessageDuplicate(type, title, message)) {
+      console.log('[MESSAGE] Duplicate message skipped:', type);
+      return null;
+    }
+
     const newMessage = await prisma.adminMessage.create({
       data: {
         type,
@@ -118,9 +148,24 @@ const createMessage = async (type, title, message) => {
       },
     });
     console.log('[MESSAGE] Created admin message:', newMessage.id, type);
+
+    // Emit real-time notification to all admins via Socket.io
+    if (global.io) {
+      global.io.to('admin_room').emit('newAdminMessage', {
+        id: newMessage.id,
+        type: newMessage.type,
+        title: newMessage.title,
+        message: newMessage.message,
+        read: newMessage.read,
+        createdAt: newMessage.createdAt,
+      });
+      console.log('[Socket.io] Admin message', newMessage.id, 'emitted to admin_room');
+    }
+
     return newMessage;
   } catch (error) {
     console.error('[ERROR] Create admin message:', error);
+    return null;
   }
 };
 

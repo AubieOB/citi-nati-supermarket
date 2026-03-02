@@ -216,18 +216,48 @@ const sendPaymentConfirmationEmail = async (email, userName, paymentDetails) => 
           <h2 style="color: #333;">Payment Confirmed</h2>
           <p style="color: #666;">Hi ${userName},</p>
           <p style="color: #666; font-size: 16px; line-height: 1.6;">
-            Your payment has been successfully processed.
+            Your payment has been successfully processed. Your order is being prepared.
           </p>
           <div style="background-color: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 8px; margin: 20px 0;">
             <p style="color: #155724; margin: 0;">✓ Payment Received</p>
           </div>
-          <div style="background-color: #fff; padding: 15px; border-radius: 8px; margin: 20px 0;">
-            <p style="color: #999; font-size: 12px; margin: 0;"><strong>Amount:</strong> MWK ${paymentDetails.amount?.toLocaleString() || 'N/A'}</p>
-            <p style="color: #999; font-size: 12px; margin: 5px 0;"><strong>Reference:</strong> ${paymentDetails.reference || 'N/A'}</p>
+          
+          <h3 style="color: #333; margin-top: 20px; margin-bottom: 10px;">Order Summary</h3>
+          <div style="background-color: #fff; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #e0e0e0;">
+            <p style="color: #999; font-size: 12px; margin: 0;"><strong>Order ID:</strong> #${paymentDetails.orderId || 'N/A'}</p>
+            <p style="color: #999; font-size: 12px; margin: 5px 0;"><strong>Payment Reference:</strong> ${paymentDetails.reference || 'N/A'}</p>
+            <p style="color: #999; font-size: 12px; margin: 5px 0;"><strong>Amount Paid:</strong> MWK ${paymentDetails.amount?.toLocaleString() || 'N/A'}</p>
+            <p style="color: #999; font-size: 12px; margin: 5px 0;"><strong>Status:</strong> PAID</p>
             <p style="color: #999; font-size: 12px; margin: 5px 0;"><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+            <p style="color: #999; font-size: 12px; margin: 5px 0;"><strong>Delivery Address:</strong> ${paymentDetails.deliveryAddress || 'N/A'}</p>
           </div>
-          <p style="color: #666; font-size: 14px;">
-            Thank you for shopping with Citi-Nati Supermarket!
+
+          <h3 style="color: #333; margin-top: 20px; margin-bottom: 10px;">Order Items</h3>
+          <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+            <thead>
+              <tr style="background-color: #5B4B8A; color: white;">
+                <th style="padding: 10px; text-align: left; font-size: 12px;">Product</th>
+                <th style="padding: 10px; text-align: center; font-size: 12px;">Qty</th>
+                <th style="padding: 10px; text-align: right; font-size: 12px;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${paymentDetails.items?.map(item => `
+                <tr style="border-bottom: 1px solid #ddd;">
+                  <td style="padding: 10px; font-size: 12px; color: #333;">${item.productName || 'Product'}</td>
+                  <td style="padding: 10px; text-align: center; font-size: 12px; color: #333;">${item.quantity || 0}</td>
+                  <td style="padding: 10px; text-align: right; font-size: 12px; color: #333;">MWK ${(item.total || 0).toLocaleString()}</td>
+                </tr>
+              `).join('') || '<tr><td colspan="3" style="padding: 10px; text-align: center; color: #999;">No items</td></tr>'}
+            </tbody>
+          </table>
+
+          <div style="text-align: right; padding-top: 15px; border-top: 2px solid #e0e0e0;">
+            <p style="color: #333; font-size: 14px; margin: 0;"><strong>Grand Total: MWK ${paymentDetails.amount?.toLocaleString() || 'N/A'}</strong></p>
+          </div>
+
+          <p style="color: #666; font-size: 14px; margin-top: 20px;">
+            You'll receive another email when your order is assigned to a driver. You can track your order status in your account dashboard.
           </p>
         </div>
         <div style="background-color: #f0f0f0; padding: 20px; text-align: center; border-radius: 0 0 8px 8px; font-size: 12px; color: #999;">

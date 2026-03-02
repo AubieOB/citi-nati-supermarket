@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import toast from 'react-hot-toast';
 import api from '../../utils/api.js';
+import { getSocket } from '../../utils/socket.js';
 import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
 
@@ -100,6 +102,60 @@ const AdminInbox = () => {
       playNotificationSound();
     }
   }, [messages]);
+
+  // Set up Socket.io listener for real-time admin messages
+  useEffect(() => {
+    try {
+      const socket = getSocket();
+      if (!socket) {
+        console.warn('[AdminInbox] Socket not initialized');
+        return;
+      }
+
+      /**
+       * Listen for new admin messages in real-time
+       */
+      const handleNewAdminMessage = (newMessage) => {
+        console.log('[AdminInbox] New message received via Socket.io:', newMessage);
+        
+        // Check if message already exists (prevent duplicates)
+        if (!messages.some(m => m.id === newMessage.id)) {
+          // Add new message to the front of the list
+          setMessages(prevMessages => [newMessage, ...prevMessages]);
+          
+          // Play sound and show toast for ALL messages
+          playNotificationSound();
+          
+          // Get message type info for better display
+          const messageType = messageTypes.find(t => t.value === newMessage.type);
+          const icon = messageType?.icon || 'fa-bell';
+          const color = messageType?.color || '#607D8B';
+          
+          // Show toast notification
+          toast.success(
+            <div>
+              <strong>{newMessage.title}</strong><br/>
+              <small>{newMessage.message.substring(0, 60)}...</small>
+            </div>,
+            {
+              duration: 4000,
+              icon: <i className={`fas ${icon}`} style={{ color }}></i>,
+            }
+          );
+        }
+      };
+
+      socket.on('newAdminMessage', handleNewAdminMessage);
+      console.log('[AdminInbox] Socket.io listener registered for newAdminMessage');
+
+      return () => {
+        socket.off('newAdminMessage', handleNewAdminMessage);
+        console.log('[AdminInbox] Socket.io listener removed');
+      };
+    } catch (err) {
+      console.error('[AdminInbox] Socket.io setup error:', err);
+    }
+  }, [messages, messageTypes]);
 
   // Apply filters whenever messages, filters change
   useEffect(() => {

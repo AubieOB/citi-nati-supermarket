@@ -1,8 +1,9 @@
 const { PrismaClient } = require('@prisma/client');
 const axios = require('axios');
+const PDFDocument = require('pdfkit');
 const { emitNewOrder, emitOrderAssigned, emitOrderStatusUpdated, emitOrderUpdated, emitOrderUpdatedToAdminAndCustomer } = require('../utils/socket');
 const { notifyDriverAssigned, notifyOrderCompleted } = require('../utils/messageService');
-const { sendDriverAssignedEmail, sendDeliveryStatusEmail } = require('../utils/emailService');
+const { sendDriverAssignedEmail, sendDeliveryStatusEmail, sendRefundNotificationEmail } = require('../utils/emailService');
 const { isPaymentConfirmedInCache } = require('../utils/webhookCache');
 
 const prisma = new PrismaClient();
@@ -986,17 +987,81 @@ const getReceipt = async (req, res) => {
           <div class="footer">
             <p>Thank you for shopping at Citi-Nati Supermarket!</p>
             <p>For inquiries, contact us via the app or visit our store.</p>
-            <p style="margin-top: 20px; color: #ccc;">Receipt Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
+    // Generate PDF receipt
+    const doc = new PDFDocument({ margin: 40 });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="receipt-${order.id}.pdf"`);
+    doc.pipe(res);
 
-    // Send receipt as HTML
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="receipt-${order.id}.html"`);
-    return res.status(200).send(receiptHTML);
+    // Header
+    doc.fontSize(20).font('Helvetica-Bold').text('CITI-NATI SUPERMARKET', { align: 'center' });
+    doc.moveDown(0.3);
+    doc.fontSize(10).font('Helvetica').text('Order Receipt', { align: 'center' });
+    doc.moveDown(0.5);
+
+    // Horizontal line
+    doc.strokeColor('#5B4B8A').lineWidth(1).moveTo(40, doc.y).lineTo(doc.page.width - 40, doc.y).stroke();
+    doc.moveDown(0.5);
+
+    // Order Info
+    doc.fontSize(11).font('Helvetica-Bold').text('ORDER INFORMATION', { underline: false });
+    doc.fontSize(10).font('Helvetica').fillColor('#333');
+    doc.text(`Order #${order.id}`);
+    doc.text(`Date: ${new Date(order.createdAt).toLocaleDateString()}`);
+    doc.text(`Customer: ${order.user.name}`);
+    doc.text(`Email: ${order.user.email}`);
+    doc.text(`Phone: ${order.user.phone}`);
+    doc.moveDown(0.3);
+
+    // Delivery Info
+    doc.fontSize(11).font('Helvetica-Bold').fillColor('#333').text('DELIVERY ADDRESS');
+    doc.fontSize(10).font('Helvetica').fillColor('#333');
+    doc.text(`${order.deliveryAddress}, House ${order.houseNumber}`);
+    if (order.driver) {
+      doc.text(`Driver: ${order.driver.name}`);
+      doc.text(`Driver Phone: ${order.driver.phone}`);
+    }
+    doc.moveDown(0.5);
+
+    // Items table header
+    doc.fontSize(11).font('Helvetica-Bold').fillColor('white');
+    const tableTop = doc.y;
+    const col1X = 50, col2X = 300, col3X = 420, col4X = 520;
+    
+    // Header background
+    doc.rect(40, tableTop, doc.page.width - 80, 20).fillAndStroke('#5B4B8A', '#5B4B8A');
+    doc.text('Product', col1X, tableTop + 3);
+    doc.text('Qty', col2X, tableTop + 3);
+    doc.text('Unit Price', col3X, tableTop + 3);
+    doc.text('Total', col4X, tableTop + 3);
+    
+    doc.moveDown(1.5);
+    doc.fontSize(10).font('Helvetica').fillColor('#333');
+
+    // Items
+    order.items.forEach((item) => {
+      const itemTotal = item.quantity * item.price;
+      doc.text(item.product.name.substring(0, 30), col1X, doc.y);
+      doc.text(item.quantity.toString(), col2X, doc.y - doc.currentLineHeight());
+      doc.text(`MWK ${item.price.toLocaleString()}`, col3X, doc.y - doc.currentLineHeight());
+      doc.text(`MWK ${itemTotal.toLocaleString()}`, col4X, doc.y - doc.currentLineHeight());
+      doc.moveDown(0.8);
+    });
+
+    // Total line
+    doc.moveTo(40, doc.y).lineTo(doc.page.width - 40, doc.y).stroke();
+    doc.moveDown(0.3);
+    doc.fontSize(12).font('Helvetica-Bold').fillColor('#5B4B8A').text(`TOTAL: MWK ${order.total.toLocaleString()}`, { align: 'right' });
+    doc.moveDown(0.5);
+
+    // Footer
+    doc.fontSize(9).font('Helvetica').fillColor('#999').text('Thank you for shopping with Citi-Nati Supermarket!', { align: 'center' });
+    doc.text('© 2026 Citi-Nati Supermarket. All rights reserved.', { align: 'center' });
+    doc.moveDown(0.3);
+    doc.fontSize(8).text(`Receipt Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`, { align: 'center' });
+
+    doc.end();
+    return;
 
   } catch (err) {
     console.error('Error fetching receipt:', err);
@@ -1103,6 +1168,24 @@ const markOrderAsRefunded = async (req, res) => {
         items: { include: { product: { select: { name: true, price: true } } } }
       }
     });
+
+    // Send refund notification email to customer
+    try {
+      await sendRefundNotificationEmail(
+        updatedOrder.user.email,
+        updatedOrder.user.name,
+        {
+          orderId: updatedOrder.id,
+          amount: updatedOrder.total,
+          reason: refundNote || 'Order cancelled - refund processed',
+          timestamp: new Date().toISOString()
+        }
+      );
+      console.log(`[ORDER] Refund notification email sent to ${updatedOrder.user.email}`);
+    } catch (emailErr) {
+      console.error('[ORDER] Error sending refund email:', emailErr.message);
+      // Don't fail the refund if email fails
+    }
 
     console.log(`[Admin] Order ${orderId} marked as REFUNDED by admin ${req.user.userId}`);
 
