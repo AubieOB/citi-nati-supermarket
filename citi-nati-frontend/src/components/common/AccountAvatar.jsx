@@ -99,7 +99,7 @@ const AccountAvatar = ({ bgColor = '#ff3860', size = '40px', fontSize = '18px' }
         <div
           style={{
             position: 'absolute',
-            top: '50px',
+            bottom: '60px',
             right: '0',
             backgroundColor: '#333',
             color: 'white',
@@ -107,7 +107,7 @@ const AccountAvatar = ({ bgColor = '#ff3860', size = '40px', fontSize = '18px' }
             borderRadius: '4px',
             fontSize: '12px',
             whiteSpace: 'nowrap',
-            zIndex: 999,
+            zIndex: 9999,
           }}
         >
           Account
@@ -120,14 +120,14 @@ const AccountAvatar = ({ bgColor = '#ff3860', size = '40px', fontSize = '18px' }
           onClick={(e) => e.stopPropagation()}
           style={{
             position: 'absolute',
-            top: '50px',
+            bottom: '60px',
             right: '0',
             backgroundColor: 'white',
             border: '1px solid #ddd',
             borderRadius: '4px',
             padding: '12px',
             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-            zIndex: 1000,
+            zIndex: 10000,
             minWidth: '220px',
             pointerEvents: 'auto',
           }}
