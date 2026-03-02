@@ -11,6 +11,7 @@ import AdminRefunds from '../../components/admin/AdminRefunds.jsx';
 import SupportDashboard from './SupportDashboard.jsx';
 import { useOrderUpdates } from '../../hooks/useOrderUpdates.js';
 import '../../styles/global.css';
+import '../../styles/admin-dashboard.css';
 
 /**
  * 🛡️ ADMIN DASHBOARD
@@ -26,6 +27,7 @@ import '../../styles/global.css';
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('inbox');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
   const tabs = [
     { id: 'inbox', label: 'Inbox', icon: 'fa-inbox' },
@@ -50,20 +52,24 @@ const AdminDashboard = () => {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'row', backgroundColor: '#f5f5f5' }}>
+      {/* Hamburger Menu Icon - Mobile Only */}
+      <button
+        className="admin-hamburger"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+      >
+        <i className={`fas ${sidebarOpen ? 'fa-times' : 'fa-bars'}`}></i>
+      </button>
+
+      {/* Mobile Overlay - Click to close sidebar */}
+      {sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          className="mobile-overlay"
+        />
+      )}
+
       {/* Fixed Left Sidebar Navigation */}
-      <div style={{
-        position: 'fixed',
-        left: 0,
-        top: 0,
-        width: '250px',
-        height: '100vh',
-        backgroundColor: '#fff',
-        borderRight: '1px solid #e0e0e0',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-        zIndex: 100,
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
+      <div className={`admin-sidebar ${sidebarOpen ? 'open' : ''}`}>
         {/* Sidebar Logo/Title */}
         <div style={{
           padding: '1rem 1.5rem',
@@ -90,12 +96,15 @@ const AdminDashboard = () => {
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id);
+                setSidebarOpen(false); // Close sidebar on mobile after selection
+              }}
               style={{
                 width: '100%',
                 padding: '1rem 1.5rem',
                 border: 'none',
-                backgroundColor: activeTab === tab.id ? '#f0f0f0' : 'transparent',
+                backgroundColor: 'transparent',
                 borderLeft: activeTab === tab.id ? '4px solid #5B4B8A' : '4px solid transparent',
                 color: activeTab === tab.id ? '#5B4B8A' : '#666',
                 fontWeight: activeTab === tab.id ? '600' : '500',
@@ -109,12 +118,12 @@ const AdminDashboard = () => {
               }}
               onMouseOver={(e) => {
                 if (activeTab !== tab.id) {
-                  e.target.style.backgroundColor = '#f9f9f9';
+                  e.currentTarget.style.color = '#5B4B8A';
                 }
               }}
               onMouseOut={(e) => {
                 if (activeTab !== tab.id) {
-                  e.target.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = '#666';
                 }
               }}
             >
@@ -167,20 +176,9 @@ const AdminDashboard = () => {
       </div>
 
       {/* Main Content Area (with left margin for fixed sidebar) */}
-      <div style={{
-        marginLeft: '250px',
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        minHeight: '100vh'
-      }}>
+      <div className="admin-main-content">
         {/* Scrollable Content */}
-        <div style={{
-          flex: 1,
-          overflow: 'auto',
-          padding: '2rem',
-          backgroundColor: '#f5f5f5'
-        }}>
+        <div className="admin-content-area">
           {activeTab === 'inbox' && <AdminInbox />}
           {activeTab === 'products' && <AdminProducts />}
           {activeTab === 'orders' && <AdminOrders />}
