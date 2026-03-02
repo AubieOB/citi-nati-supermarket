@@ -47,69 +47,98 @@ const AdminDashboard = () => {
   useOrderUpdates(handleOrderUpdated, { listenAll: true, role: 'admin' });
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#f5f5f5' }}>
-      {/* Header */}
-      <div style={{ 
-        padding: '2rem', 
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'row', backgroundColor: '#f5f5f5' }}>
+      {/* Fixed Left Sidebar Navigation */}
+      <div style={{
+        position: 'fixed',
+        left: 0,
+        top: 0,
+        width: '250px',
+        height: '100vh',
         backgroundColor: '#fff',
-        borderBottom: '1px solid #e0e0e0',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+        borderRight: '1px solid #e0e0e0',
+        padding: '1rem 0',
+        overflowY: 'auto',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+        zIndex: 100
       }}>
-        <h1 style={{ color: '#5B4B8A', margin: 0 }}>
-          <i className="fas fa-shield-alt" style={{ marginRight: '0.5rem' }}></i>
-          Admin Dashboard
-        </h1>
-      </div>
-
-      {/* Main Content Area */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {/* Sidebar Navigation */}
+        {/* Sidebar Logo/Title */}
         <div style={{
-          width: '250px',
-          backgroundColor: '#fff',
-          borderRight: '1px solid #e0e0e0',
-          padding: '1rem 0',
-          overflowY: 'auto',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+          padding: '1rem 1.5rem',
+          borderBottom: '1px solid #e0e0e0',
+          marginBottom: '1rem',
+          color: '#5B4B8A',
+          fontWeight: '700',
+          fontSize: '1.1rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
         }}>
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                width: '100%',
-                padding: '1rem 1.5rem',
-                border: 'none',
-                backgroundColor: activeTab === tab.id ? '#f0f0f0' : 'transparent',
-                borderLeft: activeTab === tab.id ? '4px solid #5B4B8A' : '4px solid transparent',
-                color: activeTab === tab.id ? '#5B4B8A' : '#666',
-                fontWeight: activeTab === tab.id ? '600' : '500',
-                cursor: 'pointer',
-                fontSize: '0.95rem',
-                transition: 'all 0.2s ease',
-                textAlign: 'left',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem'
-              }}
-              onMouseOver={(e) => {
-                if (activeTab !== tab.id) {
-                  e.target.style.backgroundColor = '#f9f9f9';
-                }
-              }}
-              onMouseOut={(e) => {
-                if (activeTab !== tab.id) {
-                  e.target.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
-              <i className={`fas ${tab.icon}`} style={{ width: '20px', textAlign: 'center' }}></i>
-              <span>{tab.label}</span>
-            </button>
-          ))}
+          <i className="fas fa-shield-alt"></i>
+          <span>Admin</span>
         </div>
 
-        {/* Main Content */}
+        {/* Sidebar Menu Items */}
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              width: '100%',
+              padding: '1rem 1.5rem',
+              border: 'none',
+              backgroundColor: activeTab === tab.id ? '#f0f0f0' : 'transparent',
+              borderLeft: activeTab === tab.id ? '4px solid #5B4B8A' : '4px solid transparent',
+              color: activeTab === tab.id ? '#5B4B8A' : '#666',
+              fontWeight: activeTab === tab.id ? '600' : '500',
+              cursor: 'pointer',
+              fontSize: '0.95rem',
+              transition: 'all 0.2s ease',
+              textAlign: 'left',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem'
+            }}
+            onMouseOver={(e) => {
+              if (activeTab !== tab.id) {
+                e.target.style.backgroundColor = '#f9f9f9';
+              }
+            }}
+            onMouseOut={(e) => {
+              if (activeTab !== tab.id) {
+                e.target.style.backgroundColor = 'transparent';
+              }
+            }}
+          >
+            <i className={`fas ${tab.icon}`} style={{ width: '20px', textAlign: 'center' }}></i>
+            <span>{tab.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Main Content Area (with left margin for fixed sidebar) */}
+      <div style={{
+        marginLeft: '250px',
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: '100vh'
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: '2rem',
+          backgroundColor: '#fff',
+          borderBottom: '1px solid #e0e0e0',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+          flexShrink: 0
+        }}>
+          <h1 style={{ color: '#5B4B8A', margin: 0 }}>
+            <i className="fas fa-shield-alt" style={{ marginRight: '0.5rem' }}></i>
+            Admin Dashboard
+          </h1>
+        </div>
+
+        {/* Scrollable Content */}
         <div style={{
           flex: 1,
           overflow: 'auto',
