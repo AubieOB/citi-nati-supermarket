@@ -1799,3 +1799,11 @@ body.menu-open {
     margin-left: 2px;
   }
 }
+
+/* Driver Dashboard Mobile Responsive - Center button content */
+@media (max-width: 768px) {
+  button:has(.fa-home) {
+    padding: 0.75rem 1rem !important;
+    justify-content: center;
+  }
+}
