@@ -1004,4 +1004,115 @@ const getReceipt = async (req, res) => {
   }
 };
 
-module.exports = { createOrder, updateOrderStatus, assignDriverToOrder, getUserOrders, getAllOrders, getOrderById, getOrderByReference, checkPaymentStatus, getReceipt };
+/**
+ * Get all orders pending refund
+ * Only accessible by admins
+ */
+const getRefundPendingOrders = async (req, res) => {
+  try {
+    // Verify admin role
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Access denied - admin only' });
+    }
+
+    const orders = await prisma.order.findMany({
+      where: { paymentStatus: 'REFUND_PENDING' },
+      include: {
+        user: {
+          select: { id: true, name: true, email: true }
+        },
+        items: {
+          include: { product: { select: { name: true, price: true } } }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return res.status(200).json({
+      count: orders.length,
+      refunds: orders.map(order => ({
+        id: order.id,
+        userId: order.user.id,
+        customerName: order.user.name,
+        customerEmail: order.user.email,
+        amount: order.total,
+        items: order.items,
+        status: order.paymentStatus,
+        notes: order.notes,
+        paymentReference: order.paymentReference,
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt
+      }))
+    });
+  } catch (err) {
+    console.error('Error fetching refund pending orders:', err);
+    return res.status(500).json({ error: 'Server error while fetching refunds' });
+  }
+};
+
+/**
+ * Mark an order as refunded (after manual processing)
+ * Only accessible by admins
+ */
+const markOrderAsRefunded = async (req, res) => {
+  try {
+    // Verify admin role
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Access denied - admin only' });
+    }
+
+    const { orderId } = req.params;
+    const { refundNote } = req.body;
+
+    if (!orderId) {
+      return res.status(400).json({ error: 'Order ID is required' });
+    }
+
+    // Check if order exists and is REFUND_PENDING
+    const order = await prisma.order.findUnique({
+      where: { id: parseInt(orderId) }
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    if (order.paymentStatus !== 'REFUND_PENDING') {
+      return res.status(400).json({
+        error: `Order is not pending refund. Current status: ${order.paymentStatus}`
+      });
+    }
+
+    // Update order to REFUNDED
+    const updatedOrder = await prisma.order.update({
+      where: { id: parseInt(orderId) },
+      data: {
+        paymentStatus: 'REFUNDED',
+        status: 'CANCELLED',
+        notes: `${order.notes}\n\nRefund processed by admin at ${new Date().toISOString()}${refundNote ? ': ' + refundNote : ''}`
+      },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        items: { include: { product: { select: { name: true, price: true } } } }
+      }
+    });
+
+    console.log(`[Admin] Order ${orderId} marked as REFUNDED by admin ${req.user.userId}`);
+
+    return res.status(200).json({
+      message: 'Order marked as refunded successfully',
+      order: {
+        id: updatedOrder.id,
+        status: updatedOrder.paymentStatus,
+        customerEmail: updatedOrder.user.email,
+        amount: updatedOrder.total,
+        notes: updatedOrder.notes
+      }
+    });
+  } catch (err) {
+    console.error('Error marking order as refunded:', err);
+    return res.status(500).json({ error: 'Server error while marking order as refunded' });
+  }
+};
+
+module.exports = { createOrder, updateOrderStatus, assignDriverToOrder, getUserOrders, getAllOrders, getOrderById, getOrderByReference, checkPaymentStatus, getReceipt, getRefundPendingOrders, markOrderAsRefunded };

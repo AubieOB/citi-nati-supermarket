@@ -13,6 +13,7 @@ const express = require('express');
 const { verifyTokenMiddleware } = require('../middleware/auth.middleware');
 const { verifyAdmin } = require('../middleware/admin.middleware');
 const { PrismaClient } = require('@prisma/client');
+const { getRefundPendingOrders, markOrderAsRefunded } = require('../controllers/order.controller');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -261,5 +262,19 @@ router.get('/orders/:orderId', verifyTokenMiddleware, verifyAdmin, async (req, r
     res.status(500).json({ error: 'Failed to fetch order' });
   }
 });
+
+/**
+ * GET /api/admin/refunds/pending
+ * Get all orders pending refund
+ * Protected: Admin only
+ */
+router.get('/refunds/pending', verifyTokenMiddleware, verifyAdmin, getRefundPendingOrders);
+
+/**
+ * PUT /api/admin/refunds/:orderId/approve
+ * Mark an order as refunded (after manual processing)
+ * Protected: Admin only
+ */
+router.put('/refunds/:orderId/approve', verifyTokenMiddleware, verifyAdmin, markOrderAsRefunded);
 
 module.exports = router;
