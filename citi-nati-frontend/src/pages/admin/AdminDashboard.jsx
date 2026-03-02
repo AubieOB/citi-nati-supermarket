@@ -7,6 +7,7 @@ import AdminUsers from '../../components/admin/AdminUsers.jsx';
 import AdminDrivers from '../../components/admin/AdminDrivers.jsx';
 import AdminSales from '../../components/admin/AdminSales.jsx';
 import AdminInbox from '../../components/admin/AdminInbox.jsx';
+import AdminRefunds from '../../components/admin/AdminRefunds.jsx';
 import SupportDashboard from './SupportDashboard.jsx';
 import { useOrderUpdates } from '../../hooks/useOrderUpdates.js';
 import '../../styles/global.css';
@@ -32,6 +33,7 @@ const AdminDashboard = () => {
     { id: 'users', label: 'Users', icon: 'fa-users' },
     { id: 'drivers', label: 'Drivers', icon: 'fa-car' },
     { id: 'sales', label: 'Sales', icon: 'fa-dollar-sign' },
+    { id: 'refunds', label: 'Refunds', icon: 'fa-undo' },
     { id: 'support', label: 'Support', icon: 'fa-life-ring' },
   ];
 
@@ -88,7 +90,8 @@ const AdminDashboard = () => {
           {activeTab === 'orders' && <AdminOrders />}
           {activeTab === 'users' && <AdminUsers />}
           {activeTab === 'sales' && <AdminSales />}
-        {activeTab === 'support' && <SupportDashboard />}
+          {activeTab === 'refunds' && <AdminRefunds />}
+          {activeTab === 'support' && <SupportDashboard />}
           {activeTab === 'drivers' && <AdminDrivers />}
         </div>
       </Container>
