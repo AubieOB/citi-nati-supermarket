@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../../utils/api.js';
 import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
@@ -13,6 +13,7 @@ import { useModal } from '../../hooks/useModal.js';
  * - Mark messages as read/unread
  * - Real-time message updates
  * - Delete messages
+ * - Notification sounds for critical alerts (refunds)
  */
 
 const AdminInbox = () => {
@@ -26,6 +27,50 @@ const AdminInbox = () => {
   const [selectedType, setSelectedType] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const { modal, closeModal, showConfirm } = useModal();
+  const notificationAudioRef = useRef(null);
+
+  /**
+   * Play notification sound for critical alerts
+   */
+  const playNotificationSound = () => {
+    try {
+      const audio = new Audio('/classic-door-bell.wav');
+      audio.volume = 0.8;
+      
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log('[AdminInbox] ✅ Notification sound played');
+          })
+          .catch((err) => {
+            console.warn('[AdminInbox] ⚠️ Audio playback blocked:', err.message);
+            // Fallback: Web Audio API beep
+            try {
+              const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+              const osc = audioContext.createOscillator();
+              const gain = audioContext.createGain();
+              
+              osc.connect(gain);
+              gain.connect(audioContext.destination);
+              osc.frequency.value = 1000;
+              osc.type = 'sine';
+              gain.gain.setValueAtTime(0.3, audioContext.currentTime);
+              gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+              
+              osc.start(audioContext.currentTime);
+              osc.stop(audioContext.currentTime + 0.2);
+              
+              console.log('[AdminInbox] ✅ Fallback beep played');
+            } catch (beepErr) {
+              console.warn('[AdminInbox] Beep also failed:', beepErr.message);
+            }
+          });
+      }
+    } catch (err) {
+      console.error('[AdminInbox] Audio error:', err.message);
+    }
+  };
 
   // Message types
   const messageTypes = [
@@ -35,6 +80,7 @@ const AdminInbox = () => {
     { value: 'order_completed', label: 'Order Completed', icon: 'fa-check', color: '#8BC34A' },
     { value: 'payment_failed', label: 'Payment Failed', icon: 'fa-times-circle', color: '#F44336' },
     { value: 'driver_assigned', label: 'Driver Assigned', icon: 'fa-car', color: '#9C27B0' },
+    { value: 'refund_required', label: 'Refund Required', icon: 'fa-exclamation-triangle', color: '#FF5722' },
     { value: 'system', label: 'System Alert', icon: 'fa-bell', color: '#607D8B' },
   ];
 
@@ -45,6 +91,15 @@ const AdminInbox = () => {
     const interval = setInterval(fetchMessages, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // Check for new refund messages and play sound
+  useEffect(() => {
+    const refundMessages = messages.filter(m => m.type === 'refund_required' && !m.read);
+    if (refundMessages.length > 0) {
+      // Play sound for unread refund alerts
+      playNotificationSound();
+    }
+  }, [messages]);
 
   // Apply filters whenever messages, filters change
   useEffect(() => {

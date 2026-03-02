@@ -20,7 +20,7 @@ const PaymentSuccess = () => {
   const [searchParams] = useSearchParams();
   const { user, isLoading: authLoading } = useAuth();
 
-  const [status, setStatus] = useState('processing'); // processing, success, error
+  const [status, setStatus] = useState('processing'); // processing, success, error, refund_required
   const [message, setMessage] = useState('Processing your payment...');
   const [orderId, setOrderId] = useState(null);
   const pollAttemptsRef = useRef(0);
@@ -87,6 +87,11 @@ const PaymentSuccess = () => {
                 });
               }, 1500);
             }
+          } else if (order.paymentStatus === 'REFUND_PENDING') {
+            // Stock failed or order couldn't be completed after payment succeeded
+            setStatus('refund_required');
+            setMessage('');
+            // STOP polling immediately - don't continue checking status
           } else if (order.paymentStatus === 'PENDING') {
             // Payment still processing, retry
             if (currentAttempt < MAX_POLL_ATTEMPTS) {
@@ -266,6 +271,129 @@ const PaymentSuccess = () => {
               >
                 View Orders
               </button>
+            </>
+          )}
+
+          {/* Refund Required State */}
+          {status === 'refund_required' && (
+            <>
+              <div style={{ marginBottom: '2rem' }}>
+                <i className="fas fa-warning" style={{
+                  fontSize: '4rem',
+                  color: '#ff9800'
+                }}></i>
+              </div>
+              <h2 style={{ marginTop: 0, marginBottom: '1rem', color: '#ff9800' }}>
+                ⚠️ Order Could Not Be Completed
+              </h2>
+              <div style={{
+                backgroundColor: '#fff8e1',
+                border: '1px solid #ffecb3',
+                borderRadius: '4px',
+                padding: '1.5rem',
+                marginBottom: '1.5rem',
+                textAlign: 'left'
+              }}>
+                <p style={{
+                  fontSize: '1rem',
+                  color: '#333',
+                  marginBottom: '1rem',
+                  lineHeight: '1.6'
+                }}>
+                  Your payment has been successfully received.
+                  <br />
+                  However, we regret to inform you that your order could not be completed.
+                </p>
+
+                <p style={{
+                  fontSize: '0.95rem',
+                  color: '#555',
+                  fontWeight: '600',
+                  marginBottom: '0.5rem'
+                }}>
+                  This may happen when:
+                </p>
+                <ul style={{
+                  fontSize: '0.9rem',
+                  color: '#666',
+                  marginBottom: '1rem',
+                  paddingLeft: '1.5rem'
+                }}>
+                  <li>Another customer completed the purchase at the same time</li>
+                  <li>The item went out of stock during checkout</li>
+                  <li>The available quantity was no longer sufficient</li>
+                </ul>
+
+                <p style={{
+                  fontSize: '0.95rem',
+                  color: '#333',
+                  marginBottom: '0.5rem',
+                  fontWeight: '600'
+                }}>
+                  💰 Refund Notice:
+                </p>
+                <p style={{
+                  fontSize: '0.9rem',
+                  color: '#666',
+                  marginBottom: 0,
+                  lineHeight: '1.6'
+                }}>
+                  A refund has been initiated and will be processed shortly.
+                  Our team has been notified and is reviewing your order.
+                </p>
+              </div>
+
+              <p style={{
+                fontSize: '0.85rem',
+                color: '#999',
+                marginBottom: '1.5rem'
+              }}>
+                Order ID: <strong>#{orderId || 'N/A'}</strong>
+              </p>
+
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => navigate('/shop')}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    backgroundColor: '#2D8659',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.95rem',
+                    fontWeight: '600'
+                  }}
+                >
+                  <i className="fas fa-shopping-bag" style={{ marginRight: '0.5rem' }}></i>
+                  Return to Shop
+                </button>
+                <button
+                  onClick={() => navigate('/my-orders')}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    backgroundColor: 'transparent',
+                    color: '#2D8659',
+                    border: '2px solid #2D8659',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.95rem',
+                    fontWeight: '600',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.backgroundColor = '#2D8659';
+                    e.target.style.color = 'white';
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                    e.target.style.color = '#2D8659';
+                  }}
+                >
+                  <i className="fas fa-info-circle" style={{ marginRight: '0.5rem' }}></i>
+                  View My Orders
+                </button>
+              </div>
             </>
           )}
         </div>

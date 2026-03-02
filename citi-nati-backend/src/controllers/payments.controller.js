@@ -2,8 +2,8 @@ require('dotenv').config();
 const crypto = require('crypto');
 const axios = require('axios');
 const { PrismaClient } = require('@prisma/client');
-const { emitNewOrder, emitMultipleStockUpdates } = require('../utils/socket');
-const { notifyPaymentSuccess, notifyOrderPlaced } = require('../utils/messageService');
+const { emitNewOrder, emitOrderUpdated } = require('../utils/socket');
+const { notifyPaymentSuccess, notifyOrderPlaced, notifyRefundRequired } = require('../utils/messageService');
 const { sendOrderConfirmationEmail, sendPaymentConfirmationEmail, sendRefundNotificationEmail } = require('../utils/emailService');
 const { cacheWebhookEvent } = require('../utils/webhookCache');
 
@@ -581,6 +581,36 @@ const handleWebhook = async (req, res) => {
         console.log(`[Alert] Reason: ${txErr.message}`);
         console.log(`[Alert] Transaction ID: ${req.body.reference || 'unknown'}`);
         console.log(`[Alert] Action: Process refund via Paychangu dashboard or use Mobile Money Payout API`);
+        
+        // Emit refund alert event to admin room (real-time notification)
+        try {
+          if (global.io) {
+            global.io.to('admin_room').emit('refundAlertRequired', {
+              orderId: order.id,
+              customerId: order.userId,
+              customerName: order.user?.name || 'Unknown',
+              customerEmail: order.user?.email || 'N/A',
+              amount: order.total,
+              reason: txErr.message,
+              transactionRef: req.body.reference || 'unknown',
+              timestamp: new Date(),
+              message: `🚨 REFUND REQUIRED - Order #${order.id} (MWK ${order.total}) - ${txErr.message}`
+            });
+            console.log(`[Socket.io] Refund alert emitted to admin_room for order ${order.id}`);
+          }
+        } catch (socketErr) {
+          console.error(`[Socket] Failed to emit refund alert:`, socketErr.message);
+        }
+        
+        // Create admin notification message
+        setImmediate(async () => {
+          try {
+            await notifyRefundRequired(order, txErr.message);
+            console.log(`[Alert] ✅ Admin refund notification sent`);
+          } catch (msgErr) {
+            console.error(`[Alert] Failed to create admin message:`, msgErr.message);
+          }
+        });
         
         // Send refund notification email to customer
         setImmediate(async () => {

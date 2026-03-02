@@ -84,13 +84,51 @@ const AdminRefunds = () => {
           Manage customer refunds that require manual processing
         </p>
         <div style={{
-          backgroundColor: '#e8f4f8',
-          padding: '1rem',
-          borderRadius: '8px',
-          borderLeft: '4px solid #17a2b8'
+          display: 'grid',
+          gridTemplateColumns: '1fr auto',
+          gap: '1rem',
+          alignItems: 'start'
         }}>
-          <i className="fas fa-info-circle" style={{ marginRight: '0.5rem' }}></i>
-          <strong>Total Pending:</strong> {refunds.length} refund{refunds.length !== 1 ? 's' : ''}
+          <div style={{
+            backgroundColor: '#e8f4f8',
+            padding: '1rem',
+            borderRadius: '8px',
+            borderLeft: '4px solid #17a2b8'
+          }}>
+            <i className="fas fa-info-circle" style={{ marginRight: '0.5rem' }}></i>
+            <strong>Total Pending:</strong> {refunds.length} refund{refunds.length !== 1 ? 's' : ''}
+          </div>
+          <button
+            onClick={() => window.open('https://dashboard.paychangu.com', '_blank')}
+            style={{
+              padding: '0.75rem 1.5rem',
+              backgroundColor: '#5B4B8A',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '0.95rem',
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              transition: 'all 0.2s ease',
+              whiteSpace: 'nowrap'
+            }}
+            onMouseOver={(e) => {
+              e.target.style.backgroundColor = '#4a3a6e';
+              e.target.style.transform = 'translateY(-2px)';
+              e.target.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
+            }}
+            onMouseOut={(e) => {
+              e.target.style.backgroundColor = '#5B4B8A';
+              e.target.style.transform = 'translateY(0)';
+              e.target.style.boxShadow = 'none';
+            }}
+          >
+            <i className="fas fa-external-link-alt"></i>
+            Open PayChangu Dashboard
+          </button>
         </div>
       </div>
 

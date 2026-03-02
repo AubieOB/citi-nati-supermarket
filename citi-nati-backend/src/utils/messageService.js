@@ -145,6 +145,25 @@ const notifyLowStock = async (product) => {
   }
 };
 
+/**
+ * Create message when refund is required (payment succeeded but fulfillment failed)
+ */
+const notifyRefundRequired = async (order, reason) => {
+  try {
+    const reasonText = reason || 'Order could not be fulfilled after payment received';
+    const message = `🚨 REFUND REQUIRED\nOrder #${order.id} for ${order.user?.name || 'Unknown'} (${order.user?.email || 'N/A'})\nAmount: MWK ${order.total?.toFixed(2) || '0'}\nReason: ${reasonText}\n\nTransaction Ref: ${order.paymentReference || 'unknown'}\n\nAction: Review in Refunds panel and process through PayChangu dashboard.`;
+    
+    await createMessage(
+      'refund_required',
+      '⚠️ Refund Pending - Manual Processing Required',
+      message,
+      order.id // reference_id
+    );
+  } catch (error) {
+    console.error('[MESSAGE SERVICE] Error notifying refund required:', error);
+  }
+};
+
 module.exports = {
   notifyNewUserRegistration,
   notifyPaymentSuccess,
@@ -154,4 +173,5 @@ module.exports = {
   notifyPaymentFailed,
   notifyLowStock,
   createSystemAlert,
+  notifyRefundRequired,
 };
