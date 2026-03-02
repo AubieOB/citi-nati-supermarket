@@ -549,10 +549,11 @@ const handleWebhook = async (req, res) => {
     console.error('[Webhook] ❌ Transaction error:', txErr.message);
     
     // Payment WAS successful but order fulfillment failed (e.g., insufficient stock)
-    // We MUST refund the customer automatically
+    // Since Paychangu doesn't provide a simple refund endpoint for Mobile Money,
+    // we mark the order as REFUND_PENDING and alert the admin for manual processing
     
     try {
-      // Fetch order details for refund
+      // Fetch order details for refund processing
       const order = await prisma.order.findUnique({
         where: { id: orderId },
         include: {
@@ -561,77 +562,52 @@ const handleWebhook = async (req, res) => {
       });
 
       if (order && (txErr.message.includes('Insufficient stock') || txErr.message.includes('Products'))) {
-        console.log(`[Webhook] 💰 Attempting automatic refund for order ${order.id}...`);
-
-        // Call Paychangu to refund
-        // Use Paychangu's reference as transactionId (req.body.reference is their transaction ID)
-        const refundResult = await refundPaychanguPayment({
-          transactionId: req.body.reference || req.body.transaction_id || req.body.transactionId,
-          amount: order.total,
-          reason: `Automatic refund: ${txErr.message}`
+        console.log(`[Webhook] 💰 Processing refund for order ${order.id}...`);
+        
+        // Mark order as REFUND_PENDING for manual processing
+        await prisma.order.update({
+          where: { id: order.id },
+          data: {
+            paymentStatus: 'REFUND_PENDING',
+            status: 'PENDING',
+            notes: `Refund required: ${txErr.message}\nPaychangu Ref: ${req.body.reference || 'unknown'}`
+          }
         });
 
-        if (refundResult.success) {
-          // Mark order as refunded
-          console.log(`[Webhook] ✅ Refund successful (ID: ${refundResult.refundId})`);
-          
-          await prisma.order.update({
-            where: { id: order.id },
-            data: {
-              paymentStatus: 'REFUNDED',
-              status: 'CANCELLED',
-              notes: `Automatic refund: ${txErr.message} (Refund ID: ${refundResult.refundId})`
-            }
-          });
-
-          // Send refund email asynchronously
-          setImmediate(async () => {
-            try {
-              await sendRefundNotificationEmail(
-                order.user.email,
-                order.user.name,
-                {
-                  orderId: order.id,
-                  amount: order.total,
-                  reason: txErr.message,
-                  refundId: refundResult.refundId,
-                  timestamp: new Date()
-                }
-              );
-              console.log(`[Email] ✅ Background: Refund notification sent to ${order.user.email}`);
-            } catch (emailErr) {
-              console.error(`[Email] ❌ Failed to send refund email:`, emailErr.message);
-            }
-          });
-
-          console.log(`[Webhook] ✅ Order ${order.id} marked as REFUNDED`);
-        } else {
-          // Refund API call failed - need manual intervention
-          console.error(`[Webhook] ❌ Automatic refund failed: ${refundResult.message}`);
-          
-          // Update order with refund pending status
-          await prisma.order.update({
-            where: { id: order.id },
-            data: {
-              paymentStatus: 'REFUND_PENDING',
-              status: 'PENDING',
-              notes: `Manual refund required: ${txErr.message} (API Error: ${refundResult.message})`
-            }
-          });
-
-          // Alert admin immediately
-          console.log(`[Alert] 🚨 MANUAL REFUND REQUIRED FOR ORDER ${order.id}`);
-          console.log(`[Alert] Transaction ID: ${req.body.reference || 'unknown'}`);
-          console.log(`[Alert] Amount: ${order.total}`);
-          console.log(`[Alert] Reason: ${txErr.message}`);
-          console.log(`[Alert] Customer: ${order.user.email}`);
-        }
+        console.log(`[Webhook] ⚠️ Order ${order.id} marked as REFUND_PENDING`);
+        console.log(`[Alert] 🚨 MANUAL REFUND REQUIRED FOR ORDER ${order.id}`);
+        console.log(`[Alert] Customer: ${order.user.email}`);
+        console.log(`[Alert] Amount: ${order.total} MWK`);
+        console.log(`[Alert] Reason: ${txErr.message}`);
+        console.log(`[Alert] Transaction ID: ${req.body.reference || 'unknown'}`);
+        console.log(`[Alert] Action: Process refund via Paychangu dashboard or use Mobile Money Payout API`);
+        
+        // Send refund notification email to customer
+        setImmediate(async () => {
+          try {
+            await sendRefundNotificationEmail(
+              order.user.email,
+              order.user.name,
+              {
+                orderId: order.id,
+                amount: order.total,
+                reason: txErr.message,
+                refundId: req.body.reference,
+                timestamp: new Date(),
+                status: 'pending_processing'
+              }
+            );
+            console.log(`[Email] ✅ Background: Refund notification sent to ${order.user.email}`);
+          } catch (emailErr) {
+            console.error(`[Email] ❌ Failed to send refund email:`, emailErr.message);
+          }
+        });
       } else {
-        console.warn('[Webhook] Not attempting refund - order not found or error type not refundable');
+        console.warn('[Webhook] Not processing refund - order not found or error type not refundable');
       }
     } catch (refundErr) {
-      console.error('[Webhook] 🚨 Error during refund attempt:', refundErr.message);
-      // If refund failed and we have orderId, try to mark order as REFUND_PENDING for manual review
+      console.error('[Webhook] 🚨 Error in refund workflow:', refundErr.message);
+      // If we have orderId, ensure it's at least marked as REFUND_PENDING
       if (orderId) {
         try {
           await prisma.order.update({
@@ -639,15 +615,14 @@ const handleWebhook = async (req, res) => {
             data: {
               paymentStatus: 'REFUND_PENDING',
               status: 'PENDING',
-              notes: `Refund processing failed: ${refundErr.message}`
+              notes: `Refund workflow error: ${refundErr.message}`
             }
           });
           console.log(`[Webhook] ⚠️ Order ${orderId} marked as REFUND_PENDING for manual review`);
         } catch (updateErr) {
-          console.error(`[Webhook] ⚠️ Could not even mark order as REFUND_PENDING: ${updateErr.message}`);
+          console.error(`[Webhook] ⚠️ Could not mark order as REFUND_PENDING: ${updateErr.message}`);
         }
       }
-      // Log for debugging but still return 200 to Paychangu
     }
 
     clearTimeout(timeoutHandle);
