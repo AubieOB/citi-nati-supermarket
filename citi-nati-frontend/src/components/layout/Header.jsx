@@ -240,93 +240,9 @@ const Header = () => {
               </Link>
             )}
 
-            {/* Avatar + Email Popup for mobile */}
-            <div ref={popupRef} style={{ padding: '1rem', position: 'relative' }}>
-              <div
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowEmailPopup(!showEmailPopup);
-                }}
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '50%',
-                  backgroundColor: '#ff3860',
-                  color: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  fontSize: '18px',
-                  fontWeight: 'bold',
-                  margin: '0 auto',
-                  transition: 'transform 0.2s ease',
-                }}
-              >
-                {getInitials()[0]}
-              </div>
-
-              {/* Email and Logout in Popup for mobile */}
-              {showEmailPopup && (
-                <div
-                  style={{
-                    backgroundColor: '#f5f5f5',
-                    padding: '12px',
-                    borderRadius: '4px',
-                    marginTop: '10px',
-                    textAlign: 'center',
-                    zIndex: 1001,
-                    position: 'relative',
-                  }}
-                >
-                  {/* User Name */}
-                  <div
-                    style={{
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      color: '#333',
-                      marginBottom: '6px',
-                      wordBreak: 'break-word',
-                    }}
-                  >
-                    {user.name}
-                  </div>
-
-                  {/* Email */}
-                  <div
-                    style={{
-                      fontSize: '13px',
-                      color: '#666',
-                      marginBottom: '10px',
-                      wordBreak: 'break-word',
-                    }}
-                  >
-                    {user.email}
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleLogout();
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      backgroundColor: '#ff3860',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: '500',
-                      pointerEvents: 'auto',
-                      WebkitTouchCallout: 'auto',
-                    }}
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
+            {/* Account Avatar with Logout for mobile */}
+            <div style={{ padding: '1rem', display: 'flex', justifyContent: 'center' }}>
+              <AccountAvatar bgColor="#ff3860" size="40px" fontSize="18px" />
             </div>
           </>
         ) : (
