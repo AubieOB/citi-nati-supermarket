@@ -330,6 +330,9 @@ const handleWebhook = async (req, res) => {
     timeoutHandle = setTimeout(() => reject(new Error('Webhook processing timeout')), 30000);
   });
 
+  // Declare orderId in function scope so it's accessible in all catch blocks
+  let orderId = null;
+
   try {
     console.log('[Webhook] Received webhook request');
     console.log('[Webhook] Headers:', JSON.stringify(req.headers, null, 2));
@@ -392,7 +395,7 @@ const handleWebhook = async (req, res) => {
       return res.sendStatus(200);
     }
 
-    const orderId = verification.orderId;
+    orderId = verification.orderId;
 
     // 2️⃣ Begin atomic transaction
     const result = await prisma.$transaction(async (tx) => {
@@ -637,6 +640,22 @@ const handleWebhook = async (req, res) => {
       }
     } catch (refundErr) {
       console.error('[Webhook] 🚨 Error during refund attempt:', refundErr.message);
+      // If refund failed and we have orderId, try to mark order as REFUND_PENDING for manual review
+      if (orderId) {
+        try {
+          await prisma.order.update({
+            where: { id: orderId },
+            data: {
+              paymentStatus: 'REFUND_PENDING',
+              status: 'PENDING',
+              notes: `Refund processing failed: ${refundErr.message}`
+            }
+          });
+          console.log(`[Webhook] ⚠️ Order ${orderId} marked as REFUND_PENDING for manual review`);
+        } catch (updateErr) {
+          console.error(`[Webhook] ⚠️ Could not even mark order as REFUND_PENDING: ${updateErr.message}`);
+        }
+      }
       // Log for debugging but still return 200 to Paychangu
     }
 
