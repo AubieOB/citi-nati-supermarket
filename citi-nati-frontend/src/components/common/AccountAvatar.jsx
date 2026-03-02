@@ -58,13 +58,19 @@ const AccountAvatar = ({ bgColor = '#ff3860', size = '40px', fontSize = '18px' }
   return (
     <div
       ref={popupRef}
-      style={{ position: 'relative', display: 'inline-block' }}
+      style={{ 
+        position: 'relative', 
+        display: 'inline-block',
+        pointerEvents: 'auto',
+        zIndex: 10001
+      }}
       onMouseEnter={() => setShowLabel(true)}
       onMouseLeave={() => setShowLabel(false)}
     >
       {/* Avatar Circle */}
       <div
         onClick={(e) => {
+          e.preventDefault();
           e.stopPropagation();
           setShowPopup(!showPopup);
         }}
@@ -83,12 +89,13 @@ const AccountAvatar = ({ bgColor = '#ff3860', size = '40px', fontSize = '18px' }
           position: 'relative',
           transition: 'transform 0.2s ease',
           pointerEvents: 'auto',
+          zIndex: 10001,
         }}
         onMouseEnter={(e) => {
-          e.target.style.transform = 'scale(1.1)';
+          e.currentTarget.style.transform = 'scale(1.1)';
         }}
         onMouseLeave={(e) => {
-          e.target.style.transform = 'scale(1)';
+          e.currentTarget.style.transform = 'scale(1)';
         }}
       >
         {getInitials()[0]}
