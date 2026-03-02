@@ -47,53 +47,84 @@ const AdminDashboard = () => {
   useOrderUpdates(handleOrderUpdated, { listenAll: true, role: 'admin' });
 
   return (
-    <div style={{ padding: '2rem' }}>
-      <h1 style={{ color: '#5B4B8A', marginBottom: '2rem' }}>
-        <i className="fas fa-shield-alt" style={{ marginRight: '0.5rem' }}></i>
-        Admin Dashboard
-      </h1>
-
-      {/* Tab Navigation */}
-      <div style={{
-        display: 'flex',
-        gap: '0.5rem',
-        marginBottom: '2rem',
-        borderBottom: '2px solid #eee',
-        flexWrap: 'wrap',
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#f5f5f5' }}>
+      {/* Header */}
+      <div style={{ 
+        padding: '2rem', 
+        backgroundColor: '#fff',
+        borderBottom: '1px solid #e0e0e0',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
       }}>
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              padding: '1rem 1.5rem',
-              border: 'none',
-              backgroundColor: activeTab === tab.id ? '#5B4B8A' : 'transparent',
-              color: activeTab === tab.id ? '#fff' : '#666',
-              fontWeight: activeTab === tab.id ? '600' : '500',
-              cursor: 'pointer',
-              fontSize: '1rem',
-              transition: 'all 0.2s ease',
-              borderBottom: activeTab === tab.id ? '3px solid #5B4B8A' : 'none',
-              marginBottom: '-2px',
-            }}
-          >
-            <i className={`fas ${tab.icon}`} style={{ marginRight: '0.5rem' }}></i>
-            {tab.label}
-          </button>
-        ))}
+        <h1 style={{ color: '#5B4B8A', margin: 0 }}>
+          <i className="fas fa-shield-alt" style={{ marginRight: '0.5rem' }}></i>
+          Admin Dashboard
+        </h1>
       </div>
 
-      {/* Tab Content */}
-      <div style={{ marginBottom: '3rem' }}>
-        {activeTab === 'inbox' && <AdminInbox />}
-        {activeTab === 'products' && <AdminProducts />}
-        {activeTab === 'orders' && <AdminOrders />}
-        {activeTab === 'users' && <AdminUsers />}
-        {activeTab === 'sales' && <AdminSales />}
-        {activeTab === 'refunds' && <AdminRefunds />}
-        {activeTab === 'support' && <SupportDashboard />}
-        {activeTab === 'drivers' && <AdminDrivers />}
+      {/* Main Content Area */}
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        {/* Sidebar Navigation */}
+        <div style={{
+          width: '250px',
+          backgroundColor: '#fff',
+          borderRight: '1px solid #e0e0e0',
+          padding: '1rem 0',
+          overflowY: 'auto',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+        }}>
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                width: '100%',
+                padding: '1rem 1.5rem',
+                border: 'none',
+                backgroundColor: activeTab === tab.id ? '#f0f0f0' : 'transparent',
+                borderLeft: activeTab === tab.id ? '4px solid #5B4B8A' : '4px solid transparent',
+                color: activeTab === tab.id ? '#5B4B8A' : '#666',
+                fontWeight: activeTab === tab.id ? '600' : '500',
+                cursor: 'pointer',
+                fontSize: '0.95rem',
+                transition: 'all 0.2s ease',
+                textAlign: 'left',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem'
+              }}
+              onMouseOver={(e) => {
+                if (activeTab !== tab.id) {
+                  e.target.style.backgroundColor = '#f9f9f9';
+                }
+              }}
+              onMouseOut={(e) => {
+                if (activeTab !== tab.id) {
+                  e.target.style.backgroundColor = 'transparent';
+                }
+              }}
+            >
+              <i className={`fas ${tab.icon}`} style={{ width: '20px', textAlign: 'center' }}></i>
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Main Content */}
+        <div style={{
+          flex: 1,
+          overflow: 'auto',
+          padding: '2rem',
+          backgroundColor: '#f5f5f5'
+        }}>
+          {activeTab === 'inbox' && <AdminInbox />}
+          {activeTab === 'products' && <AdminProducts />}
+          {activeTab === 'orders' && <AdminOrders />}
+          {activeTab === 'users' && <AdminUsers />}
+          {activeTab === 'sales' && <AdminSales />}
+          {activeTab === 'refunds' && <AdminRefunds />}
+          {activeTab === 'support' && <SupportDashboard />}
+          {activeTab === 'drivers' && <AdminDrivers />}
+        </div>
       </div>
     </div>
   );
