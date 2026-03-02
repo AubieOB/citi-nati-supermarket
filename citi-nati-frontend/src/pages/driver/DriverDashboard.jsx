@@ -323,7 +323,7 @@ const DriverDashboard = () => {
           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#5B4B8A'}
         >
           <i className="fas fa-home"></i>
-          <span>Home</span>
+          <span className="home-btn-text">Home</span>
         </button>
       </div>
 

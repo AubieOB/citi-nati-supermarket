@@ -1799,3 +1799,10 @@ body.menu-open {
     margin-left: 2px;
   }
 }
+
+/* Driver Dashboard Mobile Responsive */
+@media (max-width: 768px) {
+  .home-btn-text {
+    display: none;
+  }
+}
