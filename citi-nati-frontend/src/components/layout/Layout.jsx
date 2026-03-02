@@ -7,14 +7,17 @@ import '../../styles/global.css';
 const Layout = ({ children }) => {
   const location = useLocation();
   
-  // Hide footer on admin and driver dashboards
+  // Hide header and footer on admin and driver dashboards
+  const hideHeader = location.pathname.startsWith('/admin') || location.pathname.startsWith('/driver');
   const hideFooter = location.pathname.startsWith('/admin') || location.pathname.startsWith('/driver');
 
   return (
     <div className="layout">
-      <div className="layout__header">
-        <Header />
-      </div>
+      {!hideHeader && (
+        <div className="layout__header">
+          <Header />
+        </div>
+      )}
       <div className="layout__content">
         <main className="layout__main">
           {children}

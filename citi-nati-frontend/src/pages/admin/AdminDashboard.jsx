@@ -1,4 +1,6 @@
 import React, { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext.jsx';
 import toast from 'react-hot-toast';
 import AdminProducts from '../../components/admin/AdminProducts.jsx';
 import AdminOrders from '../../components/admin/AdminOrders.jsx';
@@ -25,6 +27,8 @@ import '../../styles/global.css';
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('inbox');
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const tabs = [
     { id: 'inbox', label: 'Inbox', icon: 'fa-inbox' },
     { id: 'products', label: 'Products', icon: 'fa-box' },
@@ -57,10 +61,10 @@ const AdminDashboard = () => {
         height: '100vh',
         backgroundColor: '#fff',
         borderRight: '1px solid #e0e0e0',
-        padding: '1rem 0',
-        overflowY: 'auto',
         boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-        zIndex: 100
+        zIndex: 100,
+        display: 'flex',
+        flexDirection: 'column'
       }}>
         {/* Sidebar Logo/Title */}
         <div style={{
@@ -72,48 +76,116 @@ const AdminDashboard = () => {
           fontSize: '1.1rem',
           display: 'flex',
           alignItems: 'center',
-          gap: '0.5rem'
+          gap: '0.5rem',
+          flexShrink: 0
         }}>
           <i className="fas fa-shield-alt"></i>
           <span>Admin</span>
         </div>
 
-        {/* Sidebar Menu Items */}
-        {tabs.map((tab) => (
+        {/* Sidebar Menu Items Container - Grows to fill space */}
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '0'
+        }}>
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                width: '100%',
+                padding: '1rem 1.5rem',
+                border: 'none',
+                backgroundColor: activeTab === tab.id ? '#f0f0f0' : 'transparent',
+                borderLeft: activeTab === tab.id ? '4px solid #5B4B8A' : '4px solid transparent',
+                color: activeTab === tab.id ? '#5B4B8A' : '#666',
+                fontWeight: activeTab === tab.id ? '600' : '500',
+                cursor: 'pointer',
+                fontSize: '0.95rem',
+                transition: 'all 0.2s ease',
+                textAlign: 'left',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem'
+              }}
+              onMouseOver={(e) => {
+                if (activeTab !== tab.id) {
+                  e.target.style.backgroundColor = '#f9f9f9';
+                }
+              }}
+              onMouseOut={(e) => {
+                if (activeTab !== tab.id) {
+                  e.target.style.backgroundColor = 'transparent';
+                }
+              }}
+            >
+              <i className={`fas ${tab.icon}`} style={{ width: '20px', textAlign: 'center' }}></i>
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Sidebar Footer - Home & Avatar */}
+        <div style={{
+          padding: '1rem 1.5rem',
+          borderTop: '1px solid #e0e0e0',
+          backgroundColor: '#fff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '1rem',
+          flexShrink: 0
+        }}>
+          {/* Home Link */}
           <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => navigate('/')}
             style={{
-              width: '100%',
-              padding: '1rem 1.5rem',
+              flex: 1,
+              padding: '0.75rem 1rem',
               border: 'none',
-              backgroundColor: activeTab === tab.id ? '#f0f0f0' : 'transparent',
-              borderLeft: activeTab === tab.id ? '4px solid #5B4B8A' : '4px solid transparent',
-              color: activeTab === tab.id ? '#5B4B8A' : '#666',
-              fontWeight: activeTab === tab.id ? '600' : '500',
+              backgroundColor: '#f5f5f5',
+              color: '#666',
+              borderRadius: '4px',
               cursor: 'pointer',
-              fontSize: '0.95rem',
-              transition: 'all 0.2s ease',
-              textAlign: 'left',
+              fontSize: '0.9rem',
+              fontWeight: '500',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.75rem'
+              justifyContent: 'center',
+              gap: '0.5rem',
+              transition: 'all 0.2s ease'
             }}
             onMouseOver={(e) => {
-              if (activeTab !== tab.id) {
-                e.target.style.backgroundColor = '#f9f9f9';
-              }
+              e.target.style.backgroundColor = '#e8e8e8';
             }}
             onMouseOut={(e) => {
-              if (activeTab !== tab.id) {
-                e.target.style.backgroundColor = 'transparent';
-              }
+              e.target.style.backgroundColor = '#f5f5f5';
             }}
           >
-            <i className={`fas ${tab.icon}`} style={{ width: '20px', textAlign: 'center' }}></i>
-            <span>{tab.label}</span>
+            <i className="fas fa-home" style={{ fontSize: '1rem' }}></i>
+            <span>Home</span>
           </button>
-        ))}
+
+          {/* Avatar */}
+          {user && (
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              backgroundColor: '#5B4B8A',
+              color: '#fff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '0.9rem',
+              fontWeight: '600',
+              flexShrink: 0
+            }}>
+              {user.name ? user.name.charAt(0).toUpperCase() : 'A'}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Main Content Area (with left margin for fixed sidebar) */}
