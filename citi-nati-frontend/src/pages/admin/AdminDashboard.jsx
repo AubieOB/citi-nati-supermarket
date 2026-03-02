@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext.jsx';
+import AccountAvatar from '../../components/common/AccountAvatar.jsx';
 import toast from 'react-hot-toast';
 import AdminProducts from '../../components/admin/AdminProducts.jsx';
 import AdminOrders from '../../components/admin/AdminOrders.jsx';
@@ -28,7 +28,6 @@ import '../../styles/global.css';
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('inbox');
   const navigate = useNavigate();
-  const { user } = useAuth();
   const tabs = [
     { id: 'inbox', label: 'Inbox', icon: 'fa-inbox' },
     { id: 'products', label: 'Products', icon: 'fa-box' },
@@ -167,24 +166,8 @@ const AdminDashboard = () => {
             <span>Home</span>
           </button>
 
-          {/* Avatar */}
-          {user && (
-            <div style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '50%',
-              backgroundColor: '#5B4B8A',
-              color: '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '0.9rem',
-              fontWeight: '600',
-              flexShrink: 0
-            }}>
-              {user.name ? user.name.charAt(0).toUpperCase() : 'A'}
-            </div>
-          )}
+          {/* Account Avatar with Logout */}
+          <AccountAvatar bgColor="#5B4B8A" size="40px" fontSize="16px" />
         </div>
       </div>
 
