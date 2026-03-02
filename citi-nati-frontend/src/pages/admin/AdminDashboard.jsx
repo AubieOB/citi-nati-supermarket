@@ -79,7 +79,7 @@ const AdminDashboard = () => {
           flexShrink: 0
         }}>
           <i className="fas fa-shield-alt"></i>
-          <span>Admin - Citi-Nati</span>
+          <span>Citi-Nati - Admin</span>
         </div>
 
         {/* Sidebar Menu Items Container - Grows to fill space */}
