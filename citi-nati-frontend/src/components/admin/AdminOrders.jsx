@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import toast from 'react-hot-toast';
 import Button from '../ui/Button.jsx';
 import api from '../../utils/api.js';
 import { formatMWK } from '../../utils/currency.js';
+import { getSocket } from '../../utils/socket.js';
 import OrderDetailsModal from './OrderDetailsModal.jsx';
 import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
@@ -27,6 +29,45 @@ const AdminOrders = () => {
   useEffect(() => {
     fetchOrders();
     fetchDrivers();
+  }, []);
+
+  /**
+   * Real-time order updates via Socket.io
+   */
+  useEffect(() => {
+    try {
+      const socket = getSocket();
+      if (!socket) {
+        console.warn('[AdminOrders] Socket not initialized');
+        return;
+      }
+
+      const handleOrderUpdated = (updatedOrder) => {
+        console.log('[AdminOrders] Order updated via Socket.io:', updatedOrder.id);
+
+        if (!updatedOrder?.id) return;
+
+        // Refresh orders list when any order is updated
+        fetchOrders();
+
+        // Show toast for status changes
+        if (['REFUND_PENDING', 'CANCELLED', 'DELIVERED'].includes(updatedOrder.status)) {
+          toast(`📦 Order #${updatedOrder.id}: ${updatedOrder.status}`, {
+            duration: 3000,
+          });
+        }
+      };
+
+      socket.on('orderUpdated', handleOrderUpdated);
+      console.log('[AdminOrders] Socket.io listener registered for orderUpdated');
+
+      return () => {
+        socket.off('orderUpdated', handleOrderUpdated);
+        console.log('[AdminOrders] Socket.io listener removed');
+      };
+    } catch (err) {
+      console.error('[AdminOrders] Socket.io setup error:', err);
+    }
   }, []);
 
   const fetchOrders = async () => {
