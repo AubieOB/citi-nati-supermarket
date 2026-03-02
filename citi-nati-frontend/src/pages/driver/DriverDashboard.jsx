@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../../utils/api.js';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -18,6 +19,7 @@ import { useModal } from '../../hooks/useModal.js';
  */
 
 const DriverDashboard = () => {
+  const navigate = useNavigate();
   const [assignedOrders, setAssignedOrders] = useState([]);
   const [inTransitOrders, setInTransitOrders] = useState([]);
   const [completedOrders, setCompletedOrders] = useState([]);
@@ -299,7 +301,31 @@ const DriverDashboard = () => {
 
   return (
     <div style={{ padding: '2rem' }}>
-      <h1 style={{ color: '#5B4B8A', marginBottom: '2rem' }}><i className="fas fa-car" style={{ marginRight: '0.5rem' }}></i>Driver Dashboard</h1>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <h1 style={{ color: '#5B4B8A', margin: '0' }}><i className="fas fa-car" style={{ marginRight: '0.5rem' }}></i>Driver Dashboard</h1>
+        <button
+          onClick={() => navigate('/')}
+          style={{
+            backgroundColor: '#5B4B8A',
+            color: '#fff',
+            border: 'none',
+            padding: '0.75rem 1.5rem',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '1rem',
+            fontWeight: '600',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            transition: 'background-color 0.3s ease',
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#4A3A78'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#5B4B8A'}
+        >
+          <i className="fas fa-home"></i>
+          <span>Home</span>
+        </button>
+      </div>
 
       {/* 📊 Metrics Section */}
       <section style={{ marginBottom: '3rem' }}>
