@@ -1,6 +1,5 @@
 import React, { useState, useCallback } from 'react';
 import toast from 'react-hot-toast';
-import Container from '../../components/ui/Container.jsx';
 import AdminProducts from '../../components/admin/AdminProducts.jsx';
 import AdminOrders from '../../components/admin/AdminOrders.jsx';
 import AdminUsers from '../../components/admin/AdminUsers.jsx';
@@ -48,53 +47,54 @@ const AdminDashboard = () => {
   useOrderUpdates(handleOrderUpdated, { listenAll: true, role: 'admin' });
 
   return (
-    <div className="page admin-dashboard">
-      <Container>
-        <h1 style={{ marginTop: '2rem', marginBottom: '2rem' }}>Admin Dashboard</h1>
+    <div style={{ padding: '2rem' }}>
+      <h1 style={{ color: '#5B4B8A', marginBottom: '2rem' }}>
+        <i className="fas fa-shield-alt" style={{ marginRight: '0.5rem' }}></i>
+        Admin Dashboard
+      </h1>
 
-        {/* Tab Navigation */}
-        <div style={{
-          display: 'flex',
-          gap: '0.5rem',
-          marginBottom: '2rem',
-          borderBottom: '2px solid #eee',
-          flexWrap: 'wrap',
-        }}>
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: '1rem 1.5rem',
-                border: 'none',
-                backgroundColor: activeTab === tab.id ? '#5B4B8A' : 'transparent',
-                color: activeTab === tab.id ? '#fff' : '#666',
-                fontWeight: activeTab === tab.id ? '600' : '500',
-                cursor: 'pointer',
-                fontSize: '1rem',
-                transition: 'all 0.2s ease',
-                borderBottom: activeTab === tab.id ? '3px solid #5B4B8A' : 'none',
-                marginBottom: '-2px',
-              }}
-            >
-              <i className={`fas ${tab.icon}`} style={{ marginRight: '0.5rem' }}></i>
-              {tab.label}
-            </button>
-          ))}
-        </div>
+      {/* Tab Navigation */}
+      <div style={{
+        display: 'flex',
+        gap: '0.5rem',
+        marginBottom: '2rem',
+        borderBottom: '2px solid #eee',
+        flexWrap: 'wrap',
+      }}>
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              padding: '1rem 1.5rem',
+              border: 'none',
+              backgroundColor: activeTab === tab.id ? '#5B4B8A' : 'transparent',
+              color: activeTab === tab.id ? '#fff' : '#666',
+              fontWeight: activeTab === tab.id ? '600' : '500',
+              cursor: 'pointer',
+              fontSize: '1rem',
+              transition: 'all 0.2s ease',
+              borderBottom: activeTab === tab.id ? '3px solid #5B4B8A' : 'none',
+              marginBottom: '-2px',
+            }}
+          >
+            <i className={`fas ${tab.icon}`} style={{ marginRight: '0.5rem' }}></i>
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-        {/* Tab Content */}
-        <div style={{ marginBottom: '3rem' }}>
-          {activeTab === 'inbox' && <AdminInbox />}
-          {activeTab === 'products' && <AdminProducts />}
-          {activeTab === 'orders' && <AdminOrders />}
-          {activeTab === 'users' && <AdminUsers />}
-          {activeTab === 'sales' && <AdminSales />}
-          {activeTab === 'refunds' && <AdminRefunds />}
-          {activeTab === 'support' && <SupportDashboard />}
-          {activeTab === 'drivers' && <AdminDrivers />}
-        </div>
-      </Container>
+      {/* Tab Content */}
+      <div style={{ marginBottom: '3rem' }}>
+        {activeTab === 'inbox' && <AdminInbox />}
+        {activeTab === 'products' && <AdminProducts />}
+        {activeTab === 'orders' && <AdminOrders />}
+        {activeTab === 'users' && <AdminUsers />}
+        {activeTab === 'sales' && <AdminSales />}
+        {activeTab === 'refunds' && <AdminRefunds />}
+        {activeTab === 'support' && <SupportDashboard />}
+        {activeTab === 'drivers' && <AdminDrivers />}
+      </div>
     </div>
   );
 };
