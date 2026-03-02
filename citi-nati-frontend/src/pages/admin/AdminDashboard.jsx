@@ -72,14 +72,14 @@ const AdminDashboard = () => {
           marginBottom: '1rem',
           color: '#5B4B8A',
           fontWeight: '700',
-          fontSize: '1.1rem',
+          fontSize: '1rem',
           display: 'flex',
           alignItems: 'center',
           gap: '0.5rem',
           flexShrink: 0
         }}>
           <i className="fas fa-shield-alt"></i>
-          <span>Admin</span>
+          <span>Admin - Citi-Nati</span>
         </div>
 
         {/* Sidebar Menu Items Container - Grows to fill space */}
@@ -179,20 +179,6 @@ const AdminDashboard = () => {
         flexDirection: 'column',
         minHeight: '100vh'
       }}>
-        {/* Header */}
-        <div style={{
-          padding: '2rem',
-          backgroundColor: '#fff',
-          borderBottom: '1px solid #e0e0e0',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-          flexShrink: 0
-        }}>
-          <h1 style={{ color: '#5B4B8A', margin: 0 }}>
-            <i className="fas fa-shield-alt" style={{ marginRight: '0.5rem' }}></i>
-            Admin Dashboard
-          </h1>
-        </div>
-
         {/* Scrollable Content */}
         <div style={{
           flex: 1,
