@@ -77,6 +77,7 @@ model Order {
   longitude       Float?
   paymentStatus   String   @default("PENDING")
   paymentReference String?
+  notes           String?
   driverId        String?
   driver          Driver?  @relation("DriverOrders", fields: [driverId], references: [id])
   salesDayId      Int?
