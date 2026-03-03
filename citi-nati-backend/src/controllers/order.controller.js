@@ -680,7 +680,8 @@ const checkPaymentStatus = async (req, res) => {
 const getReceipt = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.userId;
+    const { email: emailParam } = req.query;
+    const userId = req.user?.userId;
 
     if (!id) {
       return res.status(400).json({
@@ -722,8 +723,11 @@ const getReceipt = async (req, res) => {
       });
     }
 
-    // Verify the order belongs to the authenticated user
-    if (order.userId !== userId) {
+    // Verify access: Either authenticated user who owns the order OR email parameter matches order email
+    const isAuthenticatedOwner = userId && order.userId === userId;
+    const isEmailOwner = emailParam && order.user.email.toLowerCase() === emailParam.toLowerCase();
+
+    if (!isAuthenticatedOwner && !isEmailOwner) {
       return res.status(403).json({
         error: 'Access denied - order does not belong to you',
       });

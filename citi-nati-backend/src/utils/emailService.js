@@ -330,7 +330,8 @@ const sendDeliveryStatusEmail = async (email, userName, orderDetails, status) =>
 
     const subject = statusMessages[status?.toLowerCase()] || `Order Update - ${status}`;
     const isDelivered = status?.toLowerCase() === 'delivered';
-    const receiptUrl = `${process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000'}/api/orders/${orderDetails.id}/receipt`;
+    const baseUrl = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
+    const receiptUrl = `${baseUrl}/api/orders/${orderDetails.id}/receipt?email=${encodeURIComponent(email)}`;
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
