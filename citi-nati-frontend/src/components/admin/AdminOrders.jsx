@@ -47,8 +47,12 @@ const AdminOrders = () => {
 
         if (!updatedOrder?.id) return;
 
-        // Refresh orders list when any order is updated
-        fetchOrders();
+        // Update individual order in state instead of refetching all
+        setOrders(prevOrders => 
+          prevOrders.map(order => 
+            order.id === updatedOrder.id ? { ...order, ...updatedOrder } : order
+          )
+        );
 
         // Show toast for status changes
         if (['REFUND_PENDING', 'CANCELLED', 'DELIVERED'].includes(updatedOrder.status)) {
@@ -179,6 +183,17 @@ const AdminOrders = () => {
     });
   };
 
+  /**
+   * Check if order is from today and unassigned (for highlighting)
+   */
+  const isUnassignedToday = (order) => {
+    const orderDate = new Date(order.createdAt);
+    const today = new Date();
+    orderDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    return orderDate.getTime() === today.getTime() && !order.driverId;
+  };
+
   // Separate orders into new (today) and old (previous days)
   const getGroupedOrders = () => {
     const today = new Date();
@@ -273,7 +288,14 @@ const AdminOrders = () => {
                     </thead>
                     <tbody>
                       {newOrders.map((order) => (
-                        <tr key={order.id} style={{ borderBottom: '1px solid #eee' }}>
+                        <tr 
+                          key={order.id} 
+                          style={{ 
+                            borderBottom: '1px solid #eee',
+                            backgroundColor: isUnassignedToday(order) ? '#FFF8DC' : 'transparent',
+                            borderLeft: isUnassignedToday(order) ? '4px solid #FF6B6B' : 'none',
+                          }}
+                        >
                           <td style={{ padding: '1rem' }}>#{order.id}</td>
                           <td style={{ padding: '1rem' }}>{order.user?.name || 'N/A'}</td>
                           <td style={{
@@ -386,7 +408,14 @@ const AdminOrders = () => {
                     </thead>
                     <tbody>
                       {oldOrders.map((order) => (
-                        <tr key={order.id} style={{ borderBottom: '1px solid #eee' }}>
+                        <tr 
+                          key={order.id} 
+                          style={{ 
+                            borderBottom: '1px solid #eee',
+                            backgroundColor: !order.driverId ? '#FFF8E1' : 'transparent',
+                            borderLeft: !order.driverId ? '4px solid #FFA500' : 'none',
+                          }}
+                        >
                           <td style={{ padding: '1rem' }}>#{order.id}</td>
                           <td style={{ padding: '1rem' }}>{order.user?.name || 'N/A'}</td>
                           <td style={{
