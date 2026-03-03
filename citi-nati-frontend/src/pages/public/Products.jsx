@@ -348,8 +348,8 @@ const Products = () => {
 
   return (
     <div className="page products-page">
-      {/* Promotion Banner - Appears at top if global promotion is active */}
-      <PromotionBanner />
+      {/* Promotion Banner - Appears at top if global or category promotion is active */}
+      <PromotionBanner category={selectedCategory || null} />
 
       {/* PRODUCTS GRID - FULL WIDTH SECTION */}
       <div className="products-grid-wrapper">

@@ -4,61 +4,82 @@ import api from '../../utils/api.js';
 
 /**
  * 🎉 PROMOTION BANNER
- * Displays global promotion at the top of the page
+ * Displays global or category-specific promotions at the top of the page
  * User can dismiss, persists across navigation and reloads
  * Resets when promotion changes
+ * 
+ * @param {string} category - Optional category name to check for category promotions
  */
-const PromotionBanner = () => {
+const PromotionBanner = ({ category = null }) => {
   const [promotion, setPromotion] = useState(null);
+  const [promotionType, setPromotionType] = useState(null); // Track if promotion is 'global' or 'category'
   const [loading, setLoading] = useState(true);
   const [isDismissed, setIsDismissed] = useState(false);
 
   /**
    * Get localStorage key for this promotion
    */
-  const getDismissalKey = (promo) => {
-    return `promotionBannerDismissed_${promo?.percentage || 'default'}`;
+  const getDismissalKey = (promo, type) => {
+    return `promotionBannerDismissed_${type}_${promo?.percentage || 'default'}`;
   };
 
   /**
-   * Fetch current global promotion
+   * Fetch current promotions (global and category-specific)
    */
   const fetchPromotion = async () => {
     try {
       const response = await api.get('/promotions');
       const promotions = response.data.promotions || {};
       
-      // Check if global promotion is enabled
-      if (promotions.global && promotions.global.enabled) {
-        setPromotion(promotions.global);
+      let activePromotion = null;
+      let activeType = null;
+
+      // Check if category promotion applies to current category
+      if (category && promotions.category && promotions.category.enabled && promotions.category.categoryId === category) {
+        activePromotion = promotions.category;
+        activeType = 'category';
+        console.log(`[PromotionBanner] 🏷️  Category promotion found for: ${category}`);
+      } 
+      // Fall back to global promotion
+      else if (promotions.global && promotions.global.enabled) {
+        activePromotion = promotions.global;
+        activeType = 'global';
+        console.log('[PromotionBanner] 🌍 Using global promotion');
+      }
+
+      if (activePromotion) {
+        setPromotion(activePromotion);
+        setPromotionType(activeType);
         // Reset dismissed state when promotion changes
         setIsDismissed(false);
       } else {
         setPromotion(null);
+        setPromotionType(null);
         setIsDismissed(false);
       }
     } catch (err) {
       console.error('[PromotionBanner] Error fetching promotion:', err.message);
       setPromotion(null);
+      setPromotionType(null);
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch promotion on mount
+  // Fetch promotion on mount and when category changes
   useEffect(() => {
     fetchPromotion();
-  }, []);
+  }, [category]);
 
   // Load dismissed state from localStorage when promotion changes
   useEffect(() => {
-    if (promotion) {
-      const dismissalKey = getDismissalKey(promotion);
+    if (promotion && promotionType) {
+      const dismissalKey = getDismissalKey(promotion, promotionType);
       const wasDismissed = localStorage.getItem(dismissalKey) === 'true';
       setIsDismissed(wasDismissed);
-      console.log(`[PromotionBanner] Loaded dismissed state for promotion: ${wasDismissed}`);
+      console.log(`[PromotionBanner] Loaded dismissed state for ${promotionType} promotion: ${wasDismissed}`);
     }
-  }, [promotion]);
+  }, [promotion, promotionType]);
 
   // Listen for real-time promotion updates
   useEffect(() => {
@@ -77,11 +98,28 @@ const PromotionBanner = () => {
         if (promotionData.type === 'global') {
           if (promotionData.enabled) {
             setPromotion(promotionData);
+            setPromotionType('global');
             // Reset dismissed state when promotion changes
             setIsDismissed(false);
           } else {
             setPromotion(null);
+            setPromotionType(null);
             setIsDismissed(false);
+          }
+        }
+        // Check if it's a category promotion update for the current category
+        else if (promotionData.type === 'category' && category && promotionData.categoryId === category) {
+          if (promotionData.enabled) {
+            setPromotion(promotionData);
+            setPromotionType('category');
+            // Reset dismissed state when promotion changes
+            setIsDismissed(false);
+          } else {
+            // Category promotion was disabled, revert to global if available
+            setPromotion(null);
+            setPromotionType(null);
+            setIsDismissed(false);
+            fetchPromotion(); // Re-fetch to check for global promotion
           }
         }
       };
@@ -96,26 +134,29 @@ const PromotionBanner = () => {
     } catch (err) {
       console.warn('[PromotionBanner] Socket.io setup error:', err.message);
     }
-  }, []);
+  }, [category]);
 
   /**
    * Handle banner dismissal
    */
   const handleDismiss = () => {
-    if (promotion) {
-      const dismissalKey = getDismissalKey(promotion);
+    if (promotion && promotionType) {
+      const dismissalKey = getDismissalKey(promotion, promotionType);
       localStorage.setItem(dismissalKey, 'true');
       setIsDismissed(true);
-      console.log('[PromotionBanner] Banner dismissed and saved to localStorage');
+      console.log(`[PromotionBanner] ${promotionType} banner dismissed and saved to localStorage`);
     }
   };
 
-  // Only render if there's an active global promotion and it hasn't been dismissed
-  if (loading || !promotion || isDismissed) {
+  // Only render if there's an active promotion and it hasn't been dismissed
+  if (loading || !promotion || !promotionType || isDismissed) {
     return null;
   }
 
   const discountPercentage = promotion.percentage || 0;
+  const isCategory = promotionType === 'category';
+  const promotionTitle = isCategory ? `🏷️ Category Sale` : `🎉 Special Offer`;
+  const promotionMessage = isCategory ? `Get ${discountPercentage}% OFF on ${category}!` : `Get ${discountPercentage}% OFF on all products!`;
 
   return (
     <div
@@ -134,13 +175,13 @@ const PromotionBanner = () => {
       }}
     >
       <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', position: 'relative' }}>
-        <i className="fas fa-star" style={{ fontSize: '1.2rem', color: '#FF6B6B' }}></i>
+        <i className={`fas ${isCategory ? 'fa-tag' : 'fa-star'}`} style={{ fontSize: '1.2rem', color: '#FF6B6B' }}></i>
         <div>
-          <span>🎉 Special Offer! Get </span>
+          <span>{promotionTitle}! </span>
           <strong style={{ fontSize: '1.2rem', color: '#FF6B6B' }}>{discountPercentage}% OFF</strong>
-          <span> on all products!</span>
+          <span> {isCategory ? `on ${category}!` : 'on all products!'}</span>
         </div>
-        <i className="fas fa-star" style={{ fontSize: '1.2rem', color: '#FF6B6B' }}></i>
+        <i className={`fas ${isCategory ? 'fa-tag' : 'fa-star'}`} style={{ fontSize: '1.2rem', color: '#FF6B6B' }}></i>
         
         {/* Close Button */}
         <button
