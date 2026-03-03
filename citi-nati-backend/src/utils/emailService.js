@@ -330,8 +330,8 @@ const sendDeliveryStatusEmail = async (email, userName, orderDetails, status) =>
 
     const subject = statusMessages[status?.toLowerCase()] || `Order Update - ${status}`;
     const isDelivered = status?.toLowerCase() === 'delivered';
-    const baseUrl = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
-    const receiptUrl = `${baseUrl}/api/orders/${orderDetails.id}/receipt?email=${encodeURIComponent(email)}`;
+    const frontendUrl = process.env.FRONTEND_URL || (process.env.RENDER_EXTERNAL_URL ? process.env.RENDER_EXTERNAL_URL.replace(':5000', ':3000') : 'http://localhost:3000');
+    const dashboardLink = `${frontendUrl}/my-orders`;
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -354,8 +354,8 @@ const sendDeliveryStatusEmail = async (email, userName, orderDetails, status) =>
           ${isDelivered ? `
             <div style="margin: 20px 0; padding: 15px; background-color: #e8f5e9; border-left: 4px solid #4caf50; border-radius: 4px;">
               <p style="color: #2e7d32; font-size: 14px; margin: 0 0 10px 0;"><strong>📄 Download Your Receipt</strong></p>
-              <p style="color: #555; font-size: 13px; margin: 0 0 15px 0;">Keep a copy of your receipt for your records and warranty information.</p>
-              <a href="${receiptUrl}" style="display: inline-block; background-color: #4caf50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold;">Download Receipt</a>
+              <p style="color: #555; font-size: 13px; margin: 0 0 15px 0;">Go to your account dashboard to download your order receipt.</p>
+              <a href="${dashboardLink}" style="display: inline-block; background-color: #4caf50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold;">View My Orders</a>
             </div>
           ` : ''}
           

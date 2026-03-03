@@ -151,6 +151,125 @@ async function start() {
         }
       });
 
+      // Receipt download via Socket.io
+      socket.on('requestReceipt', async (orderId, callback) => {
+        try {
+          const userId = socket.userId;
+          
+          if (!userId) {
+            console.warn(`[Socket] Receipt request from unauthenticated socket ${socket.id}`);
+            return callback({ error: 'Not authenticated' });
+          }
+
+          if (!orderId) {
+            return callback({ error: 'Order ID is required' });
+          }
+
+          // Find order
+          const order = await prisma.order.findUnique({
+            where: { id: parseInt(orderId) },
+            include: {
+              items: { include: { product: true } },
+              user: { select: { id: true, name: true, email: true, phone: true } },
+              driver: { select: { id: true, name: true, phone: true, vehicle: true } }
+            }
+          });
+
+          if (!order) {
+            return callback({ error: 'Order not found' });
+          }
+
+          // Verify ownership
+          if (order.userId !== userId) {
+            return callback({ error: 'Access denied' });
+          }
+
+          console.log(`[Socket] Generating receipt for order ${orderId}`);
+          
+          // Generate receipt PDF as base64
+          const PDFDocument = require('pdfkit');
+          const buffers = [];
+          const doc = new PDFDocument({ margin: 40 });
+
+          doc.on('data', chunk => buffers.push(chunk));
+          doc.on('end', () => {
+            const pdfBuffer = Buffer.concat(buffers);
+            const base64Pdf = pdfBuffer.toString('base64');
+            
+            callback({
+              success: true,
+              pdf: base64Pdf,
+              filename: `receipt-${order.id}.pdf`
+            });
+            
+            console.log(`[Socket] Receipt sent for order ${orderId}`);
+          });
+
+          // Build PDF content
+          doc.fontSize(20).font('Helvetica-Bold').text('CITI-NATI SUPERMARKET', { align: 'center' });
+          doc.moveDown(0.3);
+          doc.fontSize(10).font('Helvetica').text('Order Receipt', { align: 'center' });
+          doc.moveDown(0.5);
+          doc.strokeColor('#5B4B8A').lineWidth(1).moveTo(40, doc.y).lineTo(doc.page.width - 40, doc.y).stroke();
+          doc.moveDown(0.5);
+
+          // Order Info
+          doc.fontSize(11).font('Helvetica-Bold').text('ORDER INFORMATION');
+          doc.fontSize(10).font('Helvetica').fillColor('#333');
+          doc.text(`Order ID: #${order.id}`);
+          doc.text(`Date: ${new Date(order.createdAt).toLocaleDateString()}`);
+          doc.text(`Status: ${order.status}`);
+          doc.moveDown(0.5);
+
+          // Customer Info
+          doc.fontSize(11).font('Helvetica-Bold').text('CUSTOMER INFORMATION');
+          doc.fontSize(10).font('Helvetica');
+          doc.text(`Name: ${order.user.name}`);
+          doc.text(`Email: ${order.user.email}`);
+          doc.text(`Phone: ${order.user.phone || 'N/A'}`);
+          doc.text(`Delivery Address: ${order.deliveryAddress || 'N/A'}`);
+          doc.moveDown(0.5);
+
+          // Items table
+          doc.fontSize(11).font('Helvetica-Bold').text('ORDER ITEMS');
+          doc.fontSize(10).font('Helvetica');
+          
+          const itemWidth = 250;
+          const qtyWidth = 80;
+          const priceWidth = 80;
+          
+          doc.text('Product', 40, doc.y, { width: itemWidth });
+          doc.text('Qty', 40 + itemWidth, doc.y - 20, { width: qtyWidth });
+          doc.text('Subtotal', 40 + itemWidth + qtyWidth, doc.y - 20, { width: priceWidth });
+          doc.moveTo(40, doc.y).lineTo(doc.page.width - 40, doc.y).stroke();
+          doc.moveDown(0.3);
+
+          order.items.forEach(item => {
+            const subtotal = item.product.price * item.quantity;
+            doc.text(item.product.name, 40, doc.y, { width: itemWidth });
+            doc.text(String(item.quantity), 40 + itemWidth, doc.y - 20, { width: qtyWidth, align: 'center' });
+            doc.text(`MWK ${subtotal.toLocaleString()}`, 40 + itemWidth + qtyWidth, doc.y - 20, { width: priceWidth, align: 'right' });
+            doc.moveDown(0.4);
+          });
+
+          doc.moveTo(40, doc.y).lineTo(doc.page.width - 40, doc.y).stroke();
+          doc.moveDown(0.3);
+
+          // Total
+          doc.fontSize(12).font('Helvetica-Bold').text(`TOTAL: MWK ${order.total.toLocaleString()}`, { align: 'right' });
+          doc.moveDown(1);
+          
+          doc.fontSize(9).font('Helvetica').fillColor('#999');
+          doc.text('Thank you for your order!', { align: 'center' });
+          doc.text('© 2026 Citi-Nati Supermarket', { align: 'center' });
+
+          doc.end();
+        } catch (err) {
+          console.error('[Socket] Error generating receipt:', err);
+          callback({ error: 'Failed to generate receipt' });
+        }
+      });
+
       socket.on('disconnect', () => {
         console.log(`[Socket] ${socket.id} disconnected`);
       });

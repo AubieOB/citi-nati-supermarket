@@ -14,8 +14,8 @@ router.get('/payment-check/:reference', verifyTokenMiddleware, checkPaymentStatu
 // GET /api/orders/by-reference/:reference - Get order by payment reference (authenticated users)
 router.get('/by-reference/:reference', verifyTokenMiddleware, getOrderByReference);
 
-// GET /api/orders/:id/receipt - Get order receipt (authenticated users OR email parameter for email links)
-router.get('/:id/receipt', getReceipt);
+// GET /api/orders/:id/receipt - Get order receipt (authenticated users only)
+router.get('/:id/receipt', verifyTokenMiddleware, getReceipt);
 
 // GET /api/orders/:id - Get single order by ID (authenticated users - customers, drivers)
 router.get('/:id', verifyTokenMiddleware, getOrderById);
