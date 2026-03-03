@@ -151,14 +151,51 @@ const SupportDashboard = () => {
       console.log(`[Chat] ${role} user ${userId} joined the ticket room`);
     };
 
+    // Listen for new tickets created by customers
+    const handleNewTicket = (ticketData) => {
+      console.log('[SupportDashboard] 🎫 New support ticket received:', ticketData.subject);
+      
+      // Create a ticket object to add to the list
+      const newTicket = {
+        id: ticketData.id,
+        subject: ticketData.subject,
+        message: ticketData.message,
+        priority: ticketData.priority,
+        status: ticketData.status,
+        createdAt: ticketData.createdAt,
+        updatedAt: ticketData.createdAt,
+        user: {
+          id: ticketData.userId,
+          name: ticketData.userName,
+          email: ticketData.userEmail
+        },
+        replies: [],
+        userId: ticketData.userId
+      };
+
+      // Add to beginning of tickets list
+      setTickets(prev => [newTicket, ...prev]);
+      
+      // Update unattended count
+      if (ticketData.status === 'OPEN') {
+        setUnattendedCount(prev => prev + 1);
+      }
+
+      // Play notification sound
+      playNotificationBeep();
+      notifyInfo(`New Support Ticket: ${ticketData.subject}`);
+    };
+
     socket.current.on('ticketMessage', handleTicketMessage);
     socket.current.on('ticketTyping', handleTyping);
     socket.current.on('userJoined', handleUserJoined);
+    socket.current.on('newTicket', handleNewTicket);
 
     return () => {
       socket.current?.off('ticketMessage', handleTicketMessage);
       socket.current?.off('ticketTyping', handleTyping);
       socket.current?.off('userJoined', handleUserJoined);
+      socket.current?.off('newTicket', handleNewTicket);
     };
   }, [user]);
 

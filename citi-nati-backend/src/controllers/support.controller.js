@@ -326,6 +326,16 @@ const updateTicketStatus = async (req, res) => {
       }
     });
 
+    // Emit Socket.io event to notify customer of status change in real-time
+    if (global.io) {
+      global.io.emit('ticketStatusChanged', {
+        ticketId: ticket.id,
+        status: ticket.status,
+        userId: ticket.userId
+      });
+      console.log(`[Socket.io] Ticket ${ticketId} status changed to ${status} - emitted to all clients`);
+    }
+
     res.json({
       success: true,
       ticket
@@ -379,6 +389,15 @@ const updateTicketPriority = async (req, res) => {
       }
     });
 
+    // Emit Socket.io event to notify of priority change in real-time
+    if (global.io) {
+      global.io.emit('ticketPriorityChanged', {
+        ticketId: ticket.id,
+        priority: ticket.priority
+      });
+      console.log(`[Socket.io] Ticket ${ticketId} priority changed to ${priority} - emitted to all clients`);
+    }
+
     res.json({
       success: true,
       ticket
@@ -427,6 +446,15 @@ const deleteTicket = async (req, res) => {
     await prisma.supportTicket.delete({
       where: { id: ticketId }
     });
+
+    // Emit Socket.io event to notify of ticket deletion in real-time
+    if (global.io) {
+      global.io.emit('ticketDeleted', {
+        ticketId: ticketId,
+        userId: ticket.userId
+      });
+      console.log(`[Socket.io] Ticket ${ticketId} deleted - emitted to all clients`);
+    }
 
     res.json({
       success: true,

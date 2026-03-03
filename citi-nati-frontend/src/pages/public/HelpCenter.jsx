@@ -153,14 +153,52 @@ const HelpCenter = () => {
       console.log(`[Chat] ${role} user ${userId} joined the ticket room`);
     };
 
+    // Listen for ticket status changes from admin
+    const handleTicketStatusChanged = (data) => {
+      if (data.userId === user.id) {
+        console.log(`[HelpCenter] Ticket ${data.ticketId} status changed to ${data.status}`);
+        
+        setSelectedTicket(prev => {
+          if (!prev || prev.id !== data.ticketId) return prev;
+          return { ...prev, status: data.status };
+        });
+
+        setTickets(prev =>
+          prev.map(t =>
+            t.id === data.ticketId ? { ...t, status: data.status } : t
+          )
+        );
+
+        notifyInfo(`Ticket status updated to ${data.status}`);
+      }
+    };
+
+    // Listen for ticket deletion from admin
+    const handleTicketDeleted = (data) => {
+      if (data.userId === user.id) {
+        console.log(`[HelpCenter] Ticket ${data.ticketId} was deleted`);
+        
+        setTickets(prev => prev.filter(t => t.id !== data.ticketId));
+        
+        if (selectedTicket && selectedTicket.id === data.ticketId) {
+          setSelectedTicket(null);
+          notifyInfo('Your ticket has been deleted');
+        }
+      }
+    };
+
     socket.current.on('ticketMessage', handleTicketMessage);
     socket.current.on('ticketTyping', handleTyping);
     socket.current.on('userJoined', handleUserJoined);
+    socket.current.on('ticketStatusChanged', handleTicketStatusChanged);
+    socket.current.on('ticketDeleted', handleTicketDeleted);
 
     return () => {
       socket.current?.off('ticketMessage', handleTicketMessage);
       socket.current?.off('ticketTyping', handleTyping);
       socket.current?.off('userJoined', handleUserJoined);
+      socket.current?.off('ticketStatusChanged', handleTicketStatusChanged);
+      socket.current?.off('ticketDeleted', handleTicketDeleted);
     };
   }, [user]);
 
