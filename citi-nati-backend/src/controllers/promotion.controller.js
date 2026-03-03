@@ -10,14 +10,14 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 /**
- * Emit promotion update to all connected admin clients via Socket.io
+ * Emit promotion update to all connected clients (both admin and users) via Socket.io
  */
 const emitPromotionUpdate = (promotion) => {
   try {
     if (global.io) {
-      // Broadcast to admin_room only
-      global.io.to('admin_room').emit('promotionUpdated', promotion);
-      console.log(`[Socket.io] Promotion updated: ${promotion.type} - emitted to admin_room`);
+      // Broadcast to everyone - both admins and users seeing products page need to know
+      global.io.emit('promotionUpdated', promotion);
+      console.log(`[Socket.io] Promotion updated: ${promotion.type} - emitted to all clients`);
     }
   } catch (err) {
     console.error('Error emitting promotion:', err);

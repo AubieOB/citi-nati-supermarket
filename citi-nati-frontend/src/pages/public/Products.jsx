@@ -203,24 +203,7 @@ const Products = () => {
       const handlePromotionUpdated = (promotion) => {
         console.log('[PRODUCTS] 🎯 Promotion updated:', promotion.type);
         // Refetch all products to get updated discount prices
-        const refetchProducts = async () => {
-          try {
-            const response = await fetch('http://localhost:3001/api/products');
-            const data = await response.json();
-            setProducts(data.products || []);
-            // Reapply filters to refresh filtered list
-            const filtered = (data.products || []).filter(product => {
-              const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
-              const matchesCategory = !selectedCategory || product.category === selectedCategory;
-              const matchesSort = true; // Sort is applied later
-              return matchesSearch && matchesCategory && matchesSort;
-            });
-            setFilteredProducts(filtered);
-          } catch (err) {
-            console.error('[PRODUCTS] Error refetching products:', err);
-          }
-        };
-        refetchProducts();
+        fetchProducts();
       };
 
       // Listen for stock updates, product updates, and promotion changes
