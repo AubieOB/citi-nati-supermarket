@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import api from '../../utils/api.js';
 import { formatMWK } from '../../utils/currency.js';
+import { getSocket } from '../../utils/socket.js';
 import { notifySuccess, notifyError } from '../../utils/notifications.js';
 
 /**
@@ -15,10 +16,12 @@ import { notifySuccess, notifyError } from '../../utils/notifications.js';
 
 const AdminPromotions = () => {
   const [categories, setCategories] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [promotions, setPromotions] = useState({
     global: { enabled: false, percentage: 10 },
     category: { enabled: false, percentage: 10, categoryId: null },
-    random: { enabled: false, percentage: 10, productCount: 5 },
+    selective: { enabled: false, percentage: 10, selectedProducts: [] },
   });
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('global');
@@ -28,13 +31,45 @@ const AdminPromotions = () => {
   useEffect(() => {
     fetchCategories();
     fetchCurrentPromotions();
+    setupSocketListeners();
   }, []);
+
+  /**
+   * Real-time promotion updates via Socket.io
+   */
+  const setupSocketListeners = () => {
+    try {
+      const socket = getSocket();
+      if (!socket) {
+        console.warn('[AdminPromotions] Socket not initialized');
+        return;
+      }
+
+      const handlePromotionUpdated = (updatedPromotion) => {
+        console.log('[AdminPromotions] Promotion updated via Socket.io:', updatedPromotion.type);
+        setPromotions(prev => ({
+          ...prev,
+          [updatedPromotion.type]: updatedPromotion
+        }));
+      };
+
+      socket.on('promotionUpdated', handlePromotionUpdated);
+      console.log('[AdminPromotions] Socket.io listener registered for promotionUpdated');
+
+      return () => {
+        socket.off('promotionUpdated', handlePromotionUpdated);
+      };
+    } catch (err) {
+      console.error('[AdminPromotions] Socket.io setup error:', err);
+    }
+  };
 
   const fetchCategories = async () => {
     try {
       const response = await api.get('/products');
       const uniqueCategories = [...new Set(response.data.products.map(p => p.category))];
       setCategories(uniqueCategories.filter(Boolean));
+      setAllProducts(response.data.products || []);
     } catch (err) {
       console.error('Error fetching categories:', err);
     }
@@ -66,8 +101,25 @@ const AdminPromotions = () => {
     const newValue = Math.max(1, value);
     setPromotions(prev => ({
       ...prev,
-      random: { ...prev.random, productCount: newValue }
+      selective: { ...prev.selective, productCount: newValue }
     }));
+  };
+
+  const handleSelectProduct = (productId) => {
+    setPromotions(prev => {
+      const currentSelected = prev.selective.selectedProducts || [];
+      const isSelected = currentSelected.includes(productId);
+      
+      return {
+        ...prev,
+        selective: {
+          ...prev.selective,
+          selectedProducts: isSelected 
+            ? currentSelected.filter(id => id !== productId)
+            : [...currentSelected, productId]
+        }
+      };
+    });
   };
 
   const handleTogglePromotion = async (type) => {
@@ -77,6 +129,13 @@ const AdminPromotions = () => {
         enabled: !promotions[type].enabled
       };
 
+      // For selective promotions, check if products are selected
+      if (type === 'selective' && newPromotion.enabled && (!newPromotion.selectedProducts || newPromotion.selectedProducts.length === 0)) {
+        notifyError('Please select at least one product', 3000);
+        return;
+      }
+
+      // Apply promotion via API
       const response = await api.post(`/admin/promotions/${type}`, newPromotion);
       
       setPromotions(prev => ({
@@ -85,7 +144,7 @@ const AdminPromotions = () => {
       }));
 
       if (newPromotion.enabled) {
-        notifySuccess(`✅ Promotion activated!`, 3000);
+        notifySuccess(`✅ Promotion activated! Prices updating...`, 3000);
       } else {
         notifySuccess(`❌ Promotion deactivated`, 3000);
       }
@@ -97,7 +156,15 @@ const AdminPromotions = () => {
 
   const previewPromotion = async (type) => {
     try {
-      const response = await api.post(`/admin/promotions/${type}/preview`, promotions[type]);
+      const payload = promotions[type];
+      
+      // For selective, pass selected product IDs
+      if (type === 'selective' && (!payload.selectedProducts || payload.selectedProducts.length === 0)) {
+        notifyError('Please select at least one product to preview', 3000);
+        return;
+      }
+
+      const response = await api.post(`/admin/promotions/${type}/preview`, payload);
       setPreviewProducts(response.data.products || []);
       setShowPreview(true);
     } catch (err) {
@@ -106,9 +173,13 @@ const AdminPromotions = () => {
     }
   };
 
-  const renderPromotionCard = (type, label, description) => {
+  const renderPromotionCard = (type, label, description, icon) => {
     const promo = promotions[type];
     const isActive = promo.enabled;
+    const filteredProducts = allProducts.filter(p =>
+      p.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    const selectedCount = (promo.selectedProducts || []).length;
 
     return (
       <div style={{
@@ -127,7 +198,8 @@ const AdminPromotions = () => {
           marginBottom: '1rem',
         }}>
           <div>
-            <h3 style={{ margin: '0 0 0.5rem 0', color: '#333' }}>
+            <h3 style={{ margin: '0 0 0.5rem 0', color: '#333', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <i className={`fas ${icon}`} style={{ color: '#5B4B8A' }}></i>
               {label}
             </h3>
             <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
@@ -166,6 +238,7 @@ const AdminPromotions = () => {
             fontWeight: '600',
             color: '#333',
           }}>
+            <i className="fas fa-percent" style={{ marginRight: '0.5rem', color: '#5B4B8A' }}></i>
             Discount Percentage
           </label>
           <div style={{
@@ -232,6 +305,7 @@ const AdminPromotions = () => {
               fontWeight: '600',
               color: '#333',
             }}>
+              <i className="fas fa-folder" style={{ marginRight: '0.5rem', color: '#5B4B8A' }}></i>
               Select Category
             </label>
             <select
@@ -261,8 +335,8 @@ const AdminPromotions = () => {
           </div>
         )}
 
-        {/* Random product count selector */}
-        {type === 'random' && (
+        {/* Product selector for selective promotions */}
+        {type === 'selective' && (
           <div style={{ marginBottom: '1rem' }}>
             <label style={{
               display: 'block',
@@ -270,44 +344,71 @@ const AdminPromotions = () => {
               fontWeight: '600',
               color: '#333',
             }}>
-              Number of Products to Promote
+              <i className="fas fa-search" style={{ marginRight: '0.5rem', color: '#5B4B8A' }}></i>
+              Search & Select Products ({selectedCount} selected)
             </label>
+            <input
+              type="text"
+              placeholder="Search products to promote..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                borderRadius: '4px',
+                border: '1px solid #ddd',
+                fontSize: '0.95rem',
+                marginBottom: '0.75rem',
+              }}
+            />
             <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
+              maxHeight: '200px',
+              overflowY: 'auto',
+              border: '1px solid #ddd',
+              borderRadius: '4px',
+              padding: '0.5rem',
+              backgroundColor: '#fafafa',
             }}>
-              <button
-                onClick={() => handleRandomCountChange(promo.productCount - 1)}
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '4px',
-                  border: '1px solid #ddd',
-                  backgroundColor: '#f5f5f5',
-                  cursor: 'pointer',
-                  fontWeight: '600',
-                  fontSize: '1.2rem',
-                }}
-              >
-                −
-              </button>
-              <input
-                type="number"
-                value={promo.productCount}
-                onChange={(e) => handleRandomCountChange(parseInt(e.target.value) || 1)}
-                style={{
-                  width: '80px',
-                  padding: '0.5rem',
-                  borderRadius: '4px',
-                  border: '1px solid #ddd',
-                  textAlign: 'center',
-                  fontSize: '1rem',
-                  fontWeight: '600',
-                }}
-                min="1"
-              />
-              <span style={{ color: '#666' }}>products</span>
+              {filteredProducts.length > 0 ? (
+                filteredProducts.map(product => (
+                  <div
+                    key={product.id}
+                    onClick={() => handleSelectProduct(product.id)}
+                    style={{
+                      padding: '0.75rem',
+                      borderRadius: '4px',
+                      marginBottom: '0.5rem',
+                      cursor: 'pointer',
+                      backgroundColor: (promo.selectedProducts || []).includes(product.id) ? '#e8f5e9' : '#fff',
+                      border: (promo.selectedProducts || []).includes(product.id) ? '2px solid #4CAF50' : '1px solid #ddd',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f0f0f0';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.backgroundColor = (promo.selectedProducts || []).includes(product.id) ? '#e8f5e9' : '#fff';
+                    }}
+                  >
+                    {(promo.selectedProducts || []).includes(product.id) && (
+                      <i className="fas fa-check-circle" style={{ color: '#4CAF50' }}></i>
+                    )}
+                    <div style={{ flex: 1 }}>
+                      <strong>{product.name}</strong>
+                      <div style={{ fontSize: '0.85rem', color: '#666' }}>
+                        ${product.price.toFixed(2)} → ${(product.price - (product.price * promo.percentage) / 100).toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p style={{ textAlign: 'center', color: '#999', padding: '1rem' }}>
+                  No products found
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -319,7 +420,7 @@ const AdminPromotions = () => {
         }}>
           <button
             onClick={() => previewPromotion(type)}
-            disabled={!promo.categoryId && type === 'category'}
+            disabled={(type === 'category' && !promo.categoryId) || (type === 'selective' && (!promo.selectedProducts || promo.selectedProducts.length === 0))}
             style={{
               flex: 1,
               padding: '0.75rem 1.5rem',
@@ -338,7 +439,8 @@ const AdminPromotions = () => {
               e.target.style.backgroundColor = '#fff';
             }}
           >
-            👁 Preview
+            <i className="fas fa-eye" style={{ marginRight: '0.5rem' }}></i>
+            Preview
           </button>
         </div>
       </div>
@@ -369,9 +471,13 @@ const AdminPromotions = () => {
         borderRadius: '4px',
         marginBottom: '2rem',
         color: '#1565c0',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.75rem',
       }}>
+        <i className="fas fa-lightbulb" style={{ fontSize: '1.2rem' }}></i>
         <p style={{ margin: 0 }}>
-          💡 <strong>Tip:</strong> Use promotions to boost sales. Preview products before activating to ensure correct targeting.
+          <strong>Tip:</strong> Use promotions to boost sales. Preview products before activating to ensure correct targeting.
         </p>
       </div>
 
@@ -379,18 +485,21 @@ const AdminPromotions = () => {
       <div style={{ maxWidth: '900px' }}>
         {renderPromotionCard(
           'global',
-          '🌍 Global Promotion',
-          'Apply discount to all products in store'
+          'Global Promotion',
+          'Apply discount to all products in store',
+          'fa-globe'
         )}
         {renderPromotionCard(
           'category',
-          '📦 Category Promotion',
-          'Apply discount to all products in a selected category'
+          'Category Promotion',
+          'Apply discount to all products in a selected category',
+          'fa-box'
         )}
         {renderPromotionCard(
-          'random',
-          '🎲 Random Products Promotion',
-          'Apply discount to a random selection of products'
+          'selective',
+          'Selective Promotion',
+          'Apply discount to specific products you choose',
+          'fa-hand-pointer'
         )}
       </div>
 

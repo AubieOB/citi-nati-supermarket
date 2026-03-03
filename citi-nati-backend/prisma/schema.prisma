@@ -170,11 +170,11 @@ model TicketReadStatus {
 
 model Promotion {
   id           Int      @id @default(autoincrement())
-  type         String   @unique // 'global', 'category', or 'random'
+  type         String   @unique // 'global', 'category', or 'selective'
   enabled      Boolean  @default(false)
   percentage   Int      @default(10) // Discount percentage
   categoryId   String?  // For category promotions
-  productCount Int?     // For random promotions
+  selectedProductIds Int[]  @default([]) // For selective promotions
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }

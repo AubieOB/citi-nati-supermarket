@@ -295,20 +295,6 @@ router.put('/refunds/:orderId/approve', verifyTokenMiddleware, verifyAdmin, mark
 router.get('/promotions', verifyTokenMiddleware, verifyAdmin, getCurrentPromotions);
 
 /**
- * POST /api/admin/promotions/:type
- * Update/toggle a promotion (global, category, or random)
- * Protected: Admin only
- */
-router.post('/promotions/:type', verifyTokenMiddleware, verifyAdmin, updatePromotion);
-
-/**
- * POST /api/admin/promotions/:type/preview
- * Preview products matching promotion criteria
- * Protected: Admin only
- */
-router.post('/promotions/:type/preview', verifyTokenMiddleware, verifyAdmin, previewPromotion);
-
-/**
  * POST /api/admin/promotions/apply
  * Apply active promotions to products
  * Protected: Admin only
@@ -321,5 +307,19 @@ router.post('/promotions/apply', verifyTokenMiddleware, verifyAdmin, applyPromot
  * Protected: Admin only
  */
 router.post('/promotions/remove', verifyTokenMiddleware, verifyAdmin, removePromotion);
+
+/**
+ * POST /api/admin/promotions/:type/preview
+ * Preview products matching promotion criteria
+ * Protected: Admin only
+ */
+router.post('/promotions/:type/preview', verifyTokenMiddleware, verifyAdmin, previewPromotion);
+
+/**
+ * POST /api/admin/promotions/:type
+ * Update/toggle a promotion (global, category, or selective)
+ * Protected: Admin only
+ */
+router.post('/promotions/:type', verifyTokenMiddleware, verifyAdmin, updatePromotion);
 
 module.exports = router;

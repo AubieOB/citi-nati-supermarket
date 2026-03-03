@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import api from '../../utils/api.js';
+import { getSocket } from '../../utils/socket.js';
 import { notifySuccess, notifyError } from '../../utils/notifications.js';
 
 /**
@@ -28,7 +29,40 @@ const AdminStocks = () => {
 
   useEffect(() => {
     fetchProducts();
+    setupSocketListeners();
   }, []);
+
+  /**
+   * Real-time stock updates via Socket.io
+   */
+  const setupSocketListeners = () => {
+    try {
+      const socket = getSocket();
+      if (!socket) {
+        console.warn('[AdminStocks] Socket not initialized');
+        return;
+      }
+
+      const handleStockUpdate = (updatedProduct) => {
+        console.log('[AdminStocks] Stock updated via Socket.io:', updatedProduct.id);
+        
+        setProducts(prevProducts =>
+          prevProducts.map(p =>
+            p.id === updatedProduct.id ? { ...p, stock: updatedProduct.stock } : p
+          )
+        );
+      };
+
+      socket.on('stock_update', handleStockUpdate);
+      console.log('[AdminStocks] Socket.io listener registered for stock_update');
+
+      return () => {
+        socket.off('stock_update', handleStockUpdate);
+      };
+    } catch (err) {
+      console.error('[AdminStocks] Socket.io setup error:', err);
+    }
+  };
 
   const fetchProducts = async () => {
     try {
@@ -145,7 +179,10 @@ const AdminStocks = () => {
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
           borderLeft: '4px solid #2196F3',
         }}>
-          <p style={{ margin: '0 0 0.5rem 0', color: '#666', fontSize: '0.9rem' }}>Total Products</p>
+          <p style={{ margin: '0 0 0.5rem 0', color: '#666', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <i className="fas fa-cubes" style={{ color: '#2196F3' }}></i>
+            Total Products
+          </p>
           <h3 style={{ margin: 0, color: '#2196F3', fontSize: '2rem' }}>{products.length}</h3>
         </div>
         <div style={{
@@ -155,7 +192,10 @@ const AdminStocks = () => {
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
           borderLeft: '4px solid #388e3c',
         }}>
-          <p style={{ margin: '0 0 0.5rem 0', color: '#666', fontSize: '0.9rem' }}>In Stock</p>
+          <p style={{ margin: '0 0 0.5rem 0', color: '#666', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <i className="fas fa-check-circle" style={{ color: '#388e3c' }}></i>
+            In Stock
+          </p>
           <h3 style={{ margin: 0, color: '#388e3c', fontSize: '2rem' }}>{goodStock.length}</h3>
         </div>
         <div style={{
@@ -165,7 +205,10 @@ const AdminStocks = () => {
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
           borderLeft: '4px solid #f57c00',
         }}>
-          <p style={{ margin: '0 0 0.5rem 0', color: '#666', fontSize: '0.9rem' }}>Low Stock</p>
+          <p style={{ margin: '0 0 0.5rem 0', color: '#666', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <i className="fas fa-exclamation-circle" style={{ color: '#f57c00' }}></i>
+            Low Stock
+          </p>
           <h3 style={{ margin: 0, color: '#f57c00', fontSize: '2rem' }}>{lowStock.length}</h3>
         </div>
         <div style={{
@@ -175,7 +218,10 @@ const AdminStocks = () => {
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
           borderLeft: '4px solid #d32f2f',
         }}>
-          <p style={{ margin: '0 0 0.5rem 0', color: '#666', fontSize: '0.9rem' }}>Out of Stock</p>
+          <p style={{ margin: '0 0 0.5rem 0', color: '#666', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <i className="fas fa-ban" style={{ color: '#d32f2f' }}></i>
+            Out of Stock
+          </p>
           <h3 style={{ margin: 0, color: '#d32f2f', fontSize: '2rem' }}>{outOfStock.length}</h3>
         </div>
       </div>
@@ -188,7 +234,10 @@ const AdminStocks = () => {
         marginBottom: '2rem',
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
       }}>
-        <h3 style={{ margin: '0 0 1rem 0', color: '#333' }}>Filters</h3>
+        <h3 style={{ margin: '0 0 1rem 0', color: '#333', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <i className="fas fa-filter" style={{ color: '#5B4B8A' }}></i>
+          Filters
+        </h3>
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
@@ -201,7 +250,11 @@ const AdminStocks = () => {
               fontWeight: '600',
               color: '#333',
               fontSize: '0.9rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
             }}>
+              <i className="fas fa-search" style={{ color: '#5B4B8A' }}></i>
               Search Product
             </label>
             <input
@@ -225,7 +278,11 @@ const AdminStocks = () => {
               fontWeight: '600',
               color: '#333',
               fontSize: '0.9rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
             }}>
+              <i className="fas fa-folder" style={{ color: '#5B4B8A' }}></i>
               Category
             </label>
             <select
@@ -253,7 +310,11 @@ const AdminStocks = () => {
               fontWeight: '600',
               color: '#333',
               fontSize: '0.9rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
             }}>
+              <i className="fas fa-bell" style={{ color: '#5B4B8A' }}></i>
               Low Stock Threshold
             </label>
             <input
@@ -339,8 +400,17 @@ const AdminStocks = () => {
                         color: status.color,
                         fontWeight: '600',
                         fontSize: '0.85rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        justifyContent: 'center',
                       }}>
-                        {status.icon} {status.label}
+                        <i className={`fas ${
+                          product.stock === 0 ? 'fa-ban' :
+                          product.stock <= lowStockThreshold ? 'fa-exclamation-circle' :
+                          'fa-check-circle'
+                        }`}></i>
+                        {status.label}
                       </span>
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'center' }}>
@@ -362,11 +432,15 @@ const AdminStocks = () => {
                             fontWeight: '600',
                             fontSize: '0.85rem',
                             transition: 'all 0.2s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
                           }}
                           onMouseOver={(e) => e.target.style.opacity = '0.8'}
                           onMouseOut={(e) => e.target.style.opacity = '1'}
                         >
-                          + Add
+                          <i className="fas fa-plus"></i>
+                          Add
                         </button>
                         <button
                           onClick={() => openStockModal(product, 'subtract')}
@@ -381,11 +455,15 @@ const AdminStocks = () => {
                             fontWeight: '600',
                             fontSize: '0.85rem',
                             transition: 'all 0.2s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
                           }}
                           onMouseOver={(e) => e.target.style.opacity = '0.8'}
                           onMouseOut={(e) => e.target.style.opacity = '1'}
                         >
-                          − Remove
+                          <i className="fas fa-minus"></i>
+                          Remove
                         </button>
                       </div>
                     </td>
@@ -426,8 +504,9 @@ const AdminStocks = () => {
             width: '100%',
             boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
           }}>
-            <h2 style={{ margin: '0 0 1rem 0', color: '#333' }}>
-              {actionType === 'add' ? '➕ Add Stock' : '➖ Remove Stock'}
+            <h2 style={{ margin: '0 0 1rem 0', color: '#333', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <i className={`fas ${actionType === 'add' ? 'fa-plus' : 'fa-minus'}`} style={{ color: actionType === 'add' ? '#4CAF50' : '#f44336' }}></i>
+              {actionType === 'add' ? 'Add Stock' : 'Remove Stock'}
             </h2>
             
             <div style={{ marginBottom: '1.5rem' }}>
@@ -501,10 +580,14 @@ const AdminStocks = () => {
                   fontWeight: '600',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
                 }}
                 onMouseOver={(e) => e.target.style.backgroundColor = '#eee'}
                 onMouseOut={(e) => e.target.style.backgroundColor = '#f5f5f5'}
               >
+                <i className="fas fa-x"></i>
                 Cancel
               </button>
               <button
@@ -518,11 +601,15 @@ const AdminStocks = () => {
                   fontWeight: '600',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
                 }}
                 onMouseOver={(e) => e.target.style.opacity = '0.9'}
                 onMouseOut={(e) => e.target.style.opacity = '1'}
               >
-                {actionType === 'add' ? '✓ Add Stock' : '✓ Remove Stock'}
+                <i className={`fas ${actionType === 'add' ? 'fa-check' : 'fa-check'}`}></i>
+                {actionType === 'add' ? 'Add Stock' : 'Remove Stock'}
               </button>
             </div>
           </div>

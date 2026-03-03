@@ -3,11 +3,26 @@
  * Handles promotion management for:
  * 1. Global promotions (all products)
  * 2. Category-based promotions
- * 3. Random product promotions
+ * 3. Selective product promotions
  */
 
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+
+/**
+ * Emit promotion update to all connected admin clients via Socket.io
+ */
+const emitPromotionUpdate = (promotion) => {
+  try {
+    if (global.io) {
+      // Broadcast to admin_room only
+      global.io.to('admin_room').emit('promotionUpdated', promotion);
+      console.log(`[Socket.io] Promotion updated: ${promotion.type} - emitted to admin_room`);
+    }
+  } catch (err) {
+    console.error('Error emitting promotion:', err);
+  }
+};
 
 /**
  * Get current promotions
@@ -20,7 +35,7 @@ const getCurrentPromotions = async (req, res) => {
     const formattedPromotions = {
       global: promotions.find(p => p.type === 'global') || { enabled: false, percentage: 10, type: 'global' },
       category: promotions.find(p => p.type === 'category') || { enabled: false, percentage: 10, type: 'category', categoryId: null },
-      random: promotions.find(p => p.type === 'random') || { enabled: false, percentage: 10, type: 'random', productCount: 5 },
+      selective: promotions.find(p => p.type === 'selective') || { enabled: false, percentage: 10, type: 'selective', selectedProducts: [] },
     };
 
     return res.json({
@@ -37,17 +52,133 @@ const getCurrentPromotions = async (req, res) => {
 };
 
 /**
- * Activate or deactivate a promotion
+ * Activate or deactivate a promotion and apply it
  */
 const updatePromotion = async (req, res) => {
   try {
     const { type } = req.params;
-    const { enabled, percentage, categoryId, productCount } = req.body;
+    const { enabled, percentage, categoryId, selectedProducts } = req.body;
 
     // Validate promotion type
-    if (!['global', 'category', 'random'].includes(type)) {
+    if (!['global', 'category', 'selective'].includes(type)) {
       return res.status(400).json({
         success: false,
+        error: 'Invalid promotion type'
+      });
+    }
+
+    // If enabling category promotion, ensure category is selected
+    if (type === 'category' && enabled && !categoryId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Category must be selected for category promotion'
+      });
+    }
+
+    // If enabling selective promotion, ensure products are selected
+    if (type === 'selective' && enabled && (!selectedProducts || selectedProducts.length === 0)) {
+      return res.status(400).json({
+        success: false,
+        error: 'At least one product must be selected'
+      });
+    }
+
+    // First, reset all products (remove promotional pricing) if disabling
+    if (!enabled) {
+      await prisma.product.updateMany({
+        data: {
+          discountPrice: null,
+          isOnSale: false,
+        }
+      });
+    }
+
+    // Update or create promotion in database
+    const promotionData = {
+      type,
+      enabled,
+      percentage: parseInt(percentage) || 10,
+    };
+
+    // Add type-specific data
+    if (type === 'category') {
+      promotionData.categoryId = categoryId;
+    } else if (type === 'selective') {
+      promotionData.selectedProductIds = selectedProducts || [];
+    }
+
+    const promotion = await prisma.promotion.upsert({
+      where: { type },
+      update: promotionData,
+      create: promotionData,
+    });
+
+    // Apply promotions if enabled
+    if (enabled) {
+      let productsToUpdate = [];
+
+      if (type === 'global') {
+        // Get all products
+        productsToUpdate = await prisma.product.findMany();
+      } else if (type === 'category') {
+        // Get products in specific category
+        productsToUpdate = await prisma.product.findMany({
+          where: { category: categoryId }
+        });
+      } else if (type === 'selective') {
+        // Get selected products
+        productsToUpdate = await prisma.product.findMany({
+          where: { id: { in: selectedProducts } }
+        });
+      }
+
+      // Update each product with discount price
+      for (const product of productsToUpdate) {
+        const discountAmount = (product.price * percentage) / 100;
+        const discountedPrice = product.price - discountAmount;
+
+        await prisma.product.update({
+          where: { id: product.id },
+          data: {
+            discountPrice: discountedPrice,
+            isOnSale: true,
+            updatedAt: new Date(),
+          },
+        });
+      }
+
+      console.log(`[Promotions] ${type} promotion activated - applied to ${productsToUpdate.length} products at ${percentage}% off`);
+    } else {
+      console.log(`[Promotions] ${type} promotion deactivated`);
+    }
+
+    // Emit real-time update to all clients
+    emitPromotionUpdate({
+      type: promotion.type,
+      enabled: promotion.enabled,
+      percentage: promotion.percentage,
+      categoryId: promotion.categoryId,
+      selectedProducts: promotion.selectedProductIds || [],
+    });
+
+    return res.json({
+      success: true,
+      promotion: {
+        type: promotion.type,
+        enabled: promotion.enabled,
+        percentage: promotion.percentage,
+        categoryId: promotion.categoryId,
+        selectedProducts: promotion.selectedProductIds || [],
+      },
+    });
+  } catch (err) {
+    console.error('Error updating promotion:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to update promotion'
+    });
+  }
+};
         error: 'Invalid promotion type'
       });
     }
@@ -116,7 +247,15 @@ const updatePromotion = async (req, res) => {
 const previewPromotion = async (req, res) => {
   try {
     const { type } = req.params;
-    const { percentage, categoryId, productCount } = req.body;
+    const { percentage, categoryId, selectedProducts } = req.body;
+
+    // Validate type
+    if (!['global', 'category', 'selective'].includes(type)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid promotion type'
+      });
+    }
 
     let products = [];
 
@@ -134,10 +273,17 @@ const previewPromotion = async (req, res) => {
       products = await prisma.product.findMany({
         where: { category: categoryId }
       });
-    } else if (type === 'random') {
-      // Get random products
-      const allProducts = await prisma.product.findMany();
-      products = allProducts.sort(() => Math.random() - 0.5).slice(0, productCount || 5);
+    } else if (type === 'selective') {
+      // Get selected products
+      if (!selectedProducts || selectedProducts.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'At least one product must be selected'
+        });
+      }
+      products = await prisma.product.findMany({
+        where: { id: { in: selectedProducts } }
+      });
     }
 
     // Calculate discounted prices
@@ -192,9 +338,13 @@ const applyPromotion = async (req, res) => {
         products = await prisma.product.findMany({
           where: { category: promotion.categoryId }
         });
-      } else if (promotion.type === 'random') {
-        const allProducts = await prisma.product.findMany();
-        products = allProducts.sort(() => Math.random() - 0.5).slice(0, promotion.productCount || 5);
+      } else if (promotion.type === 'selective') {
+        // Use selectedProductIds from database
+        const selectedIds = promotion.selectedProductIds || [];
+        if (selectedIds.length === 0) continue; // Skip if no products selected
+        products = await prisma.product.findMany({
+          where: { id: { in: selectedIds } }
+        });
       }
 
       // Update each product with discount price
