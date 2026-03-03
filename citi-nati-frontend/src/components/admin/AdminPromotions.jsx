@@ -399,7 +399,7 @@ const AdminPromotions = () => {
                     <div style={{ flex: 1 }}>
                       <strong>{product.name}</strong>
                       <div style={{ fontSize: '0.85rem', color: '#666' }}>
-                        ${product.price.toFixed(2)} → ${(product.price - (product.price * promo.percentage) / 100).toFixed(2)}
+                        {formatMWK(product.price)} → {formatMWK(product.price - (product.price * promo.percentage) / 100)}
                       </div>
                     </div>
                   </div>

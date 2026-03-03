@@ -31,11 +31,41 @@ const getCurrentPromotions = async (req, res) => {
   try {
     const promotions = await prisma.promotion.findMany();
     
-    // Format promotions by type
+    // Helper to format a promotion record
+    const formatPromotion = (promo) => {
+      if (!promo) return null;
+      return {
+        type: promo.type,
+        enabled: promo.enabled,
+        percentage: promo.percentage,
+        categoryId: promo.categoryId || null,
+        selectedProducts: promo.selectedProductIds || [],
+      };
+    };
+
+    // Format promotions by type with safe defaults
     const formattedPromotions = {
-      global: promotions.find(p => p.type === 'global') || { enabled: false, percentage: 10, type: 'global' },
-      category: promotions.find(p => p.type === 'category') || { enabled: false, percentage: 10, type: 'category', categoryId: null },
-      selective: promotions.find(p => p.type === 'selective') || { enabled: false, percentage: 10, type: 'selective', selectedProducts: [] },
+      global: formatPromotion(promotions.find(p => p.type === 'global')) || { 
+        type: 'global',
+        enabled: false, 
+        percentage: 10, 
+        categoryId: null,
+        selectedProducts: []
+      },
+      category: formatPromotion(promotions.find(p => p.type === 'category')) || { 
+        type: 'category',
+        enabled: false, 
+        percentage: 10, 
+        categoryId: null,
+        selectedProducts: []
+      },
+      selective: formatPromotion(promotions.find(p => p.type === 'selective')) || { 
+        type: 'selective',
+        enabled: false, 
+        percentage: 10, 
+        categoryId: null,
+        selectedProducts: []
+      },
     };
 
     return res.json({
@@ -83,6 +113,20 @@ const updatePromotion = async (req, res) => {
       });
     }
 
+    // Validate selectedProducts are valid integers if provided
+    if (selectedProducts && selectedProducts.length > 0) {
+      const validIds = selectedProducts.filter(id => {
+        const parsed = parseInt(id);
+        return !isNaN(parsed) && parsed > 0;
+      });
+      if (validIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid product IDs provided'
+        });
+      }
+    }
+
     // First, reset all products (remove promotional pricing) if disabling
     if (!enabled) {
       await prisma.product.updateMany({
@@ -98,20 +142,25 @@ const updatePromotion = async (req, res) => {
       type,
       enabled,
       percentage: parseInt(percentage) || 10,
+      selectedProductIds: [],
     };
 
     // Add type-specific data
     if (type === 'category') {
       promotionData.categoryId = categoryId;
     } else if (type === 'selective') {
-      promotionData.selectedProductIds = selectedProducts || [];
+      promotionData.selectedProductIds = (selectedProducts || []).map(id => parseInt(id));
     }
+
+    console.log('[Promotions] Upserting promotion:', { type, enabled, percentage, selectedProductIds: promotionData.selectedProductIds });
 
     const promotion = await prisma.promotion.upsert({
       where: { type },
       update: promotionData,
       create: promotionData,
     });
+
+    console.log('[Promotions] Promotion upserted:', promotion);
 
     // Apply promotions if enabled
     if (enabled) {
@@ -126,10 +175,13 @@ const updatePromotion = async (req, res) => {
           where: { category: categoryId }
         });
       } else if (type === 'selective') {
-        // Get selected products
-        productsToUpdate = await prisma.product.findMany({
-          where: { id: { in: selectedProducts } }
-        });
+        // Get selected products - use parsed IDs
+        const validIds = (selectedProducts || []).map(id => parseInt(id)).filter(id => !isNaN(id) && id > 0);
+        if (validIds.length > 0) {
+          productsToUpdate = await prisma.product.findMany({
+            where: { id: { in: validIds } }
+          });
+        }
       }
 
       // Update each product with discount price
@@ -153,29 +205,31 @@ const updatePromotion = async (req, res) => {
     }
 
     // Emit real-time update to all clients
-    emitPromotionUpdate({
+    const promotionResponse = {
       type: promotion.type,
       enabled: promotion.enabled,
       percentage: promotion.percentage,
-      categoryId: promotion.categoryId,
+      categoryId: promotion.categoryId || null,
       selectedProducts: promotion.selectedProductIds || [],
-    });
+    };
+    
+    try {
+      emitPromotionUpdate(promotionResponse);
+    } catch (emitErr) {
+      console.error('[Promotions] Socket.io emit error:', emitErr);
+      // Continue even if Socket.io fails
+    }
 
     return res.json({
       success: true,
-      promotion: {
-        type: promotion.type,
-        enabled: promotion.enabled,
-        percentage: promotion.percentage,
-        categoryId: promotion.categoryId,
-        selectedProducts: promotion.selectedProductIds || [],
-      },
+      promotion: promotionResponse,
     });
   } catch (err) {
-    console.error('Error updating promotion:', err);
+    console.error('[Promotions] Error updating promotion:', err.message || err);
+    console.error('[Promotions] Full error:', err);
     return res.status(500).json({
       success: false,
-      error: 'Failed to update promotion'
+      error: 'Failed to update promotion: ' + (err.message || 'Unknown error')
     });
   }
 };
