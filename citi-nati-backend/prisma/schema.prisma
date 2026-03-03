@@ -168,6 +168,17 @@ model TicketReadStatus {
   @@unique([ticketId, userId])
 }
 
+model Promotion {
+  id           Int      @id @default(autoincrement())
+  type         String   @unique // 'global', 'category', or 'random'
+  enabled      Boolean  @default(false)
+  percentage   Int      @default(10) // Discount percentage
+  categoryId   String?  // For category promotions
+  productCount Int?     // For random promotions
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
 model AdminMessage {
   id        Int      @id @default(autoincrement())
   type      String   // new_user, payment_success, order_placed, order_completed, payment_failed, driver_assigned, system

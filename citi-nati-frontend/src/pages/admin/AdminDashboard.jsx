@@ -8,6 +8,8 @@ import AdminDrivers from '../../components/admin/AdminDrivers.jsx';
 import AdminSales from '../../components/admin/AdminSales.jsx';
 import AdminInbox from '../../components/admin/AdminInbox.jsx';
 import AdminRefunds from '../../components/admin/AdminRefunds.jsx';
+import AdminPromotions from '../../components/admin/AdminPromotions.jsx';
+import AdminStocks from '../../components/admin/AdminStocks.jsx';
 import SupportDashboard from './SupportDashboard.jsx';
 import { useOrderUpdates } from '../../hooks/useOrderUpdates.js';
 import '../../styles/global.css';
@@ -32,6 +34,8 @@ const AdminDashboard = () => {
   const tabs = [
     { id: 'inbox', label: 'Inbox', icon: 'fa-inbox' },
     { id: 'products', label: 'Products', icon: 'fa-box' },
+    { id: 'stocks', label: 'Stocks', icon: 'fa-warehouse' },
+    { id: 'promotions', label: 'Promotions', icon: 'fa-tags' },
     { id: 'orders', label: 'Orders', icon: 'fa-list' },
     { id: 'users', label: 'Users', icon: 'fa-users' },
     { id: 'drivers', label: 'Drivers', icon: 'fa-car' },
@@ -181,6 +185,8 @@ const AdminDashboard = () => {
         <div className="admin-content-area">
           {activeTab === 'inbox' && <AdminInbox />}
           {activeTab === 'products' && <AdminProducts />}
+          {activeTab === 'stocks' && <AdminStocks />}
+          {activeTab === 'promotions' && <AdminPromotions />}
           {activeTab === 'orders' && <AdminOrders />}
           {activeTab === 'users' && <AdminUsers />}
           {activeTab === 'sales' && <AdminSales />}

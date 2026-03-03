@@ -130,8 +130,15 @@ const AdminOrders = () => {
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
       setUpdatingStatus(orderId);
+      
+      // Optimistic update
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === orderId ? { ...order, status: newStatus } : order
+        )
+      );
+      
       await api.put(`/orders/${orderId}/status`, { status: newStatus });
-      await fetchOrders();
       
       // Show success notification with sound
       if (newStatus === 'IN_TRANSIT') {
@@ -146,6 +153,8 @@ const AdminOrders = () => {
     } catch (err) {
       console.error('Error updating status:', err);
       notifyError(`Failed to update order status: ${err.response?.data?.error || 'Unknown error'}`, 4000);
+      // Refetch on error to revert optimistic update
+      await fetchOrders();
     } finally {
       setUpdatingStatus(null);
     }
@@ -162,12 +171,20 @@ const AdminOrders = () => {
       `Are you sure you want to assign ${driverName} to this order?`,
       async () => {
         try {
+          // Optimistic update
+          setOrders(prevOrders => 
+            prevOrders.map(order => 
+              order.id === orderId ? { ...order, driverId, driver } : order
+            )
+          );
+          
           await api.put(`/orders/${orderId}/assign-driver`, { driverId });
-          await fetchOrders();
           notifySuccess(`📦 ${driverName} assigned to order #${orderId}!`, 4000);
         } catch (err) {
           console.error('Error assigning driver:', err);
           notifyError(`Failed to assign driver: ${err.response?.data?.error || 'Unknown error'}`, 4000);
+          // Refetch on error to revert optimistic update
+          await fetchOrders();
         }
       }
     );

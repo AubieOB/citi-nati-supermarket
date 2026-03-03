@@ -14,6 +14,7 @@ const { verifyTokenMiddleware } = require('../middleware/auth.middleware');
 const { verifyAdmin } = require('../middleware/admin.middleware');
 const { PrismaClient } = require('@prisma/client');
 const { getRefundPendingOrders, markOrderAsRefunded } = require('../controllers/order.controller');
+const { getCurrentPromotions, updatePromotion, previewPromotion, applyPromotion, removePromotion } = require('../controllers/promotion.controller');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -279,5 +280,46 @@ router.get('/refunds/pending', verifyTokenMiddleware, verifyAdmin, getRefundPend
  * Protected: Admin only
  */
 router.put('/refunds/:orderId/approve', verifyTokenMiddleware, verifyAdmin, markOrderAsRefunded);
+
+/**
+ * ============================================
+ * 🎯 PROMOTIONS MANAGEMENT ROUTES
+ * ============================================
+ */
+
+/**
+ * GET /api/admin/promotions
+ * Get current promotion settings
+ * Protected: Admin only
+ */
+router.get('/promotions', verifyTokenMiddleware, verifyAdmin, getCurrentPromotions);
+
+/**
+ * POST /api/admin/promotions/:type
+ * Update/toggle a promotion (global, category, or random)
+ * Protected: Admin only
+ */
+router.post('/promotions/:type', verifyTokenMiddleware, verifyAdmin, updatePromotion);
+
+/**
+ * POST /api/admin/promotions/:type/preview
+ * Preview products matching promotion criteria
+ * Protected: Admin only
+ */
+router.post('/promotions/:type/preview', verifyTokenMiddleware, verifyAdmin, previewPromotion);
+
+/**
+ * POST /api/admin/promotions/apply
+ * Apply active promotions to products
+ * Protected: Admin only
+ */
+router.post('/promotions/apply', verifyTokenMiddleware, verifyAdmin, applyPromotion);
+
+/**
+ * POST /api/admin/promotions/remove
+ * Remove all active promotions
+ * Protected: Admin only
+ */
+router.post('/promotions/remove', verifyTokenMiddleware, verifyAdmin, removePromotion);
 
 module.exports = router;
