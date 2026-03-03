@@ -7,6 +7,7 @@ import ProtectedRoute from './components/ProtectedRoute.jsx';
 import ScrollToTop from './components/ScrollToTop.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 import { initSocket, identifySocket } from './utils/socket.js';
+import { initializeAuth } from './utils/api.js';
 import { useGlobalNotifications } from './hooks/useGlobalNotifications.js';
 
 // Public Pages
@@ -42,6 +43,16 @@ import './styles/global.css';
 
 function AppInner() {
   const { user, isLoading } = useAuth();
+
+  // Initialize API authentication on app startup (FIRST EFFECT - must run before other API calls)
+  useEffect(() => {
+    try {
+      initializeAuth();
+      console.log('[APP] API authentication initialized from localStorage');
+    } catch (err) {
+      console.error('[APP] API authentication initialization failed:', err);
+    }
+  }, []);
 
   // Initialize WebSocket on app startup
   useEffect(() => {

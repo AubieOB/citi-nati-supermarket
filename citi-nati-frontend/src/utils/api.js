@@ -11,6 +11,7 @@
  */
 
 import axios from 'axios';
+import { tokenStorage } from './tokenStorage.js';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api',
@@ -20,13 +21,32 @@ const api = axios.create({
 });
 
 /**
+ * Request interceptor to ensure token is always included
+ */
+api.interceptors.request.use(
+  (config) => {
+    const token = tokenStorage.getToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+/**
  * Initialize API with token from localStorage
  * Called on app startup (in App.jsx or main.jsx)
  */
 export const initializeAuth = () => {
-  const token = localStorage.getItem('token');
+  const token = tokenStorage.getToken();
   if (token) {
     api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    console.log('[API] Authorization header set from localStorage');
+  } else {
+    console.log('[API] No token found in localStorage');
   }
 };
 
@@ -37,7 +57,8 @@ export const initializeAuth = () => {
 export const setAuthToken = (token) => {
   if (token) {
     api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    localStorage.setItem('token', token);
+    tokenStorage.setToken(token);
+    console.log('[API] Authorization header updated with new token');
   }
 };
 
@@ -47,8 +68,8 @@ export const setAuthToken = (token) => {
  */
 export const clearAuthToken = () => {
   delete api.defaults.headers.common['Authorization'];
-  localStorage.removeItem('token');
-  localStorage.removeItem('user');
+  tokenStorage.clear();
+  console.log('[API] Authorization header cleared');
 };
 
 export default api;
