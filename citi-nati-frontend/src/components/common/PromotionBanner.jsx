@@ -188,30 +188,32 @@ const PromotionBanner = ({ category = null }) => {
           onClick={handleDismiss}
           style={{
             position: 'absolute',
-            right: '1rem',
-            top: '50%',
-            transform: 'translateY(-50%)',
-            background: 'rgba(255, 255, 255, 0.3)',
+            right: '0.75rem',
+            top: '0.5rem',
+            transform: 'translateY(0)',
+            background: 'rgba(255, 255, 255, 0.4)',
             border: 'none',
             color: '#333',
             cursor: 'pointer',
-            fontSize: '1.5rem',
-            width: '32px',
-            height: '32px',
+            fontSize: '0.875rem',
+            width: '24px',
+            height: '24px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             borderRadius: '50%',
             transition: 'all 0.2s ease',
             padding: 0,
+            minWidth: '24px',
+            minHeight: '24px',
           }}
           onMouseOver={(e) => {
-            e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.5)';
-            e.target.style.transform = 'translateY(-50%) scale(1.1)';
+            e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.6)';
+            e.target.style.transform = 'scale(1.15)';
           }}
           onMouseOut={(e) => {
-            e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
-            e.target.style.transform = 'translateY(-50%) scale(1)';
+            e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.4)';
+            e.target.style.transform = 'scale(1)';
           }}
           title="Dismiss banner"
         >
