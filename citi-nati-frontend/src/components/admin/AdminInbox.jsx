@@ -322,6 +322,20 @@ const AdminInbox = () => {
     );
   };
 
+  const handleMarkAllAsRead = async () => {
+    try {
+      const response = await api.patch('/admin/messages/read/all');
+      // Update all messages to read state
+      setMessages(messages.map(msg => ({ ...msg, read: true })));
+      toast.success(`Marked ${response.data.updated} message${response.data.updated !== 1 ? 's' : ''} as read`, {
+        duration: 2000,
+      });
+    } catch (err) {
+      console.error('Error marking all messages as read:', err);
+      toast.error('Failed to mark messages as read', { duration: 2000 });
+    }
+  };
+
   const getMessageTypeInfo = (type) => {
     return messageTypes.find(t => t.value === type) || messageTypes[messageTypes.length - 1];
   };
@@ -401,28 +415,56 @@ const AdminInbox = () => {
           )}
         </div>
         {messages.length > 0 && (
-          <button
-            onClick={handleDeleteAll}
-            style={{
-              padding: '0.5rem 1rem',
-              backgroundColor: '#f8f9fa',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '0.9rem',
-              color: '#666',
-              transition: 'all 0.2s',
-            }}
-            onMouseOver={(e) => {
-              e.target.style.backgroundColor = '#eee';
-            }}
-            onMouseOut={(e) => {
-              e.target.style.backgroundColor = '#f8f9fa';
-            }}
-          >
-            <i className="fas fa-trash" style={{ marginRight: '0.5rem' }}></i>
-            Clear All
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {unreadCount > 0 && (
+              <button
+                onClick={handleMarkAllAsRead}
+                style={{
+                  padding: '0.5rem 1rem',
+                  backgroundColor: '#4CAF50',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  color: '#fff',
+                  fontWeight: '600',
+                  transition: 'all 0.2s',
+                }}
+                onMouseOver={(e) => {
+                  e.target.style.backgroundColor = '#45a049';
+                }}
+                onMouseOut={(e) => {
+                  e.target.style.backgroundColor = '#4CAF50';
+                }}
+                title={`Mark all ${unreadCount} unread message${unreadCount !== 1 ? 's' : ''} as read`}
+              >
+                <i className="fas fa-check-double" style={{ marginRight: '0.5rem' }}></i>
+                Mark All Read
+              </button>
+            )}
+            <button
+              onClick={handleDeleteAll}
+              style={{
+                padding: '0.5rem 1rem',
+                backgroundColor: '#f8f9fa',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                color: '#666',
+                transition: 'all 0.2s',
+              }}
+              onMouseOver={(e) => {
+                e.target.style.backgroundColor = '#eee';
+              }}
+              onMouseOut={(e) => {
+                e.target.style.backgroundColor = '#f8f9fa';
+              }}
+            >
+              <i className="fas fa-trash" style={{ marginRight: '0.5rem' }}></i>
+              Clear All
+            </button>
+          </div>
         )}
       </div>
 

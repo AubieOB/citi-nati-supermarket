@@ -6,6 +6,7 @@ const {
   getMessages,
   markAsRead,
   markAsUnread,
+  markAllAsRead,
   deleteMessage,
   deleteAllMessages,
 } = require('../controllers/admin-messages.controller.js');
@@ -17,6 +18,9 @@ const {
 
 // Get all messages (with filtering)
 router.get('/', verifyTokenMiddleware, verifyAdmin, getMessages);
+
+// Mark all messages as read (specific route before parameterized routes)
+router.patch('/read/all', verifyTokenMiddleware, verifyAdmin, markAllAsRead);
 
 // Mark message as read
 router.patch('/:id/read', verifyTokenMiddleware, verifyAdmin, markAsRead);

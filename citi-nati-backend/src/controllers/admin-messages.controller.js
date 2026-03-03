@@ -129,6 +129,24 @@ const deleteAllMessages = async (req, res) => {
 };
 
 /**
+ * Mark all messages as read
+ */
+const markAllAsRead = async (req, res) => {
+  try {
+    const result = await prisma.adminMessage.updateMany({
+      where: { read: false },
+      data: { read: true },
+    });
+
+    console.log(`[ADMIN_MSG] Marked ${result.count} messages as read`);
+    return res.json({ success: true, updated: result.count });
+  } catch (error) {
+    console.error('[ERROR] Mark all messages as read:', error);
+    return res.status(500).json({ error: 'Failed to mark all messages as read' });
+  }
+};
+
+/**
  * Create a new admin message (used internally)
  */
 const createMessage = async (type, title, message) => {
@@ -173,6 +191,7 @@ module.exports = {
   getMessages,
   markAsRead,
   markAsUnread,
+  markAllAsRead,
   deleteMessage,
   deleteAllMessages,
   createMessage,
