@@ -34,13 +34,19 @@ const PromotionBanner = ({ category = null }) => {
       let activePromotion = null;
       let activeType = null;
 
-      // Check if category promotion applies to current category
+      // Priority 1: Check if category promotion applies to current category (on Products page)
       if (category && promotions.category && promotions.category.enabled && promotions.category.categoryId === category) {
         activePromotion = promotions.category;
         activeType = 'category';
         console.log(`[PromotionBanner] 🏷️  Category promotion found for: ${category}`);
       } 
-      // Fall back to global promotion
+      // Priority 2: Show category promotion if we're on homepage and it's enabled (no category filter)
+      else if (!category && promotions.category && promotions.category.enabled) {
+        activePromotion = promotions.category;
+        activeType = 'category';
+        console.log(`[PromotionBanner] 🏷️  Category promotion active (no specific category)`);
+      }
+      // Priority 3: Fall back to global promotion
       else if (promotions.global && promotions.global.enabled) {
         activePromotion = promotions.global;
         activeType = 'global';
@@ -107,19 +113,22 @@ const PromotionBanner = ({ category = null }) => {
             setIsDismissed(false);
           }
         }
-        // Check if it's a category promotion update for the current category
-        else if (promotionData.type === 'category' && category && promotionData.categoryId === category) {
-          if (promotionData.enabled) {
-            setPromotion(promotionData);
-            setPromotionType('category');
-            // Reset dismissed state when promotion changes
-            setIsDismissed(false);
-          } else {
-            // Category promotion was disabled, revert to global if available
-            setPromotion(null);
-            setPromotionType(null);
-            setIsDismissed(false);
-            fetchPromotion(); // Re-fetch to check for global promotion
+        // Check if it's a category promotion update
+        else if (promotionData.type === 'category') {
+          // On Products page with specific category
+          if (category && promotionData.categoryId === category) {
+            if (promotionData.enabled) {
+              setPromotion(promotionData);
+              setPromotionType('category');
+              setIsDismissed(false);
+            } else {
+              // Category promotion was disabled, revert to global if available
+              fetchPromotion(); // Re-fetch to check for global promotion
+            }
+          }
+          // On Homepage (no category filter) - also handle category promotion updates
+          else if (!category) {
+            fetchPromotion(); // Re-fetch to handle category promotion enable/disable on homepage
           }
         }
       };
@@ -164,7 +173,7 @@ const PromotionBanner = ({ category = null }) => {
         backgroundColor: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
         background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
         color: '#333',
-        padding: '1rem',
+        padding: '1rem 4rem 1rem 1rem',
         textAlign: 'center',
         fontWeight: '600',
         fontSize: '1rem',
@@ -174,23 +183,23 @@ const PromotionBanner = ({ category = null }) => {
         zIndex: 100,
       }}
     >
-      <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', position: 'relative' }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
         <i className={`fas ${isCategory ? 'fa-tag' : 'fa-star'}`} style={{ fontSize: '1.2rem', color: '#FF6B6B' }}></i>
         <div>
           <span>{promotionTitle}! </span>
           <strong style={{ fontSize: '1.2rem', color: '#FF6B6B' }}>{discountPercentage}% OFF</strong>
-          <span> {isCategory ? `on ${category}!` : 'on all products!'}</span>
+          <span> {isCategory && category ? `on ${category}!` : (isCategory ? 'on selected items!' : 'on all products!')}</span>
         </div>
         <i className={`fas ${isCategory ? 'fa-tag' : 'fa-star'}`} style={{ fontSize: '1.2rem', color: '#FF6B6B' }}></i>
-        
-        {/* Close Button */}
-        <button
+      </div>
+      
+      {/* Close Button - Positioned at very top right */}
+      <button
           onClick={handleDismiss}
           style={{
             position: 'absolute',
-            right: '0.75rem',
-            top: '0.5rem',
-            transform: 'translateY(0)',
+            right: '0.25rem',
+            top: '0.4rem',
             background: 'rgba(255, 255, 255, 0.4)',
             border: 'none',
             color: '#333',
@@ -206,6 +215,7 @@ const PromotionBanner = ({ category = null }) => {
             padding: 0,
             minWidth: '24px',
             minHeight: '24px',
+            zIndex: 101,
           }}
           onMouseOver={(e) => {
             e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.6)';
@@ -219,7 +229,6 @@ const PromotionBanner = ({ category = null }) => {
         >
           <i className="fas fa-times"></i>
         </button>
-      </div>
 
       <style>{`
         @keyframes slideDown {
