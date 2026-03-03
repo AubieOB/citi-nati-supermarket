@@ -41,6 +41,22 @@ const createTicket = async (req, res) => {
       }
     });
 
+    // Emit Socket.io event to notify admins of new ticket in real-time
+    if (global.io) {
+      global.io.emit('newTicket', {
+        id: ticket.id,
+        subject: ticket.subject,
+        message: ticket.message,
+        priority: ticket.priority,
+        userName: ticket.user.name,
+        userEmail: ticket.user.email,
+        userId: ticket.user.id,
+        createdAt: ticket.createdAt,
+        status: ticket.status
+      });
+      console.log('[Socket.io] New ticket created - emitted to admin:', ticket.subject);
+    }
+
     res.status(201).json({
       success: true,
       ticket

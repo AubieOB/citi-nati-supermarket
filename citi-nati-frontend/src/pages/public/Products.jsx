@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Container from '../../components/ui/Container.jsx';
 import Button from '../../components/ui/Button.jsx';
+import PromotionBanner from '../../components/common/PromotionBanner.jsx';
 import api from '../../utils/api.js';
 import { getSocket } from '../../utils/socket.js';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -347,6 +348,9 @@ const Products = () => {
 
   return (
     <div className="page products-page">
+      {/* Promotion Banner - Appears at top if global promotion is active */}
+      <PromotionBanner />
+
       {/* PRODUCTS GRID - FULL WIDTH SECTION */}
       <div className="products-grid-wrapper">
         {/* Header Section */}

@@ -2,11 +2,15 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import Container from '../../components/ui/Container.jsx';
 import Button from '../../components/ui/Button.jsx';
+import PromotionBanner from '../../components/common/PromotionBanner.jsx';
 import '../../styles/global.css';
 
 const Home = () => {
   return (
     <div className="page">
+      {/* Promotion Banner - Appears at top if global promotion is active */}
+      <PromotionBanner />
+
       {/* Hero Section */}
       <section className="hero">
         <h1 className="hero__title">Welcome to Citi-Nati Supermarket</h1>

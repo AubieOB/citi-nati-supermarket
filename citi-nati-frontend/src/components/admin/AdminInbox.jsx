@@ -142,12 +142,46 @@ const AdminInbox = () => {
         }
       };
 
+      const handleNewTicket = (ticketData) => {
+        console.log('[AdminInbox] 🎫 New support ticket received:', ticketData.subject);
+        playNotificationSound();
+        
+        // Create a message for the ticket
+        const newMessage = {
+          id: `ticket_${ticketData.id}_${Date.now()}`,
+          type: 'support_ticket',
+          title: `New Support Ticket: ${ticketData.subject}`,
+          message: `From: ${ticketData.userName} (${ticketData.userEmail})\n${ticketData.message.substring(0, 100)}...`,
+          timestamp: new Date(ticketData.createdAt),
+          icon: 'fa-ticket-alt',
+          color: '#FF9800',
+          priority: ticketData.priority
+        };
+        
+        setMessages(prev => [newMessage, ...prev]);
+        
+        // Show toast notification
+        toast.success(
+          <div>
+            <strong>New Support Ticket</strong><br/>
+            <small>{ticketData.subject}</small><br/>
+            <small style={{ fontSize: '0.75rem' }}>From: {ticketData.userName}</small>
+          </div>,
+          {
+            duration: 4000,
+            icon: <i className="fas fa-ticket-alt" style={{ color: '#FF9800' }}></i>,
+          }
+        );
+      };
+
       socket.on('newAdminMessage', handleNewAdminMessage);
-      console.log('[AdminInbox] Socket.io listener registered for newAdminMessage');
+      socket.on('newTicket', handleNewTicket);
+      console.log('[AdminInbox] Socket.io listeners registered for newAdminMessage and newTicket');
 
       return () => {
         socket.off('newAdminMessage', handleNewAdminMessage);
-        console.log('[AdminInbox] Socket.io listener removed');
+        socket.off('newTicket', handleNewTicket);
+        console.log('[AdminInbox] Socket.io listeners removed');
       };
     } catch (err) {
       console.error('[AdminInbox] Socket.io setup error:', err);
