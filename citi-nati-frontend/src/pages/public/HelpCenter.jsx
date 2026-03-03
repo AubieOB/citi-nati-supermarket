@@ -740,19 +740,22 @@ const HelpCenter = () => {
                     </div>
 
                     {/* Replies */}
-                    {selectedTicket.replies.map(reply => (
+                    {selectedTicket.replies.map(reply => {
+                      const isUserMessage = reply.senderId === user.id;
+                      return (
                       <div
                         key={reply.id}
                         style={{
                           marginBottom: '1rem',
                           padding: '0.75rem',
-                          backgroundColor: '#fff',
+                          backgroundColor: isUserMessage ? '#f0f8ff' : '#fff',
                           borderRadius: '4px',
-                          border: '1px solid #e0e0e0'
+                          border: '1px solid #e0e0e0',
+                          borderLeft: `3px solid ${isUserMessage ? '#2D8659' : '#ff6b6b'}`
                         }}
                       >
                         <div style={{ fontSize: '0.85rem', color: '#999', marginBottom: '0.5rem' }}>
-                          Admin • {new Date(reply.createdAt).toLocaleString()}
+                          {isUserMessage ? 'You' : 'Admin'} • {new Date(reply.createdAt).toLocaleString()}
                         </div>
                         <p style={{ margin: '0.25rem 0', color: '#333', whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>
                           {reply.message}
@@ -788,7 +791,8 @@ const HelpCenter = () => {
                           </div>
                         )}
                       </div>
-                    ))}
+                    );
+                    })}
 
                     {/* Typing Indicator */}
                     {typingUser && (

@@ -200,15 +200,40 @@ const Products = () => {
         );
       };
 
-      // Listen for stock updates and comprehensive product updates
+      const handlePromotionUpdated = (promotion) => {
+        console.log('[PRODUCTS] 🎯 Promotion updated:', promotion.type);
+        // Refetch all products to get updated discount prices
+        const refetchProducts = async () => {
+          try {
+            const response = await fetch('http://localhost:3001/api/products');
+            const data = await response.json();
+            setProducts(data.products || []);
+            // Reapply filters to refresh filtered list
+            const filtered = (data.products || []).filter(product => {
+              const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
+              const matchesCategory = !selectedCategory || product.category === selectedCategory;
+              const matchesSort = true; // Sort is applied later
+              return matchesSearch && matchesCategory && matchesSort;
+            });
+            setFilteredProducts(filtered);
+          } catch (err) {
+            console.error('[PRODUCTS] Error refetching products:', err);
+          }
+        };
+        refetchProducts();
+      };
+
+      // Listen for stock updates, product updates, and promotion changes
       socket.on('stock_update', handleStockUpdate);
       socket.on('product_updated', handleProductUpdate);
-      console.log('[PRODUCTS] 🔌 Socket listeners attached for stock_update and product_updated events');
+      socket.on('promotionUpdated', handlePromotionUpdated);
+      console.log('[PRODUCTS] 🔌 Socket listeners attached for stock_update, product_updated, and promotionUpdated events');
 
       // Cleanup: remove listeners on component unmount
       return () => {
         socket.off('stock_update', handleStockUpdate);
         socket.off('product_updated', handleProductUpdate);
+        socket.off('promotionUpdated', handlePromotionUpdated);
         console.log('[PRODUCTS] 🔌 Socket listeners removed');
       };
     } catch (err) {
