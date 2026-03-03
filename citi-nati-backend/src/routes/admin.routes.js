@@ -209,14 +209,14 @@ router.delete('/users/:userId', verifyTokenMiddleware, verifyAdmin, async (req, 
 
 /**
  * GET /api/admin/orders
- * Get all orders in the system (only CONFIRMED and beyond, not PENDING until payment verified)
+ * Get all orders in the system (only payment-verified orders, exclude PENDING_PAYMENT)
  * Protected: Admin only
  */
 router.get('/orders', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
   try {
     const orders = await prisma.order.findMany({
       where: {
-        status: { not: 'PENDING' }  // Exclude pending orders (waiting for payment)
+        status: { not: 'PENDING_PAYMENT' }  // Exclude orders waiting for payment (PENDING_PAYMENT status means payment not verified yet)
       },
       include: {
         user: { select: { id: true, name: true, email: true } },
