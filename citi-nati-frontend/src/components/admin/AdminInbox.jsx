@@ -30,6 +30,7 @@ const AdminInbox = () => {
   const [dateFilter, setDateFilter] = useState('');
   const { modal, closeModal, showConfirm } = useModal();
   const notificationAudioRef = useRef(null);
+  const soundedMessagesRef = useRef(new Set());
 
   /**
    * Play notification sound for critical alerts
@@ -94,14 +95,7 @@ const AdminInbox = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Check for new refund messages and play sound
-  useEffect(() => {
-    const refundMessages = messages.filter(m => m.type === 'refund_required' && !m.read);
-    if (refundMessages.length > 0) {
-      // Play sound for unread refund alerts
-      playNotificationSound();
-    }
-  }, [messages]);
+
 
   // Set up Socket.io listener for real-time admin messages
   useEffect(() => {
@@ -123,8 +117,11 @@ const AdminInbox = () => {
           // Add new message to the front of the list
           setMessages(prevMessages => [newMessage, ...prevMessages]);
           
-          // Play sound and show toast for ALL messages
-          playNotificationSound();
+          // Play sound ONLY ONCE per message
+          if (!soundedMessagesRef.current.has(newMessage.id)) {
+            soundedMessagesRef.current.add(newMessage.id);
+            playNotificationSound();
+          }
           
           // Get message type info for better display
           const messageType = messageTypes.find(t => t.value === newMessage.type);
