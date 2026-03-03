@@ -98,43 +98,59 @@ const PromotionBanner = ({ category = null }) => {
       }
 
       const handlePromotionUpdated = (promotionData) => {
-        console.log('[PromotionBanner] 🎯 Promotion updated:', promotionData.type);
+        console.log('[PromotionBanner] 🎯 Promotion updated:', promotionData.type, 'enabled:', promotionData.enabled);
         
         // Check if it's a global promotion update
         if (promotionData.type === 'global') {
           if (promotionData.enabled) {
             setPromotion(promotionData);
             setPromotionType('global');
-            // Reset dismissed state when promotion changes
             setIsDismissed(false);
+            console.log('[PromotionBanner] Global promotion enabled');
           } else {
+            // Global disabled - check if there's a category promotion to show
             setPromotion(null);
             setPromotionType(null);
             setIsDismissed(false);
+            console.log('[PromotionBanner] Global promotion disabled');
           }
         }
-        // Check if it's a category promotion update
+        // Category promotion update
         else if (promotionData.type === 'category') {
+          console.log('[PromotionBanner] Category promotion update - category:', category, 'promotionCategoryId:', promotionData.categoryId);
+          
           // On Products page with specific category
           if (category && promotionData.categoryId === category) {
             if (promotionData.enabled) {
               setPromotion(promotionData);
               setPromotionType('category');
               setIsDismissed(false);
+              console.log('[PromotionBanner] Category promotion enabled for: ' + category);
             } else {
-              // Category promotion was disabled, revert to global if available
-              fetchPromotion(); // Re-fetch to check for global promotion
+              setPromotion(null);
+              setPromotionType(null);
+              setIsDismissed(false);
+              console.log('[PromotionBanner] Category promotion disabled for: ' + category);
             }
           }
-          // On Homepage (no category filter) - also handle category promotion updates
+          // On Homepage (no category filter) - show ANY category promotion if enabled
           else if (!category) {
-            fetchPromotion(); // Re-fetch to handle category promotion enable/disable on homepage
+            if (promotionData.enabled) {
+              setPromotion(promotionData);
+              setPromotionType('category');
+              setIsDismissed(false);
+              console.log('[PromotionBanner] Category promotion shown on homepage');
+            } else {
+              // Category promotion disabled on homepage - revert to global if available
+              fetchPromotion();
+              console.log('[PromotionBanner] Category promotion disabled on homepage - checking for global');
+            }
           }
         }
       };
 
       socket.on('promotionUpdated', handlePromotionUpdated);
-      console.log('[PromotionBanner] Socket.io listener attached for promotionUpdated');
+      console.log('[PromotionBanner] Socket.io listener attached');
 
       return () => {
         socket.off('promotionUpdated', handlePromotionUpdated);
@@ -143,7 +159,7 @@ const PromotionBanner = ({ category = null }) => {
     } catch (err) {
       console.warn('[PromotionBanner] Socket.io setup error:', err.message);
     }
-  }, [category]);
+  }, [category, fetchPromotion]);
 
   /**
    * Handle banner dismissal
@@ -165,7 +181,17 @@ const PromotionBanner = ({ category = null }) => {
   const discountPercentage = promotion.percentage || 0;
   const isCategory = promotionType === 'category';
   const promotionTitle = isCategory ? `🏷️ Category Sale` : `🎉 Special Offer`;
-  const promotionMessage = isCategory ? `Get ${discountPercentage}% OFF on ${category}!` : `Get ${discountPercentage}% OFF on all products!`;
+  
+  // Determine the display text for category promotions
+  let categoryDisplayName = '';
+  if (isCategory) {
+    if (category) {
+      categoryDisplayName = category; // On Products page with specific category
+    } else if (promotion.categoryId) {
+      // On homepage - use the categoryId if no category name available
+      categoryDisplayName = `${promotion.categoryId}`;
+    }
+  }
 
   return (
     <div
@@ -188,7 +214,7 @@ const PromotionBanner = ({ category = null }) => {
         <div>
           <span>{promotionTitle}! </span>
           <strong style={{ fontSize: '1.2rem', color: '#FF6B6B' }}>{discountPercentage}% OFF</strong>
-          <span> {isCategory && category ? `on ${category}!` : (isCategory ? 'on selected items!' : 'on all products!')}</span>
+          <span> {isCategory ? `on ${categoryDisplayName}!` : 'on all products!'}</span>
         </div>
         <i className={`fas ${isCategory ? 'fa-tag' : 'fa-star'}`} style={{ fontSize: '1.2rem', color: '#FF6B6B' }}></i>
       </div>
