@@ -171,12 +171,19 @@ const emitOrderStatusUpdated = (order) => {
 const emitProductUpdate = (product) => {
   try {
     if (global.io && product) {
+      // Calculate finalPrice (same logic as formatProduct)
+      let finalPrice = product.price;
+      if (product.isOnSale && product.discountPrice) {
+        finalPrice = product.discountPrice;
+      }
+
       const productUpdateData = {
         id: product.id,
         name: product.name,
         price: product.price,
         originalPrice: product.originalPrice,
         discountPrice: product.discountPrice,
+        finalPrice: finalPrice,
         isOnSale: product.isOnSale,
         stock: product.stock,
         category: product.category,
@@ -191,6 +198,7 @@ const emitProductUpdate = (product) => {
       console.log(`[Socket.io] Product update emitted for product ${product.id}:`, {
         name: product.name,
         price: product.price,
+        finalPrice: finalPrice,
         stock: product.stock,
         isOnSale: product.isOnSale
       });

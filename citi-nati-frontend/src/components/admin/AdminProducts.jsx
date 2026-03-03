@@ -76,6 +76,7 @@ const AdminProducts = () => {
                   price: updatedProduct.price,
                   originalPrice: updatedProduct.originalPrice,
                   discountPrice: updatedProduct.discountPrice,
+                  finalPrice: updatedProduct.finalPrice,
                   isOnSale: updatedProduct.isOnSale,
                   stock: updatedProduct.stock,
                   category: updatedProduct.category,
