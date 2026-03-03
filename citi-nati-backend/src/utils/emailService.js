@@ -242,13 +242,13 @@ const sendPaymentConfirmationEmail = async (email, userName, paymentDetails) => 
               </tr>
             </thead>
             <tbody>
-              ${paymentDetails.items?.map(item => `
+              ${paymentDetails.items && paymentDetails.items.length > 0 ? paymentDetails.items.map(item => `
                 <tr style="border-bottom: 1px solid #ddd;">
-                  <td style="padding: 10px; font-size: 12px; color: #333;">${item.productName || 'Product'}</td>
-                  <td style="padding: 10px; text-align: center; font-size: 12px; color: #333;">${item.quantity || 0}</td>
-                  <td style="padding: 10px; text-align: right; font-size: 12px; color: #333;">MWK ${(item.total || 0).toLocaleString()}</td>
+                  <td style="padding: 10px; font-size: 12px; color: #333;">${item.productName} </td>
+                  <td style="padding: 10px; text-align: center; font-size: 12px; color: #333;">${item.quantity}</td>
+                  <td style="padding: 10px; text-align: right; font-size: 12px; color: #333;">MWK ${(item.total).toLocaleString()}</td>
                 </tr>
-              `).join('') || '<tr><td colspan="3" style="padding: 10px; text-align: center; color: #999;">No items</td></tr>'}
+              `).join('') : '<tr><td colspan="3" style="padding: 10px; text-align: center; color: #999;">No items</td></tr>'}
             </tbody>
           </table>
 

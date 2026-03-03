@@ -516,15 +516,27 @@ const handleWebhook = async (req, res) => {
     // Send emails asynchronously in background (don't block the response)
     setImmediate(async () => {
       try {
+        // Format items with quantity for email templates
+        const formattedItems = result.items.map(item => ({
+          productName: item.product.name,
+          quantity: item.quantity,
+          price: item.product.price,
+          total: item.product.price * item.quantity,
+        }));
+
         // Send order confirmation email
         await sendOrderConfirmationEmail(
           result.user.email,
           result.user.name,
           result,
-          result.items.map(item => item.product)
+          result.items.map(item => ({
+            name: item.product.name,
+            quantity: item.quantity,
+            price: item.product.price,
+          }))
         );
 
-        // Send payment confirmation email
+        // Send payment confirmation email with items
         await sendPaymentConfirmationEmail(
           result.user.email,
           result.user.name,
@@ -536,6 +548,8 @@ const handleWebhook = async (req, res) => {
             date: new Date(),
             reference: reference,
             status: 'COMPLETED',
+            deliveryAddress: result.deliveryAddress || 'N/A',
+            items: formattedItems,
           }
         );
 
