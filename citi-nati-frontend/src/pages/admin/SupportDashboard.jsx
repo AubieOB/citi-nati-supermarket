@@ -151,14 +151,89 @@ const SupportDashboard = () => {
       console.log(`[Chat] ${role} user ${userId} joined the ticket room`);
     };
 
+    // Listen for new tickets from customers
+    const handleNewTicket = (ticketData) => {
+      console.log('[SupportDashboard] 🎫 New support ticket:', ticketData.subject);
+      const newTicket = {
+        id: ticketData.id,
+        subject: ticketData.subject,
+        message: ticketData.message,
+        priority: ticketData.priority,
+        status: ticketData.status,
+        createdAt: ticketData.createdAt,
+        updatedAt: ticketData.createdAt,
+        user: {
+          id: ticketData.userId,
+          name: ticketData.userName,
+          email: ticketData.userEmail
+        },
+        replies: [],
+        userId: ticketData.userId
+      };
+      
+      setTickets(prev => [newTicket, ...prev]);
+      setUnattendedCount(prev => prev + 1);
+      playNotificationBeep();
+      notifyInfo(`New Support Ticket from ${ticketData.userName}`);
+    };
+
+    // Listen for ticket status changes from other admins
+    const handleTicketStatusChanged = (data) => {
+      setSelectedTicket(prev =>
+        prev && prev.id === data.ticketId
+          ? { ...prev, status: data.status }
+          : prev
+      );
+      setTickets(prev =>
+        prev.map(t =>
+          t.id === data.ticketId
+            ? { ...t, status: data.status }
+            : t
+        )
+      );
+    };
+
+    // Listen for ticket priority changes from other admins
+    const handleTicketPriorityChanged = (data) => {
+      setSelectedTicket(prev =>
+        prev && prev.id === data.ticketId
+          ? { ...prev, priority: data.priority }
+          : prev
+      );
+      setTickets(prev =>
+        prev.map(t =>
+          t.id === data.ticketId
+            ? { ...t, priority: data.priority }
+            : t
+        )
+      );
+    };
+
+    // Listen for ticket deletions from other admins
+    const handleTicketDeleted = (data) => {
+      setTickets(prev => prev.filter(t => t.id !== data.ticketId));
+      if (selectedTicket?.id === data.ticketId) {
+        setSelectedTicket(null);
+      }
+      setUnattendedCount(prev => Math.max(0, prev - 1));
+    };
+
     socket.current.on('ticketMessage', handleTicketMessage);
     socket.current.on('ticketTyping', handleTyping);
     socket.current.on('userJoined', handleUserJoined);
+    socket.current.on('newTicket', handleNewTicket);
+    socket.current.on('ticketStatusChanged', handleTicketStatusChanged);
+    socket.current.on('ticketPriorityChanged', handleTicketPriorityChanged);
+    socket.current.on('ticketDeleted', handleTicketDeleted);
 
     return () => {
       socket.current?.off('ticketMessage', handleTicketMessage);
       socket.current?.off('ticketTyping', handleTyping);
       socket.current?.off('userJoined', handleUserJoined);
+      socket.current?.off('newTicket', handleNewTicket);
+      socket.current?.off('ticketStatusChanged', handleTicketStatusChanged);
+      socket.current?.off('ticketPriorityChanged', handleTicketPriorityChanged);
+      socket.current?.off('ticketDeleted', handleTicketDeleted);
     };
   }, [user]);
 
