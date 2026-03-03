@@ -214,7 +214,7 @@ const PromotionBanner = ({ category = null }) => {
         <div>
           <span>{promotionTitle}! </span>
           <strong style={{ fontSize: '1.2rem', color: '#FF6B6B' }}>{discountPercentage}% OFF</strong>
-          <span> {isCategory ? `on ${categoryDisplayName}!` : 'on all products!'}</span>
+          <span> {isCategory ? `on all '${categoryDisplayName}' products!` : 'on all products!'}</span>
         </div>
         <i className={`fas ${isCategory ? 'fa-tag' : 'fa-star'}`} style={{ fontSize: '1.2rem', color: '#FF6B6B' }}></i>
       </div>
