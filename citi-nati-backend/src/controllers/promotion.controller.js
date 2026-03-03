@@ -233,67 +233,6 @@ const updatePromotion = async (req, res) => {
     });
   }
 };
-        error: 'Invalid promotion type'
-      });
-    }
-
-    // If enabling category promotion, ensure category is selected
-    if (type === 'category' && enabled && !categoryId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Category must be selected for category promotion'
-      });
-    }
-
-    // Deactivate other promotions if enabling this one (optional: only one at a time)
-    // Uncomment below if you want only one active promotion at a time
-    // if (enabled) {
-    //   await prisma.promotion.updateMany({
-    //     where: { type: { not: type } },
-    //     data: { enabled: false }
-    //   });
-    // }
-
-    // Update or create promotion
-    const promotion = await prisma.promotion.upsert({
-      where: { type },
-      update: {
-        enabled,
-        percentage: parseInt(percentage) || 10,
-        categoryId: type === 'category' ? categoryId : null,
-        productCount: type === 'random' ? parseInt(productCount) || 5 : null,
-        updatedAt: new Date(),
-      },
-      create: {
-        type,
-        enabled,
-        percentage: parseInt(percentage) || 10,
-        categoryId: type === 'category' ? categoryId : null,
-        productCount: type === 'random' ? parseInt(productCount) || 5 : null,
-      },
-    });
-
-    // Log promotion change
-    console.log(`[Promotions] ${type} promotion ${enabled ? 'activated' : 'deactivated'} - ${percentage}% off`);
-
-    return res.json({
-      success: true,
-      promotion: {
-        type: promotion.type,
-        enabled: promotion.enabled,
-        percentage: promotion.percentage,
-        categoryId: promotion.categoryId,
-        productCount: promotion.productCount,
-      },
-    });
-  } catch (err) {
-    console.error('Error updating promotion:', err);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to update promotion'
-    });
-  }
-};
 
 /**
  * Preview products matching promotion criteria
