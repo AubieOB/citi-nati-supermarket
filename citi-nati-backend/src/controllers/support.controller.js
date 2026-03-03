@@ -215,12 +215,12 @@ const getAllTickets = async (req, res) => {
  */
 const replyToTicket = async (req, res) => {
   try {
-    const { message } = req.body;
+    const { message, attachments } = req.body;
     const ticketId = parseInt(req.params.id);
     const senderId = req.user.userId;
 
     // Validate message
-    if (!message) {
+    if (!message || !message.trim()) {
       return res.status(400).json({
         error: 'Message is required'
       });
@@ -244,11 +244,24 @@ const replyToTicket = async (req, res) => {
       });
     }
 
+    // Create reply with attachments
     const reply = await prisma.ticketReply.create({
       data: {
         message,
         ticketId,
-        senderId
+        senderId,
+        // Connect existing attachments or create new ones
+        attachments: attachments && attachments.length > 0 ? {
+          create: attachments.map(att => ({
+            fileName: att.fileName,
+            fileUrl: att.fileUrl,
+            fileSize: att.fileSize,
+            mimeType: att.mimeType || 'application/octet-stream'
+          }))
+        } : undefined
+      },
+      include: {
+        attachments: true
       }
     });
 

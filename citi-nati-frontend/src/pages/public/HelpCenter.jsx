@@ -238,7 +238,7 @@ const HelpCenter = () => {
     try {
       setError(null);
 
-      // Upload files first
+      // Upload files first and get attachment data
       let uploadedAttachments = [];
       for (const file of attachedFiles) {
         const formData = new FormData();
@@ -258,7 +258,35 @@ const HelpCenter = () => {
         }
       }
 
-      // Use socket for real-time message
+      // Create the reply via API (not Socket.io) so it's properly saved to database with attachments
+      const replyResponse = await api.post(`/support/tickets/${selectedTicket.id}/reply`, {
+        message: replyMessage,
+        attachments: uploadedAttachments
+      });
+
+      const newReply = replyResponse.data.reply;
+      
+      // Manually add attachments to the reply object
+      if (uploadedAttachments.length > 0) {
+        newReply.attachments = uploadedAttachments;
+      }
+
+      // Update the selected ticket with new reply
+      setSelectedTicket(prev => ({
+        ...prev,
+        replies: [...(prev.replies || []), newReply]
+      }));
+
+      // Also update the ticket in the list
+      setTickets(prev =>
+        prev.map(t =>
+          t.id === selectedTicket.id
+            ? { ...t, replies: [...(t.replies || []), newReply] }
+            : t
+        )
+      );
+
+      // Emit Socket.io event for real-time notification to admin
       if (socket.current) {
         socket.current.emit('ticketMessage', {
           ticketId: selectedTicket.id,
@@ -272,7 +300,7 @@ const HelpCenter = () => {
       setAttachedFiles([]);
     } catch (err) {
       console.error('Error sending reply:', err);
-      setError('Failed to send reply');
+      setError(err.response?.data?.error || 'Failed to send reply');
     }
   };
 
@@ -681,7 +709,8 @@ const HelpCenter = () => {
                   border: '1px solid #e0e0e0',
                   display: 'flex',
                   flexDirection: 'column',
-                  minHeight: '600px'
+                  height: '600px',
+                  maxHeight: '600px'
                 }}>
                   {/* Ticket Header */}
                   <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid #e0e0e0' }}>
