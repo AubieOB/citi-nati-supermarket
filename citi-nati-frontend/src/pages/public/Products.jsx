@@ -108,8 +108,8 @@ const Products = () => {
   }, [searchInput, products]);
 
   /**
-   * Listen for real-time stock updates from other users' purchases
-   * Updates product stock and price immediately when received
+   * Listen for real-time product updates (stock, price, promotions, name, etc)
+   * Updates product details immediately when admin makes changes
    */
   useEffect(() => {
     try {
@@ -150,17 +150,67 @@ const Products = () => {
         );
       };
 
-      // Listen for stock updates
-      socket.on('stock_update', handleStockUpdate);
-      console.log('[PRODUCTS] 🔌 Socket listener attached for stock_update events');
+      const handleProductUpdate = (updatedProduct) => {
+        console.log('[PRODUCTS] 🔄 Product update received:', updatedProduct.name);
+        
+        // Update the products list with complete product details
+        setProducts(prevProducts =>
+          prevProducts.map(product =>
+            product.id === updatedProduct.id
+              ? {
+                  ...product,
+                  name: updatedProduct.name,
+                  price: updatedProduct.price,
+                  originalPrice: updatedProduct.originalPrice,
+                  discountPrice: updatedProduct.discountPrice,
+                  isOnSale: updatedProduct.isOnSale,
+                  stock: updatedProduct.stock,
+                  category: updatedProduct.category,
+                  image: updatedProduct.image,
+                  expiryDate: updatedProduct.expiryDate,
+                  expiryStatus: updatedProduct.expiryStatus,
+                  updatedAt: updatedProduct.updatedAt,
+                }
+              : product
+          )
+        );
 
-      // Cleanup: remove listener on component unmount
+        // Also update filtered products to ensure UI reflects changes
+        setFilteredProducts(prevFiltered =>
+          prevFiltered.map(product =>
+            product.id === updatedProduct.id
+              ? {
+                  ...product,
+                  name: updatedProduct.name,
+                  price: updatedProduct.price,
+                  originalPrice: updatedProduct.originalPrice,
+                  discountPrice: updatedProduct.discountPrice,
+                  isOnSale: updatedProduct.isOnSale,
+                  stock: updatedProduct.stock,
+                  category: updatedProduct.category,
+                  image: updatedProduct.image,
+                  expiryDate: updatedProduct.expiryDate,
+                  expiryStatus: updatedProduct.expiryStatus,
+                  updatedAt: updatedProduct.updatedAt,
+                }
+              : product
+          )
+        );
+      };
+
+      // Listen for stock updates and comprehensive product updates
+      socket.on('stock_update', handleStockUpdate);
+      socket.on('product_updated', handleProductUpdate);
+      console.log('[PRODUCTS] 🔌 Socket listeners attached for stock_update and product_updated events');
+
+      // Cleanup: remove listeners on component unmount
       return () => {
         socket.off('stock_update', handleStockUpdate);
-        console.log('[PRODUCTS] 🔌 Socket listener removed');
+        socket.off('product_updated', handleProductUpdate);
+        console.log('[PRODUCTS] 🔌 Socket listeners removed');
       };
     } catch (err) {
-      console.warn('[PRODUCTS] Error setting up stock update listener:', err.message);
+      console.warn('[PRODUCTS] Error setting up update listeners:', err.message);
     }
   }, []);
 

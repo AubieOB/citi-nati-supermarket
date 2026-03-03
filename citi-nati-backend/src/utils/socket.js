@@ -160,8 +160,47 @@ const emitOrderStatusUpdated = (order) => {
   emitOrderUpdated(order);
 };
 
-/**
- * Emit stock update event to all connected clients
+/** * Emit product update to all connected clients
+ * Called when admin updates ANY product details (price, name, promotion, stock, etc)
+ * 
+ * Called when:
+ * 1. Admin updates product details via AdminProducts
+ * 2. Stock changes
+ * 3. Price or promotional details change
+ */
+const emitProductUpdate = (product) => {
+  try {
+    if (global.io && product) {
+      const productUpdateData = {
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        originalPrice: product.originalPrice,
+        discountPrice: product.discountPrice,
+        isOnSale: product.isOnSale,
+        stock: product.stock,
+        category: product.category,
+        image: product.image,
+        expiryDate: product.expiryDate,
+        expiryStatus: product.expiryStatus,
+        updatedAt: product.updatedAt,
+      };
+
+      // Broadcast to all connected clients
+      global.io.emit('product_updated', productUpdateData);
+      console.log(`[Socket.io] Product update emitted for product ${product.id}:`, {
+        name: product.name,
+        price: product.price,
+        stock: product.stock,
+        isOnSale: product.isOnSale
+      });
+    }
+  } catch (err) {
+    console.error('Error emitting product_updated event:', err.message);
+  }
+};
+
+/** * Emit stock update event to all connected clients
  * Called when:
  * 1. An order payment is confirmed (stock decremented)
  * 2. Admin updates product inventory
@@ -215,6 +254,7 @@ module.exports = {
   emitOrderStatusUpdated,
   emitOrderUpdated,
   emitOrderUpdatedToAdminAndCustomer,
+  emitProductUpdate,
   emitStockUpdate,
   emitMultipleStockUpdates,
 };

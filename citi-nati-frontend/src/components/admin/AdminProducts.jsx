@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Button from '../ui/Button.jsx';
 import api from '../../utils/api.js';
 import { formatMWK } from '../../utils/currency.js';
+import { getSocket } from '../../utils/socket.js';
 import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
 
@@ -47,6 +48,59 @@ const AdminProducts = () => {
   // Fetch products on mount
   useEffect(() => {
     fetchProducts();
+  }, []);
+
+  /**
+   * Listen for real-time product updates from admin changes
+   * Updates product list immediately when any product is modified
+   */
+  useEffect(() => {
+    try {
+      const socket = getSocket();
+      
+      if (!socket) {
+        console.log('[AdminProducts] Socket not available yet');
+        return;
+      }
+
+      const handleProductUpdate = (updatedProduct) => {
+        console.log('[AdminProducts] 🔄 Product update received:', updatedProduct.name);
+        
+        // Update the products list with complete product details
+        setProducts(prevProducts =>
+          prevProducts.map(product =>
+            product.id === updatedProduct.id
+              ? {
+                  ...product,
+                  name: updatedProduct.name,
+                  price: updatedProduct.price,
+                  originalPrice: updatedProduct.originalPrice,
+                  discountPrice: updatedProduct.discountPrice,
+                  isOnSale: updatedProduct.isOnSale,
+                  stock: updatedProduct.stock,
+                  category: updatedProduct.category,
+                  image: updatedProduct.image,
+                  expiryDate: updatedProduct.expiryDate,
+                  expiryStatus: updatedProduct.expiryStatus,
+                  updatedAt: updatedProduct.updatedAt,
+                }
+              : product
+          )
+        );
+      };
+
+      // Listen for comprehensive product updates
+      socket.on('product_updated', handleProductUpdate);
+      console.log('[AdminProducts] 🔌 Socket listener attached for product_updated events');
+
+      // Cleanup: remove listener on component unmount
+      return () => {
+        socket.off('product_updated', handleProductUpdate);
+        console.log('[AdminProducts] 🔌 Socket listener removed');
+      };
+    } catch (err) {
+      console.warn('[AdminProducts] Error setting up product update listener:', err.message);
+    }
   }, []);
 
   const fetchProducts = async () => {

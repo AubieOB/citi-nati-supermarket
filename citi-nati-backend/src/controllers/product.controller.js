@@ -364,17 +364,11 @@ const updateProduct = async (req, res) => {
     // Format product with computed fields
     const formattedProduct = formatProduct(updatedProduct, req, true);
 
-    // Emit real-time stock/price updates to all connected clients
+    // Emit real-time product updates to all connected clients (name, price, promotion, stock, etc)
     try {
-      const { emitStockUpdate } = require('../utils/socket');
-      if (updateData.stock !== undefined || updateData.price !== undefined) {
-        emitStockUpdate(
-          updatedProduct.id,
-          updatedProduct.stock,
-          updateData.price ? updatedProduct.price : null
-        );
-        console.log(`[PRODUCT UPDATE] 📊 Stock update emitted for product ${updatedProduct.id}`);
-      }
+      const { emitProductUpdate } = require('../utils/socket');
+      emitProductUpdate(updatedProduct);
+      console.log(`[PRODUCT UPDATE] 🔄 Product update emitted for product ${updatedProduct.id}`);
     } catch (socketErr) {
       console.warn('[PRODUCT UPDATE] Could not emit socket event:', socketErr.message);
     }
