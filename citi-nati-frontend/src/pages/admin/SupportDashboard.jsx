@@ -280,11 +280,6 @@ const SupportDashboard = () => {
   const handleReply = async (e) => {
     e.preventDefault();
 
-    if (!replyText.trim() && attachedFiles.length === 0) {
-      setError('Reply message or attachment is required');
-      return;
-    }
-
     if (!selectedTicket) return;
 
     try {
@@ -848,10 +843,14 @@ const SupportDashboard = () => {
                               <i className="fas fa-paperclip"></i> Attachments:
                             </div>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                              {reply.attachments.map((attachment, idx) => (
+                              {reply.attachments.map((attachment, idx) => {
+                                const filename = attachment.fileUrl?.split('/').pop() || attachment.fileName;
+                                const backendBaseUrl = api.defaults.baseURL?.replace('/api', '') || 'http://localhost:5000';
+                                const downloadUrl = `${backendBaseUrl}/api/support/download-attachment/${filename}`;
+                                return (
                                 <a
                                   key={idx}
-                                  href={attachment.fileUrl}
+                                  href={downloadUrl}
                                   download={attachment.fileName}
                                   style={{
                                     padding: '0.35rem 0.5rem',
@@ -867,7 +866,8 @@ const SupportDashboard = () => {
                                 >
                                   <i className="fas fa-download"></i> {attachment.fileName}
                                 </a>
-                              ))}
+                                );
+                              })}
                             </div>
                           </div>
                         )}

@@ -11,7 +11,7 @@ const {
   updateTicketPriority,
   deleteTicket
 } = require('../controllers/support.controller');
-const { uploadTicketAttachment } = require('../controllers/upload.controller');
+const { uploadTicketAttachment, downloadTicketAttachment } = require('../controllers/upload.controller');
 const { verifyTokenMiddleware } = require('../middleware/auth.middleware');
 
 // Configure multer for file uploads
@@ -80,6 +80,9 @@ router.delete('/tickets/:id', deleteTicket);
 
 // Upload ticket attachment
 router.post('/upload-attachment', upload.single('file'), uploadTicketAttachment);
+
+// Download ticket attachment with proper headers
+router.get('/download-attachment/:filename', downloadTicketAttachment);
 
 /**
  * ADMIN ROUTES

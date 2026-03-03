@@ -95,6 +95,7 @@ const HelpCenter = () => {
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeoutRef = useRef(null);
   const [attachedFiles, setAttachedFiles] = useState([]);
+  const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef(null);
   const { modal, closeModal, showConfirm } = useModal();
 
@@ -264,11 +265,6 @@ const HelpCenter = () => {
   const handleSendReply = async (e) => {
     e.preventDefault();
 
-    if (!replyMessage.trim() && attachedFiles.length === 0) {
-      setError('Message or attachment is required');
-      return;
-    }
-
     if (!selectedTicket) {
       return;
     }
@@ -358,6 +354,37 @@ const HelpCenter = () => {
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    const maxSize = 5 * 1024 * 1024; // 5MB
+
+    const validFiles = files.filter(file => {
+      if (file.size > maxSize) {
+        notifyError(`File ${file.name} is larger than 5MB`);
+        return false;
+      }
+      return true;
+    });
+
+    setAttachedFiles(prev => [...prev, ...validFiles]);
   };
 
   const removeAttachedFile = (index) => {
@@ -835,13 +862,15 @@ const HelpCenter = () => {
                             </div>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                               {reply.attachments.map((attachment, idx) => {
-                                // Construct full attachment URL using backend base URL
+                                // Extract filename for download endpoint
+                                const filename = attachment.fileUrl?.split('/').pop() || attachment.fileName;
                                 const backendBaseUrl = api.defaults.baseURL?.replace('/api', '') || 'http://localhost:5000';
-                                const fullAttachmentUrl = `${backendBaseUrl}${attachment.fileUrl}`;
+                                const downloadUrl = `${backendBaseUrl}/api/support/download-attachment/${filename}`;
+                                
                                 return (
                                 <a
                                   key={idx}
-                                  href={fullAttachmentUrl}
+                                  href={downloadUrl}
                                   download={attachment.fileName}
                                   style={{
                                     padding: '0.5rem 0.75rem',
@@ -851,7 +880,16 @@ const HelpCenter = () => {
                                     borderRadius: '4px',
                                     fontSize: '0.85rem',
                                     border: '1px solid #2D8659',
-                                    cursor: 'pointer'
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease'
+                                  }}
+                                  onMouseOver={(e) => {
+                                    e.target.style.backgroundColor = '#2D8659';
+                                    e.target.style.color = '#fff';
+                                  }}
+                                  onMouseOut={(e) => {
+                                    e.target.style.backgroundColor = '#f0f8ff';
+                                    e.target.style.color = '#2D8659';
                                   }}
                                   title={`${attachment.fileName} (${(attachment.fileSize / 1024).toFixed(2)} KB)`}
                                 >
@@ -895,10 +933,20 @@ const HelpCenter = () => {
                           border: '1px solid #2D8659'
                         }}>
                           <h5 style={{ margin: '0 0 0.5rem 0', color: '#333', fontSize: '0.9rem' }}>
-                            <i className="fas fa-paperclip"></i> Attachments ({attachedFiles.length})
+                            <i className="fas fa-paperclip"></i> Selected Files ({attachedFiles.length})
                           </h5>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                            {attachedFiles.map((file, idx) => (
+                            {attachedFiles.map((file, idx) => {
+                              const getFileIcon = (filename) => {
+                                const ext = filename.split('.').pop().toLowerCase();
+                                if (['jpg', 'jpeg', 'png', 'gif'].includes(ext)) return 'fa-image';
+                                if (ext === 'pdf') return 'fa-file-pdf';
+                                if (['doc', 'docx'].includes(ext)) return 'fa-file-word';
+                                if (['xls', 'xlsx'].includes(ext)) return 'fa-file-excel';
+                                if (ext === 'txt') return 'fa-file-text';
+                                return 'fa-file';
+                              };
+                              return (
                               <div
                                 key={idx}
                                 style={{
@@ -912,8 +960,14 @@ const HelpCenter = () => {
                                   color: '#333'
                                 }}
                               >
-                                <i className="fas fa-file"></i>
-                                <span>{file.name.substring(0, 20)}...</span>
+                                <i className={`fas ${getFileIcon(file.name)}`} style={{ color: '#2D8659' }}></i>
+                                <span title={file.name}>
+                                  {file.name.substring(0, 20)}
+                                  {file.name.length > 20 ? '...' : ''}
+                                  <span style={{ fontSize: '0.75rem', color: '#999', marginLeft: '0.25rem' }}>
+                                    ({(file.size / 1024).toFixed(1)}KB)
+                                  </span>
+                                </span>
                                 <button
                                   type="button"
                                   onClick={() => removeAttachedFile(idx)}
@@ -928,58 +982,92 @@ const HelpCenter = () => {
                                   ✕
                                 </button>
                               </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       )}
 
-                      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
-                        <input
-                          type="text"
-                          value={replyMessage}
-                          onChange={handleTyping}
-                          placeholder="Type your message..."
-                          style={{
-                            flex: 1,
-                            minWidth: '150px',
-                            padding: '0.75rem',
-                            border: '1px solid #ddd',
-                            borderRadius: '4px',
+                      {/* Drag-and-Drop Area + Message Input */}
+                      <div
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                        style={{
+                          padding: '1rem',
+                          backgroundColor: dragOver ? '#e8f5e9' : 'white',
+                          border: dragOver ? '2px dashed #2D8659' : '1px solid #ddd',
+                          borderRadius: '4px',
+                          transition: 'all 0.2s',
+                          marginBottom: '0.75rem'
+                        }}
+                      >
+                        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'nowrap', alignItems: 'stretch', flexDirection: window.innerWidth < 640 ? undefined : 'row' }}>
+                          <input
+                            type="text"
+                            value={replyMessage}
+                            onChange={handleTyping}
+                            placeholder={dragOver ? 'Drop files here or type your message...' : 'Type your message... (or drag files here)'}
+                            style={{
+                              flex: 1,
+                              minWidth: window.innerWidth < 640 ? '0' : '150px',
+                              padding: '0.75rem',
+                              border: '1px solid #ddd',
+                              borderRadius: '4px',
+                              fontSize: '0.9rem',
+                              fontFamily: 'inherit'
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            title="Attach file"
+                            style={{
+                              padding: '0.75rem',
+                              backgroundColor: '#4ecdc4',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '1rem',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => e.target.style.backgroundColor = '#3db8ae'}
+                            onMouseOut={(e) => e.target.style.backgroundColor = '#4ecdc4'}
+                          >
+                            <i className="fas fa-paperclip"></i>
+                          </button>
+                          <button
+                            type="submit"
+                            style={{
+                              padding: '0.75rem 1.5rem',
+                              backgroundColor: '#2D8659',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '0.9rem',
+                              whiteSpace: 'nowrap',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => e.target.style.backgroundColor = '#1f5f3f'}
+                            onMouseOut={(e) => e.target.style.backgroundColor = '#2D8659'}
+                          >
+                            Send
+                          </button>
+                        </div>
+                        {dragOver && (
+                          <div style={{
+                            textAlign: 'center',
+                            padding: '0.5rem',
+                            color: '#2D8659',
                             fontSize: '0.9rem',
-                            fontFamily: 'inherit'
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => fileInputRef.current?.click()}
-                          title="Attach file"
-                          style={{
-                            padding: '0.75rem',
-                            backgroundColor: '#4ecdc4',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '1rem'
-                          }}
-                        >
-                          <i className="fas fa-paperclip"></i>
-                        </button>
-                        <button
-                          type="submit"
-                          style={{
-                            padding: '0.75rem 1.5rem',
-                            backgroundColor: '#2D8659',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '0.9rem',
-                            whiteSpace: 'nowrap'
-                          }}
-                        >
-                          Send
-                        </button>
+                            fontStyle: 'italic'
+                          }}>
+                            <i className="fas fa-cloud-upload-alt" style={{ marginRight: '0.5rem' }}></i>
+                            Drop files here to add them
+                          </div>
+                        )}
                       </div>
 
                       <input
