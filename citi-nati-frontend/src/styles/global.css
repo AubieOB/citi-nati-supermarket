@@ -1771,7 +1771,6 @@ body.menu-open {
 
 /* Mozilla Firefox styling */
 .cart-quantity-input {
-  appearance: textfield;
   -moz-appearance: textfield; /* Remove default spinners */
 }
 
