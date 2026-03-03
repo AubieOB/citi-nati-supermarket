@@ -33,6 +33,9 @@ const AdminOrders = () => {
 
   /**
    * Real-time order updates via Socket.io
+   * Listens for:
+   * 1. New orders (newOrder event) - Adds to list immediately
+   * 2. Updated orders (orderUpdated event) - Updates existing order
    */
   useEffect(() => {
     try {
@@ -42,6 +45,23 @@ const AdminOrders = () => {
         return;
       }
 
+      // Handle NEW orders arriving in real-time
+      const handleNewOrder = (newOrder) => {
+        console.log('[AdminOrders] New order received via Socket.io:', newOrder.id);
+
+        if (!newOrder?.id) return;
+
+        // Add new order to the top of the list
+        setOrders(prevOrders => [newOrder, ...prevOrders]);
+
+        // Show celebratory notification
+        toast(`🎉 New Order #${newOrder.id} from ${newOrder.user?.name || 'Customer'}!`, {
+          duration: 4000,
+          icon: '📋',
+        });
+      };
+
+      // Handle UPDATED orders (status changes, driver assignment, etc.)
       const handleOrderUpdated = (updatedOrder) => {
         console.log('[AdminOrders] Order updated via Socket.io:', updatedOrder.id);
 
@@ -62,12 +82,14 @@ const AdminOrders = () => {
         }
       };
 
+      socket.on('newOrder', handleNewOrder);
       socket.on('orderUpdated', handleOrderUpdated);
-      console.log('[AdminOrders] Socket.io listener registered for orderUpdated');
+      console.log('[AdminOrders] Socket.io listeners registered for newOrder and orderUpdated');
 
       return () => {
+        socket.off('newOrder', handleNewOrder);
         socket.off('orderUpdated', handleOrderUpdated);
-        console.log('[AdminOrders] Socket.io listener removed');
+        console.log('[AdminOrders] Socket.io listeners removed');
       };
     } catch (err) {
       console.error('[AdminOrders] Socket.io setup error:', err);

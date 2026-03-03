@@ -17,12 +17,16 @@ const emitNewOrder = (order) => {
       global.io.to('admin_room').emit('newOrder', {
         id: order.id,
         userId: order.userId,
+        user: order.user || { id: order.userId, name: 'Unknown Customer', email: '' },
         total: order.total,
         status: order.status,
         paymentStatus: order.paymentStatus,
         deliveryAddress: order.deliveryAddress,
         houseNumber: order.houseNumber,
         phone: order.phone,
+        driverId: order.driverId || null,
+        driver: order.driver || null,
+        items: order.items || [],
         createdAt: order.createdAt,
       });
       console.log(`[Socket.io] New order ${order.id} emitted to admin_room`);
