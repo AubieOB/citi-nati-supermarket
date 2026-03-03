@@ -1002,7 +1002,7 @@ const HelpCenter = () => {
                           marginBottom: '0.75rem'
                         }}
                       >
-                        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'nowrap', alignItems: 'stretch', flexDirection: window.innerWidth < 640 ? undefined : 'row' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', flexDirection: window.innerWidth < 640 ? 'column' : 'row', alignItems: window.innerWidth < 640 ? 'stretch' : 'stretch' }}>
                           <input
                             type="text"
                             value={replyMessage}
@@ -1010,7 +1010,7 @@ const HelpCenter = () => {
                             placeholder={dragOver ? 'Drop files here or type your message...' : 'Type your message... (or drag files here)'}
                             style={{
                               flex: 1,
-                              minWidth: window.innerWidth < 640 ? '0' : '150px',
+                              minWidth: '0',
                               padding: '0.75rem',
                               border: '1px solid #ddd',
                               borderRadius: '4px',
