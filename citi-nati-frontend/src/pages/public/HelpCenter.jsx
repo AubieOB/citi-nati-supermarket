@@ -767,10 +767,14 @@ const HelpCenter = () => {
                               <i className="fas fa-paperclip"></i> Attachments:
                             </div>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                              {reply.attachments.map((attachment, idx) => (
+                              {reply.attachments.map((attachment, idx) => {
+                                // Construct full attachment URL using backend base URL
+                                const backendBaseUrl = api.defaults.baseURL?.replace('/api', '') || 'http://localhost:5000';
+                                const fullAttachmentUrl = `${backendBaseUrl}${attachment.fileUrl}`;
+                                return (
                                 <a
                                   key={idx}
-                                  href={attachment.fileUrl}
+                                  href={fullAttachmentUrl}
                                   download={attachment.fileName}
                                   style={{
                                     padding: '0.5rem 0.75rem',
@@ -786,7 +790,8 @@ const HelpCenter = () => {
                                 >
                                   <i className="fas fa-download"></i> {attachment.fileName}
                                 </a>
-                              ))}
+                                );
+                              })}
                             </div>
                           </div>
                         )}
