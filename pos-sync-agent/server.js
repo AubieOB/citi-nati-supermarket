@@ -61,7 +61,7 @@ async function sendProductsToLiveServer(products) {
     console.log(`[POS SYNC] Sending ${products.length} products to live server...`);
 
     const response = await axios.post(
-      `${process.env.LIVE_SERVER_URL}/api/pos-sync/push`,
+      `${process.env.LIVE_SERVER_URL}/api/products/pos-sync/push`,
       {
         products: products.map(p => ({
           sourceCode: p.ProductCode,
