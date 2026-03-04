@@ -87,6 +87,7 @@ async function sendProductsToLiveServer(products) {
               price: p.SellingPrice,
               stock: p.QuantityAvailable,
               barcode: p.Barcode || '',
+              category: p.CategoryName || 'Uncategorized',
             })),
           },
           {
@@ -125,10 +126,8 @@ async function sendProductsToLiveServer(products) {
   }
 }
 
-/**
- * Copilot statement: fetch all products safely with latest price & stock
- */
-app.get('/pos-sync/products', validateApiKey, async (req, res) => {
+/** Fetch products from POS with category information */
+async function fetchProductsFromPOS() {
   try {
     if (!pool) await initializePool();
 
@@ -137,6 +136,7 @@ app.get('/pos-sync/products', validateApiKey, async (req, res) => {
           p.ProductCode,
           p.ProductName,
           ISNULL(p.Barcode,'') AS Barcode,
+          ISNULL(pt.ProductTypeName, 'Uncategorized') AS CategoryName,
           ISNULL((
               SELECT TOP 1 FPrice 
               FROM POS.dbo.productprices pr 
@@ -149,15 +149,28 @@ app.get('/pos-sync/products', validateApiKey, async (req, res) => {
               WHERE sd.ProductCode = p.ProductCode
           ), 0) AS QuantityAvailable
       FROM POS.dbo.productsmaster p
+      LEFT JOIN POS.dbo.producttypes pt ON p.ProductType = pt.ProductType
       ORDER BY p.ProductCode
     `;
 
     const result = await pool.request().query(query);
+    return result.recordset;
+  } catch (err) {
+    console.error('[POS FETCH] Error fetching products:', err.message);
+    return [];
+  }
+}
 
-    console.log(`[POS SYNC] Fetched ${result.recordset.length} products from Global POS`);
+/**
+ * Manual endpoint: fetch and sync products
+ */
+app.get('/pos-sync/products', validateApiKey, async (req, res) => {
+  try {
+    const products = await fetchProductsFromPOS();
+    console.log(`[POS SYNC] Fetched ${products.length} products from Global POS`);
 
     // Send to live server
-    const syncResult = await sendProductsToLiveServer(result.recordset);
+    const syncResult = await sendProductsToLiveServer(products);
 
     res.json({
       success: true,
@@ -375,6 +388,10 @@ app.use((err, req, res, next) => {
 /** Graceful shutdown */
 async function gracefulShutdown() {
   console.log('Shutting down gracefully...');
+  if (autoSyncInterval) {
+    clearInterval(autoSyncInterval);
+    console.log('Auto-sync interval cleared');
+  }
   if (pool) {
     await pool.close();
     console.log('Database connection pool closed');
@@ -384,8 +401,29 @@ async function gracefulShutdown() {
 process.on('SIGTERM', gracefulShutdown);
 process.on('SIGINT', gracefulShutdown);
 
+/** Auto-sync interval */
+let autoSyncInterval;
+const SYNC_INTERVAL_MS = process.env.SYNC_INTERVAL_MS || 60000; // 60 seconds default
+
+/**
+ * Automatic sync function - runs on interval
+ */
+async function autoSync() {
+  try {
+    const products = await fetchProductsFromPOS();
+    if (products.length > 0) {
+      console.log(`[AUTO SYNC] Triggered - fetched ${products.length} products`);
+      await sendProductsToLiveServer(products);
+    }
+  } catch (err) {
+    console.error('[AUTO SYNC] Error:', err.message);
+  }
+}
+
 /** Start server */
 const PORT = process.env.PORT || 3001;
+let autoSyncStarted = false;
+
 startServer();
 async function startServer() {
   try {
@@ -395,6 +433,14 @@ async function startServer() {
       console.log(`API Key validation: ENABLED`);
       console.log(`Database: ${process.env.DB_SERVER}/${process.env.DB_DATABASE}`);
       console.log(`Live Server: ${process.env.LIVE_SERVER_URL || 'NOT CONFIGURED'}`);
+      console.log(`Auto-sync interval: ${SYNC_INTERVAL_MS}ms (${Math.round(SYNC_INTERVAL_MS / 1000)}s)`);
+
+      // Start automatic sync if not already started
+      if (!autoSyncStarted) {
+        autoSyncInterval = setInterval(autoSync, SYNC_INTERVAL_MS);
+        autoSyncStarted = true;
+        console.log('[AUTO SYNC] ✅ Auto-sync enabled');
+      }
     });
   } catch (err) {
     console.error('Failed to start server:', err.message);

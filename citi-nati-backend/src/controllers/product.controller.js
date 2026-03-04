@@ -510,6 +510,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
               name: product.name,
               price: product.price || 0,
               stock: product.stock || 0,
+              category: product.category || 'Uncategorized',
               description: product.description || '',
               barcode: product.barcode || '',
               updatedAt: new Date(),
@@ -519,6 +520,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
               name: product.name,
               price: product.price || 0,
               stock: product.stock || 0,
+              category: product.category || 'Uncategorized',
               description: product.description || '',
               barcode: product.barcode || '',
               isActive: true,
@@ -535,6 +537,21 @@ const syncProductsFromPOSAgent = async (req, res) => {
         const errorMsg = `Failed to sync product ${product.sourceCode}: ${error.message}`;
         errors.push(errorMsg);
         console.error(`[POS AGENT PUSH] ❌ ${errorMsg}`);
+      }
+    }
+
+    // Emit real-time update to all connected clients
+    if (synced > 0 && global.io) {
+      try {
+        global.io.emit('pos-products-synced', {
+          synced,
+          skipped,
+          total: products.length,
+          timestamp: new Date().toISOString(),
+        });
+        console.log(`[POS AGENT PUSH] 🔄 Emitted real-time update to ${synced} synced products`);
+      } catch (ioErr) {
+        console.warn('[POS AGENT PUSH] Could not emit socket event:', ioErr.message);
       }
     }
 
