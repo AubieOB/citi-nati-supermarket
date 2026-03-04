@@ -10,6 +10,7 @@ import AdminInbox from '../../components/admin/AdminInbox.jsx';
 import AdminRefunds from '../../components/admin/AdminRefunds.jsx';
 import AdminPromotions from '../../components/admin/AdminPromotions.jsx';
 import AdminStocks from '../../components/admin/AdminStocks.jsx';
+import AdminPOSManagement from './AdminPOSManagement.jsx';
 import SupportDashboard from './SupportDashboard.jsx';
 import { useOrderUpdates } from '../../hooks/useOrderUpdates.js';
 import '../../styles/global.css';
@@ -36,6 +37,7 @@ const AdminDashboard = () => {
     { id: 'products', label: 'Products', icon: 'fa-box' },
     { id: 'stocks', label: 'Stocks', icon: 'fa-warehouse' },
     { id: 'promotions', label: 'Promotions', icon: 'fa-tags' },
+    { id: 'pos-management', label: 'POS Management', icon: 'fa-database' },
     { id: 'orders', label: 'Orders', icon: 'fa-list' },
     { id: 'users', label: 'Users', icon: 'fa-users' },
     { id: 'drivers', label: 'Drivers', icon: 'fa-car' },
@@ -187,6 +189,7 @@ const AdminDashboard = () => {
           {activeTab === 'products' && <AdminProducts />}
           {activeTab === 'stocks' && <AdminStocks />}
           {activeTab === 'promotions' && <AdminPromotions />}
+          {activeTab === 'pos-management' && <AdminPOSManagement />}
           {activeTab === 'orders' && <AdminOrders />}
           {activeTab === 'users' && <AdminUsers />}
           {activeTab === 'sales' && <AdminSales />}

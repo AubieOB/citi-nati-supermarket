@@ -102,10 +102,13 @@ const Products = () => {
   /**
    * Client-side AND search filtering
    * Split search term by spaces and show products matching ALL terms
+   * Also filters out products marked as hideFromProductsPage
    */
   useEffect(() => {
     if (!searchInput.trim()) {
-      setFilteredProducts(products);
+      // Filter out hidden products even when no search
+      const visible = products.filter(p => !p.hideFromProductsPage);
+      setFilteredProducts(visible);
       return;
     }
 
@@ -116,6 +119,9 @@ const Products = () => {
       .filter(term => term.length > 0);
 
     const filtered = products.filter(product => {
+      // Skip hidden products
+      if (product.hideFromProductsPage) return false;
+
       const productName = product.name.toLowerCase();
       const productCategory = (product.category || '').toLowerCase();
       

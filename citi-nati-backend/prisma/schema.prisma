@@ -27,24 +27,25 @@ model User {
 }
 
 model Product {
-  id               Int        @id @default(autoincrement())
-  sourceCode       String?    @unique
-  name             String
-  price            Float
-  originalPrice    Float?
-  discountPrice    Float?
-  isOnSale         Boolean    @default(false)
-  stock            Int        @default(0)
-  category         String?
-  description      String?    @default("")
-  barcode          String?
-  expiryDate       DateTime?
-  image            String?
-  isActive         Boolean    @default(true)
-  cartItems        CartItem[]
-  orderItems       OrderItem[]
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
+  id                      Int        @id @default(autoincrement())
+  sourceCode              String?    @unique
+  name                    String
+  price                   Float
+  originalPrice           Float?
+  discountPrice           Float?
+  isOnSale                Boolean    @default(false)
+  stock                   Int        @default(0)
+  category                String?
+  description             String?    @default("")
+  barcode                 String?
+  expiryDate              DateTime?
+  image                   String?
+  isActive                Boolean    @default(true)
+  hideFromProductsPage    Boolean    @default(false)
+  cartItems               CartItem[]
+  orderItems              OrderItem[]
+  createdAt               DateTime   @default(now())
+  updatedAt               DateTime   @updatedAt
 }
 
 model Cart {

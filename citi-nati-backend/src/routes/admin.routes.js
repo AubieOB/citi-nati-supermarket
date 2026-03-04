@@ -322,4 +322,176 @@ router.post('/promotions/:type/preview', verifyTokenMiddleware, verifyAdmin, pre
  */
 router.post('/promotions/:type', verifyTokenMiddleware, verifyAdmin, updatePromotion);
 
+/**
+ * GET /api/admin/pos-products
+ * Get all POS synced products with optional search
+ * Query params: search, page, limit
+ * Protected: Admin only
+ */
+router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const { search = '', page = 1, limit = 20 } = req.query;
+    const skip = (page - 1) * limit;
+
+    // Build where clause
+    const where = {
+      sourceCode: { not: null }, // Only POS products
+    };
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { sourceCode: { contains: search, mode: 'insensitive' } },
+        { category: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    // Get total count
+    const total = await prisma.product.count({ where });
+
+    // Get paginated products
+    const products = await prisma.product.findMany({
+      where,
+      skip,
+      take: parseInt(limit),
+      select: {
+        id: true,
+        name: true,
+        sourceCode: true,
+        category: true,
+        price: true,
+        stock: true,
+        hideFromProductsPage: true,
+        image: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({
+      success: true,
+      products,
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (err) {
+    console.error('[ADMIN POS] Get products error:', err.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch POS products',
+      details: err.message,
+    });
+  }
+});
+
+/**
+ * PUT /api/admin/pos-products/:id/visibility
+ * Toggle product visibility (hide/show from products page)
+ * Protected: Admin only
+ */
+router.put('/pos-products/:id/visibility', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { hideFromProductsPage } = req.body;
+
+    const product = await prisma.product.update({
+      where: { id: parseInt(id) },
+      data: { hideFromProductsPage: Boolean(hideFromProductsPage) },
+      select: {
+        id: true,
+        name: true,
+        hideFromProductsPage: true,
+      },
+    });
+
+    console.log(`[ADMIN POS] Product ${id} visibility updated: ${product.hideFromProductsPage ? 'HIDDEN' : 'VISIBLE'}`);
+
+    res.json({
+      success: true,
+      message: product.hideFromProductsPage ? 'Product hidden from products page' : 'Product shown on products page',
+      product,
+    });
+  } catch (err) {
+    console.error('[ADMIN POS] Update visibility error:', err.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update product visibility',
+      details: err.message,
+    });
+  }
+});
+
+/**
+ * DELETE /api/admin/pos-products/delete-selected
+ * Delete selected product IDs
+ * Body: { productIds: [1, 2, 3] }
+ * Protected: Admin only
+ */
+router.delete('/pos-products/delete-selected', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const { productIds } = req.body;
+
+    if (!Array.isArray(productIds) || productIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'productIds must be a non-empty array',
+      });
+    }
+
+    const deleted = await prisma.product.deleteMany({
+      where: {
+        id: { in: productIds.map(id => parseInt(id)) },
+        sourceCode: { not: null }, // Only allow deleting POS products
+      },
+    });
+
+    console.log(`[ADMIN POS] Deleted ${deleted.count} selected products`);
+
+    res.json({
+      success: true,
+      message: `Deleted ${deleted.count} product(s)`,
+      deletedCount: deleted.count,
+    });
+  } catch (err) {
+    console.error('[ADMIN POS] Delete selected error:', err.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete selected products',
+      details: err.message,
+    });
+  }
+});
+
+/**
+ * DELETE /api/admin/pos-products/delete-all
+ * Delete ALL POS synced products
+ * Protected: Admin only
+ */
+router.delete('/pos-products/delete-all', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const deleted = await prisma.product.deleteMany({
+      where: {
+        sourceCode: { not: null }, // Only POS products
+      },
+    });
+
+    console.log(`[ADMIN POS] Deleted ALL ${deleted.count} POS products`);
+
+    res.json({
+      success: true,
+      message: `Deleted all ${deleted.count} POS products`,
+      deletedCount: deleted.count,
+    });
+  } catch (err) {
+    console.error('[ADMIN POS] Delete all error:', err.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete all POS products',
+      details: err.message,
+    });
+  }
+});
+
 module.exports = router;
