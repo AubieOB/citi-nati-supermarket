@@ -207,17 +207,26 @@ const Products = () => {
         fetchProducts();
       };
 
-      // Listen for stock updates, product updates, and promotion changes
+      const handlePOSSync = (syncData) => {
+        console.log('[PRODUCTS] 🔄 POS Products synced:', syncData);
+        // Refetch all products to get updates from POS
+        showSuccess('POS Sync', `${syncData.synced} products synced from POS!`);
+        fetchProducts();
+      };
+
+      // Listen for stock updates, product updates, promotion changes, and POS syncs
       socket.on('stock_update', handleStockUpdate);
       socket.on('product_updated', handleProductUpdate);
       socket.on('promotionUpdated', handlePromotionUpdated);
-      console.log('[PRODUCTS] 🔌 Socket listeners attached for stock_update, product_updated, and promotionUpdated events');
+      socket.on('pos-products-synced', handlePOSSync);
+      console.log('[PRODUCTS] 🔌 Socket listeners attached for POS sync events');
 
       // Cleanup: remove listeners on component unmount
       return () => {
         socket.off('stock_update', handleStockUpdate);
         socket.off('product_updated', handleProductUpdate);
         socket.off('promotionUpdated', handlePromotionUpdated);
+        socket.off('pos-products-synced', handlePOSSync);
         console.log('[PRODUCTS] 🔌 Socket listeners removed');
       };
     } catch (err) {
