@@ -60,10 +60,30 @@ const Products = () => {
         throw new Error('Invalid response schema: expected { products: [...] }');
       }
 
-      setProducts(data.products);
+      // Deduplicate: keep POS products (with sourceCode), remove old admin duplicates (without sourceCode)
+      const deduped = [];
+      const seenNames = new Map();
+      
+      // First pass: collect POS products (with sourceCode)
+      data.products.forEach(p => {
+        if (p.sourceCode) {
+          seenNames.set(p.name, p);
+          deduped.push(p);
+        }
+      });
+      
+      // Second pass: add non-POS products only if name not already seen
+      data.products.forEach(p => {
+        if (!p.sourceCode && !seenNames.has(p.name)) {
+          deduped.push(p);
+        }
+      });
+      
+      console.log(`[PRODUCTS FETCH] Deduplicated: ${data.products.length} → ${deduped.length} products`);
+      setProducts(deduped);
 
       // Extract unique categories for filter dropdown
-      const uniqueCategories = [...new Set(data.products.map(p => p.category))];
+      const uniqueCategories = [...new Set(deduped.map(p => p.category))].filter(Boolean);
       setCategories(uniqueCategories.sort());
     } catch (err) {
       console.error('❌ Error fetching products:', err.message);
@@ -208,19 +228,22 @@ const Products = () => {
           // Try matching by ID first (most reliable)
           let matched = prevProducts.findIndex(p => p.id === syncedProduct.id);
           
-          // Fallback: try sourceCode if ID doesn't match
-          if (matched === -1 && syncedProduct.sourceCode) {
+          // Fallback: try sourceCode if they both exist
+          if (matched === -1 && syncedProduct.sourceCode && prevProducts.some(p => p.sourceCode)) {
             matched = prevProducts.findIndex(p => p.sourceCode === syncedProduct.sourceCode);
           }
           
-          // Try matching by exact name (last resort)
+          // Fallback: try matching by exact name (but only if no sourceCode collision)
           if (matched === -1 && syncedProduct.name) {
-            matched = prevProducts.findIndex(p => p.name === syncedProduct.name);
+            const nameMatch = prevProducts.findIndex(p => p.name === syncedProduct.name && !p.sourceCode);
+            if (nameMatch >= 0) {
+              matched = nameMatch;
+            }
           }
           
           if (matched >= 0) {
-            // Update existing product
-            console.log('[PRODUCTS] ✅ Updated:', syncedProduct.name);
+            // Update existing product - THIS REPLACES IT, NOT ADDS
+            console.log('[PRODUCTS] ✅ UPDATED (not duplicated):', syncedProduct.name, 'ID:', syncedProduct.id);
             const updated = [...prevProducts];
             updated[matched] = {
               ...updated[matched],
@@ -229,8 +252,15 @@ const Products = () => {
             };
             return updated;
           } else {
-            // New product from POS - add it
-            console.log('[PRODUCTS] ➕ Added new:', syncedProduct.name);
+            // Check for duplicate by name before adding
+            const dupCheck = prevProducts.find(p => p.name === syncedProduct.name && p.sourceCode === syncedProduct.sourceCode);
+            if (dupCheck) {
+              console.log('[PRODUCTS] ⚠️ DUPLICATE DETECTED - SKIPPING:', syncedProduct.name);
+              return prevProducts; // Don't add duplicate
+            }
+            
+            // New product - add it
+            console.log('[PRODUCTS] ➕ NEW PRODUCT:', syncedProduct.name, 'ID:', syncedProduct.id);
             return [...prevProducts, { ...syncedProduct, finalPrice: syncedProduct.price }];
           }
         });
