@@ -458,4 +458,112 @@ const syncFromPOS = async (req, res) => {
   }
 };
 
-module.exports = { createProduct, getProducts, getProductById, updateProduct, deleteProduct, syncFromPOS };
+/**
+ * Receive products pushed from POS Sync Agent
+ * Called by: POST /api/products/pos-sync/push
+ * Authentication: x-pos-secret header
+ */
+const syncProductsFromPOSAgent = async (req, res) => {
+  try {
+    // Validate API secret
+    const secret = req.headers['x-pos-secret'];
+    const expectedSecret = process.env.POS_SECRET;
+
+    if (!secret || secret !== expectedSecret) {
+      console.error('[POS AGENT PUSH] Unauthorized attempt with secret:', secret ? 'provided' : 'missing');
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Unauthorized: Invalid x-pos-secret header' 
+      });
+    }
+
+    const { products } = req.body;
+
+    if (!products || !Array.isArray(products)) {
+      console.error('[POS AGENT PUSH] Invalid products format');
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid products format. Expected array.' 
+      });
+    }
+
+    console.log(`[POS AGENT PUSH] Received ${products.length} products from POS Agent`);
+
+    let synced = 0;
+    let skipped = 0;
+    const errors = [];
+
+    for (const product of products) {
+      try {
+        // Validate required fields
+        if (!product.sourceCode || !product.name) {
+          skipped++;
+          errors.push(`Missing required fields for product: ${JSON.stringify(product)}`);
+          continue;
+        }
+
+        // Upsert product into database
+        const result = await prisma.product.upsert(
+          {
+            where: { sourceCode: product.sourceCode },
+            update: {
+              name: product.name,
+              price: product.price || 0,
+              stock: product.stock || 0,
+              description: product.description || '',
+              barcode: product.barcode || '',
+              updatedAt: new Date(),
+            },
+            create: {
+              sourceCode: product.sourceCode,
+              name: product.name,
+              price: product.price || 0,
+              stock: product.stock || 0,
+              description: product.description || '',
+              barcode: product.barcode || '',
+              isActive: true,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          }
+        );
+
+        synced++;
+        console.log(`[POS AGENT PUSH] ✅ Synced product: ${product.name} (${product.sourceCode})`);
+      } catch (error) {
+        skipped++;
+        const errorMsg = `Failed to sync product ${product.sourceCode}: ${error.message}`;
+        errors.push(errorMsg);
+        console.error(`[POS AGENT PUSH] ❌ ${errorMsg}`);
+      }
+    }
+
+    console.log(`[POS AGENT PUSH] Sync complete - Synced: ${synced}, Skipped: ${skipped}`);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Products received and processed',
+      synced,
+      skipped,
+      total: products.length,
+      errors: errors.length > 0 ? errors : undefined,
+    });
+  } catch (err) {
+    console.error('[POS AGENT PUSH] Endpoint error:', err.message);
+    return res.status(500).json({
+      success: false,
+      error: 'Server error while processing POS products',
+      details: err.message,
+    });
+  }
+};
+
+module.exports = { 
+  createProduct, 
+  getProducts, 
+  getProductById, 
+  updateProduct, 
+  deleteProduct, 
+  syncFromPOS,
+  syncProductsFromPOSAgent
+};

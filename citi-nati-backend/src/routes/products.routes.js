@@ -46,4 +46,8 @@ router.post(
   syncFromPOS
 );
 
+// POST /api/pos-sync/push - Receive products from POS Agent (API Key auth)
+// This endpoint is called directly by the POS Sync Agent
+router.post('/pos-sync/push', require('../controllers/product.controller').syncProductsFromPOSAgent);
+
 module.exports = router;

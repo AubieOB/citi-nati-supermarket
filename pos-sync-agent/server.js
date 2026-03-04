@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const sql = require('mssql');
+const axios = require('axios');
 
 const app = express();
 app.use(express.json());
@@ -49,6 +50,45 @@ function validateApiKey(req, res, next) {
   next();
 }
 
+/** Send products to live server API endpoint */
+async function sendProductsToLiveServer(products) {
+  try {
+    if (!process.env.LIVE_SERVER_URL) {
+      console.error('[POS SYNC] ERROR: LIVE_SERVER_URL not configured in .env');
+      return { success: false, error: 'LIVE_SERVER_URL not configured' };
+    }
+
+    console.log(`[POS SYNC] Sending ${products.length} products to live server...`);
+
+    const response = await axios.post(
+      `${process.env.LIVE_SERVER_URL}/api/pos-sync/push`,
+      {
+        products: products.map(p => ({
+          sourceCode: p.ProductCode,
+          name: p.ProductName,
+          price: p.SellingPrice,
+          stock: p.QuantityAvailable,
+          barcode: p.Barcode || '',
+        })),
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-pos-secret': process.env.POS_SECRET,
+        },
+        timeout: 60000,
+      }
+    );
+
+    console.log(`[POS SYNC] ✅ Products sent successfully:`, response.data);
+    return response.data;
+  } catch (error) {
+    console.error('[POS SYNC] ❌ Failed to send products to live server:');
+    console.error(error.response?.data || error.message);
+    return { success: false, error: error.message };
+  }
+}
+
 /**
  * Copilot statement: fetch all products safely with latest price & stock
  */
@@ -78,12 +118,16 @@ app.get('/pos-sync/products', validateApiKey, async (req, res) => {
 
     const result = await pool.request().query(query);
 
-    console.log(`[/pos-sync/products] Fetched ${result.recordset.length} products`);
+    console.log(`[POS SYNC] Fetched ${result.recordset.length} products from Global POS`);
+
+    // Send to live server
+    const syncResult = await sendProductsToLiveServer(result.recordset);
 
     res.json({
       success: true,
       count: result.recordset.length,
       data: result.recordset,
+      syncResult: syncResult,
     });
   } catch (err) {
     console.error('Database query error:', err.message);
@@ -314,6 +358,7 @@ async function startServer() {
       console.log(`POS Sync Agent listening on port ${PORT}`);
       console.log(`API Key validation: ENABLED`);
       console.log(`Database: ${process.env.DB_SERVER}/${process.env.DB_DATABASE}`);
+      console.log(`Live Server: ${process.env.LIVE_SERVER_URL || 'NOT CONFIGURED'}`);
     });
   } catch (err) {
     console.error('Failed to start server:', err.message);
