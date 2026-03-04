@@ -532,23 +532,25 @@ const syncProductsFromPOSAgent = async (req, res) => {
 
         synced++;
         
+        // Fetch the complete product with all fields for frontend
+        const completeProduct = await prisma.product.findUnique({
+          where: { id: result.id }
+        });
+        
         // Emit real-time update for this specific product (for instant frontend updates)
-        if (global.io && result) {
+        if (global.io && completeProduct) {
           try {
-            const formattedProduct = {
-              id: result.id,
-              sourceCode: result.sourceCode,
-              name: result.name,
-              price: result.price,
-              stock: result.stock,
-              category: result.category,
-              barcode: result.barcode,
-              isActive: result.isActive,
-              updatedAt: result.updatedAt,
-            };
-            global.io.emit('pos-product-updated', formattedProduct);
+            console.log(`[POS AGENT PUSH] 📡 Emitting real-time update for: ${completeProduct.name}`);
+            global.io.emit('pos-product-updated', {
+              id: completeProduct.id,
+              sourceCode: completeProduct.sourceCode,
+              name: completeProduct.name,
+              price: completeProduct.price,
+              stock: completeProduct.stock,
+              category: completeProduct.category,
+            });
           } catch (ioErr) {
-            // Silent fail for socket events
+            console.warn('[POS AGENT PUSH] Socket emit failed:', ioErr.message);
           }
         }
         

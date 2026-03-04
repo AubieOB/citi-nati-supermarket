@@ -202,31 +202,48 @@ const Products = () => {
       };
 
       const handlePOSProductUpdate = (syncedProduct) => {
-        console.log('[PRODUCTS] 📦 POS product update:', syncedProduct.name);
+        console.log('[PRODUCTS] 📦 POS product update:', { id: syncedProduct.id, name: syncedProduct.name, sourceCode: syncedProduct.sourceCode });
         
-        // Check if product already exists
-        const existingIndex = products.findIndex(p => p.sourceCode === syncedProduct.sourceCode);
+        // Try matching by ID first (most reliable)
+        let matched = products.findIndex(p => p.id === syncedProduct.id);
         
-        if (existingIndex >= 0) {
+        // Fallback: try sourceCode if ID doesn't match
+        if (matched === -1 && syncedProduct.sourceCode) {
+          matched = products.findIndex(p => p.sourceCode === syncedProduct.sourceCode);
+        }
+        
+        if (matched >= 0) {
           // Update existing product
           const updatedProducts = [...products];
-          updatedProducts[existingIndex] = {
-            ...updatedProducts[existingIndex],
+          updatedProducts[matched] = {
+            ...updatedProducts[matched],
             ...syncedProduct,
+            finalPrice: syncedProduct.price, // Use synced price as final price
           };
           setProducts(updatedProducts);
+          console.log('[PRODUCTS] ✅ Updated product:', updatedProducts[matched].name);
           
           // Update filtered as well
-          const filteredUpdated = filteredProducts.map(p =>
-            p.sourceCode === syncedProduct.sourceCode 
-              ? { ...p, ...syncedProduct }
-              : p
+          const filteredMatched = filteredProducts.findIndex(
+            p => p.id === syncedProduct.id || (syncedProduct.sourceCode && p.sourceCode === syncedProduct.sourceCode)
           );
-          setFilteredProducts(filteredUpdated);
+          if (filteredMatched >= 0) {
+            const filteredUpdated = [...filteredProducts];
+            filteredUpdated[filteredMatched] = {
+              ...filteredUpdated[filteredMatched],
+              ...syncedProduct,
+              finalPrice: syncedProduct.price,
+            };
+            setFilteredProducts(filteredUpdated);
+          }
         } else {
-          // New product from POS - add it
-          setProducts(prev => [...prev, syncedProduct]);
-          setFilteredProducts(prev => [...prev, syncedProduct]);
+          // New product from POS - add it if it matches current filters
+          const shouldAdd = !selectedCategory || syncedProduct.category === selectedCategory;
+          if (shouldAdd) {
+            console.log('[PRODUCTS] ➕ Adding new POS product:', syncedProduct.name);
+            setProducts(prev => [...prev, syncedProduct]);
+            setFilteredProducts(prev => [...prev, syncedProduct]);
+          }
         }
       };
 
