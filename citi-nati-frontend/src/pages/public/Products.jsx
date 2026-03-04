@@ -201,6 +201,35 @@ const Products = () => {
         );
       };
 
+      const handlePOSProductUpdate = (syncedProduct) => {
+        console.log('[PRODUCTS] 📦 POS product update:', syncedProduct.name);
+        
+        // Check if product already exists
+        const existingIndex = products.findIndex(p => p.sourceCode === syncedProduct.sourceCode);
+        
+        if (existingIndex >= 0) {
+          // Update existing product
+          const updatedProducts = [...products];
+          updatedProducts[existingIndex] = {
+            ...updatedProducts[existingIndex],
+            ...syncedProduct,
+          };
+          setProducts(updatedProducts);
+          
+          // Update filtered as well
+          const filteredUpdated = filteredProducts.map(p =>
+            p.sourceCode === syncedProduct.sourceCode 
+              ? { ...p, ...syncedProduct }
+              : p
+          );
+          setFilteredProducts(filteredUpdated);
+        } else {
+          // New product from POS - add it
+          setProducts(prev => [...prev, syncedProduct]);
+          setFilteredProducts(prev => [...prev, syncedProduct]);
+        }
+      };
+
       const handlePromotionUpdated = (promotion) => {
         console.log('[PRODUCTS] 🎯 Promotion updated:', promotion.type);
         // Refetch all products to get updated discount prices
@@ -208,36 +237,24 @@ const Products = () => {
       };
 
       const handlePOSSync = (syncData) => {
-        console.log('[PRODUCTS] 🔄 POS Products synced silently:', syncData);
-        // Silently refetch without showing modal or loading state
-        const refreshProducts = async () => {
-          try {
-            const params = new URLSearchParams();
-            if (selectedCategory) params.append('category', selectedCategory);
-            if (onSaleOnly) params.append('onSale', 'true');
-            const response = await api.get(`/products${params.toString() ? '?' + params.toString() : ''}`);
-            if (response.data.products) {
-              setProducts(response.data.products);
-              console.log('[PRODUCTS] ✅ Silent update complete');
-            }
-          } catch (err) {
-            console.warn('[PRODUCTS] Silent refresh failed:', err.message);
-          }
-        };
-        refreshProducts();
+        console.log('[PRODUCTS] 🔄 POS Sync triggered:', syncData);
+        // Individual product updates will arrive via 'pos-product-updated' events
+        // No need to refetch - updates happen in real-time as products sync
       };
 
-      // Listen for stock updates, product updates, promotion changes, and POS syncs
+      // Listen for stock updates, product updates, promotion changes, and POS product updates
       socket.on('stock_update', handleStockUpdate);
       socket.on('product_updated', handleProductUpdate);
+      socket.on('pos-product-updated', handlePOSProductUpdate);
       socket.on('promotionUpdated', handlePromotionUpdated);
       socket.on('pos-products-synced', handlePOSSync);
-      console.log('[PRODUCTS] 🔌 Socket listeners attached for POS sync events');
+      console.log('[PRODUCTS] 🔌 Socket listeners attached for real-time POS updates');
 
       // Cleanup: remove listeners on component unmount
       return () => {
         socket.off('stock_update', handleStockUpdate);
         socket.off('product_updated', handleProductUpdate);
+        socket.off('pos-product-updated', handlePOSProductUpdate);
         socket.off('promotionUpdated', handlePromotionUpdated);
         socket.off('pos-products-synced', handlePOSSync);
         console.log('[PRODUCTS] 🔌 Socket listeners removed');

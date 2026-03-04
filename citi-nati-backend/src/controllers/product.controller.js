@@ -531,6 +531,27 @@ const syncProductsFromPOSAgent = async (req, res) => {
         );
 
         synced++;
+        
+        // Emit real-time update for this specific product (for instant frontend updates)
+        if (global.io && result) {
+          try {
+            const formattedProduct = {
+              id: result.id,
+              sourceCode: result.sourceCode,
+              name: result.name,
+              price: result.price,
+              stock: result.stock,
+              category: result.category,
+              barcode: result.barcode,
+              isActive: result.isActive,
+              updatedAt: result.updatedAt,
+            };
+            global.io.emit('pos-product-updated', formattedProduct);
+          } catch (ioErr) {
+            // Silent fail for socket events
+          }
+        }
+        
         console.log(`[POS AGENT PUSH] ✅ Synced product: ${product.name} (${product.sourceCode})`);
       } catch (error) {
         skipped++;
