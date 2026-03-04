@@ -598,6 +598,37 @@ const syncProductsFromPOSAgent = async (req, res) => {
   }
 };
 
+/**
+ * Delete all POS synced products (products with sourceCode)
+ * Admin only endpoint
+ */
+const deletePOSProducts = async (req, res) => {
+  try {
+    const deleted = await prisma.product.deleteMany({
+      where: {
+        sourceCode: {
+          not: null
+        }
+      }
+    });
+
+    console.log(`[DELETE POS] Deleted ${deleted.count} POS products`);
+
+    return res.status(200).json({
+      success: true,
+      message: `Deleted ${deleted.count} POS products`,
+      deletedCount: deleted.count,
+    });
+  } catch (err) {
+    console.error('[DELETE POS] Error:', err.message);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to delete POS products',
+      details: err.message,
+    });
+  }
+};
+
 module.exports = { 
   createProduct, 
   getProducts, 
@@ -605,5 +636,6 @@ module.exports = {
   updateProduct, 
   deleteProduct, 
   syncFromPOS,
-  syncProductsFromPOSAgent
+  syncProductsFromPOSAgent,
+  deletePOSProducts
 };
