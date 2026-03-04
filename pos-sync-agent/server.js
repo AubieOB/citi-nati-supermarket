@@ -136,7 +136,7 @@ async function fetchProductsFromPOS() {
           p.ProductCode,
           p.ProductName,
           ISNULL(p.Barcode,'') AS Barcode,
-          'General' AS CategoryName,
+          ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
           ISNULL((
               SELECT TOP 1 FPrice 
               FROM POS.dbo.productprices pr 
@@ -149,6 +149,7 @@ async function fetchProductsFromPOS() {
               WHERE sd.ProductCode = p.ProductCode
           ), 0) AS QuantityAvailable
       FROM POS.dbo.productsmaster p
+      LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
       ORDER BY p.ProductCode
     `;
 
