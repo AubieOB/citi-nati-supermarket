@@ -1,5 +1,5 @@
 const express = require('express');
-const { createProduct, getProducts, getProductById, updateProduct, deleteProduct } = require('../controllers/product.controller');
+const { createProduct, getProducts, getProductById, updateProduct, deleteProduct, syncFromPOS } = require('../controllers/product.controller');
 const { verifyTokenMiddleware } = require('../middleware/auth.middleware');
 const { verifyAdmin } = require('../middleware/admin.middleware');
 const uploadProductImage = require('../middlewares/uploadProductImageCloudinary');
@@ -36,6 +36,14 @@ router.delete(
   verifyTokenMiddleware,
   verifyAdmin,
   deleteProduct
+);
+
+// POST /api/products/sync/pos - Sync products from POS Agent (ADMIN only)
+router.post(
+  '/sync/pos',
+  verifyTokenMiddleware,
+  verifyAdmin,
+  syncFromPOS
 );
 
 module.exports = router;

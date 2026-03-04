@@ -422,4 +422,40 @@ const deleteProduct = async (req, res) => {
   }
 };
 
-module.exports = { createProduct, getProducts, getProductById, updateProduct, deleteProduct };
+/**
+ * Sync products from POS Agent to database
+ * ADMIN only endpoint
+ */
+const syncFromPOS = async (req, res) => {
+  try {
+    const { syncProductsFromPOS } = require('../services/posSync.service');
+
+    console.log('[POS SYNC ENDPOINT] Starting manual sync...');
+    const result = await syncProductsFromPOS();
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: result.error || 'Sync failed',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Products synced successfully',
+      synced: result.synced,
+      skipped: result.skipped,
+      total: result.total,
+      errors: result.errors,
+    });
+  } catch (err) {
+    console.error('[POS SYNC ENDPOINT] Error:', err.message);
+    return res.status(500).json({
+      success: false,
+      error: 'Server error while syncing products',
+      details: err.message,
+    });
+  }
+};
+
+module.exports = { createProduct, getProducts, getProductById, updateProduct, deleteProduct, syncFromPOS };
