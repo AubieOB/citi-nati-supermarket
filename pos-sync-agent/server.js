@@ -50,7 +50,7 @@ function validateApiKey(req, res, next) {
   next();
 }
 
-/** Send products to live server API endpoint */
+/** Send products to live server API endpoint - with batching for large datasets */
 async function sendProductsToLiveServer(products) {
   try {
     if (!process.env.LIVE_SERVER_URL) {
@@ -58,33 +58,69 @@ async function sendProductsToLiveServer(products) {
       return { success: false, error: 'LIVE_SERVER_URL not configured' };
     }
 
-    console.log(`[POS SYNC] Sending ${products.length} products to live server...`);
+    console.log(`[POS SYNC] Sending ${products.length} products to live server (batching)...`);
 
-    const response = await axios.post(
-      `${process.env.LIVE_SERVER_URL}/api/products/pos-sync/push`,
-      {
-        products: products.map(p => ({
-          sourceCode: p.ProductCode,
-          name: p.ProductName,
-          price: p.SellingPrice,
-          stock: p.QuantityAvailable,
-          barcode: p.Barcode || '',
-        })),
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-pos-secret': process.env.POS_SECRET,
-        },
-        timeout: 60000,
+    // Batch size to avoid payload too large errors
+    const BATCH_SIZE = 200;
+    const batches = [];
+
+    for (let i = 0; i < products.length; i += BATCH_SIZE) {
+      batches.push(products.slice(i, i + BATCH_SIZE));
+    }
+
+    console.log(`[POS SYNC] Split into ${batches.length} batches of up to ${BATCH_SIZE} products`);
+
+    let totalSynced = 0;
+    let totalErrors = 0;
+
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+      const batch = batches[batchIndex];
+      console.log(`[POS SYNC] Sending batch ${batchIndex + 1}/${batches.length} (${batch.length} products)...`);
+
+      try {
+        const response = await axios.post(
+          `${process.env.LIVE_SERVER_URL}/api/products/pos-sync/push`,
+          {
+            products: batch.map(p => ({
+              sourceCode: p.ProductCode,
+              name: p.ProductName,
+              price: p.SellingPrice,
+              stock: p.QuantityAvailable,
+              barcode: p.Barcode || '',
+            })),
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'x-pos-secret': process.env.POS_SECRET,
+            },
+            timeout: 60000,
+          }
+        );
+
+        if (response.data.success) {
+          totalSynced += response.data.synced || batch.length;
+          console.log(`[POS SYNC] ✅ Batch ${batchIndex + 1} sent successfully`);
+        }
+      } catch (batchError) {
+        totalErrors++;
+        console.error(`[POS SYNC] ❌ Batch ${batchIndex + 1} failed:`, batchError.message);
       }
-    );
+    }
 
-    console.log(`[POS SYNC] ✅ Products sent successfully:`, response.data);
-    return response.data;
+    const summary = {
+      success: totalErrors === 0,
+      totalProducts: products.length,
+      batchesSent: batches.length,
+      batchesFailed: totalErrors,
+      totalSynced,
+    };
+
+    console.log(`[POS SYNC] ✅ Sync complete:`, summary);
+    return summary;
   } catch (error) {
     console.error('[POS SYNC] ❌ Failed to send products to live server:');
-    console.error(error.response?.data || error.message);
+    console.error(error.message);
     return { success: false, error: error.message };
   }
 }
