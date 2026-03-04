@@ -208,10 +208,23 @@ const Products = () => {
       };
 
       const handlePOSSync = (syncData) => {
-        console.log('[PRODUCTS] 🔄 POS Products synced:', syncData);
-        // Refetch all products to get updates from POS
-        showSuccess('POS Sync', `${syncData.synced} products synced from POS!`);
-        fetchProducts();
+        console.log('[PRODUCTS] 🔄 POS Products synced silently:', syncData);
+        // Silently refetch without showing modal or loading state
+        const refreshProducts = async () => {
+          try {
+            const params = new URLSearchParams();
+            if (selectedCategory) params.append('category', selectedCategory);
+            if (onSaleOnly) params.append('onSale', 'true');
+            const response = await api.get(`/products${params.toString() ? '?' + params.toString() : ''}`);
+            if (response.data.products) {
+              setProducts(response.data.products);
+              console.log('[PRODUCTS] ✅ Silent update complete');
+            }
+          } catch (err) {
+            console.warn('[PRODUCTS] Silent refresh failed:', err.message);
+          }
+        };
+        refreshProducts();
       };
 
       // Listen for stock updates, product updates, promotion changes, and POS syncs
