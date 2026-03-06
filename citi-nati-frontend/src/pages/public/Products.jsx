@@ -131,19 +131,35 @@ const Products = () => {
   }, [selectedCategory, onSaleOnly, searchParams]);
 
   /**
-   * Update displayed products based on filters
-   * Shows search results if search is active, otherwise shows paginated products
+   * Update displayed products based on filters and pagination
+   * Applies pagination to both search results and paginated products
    */
   useEffect(() => {
+    let resultsToDisplay = [];
+    
     if (searchInput.trim()) {
-      // Search results are already in filteredProducts (fetched by API)
-      return;
+      // Search active - filter products on client-side
+      const searchTerm = searchInput.toLowerCase();
+      resultsToDisplay = products.filter(p => 
+        !p.hideFromProductsPage &&
+        p.name.toLowerCase().includes(searchTerm)
+      );
+    } else {
+      // No search - show all visible products from current page
+      resultsToDisplay = products.filter(p => !p.hideFromProductsPage);
     }
     
-    // No search active - show current page products, filter out hidden ones
-    const visible = products.filter(p => !p.hideFromProductsPage);
-    setFilteredProducts(visible);
-  }, [searchInput, products]);
+    // Apply pagination to filtered results
+    const pageSize = 20;
+    const totalResults = resultsToDisplay.length;
+    const calculatedTotalPages = Math.ceil(totalResults / pageSize);
+    const startIndex = (currentPage - 1) * pageSize;
+    const paginatedResults = resultsToDisplay.slice(startIndex, startIndex + pageSize);
+    
+    setFilteredProducts(paginatedResults);
+    setTotalPages(calculatedTotalPages);
+    setTotalProducts(totalResults);
+  }, [searchInput, products, currentPage]);
 
   /**
    * Listen for real-time product updates (stock, price, promotions, name, etc)
@@ -327,25 +343,13 @@ const Products = () => {
   /**
    * Handle search input change
    * Client-side filtering - no API calls, just filter existing products
+   * Resets to page 1 when search term changes
    */
   const handleSearchChange = (e) => {
     const value = e.target.value;
     setSearchInput(value);
-    
-    if (value.trim()) {
-      // Filter products on client-side - search by name (case-insensitive)
-      const searchTerm = value.toLowerCase();
-      const results = products.filter(p => 
-        !p.hideFromProductsPage &&
-        p.name.toLowerCase().includes(searchTerm)
-      );
-      console.log(`[PRODUCTS SEARCH] Found ${results.length} matching products for: "${value}"`);
-      setFilteredProducts(results);
-    } else {
-      // If search is cleared, reset to current page products
-      const visible = products.filter(p => !p.hideFromProductsPage);
-      setFilteredProducts(visible);
-    }
+    setCurrentPage(1); // Reset to page 1 when search changes
+    console.log(`[PRODUCTS SEARCH] Search term: "${value}"`);
   };
 
   /**
@@ -569,10 +573,11 @@ const Products = () => {
             </select>
 
             {/* Clear Filters Button */}
-            {(searchInput || selectedCategory) && (
+            {(searchInput || selectedCategory || onSaleOnly) && (
               <button
                 onClick={() => {
                   setSearchInput('');
+                  setCurrentPage(1);
                   if (selectedCategory || onSaleOnly) {
                     const newParams = new URLSearchParams();
                     newParams.set('page', '1');
