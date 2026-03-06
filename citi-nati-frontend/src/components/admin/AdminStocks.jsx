@@ -187,12 +187,6 @@ const AdminStocks = () => {
     const inStock = paginatedProducts.filter(p => p.stock > lowStockThreshold);
     return { outOfStock, lowStock, inStock };
   };
-  });
-
-  // Separate products by stock status
-  const outOfStock = filteredProducts.filter(p => p.stock === 0);
-  const lowStock = filteredProducts.filter(p => p.stock > 0 && p.stock <= lowStockThreshold);
-  const goodStock = filteredProducts.filter(p => p.stock > lowStockThreshold);
 
   if (loading) {
     return <div style={{ textAlign: 'center', padding: '2rem' }}>Loading products...</div>;
