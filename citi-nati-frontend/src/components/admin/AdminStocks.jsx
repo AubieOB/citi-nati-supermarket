@@ -212,58 +212,65 @@ const AdminStocks = () => {
         gap: '1rem',
         marginBottom: '2rem',
       }}>
-        <div style={{
-          backgroundColor: '#fff',
-          borderRadius: '8px',
-          padding: '1.5rem',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-          borderLeft: '4px solid #2196F3',
-        }}>
-          <p style={{ margin: '0 0 0.5rem 0', color: '#666', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <i className="fas fa-cubes" style={{ color: '#2196F3' }}></i>
-            Total Products
-          </p>
-          <h3 style={{ margin: 0, color: '#2196F3', fontSize: '2rem' }}>{products.length}</h3>
-        </div>
-        <div style={{
-          backgroundColor: '#fff',
-          borderRadius: '8px',
-          padding: '1.5rem',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-          borderLeft: '4px solid #388e3c',
-        }}>
-          <p style={{ margin: '0 0 0.5rem 0', color: '#666', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <i className="fas fa-check-circle" style={{ color: '#388e3c' }}></i>
-            In Stock
-          </p>
-          <h3 style={{ margin: 0, color: '#388e3c', fontSize: '2rem' }}>{goodStock.length}</h3>
-        </div>
-        <div style={{
-          backgroundColor: '#fff',
-          borderRadius: '8px',
-          padding: '1.5rem',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-          borderLeft: '4px solid #f57c00',
-        }}>
-          <p style={{ margin: '0 0 0.5rem 0', color: '#666', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <i className="fas fa-exclamation-circle" style={{ color: '#f57c00' }}></i>
-            Low Stock
-          </p>
-          <h3 style={{ margin: 0, color: '#f57c00', fontSize: '2rem' }}>{lowStock.length}</h3>
-        </div>
-        <div style={{
-          backgroundColor: '#fff',
-          borderRadius: '8px',
-          padding: '1.5rem',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-          borderLeft: '4px solid #d32f2f',
-        }}>
-          <p style={{ margin: '0 0 0.5rem 0', color: '#666', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <i className="fas fa-ban" style={{ color: '#d32f2f' }}></i>
-            Out of Stock
-          </p>
-          <h3 style={{ margin: 0, color: '#d32f2f', fontSize: '2rem' }}>{outOfStock.length}</h3>
-        </div>
+        {(() => {
+          const { outOfStock, lowStock, inStock } = separateProducts();
+          return (
+            <>
+              <div style={{
+                backgroundColor: '#fff',
+                borderRadius: '8px',
+                padding: '1.5rem',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                borderLeft: '4px solid #2196F3',
+              }}>
+                <p style={{ margin: '0 0 0.5rem 0', color: '#666', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <i className="fas fa-cubes" style={{ color: '#2196F3' }}></i>
+                  Total Products
+                </p>
+                <h3 style={{ margin: 0, color: '#2196F3', fontSize: '2rem' }}>{products.length}</h3>
+              </div>
+              <div style={{
+                backgroundColor: '#fff',
+                borderRadius: '8px',
+                padding: '1.5rem',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                borderLeft: '4px solid #388e3c',
+              }}>
+                <p style={{ margin: '0 0 0.5rem 0', color: '#666', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <i className="fas fa-check-circle" style={{ color: '#388e3c' }}></i>
+                  In Stock
+                </p>
+                <h3 style={{ margin: 0, color: '#388e3c', fontSize: '2rem' }}>{inStock.length}</h3>
+              </div>
+              <div style={{
+                backgroundColor: '#fff',
+                borderRadius: '8px',
+                padding: '1.5rem',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                borderLeft: '4px solid #f57c00',
+              }}>
+                <p style={{ margin: '0 0 0.5rem 0', color: '#666', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <i className="fas fa-exclamation-circle" style={{ color: '#f57c00' }}></i>
+                  Low Stock
+                </p>
+                <h3 style={{ margin: 0, color: '#f57c00', fontSize: '2rem' }}>{lowStock.length}</h3>
+              </div>
+              <div style={{
+                backgroundColor: '#fff',
+                borderRadius: '8px',
+                padding: '1.5rem',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                borderLeft: '4px solid #d32f2f',
+              }}>
+                <p style={{ margin: '0 0 0.5rem 0', color: '#666', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <i className="fas fa-ban" style={{ color: '#d32f2f' }}></i>
+                  Out of Stock
+                </p>
+                <h3 style={{ margin: 0, color: '#d32f2f', fontSize: '2rem' }}>{outOfStock.length}</h3>
+              </div>
+            </>
+          );
+        })()}
       </div>
 
       {/* Filters */}
