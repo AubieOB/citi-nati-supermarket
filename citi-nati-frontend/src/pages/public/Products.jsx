@@ -85,6 +85,7 @@ const Products = () => {
       console.log(`[SEARCH CACHE HIT] "${query}"`);
       const cachedResults = searchCacheRef.current.get(query);
       setFilteredProducts(cachedResults);
+      setError(null); // Clear any previous errors
       return;
     }
 
@@ -94,6 +95,7 @@ const Products = () => {
         // No search term - show all products
         const visible = productsRef.current.filter(p => !p.hideFromProductsPage);
         setFilteredProducts(visible);
+        setError(null); // Clear any previous errors
         return;
       }
 
@@ -129,16 +131,21 @@ const Products = () => {
           // Cache the results
           searchCacheRef.current.set(query, visibleResults);
 
-          // Update display silently
+          // Update display silently and clear any errors
           setFilteredProducts(visibleResults);
+          setError(null);
 
           console.log(`[SEARCH API] Found ${visibleResults.length} results for "${query}"`);
         } catch (err) {
           // Ignore abort errors - those are intentional cancellations
-          if (err.name !== 'AbortError') {
-            console.error('[SEARCH ERROR]', err.message);
-            setError(err.message);
+          if (err.name === 'AbortError') {
+            console.log(`[SEARCH CANCELLED] Request for "${query}" was cancelled`);
+            // Don't set error for aborted requests
+            return;
           }
+          
+          console.error('[SEARCH ERROR]', err.message);
+          setError(err.message);
         }
       })();
     }, 200); // 200ms debounce
