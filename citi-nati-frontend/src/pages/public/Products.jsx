@@ -32,7 +32,8 @@ const Products = () => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchInput, setSearchInput] = useState('');
+  const [searchInput, setSearchInput] = useState(''); // User typing
+  const [debouncedSearch, setDebouncedSearch] = useState(''); // API search (debounced)
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalProducts, setTotalProducts] = useState(0);
@@ -126,11 +127,25 @@ const Products = () => {
     selectedCategoryRef.current = selectedCategory;
   }, [selectedCategory]);
 
-  // Fetch products when category, promotion filters change, or search changes
+  /**
+   * Debounce search input
+   * Wait 500ms after user stops typing before updating debounced search
+   * This prevents API calls on every keystroke
+   */
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchInput);
+      setCurrentPage(1); // Reset to page 1 when search changes
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  // Fetch products when category, promotion filters, or debounced search changes
   useEffect(() => {
     const page = parseInt(searchParams.get('page')) || 1;
-    fetchProducts(page, searchInput);
-  }, [selectedCategory, onSaleOnly, searchParams, searchInput]);
+    fetchProducts(page, debouncedSearch);
+  }, [selectedCategory, onSaleOnly, searchParams, debouncedSearch]);
 
   /**
    * Update displayed products
@@ -323,17 +338,13 @@ const Products = () => {
 
   /**
    * Handle search input change
-   * API call happens automatically via useEffect
-   * Resets to page 1 when search term changes
+   * Debounce logic in useEffect waits 500ms before API call
+   * Prevents continuous API calls on every keystroke
    */
   const handleSearchChange = (e) => {
     const value = e.target.value;
     setSearchInput(value);
-    // Reset to page 1 for new search results
-    const newParams = new URLSearchParams(searchParams);
-    newParams.set('page', '1');
-    setSearchParams(newParams);
-    console.log(`[PRODUCTS SEARCH] Searching database for: "${value}"`);
+    console.log(`[PRODUCTS SEARCH] User typing: "${value}"`);
   };
 
   /**
