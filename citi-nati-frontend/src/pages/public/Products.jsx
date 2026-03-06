@@ -160,8 +160,8 @@ const Products = () => {
 
       console.log(`[PRODUCTS FETCH] Page ${page}/${data.pagination?.totalPages || 1} | Total: ${data.pagination?.total || 0} | Category: ${selectedCategory || 'all'}`);
       
-      const products = data.products;
-      setProducts(products);
+      const fetchedProducts = data.products;
+      setProducts(fetchedProducts);
       
       // Update pagination state
       if (data.pagination) {
