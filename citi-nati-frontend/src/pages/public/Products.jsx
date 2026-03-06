@@ -34,7 +34,6 @@ const Products = () => {
   const [error, setError] = useState(null);
   const [searchInput, setSearchInput] = useState(''); // User typing
   const [debouncedSearch, setDebouncedSearch] = useState(''); // API search (debounced)
-  const [loadingProducts, setLoadingProducts] = useState(false); // Smooth loading indicator
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalProducts, setTotalProducts] = useState(0);
@@ -51,13 +50,16 @@ const Products = () => {
 
   /**
    * Fetch products with pagination and filters
-   * Searches entire database, not just current page
-   * Fixed page size of 20 products per page
+   * Searches entire database silently - products remain visible during fetch
+   * No loading indicators or page flicker
    */
   const fetchProducts = async (page = 1, search = '') => {
     try {
-      setLoading(true);
-      setLoadingProducts(true); // Smooth loading indicator for searches
+      // Only show loading spinner for initial page load, not for searches
+      // If we already have products, keep them visible while fetching
+      if (products.length === 0) {
+        setLoading(true);
+      }
       setError(null);
 
       const pageSize = 20; // Fixed page size
@@ -100,10 +102,12 @@ const Products = () => {
     } catch (err) {
       console.error('❌ Error fetching products:', err.message);
       setError(err.message);
-      setProducts([]);
+      // Only clear products on error if it's the first load
+      if (products.length === 0) {
+        setProducts([]);
+      }
     } finally {
       setLoading(false);
-      setLoadingProducts(false);
     }
   };
 
@@ -601,23 +605,6 @@ const Products = () => {
             )}
           </div>
         </div>
-
-        {/* Smooth Loading Indicator for Searches */}
-        {loadingProducts && (
-          <div style={{
-            padding: '1rem',
-            textAlign: 'center',
-            color: '#666',
-            fontSize: '0.95rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.5rem'
-          }}>
-            <i className="fas fa-spinner" style={{ animation: 'spin 1s linear infinite' }}></i>
-            Searching products...
-          </div>
-        )}
 
         {filteredProducts.length === 0 ? (
           <div style={{
