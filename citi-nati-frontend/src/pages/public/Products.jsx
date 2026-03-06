@@ -34,6 +34,7 @@ const Products = () => {
   const [error, setError] = useState(null);
   const [searchInput, setSearchInput] = useState(''); // User typing
   const [debouncedSearch, setDebouncedSearch] = useState(''); // API search (debounced)
+  const [loadingProducts, setLoadingProducts] = useState(false); // Smooth loading indicator
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalProducts, setTotalProducts] = useState(0);
@@ -56,6 +57,7 @@ const Products = () => {
   const fetchProducts = async (page = 1, search = '') => {
     try {
       setLoading(true);
+      setLoadingProducts(true); // Smooth loading indicator for searches
       setError(null);
 
       const pageSize = 20; // Fixed page size
@@ -76,7 +78,7 @@ const Products = () => {
         throw new Error('Invalid response schema: expected { products: [...] }');
       }
 
-      console.log(`[PRODUCTS FETCH] Page ${page}/${data.pagination?.totalPages || 1} | Total: ${data.pagination?.total || 0} | Category: ${selectedCategory || 'all'}`);
+      console.log(`[PRODUCTS FETCH] Page ${page}/${data.pagination?.totalPages || 1} | Total: ${data.pagination?.total || 0} | Search: "${search}" | Category: ${selectedCategory || 'all'}`);
       
       // Products come directly from database (single source of truth)
       // No deduplication needed - database handles it
@@ -101,6 +103,7 @@ const Products = () => {
       setProducts([]);
     } finally {
       setLoading(false);
+      setLoadingProducts(false);
     }
   };
 
@@ -598,6 +601,24 @@ const Products = () => {
             )}
           </div>
         </div>
+
+        {/* Smooth Loading Indicator for Searches */}
+        {loadingProducts && (
+          <div style={{
+            padding: '1rem',
+            textAlign: 'center',
+            color: '#666',
+            fontSize: '0.95rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem'
+          }}>
+            <i className="fas fa-spinner" style={{ animation: 'spin 1s linear infinite' }}></i>
+            Searching products...
+          </div>
+        )}
+
         {filteredProducts.length === 0 ? (
           <div style={{
             textAlign: 'center',
