@@ -34,7 +34,6 @@ const Products = () => {
   const [error, setError] = useState(null);
   const [searchInput, setSearchInput] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
   const [totalPages, setTotalPages] = useState(1);
   const [totalProducts, setTotalProducts] = useState(0);
   const { isAuthenticated, logout } = useAuth();
@@ -50,12 +49,14 @@ const Products = () => {
 
   /**
    * Fetch products with pagination and filters
-   * Uses cache API for faster queries (no search, no onSale filter)
+   * Fixed page size of 20 products per page
    */
   const fetchProducts = async (page = 1) => {
     try {
       setLoading(true);
       setError(null);
+
+      const pageSize = 20; // Fixed page size
 
       // Build query params with pagination
       const params = new URLSearchParams();
@@ -123,11 +124,11 @@ const Products = () => {
     selectedCategoryRef.current = selectedCategory;
   }, [selectedCategory]);
 
-  // Fetch products when category, promotion filters, or pageSize changes
+  // Fetch products when category, promotion filters change
   useEffect(() => {
     const page = parseInt(searchParams.get('page')) || 1;
     fetchProducts(page);
-  }, [selectedCategory, onSaleOnly, pageSize, searchParams]);
+  }, [selectedCategory, onSaleOnly, searchParams]);
 
   /**
    * Client-side AND search filtering
@@ -266,7 +267,7 @@ const Products = () => {
       const handlePOSProductUpdate = (syncedProduct) => {
         console.log('[PRODUCTS] 📦 POS product update:', { id: syncedProduct.id, name: syncedProduct.name, sourceCode: syncedProduct.sourceCode, category: syncedProduct.category });
         
-        // If a category filter is active, only update/add products from that category
+        // If a category filter is active, only update products from that category
         if (selectedCategoryRef.current && syncedProduct.category !== selectedCategoryRef.current) {
           console.log('[PRODUCTS] ⏭️ SKIPPING POS update - Product category mismatch:', syncedProduct.category, 'vs selected:', selectedCategoryRef.current);
           return; // Skip products from other categories when filter is active
@@ -290,26 +291,22 @@ const Products = () => {
           }
           
           if (matched >= 0) {
-            // Update existing product - THIS REPLACES IT, NOT ADDS
-            console.log('[PRODUCTS] ✅ UPDATED (not duplicated):', syncedProduct.name, 'ID:', syncedProduct.id);
+            // Update existing product - only update stock/price to avoid breaking pagination
+            console.log('[PRODUCTS] ✅ UPDATED:', syncedProduct.name, 'ID:', syncedProduct.id);
             const updated = [...prevProducts];
             updated[matched] = {
               ...updated[matched],
-              ...syncedProduct,
+              stock: syncedProduct.stock,
+              price: syncedProduct.price,
               finalPrice: syncedProduct.price,
             };
             return updated;
           } else {
-            // Check for duplicate by name before adding
-            const dupCheck = prevProducts.find(p => p.name === syncedProduct.name && p.sourceCode === syncedProduct.sourceCode);
-            if (dupCheck) {
-              console.log('[PRODUCTS] ⚠️ DUPLICATE DETECTED - SKIPPING:', syncedProduct.name);
-              return prevProducts; // Don't add duplicate
-            }
-            
-            // New product - add it
-            console.log('[PRODUCTS] ➕ NEW PRODUCT:', syncedProduct.name, 'ID:', syncedProduct.id);
-            return [...prevProducts, { ...syncedProduct, finalPrice: syncedProduct.price }];
+            // New product detected during sync - refetch current page to maintain pagination
+            console.log('[PRODUCTS] 📄 New product detected - refetching current page to maintain pagination');
+            // Schedule a refetch of the current page to include the new product
+            setTimeout(() => fetchProducts(currentPage), 100);
+            return prevProducts; // Don't add locally to avoid pagination issues
           }
         });
       };
@@ -400,19 +397,6 @@ const Products = () => {
     params.set('page', newPage);
     setSearchParams(params);
     fetchProducts(newPage);
-  };
-
-  /**
-   * Handle page size change
-   */
-  const handlePageSizeChange = (e) => {
-    const newSize = parseInt(e.target.value);
-    setPageSize(newSize);
-    // Reset to page 1 when changing page size
-    const params = new URLSearchParams(searchParams);
-    params.set('page', '1');
-    setSearchParams(params);
-    fetchProducts(1);
   };
 
   /**
@@ -595,52 +579,6 @@ const Products = () => {
                 <option key={cat} value={cat}>{cat}</option>
               ))}
             </select>
-
-            {/* Page Size Selector */}
-            <div style={{ 
-              flex: '0 0 auto',
-              minWidth: '140px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}>
-              <label htmlFor="pageSize" style={{ 
-                marginRight: '0.25rem',
-                fontSize: '0.9rem',
-                color: '#666',
-                whiteSpace: 'nowrap'
-              }}>
-                Per page:
-              </label>
-              <select 
-                id="pageSize"
-                value={pageSize} 
-                onChange={handlePageSizeChange}
-                style={{
-                  padding: '0.6rem 0.75rem',
-                  borderRadius: '4px',
-                  border: 'none',
-                  backgroundColor: '#f5f5f5',
-                  cursor: 'pointer',
-                  fontSize: '0.95rem',
-                  flex: '1',
-                  transition: 'box-shadow 0.3s ease, background-color 0.3s ease'
-                }}
-                onFocus={(e) => {
-                  e.target.style.backgroundColor = '#fff';
-                  e.target.style.boxShadow = '0 4px 12px rgba(91, 75, 138, 0.2)';
-                }}
-                onBlur={(e) => {
-                  e.target.style.backgroundColor = '#f5f5f5';
-                  e.target.style.boxShadow = 'none';
-                }}
-              >
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
-            </div>
 
             {/* Clear Filters Button */}
             {(searchInput || selectedCategory) && (
