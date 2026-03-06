@@ -76,7 +76,7 @@ const AdminStocks = () => {
   // more rows are returned and merges them into a single list.
   const fetchProducts = async () => {
     try {
-      setLoading(true);
+      if (allProducts.length === 0) setLoading(true);
       let page = 1;
       const perPage = 100; // server limit
       let collected = [];

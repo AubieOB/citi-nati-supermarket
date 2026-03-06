@@ -46,6 +46,8 @@ const Products = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null); // Only for browsing errors, NOT search errors
   const [searchInput, setSearchInput] = useState(''); // User typing (instant)
+  const [suggestions, setSuggestions] = useState([]); // autocomplete list
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalProducts, setTotalProducts] = useState(0);
@@ -56,7 +58,9 @@ const Products = () => {
   // Refs for predictive search with caching and cancellation
   const searchCacheRef = useRef(new Map()); // Cache previous search results
   const abortControllerRef = useRef(null); // Cancel previous requests
-  const debounceTimerRef = useRef(null); // Debounce timer
+  const debounceTimerRef = useRef(null); // Debounce timer for product search
+  const suggestTimerRef = useRef(null); // Debounce timer for suggestions
+  const suggestionRef = useRef(null); // click-outside container
   const selectedCategoryRef = useRef(''); // Track selected category in socket handlers
   const productsRef = useRef([]); // Keep products in ref for search callback
   const selectedCategorySearchRef = useRef(''); // Keep category for search callback
@@ -79,6 +83,28 @@ const Products = () => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
+
+    // -------------------- SUGGESTIONS --------------------
+    // fetch name suggestions in parallel (debounced 200ms)
+    if (suggestTimerRef.current) {
+      clearTimeout(suggestTimerRef.current);
+    }
+    suggestTimerRef.current = setTimeout(async () => {
+      if (!query || query.length < 2) {
+        setSuggestions([]);
+        setShowSuggestions(false);
+        return;
+      }
+      try {
+        const resp = await api.get(`/products/suggestions?q=${encodeURIComponent(query)}`);
+        const data = resp.data || [];
+        setSuggestions(data.slice(0, 8));
+        setShowSuggestions(data.length > 0);
+      } catch (e) {
+        console.warn('[SUGGESTIONS] fetch failed', e.message);
+      }
+    }, 200);
+    // ----------------------------------------------------
 
     // Check cache first - return instantly if cached
     if (query && searchCacheRef.current.has(query)) {
@@ -233,7 +259,21 @@ const Products = () => {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
+      if (suggestTimerRef.current) {
+        clearTimeout(suggestTimerRef.current);
+      }
     };
+  }, []);
+
+  // hide suggestion dropdown when clicking outside of it
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (suggestionRef.current && !suggestionRef.current.contains(e.target)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
   // Update refs whenever state changes (for use in search callback closures)
@@ -626,10 +666,11 @@ const Products = () => {
           className="products-filters"
           >
             {/* Search Input */}
-            <div style={{ 
+            <div ref={suggestionRef} style={{ 
               flex: '0 0 auto',
               maxWidth: '300px',
-              minWidth: '160px'
+              minWidth: '160px',
+              position: 'relative' // for dropdown positioning
             }}>
               <input
                 type="text"
@@ -649,12 +690,51 @@ const Products = () => {
                 onFocus={(e) => {
                   e.target.style.backgroundColor = '#fff';
                   e.target.style.boxShadow = '0 4px 12px rgba(91, 75, 138, 0.2)';
+                  if (suggestions.length) setShowSuggestions(true);
                 }}
                 onBlur={(e) => {
                   e.target.style.backgroundColor = '#f5f5f5';
                   e.target.style.boxShadow = 'none';
                 }}
               />
+
+              {/* suggestions dropdown */}
+              {showSuggestions && suggestions.length > 0 && (
+                <ul style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  backgroundColor: '#fff',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  marginTop: '0.25rem',
+                  maxHeight: '240px',
+                  overflowY: 'auto',
+                  zIndex: 1000,
+                  listStyle: 'none',
+                  padding: 0
+                }}>
+                  {suggestions.map((sugg, idx) => (
+                    <li
+                      key={idx}
+                      onMouseDown={(e) => { // use mouseDown to prevent blur before click
+                        e.preventDefault();
+                        setSearchInput(sugg);
+                        handlePredictiveSearch(sugg);
+                        setShowSuggestions(false);
+                      }}
+                      style={{
+                        padding: '0.5rem 0.75rem',
+                        cursor: 'pointer',
+                        borderBottom: idx < suggestions.length - 1 ? '1px solid #eee' : 'none'
+                      }}
+                    >
+                      {sugg}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             {/* Category Filter */}

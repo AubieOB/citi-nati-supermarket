@@ -98,7 +98,8 @@ const AdminOrders = () => {
 
   const fetchOrders = async () => {
     try {
-      setLoading(true);
+      // only show loading spinner if we have no orders yet
+      if (orders.length === 0) setLoading(true);
       setError(null);
       const response = await api.get('/admin/orders');
       setOrders(response.data.orders || []);

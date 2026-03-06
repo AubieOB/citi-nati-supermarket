@@ -91,7 +91,10 @@ const DriverDashboard = () => {
    */
   const fetchDriverOrders = useCallback(async () => {
     try {
-      setLoading(true);
+      // don't clear existing orders unless this is the first load
+      if (assignedOrders.length === 0 && inTransitOrders.length === 0 && completedOrders.length === 0) {
+        setLoading(true);
+      }
       setError(null);
       const response = await api.get('/drivers/orders');
       const orders = response.data.orders || [];
@@ -106,7 +109,7 @@ const DriverDashboard = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [assignedOrders, inTransitOrders, completedOrders]);
 
   /**
    * Listen for real-time order updates assigned to this driver

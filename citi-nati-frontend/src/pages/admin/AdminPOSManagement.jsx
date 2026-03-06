@@ -38,7 +38,8 @@ const AdminPOSManagement = () => {
    */
   const fetchProducts = async (searchValue = '', pageNum = 1) => {
     try {
-      setLoading(true);
+      // only show spinner if we have no data yet
+      if (products.length === 0) setLoading(true);
       setError(null);
 
       const params = new URLSearchParams();

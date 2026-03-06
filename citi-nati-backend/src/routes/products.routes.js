@@ -1,5 +1,5 @@
 const express = require('express');
-const { createProduct, getProducts, getProductById, updateProduct, deleteProduct, syncFromPOS, syncProductsFromPOSAgent, deletePOSProducts, getCategories, toggleProductVisibility } = require('../controllers/product.controller');
+const { createProduct, getProducts, getProductById, updateProduct, deleteProduct, syncFromPOS, syncProductsFromPOSAgent, deletePOSProducts, getCategories, toggleProductVisibility, getProductSuggestions } = require('../controllers/product.controller');
 const { verifyTokenMiddleware } = require('../middleware/auth.middleware');
 const { verifyAdmin } = require('../middleware/admin.middleware');
 const uploadProductImage = require('../middlewares/uploadProductImageCloudinary');
@@ -8,6 +8,9 @@ const router = express.Router();
 
 // GET /api/products/categories - Fetch all distinct categories
 router.get('/categories', getCategories);
+
+// GET /api/products/suggestions?q=... - Autocomplete search
+router.get('/suggestions', getProductSuggestions);
 
 // GET /api/products - Fetch all products (with pagination, filtering, category)
 router.get('/', getProducts);

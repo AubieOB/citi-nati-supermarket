@@ -110,7 +110,8 @@ const AdminProducts = () => {
 
   const fetchProducts = async () => {
     try {
-      setLoading(true);
+      // show spinner only on first load
+      if (products.length === 0) setLoading(true);
       setError(null);
 
       // iterate pages because API caps pageSize at 100
