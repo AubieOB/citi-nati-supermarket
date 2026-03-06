@@ -15,6 +15,19 @@ import { useModal } from '../../hooks/useModal.js';
 import '../../styles/global.css';
 
 /**
+ * HELPER FUNCTIONS - Defined before component
+ */
+
+/**
+ * Calculate discount percentage
+ */
+function calculateDiscount(originalPrice, finalPrice) {
+  if (!originalPrice || !finalPrice) return 0;
+  const discount = ((originalPrice - finalPrice) / originalPrice) * 100;
+  return Math.round(discount);
+}
+
+/**
  * Products Page - Enhanced with Search, Filters, and Promotions
  * 
  * Features:

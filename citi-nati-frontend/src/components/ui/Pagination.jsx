@@ -1,5 +1,34 @@
 import React from 'react';
 
+const styles = {
+  container: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: '15px',
+    marginTop: '30px',
+    marginBottom: '30px',
+  },
+  button: {
+    padding: '8px 16px',
+    backgroundColor: '#007bff',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+    transition: 'background-color 0.3s ease',
+  },
+  pageInfo: {
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#333',
+    minWidth: '100px',
+    textAlign: 'center',
+  },
+};
+
 const Pagination = ({ currentPage, totalPages, onPageChange }) => {
   const handlePrevious = () => {
     if (currentPage > 1) {
@@ -44,35 +73,6 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
       </button>
     </div>
   );
-};
-
-const styles = {
-  container: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: '15px',
-    marginTop: '30px',
-    marginBottom: '30px',
-  },
-  button: {
-    padding: '8px 16px',
-    backgroundColor: '#007bff',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '500',
-    transition: 'background-color 0.3s ease',
-  },
-  pageInfo: {
-    fontSize: '14px',
-    fontWeight: '500',
-    color: '#333',
-    minWidth: '100px',
-    textAlign: 'center',
-  },
 };
 
 export default Pagination;
