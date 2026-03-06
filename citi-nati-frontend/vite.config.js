@@ -22,6 +22,16 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     minify: 'esbuild',
-    chunkSizeWarningLimit: 1000,
+    chunkSizeWarningLimit: 1500,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor': ['react', 'react-dom', 'react-router-dom'],
+          'auth': ['./src/context/AuthContext.jsx', './src/context/CartContext.jsx'],
+          'admin': ['./src/pages/admin/AdminDashboard.jsx', './src/components/admin/AdminProducts.jsx', './src/components/admin/AdminStocks.jsx', './src/components/admin/AdminPOSManagement.jsx'],
+          'pages': ['./src/pages/public/Products.jsx', './src/pages/public/Orders.jsx', './src/pages/public/Login.jsx'],
+        },
+      },
+    },
   },
 });

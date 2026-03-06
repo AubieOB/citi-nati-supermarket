@@ -1,17 +1,20 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import AdminProducts from '../../components/admin/AdminProducts.jsx';
-import AdminOrders from '../../components/admin/AdminOrders.jsx';
-import AdminUsers from '../../components/admin/AdminUsers.jsx';
-import AdminDrivers from '../../components/admin/AdminDrivers.jsx';
-import AdminSales from '../../components/admin/AdminSales.jsx';
-import AdminInbox from '../../components/admin/AdminInbox.jsx';
-import AdminRefunds from '../../components/admin/AdminRefunds.jsx';
-import AdminPromotions from '../../components/admin/AdminPromotions.jsx';
-import AdminStocks from '../../components/admin/AdminStocks.jsx';
-import AdminPOSManagement from './AdminPOSManagement.jsx';
-import SupportDashboard from './SupportDashboard.jsx';
+
+// Lazy load admin components to reduce bundle size
+const AdminProducts = React.lazy(() => import('../../components/admin/AdminProducts.jsx'));
+const AdminOrders = React.lazy(() => import('../../components/admin/AdminOrders.jsx'));
+const AdminUsers = React.lazy(() => import('../../components/admin/AdminUsers.jsx'));
+const AdminDrivers = React.lazy(() => import('../../components/admin/AdminDrivers.jsx'));
+const AdminSales = React.lazy(() => import('../../components/admin/AdminSales.jsx'));
+const AdminInbox = React.lazy(() => import('../../components/admin/AdminInbox.jsx'));
+const AdminRefunds = React.lazy(() => import('../../components/admin/AdminRefunds.jsx'));
+const AdminPromotions = React.lazy(() => import('../../components/admin/AdminPromotions.jsx'));
+const AdminStocks = React.lazy(() => import('../../components/admin/AdminStocks.jsx'));
+const AdminPOSManagement = React.lazy(() => import('./AdminPOSManagement.jsx'));
+const SupportDashboard = React.lazy(() => import('./SupportDashboard.jsx'));
+
 import { useOrderUpdates } from '../../hooks/useOrderUpdates.js';
 import '../../styles/global.css';
 import '../../styles/admin-dashboard.css';
@@ -185,17 +188,19 @@ const AdminDashboard = () => {
       <div className="admin-main-content">
         {/* Scrollable Content */}
         <div className="admin-content-area">
-          {activeTab === 'inbox' && <AdminInbox />}
-          {activeTab === 'products' && <AdminProducts />}
-          {activeTab === 'stocks' && <AdminStocks />}
-          {activeTab === 'promotions' && <AdminPromotions />}
-          {activeTab === 'pos-management' && <AdminPOSManagement />}
-          {activeTab === 'orders' && <AdminOrders />}
-          {activeTab === 'users' && <AdminUsers />}
-          {activeTab === 'sales' && <AdminSales />}
-          {activeTab === 'refunds' && <AdminRefunds />}
-          {activeTab === 'support' && <SupportDashboard />}
-          {activeTab === 'drivers' && <AdminDrivers />}
+          <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>Loading...</div>}>
+            {activeTab === 'inbox' && <AdminInbox />}
+            {activeTab === 'products' && <AdminProducts />}
+            {activeTab === 'stocks' && <AdminStocks />}
+            {activeTab === 'promotions' && <AdminPromotions />}
+            {activeTab === 'pos-management' && <AdminPOSManagement />}
+            {activeTab === 'orders' && <AdminOrders />}
+            {activeTab === 'users' && <AdminUsers />}
+            {activeTab === 'sales' && <AdminSales />}
+            {activeTab === 'refunds' && <AdminRefunds />}
+            {activeTab === 'support' && <SupportDashboard />}
+            {activeTab === 'drivers' && <AdminDrivers />}
+          </Suspense>
         </div>
       </div>
     </div>

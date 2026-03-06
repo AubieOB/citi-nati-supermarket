@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { GoogleOAuthProvider } from '@react-oauth/google';
@@ -10,33 +10,33 @@ import { initSocket, identifySocket } from './utils/socket.js';
 import { initializeAuth } from './utils/api.js';
 import { useGlobalNotifications } from './hooks/useGlobalNotifications.js';
 
-// Public Pages
-import Home from './pages/public/Home.jsx';
-import Login from './pages/public/Login.jsx';
-import Register from './pages/public/Register.jsx';
-import VerifyEmail from './pages/public/VerifyEmail.jsx';
-import ForgotPassword from './pages/public/ForgotPassword.jsx';
-import ResetPassword from './pages/public/ResetPassword.jsx';
-import Products from './pages/public/Products.jsx';
-import Cart from './pages/public/Cart.jsx';
-import Checkout from './pages/public/Checkout.jsx';
-import MyOrders from './pages/public/MyOrders.jsx';
-import PaymentSuccess from './pages/public/PaymentSuccess.jsx';
-import About from './pages/public/About.jsx';
-import HelpCenter from './pages/public/HelpCenter.jsx';
-import Contact from './pages/public/Contact.jsx';
-import FAQs from './pages/public/FAQs.jsx';
-import Terms from './pages/public/Terms.jsx';
-import Returns from './pages/public/Returns.jsx';
+// Public Pages (lazy loaded)
+const Home = React.lazy(() => import('./pages/public/Home.jsx'));
+const Login = React.lazy(() => import('./pages/public/Login.jsx'));
+const Register = React.lazy(() => import('./pages/public/Register.jsx'));
+const VerifyEmail = React.lazy(() => import('./pages/public/VerifyEmail.jsx'));
+const ForgotPassword = React.lazy(() => import('./pages/public/ForgotPassword.jsx'));
+const ResetPassword = React.lazy(() => import('./pages/public/ResetPassword.jsx'));
+const Products = React.lazy(() => import('./pages/public/Products.jsx'));
+const Cart = React.lazy(() => import('./pages/public/Cart.jsx'));
+const Checkout = React.lazy(() => import('./pages/public/Checkout.jsx'));
+const MyOrders = React.lazy(() => import('./pages/public/MyOrders.jsx'));
+const PaymentSuccess = React.lazy(() => import('./pages/public/PaymentSuccess.jsx'));
+const About = React.lazy(() => import('./pages/public/About.jsx'));
+const HelpCenter = React.lazy(() => import('./pages/public/HelpCenter.jsx'));
+const Contact = React.lazy(() => import('./pages/public/Contact.jsx'));
+const FAQs = React.lazy(() => import('./pages/public/FAQs.jsx'));
+const Terms = React.lazy(() => import('./pages/public/Terms.jsx'));
+const Returns = React.lazy(() => import('./pages/public/Returns.jsx'));
 
-// Admin Pages
-import AdminDashboard from './pages/admin/AdminDashboard.jsx';
+// Admin Pages (lazy loaded)
+const AdminDashboard = React.lazy(() => import('./pages/admin/AdminDashboard.jsx'));
 
-// Driver Pages
-import DriverDashboard from './pages/driver/DriverDashboard.jsx';
+// Driver Pages (lazy loaded)
+const DriverDashboard = React.lazy(() => import('./pages/driver/DriverDashboard.jsx'));
 
 // Not Found
-import NotFound from './pages/NotFound.jsx';
+const NotFound = React.lazy(() => import('./pages/NotFound.jsx'));
 
 // Import global styles
 import './styles/global.css';
@@ -75,50 +75,58 @@ function AppInner() {
   // Set up global notifications for all pages
   useGlobalNotifications();
 
+  const loadingFallback = <div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>Loading...</div>;
+
   return (
-    <Routes>
-      {/* Public Routes */}
-      <Route path="/" element={<Home />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/verify-email" element={<VerifyEmail />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/products" element={<Products />} />
-      <Route path="/cart" element={<Cart />} />
-      <Route path="/checkout" element={<Checkout />} />
-      <Route path="/payment-success" element={<PaymentSuccess />} />
-      <Route path="/my-orders" element={<MyOrders />} />
-      <Route path="/about" element={<About />} />
-      <Route path="/help-center" element={<HelpCenter />} />
-      <Route path="/contact" element={<Contact />} />
-      <Route path="/faqs" element={<FAQs />} />
-      <Route path="/terms" element={<Terms />} />
-      <Route path="/returns" element={<Returns />} />
+    <Suspense fallback={loadingFallback}>
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/" element={<Suspense fallback={loadingFallback}><Home /></Suspense>} />
+        <Route path="/login" element={<Suspense fallback={loadingFallback}><Login /></Suspense>} />
+        <Route path="/register" element={<Suspense fallback={loadingFallback}><Register /></Suspense>} />
+        <Route path="/verify-email" element={<Suspense fallback={loadingFallback}><VerifyEmail /></Suspense>} />
+        <Route path="/forgot-password" element={<Suspense fallback={loadingFallback}><ForgotPassword /></Suspense>} />
+        <Route path="/reset-password" element={<Suspense fallback={loadingFallback}><ResetPassword /></Suspense>} />
+        <Route path="/products" element={<Suspense fallback={loadingFallback}><Products /></Suspense>} />
+        <Route path="/cart" element={<Suspense fallback={loadingFallback}><Cart /></Suspense>} />
+        <Route path="/checkout" element={<Suspense fallback={loadingFallback}><Checkout /></Suspense>} />
+        <Route path="/payment-success" element={<Suspense fallback={loadingFallback}><PaymentSuccess /></Suspense>} />
+        <Route path="/my-orders" element={<Suspense fallback={loadingFallback}><MyOrders /></Suspense>} />
+        <Route path="/about" element={<Suspense fallback={loadingFallback}><About /></Suspense>} />
+        <Route path="/help-center" element={<Suspense fallback={loadingFallback}><HelpCenter /></Suspense>} />
+        <Route path="/contact" element={<Suspense fallback={loadingFallback}><Contact /></Suspense>} />
+        <Route path="/faqs" element={<Suspense fallback={loadingFallback}><FAQs /></Suspense>} />
+        <Route path="/terms" element={<Suspense fallback={loadingFallback}><Terms /></Suspense>} />
+        <Route path="/returns" element={<Suspense fallback={loadingFallback}><Returns /></Suspense>} />
 
-      {/* Admin Routes */}
-      <Route
-        path="/admin"
-        element={
-          <ProtectedRoute allowedRoles={["admin"]}>
-            <AdminDashboard />
-          </ProtectedRoute>
-        }
-      />
+        {/* Admin Routes */}
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <Suspense fallback={loadingFallback}>
+                <AdminDashboard />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
 
-      {/* Driver Routes */}
-      <Route
-        path="/driver"
-        element={
-          <ProtectedRoute allowedRoles={["driver"]}>
-            <DriverDashboard />
-          </ProtectedRoute>
-        }
-      />
+        {/* Driver Routes */}
+        <Route
+          path="/driver"
+          element={
+            <ProtectedRoute allowedRoles={["driver"]}>
+              <Suspense fallback={loadingFallback}>
+                <DriverDashboard />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
 
-      {/* 404 Not Found */}
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+        {/* 404 Not Found */}
+        <Route path="*" element={<Suspense fallback={loadingFallback}><NotFound /></Suspense>} />
+      </Routes>
+    </Suspense>
   );
 }
 
