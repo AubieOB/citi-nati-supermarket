@@ -651,79 +651,70 @@ const Products = () => {
           </div>
 
           {/* Right: FILTERS SECTION */}
+          {/* SEARCH BAR */}
           <div style={{
-            backgroundColor: '#fff',
-            padding: '1rem',
-            borderRadius: '8px',
-            display: 'flex',
-            gap: '0.75rem',
-            alignItems: 'center',
-            flexWrap: 'nowrap',
-            overflowX: 'auto',
-            whiteSpace: 'nowrap',
-            paddingBottom: '0.5rem'
-          }}
-          className="products-filters"
-          >
-            {/* Search Input */}
-            <div ref={suggestionRef} style={{ 
-              flex: '0 0 auto',
-              maxWidth: '300px',
-              minWidth: '160px',
-              position: 'relative' // for dropdown positioning
-            }}>
-              <input
-                type="text"
-                placeholder="Search products..."
-                value={searchInput}
-                onChange={handleSearchChange}
-                style={{
-                  width: '100%',
-                  padding: '0.6rem 1rem',
-                  border: 'none',
-                  borderRadius: '4px',
-                  fontSize: '0.95rem',
-                  boxSizing: 'border-box',
-                  backgroundColor: '#f5f5f5',
-                  transition: 'box-shadow 0.3s ease, background-color 0.3s ease'
-                }}
-                onFocus={(e) => {
-                  e.target.style.backgroundColor = '#fff';
-                  e.target.style.boxShadow = '0 4px 12px rgba(91, 75, 138, 0.2)';
-                  if (suggestions.length) setShowSuggestions(true);
-                }}
-                onBlur={(e) => {
-                  e.target.style.backgroundColor = '#f5f5f5';
-                  e.target.style.boxShadow = 'none';
-                }}
-              />
-
-              {/* suggestions dropdown */}
-              {showSuggestions && suggestions.length > 0 && (
-                <ul style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  backgroundColor: '#fff',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  marginTop: '0.25rem',
-                  maxHeight: '240px',
-                  overflowY: 'auto',
-                  zIndex: 1000,
-                  listStyle: 'none',
-                  padding: 0
-                }}>
-                  {suggestions.map((sugg, idx) => (
-                    <li
-                      key={idx}
-                      onMouseDown={(e) => { // use mouseDown to prevent blur before click
-                        e.preventDefault();
-                        setSearchInput(sugg);
-                        handlePredictiveSearch(sugg);
-                        setShowSuggestions(false);
-                      }}
+            position: 'relative',
+            marginBottom: '0.75rem',
+            maxWidth: '300px'
+          }} ref={suggestionRef}>
+            <input
+              type="text"
+              placeholder="Search products..."
+              value={searchInput}
+              onChange={handleSearchChange}
+              style={{
+                width: '100%',
+                padding: '0.6rem 1rem',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+                fontSize: '0.95rem',
+                boxSizing: 'border-box',
+                backgroundColor: '#fff',
+                transition: 'box-shadow 0.3s ease, background-color 0.3s ease'
+              }}
+              onFocus={(e) => {
+                e.target.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                if (suggestions.length) setShowSuggestions(true);
+              }}
+              onBlur={(e) => {
+                e.target.style.boxShadow = 'none';
+              }}
+            />
+            {showSuggestions && suggestions.length > 0 && (
+              <ul style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                backgroundColor: '#fff',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                marginTop: '0.25rem',
+                maxHeight: '240px',
+                overflowY: 'auto',
+                zIndex: 2000,
+                listStyle: 'none',
+                padding: 0,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.12)'
+              }}>
+                {suggestions.map((sugg, idx) => (
+                  <li
+                    key={idx}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      setSearchInput(sugg);
+                      handlePredictiveSearch(sugg);
+                      setShowSuggestions(false);
+                    }}
+                    style={{
+                      padding: '0.5rem 0.75rem',
+                      cursor: 'pointer',
+                      borderBottom: idx < suggestions.length - 1 ? '1px solid #eee' : 'none',
+                      fontSize: '0.95rem',
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#fff'}
+                  >
                       style={{
                         padding: '0.5rem 0.75rem',
                         cursor: 'pointer',
