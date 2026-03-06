@@ -715,12 +715,6 @@ const Products = () => {
                     onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
                     onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#fff'}
                   >
-                      style={{
-                        padding: '0.5rem 0.75rem',
-                        cursor: 'pointer',
-                        borderBottom: idx < suggestions.length - 1 ? '1px solid #eee' : 'none'
-                      }}
-                    >
                       {sugg}
                     </li>
                   ))}
