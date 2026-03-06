@@ -424,6 +424,44 @@ router.put('/pos-products/:id/visibility', verifyTokenMiddleware, verifyAdmin, a
 });
 
 /**
+ * PUT /api/admin/pos-products/:id/enabled
+ * Toggle product enabled/disabled status
+ * Body: { enabled: true/false }
+ * Protected: Admin only
+ */
+router.put('/pos-products/:id/enabled', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { enabled } = req.body;
+
+    const product = await prisma.product.update({
+      where: { id: parseInt(id) },
+      data: { enabled: Boolean(enabled) },
+      select: {
+        id: true,
+        name: true,
+        enabled: true,
+      },
+    });
+
+    console.log(`[ADMIN POS] Product ${id} enabled status updated: ${product.enabled ? 'ENABLED' : 'DISABLED'}`);
+
+    res.json({
+      success: true,
+      message: product.enabled ? 'Product enabled and available for purchase' : 'Product disabled',
+      product,
+    });
+  } catch (err) {
+    console.error('[ADMIN POS] Update enabled error:', err.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update product status',
+      details: err.message,
+    });
+  }
+});
+
+/**
  * DELETE /api/admin/pos-products/delete-selected
  * Delete selected product IDs
  * Body: { productIds: [1, 2, 3] }

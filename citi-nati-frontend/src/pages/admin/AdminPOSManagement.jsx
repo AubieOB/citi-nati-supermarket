@@ -12,6 +12,7 @@ import '../../styles/global.css';
  * Features:
  * - View all POS synced products with pagination
  * - Search products by name, sourceCode, or category
+ * - Toggle enabled/disabled status (product availability)
  * - Toggle visibility (hide/show from products page)
  * - Delete selected products
  * - Delete all POS products at once
@@ -102,7 +103,7 @@ const AdminPOSManagement = () => {
   };
 
   /**
-   * Toggle product visibility
+   * Toggle product visibility (hide/show from products page)
    */
   const handleToggleVisibility = async (productId, hideFromProductsPage) => {
     try {
@@ -123,6 +124,33 @@ const AdminPOSManagement = () => {
     } catch (err) {
       console.error('Error updating visibility:', err);
       showError(err.response?.data?.error || 'Failed to update visibility');
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  /**
+   * Toggle product enabled/disabled status
+   */
+  const handleToggleEnabled = async (productId, enabled) => {
+    try {
+      setUpdating(productId);
+      const response = await api.put(`/admin/pos-products/${productId}/enabled`, {
+        enabled: !enabled,
+      });
+
+      if (response.data.success) {
+        // Update local state
+        setProducts(prev => prev.map(p => 
+          p.id === productId 
+            ? { ...p, enabled: !enabled }
+            : p
+        ));
+        showSuccess(response.data.message);
+      }
+    } catch (err) {
+      console.error('Error updating enabled status:', err);
+      showError(err.response?.data?.error || 'Failed to update product status');
     } finally {
       setUpdating(null);
     }
@@ -269,8 +297,9 @@ const AdminPOSManagement = () => {
                     <th style={styles.cell}>Category</th>
                     <th style={styles.cell}>Price</th>
                     <th style={styles.cell}>Stock</th>
-                    <th style={styles.cell}>Status</th>
-                    <th style={styles.cell}>Action</th>
+                    <th style={styles.cell}>Availability</th>
+                    <th style={styles.cell}>Visibility</th>
+                    <th style={styles.cell}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -307,27 +336,61 @@ const AdminPOSManagement = () => {
                         <span style={{
                           padding: '4px 8px',
                           borderRadius: '4px',
+                          backgroundColor: product.enabled ? '#d4edda' : '#f8d7da',
+                          color: product.enabled ? '#155724' : '#721c24',
+                          fontSize: '12px',
+                          fontWeight: 'bold',
+                        }}>
+                          <i style={{ marginRight: '6px' }} className={product.enabled ? 'fas fa-check-circle' : 'fas fa-times-circle'} />
+                          {product.enabled ? 'ACTIVE' : 'DISABLED'}
+                        </span>
+                      </td>
+                      <td style={styles.cell}>
+                        <span style={{
+                          padding: '4px 8px',
+                          borderRadius: '4px',
                           backgroundColor: product.hideFromProductsPage ? '#fff3cd' : '#d4edda',
                           color: product.hideFromProductsPage ? '#856404' : '#155724',
                           fontSize: '12px',
                           fontWeight: 'bold',
                         }}>
-                          {product.hideFromProductsPage ? '🚫 HIDDEN' : '✅ VISIBLE'}
+                          <i style={{ marginRight: '6px' }} className={product.hideFromProductsPage ? 'fas fa-eye-slash' : 'fas fa-eye'} />
+                          {product.hideFromProductsPage ? 'HIDDEN' : 'VISIBLE'}
                         </span>
                       </td>
                       <td style={styles.cell}>
-                        <button
-                          onClick={() => handleToggleVisibility(product.id, product.hideFromProductsPage)}
-                          disabled={updating === product.id}
-                          style={{
-                            ...styles.toggleButton,
-                            backgroundColor: product.hideFromProductsPage ? '#28a745' : '#ffc107',
-                            opacity: updating === product.id ? 0.5 : 1,
-                            cursor: updating === product.id ? 'not-allowed' : 'pointer',
-                          }}
-                        >
-                          {updating === product.id ? '...' : (product.hideFromProductsPage ? 'Show' : 'Hide')}
-                        </button>
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                          <button
+                            onClick={() => handleToggleEnabled(product.id, product.enabled)}
+                            disabled={updating === product.id}
+                            title={product.enabled ? 'Disable this product' : 'Enable this product'}
+                            style={{
+                              ...styles.toggleButton,
+                              backgroundColor: product.enabled ? '#dc3545' : '#28a745',
+                              opacity: updating === product.id ? 0.5 : 1,
+                              cursor: updating === product.id ? 'not-allowed' : 'pointer',
+                              padding: '5px 10px',
+                              fontSize: '11px',
+                            }}
+                          >
+                            {updating === product.id ? '...' : (product.enabled ? 'Disable' : 'Enable')}
+                          </button>
+                          <button
+                            onClick={() => handleToggleVisibility(product.id, product.hideFromProductsPage)}
+                            disabled={updating === product.id}
+                            title={product.hideFromProductsPage ? 'Show on products page' : 'Hide from products page'}
+                            style={{
+                              ...styles.toggleButton,
+                              backgroundColor: product.hideFromProductsPage ? '#28a745' : '#ffc107',
+                              opacity: updating === product.id ? 0.5 : 1,
+                              cursor: updating === product.id ? 'not-allowed' : 'pointer',
+                              padding: '5px 10px',
+                              fontSize: '11px',
+                            }}
+                          >
+                            {updating === product.id ? '...' : (product.hideFromProductsPage ? 'Show' : 'Hide')}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -365,7 +428,10 @@ const AdminPOSManagement = () => {
         {modal.isOpen && (
           <div style={styles.modalOverlay} onClick={closeModal}>
             <div style={styles.modalContent} onClick={e => e.stopPropagation()}>
-              <h2 style={styles.modalTitle}>{modal.type === 'success' ? '✅' : '❌'} {modal.title}</h2>
+              <h2 style={styles.modalTitle}>
+                <i style={{ marginRight: '8px' }} className={modal.type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle'} />
+                {modal.title}
+              </h2>
               <p style={styles.modalMessage}>{modal.message}</p>
               <button onClick={closeModal} style={styles.modalButton}>
                 Close

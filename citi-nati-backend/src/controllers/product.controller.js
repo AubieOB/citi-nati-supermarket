@@ -163,14 +163,15 @@ const createProduct = async (req, res) => {
 const getProducts = async (req, res) => {
   try {
     // Extract query parameters for filtering and pagination
-    const { search, category, onSale, page = '1', pageSize = '20' } = req.query;
+    const { search, category, onSale, page = '1', pageSize = '50' } = req.query;
 
     // Validate pagination params
     const pageNum = Math.max(1, parseInt(page) || 1);
-    const pageSizeNum = Math.min(100, Math.max(1, parseInt(pageSize) || 20));
+    const pageSizeNum = Math.min(100, Math.max(1, parseInt(pageSize) || 50));
+
     const skip = (pageNum - 1) * pageSizeNum;
 
-    // Build where clause for filtering
+    // Build where clause for filtering - single source of truth (Product table)
     const where = {
       isActive: true,
       enabled: true, // Only show enabled products
@@ -198,6 +199,7 @@ const getProducts = async (req, res) => {
     const total = await prisma.product.count({ where });
 
     // Fetch products with filters, pagination, ordered by createdAt descending
+    // Direct query to Products table (single source of truth)
     const products = await prisma.product.findMany({
       where,
       skip,
@@ -208,7 +210,7 @@ const getProducts = async (req, res) => {
     });
 
     // Debug logging
-    console.log(`[PRODUCTS FETCH] Page ${pageNum}, Size ${pageSizeNum}, Total: ${total}, Retrieved: ${products.length}`);
+    console.log(`[PRODUCTS] Page ${pageNum}, Size ${pageSizeNum}, Total: ${total}, Retrieved: ${products.length}, Category: ${category || 'all'}`);
 
     // Map over products and format with computed fields
     const productsWithFormatted = products.map((product) =>
@@ -480,6 +482,7 @@ const syncFromPOS = async (req, res) => {
  * Receive products pushed from POS Sync Agent
  * Called by: POST /api/products/pos-sync/push
  * Authentication: x-pos-secret header
+ * Updates Product table directly (single source of truth)
  */
 const syncProductsFromPOSAgent = async (req, res) => {
   try {
@@ -520,7 +523,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
           continue;
         }
 
-        // Upsert product into database
+        // Upsert product into Product table (single source of truth)
         const result = await prisma.product.upsert(
           {
             where: { sourceCode: product.sourceCode },
@@ -653,10 +656,11 @@ const deletePOSProducts = async (req, res) => {
  */
 const getCategories = async (req, res) => {
   try {
+    // Get all distinct categories from Product table (single source of truth)
     const categories = await prisma.product.findMany({
       where: {
         category: {
-          not: ''
+          not: null
         },
         enabled: true,
         isActive: true
@@ -674,7 +678,7 @@ const getCategories = async (req, res) => {
       .map(c => c.category)
       .filter(c => c && c.trim() !== '');
 
-    console.log(`[CATEGORIES] Retrieved ${categoryList.length} unique categories`);
+    console.log(`[CATEGORIES] Retrieved ${categoryList.length} unique categories from Product table`);
 
     return res.status(200).json({
       categories: categoryList

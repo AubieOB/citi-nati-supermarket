@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Container from '../../components/ui/Container.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -40,6 +40,9 @@ const Products = () => {
   const { isAuthenticated, logout } = useAuth();
   const { updateCartCount } = useCart();
   const { modal, closeModal, showError, showSuccess } = useModal();
+  
+  // Ref to track selected category in socket handlers
+  const selectedCategoryRef = useRef('');
 
   // Filter state from URL params (category and promotion only, not search)
   const selectedCategory = searchParams.get('category') || '';
@@ -47,6 +50,7 @@ const Products = () => {
 
   /**
    * Fetch products with pagination and filters
+   * Uses cache API for faster queries (no search, no onSale filter)
    */
   const fetchProducts = async (page = 1) => {
     try {
@@ -57,6 +61,7 @@ const Products = () => {
       const params = new URLSearchParams();
       params.append('page', page);
       params.append('pageSize', pageSize);
+      
       if (selectedCategory) params.append('category', selectedCategory);
       if (onSaleOnly) params.append('onSale', 'true');
 
@@ -67,27 +72,13 @@ const Products = () => {
         throw new Error('Invalid response schema: expected { products: [...] }');
       }
 
-      // Deduplicate: keep POS products (with sourceCode), remove old admin duplicates (without sourceCode)
-      const deduped = [];
-      const seenNames = new Map();
+      console.log(`[PRODUCTS FETCH] Page ${page}/${data.pagination?.totalPages || 1} | Total: ${data.pagination?.total || 0} | Category: ${selectedCategory || 'all'}`);
       
-      // First pass: collect POS products (with sourceCode)
-      data.products.forEach(p => {
-        if (p.sourceCode) {
-          seenNames.set(p.name, p);
-          deduped.push(p);
-        }
-      });
+      // Products come directly from database (single source of truth)
+      // No deduplication needed - database handles it
+      const products = data.products;
       
-      // Second pass: add non-POS products only if name not already seen
-      data.products.forEach(p => {
-        if (!p.sourceCode && !seenNames.has(p.name)) {
-          deduped.push(p);
-        }
-      });
-      
-      console.log(`[PRODUCTS FETCH] Page ${page}/${data.pagination?.totalPages || 1}`);
-      setProducts(deduped);
+      setProducts(products);
       
       // Update pagination state from backend response
       if (data.pagination) {
@@ -108,6 +99,29 @@ const Products = () => {
       setLoading(false);
     }
   };
+
+  // Fetch categories on component mount
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await api.get('/products/categories');
+        if (response.data.categories) {
+          setCategories(response.data.categories);
+          console.log('[PRODUCTS] Categories loaded:', response.data.categories);
+        }
+      } catch (err) {
+        console.warn('[PRODUCTS] Error fetching categories:', err.message);
+        // Continue without categories - not critical
+      }
+    };
+    
+    fetchCategories();
+  }, []);
+
+  // Update ref whenever selectedCategory changes (for use in socket handlers)
+  useEffect(() => {
+    selectedCategoryRef.current = selectedCategory;
+  }, [selectedCategory]);
 
   // Fetch products when category, promotion filters, or pageSize changes
   useEffect(() => {
@@ -196,6 +210,12 @@ const Products = () => {
       const handleProductUpdate = (updatedProduct) => {
         console.log('[PRODUCTS] 🔄 Product update received:', updatedProduct.name);
         
+        // If a category filter is active, only update products from that category
+        if (selectedCategoryRef.current && updatedProduct.category !== selectedCategoryRef.current) {
+          console.log('[PRODUCTS] ⏭️ SKIPPING update - Product category mismatch:', updatedProduct.category, 'vs selected:', selectedCategoryRef.current);
+          return; // Skip products from other categories when filter is active
+        }
+        
         // Update the products list with complete product details
         setProducts(prevProducts =>
           prevProducts.map(product =>
@@ -244,7 +264,13 @@ const Products = () => {
       };
 
       const handlePOSProductUpdate = (syncedProduct) => {
-        console.log('[PRODUCTS] 📦 POS product update:', { id: syncedProduct.id, name: syncedProduct.name, sourceCode: syncedProduct.sourceCode });
+        console.log('[PRODUCTS] 📦 POS product update:', { id: syncedProduct.id, name: syncedProduct.name, sourceCode: syncedProduct.sourceCode, category: syncedProduct.category });
+        
+        // If a category filter is active, only update/add products from that category
+        if (selectedCategoryRef.current && syncedProduct.category !== selectedCategoryRef.current) {
+          console.log('[PRODUCTS] ⏭️ SKIPPING POS update - Product category mismatch:', syncedProduct.category, 'vs selected:', selectedCategoryRef.current);
+          return; // Skip products from other categories when filter is active
+        }
         
         setProducts(prevProducts => {
           // Try matching by ID first (most reliable)
