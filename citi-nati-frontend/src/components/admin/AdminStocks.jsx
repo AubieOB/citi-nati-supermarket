@@ -430,7 +430,6 @@ const AdminStocks = () => {
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'center' }}>
                       <span style={{
-                        display: 'inline-block',
                         padding: '0.5rem 0.75rem',
                         borderRadius: '20px',
                         backgroundColor: status.color + '20',

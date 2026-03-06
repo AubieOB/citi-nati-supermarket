@@ -29,7 +29,7 @@ export default defineConfig({
           'vendor': ['react', 'react-dom', 'react-router-dom'],
           'auth': ['./src/context/AuthContext.jsx', './src/context/CartContext.jsx'],
           'admin': ['./src/pages/admin/AdminDashboard.jsx', './src/components/admin/AdminProducts.jsx', './src/components/admin/AdminStocks.jsx', './src/pages/admin/AdminPOSManagement.jsx'],
-          'pages': ['./src/pages/public/Products.jsx', './src/pages/public/Orders.jsx', './src/pages/public/Login.jsx'],
+          'pages': ['./src/pages/public/Products.jsx', './src/pages/public/Login.jsx'],
         },
       },
     },
