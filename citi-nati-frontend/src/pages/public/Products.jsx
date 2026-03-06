@@ -131,38 +131,18 @@ const Products = () => {
   }, [selectedCategory, onSaleOnly, searchParams]);
 
   /**
-   * Client-side AND search filtering
-   * Split search term by spaces and show products matching ALL terms
-   * Also filters out products marked as hideFromProductsPage
+   * Update displayed products based on filters
+   * Shows search results if search is active, otherwise shows paginated products
    */
   useEffect(() => {
-    if (!searchInput.trim()) {
-      // Filter out hidden products even when no search
-      const visible = products.filter(p => !p.hideFromProductsPage);
-      setFilteredProducts(visible);
+    if (searchInput.trim()) {
+      // Search results are already in filteredProducts (fetched by API)
       return;
     }
-
-    const searchTerms = searchInput
-      .toLowerCase()
-      .trim()
-      .split(/\s+/)
-      .filter(term => term.length > 0);
-
-    const filtered = products.filter(product => {
-      // Skip hidden products
-      if (product.hideFromProductsPage) return false;
-
-      const productName = product.name.toLowerCase();
-      const productCategory = (product.category || '').toLowerCase();
-      
-      // AND search: match if product matches ALL search terms
-      return searchTerms.every(term => 
-        productName.includes(term) || productCategory.includes(term)
-      );
-    });
-
-    setFilteredProducts(filtered);
+    
+    // No search active - show current page products, filter out hidden ones
+    const visible = products.filter(p => !p.hideFromProductsPage);
+    setFilteredProducts(visible);
   }, [searchInput, products]);
 
   /**
@@ -345,18 +325,63 @@ const Products = () => {
   }, []);
 
   /**
-   * Calculate discount percentage
+   * Fetch ALL products matching search term (no pagination)
+   * Used for global search across all products
    */
-  const calculateDiscount = (original, discounted) => {
-    if (!original || !discounted) return 0;
-    return Math.round(((original - discounted) / original) * 100);
+  const fetchSearchResults = async (searchTerm) => {
+    try {
+      if (!searchTerm.trim()) {
+        setFilteredProducts([]);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      // Build query params - fetch ALL matching products by using large pageSize
+      const params = new URLSearchParams();
+      params.append('search', searchTerm);
+      params.append('page', '1');
+      params.append('pageSize', '1000'); // Fetch up to 1000 products for search
+
+      const response = await api.get(`/products?${params.toString()}`);
+      const data = response.data;
+
+      if (!data.products || !Array.isArray(data.products)) {
+        throw new Error('Invalid response schema');
+      }
+
+      console.log(`[PRODUCTS SEARCH] Found ${data.products.length} matching products for: "${searchTerm}"`);
+
+      // Filter out hidden products and apply additional filtering
+      const visible = data.products.filter(p => !p.hideFromProductsPage);
+      setFilteredProducts(visible);
+      setTotalProducts(data.pagination?.total || visible.length);
+      
+    } catch (err) {
+      console.error('❌ Error searching products:', err.message);
+      setError(err.message);
+      setFilteredProducts([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   /**
-   * Handle search input change - real-time OR search
+   * Handle search input change
+   * Debounced search to avoid too many API calls
    */
   const handleSearchChange = (e) => {
-    setSearchInput(e.target.value);
+    const value = e.target.value;
+    setSearchInput(value);
+    
+    // Fetch all matching products when user types
+    if (value.trim()) {
+      fetchSearchResults(value);
+    } else {
+      // If search is cleared, reset to current page products
+      setFilteredProducts([]);
+    }
   };
 
   /**

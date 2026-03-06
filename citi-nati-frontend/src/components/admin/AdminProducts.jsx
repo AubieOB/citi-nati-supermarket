@@ -108,7 +108,8 @@ const AdminProducts = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get('/products');
+      // Request maximum allowed products per page (100) to show all products
+      const response = await api.get('/products?pageSize=1000');
       
       // Sort by expiry status for visibility
       const sorted = (response.data.products || []).sort((a, b) => {
@@ -129,6 +130,7 @@ const AdminProducts = () => {
       });
       
       setProducts(sorted);
+      console.log('[AdminProducts] Loaded', sorted.length, 'total products');
     } catch (err) {
       console.error('Error fetching products:', err);
       setError(err.response?.data?.error || 'Failed to load products');
