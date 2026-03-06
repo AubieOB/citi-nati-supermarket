@@ -167,7 +167,7 @@ const getProducts = async (req, res) => {
 
     // Validate pagination params
     const pageNum = Math.max(1, parseInt(page) || 1);
-    const pageSizeNum = Math.min(100, Math.max(1, parseInt(pageSize) || 50));
+    const pageSizeNum = Math.min(5000, Math.max(1, parseInt(pageSize) || 50));
 
     const skip = (pageNum - 1) * pageSizeNum;
 
