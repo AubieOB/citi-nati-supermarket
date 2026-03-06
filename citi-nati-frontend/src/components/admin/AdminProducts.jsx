@@ -1018,7 +1018,6 @@ const AdminProducts = () => {
               })}
             </tbody>
           </table>
-          </div>
 
           {/* Pagination */}
           {totalPages > 1 && (
@@ -1030,6 +1029,7 @@ const AdminProducts = () => {
               />
             </div>
           )}
+          </div>
         )
       )}
       <Modal
