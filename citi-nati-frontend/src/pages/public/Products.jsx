@@ -325,62 +325,26 @@ const Products = () => {
   }, []);
 
   /**
-   * Fetch ALL products matching search term (no pagination)
-   * Used for global search across all products
-   */
-  const fetchSearchResults = async (searchTerm) => {
-    try {
-      if (!searchTerm.trim()) {
-        setFilteredProducts([]);
-        return;
-      }
-
-      setLoading(true);
-      setError(null);
-
-      // Build query params - fetch ALL matching products by using large pageSize
-      const params = new URLSearchParams();
-      params.append('search', searchTerm);
-      params.append('page', '1');
-      params.append('pageSize', '1000'); // Fetch up to 1000 products for search
-
-      const response = await api.get(`/products?${params.toString()}`);
-      const data = response.data;
-
-      if (!data.products || !Array.isArray(data.products)) {
-        throw new Error('Invalid response schema');
-      }
-
-      console.log(`[PRODUCTS SEARCH] Found ${data.products.length} matching products for: "${searchTerm}"`);
-
-      // Filter out hidden products and apply additional filtering
-      const visible = data.products.filter(p => !p.hideFromProductsPage);
-      setFilteredProducts(visible);
-      setTotalProducts(data.pagination?.total || visible.length);
-      
-    } catch (err) {
-      console.error('❌ Error searching products:', err.message);
-      setError(err.message);
-      setFilteredProducts([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /**
    * Handle search input change
-   * Debounced search to avoid too many API calls
+   * Client-side filtering - no API calls, just filter existing products
    */
   const handleSearchChange = (e) => {
     const value = e.target.value;
     setSearchInput(value);
     
-    // Fetch all matching products when user types
     if (value.trim()) {
-      fetchSearchResults(value);
+      // Filter products on client-side - search by name (case-insensitive)
+      const searchTerm = value.toLowerCase();
+      const results = products.filter(p => 
+        !p.hideFromProductsPage &&
+        p.name.toLowerCase().includes(searchTerm)
+      );
+      console.log(`[PRODUCTS SEARCH] Found ${results.length} matching products for: "${value}"`);
+      setFilteredProducts(results);
     } else {
       // If search is cleared, reset to current page products
-      setFilteredProducts([]);
+      const visible = products.filter(p => !p.hideFromProductsPage);
+      setFilteredProducts(visible);
     }
   };
 
