@@ -67,7 +67,7 @@ const AdminStocks = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/products');
+      const response = await api.get('/products?pageSize=5000');
       setProducts(response.data.products || []);
       
       // Extract unique categories

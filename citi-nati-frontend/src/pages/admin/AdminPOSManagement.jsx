@@ -26,7 +26,7 @@ const AdminPOSManagement = () => {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
-  const [limit] = useState(20);
+  const [limit] = useState(5000);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const { modal, closeModal, showError, showSuccess } = useModal();

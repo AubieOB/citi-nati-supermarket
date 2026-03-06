@@ -330,7 +330,7 @@ router.post('/promotions/:type', verifyTokenMiddleware, verifyAdmin, updatePromo
  */
 router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
   try {
-    const { search = '', page = 1, limit = 20 } = req.query;
+    const { search = '', page = 1, limit = 5000 } = req.query;
     const skip = (page - 1) * limit;
 
     // Build where clause
