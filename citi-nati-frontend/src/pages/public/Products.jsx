@@ -45,6 +45,9 @@ const Products = () => {
   const abortControllerRef = useRef(null); // Cancel previous requests
   const debounceTimerRef = useRef(null); // Debounce timer
   const selectedCategoryRef = useRef(''); // Track selected category in socket handlers
+  const productsRef = useRef([]); // Keep products in ref for search callback
+  const selectedCategorySearchRef = useRef(''); // Keep category for search callback
+  const onSaleOnlyRef = useRef(false); // Keep sale filter for search callback
 
   // Filter state from URL params (category and promotion only, not search)
   const selectedCategory = searchParams.get('category') || '';
@@ -76,7 +79,7 @@ const Products = () => {
     debounceTimerRef.current = setTimeout(() => {
       if (!query.trim()) {
         // No search term - show all products
-        const visible = products.filter(p => !p.hideFromProductsPage);
+        const visible = productsRef.current.filter(p => !p.hideFromProductsPage);
         setFilteredProducts(visible);
         return;
       }
@@ -97,8 +100,8 @@ const Products = () => {
           params.append('page', '1');
           params.append('pageSize', pageSize);
           params.append('search', query);
-          if (selectedCategory) params.append('category', selectedCategory);
-          if (onSaleOnly) params.append('onSale', 'true');
+          if (selectedCategorySearchRef.current) params.append('category', selectedCategorySearchRef.current);
+          if (onSaleOnlyRef.current) params.append('onSale', 'true');
 
           const response = await api.get(`/products?${params.toString()}`, {
             signal: abortControllerRef.current.signal
@@ -216,10 +219,19 @@ const Products = () => {
     };
   }, []);
 
-  // Update ref whenever selectedCategory changes (for use in socket handlers)
+  // Update refs whenever state changes (for use in search callback closures)
   useEffect(() => {
     selectedCategoryRef.current = selectedCategory;
+    selectedCategorySearchRef.current = selectedCategory;
   }, [selectedCategory]);
+
+  useEffect(() => {
+    productsRef.current = products;
+  }, [products]);
+
+  useEffect(() => {
+    onSaleOnlyRef.current = onSaleOnly;
+  }, [onSaleOnly]);
 
   // Initial product load on category/filter change
   useEffect(() => {
