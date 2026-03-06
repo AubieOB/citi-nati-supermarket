@@ -49,9 +49,10 @@ const Products = () => {
 
   /**
    * Fetch products with pagination and filters
+   * Searches entire database, not just current page
    * Fixed page size of 20 products per page
    */
-  const fetchProducts = async (page = 1) => {
+  const fetchProducts = async (page = 1, search = '') => {
     try {
       setLoading(true);
       setError(null);
@@ -63,6 +64,7 @@ const Products = () => {
       params.append('page', page);
       params.append('pageSize', pageSize);
       
+      if (search && search.trim()) params.append('search', search);
       if (selectedCategory) params.append('category', selectedCategory);
       if (onSaleOnly) params.append('onSale', 'true');
 
@@ -124,37 +126,21 @@ const Products = () => {
     selectedCategoryRef.current = selectedCategory;
   }, [selectedCategory]);
 
-  // Fetch products when category, promotion filters change
+  // Fetch products when category, promotion filters change, or search changes
   useEffect(() => {
     const page = parseInt(searchParams.get('page')) || 1;
-    fetchProducts(page);
-  }, [selectedCategory, onSaleOnly, searchParams]);
+    fetchProducts(page, searchInput);
+  }, [selectedCategory, onSaleOnly, searchParams, searchInput]);
 
   /**
-   * Update displayed products based on filters and pagination
-   * Search shows ALL matching results across all pages
-   * Category/sale filters show paginated results
+   * Update displayed products
+   * No client-side filtering - all filtering happens on backend via API call
    */
   useEffect(() => {
-    let resultsToDisplay = [];
-    
-    if (searchInput.trim()) {
-      // Search active - return ALL matching products (no pagination)
-      const searchTerm = searchInput.toLowerCase();
-      resultsToDisplay = products.filter(p => 
-        !p.hideFromProductsPage &&
-        p.name.toLowerCase().includes(searchTerm)
-      );
-      setFilteredProducts(resultsToDisplay);
-      setTotalPages(1); // Show all results on one page
-      setTotalProducts(resultsToDisplay.length);
-    } else {
-      // No search - show paginated results from current page
-      const visible = products.filter(p => !p.hideFromProductsPage);
-      setFilteredProducts(visible);
-      // Pagination is already set by fetchProducts API call
-    }
-  }, [searchInput, products]);
+    // Filter out hidden products from API response
+    const visible = products.filter(p => !p.hideFromProductsPage);
+    setFilteredProducts(visible);
+  }, [products]);
 
   /**
    * Listen for real-time product updates (stock, price, promotions, name, etc)
@@ -337,13 +323,17 @@ const Products = () => {
 
   /**
    * Handle search input change
-   * Client-side filtering - no API calls, just filter existing products
-   * Returns ALL matching products at once (no pagination for search)
+   * API call happens automatically via useEffect
+   * Resets to page 1 when search term changes
    */
   const handleSearchChange = (e) => {
     const value = e.target.value;
     setSearchInput(value);
-    console.log(`[PRODUCTS SEARCH] Search term: "${value}"`);
+    // Reset to page 1 for new search results
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('page', '1');
+    setSearchParams(newParams);
+    console.log(`[PRODUCTS SEARCH] Searching database for: "${value}"`);
   };
 
   /**
