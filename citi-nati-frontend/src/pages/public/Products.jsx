@@ -753,7 +753,6 @@ const Products = () => {
         currentPage={currentPage}
         totalPages={totalPages}
         onPageChange={handlePageChange}
-        pageSize={pageSize}
         total={totalProducts}
       />
       
