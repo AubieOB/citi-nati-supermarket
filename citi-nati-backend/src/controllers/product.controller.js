@@ -796,5 +796,6 @@ module.exports = {
   syncProductsFromPOSAgent,
   deletePOSProducts,
   getCategories,
-  toggleProductVisibility
+  toggleProductVisibility,
+  getProductSuggestions
 };
