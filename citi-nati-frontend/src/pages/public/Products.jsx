@@ -302,11 +302,10 @@ const Products = () => {
             };
             return updated;
           } else {
-            // New product detected during sync - refetch current page to maintain pagination
-            console.log('[PRODUCTS] 📄 New product detected - refetching current page to maintain pagination');
-            // Schedule a refetch of the current page to include the new product
-            setTimeout(() => fetchProducts(currentPage), 100);
-            return prevProducts; // Don't add locally to avoid pagination issues
+            // New product detected during sync - silently skip it
+            // The full list will be refreshed via pagination or category change
+            console.log('[PRODUCTS] ⏭️ Skipping new product to avoid pagination issues:', syncedProduct.name);
+            return prevProducts; // Don't add locally and don't refetch
           }
         });
       };
