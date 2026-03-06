@@ -32,8 +32,7 @@ const Products = () => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchInput, setSearchInput] = useState(''); // User typing
-  const [debouncedSearch, setDebouncedSearch] = useState(''); // API search (debounced)
+  const [searchInput, setSearchInput] = useState(''); // User typing (instant)
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalProducts, setTotalProducts] = useState(0);
@@ -41,35 +40,110 @@ const Products = () => {
   const { updateCartCount } = useCart();
   const { modal, closeModal, showError, showSuccess } = useModal();
   
-  // Ref to track selected category in socket handlers
-  const selectedCategoryRef = useRef('');
+  // Refs for predictive search with caching and cancellation
+  const searchCacheRef = useRef(new Map()); // Cache previous search results
+  const abortControllerRef = useRef(null); // Cancel previous requests
+  const debounceTimerRef = useRef(null); // Debounce timer
 
   // Filter state from URL params (category and promotion only, not search)
   const selectedCategory = searchParams.get('category') || '';
   const onSaleOnly = searchParams.get('onSale') === 'true';
 
   /**
-   * Fetch products with pagination and filters
-   * Searches entire database silently - products remain visible during fetch
-   * No loading indicators or page flicker
+   * Predictive search like Amazon/Alibaba
+   * - Silent background fetching
+   * - Results cached in memory
+   * - Previous requests cancelled
+   * - Products remain visible
+   * - No loading UI
    */
-  const fetchProducts = async (page = 1, search = '') => {
+  const handlePredictiveSearch = (query) => {
+    // Clear previous debounce timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Check cache first - return instantly if cached
+    if (query && searchCacheRef.current.has(query)) {
+      console.log(`[SEARCH CACHE HIT] "${query}"`);
+      const cachedResults = searchCacheRef.current.get(query);
+      setFilteredProducts(cachedResults);
+      return;
+    }
+
+    // Debounce the API call (200ms)
+    debounceTimerRef.current = setTimeout(() => {
+      if (!query.trim()) {
+        // No search term - show all products
+        const visible = products.filter(p => !p.hideFromProductsPage);
+        setFilteredProducts(visible);
+        return;
+      }
+
+      // Cancel previous request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      // Create new controller for this request
+      abortControllerRef.current = new AbortController();
+
+      // Silent fetch - no loading state changes
+      (async () => {
+        try {
+          const pageSize = 50; // Search returns more results
+          const params = new URLSearchParams();
+          params.append('page', '1');
+          params.append('pageSize', pageSize);
+          params.append('search', query);
+          if (selectedCategory) params.append('category', selectedCategory);
+          if (onSaleOnly) params.append('onSale', 'true');
+
+          const response = await api.get(`/products?${params.toString()}`, {
+            signal: abortControllerRef.current.signal
+          });
+
+          const data = response.data;
+          const results = data.products || [];
+
+          // Filter out hidden products
+          const visibleResults = results.filter(p => !p.hideFromProductsPage);
+
+          // Cache the results
+          searchCacheRef.current.set(query, visibleResults);
+
+          // Update display silently
+          setFilteredProducts(visibleResults);
+
+          console.log(`[SEARCH API] Found ${visibleResults.length} results for "${query}"`);
+        } catch (err) {
+          // Ignore abort errors - those are intentional cancellations
+          if (err.name !== 'AbortError') {
+            console.error('[SEARCH ERROR]', err.message);
+            setError(err.message);
+          }
+        }
+      })();
+    }, 200); // 200ms debounce
+  };
+
+  /**
+   * Fetch products for pagination and category filtering
+   * Separate from search - handles normal browsing
+   */
+  const fetchProducts = async (page = 1) => {
     try {
-      // Only show loading spinner for initial page load, not for searches
-      // If we already have products, keep them visible while fetching
+      // Only show loading spinner for initial page load
       if (products.length === 0) {
         setLoading(true);
       }
       setError(null);
 
-      const pageSize = 20; // Fixed page size
-
-      // Build query params with pagination
+      const pageSize = 20;
       const params = new URLSearchParams();
       params.append('page', page);
       params.append('pageSize', pageSize);
       
-      if (search && search.trim()) params.append('search', search);
       if (selectedCategory) params.append('category', selectedCategory);
       if (onSaleOnly) params.append('onSale', 'true');
 
@@ -80,29 +154,29 @@ const Products = () => {
         throw new Error('Invalid response schema: expected { products: [...] }');
       }
 
-      console.log(`[PRODUCTS FETCH] Page ${page}/${data.pagination?.totalPages || 1} | Total: ${data.pagination?.total || 0} | Search: "${search}" | Category: ${selectedCategory || 'all'}`);
+      console.log(`[PRODUCTS FETCH] Page ${page}/${data.pagination?.totalPages || 1} | Total: ${data.pagination?.total || 0} | Category: ${selectedCategory || 'all'}`);
       
-      // Products come directly from database (single source of truth)
-      // No deduplication needed - database handles it
       const products = data.products;
-      
       setProducts(products);
       
-      // Update pagination state from backend response
+      // Update pagination state
       if (data.pagination) {
         setCurrentPage(data.pagination.currentPage);
         setTotalPages(data.pagination.totalPages);
         setTotalProducts(data.pagination.total);
       }
       
-      // Update URL with current page
+      // Update URL
       const newParams = new URLSearchParams(searchParams);
       newParams.set('page', page);
       setSearchParams(newParams);
+
+      // Clear search when browsing
+      setSearchInput('');
+      searchCacheRef.current.clear();
     } catch (err) {
       console.error('❌ Error fetching products:', err.message);
       setError(err.message);
-      // Only clear products on error if it's the first load
       if (products.length === 0) {
         setProducts([]);
       }
@@ -129,40 +203,48 @@ const Products = () => {
     fetchCategories();
   }, []);
 
+  // Cleanup on unmount - cancel pending requests
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
   // Update ref whenever selectedCategory changes (for use in socket handlers)
   useEffect(() => {
     selectedCategoryRef.current = selectedCategory;
   }, [selectedCategory]);
 
-  /**
-   * Debounce search input
-   * Wait 500ms after user stops typing before updating debounced search
-   * This prevents API calls on every keystroke
-   */
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchInput);
-      setCurrentPage(1); // Reset to page 1 when search changes
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [searchInput]);
-
-  // Fetch products when category, promotion filters, or debounced search changes
+  // Initial product load on category/filter change
   useEffect(() => {
     const page = parseInt(searchParams.get('page')) || 1;
-    fetchProducts(page, debouncedSearch);
-  }, [selectedCategory, onSaleOnly, searchParams, debouncedSearch]);
+    fetchProducts(page);
+  }, [selectedCategory, onSaleOnly]);
+
+  // Fetch on pagination change
+  useEffect(() => {
+    const page = parseInt(searchParams.get('page')) || 1;
+    if (page !== currentPage) {
+      fetchProducts(page);
+    }
+  }, [searchParams]);
 
   /**
-   * Update displayed products
-   * No client-side filtering - all filtering happens on backend via API call
+   * Update displayed products based on current products
+   * Filtered products stay visible during search
    */
   useEffect(() => {
-    // Filter out hidden products from API response
-    const visible = products.filter(p => !p.hideFromProductsPage);
-    setFilteredProducts(visible);
-  }, [products]);
+    // If no search, show all products from current fetch
+    if (!searchInput) {
+      const visible = products.filter(p => !p.hideFromProductsPage);
+      setFilteredProducts(visible);
+    }
+  }, [products, searchInput]);
 
   /**
    * Listen for real-time product updates (stock, price, promotions, name, etc)
@@ -345,12 +427,13 @@ const Products = () => {
 
   /**
    * Handle search input change
-   * Debounce logic in useEffect waits 500ms before API call
-   * Prevents continuous API calls on every keystroke
+   * Triggers predictive search with caching and request cancellation
+   * Products remain visible during silent background fetch
    */
   const handleSearchChange = (e) => {
     const value = e.target.value;
     setSearchInput(value);
+    handlePredictiveSearch(value);
     console.log(`[PRODUCTS SEARCH] User typing: "${value}"`);
   };
 
