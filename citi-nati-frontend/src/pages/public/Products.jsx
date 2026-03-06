@@ -44,6 +44,7 @@ const Products = () => {
   const searchCacheRef = useRef(new Map()); // Cache previous search results
   const abortControllerRef = useRef(null); // Cancel previous requests
   const debounceTimerRef = useRef(null); // Debounce timer
+  const selectedCategoryRef = useRef(''); // Track selected category in socket handlers
 
   // Filter state from URL params (category and promotion only, not search)
   const selectedCategory = searchParams.get('category') || '';
