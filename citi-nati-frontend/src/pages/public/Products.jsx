@@ -44,7 +44,7 @@ const Products = () => {
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState(null); // Only for browsing errors, NOT search errors
   const [searchInput, setSearchInput] = useState(''); // User typing (instant)
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -85,7 +85,6 @@ const Products = () => {
       console.log(`[SEARCH CACHE HIT] "${query}"`);
       const cachedResults = searchCacheRef.current.get(query);
       setFilteredProducts(cachedResults);
-      setError(null); // Clear any previous errors
       return;
     }
 
@@ -95,7 +94,6 @@ const Products = () => {
         // No search term - show all products
         const visible = productsRef.current.filter(p => !p.hideFromProductsPage);
         setFilteredProducts(visible);
-        setError(null); // Clear any previous errors
         return;
       }
 
@@ -107,7 +105,7 @@ const Products = () => {
       // Create new controller for this request
       abortControllerRef.current = new AbortController();
 
-      // Silent fetch - no loading state changes
+      // Silent fetch - no loading state changes, NO error display
       (async () => {
         try {
           const pageSize = 50; // Search returns more results
@@ -131,21 +129,20 @@ const Products = () => {
           // Cache the results
           searchCacheRef.current.set(query, visibleResults);
 
-          // Update display silently and clear any errors
+          // Update display silently
           setFilteredProducts(visibleResults);
-          setError(null);
 
           console.log(`[SEARCH API] Found ${visibleResults.length} results for "${query}"`);
         } catch (err) {
-          // Ignore abort errors - those are intentional cancellations
+          // For search: silently ignore ALL errors including network errors
+          // This includes AbortError and any other errors
+          // Products remain visible - search just fails silently
           if (err.name === 'AbortError') {
             console.log(`[SEARCH CANCELLED] Request for "${query}" was cancelled`);
-            // Don't set error for aborted requests
-            return;
+          } else {
+            console.warn(`[SEARCH SILENT FAIL] Request for "${query}" failed:`, err.message);
+            // Don't show error page - products stay visible
           }
-          
-          console.error('[SEARCH ERROR]', err.message);
-          setError(err.message);
         }
       })();
     }, 200); // 200ms debounce
