@@ -285,7 +285,6 @@ const AdminStocks = () => {
         }}>
           <div>
             <label style={{
-              display: 'block',
               marginBottom: '0.5rem',
               fontWeight: '600',
               color: '#333',
@@ -313,7 +312,6 @@ const AdminStocks = () => {
           </div>
           <div>
             <label style={{
-              display: 'block',
               marginBottom: '0.5rem',
               fontWeight: '600',
               color: '#333',
@@ -345,7 +343,6 @@ const AdminStocks = () => {
           </div>
           <div>
             <label style={{
-              display: 'block',
               marginBottom: '0.5rem',
               fontWeight: '600',
               color: '#333',
