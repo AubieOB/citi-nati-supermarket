@@ -16,7 +16,8 @@ import Pagination from '../ui/Pagination.jsx';
  */
 
 const AdminStocks = () => {
-  const [products, setProducts] = useState([]);
+  // `products` is deprecated; we now rely on `allProducts` for everything.
+  // previously products was only used in stats cards which caused counts to be wrong
   const [allProducts, setAllProducts] = useState([]); // Store all products for client-side filtering
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -51,7 +52,7 @@ const AdminStocks = () => {
       const handleStockUpdate = (updatedProduct) => {
         console.log('[AdminStocks] Stock updated via Socket.io:', updatedProduct.id);
         
-        setProducts(prevProducts =>
+        setAllProducts(prevProducts =>
           prevProducts.map(p =>
             p.id === updatedProduct.id ? { ...p, stock: updatedProduct.stock } : p
           )
@@ -69,17 +70,34 @@ const AdminStocks = () => {
     }
   };
 
+  // fetch all pages from the backend (pageSize max is 100 on the server).
+  // the previous one‑shot request used a large pageSize that was silently capped,
+  // so dashboards only ever saw the first 100 items. this helper loops until no
+  // more rows are returned and merges them into a single list.
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/products?pageSize=5000');
-      setAllProducts(response.data.products || []);
-      
-      // Extract unique categories
-      const uniqueCategories = [...new Set(response.data.products.map(p => p.category))];
+      let page = 1;
+      const perPage = 100; // server limit
+      let collected = [];
+
+      while (true) {
+        const res = await api.get(`/products?page=${page}&pageSize=${perPage}`);
+        const items = res.data.products || [];
+        if (items.length === 0) break;
+        collected = collected.concat(items);
+        if (items.length < perPage) break; // last page
+        page += 1;
+      }
+
+      setAllProducts(collected);
+
+      // Extract unique categories from entire set
+      const uniqueCategories = [...new Set(collected.map(p => p.category))];
       setCategories(uniqueCategories.filter(Boolean));
-      
+
       setCurrentPage(1); // Reset to first page
+      console.log('[AdminStocks] fetched', collected.length, 'products in total');
     } catch (err) {
       console.error('Error fetching products:', err);
       notifyError('Failed to load products', 3000);
@@ -103,8 +121,8 @@ const AdminStocks = () => {
         stock: newStock
       });
 
-      // Update local state
-      setProducts(prev => 
+      // Update local state (allProducts list used for filtering/pagination)
+      setAllProducts(prev => 
         prev.map(p => 
           p.id === selectedProduct.id 
             ? { ...p, stock: newStock }
@@ -180,13 +198,6 @@ const AdminStocks = () => {
     setCurrentPage(1); // Reset to page 1
   };
 
-  // Separate products by stock status
-  const separateProducts = () => {
-    const outOfStock = paginatedProducts.filter(p => p.stock === 0);
-    const lowStock = paginatedProducts.filter(p => p.stock > 0 && p.stock <= lowStockThreshold);
-    const inStock = paginatedProducts.filter(p => p.stock > lowStockThreshold);
-    return { outOfStock, lowStock, inStock };
-  };
 
   if (loading) {
     return <div style={{ textAlign: 'center', padding: '2rem' }}>Loading products...</div>;
@@ -213,7 +224,18 @@ const AdminStocks = () => {
         marginBottom: '2rem',
       }}>
         {(() => {
-          const { outOfStock, lowStock, inStock } = separateProducts();
+          // use filteredProducts (all results matching current filters) instead
+          // of just the current page; otherwise the stats cards showed only 20
+          // items at a time and the total count was always "0" because `products`
+          // state was never set.
+          const { outOfStock, lowStock, inStock } = (() => {
+            const source = filteredProducts; // includes any search/category filters
+            return {
+              outOfStock: source.filter(p => p.stock === 0),
+              lowStock: source.filter(p => p.stock > 0 && p.stock <= lowStockThreshold),
+              inStock: source.filter(p => p.stock > lowStockThreshold),
+            };
+          })();
           return (
             <>
               <div style={{
@@ -227,7 +249,7 @@ const AdminStocks = () => {
                   <i className="fas fa-cubes" style={{ color: '#2196F3' }}></i>
                   Total Products
                 </p>
-                <h3 style={{ margin: 0, color: '#2196F3', fontSize: '2rem' }}>{products.length}</h3>
+                <h3 style={{ margin: 0, color: '#2196F3', fontSize: '2rem' }}>{filteredProducts.length}</h3>
               </div>
               <div style={{
                 backgroundColor: '#fff',

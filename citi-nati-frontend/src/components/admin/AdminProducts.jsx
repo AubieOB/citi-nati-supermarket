@@ -112,11 +112,23 @@ const AdminProducts = () => {
     try {
       setLoading(true);
       setError(null);
-      // Request maximum allowed products per page (100) to show all products
-      const response = await api.get('/products?pageSize=1000');
-      
+
+      // iterate pages because API caps pageSize at 100
+      let page = 1;
+      const perPage = 100;
+      let all = [];
+
+      while (true) {
+        const resp = await api.get(`/products?page=${page}&pageSize=${perPage}`);
+        const items = resp.data.products || [];
+        if (items.length === 0) break;
+        all = all.concat(items);
+        if (items.length < perPage) break;
+        page += 1;
+      }
+
       // Sort by expiry status for visibility
-      const sorted = (response.data.products || []).sort((a, b) => {
+      const sorted = all.sort((a, b) => {
         if (!a.expiryStatus && !b.expiryStatus) return 0;
         if (!a.expiryStatus) return 1;
         if (!b.expiryStatus) return -1;
