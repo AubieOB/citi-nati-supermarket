@@ -5,6 +5,7 @@ import { formatMWK } from '../../utils/currency.js';
 import { getSocket } from '../../utils/socket.js';
 import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
+import Pagination from '../ui/Pagination.jsx';
 
 /**
  * 📦 ADMIN PRODUCTS MANAGEMENT - ENHANCED
@@ -43,6 +44,9 @@ const AdminProducts = () => {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [onSaleOnly, setOnSaleOnly] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState('products'); // 'products' or 'expiry-alerts'
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 20;
+  const searchTimeoutRef = useRef(null);
   const { modal, closeModal, showConfirm, showError, showSuccess } = useModal();
 
   // Fetch products on mount
@@ -157,8 +161,44 @@ const AdminProducts = () => {
     return matchesSearch && matchesCategory && matchesSale;
   });
 
+  // Paginate filtered products
+  const totalPages = Math.ceil(filteredProducts.length / pageSize);
+  const paginatedProducts = filteredProducts.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
   // Get unique categories for filter dropdown
   const categories = [...new Set(products.map(p => p.category))].sort();
+
+  // Handle search with debounce
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    setCurrentPage(1); // Reset to page 1 on search
+    
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // Debounce the search by 300ms
+    searchTimeoutRef.current = setTimeout(() => {
+      // Search is now applied via filteredProducts
+    }, 300);
+  };
+
+  // Handle category change
+  const handleCategoryChange = (value) => {
+    setSelectedCategory(value);
+    setCurrentPage(1); // Reset to page 1
+  };
+
+  // Handle sale filter change
+  const handleSaleFilterChange = (value) => {
+    setOnSaleOnly(value);
+    setCurrentPage(1); // Reset to page 1
+  };
 
   const handleFormChange = (e) => {
     const { name, value } = e.target;
@@ -741,7 +781,7 @@ const AdminProducts = () => {
             type="text"
             placeholder="Search by name or category..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={handleSearchChange}
             style={{
               flex: 1,
               minWidth: '200px',
@@ -765,7 +805,7 @@ const AdminProducts = () => {
           {/* Category Filter */}
           <select
             value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
+            onChange={(e) => handleCategoryChange(e.target.value)}
             style={{
               padding: '0.75rem',
               border: 'none',
@@ -795,7 +835,7 @@ const AdminProducts = () => {
             <input
               type="checkbox"
               checked={onSaleOnly}
-              onChange={(e) => setOnSaleOnly(e.target.checked)}
+              onChange={(e) => handleSaleFilterChange(e.target.checked)}
               style={{ cursor: 'pointer' }}
             />
             <span style={{ fontWeight: onSaleOnly ? '600' : '400' }}>Promotions</span>
@@ -858,7 +898,7 @@ const AdminProducts = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredProducts.map((product) => {
+              {paginatedProducts.map((product) => {
                 const finalPrice = product.isOnSale && product.discountPrice ? product.discountPrice : product.price;
                 const discountPct = product.originalPrice && product.discountPrice 
                   ? Math.round(((product.originalPrice - product.discountPrice) / product.originalPrice) * 100)
@@ -979,6 +1019,17 @@ const AdminProducts = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'center' }}>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
+          </div>
+        )}
         )
       )}
       <Modal

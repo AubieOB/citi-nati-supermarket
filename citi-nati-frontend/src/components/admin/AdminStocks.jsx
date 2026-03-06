@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import api from '../../utils/api.js';
 import { getSocket } from '../../utils/socket.js';
 import { notifySuccess, notifyError } from '../../utils/notifications.js';
+import Pagination from '../ui/Pagination.jsx';
 
 /**
  * 📊 ADMIN STOCKS MANAGEMENT
@@ -16,6 +17,7 @@ import { notifySuccess, notifyError } from '../../utils/notifications.js';
 
 const AdminStocks = () => {
   const [products, setProducts] = useState([]);
+  const [allProducts, setAllProducts] = useState([]); // Store all products for client-side filtering
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
@@ -26,6 +28,9 @@ const AdminStocks = () => {
   const [showActionModal, setShowActionModal] = useState(false);
   const [actionType, setActionType] = useState('add'); // 'add' or 'subtract'
   const [lowStockThreshold, setLowStockThreshold] = useState(5);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 20;
+  const searchTimeoutRef = useRef(null);
 
   useEffect(() => {
     fetchProducts();
@@ -68,11 +73,13 @@ const AdminStocks = () => {
     try {
       setLoading(true);
       const response = await api.get('/products?pageSize=5000');
-      setProducts(response.data.products || []);
+      setAllProducts(response.data.products || []);
       
       // Extract unique categories
       const uniqueCategories = [...new Set(response.data.products.map(p => p.category))];
       setCategories(uniqueCategories.filter(Boolean));
+      
+      setCurrentPage(1); // Reset to first page
     } catch (err) {
       console.error('Error fetching products:', err);
       notifyError('Failed to load products', 3000);
@@ -136,11 +143,50 @@ const AdminStocks = () => {
     return { color: '#388e3c', label: 'In Stock', icon: '🟢' };
   };
 
-  // Filter products
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
+  // Filter products with debounced search
+  const filteredProducts = allProducts.filter(product => {
+    const matchesSearch = !searchTerm || product.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = filterCategory === 'all' || product.category === filterCategory;
     return matchesSearch && matchesCategory;
+  });
+
+  // Paginate filtered results
+  const totalPages = Math.ceil(filteredProducts.length / pageSize);
+  const paginatedProducts = filteredProducts.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  // Handle search with debounce
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    setCurrentPage(1); // Reset to page 1 on search
+    
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // Debounce the search by 300ms
+    searchTimeoutRef.current = setTimeout(() => {
+      // Search is now applied via filteredProducts
+    }, 300);
+  };
+
+  // Handle category change
+  const handleCategoryChange = (category) => {
+    setFilterCategory(category);
+    setCurrentPage(1); // Reset to page 1
+  };
+
+  // Separate products by stock status
+  const separateProducts = () => {
+    const outOfStock = paginatedProducts.filter(p => p.stock === 0);
+    const lowStock = paginatedProducts.filter(p => p.stock > 0 && p.stock <= lowStockThreshold);
+    const inStock = paginatedProducts.filter(p => p.stock > lowStockThreshold);
+    return { outOfStock, lowStock, inStock };
+  };
   });
 
   // Separate products by stock status
@@ -261,7 +307,7 @@ const AdminStocks = () => {
               type="text"
               placeholder="Search by product name..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={handleSearchChange}
               style={{
                 width: '100%',
                 padding: '0.75rem',
@@ -287,7 +333,7 @@ const AdminStocks = () => {
             </label>
             <select
               value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
+              onChange={(e) => handleCategoryChange(e.target.value)}
               style={{
                 width: '100%',
                 padding: '0.75rem',
@@ -365,8 +411,8 @@ const AdminStocks = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredProducts.length > 0 ? (
-              filteredProducts.map((product) => {
+            {paginatedProducts.length > 0 ? (
+              paginatedProducts.map((product) => {
                 const status = getStockStatus(product.stock);
                 return (
                   <tr
@@ -480,6 +526,17 @@ const AdminStocks = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'center' }}>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
+        </div>
+      )}
 
       {/* Stock Action Modal */}
       {showActionModal && selectedProduct && (

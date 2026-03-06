@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../../utils/api.js';
 import Button from '../../components/ui/Button.jsx';
 import Container from '../../components/ui/Container.jsx';
 import { useModal } from '../../hooks/useModal.js';
 import { formatMWK } from '../../utils/currency.js';
+import Pagination from '../../components/ui/Pagination.jsx';
 import '../../styles/global.css';
 
 /**
@@ -26,9 +27,11 @@ const AdminPOSManagement = () => {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
+  const [pageSize] = useState(50);
   const [limit] = useState(5000);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const searchTimeoutRef = useRef(null);
   const { modal, closeModal, showError, showSuccess } = useModal();
   const [updating, setUpdating] = useState(null); // Track which product is being updated
 
@@ -60,17 +63,27 @@ const AdminPOSManagement = () => {
     }
   };
 
+  // Handle search with debounce
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    setPage(1);
+    
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // Debounce the search by 500ms
+    searchTimeoutRef.current = setTimeout(() => {
+      fetchProducts(value, 1);
+    }, 500);
+  };
+
   // Initial fetch
   useEffect(() => {
     fetchProducts('', 1);
   }, []);
-
-  // Handle search
-  const handleSearch = (e) => {
-    setSearchTerm(e.target.value);
-    setPage(1);
-    fetchProducts(e.target.value, 1);
-  };
 
   // Handle pagination
   const handlePageChange = (newPage) => {
@@ -246,7 +259,7 @@ const AdminPOSManagement = () => {
               type="text"
               placeholder="Search by product name, code, or category..."
               value={searchTerm}
-              onChange={handleSearch}
+              onChange={handleSearchChange}
               style={styles.searchInput}
             />
           </div>
