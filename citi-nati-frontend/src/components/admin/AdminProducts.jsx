@@ -877,8 +877,8 @@ const AdminProducts = () => {
             No products match your search or filter criteria.
           </div>
         ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{
             width: '100%',
             borderCollapse: 'collapse',
             backgroundColor: '#fff',
@@ -1018,18 +1018,18 @@ const AdminProducts = () => {
               })}
             </tbody>
           </table>
-        </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'center' }}>
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-            />
           </div>
-        )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'center' }}>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+              />
+            </div>
+          )}
         )
       )}
       <Modal
