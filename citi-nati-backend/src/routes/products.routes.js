@@ -1,12 +1,15 @@
 const express = require('express');
-const { createProduct, getProducts, getProductById, updateProduct, deleteProduct, syncFromPOS, syncProductsFromPOSAgent, deletePOSProducts } = require('../controllers/product.controller');
+const { createProduct, getProducts, getProductById, updateProduct, deleteProduct, syncFromPOS, syncProductsFromPOSAgent, deletePOSProducts, getCategories, toggleProductVisibility } = require('../controllers/product.controller');
 const { verifyTokenMiddleware } = require('../middleware/auth.middleware');
 const { verifyAdmin } = require('../middleware/admin.middleware');
 const uploadProductImage = require('../middlewares/uploadProductImageCloudinary');
 
 const router = express.Router();
 
-// GET /api/products - Fetch all products
+// GET /api/products/categories - Fetch all distinct categories
+router.get('/categories', getCategories);
+
+// GET /api/products - Fetch all products (with pagination, filtering, category)
 router.get('/', getProducts);
 
 // POST /api/products - Create a new product (ADMIN only)
@@ -28,6 +31,14 @@ router.put(
   verifyAdmin,
   uploadProductImage,
   updateProduct
+);
+
+// PUT /api/products/:id/visibility - Toggle product visibility (ADMIN only)
+router.put(
+  '/:id/visibility',
+  verifyTokenMiddleware,
+  verifyAdmin,
+  toggleProductVisibility
 );
 
 // DELETE /api/products/:id - Delete product by id (ADMIN only)

@@ -42,6 +42,7 @@ model Product {
   image                   String?
   isActive                Boolean    @default(true)
   hideFromProductsPage    Boolean    @default(false)
+  enabled                 Boolean    @default(true)
   cartItems               CartItem[]
   orderItems              OrderItem[]
   createdAt               DateTime   @default(now())

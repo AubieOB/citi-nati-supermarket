@@ -162,11 +162,19 @@ const createProduct = async (req, res) => {
 
 const getProducts = async (req, res) => {
   try {
-    // Extract query parameters for filtering
-    const { search, category, onSale } = req.query;
+    // Extract query parameters for filtering and pagination
+    const { search, category, onSale, page = '1', pageSize = '20' } = req.query;
+
+    // Validate pagination params
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const pageSizeNum = Math.min(100, Math.max(1, parseInt(pageSize) || 20));
+    const skip = (pageNum - 1) * pageSizeNum;
 
     // Build where clause for filtering
-    const where = {};
+    const where = {
+      isActive: true,
+      enabled: true, // Only show enabled products
+    };
 
     // Search filter (case-insensitive name search)
     if (search) {
@@ -186,31 +194,41 @@ const getProducts = async (req, res) => {
       where.isOnSale = true;
     }
 
-    // Fetch products with filters, ordered by createdAt descending
+    // Get total count for pagination metadata
+    const total = await prisma.product.count({ where });
+
+    // Fetch products with filters, pagination, ordered by createdAt descending
     const products = await prisma.product.findMany({
       where,
+      skip,
+      take: pageSizeNum,
       orderBy: {
         createdAt: 'desc',
       },
     });
 
     // Debug logging
-    console.log(`[PRODUCTS FETCH] Retrieved ${products.length} products`);
-    const productsWithImages = products.filter(p => p.image).length;
-    const productsWithoutImages = products.filter(p => !p.image).length;
-    console.log(`[PRODUCTS FETCH] With images: ${productsWithImages}, Without images: ${productsWithoutImages}`);
+    console.log(`[PRODUCTS FETCH] Page ${pageNum}, Size ${pageSizeNum}, Total: ${total}, Retrieved: ${products.length}`);
 
     // Map over products and format with computed fields
     const productsWithFormatted = products.map((product) =>
       formatProduct(product, req, false)
     );
 
+    // Calculate pagination metadata
+    const hasNextPage = skip + pageSizeNum < total;
+    const hasPrevPage = pageNum > 1;
+    const totalPages = Math.ceil(total / pageSizeNum);
+
     return res.status(200).json({
       products: productsWithFormatted,
-      _debug: {
-        total: productsWithFormatted.length,
-        withImages: productsWithImages,
-        withoutImages: productsWithoutImages
+      pagination: {
+        currentPage: pageNum,
+        pageSize: pageSizeNum,
+        total,
+        totalPages,
+        hasNextPage,
+        hasPrevPage
       }
     });
   } catch (err) {
@@ -629,6 +647,94 @@ const deletePOSProducts = async (req, res) => {
   }
 };
 
+/**
+ * Get all distinct categories
+ * Used for filter dropdowns on frontend
+ */
+const getCategories = async (req, res) => {
+  try {
+    const categories = await prisma.product.findMany({
+      where: {
+        category: {
+          not: ''
+        },
+        enabled: true,
+        isActive: true
+      },
+      distinct: ['category'],
+      select: {
+        category: true
+      },
+      orderBy: {
+        category: 'asc'
+      }
+    });
+
+    const categoryList = categories
+      .map(c => c.category)
+      .filter(c => c && c.trim() !== '');
+
+    console.log(`[CATEGORIES] Retrieved ${categoryList.length} unique categories`);
+
+    return res.status(200).json({
+      categories: categoryList
+    });
+  } catch (err) {
+    console.error('[CATEGORIES ERROR]:', err);
+    return res.status(500).json({
+      error: 'Server error while fetching categories'
+    });
+  }
+};
+
+/**
+ * Toggle product visibility (Enabled field)
+ * Admin only endpoint
+ */
+const toggleProductVisibility = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { enabled } = req.body;
+
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({
+        error: 'enabled field must be a boolean'
+      });
+    }
+
+    // Fetch current product
+    const product = await prisma.product.findUnique({
+      where: { id }
+    });
+
+    if (!product) {
+      return res.status(404).json({
+        error: 'Product not found'
+      });
+    }
+
+    // Update product
+    const updatedProduct = await prisma.product.update({
+      where: { id },
+      data: { enabled }
+    });
+
+    console.log(`[VISIBILITY] Product ${id} (${updatedProduct.name}) toggled to ${enabled ? 'visible' : 'hidden'}`);
+
+    return res.status(200).json({
+      success: true,
+      message: `Product ${enabled ? 'enabled' : 'disabled'} successfully`,
+      product: formatProduct(updatedProduct, req)
+    });
+  } catch (err) {
+    console.error('[VISIBILITY ERROR]:', err.message);
+    return res.status(500).json({
+      error: 'Failed to toggle product visibility',
+      details: err.message
+    });
+  }
+};
+
 module.exports = { 
   createProduct, 
   getProducts, 
@@ -637,5 +743,7 @@ module.exports = {
   deleteProduct, 
   syncFromPOS,
   syncProductsFromPOSAgent,
-  deletePOSProducts
+  deletePOSProducts,
+  getCategories,
+  toggleProductVisibility
 };

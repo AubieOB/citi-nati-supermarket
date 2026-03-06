@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import Container from '../../components/ui/Container.jsx';
 import Button from '../../components/ui/Button.jsx';
 import PromotionBanner from '../../components/common/PromotionBanner.jsx';
+import Pagination from '../../components/ui/Pagination.jsx';
 import api from '../../utils/api.js';
 import { getSocket } from '../../utils/socket.js';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -32,6 +33,10 @@ const Products = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchInput, setSearchInput] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
   const { isAuthenticated, logout } = useAuth();
   const { updateCartCount } = useCart();
   const { modal, closeModal, showError, showSuccess } = useModal();
@@ -41,19 +46,21 @@ const Products = () => {
   const onSaleOnly = searchParams.get('onSale') === 'true';
 
   /**
-   * Fetch products with category and promotion filters
+   * Fetch products with pagination and filters
    */
-  const fetchProducts = async () => {
+  const fetchProducts = async (page = 1) => {
     try {
       setLoading(true);
       setError(null);
 
-      // Build query params (no search - that's done client-side)
+      // Build query params with pagination
       const params = new URLSearchParams();
+      params.append('page', page);
+      params.append('pageSize', pageSize);
       if (selectedCategory) params.append('category', selectedCategory);
       if (onSaleOnly) params.append('onSale', 'true');
 
-      const response = await api.get(`/products${params.toString() ? '?' + params.toString() : ''}`);
+      const response = await api.get(`/products?${params.toString()}`);
       const data = response.data;
 
       if (!data.products || !Array.isArray(data.products)) {
@@ -79,12 +86,20 @@ const Products = () => {
         }
       });
       
-      console.log(`[PRODUCTS FETCH] Deduplicated: ${data.products.length} → ${deduped.length} products`);
+      console.log(`[PRODUCTS FETCH] Page ${page}/${data.pagination?.totalPages || 1}`);
       setProducts(deduped);
-
-      // Extract unique categories for filter dropdown
-      const uniqueCategories = [...new Set(deduped.map(p => p.category))].filter(Boolean);
-      setCategories(uniqueCategories.sort());
+      
+      // Update pagination state from backend response
+      if (data.pagination) {
+        setCurrentPage(data.pagination.currentPage);
+        setTotalPages(data.pagination.totalPages);
+        setTotalProducts(data.pagination.total);
+      }
+      
+      // Update URL with current page
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set('page', page);
+      setSearchParams(newParams);
     } catch (err) {
       console.error('❌ Error fetching products:', err.message);
       setError(err.message);
@@ -94,10 +109,11 @@ const Products = () => {
     }
   };
 
-  // Fetch products when category or promotion filters change
+  // Fetch products when category, promotion filters, or pageSize changes
   useEffect(() => {
-    fetchProducts();
-  }, [selectedCategory, onSaleOnly]);
+    const page = parseInt(searchParams.get('page')) || 1;
+    fetchProducts(page);
+  }, [selectedCategory, onSaleOnly, pageSize, searchParams]);
 
   /**
    * Client-side AND search filtering
@@ -332,6 +348,7 @@ const Products = () => {
     } else {
       newParams.delete('category');
     }
+    newParams.set('page', '1'); // Reset to page 1 when changing category
     setSearchParams(newParams);
   };
 
@@ -345,7 +362,31 @@ const Products = () => {
     } else {
       newParams.set('onSale', 'true');
     }
+    newParams.set('page', '1'); // Reset to page 1 when changing filters
     setSearchParams(newParams);
+  };
+
+  /**
+   * Handle page change
+   */
+  const handlePageChange = (newPage) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('page', newPage);
+    setSearchParams(params);
+    fetchProducts(newPage);
+  };
+
+  /**
+   * Handle page size change
+   */
+  const handlePageSizeChange = (e) => {
+    const newSize = parseInt(e.target.value);
+    setPageSize(newSize);
+    // Reset to page 1 when changing page size
+    const params = new URLSearchParams(searchParams);
+    params.set('page', '1');
+    setSearchParams(params);
+    fetchProducts(1);
   };
 
   /**
@@ -529,6 +570,52 @@ const Products = () => {
               ))}
             </select>
 
+            {/* Page Size Selector */}
+            <div style={{ 
+              flex: '0 0 auto',
+              minWidth: '140px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <label htmlFor="pageSize" style={{ 
+                marginRight: '0.25rem',
+                fontSize: '0.9rem',
+                color: '#666',
+                whiteSpace: 'nowrap'
+              }}>
+                Per page:
+              </label>
+              <select 
+                id="pageSize"
+                value={pageSize} 
+                onChange={handlePageSizeChange}
+                style={{
+                  padding: '0.6rem 0.75rem',
+                  borderRadius: '4px',
+                  border: 'none',
+                  backgroundColor: '#f5f5f5',
+                  cursor: 'pointer',
+                  fontSize: '0.95rem',
+                  flex: '1',
+                  transition: 'box-shadow 0.3s ease, background-color 0.3s ease'
+                }}
+                onFocus={(e) => {
+                  e.target.style.backgroundColor = '#fff';
+                  e.target.style.boxShadow = '0 4px 12px rgba(91, 75, 138, 0.2)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.backgroundColor = '#f5f5f5';
+                  e.target.style.boxShadow = 'none';
+                }}
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+
             {/* Clear Filters Button */}
             {(searchInput || selectedCategory) && (
               <button
@@ -536,6 +623,7 @@ const Products = () => {
                   setSearchInput('');
                   if (selectedCategory || onSaleOnly) {
                     const newParams = new URLSearchParams();
+                    newParams.set('page', '1');
                     setSearchParams(newParams);
                   }
                 }}
@@ -695,6 +783,16 @@ const Products = () => {
           </div>
         )}
       </div>
+      
+      {/* Pagination Component */}
+      <Pagination 
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={handlePageChange}
+        pageSize={pageSize}
+        total={totalProducts}
+      />
+      
       <Modal
         isOpen={modal.isOpen}
         title={modal.title}

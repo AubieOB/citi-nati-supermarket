@@ -60,8 +60,8 @@ async function sendProductsToLiveServer(products) {
 
     console.log(`[POS SYNC] Sending ${products.length} products to live server (batching)...`);
 
-    // Batch size to avoid payload too large errors
-    const BATCH_SIZE = 200;
+    // Batch size to avoid payload too large errors - reduced for faster processing
+    const BATCH_SIZE = 100;
     const batches = [];
 
     for (let i = 0; i < products.length; i += BATCH_SIZE) {
@@ -95,7 +95,7 @@ async function sendProductsToLiveServer(products) {
               'Content-Type': 'application/json',
               'x-pos-secret': process.env.POS_SECRET,
             },
-            timeout: 60000,
+            timeout: 120000,
           }
         );
 
@@ -131,29 +131,46 @@ async function fetchProductsFromPOS() {
   try {
     if (!pool) await initializePool();
 
+    // Get location code from environment or default to 'SH'
+    const LOCATION_CODE = process.env.POS_LOCATION_CODE || 'SH';
+
+    // REAL-TIME STOCK + PRICE
+    // Stock = SUM(QtyIn) - SUM(QtyOut) from ProductActivity
+    // Price = Most recent FPrice from productprices (by PriceID DESC = latest record)
     const query = `
       SELECT 
           p.ProductCode,
           p.ProductName,
           ISNULL(p.Barcode,'') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
-          ISNULL((
-              SELECT TOP 1 FPrice 
-              FROM POS.dbo.productprices pr 
-              WHERE pr.ProductCode = p.ProductCode 
-              ORDER BY FPrice DESC
-          ), 0) AS SellingPrice,
-          ISNULL((
-              SELECT SUM(StockQty - StockOut)
-              FROM POS.dbo.stockdetails sd
-              WHERE sd.ProductCode = p.ProductCode
-          ), 0) AS QuantityAvailable
+          ISNULL(SUM(pa.QtyIn), 0) - ISNULL(SUM(pa.QtyOut), 0) AS QuantityAvailable,
+          ISNULL(
+              (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC),
+              (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode ORDER BY PriceID DESC)
+          ) AS SellingPrice
       FROM POS.dbo.productsmaster p
       LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
+      LEFT JOIN POS.dbo.ProductActivity pa ON p.ProductCode = pa.ProductCode AND pa.LocationCode = @LocationCode
+      GROUP BY p.ProductCode, p.ProductName, p.Barcode, pt.ProductTypeName
       ORDER BY p.ProductCode
     `;
 
-    const result = await pool.request().query(query);
+    const request = pool.request();
+    request.input('LocationCode', sql.VarChar(10), LOCATION_CODE);
+    const result = await request.query(query);
+    
+    console.log(`[POS FETCH] ✅ Fetched ${result.recordset.length} products from location: ${LOCATION_CODE}`);
+    console.log(`[POS FETCH] Stock: SUM(QtyIn) - SUM(QtyOut)`);
+    console.log(`[POS FETCH] Price: Most recent FPrice (by PriceID DESC)`);
+    
+    // Debug log first 5 products
+    if (result.recordset.length > 0) {
+      console.log(`[POS FETCH] Sample products:`);
+      result.recordset.slice(0, 5).forEach(product => {
+        console.log(`  - ${product.ProductCode}: ${product.ProductName} | Stock: ${product.QuantityAvailable} | Price: ${product.SellingPrice}`);
+      });
+    }
+    
     return result.recordset;
   } catch (err) {
     console.error('[POS FETCH] Error fetching products:', err.message);
@@ -166,24 +183,34 @@ async function fetchProductsFromPOS() {
  */
 app.get('/pos-sync/products', validateApiKey, async (req, res) => {
   try {
+    console.log('[POS SYNC] /pos-sync/products endpoint called');
+    
     const products = await fetchProductsFromPOS();
     console.log(`[POS SYNC] Fetched ${products.length} products from Global POS`);
+
+    if (!products || products.length === 0) {
+      return res.json({
+        success: true,
+        count: 0,
+        data: [],
+        message: 'No products found',
+      });
+    }
 
     // Send to live server
     const syncResult = await sendProductsToLiveServer(products);
 
     res.json({
       success: true,
-      count: result.recordset.length,
-      data: result.recordset,
+      count: products.length,
+      data: products,
       syncResult: syncResult,
     });
   } catch (err) {
-    console.error('Database query error:', err.message);
+    console.error('[POS SYNC] Error in /pos-sync/products:', err.message);
     res.status(500).json({
       success: false,
-      error: 'Internal server error: Failed to fetch products',
-      details: process.env.NODE_ENV === 'development' ? err.message : undefined,
+      error: err.message,
     });
   }
 });
@@ -261,6 +288,8 @@ app.get('/debug/find-location-stock', validateApiKey, async (req, res) => {
   try {
     if (!pool) await initializePool();
 
+    const LOCATION_CODE = process.env.POS_LOCATION_CODE || 'SH';
+
     // Check if stocks table (which had LocationCode) can be joined with stockdetails
     const query = `
       SELECT TOP 10
@@ -272,10 +301,12 @@ app.get('/debug/find-location-stock', validateApiKey, async (req, res) => {
       FROM POS.dbo.stocks s
       INNER JOIN POS.dbo.stockdetails sd
           ON s.GRNNo = sd.GRNNo
-      WHERE s.LocationCode = 'SH'
+      WHERE s.LocationCode = @LocationCode
     `;
 
-    const result = await pool.request().query(query);
+    const request = pool.request();
+    request.input('LocationCode', sql.VarChar(10), LOCATION_CODE);
+    const result = await request.query(query);
 
     res.json({
       success: true,
@@ -328,32 +359,39 @@ app.get('/pos-sync/categories', validateApiKey, async (req, res) => {
 
 /**
  * GET /pos-sync/stock-by-location
- * Fetch stock quantities by location (SH location only)
+ * Fetch stock quantities by location (uses DailyStockBalance for real inventory)
  * Returns ProductCode, LocationCode, and current available stock
  */
 app.get('/pos-sync/stock-by-location', validateApiKey, async (req, res) => {
   try {
     if (!pool) await initializePool();
 
+    const LOCATION_CODE = process.env.POS_LOCATION_CODE || 'SH';
+
     const query = `
       SELECT 
-          sd.ProductCode,
+          d.ProductCode,
           p.ProductName,
-          s.LocationCode,
-          SUM(sd.StockQty - sd.StockOut) AS AvailableStock
-      FROM POS.dbo.stockdetails sd
-      INNER JOIN POS.dbo.stocks s
-          ON sd.GRNNo = s.GRNNo
+          d.LocationCode,
+          d.StockBalance AS AvailableStock,
+          d.StockDate
+      FROM POS.dbo.DailyStockBalance d
       INNER JOIN POS.dbo.productsmaster p 
-          ON sd.ProductCode = p.ProductCode
-      WHERE s.LocationCode = 'SH'
-      GROUP BY sd.ProductCode, p.ProductName, s.LocationCode
-      ORDER BY sd.ProductCode
+          ON d.ProductCode = p.ProductCode
+      WHERE d.LocationCode = @LocationCode
+      AND d.StockDate = (
+          SELECT MAX(StockDate)
+          FROM POS.dbo.DailyStockBalance
+          WHERE LocationCode = @LocationCode
+      )
+      ORDER BY d.ProductCode
     `;
 
-    const result = await pool.request().query(query);
+    const request = pool.request();
+    request.input('LocationCode', sql.VarChar(10), LOCATION_CODE);
+    const result = await request.query(query);
 
-    console.log(`[/pos-sync/stock-by-location] Fetched stock for ${result.recordset.length} products at location SH`);
+    console.log(`[/pos-sync/stock-by-location] Fetched stock for ${result.recordset.length} products at location ${LOCATION_CODE}`);
 
     res.json({
       success: true,
