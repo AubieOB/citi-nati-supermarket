@@ -198,9 +198,13 @@ const Products = () => {
       searchCacheRef.current.clear();
     } catch (err) {
       console.error('❌ Error fetching products:', err.message);
-      setError(err.message);
+      // Only show error if we don't have any products displayed
       if (products.length === 0) {
+        setError(err.message);
         setProducts([]);
+      } else {
+        // If we already have products, fail silently and keep them visible
+        console.warn('[PAGINATION SILENT FAIL] Keeping current products visible');
       }
     } finally {
       setLoading(false);
@@ -554,24 +558,26 @@ const Products = () => {
     }
   };
 
-  // Loading state
-  if (loading) {
+  // Loading state - ONLY show for initial page load (when there's no data at all)
+  const isInitialLoading = loading && products.length === 0 && filteredProducts.length === 0;
+
+  if (isInitialLoading) {
     return (
       <div className="page products-page">
         <Container>
-          <h1 style={{ marginTop: '2rem', marginBottom: '1rem' }}>Our Products</h1>
           <p style={{ textAlign: 'center', color: '#666', padding: '2rem' }}>Loading products...</p>
         </Container>
       </div>
     );
   }
 
-  // Error state
-  if (error) {
+  // Error state - ONLY show for initial load errors (when there's no data at all)
+  const isInitialError = error && products.length === 0 && filteredProducts.length === 0;
+
+  if (isInitialError) {
     return (
       <div className="page products-page">
         <Container>
-          <h1 style={{ marginTop: '2rem', marginBottom: '1rem' }}>Our Products</h1>
           <div style={{
             backgroundColor: '#f8d7da',
             color: '#721c24',

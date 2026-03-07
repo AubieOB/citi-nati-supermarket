@@ -239,8 +239,21 @@ const getProducts = async (req, res) => {
 
     // Fetch products with filters, pagination, ordered by createdAt descending
     // Direct query to Products table (single source of truth)
+    // Optimized: only select essential fields for frontend
     const products = await prisma.product.findMany({
       where,
+      select: {
+        id: true,
+        name: true,
+        price: true,
+        image: true,
+        stock: true,
+        category: true,
+        isOnSale: true,
+        originalPrice: true,
+        discountPrice: true,
+        expiryDate: true
+      },
       skip,
       take: pageSizeNum,
       orderBy: {
@@ -285,9 +298,21 @@ const getProductById = async (req, res) => {
     // Extract and convert id to integer
     const id = parseInt(req.params.id);
 
-    // Fetch product by id
+    // Fetch product by id - optimized to select only necessary fields
     const product = await prisma.product.findUnique({
       where: { id },
+      select: {
+        id: true,
+        name: true,
+        price: true,
+        image: true,
+        stock: true,
+        category: true,
+        isOnSale: true,
+        originalPrice: true,
+        discountPrice: true,
+        expiryDate: true
+      }
     });
 
     // Return 404 if product not found
