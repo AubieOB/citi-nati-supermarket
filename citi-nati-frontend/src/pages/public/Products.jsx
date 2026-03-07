@@ -51,7 +51,6 @@ const Products = () => {
   const [totalProducts, setTotalProducts] = useState(0); // Current page's total
   const [totalSystemProducts, setTotalSystemProducts] = useState(0); // Total enabled products in system
   const [scrollY, setScrollY] = useState(0); // Track scroll position for back-to-top button
-  const [showMobileFilters, setShowMobileFilters] = useState(false); // Mobile filter drawer state
   const { isAuthenticated, logout } = useAuth();
   const { updateCartCount } = useCart();
   const { modal, closeModal, showError, showSuccess } = useModal();
@@ -764,25 +763,25 @@ const Products = () => {
                 </select>
               </div>
             </div>
-          ) : window.innerWidth > 480 ? (
-            // Tablet Layout: Stack vertically
+          ) : (
+            // Mobile/Tablet Layout: Stack filters vertically, all always visible
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {/* SEARCH BAR */}
+              {/* SEARCH BAR - FULL WIDTH */}
               <div style={{
                 position: 'relative',
                 width: '100%'
               }}>
                 <input
                   type="text"
-                  placeholder={`Search products (${totalSystemProducts} products)`}
+                  placeholder={`Search products (${totalSystemProducts})`}
                   value={searchInput}
                   onChange={handleSearchChange}
                   style={{
                     width: '100%',
-                    padding: '0.6rem 1rem',
+                    padding: '0.6rem 0.75rem',
                     border: '1px solid #ccc',
                     borderRadius: '4px',
-                    fontSize: '0.95rem',
+                    fontSize: window.innerWidth <= 480 ? '0.85rem' : '0.95rem',
                     boxSizing: 'border-box',
                     backgroundColor: '#fff',
                     transition: 'box-shadow 0.3s ease'
@@ -796,7 +795,7 @@ const Products = () => {
                 />
               </div>
 
-              {/* Category Filter */}
+              {/* Category Filter - FULL WIDTH */}
               <select
                 value={selectedCategory}
                 onChange={handleCategoryChange}
@@ -804,11 +803,11 @@ const Products = () => {
                   padding: '0.6rem 0.75rem',
                   border: 'none',
                   borderRadius: '4px',
-                  fontSize: '0.95rem',
+                  fontSize: window.innerWidth <= 480 ? '0.85rem' : '0.95rem',
                   backgroundColor: '#f5f5f5',
                   cursor: 'pointer',
                   width: '100%',
-                  transition: 'box-shadow 0.3s ease'
+                  transition: 'box-shadow 0.3s ease, background-color 0.3s ease'
                 }}
                 onFocus={(e) => {
                   e.target.style.backgroundColor = '#fff';
@@ -824,111 +823,6 @@ const Products = () => {
                   <option key={cat} value={cat}>{cat}</option>
                 ))}
               </select>
-            </div>
-          ) : (
-            // Mobile Layout: Compact with filter drawer button
-            <div>
-              {/* MOBILE SEARCH BAR */}
-              <div style={{
-                display: 'flex',
-                gap: '0.5rem',
-                alignItems: 'center',
-                marginBottom: '0.75rem'
-              }}>
-                <input
-                  type="text"
-                  placeholder={`Search (${totalSystemProducts})`}
-                  value={searchInput}
-                  onChange={handleSearchChange}
-                  style={{
-                    flex: '1',
-                    padding: '0.5rem 0.7rem',
-                    border: '1px solid #ccc',
-                    borderRadius: '4px',
-                    fontSize: '0.85rem',
-                    boxSizing: 'border-box',
-                    backgroundColor: '#fff'
-                  }}
-                />
-                {/* Filters Button */}
-                <button
-                  onClick={() => setShowMobileFilters(!showMobileFilters)}
-                  style={{
-                    padding: '0.5rem 0.75rem',
-                    backgroundColor: '#5b4b8a',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '0.85rem',
-                    fontWeight: '600',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  <i className="fas fa-sliders-h" style={{ marginRight: '0.3rem' }}></i>
-                  Filters
-                </button>
-              </div>
-
-              {/* Mobile Filter Drawer */}
-              {showMobileFilters && (
-                <div style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  backgroundColor: 'white',
-                  borderBottom: '1px solid #eee',
-                  padding: '1rem',
-                  zIndex: 99,
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                }}>
-                  {/* Category Filter */}
-                  <div style={{ marginBottom: '1rem' }}>
-                    <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#333', marginBottom: '0.5rem', display: 'block' }}>
-                      Category
-                    </label>
-                    <select
-                      value={selectedCategory}
-                      onChange={(e) => {
-                        handleCategoryChange(e);
-                        setShowMobileFilters(false); // Close drawer after selection
-                      }}
-                      style={{
-                        width: '100%',
-                        padding: '0.6rem 0.75rem',
-                        border: '1px solid #ccc',
-                        borderRadius: '4px',
-                        fontSize: '0.85rem',
-                        boxSizing: 'border-box',
-                        backgroundColor: '#f5f5f5'
-                      }}
-                    >
-                      <option value="">All Categories</option>
-                      {categories.map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Close Button */}
-                  <button
-                    onClick={() => setShowMobileFilters(false)}
-                    style={{
-                      width: '100%',
-                      padding: '0.6rem',
-                      backgroundColor: '#eee',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '0.85rem',
-                      fontWeight: '600'
-                    }}
-                  >
-                    Done
-                  </button>
-                </div>
-              )}
             </div>
           )}
         </div>
