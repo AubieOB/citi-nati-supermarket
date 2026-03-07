@@ -290,32 +290,6 @@ const getProductById = async (req, res) => {
  * This endpoint is intentionally lightweight and returns only the name field.
  * It is used by the frontend autocomplete dropdown.
  */
-const getProductSuggestions = async (req, res) => {
-  try {
-    const { q } = req.query;
-    if (!q || q.length < 2) {
-      return res.json([]);
-    }
-
-    // case-insensitive partial match on enabled products only
-    const suggestions = await prisma.product.findMany({
-      where: {
-        enabled: true,
-        name: {
-          contains: q,
-          mode: 'insensitive',
-        },
-      },
-      select: { name: true },
-      take: 8,
-    });
-
-    res.json(suggestions.map((p) => p.name));
-  } catch (error) {
-    console.error('Suggestion error:', error);
-    res.status(500).json({ error: 'Failed to fetch suggestions' });
-  }
-};
 
 const updateProduct = async (req, res) => {
   try {
@@ -796,6 +770,5 @@ module.exports = {
   syncProductsFromPOSAgent,
   deletePOSProducts,
   getCategories,
-  toggleProductVisibility,
-  getProductSuggestions
+  toggleProductVisibility
 };
