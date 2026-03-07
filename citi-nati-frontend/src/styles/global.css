@@ -1899,7 +1899,7 @@ body.menu-open {
 
 .desktop-filter-nav {
   display: flex;
-  gap: 0.75rem;
+  gap: 1rem;
   align-items: center;
   flex-wrap: nowrap;
 }
@@ -1908,68 +1908,71 @@ body.menu-open {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 6px;
-  background-color: #f5f5f5;
-  border: 1px solid #e0e0e0;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background-color: transparent;
+  border: none;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   color: #666;
   text-decoration: none;
   position: relative;
-  font-size: 1.1rem;
+  font-size: 1.2rem;
   padding: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .desktop-filter-nav__item:hover {
   background-color: #5B4B8A;
   color: white;
-  border-color: #5B4B8A;
-  transform: scale(1.05);
+  transform: scale(1.08) translateY(-2px);
+  box-shadow: 0 6px 16px rgba(91, 75, 138, 0.3);
 }
 
 .desktop-filter-nav__item:active {
-  transform: scale(0.95);
+  transform: scale(0.96) translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .desktop-filter-nav__item--active {
   background-color: #5B4B8A;
   color: white;
-  border-color: #5B4B8A;
+  box-shadow: 0 4px 12px rgba(91, 75, 138, 0.25);
 }
 
 .desktop-filter-nav__badge {
   position: absolute;
-  top: -6px;
-  right: -6px;
-  background-color: #ff3860;
+  top: -8px;
+  right: -8px;
+  background: linear-gradient(135deg, #ff3860 0%, #ff1744 100%);
   color: white;
-  font-size: 0.65rem;
-  font-weight: bold;
+  font-size: 0.7rem;
+  font-weight: 700;
   border-radius: 50%;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 20px;
-  border: 2px solid white;
+  min-width: 22px;
+  border: 3px solid white;
+  box-shadow: 0 2px 6px rgba(255, 56, 96, 0.3);
 }
 
 .filter-container__logo {
   display: flex;
-  height: 40px;
+  height: 48px;
   width: auto;
-  max-width: 50px;
-  margin-right: 0.5rem;
+  max-width: 70px;
+  margin-right: 0.75rem;
   cursor: pointer;
-  transition: transform 0.3s ease;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   object-fit: contain;
 }
 
 .filter-container__logo:hover {
-  transform: scale(1.1);
+  transform: scale(1.12);
 }
 
 /* Hide desktop nav on mobile */
@@ -1991,6 +1994,26 @@ body.menu-open {
 
   .filter-container__logo {
     display: block;
+  }
+}
+
+/* Large screens - make logo even bigger */
+@media (min-width: 1200px) {
+  .filter-container__logo {
+    height: 56px;
+    max-width: 80px;
+  }
+
+  .desktop-filter-nav__item {
+    width: 48px;
+    height: 48px;
+    font-size: 1.3rem;
+  }
+
+  .desktop-filter-nav__badge {
+    width: 24px;
+    height: 24px;
+    font-size: 0.75rem;
   }
 }
 
