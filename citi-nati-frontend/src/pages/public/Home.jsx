@@ -1,11 +1,37 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Container from '../../components/ui/Container.jsx';
 import Button from '../../components/ui/Button.jsx';
 import PromotionBanner from '../../components/common/PromotionBanner.jsx';
+import api from '../../utils/api.js';
 import '../../styles/global.css';
 
 const Home = () => {
+  useEffect(() => {
+    // Warm up the backend - silent health check to wake Render free tier
+    const warmupBackend = async () => {
+      try {
+        await api.get('/health');
+        console.log('[WARMUP] Backend warmed up successfully');
+      } catch (err) {
+        console.warn('[WARMUP] Backend warmup failed (non-critical):', err.message);
+      }
+    };
+
+    // Prefetch first page of products silently for instant navigation
+    const prefetchProducts = async () => {
+      try {
+        await api.get('/products?page=1&pageSize=20');
+        console.log('[PREFETCH] Products prefetched successfully');
+      } catch (err) {
+        console.warn('[PREFETCH] Product prefetch failed (non-critical):', err.message);
+      }
+    };
+
+    // Run both operations on component mount
+    warmupBackend();
+    prefetchProducts();
+  }, []);
   return (
     <div className="page">
       {/* Promotion Banner - Appears at top if global promotion is active */}

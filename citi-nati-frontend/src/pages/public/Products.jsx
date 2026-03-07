@@ -594,25 +594,13 @@ const Products = () => {
 
       {/* PRODUCTS GRID - FULL WIDTH SECTION */}
       <div className="products-grid-wrapper">
-        {/* Header Section */}
-        <div className="products-header">
-          {/* Left: Title and Description */}
-          <div className="products-header__left">
-            <h1 style={{ 
-              marginBottom: '0.5rem', 
-              fontSize: 'clamp(1.5rem, 4vw, 2rem)', 
-              color: '#5B4B8A' 
-            }}>Our Products</h1>
-            <p style={{ 
-              color: '#666', 
-              margin: 0,
-              fontSize: 'clamp(0.9rem, 3vw, 1rem)'
-            }}>
-              Browse our selection of fresh groceries and essentials
-            </p>
-          </div>
-
-          {/* Right: FILTERS SECTION */}
+        {/* Compact Toolbar - Search & Filters */}
+        <div style={{
+          paddingBottom: '1rem',
+          marginBottom: '0.5rem',
+          borderBottom: '1px solid #eee'
+        }}>
+          {/* FILTERS SECTION */}
           <div style={{
             display: 'flex',
             gap: window.innerWidth <= 480 ? '0.4rem' : '0.75rem',
@@ -679,6 +667,16 @@ const Products = () => {
                 <option key={cat} value={cat}>{cat}</option>
               ))}
             </select>
+          </div>
+
+          {/* Product Count Display */}
+          <div style={{
+            fontSize: window.innerWidth <= 480 ? '0.85rem' : '0.95rem',
+            color: '#666',
+            marginTop: '0.75rem',
+            fontWeight: '500'
+          }}>
+            {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
           </div>
         </div>
 
