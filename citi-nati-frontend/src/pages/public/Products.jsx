@@ -623,7 +623,7 @@ const Products = () => {
             {/* SEARCH BAR */}
             <div style={{
               position: 'relative',
-              flex: '1 1 auto',
+              flex: '1',
               minWidth: '0'
             }}>
               <input
@@ -661,9 +661,8 @@ const Products = () => {
                 fontSize: window.innerWidth <= 480 ? '0.8rem' : '0.95rem',
                 backgroundColor: '#f5f5f5',
                 cursor: 'pointer',
-                flex: window.innerWidth <= 480 ? '0 0 auto' : '0 0 auto',
-                minWidth: window.innerWidth <= 480 ? '70px' : '140px',
-                maxWidth: window.innerWidth <= 480 ? '100px' : 'none',
+                flex: '1',
+                minWidth: '0',
                 transition: 'box-shadow 0.3s ease, background-color 0.3s ease'
               }}
               onFocus={(e) => {
@@ -693,12 +692,12 @@ const Products = () => {
                   }
                 }}
                 style={{
-                  padding: window.innerWidth <= 480 ? '0.45rem 0.5rem' : '0.6rem 1rem',
+                  padding: window.innerWidth <= 480 ? '0.3rem 0.35rem' : '0.6rem 1rem',
                   backgroundColor: '#f0f0f0',
                   border: 'none',
-                  borderRadius: '6px',
+                  borderRadius: window.innerWidth <= 480 ? '4px' : '6px',
                   cursor: 'pointer',
-                  fontSize: window.innerWidth <= 480 ? '0.75rem' : '0.95rem',
+                  fontSize: window.innerWidth <= 480 ? '0.65rem' : '0.95rem',
                   color: '#333',
                   whiteSpace: 'nowrap',
                   flex: '0 0 auto',
