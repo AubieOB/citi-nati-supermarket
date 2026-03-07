@@ -615,28 +615,28 @@ const Products = () => {
           {/* Right: FILTERS SECTION */}
           <div style={{
             display: 'flex',
-            gap: window.innerWidth <= 768 ? '0.5rem' : '0.75rem',
+            gap: window.innerWidth <= 480 ? '0.4rem' : '0.75rem',
             alignItems: 'center',
-            flexWrap: 'wrap',
+            flexWrap: 'nowrap',
             marginBottom: '0.75rem'
           }}>
             {/* SEARCH BAR */}
             <div style={{
               position: 'relative',
               flex: '1 1 auto',
-              minWidth: window.innerWidth <= 480 ? '100%' : '200px'
+              minWidth: '0'
             }}>
               <input
                 type="text"
-                placeholder="Search products..."
+                placeholder={window.innerWidth <= 480 ? "Search..." : "Search products..."}
                 value={searchInput}
                 onChange={handleSearchChange}
                 style={{
                   width: '100%',
-                  padding: '0.6rem 1rem',
+                  padding: window.innerWidth <= 480 ? '0.5rem 0.7rem' : '0.6rem 1rem',
                   border: '1px solid #ccc',
                   borderRadius: '4px',
-                  fontSize: '0.95rem',
+                  fontSize: window.innerWidth <= 480 ? '0.85rem' : '0.95rem',
                   boxSizing: 'border-box',
                   backgroundColor: '#fff',
                   transition: 'box-shadow 0.3s ease, background-color 0.3s ease'
@@ -655,14 +655,15 @@ const Products = () => {
               value={selectedCategory}
               onChange={handleCategoryChange}
               style={{
-                padding: '0.6rem 0.75rem',
+                padding: window.innerWidth <= 480 ? '0.5rem 0.5rem' : '0.6rem 0.75rem',
                 border: 'none',
                 borderRadius: '4px',
-                fontSize: '0.95rem',
+                fontSize: window.innerWidth <= 480 ? '0.8rem' : '0.95rem',
                 backgroundColor: '#f5f5f5',
                 cursor: 'pointer',
-                flex: '0 0 auto',
-                minWidth: window.innerWidth <= 480 ? '100px' : '140px',
+                flex: window.innerWidth <= 480 ? '0 0 auto' : '0 0 auto',
+                minWidth: window.innerWidth <= 480 ? '70px' : '140px',
+                maxWidth: window.innerWidth <= 480 ? '100px' : 'none',
                 transition: 'box-shadow 0.3s ease, background-color 0.3s ease'
               }}
               onFocus={(e) => {
@@ -692,12 +693,12 @@ const Products = () => {
                   }
                 }}
                 style={{
-                  padding: window.innerWidth <= 480 ? '0.4rem 0.6rem' : '0.6rem 1rem',
+                  padding: window.innerWidth <= 480 ? '0.45rem 0.5rem' : '0.6rem 1rem',
                   backgroundColor: '#f0f0f0',
                   border: 'none',
                   borderRadius: '6px',
                   cursor: 'pointer',
-                  fontSize: window.innerWidth <= 480 ? '0.8rem' : '0.95rem',
+                  fontSize: window.innerWidth <= 480 ? '0.75rem' : '0.95rem',
                   color: '#333',
                   whiteSpace: 'nowrap',
                   flex: '0 0 auto',
@@ -706,7 +707,7 @@ const Products = () => {
                 onMouseOver={(e) => e.target.style.backgroundColor = '#e0e0e0'}
                 onMouseOut={(e) => e.target.style.backgroundColor = '#f0f0f0'}
               >
-                Clear
+                {window.innerWidth <= 480 ? 'Clear' : 'Clear'}
               </button>
             )}
           </div>
