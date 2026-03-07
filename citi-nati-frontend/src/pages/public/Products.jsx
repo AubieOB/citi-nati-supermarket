@@ -641,7 +641,6 @@ const Products = () => {
                 e.target.style.boxShadow = 'none';
               }}
             />
-            </div>
 
             {/* Category Filter */}
             <select
