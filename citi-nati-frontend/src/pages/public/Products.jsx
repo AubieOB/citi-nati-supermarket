@@ -679,36 +679,6 @@ const Products = () => {
                 <option key={cat} value={cat}>{cat}</option>
               ))}
             </select>
-
-            {/* Clear Filters Button */}
-            {(searchInput || selectedCategory || onSaleOnly) && (
-              <button
-                onClick={() => {
-                  setSearchInput('');
-                  if (selectedCategory || onSaleOnly) {
-                    const newParams = new URLSearchParams();
-                    newParams.set('page', '1');
-                    setSearchParams(newParams);
-                  }
-                }}
-                style={{
-                  padding: window.innerWidth <= 480 ? '0.3rem 0.35rem' : '0.6rem 1rem',
-                  backgroundColor: '#f0f0f0',
-                  border: 'none',
-                  borderRadius: window.innerWidth <= 480 ? '4px' : '6px',
-                  cursor: 'pointer',
-                  fontSize: window.innerWidth <= 480 ? '0.65rem' : '0.95rem',
-                  color: '#333',
-                  whiteSpace: 'nowrap',
-                  flex: '0 0 auto',
-                  transition: 'all 0.2s'
-                }}
-                onMouseOver={(e) => e.target.style.backgroundColor = '#e0e0e0'}
-                onMouseOut={(e) => e.target.style.backgroundColor = '#f0f0f0'}
-              >
-                {window.innerWidth <= 480 ? 'Clear' : 'Clear'}
-              </button>
-            )}
           </div>
         </div>
 
