@@ -47,6 +47,7 @@ const DesktopFilterNav = ({ onCartClick, onAccountClick }) => {
         title="Go to Home"
       >
         <i className="fas fa-home"></i>
+        <span className="desktop-filter-nav__label">Home</span>
       </Link>
 
       {/* Products */}
@@ -57,6 +58,7 @@ const DesktopFilterNav = ({ onCartClick, onAccountClick }) => {
         title="Browse Products"
       >
         <i className="fas fa-box"></i>
+        <span className="desktop-filter-nav__label">Products</span>
       </Link>
 
       {/* Cart */}
@@ -67,6 +69,7 @@ const DesktopFilterNav = ({ onCartClick, onAccountClick }) => {
         title="View Cart"
       >
         <i className="fas fa-shopping-cart"></i>
+        <span className="desktop-filter-nav__label">Cart</span>
         {cartCount > 0 && (
           <span className="desktop-filter-nav__badge">
             {cartCount > 99 ? '99+' : cartCount}
@@ -85,6 +88,7 @@ const DesktopFilterNav = ({ onCartClick, onAccountClick }) => {
               title="View My Orders"
             >
               <i className="fas fa-receipt"></i>
+              <span className="desktop-filter-nav__label">Orders</span>
             </Link>
           ) : dashboardPath ? (
             <Link 
@@ -94,6 +98,7 @@ const DesktopFilterNav = ({ onCartClick, onAccountClick }) => {
               title={user?.role === 'admin' ? 'Admin Dashboard' : 'Driver Dashboard'}
             >
               <i className="fas fa-tachometer-alt"></i>
+              <span className="desktop-filter-nav__label">{user?.role === 'admin' ? 'Admin' : 'Driver'}</span>
             </Link>
           ) : null}
         </>
@@ -107,6 +112,7 @@ const DesktopFilterNav = ({ onCartClick, onAccountClick }) => {
         title={isAuthenticated ? 'Account' : 'Login'}
       >
         <i className={`fas ${isAuthenticated ? 'fa-user-circle' : 'fa-sign-in-alt'}`}></i>
+        <span className="desktop-filter-nav__label">{isAuthenticated ? 'Account' : 'Login'}</span>
       </button>
     </div>
   );
