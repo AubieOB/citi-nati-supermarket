@@ -615,7 +615,7 @@ const Products = () => {
           {/* Right: FILTERS SECTION */}
           <div style={{
             display: 'flex',
-            gap: '0.75rem',
+            gap: window.innerWidth <= 768 ? '0.5rem' : '0.75rem',
             alignItems: 'center',
             flexWrap: 'wrap',
             marginBottom: '0.75rem'
@@ -624,7 +624,7 @@ const Products = () => {
             <div style={{
               position: 'relative',
               flex: '1 1 auto',
-              minWidth: '200px'
+              minWidth: window.innerWidth <= 480 ? '100%' : '200px'
             }}>
               <input
                 type="text"
@@ -662,7 +662,7 @@ const Products = () => {
                 backgroundColor: '#f5f5f5',
                 cursor: 'pointer',
                 flex: '0 0 auto',
-                minWidth: '140px',
+                minWidth: window.innerWidth <= 480 ? '100px' : '140px',
                 transition: 'box-shadow 0.3s ease, background-color 0.3s ease'
               }}
               onFocus={(e) => {
@@ -692,12 +692,12 @@ const Products = () => {
                   }
                 }}
                 style={{
-                  padding: '0.6rem 1rem',
+                  padding: window.innerWidth <= 480 ? '0.4rem 0.6rem' : '0.6rem 1rem',
                   backgroundColor: '#f0f0f0',
                   border: 'none',
                   borderRadius: '6px',
                   cursor: 'pointer',
-                  fontSize: '0.95rem',
+                  fontSize: window.innerWidth <= 480 ? '0.8rem' : '0.95rem',
                   color: '#333',
                   whiteSpace: 'nowrap',
                   flex: '0 0 auto',
