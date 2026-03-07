@@ -29,15 +29,18 @@ const DesktopFilterNav = ({ onCartClick, onAccountClick }) => {
 
   return (
     <div className="desktop-filter-nav">
-      {/* Logo */}
-      <img 
-        src={logo} 
-        alt="Citi-Nati Logo" 
+      {/* Logo Button */}
+      <button 
         className="filter-container__logo"
         onClick={handleLogoClick}
         title="Go to Home"
-        style={{ display: 'block' }}
-      />
+        aria-label="Citi-Nati Home"
+      >
+        <img 
+          src={logo} 
+          alt="Citi-Nati Logo"
+        />
+      </button>
 
       {/* Home */}
       <Link 
