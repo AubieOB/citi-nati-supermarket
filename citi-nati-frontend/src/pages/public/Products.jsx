@@ -675,158 +675,97 @@ const Products = () => {
       {/* Promotion Banner - Appears at top if global or category promotion is active */}
       <PromotionBanner category={selectedCategory || null} />
 
-      {/* PRODUCTS GRID SECTION - CONTAINER WITH STICKY TOOLBAR */}
+      {/* TRULY FIXED FILTER CONTAINER - Stays at viewport top, no scroll */}
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 1000,
+        backgroundColor: 'white',
+        borderBottom: '1px solid #eee',
+        padding: window.innerWidth <= 480 ? '0.75rem' : '1rem',
+        boxShadow: scrollY > 0 ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
+        transition: 'box-shadow 0.3s ease',
+        justifyContent: 'center'
+      }}>
+        <div style={{
+          maxWidth: '1200px',
+          width: '100%',
+          margin: '0 auto',
+          display: 'flex',
+          gap: '1rem',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'nowrap'
+        }}>
+          {/* SEARCH BAR - ALWAYS ON LEFT, NO STACKING */}
+          <input
+            type="text"
+            placeholder={`Search products (${totalSystemProducts})`}
+            value={searchInput}
+            onChange={handleSearchChange}
+            style={{
+              flex: '1 1 auto',
+              minWidth: '180px',
+              maxWidth: '600px',
+              padding: '0.6rem 1rem',
+              border: '1px solid #ccc',
+              borderRadius: '4px',
+              fontSize: window.innerWidth <= 480 ? '0.85rem' : '0.95rem',
+              boxSizing: 'border-box',
+              backgroundColor: '#fff',
+              transition: 'box-shadow 0.3s ease, background-color 0.3s ease'
+            }}
+            onFocus={(e) => {
+              e.target.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+            }}
+            onBlur={(e) => {
+              e.target.style.boxShadow = 'none';
+            }}
+          />
+
+          {/* CATEGORY FILTER - ALWAYS ON RIGHT, NO STACKING */}
+          <select
+            value={selectedCategory}
+            onChange={handleCategoryChange}
+            style={{
+              flex: '0 1 auto',
+              minWidth: window.innerWidth <= 480 ? '140px' : '180px',
+              padding: '0.6rem 0.75rem',
+              border: 'none',
+              borderRadius: '4px',
+              fontSize: window.innerWidth <= 480 ? '0.85rem' : '0.95rem',
+              backgroundColor: '#f5f5f5',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              transition: 'box-shadow 0.3s ease, background-color 0.3s ease'
+            }}
+            onFocus={(e) => {
+              e.target.style.backgroundColor = '#fff';
+              e.target.style.boxShadow = '0 4px 12px rgba(91, 75, 138, 0.2)';
+            }}
+            onBlur={(e) => {
+              e.target.style.backgroundColor = '#f5f5f5';
+              e.target.style.boxShadow = 'none';
+            }}
+          >
+            <option value="">All Categories</option>
+            {categories.map(cat => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* PRODUCTS GRID SECTION - Account for fixed filter height */}
       <div style={{
         display: 'flex',
         flexDirection: 'column',
-        minHeight: 'calc(100vh - 200px)'
+        minHeight: '100vh',
+        marginTop: window.innerWidth <= 480 ? '3rem' : '3.6rem',
+        paddingTop: '0'
       }}>
-        {/* STICKY TOOLBAR */}
-        <div style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
-          backgroundColor: 'white',
-          borderBottom: '1px solid #eee',
-          padding: window.innerWidth <= 480 ? '0.75rem' : '1rem',
-          boxShadow: scrollY > 0 ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
-          transition: 'box-shadow 0.3s ease'
-        }}>
-          {/* Desktop Layout: Row with search and filters */}
-          {window.innerWidth > 768 ? (
-            <div>
-              {/* FILTERS SECTION - HORIZONTAL */}
-              <div style={{
-                display: 'flex',
-                gap: '1rem',
-                alignItems: 'center',
-                flexWrap: 'nowrap'
-              }}>
-                {/* SEARCH BAR - FLEXIBLE WITH MAX WIDTH */}
-                <div style={{
-                  position: 'relative',
-                  flex: '1',
-                  maxWidth: '600px'
-                }}>
-                  <input
-                    type="text"
-                    placeholder={`Search products (${totalSystemProducts} products)`}
-                    value={searchInput}
-                    onChange={handleSearchChange}
-                    style={{
-                      width: '100%',
-                      padding: '0.6rem 1rem',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px',
-                      fontSize: '0.95rem',
-                      boxSizing: 'border-box',
-                      backgroundColor: '#fff',
-                      transition: 'box-shadow 0.3s ease, background-color 0.3s ease'
-                    }}
-                    onFocus={(e) => {
-                      e.target.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.boxShadow = 'none';
-                    }}
-                  />
-                </div>
-
-                {/* Category Filter - FIXED WIDTH */}
-                <select
-                  value={selectedCategory}
-                  onChange={handleCategoryChange}
-                  style={{
-                    padding: '0.6rem 0.75rem',
-                    border: 'none',
-                    borderRadius: '4px',
-                    fontSize: '0.95rem',
-                    backgroundColor: '#f5f5f5',
-                    cursor: 'pointer',
-                    width: '220px',
-                    minWidth: '220px',
-                    transition: 'box-shadow 0.3s ease, background-color 0.3s ease'
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.backgroundColor = '#fff';
-                    e.target.style.boxShadow = '0 4px 12px rgba(91, 75, 138, 0.2)';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.backgroundColor = '#f5f5f5';
-                    e.target.style.boxShadow = 'none';
-                  }}
-                >
-                  <option value="">All Categories</option>
-                  {categories.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          ) : (
-            // Mobile/Tablet Layout: Stack filters vertically, all always visible
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {/* SEARCH BAR - FULL WIDTH */}
-              <div style={{
-                position: 'relative',
-                width: '100%'
-              }}>
-                <input
-                  type="text"
-                  placeholder={`Search products (${totalSystemProducts})`}
-                  value={searchInput}
-                  onChange={handleSearchChange}
-                  style={{
-                    width: '100%',
-                    padding: '0.6rem 0.75rem',
-                    border: '1px solid #ccc',
-                    borderRadius: '4px',
-                    fontSize: window.innerWidth <= 480 ? '0.85rem' : '0.95rem',
-                    boxSizing: 'border-box',
-                    backgroundColor: '#fff',
-                    transition: 'box-shadow 0.3s ease'
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.boxShadow = 'none';
-                  }}
-                />
-              </div>
-
-              {/* Category Filter - FULL WIDTH */}
-              <select
-                value={selectedCategory}
-                onChange={handleCategoryChange}
-                style={{
-                  padding: '0.6rem 0.75rem',
-                  border: 'none',
-                  borderRadius: '4px',
-                  fontSize: window.innerWidth <= 480 ? '0.85rem' : '0.95rem',
-                  backgroundColor: '#f5f5f5',
-                  cursor: 'pointer',
-                  width: '100%',
-                  transition: 'box-shadow 0.3s ease, background-color 0.3s ease'
-                }}
-                onFocus={(e) => {
-                  e.target.style.backgroundColor = '#fff';
-                  e.target.style.boxShadow = '0 4px 12px rgba(91, 75, 138, 0.2)';
-                }}
-                onBlur={(e) => {
-                  e.target.style.backgroundColor = '#f5f5f5';
-                  e.target.style.boxShadow = 'none';
-                }}
-              >
-                <option value="">All Categories</option>
-                {categories.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-            </div>
-          )}
-        </div>
-
         {/* SCROLLABLE PRODUCTS SECTION */}
         <div style={{
           flex: 1,
