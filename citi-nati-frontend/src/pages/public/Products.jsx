@@ -613,34 +613,42 @@ const Products = () => {
           </div>
 
           {/* Right: FILTERS SECTION */}
-          {/* SEARCH BAR */}
           <div style={{
-            position: 'relative',
-            marginBottom: '0.75rem',
-            maxWidth: '300px'
+            display: 'flex',
+            gap: '0.75rem',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            marginBottom: '0.75rem'
           }}>
-            <input
-              type="text"
-              placeholder="Search products..."
-              value={searchInput}
-              onChange={handleSearchChange}
-              style={{
-                width: '100%',
-                padding: '0.6rem 1rem',
-                border: '1px solid #ccc',
-                borderRadius: '4px',
-                fontSize: '0.95rem',
-                boxSizing: 'border-box',
-                backgroundColor: '#fff',
-                transition: 'box-shadow 0.3s ease, background-color 0.3s ease'
-              }}
-              onFocus={(e) => {
-                e.target.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-              }}
-              onBlur={(e) => {
-                e.target.style.boxShadow = 'none';
-              }}
-            />
+            {/* SEARCH BAR */}
+            <div style={{
+              position: 'relative',
+              flex: '1 1 auto',
+              minWidth: '200px'
+            }}>
+              <input
+                type="text"
+                placeholder="Search products..."
+                value={searchInput}
+                onChange={handleSearchChange}
+                style={{
+                  width: '100%',
+                  padding: '0.6rem 1rem',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  fontSize: '0.95rem',
+                  boxSizing: 'border-box',
+                  backgroundColor: '#fff',
+                  transition: 'box-shadow 0.3s ease, background-color 0.3s ease'
+                }}
+                onFocus={(e) => {
+                  e.target.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.boxShadow = 'none';
+                }}
+              />
+            </div>
 
             {/* Category Filter */}
             <select
