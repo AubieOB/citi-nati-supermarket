@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import Container from '../../components/ui/Container.jsx';
 import Button from '../../components/ui/Button.jsx';
 import PromotionBanner from '../../components/common/PromotionBanner.jsx';
 import Pagination from '../../components/ui/Pagination.jsx';
+import MobileBottomNav from '../../components/common/MobileBottomNav.jsx';
+import DesktopFilterNav from '../../components/common/DesktopFilterNav.jsx';
 import api from '../../utils/api.js';
 import { getSocket } from '../../utils/socket.js';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -51,9 +53,11 @@ const Products = () => {
   const [totalProducts, setTotalProducts] = useState(0); // Current page's total
   const [totalSystemProducts, setTotalSystemProducts] = useState(0); // Total enabled products in system
   const [scrollY, setScrollY] = useState(0); // Track scroll position for back-to-top button
-  const { isAuthenticated, logout } = useAuth();
+  const [showAccountPopup, setShowAccountPopup] = useState(false); // For mobile/desktop account popup
+  const { isAuthenticated, logout, user } = useAuth();
   const { updateCartCount } = useCart();
-  const { modal, closeModal, showError, showSuccess } = useModal();
+  const { modal, closeModal, showError, showSuccess, showConfirm } = useModal();
+  const navigate = useNavigate();
   
   // Refs for predictive search with caching and cancellation
   const searchCacheRef = useRef(new Map()); // Cache previous search results
@@ -635,6 +639,39 @@ const Products = () => {
     }
   };
 
+  /**
+   * Handle cart click from navigation
+   */
+  const handleNavCartClick = () => {
+    navigate('/cart');
+  };
+
+  /**
+   * Handle account/login click from navigation
+   */
+  const handleNavAccountClick = () => {
+    if (isAuthenticated) {
+      setShowAccountPopup(!showAccountPopup);
+    } else {
+      navigate('/login');
+    }
+  };
+
+  /**
+   * Handle logout from popup
+   */
+  const handleNavLogout = () => {
+    showConfirm(
+      'Confirm Logout',
+      'Are you sure you want to log out?',
+      () => {
+        logout();
+        setShowAccountPopup(false);
+        navigate('/login');
+      }
+    );
+  };
+
   // Loading state - ONLY show for initial page load (when there's no data at all)
   const isInitialLoading = loading && products.length === 0 && filteredProducts.length === 0;
 
@@ -699,6 +736,18 @@ const Products = () => {
           justifyContent: 'space-between',
           flexWrap: 'nowrap'
         }}>
+          {/* DESKTOP NAVIGATION & LOGO - Only visible on largescreen */}
+          <div style={{ 
+            display: window.innerWidth > 768 ? 'flex' : 'none',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            <DesktopFilterNav 
+              onCartClick={handleNavCartClick}
+              onAccountClick={handleNavAccountClick}
+            />
+          </div>
+
           {/* SEARCH BAR - ALWAYS ON LEFT, NO STACKING */}
           <input
             type="text"
@@ -707,8 +756,8 @@ const Products = () => {
             onChange={handleSearchChange}
             style={{
               flex: '1 1 auto',
-              minWidth: '180px',
-              maxWidth: '600px',
+              minWidth: window.innerWidth <= 768 ? '120px' : '180px',
+              maxWidth: window.innerWidth > 768 ? '400px' : '600px',
               padding: '0.6rem 1rem',
               border: '1px solid #ccc',
               borderRadius: '4px',
@@ -757,6 +806,87 @@ const Products = () => {
           </select>
         </div>
       </div>
+
+      {/* ACCOUNT POPUP FOR MOBILE/DESKTOP */}
+      {showAccountPopup && isAuthenticated && (
+        <div style={{
+          position: 'fixed',
+          top: window.innerWidth > 768 ? '70px' : 'auto',
+          bottom: window.innerWidth <= 768 ? '70px' : 'auto',
+          right: '1rem',
+          left: window.innerWidth <= 768 ? '1rem' : 'auto',
+          backgroundColor: 'white',
+          border: '1px solid #ddd',
+          borderRadius: '8px',
+          padding: '1rem',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+          zIndex: 1001,
+          maxWidth: '300px',
+          animation: 'slideIn 0.3s ease',
+          backdropFilter: 'blur(0px)'
+        }}>
+          {/* User Name */}
+          <div style={{
+            fontSize: '16px',
+            fontWeight: '600',
+            color: '#333',
+            marginBottom: '8px'
+          }}>
+            {user?.name}
+          </div>
+
+          {/* Email */}
+          <div style={{
+            fontSize: '13px',
+            color: '#666',
+            marginBottom: '12px',
+            wordBreak: 'break-word'
+          }}>
+            {user?.email}
+          </div>
+
+          {/* Logout Button */}
+          <button
+            onClick={handleNavLogout}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              backgroundColor: '#ff3860',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '500',
+              transition: 'background-color 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = '#e82860';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = '#ff3860';
+            }}
+          >
+            Logout
+          </button>
+        </div>
+      )}
+
+      {/* CLOSE POPUP ON OUTSIDE CLICK */}
+      {showAccountPopup && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 60,
+            zIndex: 999,
+            backgroundColor: 'transparent'
+          }}
+          onClick={() => setShowAccountPopup(false)}
+        />
+      )}
 
       {/* PRODUCTS GRID SECTION - Account for fixed filter height */}
       <div style={{
@@ -966,6 +1096,12 @@ const Products = () => {
         confirmText={modal.confirmText}
         cancelText={modal.cancelText}
         showCancelButton={modal.showCancelButton}
+      />
+
+      {/* MOBILE BOTTOM NAVIGATION - Only visible on mobile */}
+      <MobileBottomNav 
+        onCartClick={handleNavCartClick}
+        onAccountClick={handleNavAccountClick}
       />
     </div>
   );
