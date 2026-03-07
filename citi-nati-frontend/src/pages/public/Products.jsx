@@ -48,7 +48,8 @@ const Products = () => {
   const [searchInput, setSearchInput] = useState(''); // User typing (instant)
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [totalProducts, setTotalProducts] = useState(0);
+  const [totalProducts, setTotalProducts] = useState(0); // Current page's total
+  const [totalSystemProducts, setTotalSystemProducts] = useState(0); // Total enabled products in system
   const [scrollY, setScrollY] = useState(0); // Track scroll position for back-to-top button
   const [showMobileFilters, setShowMobileFilters] = useState(false); // Mobile filter drawer state
   const { isAuthenticated, logout } = useAuth();
@@ -57,6 +58,7 @@ const Products = () => {
   
   // Refs for predictive search with caching and cancellation
   const searchCacheRef = useRef(new Map()); // Cache previous search results
+  const productsCacheRef = useRef(new Map()); // Cache product pages (key: "page_1_category_all")
   const abortControllerRef = useRef(null); // Cancel previous requests
   const debounceTimerRef = useRef(null); // Debounce timer for product search
   const selectedCategoryRef = useRef(''); // Track selected category in socket handlers
@@ -154,6 +156,7 @@ const Products = () => {
   /**
    * Fetch products for pagination and category filtering
    * Separate from search - handles normal browsing
+   * Implements client-side caching for instant page loads
    */
   const fetchProducts = async (page = 1) => {
     try {
@@ -164,6 +167,22 @@ const Products = () => {
       setError(null);
 
       const pageSize = 20;
+      
+      // Create cache key based on page, category, and sale filter
+      const cacheKey = `page_${page}_category_${selectedCategory || 'all'}_sale_${onSaleOnly}`;
+
+      // Check if page is in cache
+      if (productsCacheRef.current.has(cacheKey)) {
+        console.log(`[CACHE HIT] Loading page ${page} from cache (category: ${selectedCategory || 'all'})`);
+        const cachedData = productsCacheRef.current.get(cacheKey);
+        setProducts(cachedData.products);
+        setCurrentPage(cachedData.currentPage);
+        setTotalPages(cachedData.totalPages);
+        setTotalProducts(cachedData.total);
+        setLoading(false);
+        return;
+      }
+
       const params = new URLSearchParams();
       params.append('page', page);
       params.append('pageSize', pageSize);
@@ -171,6 +190,8 @@ const Products = () => {
       if (selectedCategory) params.append('category', selectedCategory);
       if (onSaleOnly) params.append('onSale', 'true');
 
+      console.log(`[CACHE MISS] Fetching page ${page} from API (category: ${selectedCategory || 'all'})`);
+      
       const response = await api.get(`/products?${params.toString()}`);
       const data = response.data;
 
@@ -181,6 +202,15 @@ const Products = () => {
       console.log(`[PRODUCTS FETCH] Page ${page}/${data.pagination?.totalPages || 1} | Total: ${data.pagination?.total || 0} | Category: ${selectedCategory || 'all'}`);
       
       const fetchedProducts = data.products;
+      
+      // Cache the page data (reuse the cacheKey defined earlier in this function)
+      productsCacheRef.current.set(cacheKey, {
+        products: fetchedProducts,
+        currentPage: data.pagination?.currentPage || page,
+        totalPages: data.pagination?.totalPages || 1,
+        total: data.pagination?.total || 0
+      });
+
       setProducts(fetchedProducts);
       
       // Update pagination state
@@ -272,6 +302,32 @@ const Products = () => {
 
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Fetch total system product count on mount (all enabled products)
+  useEffect(() => {
+    const fetchTotalCount = async () => {
+      try {
+        // Fetch first page with pageSize 1 to get total count without loading all products
+        const response = await api.get('/products', {
+          params: {
+            page: 1,
+            pageSize: 1
+          }
+        });
+        
+        // Extract total count from pagination metadata
+        const count = response.data.pagination?.total || 0;
+        setTotalSystemProducts(count);
+        console.log(`[PRODUCT COUNT] Total enabled products: ${count}`);
+      } catch (err) {
+        console.warn('[PRODUCT COUNT] Failed to fetch total count:', err.message);
+        // Fail silently - don't show error, just use 0
+        setTotalSystemProducts(0);
+      }
+    };
+
+    fetchTotalCount();
   }, []);
 
   // Fetch on pagination change
@@ -640,23 +696,22 @@ const Products = () => {
           {/* Desktop Layout: Row with search and filters */}
           {window.innerWidth > 768 ? (
             <div>
-              {/* FILTERS SECTION */}
+              {/* FILTERS SECTION - HORIZONTAL */}
               <div style={{
                 display: 'flex',
-                gap: '0.75rem',
+                gap: '1rem',
                 alignItems: 'center',
-                flexWrap: 'nowrap',
-                marginBottom: '0.75rem'
+                flexWrap: 'nowrap'
               }}>
-                {/* SEARCH BAR */}
+                {/* SEARCH BAR - FLEXIBLE WITH MAX WIDTH */}
                 <div style={{
                   position: 'relative',
                   flex: '1',
-                  minWidth: '0'
+                  maxWidth: '600px'
                 }}>
                   <input
                     type="text"
-                    placeholder="Search products..."
+                    placeholder={`Search products (${totalSystemProducts} products)`}
                     value={searchInput}
                     onChange={handleSearchChange}
                     style={{
@@ -678,7 +733,7 @@ const Products = () => {
                   />
                 </div>
 
-                {/* Category Filter */}
+                {/* Category Filter - FIXED WIDTH */}
                 <select
                   value={selectedCategory}
                   onChange={handleCategoryChange}
@@ -689,8 +744,8 @@ const Products = () => {
                     fontSize: '0.95rem',
                     backgroundColor: '#f5f5f5',
                     cursor: 'pointer',
-                    flex: '1',
-                    minWidth: '0',
+                    width: '220px',
+                    minWidth: '220px',
                     transition: 'box-shadow 0.3s ease, background-color 0.3s ease'
                   }}
                   onFocus={(e) => {
@@ -708,15 +763,67 @@ const Products = () => {
                   ))}
                 </select>
               </div>
-
-              {/* Product Count Display */}
+            </div>
+          ) : window.innerWidth > 480 ? (
+            // Tablet Layout: Stack vertically
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {/* SEARCH BAR */}
               <div style={{
-                fontSize: '0.95rem',
-                color: '#666',
-                fontWeight: '500'
+                position: 'relative',
+                width: '100%'
               }}>
-                {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
+                <input
+                  type="text"
+                  placeholder={`Search products (${totalSystemProducts} products)`}
+                  value={searchInput}
+                  onChange={handleSearchChange}
+                  style={{
+                    width: '100%',
+                    padding: '0.6rem 1rem',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    fontSize: '0.95rem',
+                    boxSizing: 'border-box',
+                    backgroundColor: '#fff',
+                    transition: 'box-shadow 0.3s ease'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.boxShadow = 'none';
+                  }}
+                />
               </div>
+
+              {/* Category Filter */}
+              <select
+                value={selectedCategory}
+                onChange={handleCategoryChange}
+                style={{
+                  padding: '0.6rem 0.75rem',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontSize: '0.95rem',
+                  backgroundColor: '#f5f5f5',
+                  cursor: 'pointer',
+                  width: '100%',
+                  transition: 'box-shadow 0.3s ease'
+                }}
+                onFocus={(e) => {
+                  e.target.style.backgroundColor = '#fff';
+                  e.target.style.boxShadow = '0 4px 12px rgba(91, 75, 138, 0.2)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.backgroundColor = '#f5f5f5';
+                  e.target.style.boxShadow = 'none';
+                }}
+              >
+                <option value="">All Categories</option>
+                {categories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
             </div>
           ) : (
             // Mobile Layout: Compact with filter drawer button
@@ -730,7 +837,7 @@ const Products = () => {
               }}>
                 <input
                   type="text"
-                  placeholder="Search..."
+                  placeholder={`Search (${totalSystemProducts})`}
                   value={searchInput}
                   onChange={handleSearchChange}
                   style={{
@@ -822,15 +929,6 @@ const Products = () => {
                   </button>
                 </div>
               )}
-
-              {/* Product Count Display */}
-              <div style={{
-                fontSize: '0.85rem',
-                color: '#666',
-                fontWeight: '500'
-              }}>
-                {filteredProducts.length} products
-              </div>
             </div>
           )}
         </div>
