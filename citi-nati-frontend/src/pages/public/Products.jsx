@@ -738,29 +738,26 @@ const Products = () => {
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '0.75rem',
+              gap: '0',
               cursor: 'pointer',
-              flex: 'none'
+              flex: 'none',
+              marginLeft: '-2rem',
+              paddingLeft: '2rem'
             }} onClick={() => navigate('/')}>
               <img 
                 src={logo} 
                 alt="Citi-Nati Logo" 
                 style={{
-                  height: '48px',
-                  width: 'auto',
-                  maxWidth: '60px',
-                  objectFit: 'contain'
+                  height: 'clamp(40px, 8vw, 60px)',
+                  marginLeft: '0',
+                  marginRight: '0.1rem',
+                  verticalAlign: 'middle'
                 }}
               />
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0',
-                lineHeight: '1'
-              }}>
-                <span style={{ fontSize: '0.9rem', fontWeight: '700', color: '#5B4B8A' }}>Citi</span>
-                <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#2D8659' }}>Supermarket</span>
-              </div>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0', fontSize: 'clamp(14px, 3vw, 20px)', whiteSpace: 'nowrap' }}>
+                <span style={{ color: '#5B4B8A', fontWeight: '700' }}>Citi</span>
+                <span style={{ color: '#2D8659', fontWeight: '700' }}>-Nati Supermarket</span>
+              </span>
             </div>
 
             {/* Navigation Buttons Right Section */}
@@ -939,7 +936,7 @@ const Products = () => {
         display: 'flex',
         flexDirection: 'column',
         minHeight: '100vh',
-        marginTop: window.innerWidth > 768 ? '7rem' : '3.25rem',
+        marginTop: window.innerWidth > 768 ? '5.5rem' : '3.25rem',
         paddingTop: '0'
       }}>
         {/* SCROLLABLE PRODUCTS SECTION */}
