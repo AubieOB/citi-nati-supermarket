@@ -56,7 +56,7 @@ const Products = () => {
   const [scrollY, setScrollY] = useState(0); // Track scroll position for back-to-top button
   const [showAccountPopup, setShowAccountPopup] = useState(false); // For mobile/desktop account popup
   const { isAuthenticated, logout, user } = useAuth();
-  const { updateCartCount } = useCart();
+  const { cartCount, updateCartCount } = useCart();
   const { modal, closeModal, showError, showSuccess, showConfirm } = useModal();
   const navigate = useNavigate();
   
