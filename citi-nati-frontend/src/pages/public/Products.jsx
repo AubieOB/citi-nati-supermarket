@@ -936,7 +936,7 @@ const Products = () => {
         display: 'flex',
         flexDirection: 'column',
         minHeight: '100vh',
-        marginTop: window.innerWidth > 768 ? '5.5rem' : '3.25rem',
+        marginTop: window.innerWidth > 768 ? '4.5rem' : '3.25rem',
         paddingTop: '0'
       }}>
         {/* SCROLLABLE PRODUCTS SECTION */}
