@@ -87,7 +87,7 @@ function AppInner() {
         <Route path="/verify-email" element={<Suspense fallback={loadingFallback}><VerifyEmail /></Suspense>} />
         <Route path="/forgot-password" element={<Suspense fallback={loadingFallback}><ForgotPassword /></Suspense>} />
         <Route path="/reset-password" element={<Suspense fallback={loadingFallback}><ResetPassword /></Suspense>} />
-        <Route path="/products" element={<Layout><Suspense fallback={loadingFallback}><Products /></Suspense></Layout>} />
+        <Route path="/products" element={<Suspense fallback={loadingFallback}><Products /></Suspense>} />
         <Route path="/cart" element={<Suspense fallback={loadingFallback}><Cart /></Suspense>} />
         <Route path="/checkout" element={<Suspense fallback={loadingFallback}><Checkout /></Suspense>} />
         <Route path="/payment-success" element={<Suspense fallback={loadingFallback}><PaymentSuccess /></Suspense>} />
