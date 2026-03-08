@@ -120,26 +120,20 @@ const AdminProducts = () => {
 
   const fetchProducts = async () => {
     try {
-      // show spinner only on first load
-      if (products.length === 0) setLoading(true);
       setError(null);
 
-      // iterate pages because API caps pageSize at 100
+      // Load first page immediately (limit 100 per page)
       let page = 1;
       const perPage = 100;
       let all = [];
 
-      while (true) {
-        const resp = await api.get(`/products?page=${page}&pageSize=${perPage}`);
-        const items = resp.data.products || [];
-        if (items.length === 0) break;
-        all = all.concat(items);
-        if (items.length < perPage) break;
-        page += 1;
-      }
+      // Fetch first page to show something immediately
+      const firstResp = await api.get(`/products?page=${page}&pageSize=${perPage}`);
+      const firstItems = firstResp.data.products || [];
+      all = all.concat(firstItems);
 
-      // Sort by expiry status for visibility
-      const sorted = all.sort((a, b) => {
+      // Sort by expiry status
+      let sorted = all.sort((a, b) => {
         if (!a.expiryStatus && !b.expiryStatus) return 0;
         if (!a.expiryStatus) return 1;
         if (!b.expiryStatus) return -1;
@@ -155,13 +149,58 @@ const AdminProducts = () => {
         
         return (statusPriority[a.expiryStatus.status] || 5) - (statusPriority[b.expiryStatus.status] || 5);
       });
-      
+
       setProducts(sorted);
-      console.log('[AdminProducts] Loaded', sorted.length, 'total products');
+      setLoading(false); // Stop showing loading spinner immediately
+      console.log('[AdminProducts] First page loaded:', firstItems.length, 'products');
+
+      // If there are more pages, load them in background without blocking
+      if (firstItems.length === perPage) {
+        // Load remaining pages in background
+        (async () => {
+          try {
+            page += 1;
+            while (true) {
+              const resp = await api.get(`/products?page=${page}&pageSize=${perPage}`);
+              const items = resp.data.products || [];
+              if (items.length === 0) break;
+              
+              all = all.concat(items);
+              
+              // Re-sort and update state
+              sorted = all.sort((a, b) => {
+                if (!a.expiryStatus && !b.expiryStatus) return 0;
+                if (!a.expiryStatus) return 1;
+                if (!b.expiryStatus) return -1;
+                
+                const statusPriority = {
+                  expired: 0,
+                  '1_week_warning': 1,
+                  '2_weeks_warning': 2,
+                  '1_month_warning': 3,
+                  '2_months_warning': 4,
+                  null: 5
+                };
+                
+                return (statusPriority[a.expiryStatus.status] || 5) - (statusPriority[b.expiryStatus.status] || 5);
+              });
+              
+              setProducts(sorted);
+              console.log('[AdminProducts] Background load: +', items.length, 'products (total:', sorted.length, ')');
+
+              if (items.length < perPage) break;
+              page += 1;
+            }
+            console.log('[AdminProducts] Background load complete. Total:', all.length, 'products');
+          } catch (bgErr) {
+            console.warn('[AdminProducts] Background loading error:', bgErr.message);
+            // Don't show error - UI already has first page
+          }
+        })();
+      }
     } catch (err) {
       console.error('Error fetching products:', err);
       setError(err.response?.data?.error || 'Failed to load products');
-    } finally {
       setLoading(false);
     }
   };
