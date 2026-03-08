@@ -260,10 +260,6 @@ const AdminOrders = () => {
     return { newOrders, oldOrders };
   };
 
-  if (loading) {
-    return <div style={{ textAlign: 'center', padding: '2rem' }}>Loading orders...</div>;
-  }
-
   if (error) {
     return (
       <div style={{
@@ -277,22 +273,39 @@ const AdminOrders = () => {
     );
   }
 
-  if (orders.length === 0) {
-    return (
-      <div style={{
-        backgroundColor: '#f8f9fa',
-        padding: '2rem',
-        borderRadius: '8px',
-        textAlign: 'center',
-        color: '#666',
-      }}>
-        No orders yet
-      </div>
-    );
-  }
-
   return (
     <div>
+      {/* Loading Indicator */}
+      {loading && orders.length === 0 && (
+        <div style={{backgroundColor: '#e7f3ff', padding: '0.75rem', borderRadius: '4px', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+          <i className="fas fa-spinner fa-spin"></i>
+          <span>Loading orders...</span>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!loading && orders.length === 0 && (
+        <div style={{
+          backgroundColor: '#f8f9fa',
+          padding: '2rem',
+          borderRadius: '8px',
+          textAlign: 'center',
+          color: '#666',
+        }}>
+          No orders yet
+        </div>
+      )}
+
+      {/* Orders Content */}
+      {orders.length > 0 && (
+        <>
+          {/* Loading indicator while fetching more */}
+          {loading && (
+            <div style={{backgroundColor: '#e7f3ff', padding: '0.75rem', borderRadius: '4px', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+              <i className="fas fa-spinner fa-spin"></i>
+              <span>Loading more orders...</span>
+            </div>
+          )}
       {/* Get grouped orders */}
       {(() => {
         const { newOrders, oldOrders } = getGroupedOrders();
@@ -541,6 +554,8 @@ const AdminOrders = () => {
           </>
         );
       })()}
+        </>
+      )}
 
       {/* Order Details Modal */}
       <OrderDetailsModal

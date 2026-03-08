@@ -428,16 +428,16 @@ const AdminProducts = () => {
     setFormError('');
   };
 
-  if (loading) {
-    return (
-      <div style={{ textAlign: 'center', padding: '2rem' }}>
-        <p>Loading products...</p>
-      </div>
-    );
-  }
-
   return (
     <div>
+      {/* Loading Indicator for background pagination */}
+      {loading && products.length === 0 && (
+        <div style={{backgroundColor: '#e7f3ff', padding: '0.75rem', borderRadius: '4px', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+          <i className="fas fa-spinner fa-spin"></i>
+          <span>Loading products...</span>
+        </div>
+      )}
+
       {/* Create/Edit Form */}
       {showForm && (
         <div

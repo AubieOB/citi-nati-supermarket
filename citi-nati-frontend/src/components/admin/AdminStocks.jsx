@@ -95,37 +95,53 @@ const AdminStocks = () => {
   };
 
   // fetch all pages from the backend (pageSize max is 100 on the server).
-  // the previous one‑shot request used a large pageSize that was silently capped,
-  // so dashboards only ever saw the first 100 items. this helper loops until no
-  // more rows are returned and merges them into a single list.
+  // Load first page immediately to show UI, then fetch remaining pages in background
   const fetchProducts = async () => {
     try {
-      if (allProducts.length === 0) setLoading(true);
-      let page = 1;
-      const perPage = 100; // server limit
-      let collected = [];
+      // Load first page immediately
+      const res1 = await api.get(`/products?page=1&pageSize=100`);
+      const firstBatch = res1.data.products || [];
+      setAllProducts(firstBatch);
 
-      while (true) {
-        const res = await api.get(`/products?page=${page}&pageSize=${perPage}`);
-        const items = res.data.products || [];
-        if (items.length === 0) break;
-        collected = collected.concat(items);
-        if (items.length < perPage) break; // last page
-        page += 1;
-      }
-
-      setAllProducts(collected);
-
-      // Extract unique categories from entire set
-      const uniqueCategories = [...new Set(collected.map(p => p.category))];
+      // Extract categories from first batch
+      const uniqueCategories = [...new Set(firstBatch.map(p => p.category))];
       setCategories(uniqueCategories.filter(Boolean));
 
-      setCurrentPage(1); // Reset to first page
-      console.log('[AdminStocks] fetched', collected.length, 'products in total');
+      setCurrentPage(1);
+      setLoading(false); // UI renders after first page
+
+      // Load remaining pages in background (non-blocking)
+      const collectRemaining = async () => {
+        try {
+          let collected = [...firstBatch];
+          let page = 2;
+          const perPage = 100;
+
+          while (true) {
+            const res = await api.get(`/products?page=${page}&pageSize=${perPage}`);
+            const items = res.data.products || [];
+            if (items.length === 0) break;
+            collected = collected.concat(items);
+            if (items.length < perPage) break;
+            page += 1;
+          }
+
+          setAllProducts(collected);
+          const allCategories = [...new Set(collected.map(p => p.category))];
+          setCategories(allCategories.filter(Boolean));
+          console.log('[AdminStocks] fetched', collected.length, 'products in total');
+        } catch (err) {
+          console.error('[AdminStocks] Error loading remaining pages:', err);
+        }
+      };
+
+      // Start background load if there are more pages
+      if (firstBatch.length === 100) {
+        collectRemaining();
+      }
     } catch (err) {
       console.error('Error fetching products:', err);
       notifyError('Failed to load products', 3000);
-    } finally {
       setLoading(false);
     }
   };
@@ -224,13 +240,16 @@ const AdminStocks = () => {
     setCurrentPage(1); // Reset to page 1
   };
 
-
-  if (loading) {
-    return <div style={{ textAlign: 'center', padding: '2rem' }}>Loading products...</div>;
-  }
-
   return (
     <div style={{ padding: '1.5rem' }}>
+      {/* Loading Indicator */}
+      {loading && allProducts.length === 0 && (
+        <div style={{backgroundColor: '#e7f3ff', padding: '0.75rem', borderRadius: '4px', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+          <i className="fas fa-spinner fa-spin"></i>
+          <span>Loading products...</span>
+        </div>
+      )}
+
       {/* Header */}
       <div style={{
         display: 'flex',
