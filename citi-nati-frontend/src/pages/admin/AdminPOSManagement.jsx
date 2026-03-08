@@ -646,7 +646,6 @@ const AdminPOSManagement = () => {
     </Container>
   );
 };
-};
 
 const styles = {
   container: {
