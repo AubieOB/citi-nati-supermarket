@@ -6,6 +6,7 @@ import PromotionBanner from '../../components/common/PromotionBanner.jsx';
 import Pagination from '../../components/ui/Pagination.jsx';
 import MobileBottomNav from '../../components/common/MobileBottomNav.jsx';
 import DesktopFilterNav from '../../components/common/DesktopFilterNav.jsx';
+import logo from '../../assets/citi-nati-logo.png.png';
 import api from '../../utils/api.js';
 import { getSocket } from '../../utils/socket.js';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -738,7 +739,7 @@ const Products = () => {
         }}>
           {/* LOGO - Only visible on large screens */}
           <img 
-            src={require('../../assets/citi-nati-logo.png.png')} 
+            src={logo} 
             alt="Citi-Nati Logo" 
             className="filter-container__logo"
             onClick={() => navigate('/')}
