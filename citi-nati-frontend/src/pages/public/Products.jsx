@@ -708,7 +708,7 @@ const Products = () => {
 
   return (
     <div className="page products-page">
-      {/* FIXED FILTER BAR */}
+      {/* FIXED FILTER BAR - Single tier with filters left, buttons right */}
       <div style={{
         position: 'fixed',
         top: 0,
@@ -718,33 +718,45 @@ const Products = () => {
         backgroundColor: 'white',
         borderBottom: '1px solid #eee',
         boxShadow: scrollY > 0 ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
-        transition: 'box-shadow 0.3s ease'
+        transition: 'box-shadow 0.3s ease',
+        display: 'flex',
+        justifyContent: 'center',
+        padding: window.innerWidth <= 480 ? '0.75rem' : '0.75rem 1.5rem'
       }}>
         <div style={{
           maxWidth: '1200px',
-          margin: '0 auto',
-          padding: window.innerWidth <= 480 ? '0.75rem' : '0.75rem 1.5rem',
+          width: '100%',
           display: 'flex',
           gap: '0.75rem',
           alignItems: 'center',
-          justifyContent: 'space-between'
+          justifyContent: 'space-between',
+          flexWrap: 'nowrap'
         }}>
-          {/* Search & Category */}
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flex: 1, minWidth: 0 }}>
+          {/* LEFT SECTION - Filters */}
+          <div style={{
+            display: 'flex',
+            gap: '0.75rem',
+            alignItems: 'center',
+            flex: '1 1 auto',
+            minWidth: 0
+          }}>
+            {/* SEARCH BAR */}
             <input
               type="text"
-              placeholder={`Search (${totalSystemProducts})`}
+              placeholder={`Search products (${totalSystemProducts})`}
               value={searchInput}
               onChange={handleSearchChange}
               style={{
-                flex: 1,
+                flex: '1 1 auto',
                 minWidth: window.innerWidth <= 768 ? '120px' : '180px',
+                maxWidth: window.innerWidth > 768 ? '450px' : '600px',
                 padding: '0.5rem 0.9rem',
                 border: '1px solid #d0d0d0',
                 borderRadius: '6px',
                 fontSize: window.innerWidth <= 480 ? '0.85rem' : '0.95rem',
+                boxSizing: 'border-box',
                 backgroundColor: '#fff',
-                transition: 'all 0.2s ease'
+                transition: 'box-shadow 0.2s ease, border-color 0.2s ease'
               }}
               onFocus={(e) => {
                 e.target.style.boxShadow = '0 2px 8px rgba(91, 75, 138, 0.15)';
@@ -755,11 +767,13 @@ const Products = () => {
                 e.target.style.borderColor = '#d0d0d0';
               }}
             />
-            
+
+            {/* CATEGORY FILTER */}
             <select
               value={selectedCategory}
               onChange={handleCategoryChange}
               style={{
+                flex: '0 1 auto',
                 minWidth: window.innerWidth <= 480 ? '130px' : '160px',
                 padding: '0.5rem 0.65rem',
                 border: '1px solid #d0d0d0',
@@ -767,7 +781,8 @@ const Products = () => {
                 fontSize: window.innerWidth <= 480 ? '0.85rem' : '0.95rem',
                 backgroundColor: '#fff',
                 cursor: 'pointer',
-                transition: 'all 0.2s ease'
+                whiteSpace: 'nowrap',
+                transition: 'box-shadow 0.2s ease, border-color 0.2s ease'
               }}
               onFocus={(e) => {
                 e.target.style.borderColor = '#5B4B8A';
@@ -785,9 +800,16 @@ const Products = () => {
             </select>
           </div>
 
-          {/* Home & Cart (Desktop Only) */}
+          {/* RIGHT SECTION - Home and Cart buttons (desktop only) */}
           {window.innerWidth > 768 && (
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <div style={{
+              display: 'flex',
+              gap: '0.5rem',
+              alignItems: 'center',
+              flex: 'none',
+              marginLeft: '1rem'
+            }}>
+              {/* Home Button */}
               <button
                 onClick={() => navigate('/')}
                 style={{
@@ -819,6 +841,7 @@ const Products = () => {
                 Home
               </button>
 
+              {/* Cart Button */}
               <button
                 onClick={handleNavCartClick}
                 style={{
@@ -874,7 +897,6 @@ const Products = () => {
           )}
         </div>
       </div>
-
 
       {/* ACCOUNT POPUP FOR MOBILE/DESKTOP */}
       {showAccountPopup && isAuthenticated && (
