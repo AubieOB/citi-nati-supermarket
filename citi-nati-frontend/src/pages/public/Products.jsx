@@ -936,7 +936,8 @@ const Products = () => {
         display: 'flex',
         flexDirection: 'column',
         minHeight: '100vh',
-        marginTop: window.innerWidth > 768 ? '4.5rem' : '3.25rem',
+        marginTop: window.innerWidth > 768 ? '4.5rem' : '2.5rem',
+        paddingBottom: window.innerWidth <= 768 ? '80px' : '0',
         paddingTop: '0'
       }}>
         {/* SCROLLABLE PRODUCTS SECTION */}
@@ -1097,7 +1098,7 @@ const Products = () => {
           onClick={scrollToTop}
           style={{
             position: 'fixed',
-            bottom: '20px',
+            bottom: window.innerWidth <= 768 ? '90px' : '20px',
             right: '20px',
             width: '50px',
             height: '50px',

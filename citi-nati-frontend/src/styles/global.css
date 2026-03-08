@@ -679,6 +679,10 @@ body.menu-open {
   .footer__payment-methods {
     grid-template-columns: repeat(2, 1fr);
   }
+
+  .footer__bottom {
+    padding-bottom: 2.5rem;
+  }
 }
 
 @media (max-width: 480px) {
