@@ -713,7 +713,7 @@ const Products = () => {
       {/* Promotion Banner - Appears at top if global or category promotion is active */}
       <PromotionBanner category={selectedCategory || null} />
 
-      {/* FIXED HEADER CONTAINER - Two-tier layout */}
+      {/* FIXED FILTER BAR - Single tier with filters left, buttons right */}
       <div style={{
         position: 'fixed',
         top: 0,
@@ -723,70 +723,27 @@ const Products = () => {
         backgroundColor: 'white',
         borderBottom: '1px solid #eee',
         boxShadow: scrollY > 0 ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
-        transition: 'box-shadow 0.3s ease'
+        transition: 'box-shadow 0.3s ease',
+        display: 'flex',
+        justifyContent: 'center',
+        padding: window.innerWidth <= 480 ? '0.75rem' : '0.75rem 1.5rem'
       }}>
-        {/* TOP TIER - Logo + Text on left, Nav buttons on right */}
-        {window.innerWidth > 768 && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '0.75rem 1.5rem',
-            borderBottom: '1px solid #f0f0f0'
-          }}>
-            {/* Logo + Brand Text Left Section */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0',
-              cursor: 'pointer',
-              flex: 'none',
-              marginLeft: '-2rem',
-              paddingLeft: '2rem'
-            }} onClick={() => navigate('/')}>
-              <img 
-                src={logo} 
-                alt="Citi-Nati Logo" 
-                style={{
-                  height: 'clamp(40px, 8vw, 60px)',
-                  marginLeft: '0',
-                  marginRight: '0.1rem',
-                  verticalAlign: 'middle'
-                }}
-              />
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0', fontSize: 'clamp(14px, 3vw, 20px)', whiteSpace: 'nowrap' }}>
-                <span style={{ color: '#5B4B8A', fontWeight: '700' }}>Citi</span>
-                <span style={{ color: '#2D8659', fontWeight: '700' }}>-Nati Supermarket</span>
-              </span>
-            </div>
-
-            {/* Navigation Buttons Right Section */}
-            <div style={{
-              flex: 'none'
-            }}>
-              <DesktopFilterNav 
-                onCartClick={handleNavCartClick}
-                onAccountClick={handleNavAccountClick}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* BOTTOM TIER - Filters (Search + Category) */}
         <div style={{
+          maxWidth: '1200px',
+          width: '100%',
           display: 'flex',
-          justifyContent: 'center',
-          padding: window.innerWidth <= 480 ? '0.75rem' : '0.75rem 1.5rem',
-          backgroundColor: '#fafafa'
+          gap: '0.75rem',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'nowrap'
         }}>
+          {/* LEFT SECTION - Filters */}
           <div style={{
-            maxWidth: '1200px',
-            width: '100%',
             display: 'flex',
             gap: '0.75rem',
             alignItems: 'center',
-            justifyContent: 'flex-start',
-            flexWrap: 'nowrap'
+            flex: '1 1 auto',
+            minWidth: 0
           }}>
             {/* SEARCH BAR */}
             <input
@@ -847,6 +804,102 @@ const Products = () => {
               ))}
             </select>
           </div>
+
+          {/* RIGHT SECTION - Home and Cart buttons (desktop only) */}
+          {window.innerWidth > 768 && (
+            <div style={{
+              display: 'flex',
+              gap: '0.5rem',
+              alignItems: 'center',
+              flex: 'none',
+              marginLeft: '1rem'
+            }}>
+              {/* Home Button */}
+              <button
+                onClick={() => navigate('/')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '32px',
+                  padding: '0.25rem 0.6rem',
+                  borderRadius: '4px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.95rem',
+                  fontWeight: '500',
+                  color: '#666',
+                  transition: 'all 0.3s ease',
+                  whiteSpace: 'nowrap'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#5B4B8A';
+                  e.target.style.color = 'white';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.color = '#666';
+                }}
+                title="Go to Home"
+              >
+                Home
+              </button>
+
+              {/* Cart Button */}
+              <button
+                onClick={handleNavCartClick}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '32px',
+                  padding: '0.25rem 0.6rem',
+                  borderRadius: '4px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.95rem',
+                  fontWeight: '500',
+                  color: '#666',
+                  transition: 'all 0.3s ease',
+                  position: 'relative',
+                  whiteSpace: 'nowrap'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#5B4B8A';
+                  e.target.style.color = 'white';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.color = '#666';
+                }}
+                title="View Cart"
+              >
+                <i className="fas fa-shopping-cart" style={{ marginRight: '0.4rem' }}></i>
+                Cart
+                {cartCount > 0 && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '-8px',
+                    right: '-8px',
+                    backgroundColor: '#ff3860',
+                    color: 'white',
+                    borderRadius: '50%',
+                    width: '20px',
+                    height: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.7rem',
+                    fontWeight: '700'
+                  }}>
+                    {cartCount > 99 ? '99+' : cartCount}
+                  </span>
+                )}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -854,7 +907,7 @@ const Products = () => {
       {showAccountPopup && isAuthenticated && (
         <div style={{
           position: 'fixed',
-          top: window.innerWidth > 768 ? '112px' : 'auto',
+          top: window.innerWidth > 768 ? '60px' : 'auto',
           bottom: window.innerWidth <= 768 ? '70px' : 'auto',
           right: '1rem',
           left: window.innerWidth <= 768 ? '1rem' : 'auto',
@@ -936,7 +989,7 @@ const Products = () => {
         display: 'flex',
         flexDirection: 'column',
         minHeight: '100vh',
-        marginTop: window.innerWidth > 768 ? '4.5rem' : '2.5rem',
+        marginTop: window.innerWidth > 768 ? '3rem' : '2.5rem',
         paddingBottom: window.innerWidth <= 768 ? '80px' : '0',
         paddingTop: '0'
       }}>
