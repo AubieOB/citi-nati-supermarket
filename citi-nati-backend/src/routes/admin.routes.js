@@ -412,7 +412,6 @@ router.put('/pos-products/:id/visibility', verifyTokenMiddleware, verifyAdmin, a
         category: true,
         image: true,
         expiryDate: true,
-        expiryStatus: true,
         updatedAt: true,
       },
     });
