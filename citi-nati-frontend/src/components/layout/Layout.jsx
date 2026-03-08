@@ -7,8 +7,10 @@ import '../../styles/global.css';
 const Layout = ({ children }) => {
   const location = useLocation();
   
-  // Hide header and footer on admin and driver dashboards
-  const hideHeader = location.pathname.startsWith('/admin') || location.pathname.startsWith('/driver');
+  // Hide header only on products page and admin/driver dashboards
+  const hideHeader = location.pathname.startsWith('/admin') || 
+                     location.pathname.startsWith('/driver') ||
+                     location.pathname === '/products';
   const hideFooter = location.pathname.startsWith('/admin') || location.pathname.startsWith('/driver');
 
   return (
