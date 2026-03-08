@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import Container from '../../components/ui/Container.jsx';
 import Button from '../../components/ui/Button.jsx';
-import PromotionBanner from '../../components/common/PromotionBanner.jsx';
 import Pagination from '../../components/ui/Pagination.jsx';
 import MobileBottomNav from '../../components/common/MobileBottomNav.jsx';
 import DesktopFilterNav from '../../components/common/DesktopFilterNav.jsx';
@@ -710,9 +709,6 @@ const Products = () => {
 
   return (
     <div className="page products-page">
-      {/* Promotion Banner - Appears at top if global or category promotion is active */}
-      <PromotionBanner category={selectedCategory || null} />
-
       {/* FIXED FILTER BAR - Single tier with filters left, buttons right */}
       <div style={{
         position: 'fixed',
