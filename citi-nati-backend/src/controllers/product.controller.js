@@ -202,13 +202,27 @@ const createProduct = async (req, res) => {
 const getProducts = async (req, res) => {
   try {
     // Extract query parameters for filtering and pagination
-    const { search, category, onSale, page = '1', pageSize = '50' } = req.query;
+    // Support both offset-based (offset, limit) and page-based (page, pageSize) for backwards compatibility
+    const { search, category, onSale, page, pageSize, offset, limit } = req.query;
 
-    // Validate pagination params
-    const pageNum = Math.max(1, parseInt(page) || 1);
-    const pageSizeNum = Math.min(5000, Math.max(1, parseInt(pageSize) || 50));
-
-    const skip = (pageNum - 1) * pageSizeNum;
+    // Determine pagination mode and calculate skip/take
+    let skip, take;
+    
+    if (offset !== undefined || limit !== undefined) {
+      // Offset-based pagination (Load More - new format)
+      const offsetNum = Math.max(0, parseInt(offset) || 0);
+      const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
+      skip = offsetNum;
+      take = limitNum;
+      console.log(`[PRODUCTS] Offset-based: offset=${offsetNum}, limit=${limitNum}`);
+    } else {
+      // Page-based pagination (legacy format - backwards compatibility)
+      const pageNum = Math.max(1, parseInt(page) || 1);
+      const pageSizeNum = Math.min(5000, Math.max(1, parseInt(pageSize) || 50));
+      skip = (pageNum - 1) * pageSizeNum;
+      take = pageSizeNum;
+      console.log(`[PRODUCTS] Page-based: page=${pageNum}, pageSize=${pageSizeNum}`);
+    }
 
     // Build where clause for filtering - single source of truth (Product table)
     const where = {
@@ -255,41 +269,33 @@ const getProducts = async (req, res) => {
         expiryDate: true
       },
       skip,
-      take: pageSizeNum,
+      take,
       orderBy: {
         createdAt: 'desc',
       },
     });
 
     // Debug logging
-    console.log(`[PRODUCTS] Page ${pageNum}, Size ${pageSizeNum}, Total: ${total}, Retrieved: ${products.length}, Category: ${category || 'all'}`);
+    console.log(`[PRODUCTS] Retrieved: ${products.length}, Total: ${total}, Category: ${category || 'all'}, Search: ${search || 'none'}`);
 
     // Map over products and format with computed fields
     const productsWithFormatted = products.map((product) =>
       formatProduct(product, req, false)
     );
 
-    // Calculate pagination metadata
-    const hasNextPage = skip + pageSizeNum < total;
-    const hasPrevPage = pageNum > 1;
-    const totalPages = Math.ceil(total / pageSizeNum);
-
+    // Return response with pagination metadata
     return res.status(200).json({
       products: productsWithFormatted,
       pagination: {
-        currentPage: pageNum,
-        pageSize: pageSizeNum,
         total,
-        totalPages,
-        hasNextPage,
-        hasPrevPage
+        count: products.length,
+        offset: skip,
+        limit: take
       }
     });
   } catch (err) {
-    console.error('[PRODUCTS FETCH ERROR]:', err);
-    return res.status(500).json({
-      error: 'Server error while fetching products',
-    });
+    console.error('[PRODUCTS GET] Error:', err.message);
+    return res.status(500).json({ error: 'Failed to fetch products' });
   }
 };
 
