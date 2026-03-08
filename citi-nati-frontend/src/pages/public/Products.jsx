@@ -760,7 +760,7 @@ const Products = () => {
             {/* SEARCH BAR */}
             <input
               type="text"
-              placeholder={`Search products (${filteredProducts.length})`}
+              placeholder={`Search products (${totalSystemProducts})`}
               value={searchInput}
               onChange={handleSearchChange}
               style={{

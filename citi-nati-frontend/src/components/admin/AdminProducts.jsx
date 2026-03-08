@@ -70,6 +70,15 @@ const AdminProducts = () => {
       const handleProductUpdate = (updatedProduct) => {
         console.log('[AdminProducts] 🔄 Product update received:', updatedProduct.name);
         
+        // If product is now hidden, remove it from the admin view
+        if (updatedProduct.hideFromProductsPage) {
+          console.log('[AdminProducts] 🙈 Product hidden, removing:', updatedProduct.name);
+          setProducts(prevProducts =>
+            prevProducts.filter(p => p.id !== updatedProduct.id)
+          );
+          return;
+        }
+        
         // Update the products list with complete product details
         setProducts(prevProducts =>
           prevProducts.map(product =>
@@ -87,6 +96,7 @@ const AdminProducts = () => {
                   image: updatedProduct.image,
                   expiryDate: updatedProduct.expiryDate,
                   expiryStatus: updatedProduct.expiryStatus,
+                  hideFromProductsPage: updatedProduct.hideFromProductsPage || false,
                   updatedAt: updatedProduct.updatedAt,
                 }
               : product
@@ -157,22 +167,24 @@ const AdminProducts = () => {
   };
 
   // Filter products based on search and filters
-  const filteredProducts = products.filter(product => {
-    // Search filter (AND logic - all search terms must match)
-    const searchTerms = searchTerm.toLowerCase().trim().split(/\s+/).filter(t => t);
-    const matchesSearch = searchTerms.length === 0 || searchTerms.every(term => 
-      product.name.toLowerCase().includes(term) || 
-      product.category.toLowerCase().includes(term)
-    );
+  const filteredProducts = products
+    .filter(product => !product.hideFromProductsPage) // Hide hidden products
+    .filter(product => {
+      // Search filter (AND logic - all search terms must match)
+      const searchTerms = searchTerm.toLowerCase().trim().split(/\s+/).filter(t => t);
+      const matchesSearch = searchTerms.length === 0 || searchTerms.every(term => 
+        product.name.toLowerCase().includes(term) || 
+        product.category.toLowerCase().includes(term)
+      );
 
-    // Category filter
-    const matchesCategory = !selectedCategory || product.category === selectedCategory;
+      // Category filter
+      const matchesCategory = !selectedCategory || product.category === selectedCategory;
 
-    // Sale filter
-    const matchesSale = !onSaleOnly || product.isOnSale;
+      // Sale filter
+      const matchesSale = !onSaleOnly || product.isOnSale;
 
-    return matchesSearch && matchesCategory && matchesSale;
-  });
+      return matchesSearch && matchesCategory && matchesSale;
+    });
 
   // Paginate filtered products
   const totalPages = Math.ceil(filteredProducts.length / pageSize);
