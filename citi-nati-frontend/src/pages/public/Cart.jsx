@@ -36,7 +36,6 @@ const Cart = () => {
   const [cart, setCart] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [updating, setUpdating] = useState(false);
   const { isAuthenticated, isLoading: authLoading, logout } = useAuth();
   const { updateCartCount } = useCart();
   const { modal, closeModal, showError } = useModal();
@@ -101,20 +100,19 @@ const Cart = () => {
   }, [authLoading, isAuthenticated, logout]);
 
   /**
-   * Update item quantity
+   * Update item quantity (with optimistic UI)
    * Contract: PUT /api/cart/update with { productId, quantity }
    * Rules:
    * - quantity = 0 → delete item
    * - Don't calculate totals
    * - Trust backend response
    * - IMPORTANT: Maintain item order (no sorting)
+   * - OPTIMISTIC: Update UI immediately, verify with backend
    */
   const handleQuantityChange = async (productId, newQuantity) => {
     if (newQuantity === undefined || newQuantity === null) return;
 
     try {
-      setUpdating(true);
-
       // Convert to integer
       const quantity = parseInt(newQuantity);
 
@@ -130,51 +128,81 @@ const Cart = () => {
         return;
       }
 
-      // 6️⃣ SUBMIT: Send only what contract requires
-      // Contract: { productId, quantity }
-      // Don't send: id, name, price, subtotal, total
-      // api module automatically includes Authorization header
-      const response = await api.put('/cart/update', {
+      // OPTIMISTIC UPDATE: Update UI immediately for instant feedback
+      // Create optimistically updated cart
+      const optimisticItems = cart.items.map(item => {
+        if (item.productId === productId) {
+          if (quantity === 0) {
+            // Return null for deleted items
+            return null;
+          }
+          // Update quantity and recalculate subtotal (item.price * quantity)
+          return {
+            ...item,
+            quantity,
+            subtotal: item.price * quantity
+          };
+        }
+        return item;
+      }).filter(item => item !== null); // Remove deleted items
+
+      // Calculate optimistic total
+      const optimisticTotal = optimisticItems.reduce((sum, item) => sum + (item.subtotal || 0), 0);
+
+      // Update UI immediately (optimistic)
+      setCart({
+        ...cart,
+        items: optimisticItems,
+        total: optimisticTotal
+      });
+
+      // BACKGROUND UPDATE: Send to backend without blocking UI
+      // Send the update to backend in the background
+      const updatePromise = api.put('/cart/update', {
         productId,
         quantity
       });
 
-      // 7️⃣ REFRESH: Fetch updated cart from backend AND MAINTAIN ORDER
-      // Never update local state manually
-      const cartResponse = await api.get('/cart');
-      const backendCart = cartResponse.data;
-
-      // Map backend items to maintain original order
-      // This ensures items stay in their original position
-      const orderedItems = cart.items
-        .map(oldItem => {
-          // Find this item in the backend response
-          const backendItem = backendCart.items.find(bi => bi.productId === oldItem.productId);
-          // If found, use backend values; if not found, item was deleted
-          return backendItem || null;
-        })
-        .filter(item => item !== null); // Remove deleted items
-
-      // Update cart with reordered items but backend totals
-      setCart({
-        ...backendCart,
-        items: orderedItems
+      // Don't await the update - let it happen in background
+      // But handle errors if they occur
+      updatePromise.catch(err => {
+        // If backend update fails, revert to previous state
+        console.error('❌ Error updating cart item:', err.message);
+        
+        // Revert optimistic update by refetching
+        api.get('/cart')
+          .then(response => {
+            const backendCart = response.data;
+            const orderedItems = cart.items
+              .map(oldItem => {
+                const backendItem = backendCart.items.find(bi => bi.productId === oldItem.productId);
+                return backendItem || null;
+              })
+              .filter(item => item !== null);
+            
+            setCart({
+              ...backendCart,
+              items: orderedItems
+            });
+          })
+          .catch(refetchErr => {
+            console.error('❌ Error refetching cart after update failure:', refetchErr.message);
+            showError('Error', 'Failed to update cart. Please refresh the page.');
+          });
+      }).finally(() => {
+        // Update cart count in header (after update attempt)
+        updateCartCount();
       });
 
-      // Update cart count in header
-      await updateCartCount();
-    } catch (err) {
-      // ❌ ERROR: Handle auth errors
-      if (err.response?.status === 401) {
+      // Handle auth errors
+      if (!(await updatePromise).ok && (await updatePromise).status === 401) {
         setError('Session expired. Please login again.');
         logout();
         return;
       }
-
+    } catch (err) {
       console.error('❌ Error updating cart item:', err.message);
       showError('Error', `Error: ${err.message}`);
-    } finally {
-      setUpdating(false);
     }
   };
 
@@ -302,26 +330,22 @@ const Cart = () => {
                       min="0"
                       value={item.quantity}
                       onChange={(e) => handleQuantityChange(item.productId, e.target.value)}
-                      disabled={updating}
                       className="cart-quantity-input"
                       style={{
                         width: '70px',
                         padding: '0.5rem 0.25rem',
                         border: '2px solid #e0e0e0',
                         borderRadius: '4px',
-                        opacity: updating ? 0.6 : 1,
                         backgroundColor: '#f5f5f5',
                         transition: 'box-shadow 0.3s ease, background-color 0.3s ease, border-color 0.3s ease',
-                        cursor: updating ? 'not-allowed' : 'text',
+                        cursor: 'text',
                         fontSize: '1rem',
                         textAlign: 'center'
                       }}
                       onFocus={(e) => {
-                        if (!updating) {
-                          e.target.style.backgroundColor = '#fff';
-                          e.target.style.borderColor = '#5b4b8a';
-                          e.target.style.boxShadow = '0 4px 12px rgba(91, 75, 138, 0.2)';
-                        }
+                        e.target.style.backgroundColor = '#fff';
+                        e.target.style.borderColor = '#5b4b8a';
+                        e.target.style.boxShadow = '0 4px 12px rgba(91, 75, 138, 0.2)';
                       }}
                       onBlur={(e) => {
                         e.target.style.backgroundColor = '#f5f5f5';
@@ -341,7 +365,6 @@ const Cart = () => {
                       size="small"
                       variant="outline"
                       onClick={() => handleRemove(item.productId)}
-                      disabled={updating}
                     >
                       Remove
                     </Button>
