@@ -11,7 +11,9 @@ const Layout = ({ children }) => {
   const hideHeader = location.pathname.startsWith('/admin') || 
                      location.pathname.startsWith('/driver') ||
                      location.pathname === '/products';
-  const hideFooter = location.pathname.startsWith('/admin') || location.pathname.startsWith('/driver');
+  const hideFooter = location.pathname.startsWith('/admin') || 
+                     location.pathname.startsWith('/driver') ||
+                     location.pathname === '/products';
 
   return (
     <div className="layout">
