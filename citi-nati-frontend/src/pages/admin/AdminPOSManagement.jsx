@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import api from '../../utils/api.js';
 import Button from '../../components/ui/Button.jsx';
 import Container from '../../components/ui/Container.jsx';
+import Modal from '../../components/common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
 import { formatMWK } from '../../utils/currency.js';
 import Pagination from '../../components/ui/Pagination.jsx';
@@ -37,7 +38,7 @@ const AdminPOSManagement = () => {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const searchTimeoutRef = useRef(null);
-  const { modal, closeModal, showError, showSuccess } = useModal();
+  const { modal, closeModal, showError, showSuccess, showConfirm } = useModal();
 
   /**
    * Fetch POS products with search and pagination
@@ -185,37 +186,42 @@ const AdminPOSManagement = () => {
     }
 
     const action = hideFromProducts ? 'hide' : 'unhide';
-    if (!window.confirm(`${hideFromProducts ? 'Hide' : 'Show'} ${selectedProducts.size} product(s)? This will ${action} them from the products page.`)) {
-      return;
-    }
+    const title = hideFromProducts ? '🙈 Hide Products?' : '👁️ Show Products?';
+    const message = `${hideFromProducts ? 'Hide' : 'Show'} ${selectedProducts.size} product(s)? This will ${action} them from the products page.`;
 
-    try {
-      setLoading(true);
-      // Update each product individually
-      for (const productId of selectedProducts) {
-        const product = products.find(p => p.id === productId);
-        if (product) {
-          await api.put(`/admin/pos-products/${productId}/visibility`, {
-            hideFromProductsPage: hideFromProducts,
-          });
+    showConfirm(
+      title,
+      message,
+      async () => {
+        try {
+          setLoading(true);
+          // Update each product individually
+          for (const productId of selectedProducts) {
+            const product = products.find(p => p.id === productId);
+            if (product) {
+              await api.put(`/admin/pos-products/${productId}/visibility`, {
+                hideFromProductsPage: hideFromProducts,
+              });
+            }
+          }
+
+          // Update local state
+          setProducts(prev => prev.map(p =>
+            selectedProducts.has(p.id)
+              ? { ...p, hideFromProductsPage: hideFromProducts }
+              : p
+          ));
+
+          showSuccess(`Successfully ${action}d ${selectedProducts.size} product(s)`);
+          setSelectedProducts(new Set());
+        } catch (err) {
+          console.error(`Error updating visibility:`, err);
+          showError(err.response?.data?.error || `Failed to ${action} products`);
+        } finally {
+          setLoading(false);
         }
       }
-
-      // Update local state
-      setProducts(prev => prev.map(p =>
-        selectedProducts.has(p.id)
-          ? { ...p, hideFromProductsPage: hideFromProducts }
-          : p
-      ));
-
-      showSuccess(`Successfully ${action}d ${selectedProducts.size} product(s)`);
-      setSelectedProducts(new Set());
-    } catch (err) {
-      console.error(`Error updating visibility:`, err);
-      showError(err.response?.data?.error || `Failed to ${action} products`);
-    } finally {
-      setLoading(false);
-    }
+    );
   };
 
   /**
@@ -253,53 +259,55 @@ const AdminPOSManagement = () => {
       return;
     }
 
-    if (!window.confirm(`Delete ${selectedProducts.size} product(s)? This cannot be undone.`)) {
-      return;
-    }
+    const title = '⚠️ Delete Selected Products?';
+    const message = `Delete ${selectedProducts.size} product(s)? This cannot be undone.`;
 
-    try {
-      setLoading(true);
-      const response = await api.delete('/admin/pos-products/delete-selected', {
-        data: { productIds: Array.from(selectedProducts) },
-      });
+    showConfirm(title, message, async () => {
+      try {
+        setLoading(true);
+        const response = await api.delete('/admin/pos-products/delete-selected', {
+          data: { productIds: Array.from(selectedProducts) },
+        });
 
-      if (response.data.success) {
-        showSuccess(`Deleted ${response.data.deletedCount} products`);
-        setSelectedProducts(new Set());
-        fetchProducts(searchTerm, page, selectedCategory);
+        if (response.data.success) {
+          showSuccess(`Deleted ${response.data.deletedCount} products`);
+          setSelectedProducts(new Set());
+          fetchProducts(searchTerm, page, selectedCategory);
+        }
+      } catch (err) {
+        console.error('Error deleting products:', err);
+        showError(err.response?.data?.error || 'Failed to delete products');
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error('Error deleting products:', err);
-      showError(err.response?.data?.error || 'Failed to delete products');
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   /**
    * Delete all POS products
    */
   const handleDeleteAll = async () => {
-    if (!window.confirm(`Are you sure? This will delete ALL ${total} POS products from the website. They will re-sync the next time the POS Agent runs.\n\nThis CANNOT be undone.`)) {
-      return;
-    }
+    const title = '🚨 Delete All POS Products?';
+    const message = `Are you sure? This will delete ALL ${total} POS products from the website. They will re-sync the next time the POS Agent runs.\n\nThis CANNOT be undone.`;
 
-    try {
-      setLoading(true);
-      const response = await api.delete('/admin/pos-products/delete-all');
+    showConfirm(title, message, async () => {
+      try {
+        setLoading(true);
+        const response = await api.delete('/admin/pos-products/delete-all');
 
-      if (response.data.success) {
-        showSuccess(`Deleted all ${response.data.deletedCount} POS products`);
-        setSelectedProducts(new Set());
-        setPage(1);
-        fetchProducts('', 1, selectedCategory);
+        if (response.data.success) {
+          showSuccess(`Deleted all ${response.data.deletedCount} POS products`);
+          setSelectedProducts(new Set());
+          setPage(1);
+          fetchProducts('', 1, selectedCategory);
+        }
+      } catch (err) {
+        console.error('Error deleting all products:', err);
+        showError(err.response?.data?.error || 'Failed to delete all products');
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error('Error deleting all products:', err);
-      showError(err.response?.data?.error || 'Failed to delete all products');
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   // Calculate stats
@@ -632,6 +640,17 @@ const AdminPOSManagement = () => {
           </>
         )}
       </div>
+      <Modal
+        isOpen={modal.isOpen}
+        title={modal.title}
+        message={modal.message}
+        type={modal.type}
+        onConfirm={modal.onConfirm}
+        onCancel={modal.onCancel}
+        confirmText={modal.confirmText}
+        cancelText={modal.cancelText}
+        showCancelButton={modal.showCancelButton}
+      />
     </Container>
   );
 };
