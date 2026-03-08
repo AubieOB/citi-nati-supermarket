@@ -989,7 +989,7 @@ const Products = () => {
         display: 'flex',
         flexDirection: 'column',
         minHeight: '100vh',
-        marginTop: window.innerWidth > 768 ? '3rem' : '2.5rem',
+        marginTop: window.innerWidth > 768 ? '2.25rem' : '2rem',
         paddingBottom: window.innerWidth <= 768 ? '80px' : '0',
         paddingTop: '0'
       }}>
