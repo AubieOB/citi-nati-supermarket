@@ -5,8 +5,7 @@ import Button from '../../components/ui/Button.jsx';
 import PromotionBanner from '../../components/common/PromotionBanner.jsx';
 import Pagination from '../../components/ui/Pagination.jsx';
 import MobileBottomNav from '../../components/common/MobileBottomNav.jsx';
-import DesktopFilterNav from '../../components/common/DesktopFilterNav.jsx';
-import logo from '../../assets/citi-nati-logo.png.png';
+import DesktopNavbar from '../../components/common/DesktopNavbar.jsx';
 import api from '../../utils/api.js';
 import { getSocket } from '../../utils/socket.js';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -713,18 +712,28 @@ const Products = () => {
       {/* Promotion Banner - Appears at top if global or category promotion is active */}
       <PromotionBanner category={selectedCategory || null} />
 
-      {/* TRULY FIXED FILTER CONTAINER - Stays at viewport top, no scroll */}
+      {/* DESKTOP NAVBAR - Fixed at top on large screens */}
+      {window.innerWidth > 768 && (
+        <DesktopNavbar 
+          onCartClick={handleNavCartClick}
+          onAccountClick={handleNavAccountClick}
+          navigate={navigate}
+        />
+      )}
+
+      {/* FILTER BAR - Fixed below navbar on large screens */}
       <div style={{
         position: 'fixed',
-        top: 0,
+        top: window.innerWidth > 768 ? '70px' : '0',
         left: 0,
         right: 0,
-        zIndex: 1000,
+        zIndex: 999,
         backgroundColor: 'white',
         borderBottom: '1px solid #eee',
         padding: window.innerWidth <= 480 ? '0.75rem' : '1rem',
         boxShadow: scrollY > 0 ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
         transition: 'box-shadow 0.3s ease',
+        display: 'flex',
         justifyContent: 'center'
       }}>
         <div style={{
@@ -737,19 +746,6 @@ const Products = () => {
           justifyContent: 'flex-start',
           flexWrap: 'nowrap'
         }}>
-          {/* LOGO - Only visible on large screens */}
-          <img 
-            src={logo} 
-            alt="Citi-Nati Logo" 
-            className="filter-container__logo"
-            onClick={() => navigate('/')}
-            title="Go to Home"
-            style={{
-              display: window.innerWidth > 768 ? 'block' : 'none',
-              cursor: 'pointer'
-            }}
-          />
-
           {/* SEARCH BAR */}
           <input
             type="text"
@@ -806,20 +802,14 @@ const Products = () => {
               <option key={cat} value={cat}>{cat}</option>
             ))}
           </select>
-
-          {/* DESKTOP NAVIGATION - Only visible on large screens */}
-          <div style={{ 
-            display: window.innerWidth > 768 ? 'flex' : 'none',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}>
-            <DesktopFilterNav 
-              onCartClick={handleNavCartClick}
-              onAccountClick={handleNavAccountClick}
-            />
-          </div>
         </div>
       </div>
+
+      {/* MAIN CONTENT - Adjusted padding for navbar + filter bar */}
+      <div style={{
+        paddingTop: window.innerWidth > 768 ? '140px' : '60px',
+        width: '100%'
+      }}>
 
       {/* ACCOUNT POPUP FOR MOBILE/DESKTOP */}
       {showAccountPopup && isAuthenticated && (
@@ -1111,6 +1101,7 @@ const Products = () => {
         cancelText={modal.cancelText}
         showCancelButton={modal.showCancelButton}
       />
+      </div>
 
       {/* MOBILE BOTTOM NAVIGATION - Only visible on mobile */}
       <MobileBottomNav 
