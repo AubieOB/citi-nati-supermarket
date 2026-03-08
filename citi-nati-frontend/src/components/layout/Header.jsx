@@ -19,12 +19,12 @@ const Header = () => {
   const navigate = useNavigate();
   const { modal, closeModal, showConfirm } = useModal();
 
-  // Fetch cart count when user logs in
+  // Fetch cart count on mount and when auth is ready
   useEffect(() => {
-    if (isAuthenticated && !authLoading) {
+    if (!authLoading) {
       fetchCartCount();
     }
-  }, [isAuthenticated, authLoading, fetchCartCount]);
+  }, [authLoading, fetchCartCount]);
 
   // Close account popup when clicking outside
   useEffect(() => {
