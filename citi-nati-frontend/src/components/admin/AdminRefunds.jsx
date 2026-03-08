@@ -25,7 +25,6 @@ const AdminRefunds = () => {
 
   const fetchPendingRefunds = async () => {
     try {
-      setLoading(true);
       setError(null);
       const response = await api.get('/admin/refunds/pending');
       setRefunds(response.data.refunds || []);
@@ -64,16 +63,26 @@ const AdminRefunds = () => {
     );
   };
 
-  if (loading) {
-    return (
-      <div style={{ textAlign: 'center', padding: '2rem' }}>
-        <p>Loading refunds...</p>
-      </div>
-    );
-  }
-
   return (
     <div>
+      {/* Loading Indicator */}
+      {loading && (
+        <div style={{
+          backgroundColor: '#e7f3ff',
+          border: '1px solid #b3d9ff',
+          color: '#004085',
+          padding: '0.75rem',
+          borderRadius: '4px',
+          marginBottom: '1rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+        }}>
+          <i className="fas fa-spinner fa-spin"></i>
+          <span>Loading refunds...</span>
+        </div>
+      )}
+
       {/* Header */}
       <div style={{ marginBottom: '2rem' }}>
         <h2 style={{ color: '#5B4B8A', marginBottom: '0.5rem' }}>

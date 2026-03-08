@@ -37,7 +37,6 @@ const AdminUsers = () => {
 
   const fetchUsers = async () => {
     try {
-      setLoading(true);
       setError(null);
       const response = await api.get('/admin/users');
       setUsers(response.data.users || []);
@@ -111,10 +110,6 @@ const AdminUsers = () => {
     return userId !== loggedInUser?.id;
   };
 
-  if (loading) {
-    return <div style={{ textAlign: 'center', padding: '2rem' }}>Loading users...</div>;
-  }
-
   if (error) {
     return (
       <div style={{
@@ -128,7 +123,8 @@ const AdminUsers = () => {
     );
   }
 
-  if (users.length === 0) {
+  // Show empty state if no users loaded
+  if (!loading && users.length === 0) {
     return (
       <div style={{
         backgroundColor: '#f8f9fa',
@@ -144,6 +140,24 @@ const AdminUsers = () => {
 
   return (
     <div>
+      {/* Loading Indicator */}
+      {loading && (
+        <div style={{
+          backgroundColor: '#e7f3ff',
+          border: '1px solid #b3d9ff',
+          color: '#004085',
+          padding: '0.75rem',
+          borderRadius: '4px',
+          marginBottom: '1rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+        }}>
+          <i className="fas fa-spinner fa-spin"></i>
+          <span>Loading users...</span>
+        </div>
+      )}
+
       <div style={{ overflowX: 'auto' }}>
         <table style={{
           width: '100%',
