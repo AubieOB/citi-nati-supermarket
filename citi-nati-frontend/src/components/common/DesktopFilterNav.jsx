@@ -105,7 +105,7 @@ const DesktopFilterNav = ({ onCartClick, onAccountClick }) => {
         aria-label={isAuthenticated ? 'Account' : 'Login'}
         title={isAuthenticated ? 'Account' : 'Login'}
       >
-        <span className="desktop-filter-nav__label">{isAuthenticated ? 'Account' : 'Login'}</span>
+        <i className={`fas ${isAuthenticated ? 'fa-user-circle' : 'fa-sign-in-alt'}`}></i>
       </button>
     </div>
   );
