@@ -228,6 +228,7 @@ const getProducts = async (req, res) => {
     const where = {
       isActive: true,
       enabled: true, // Only show enabled products
+      hideFromProductsPage: false, // Exclude hidden products
     };
 
     // Search filter (case-insensitive name search)
