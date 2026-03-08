@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import Container from '../../components/ui/Container.jsx';
 import Button from '../../components/ui/Button.jsx';
-import Pagination from '../../components/ui/Pagination.jsx';
 import MobileBottomNav from '../../components/common/MobileBottomNav.jsx';
 import DesktopFilterNav from '../../components/common/DesktopFilterNav.jsx';
 import logo from '../../assets/citi-nati-logo.png.png';
@@ -46,14 +45,15 @@ const Products = () => {
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null); // Only for browsing errors, NOT search errors
-  const [searchInput, setSearchInput] = useState(''); // User typing (instant)
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalProducts, setTotalProducts] = useState(0); // Current page's total
-  const [totalSystemProducts, setTotalSystemProducts] = useState(0); // Total enabled products in system
-  const [scrollY, setScrollY] = useState(0); // Track scroll position for back-to-top button
-  const [showAccountPopup, setShowAccountPopup] = useState(false); // For mobile/desktop account popup
+  const [error, setError] = useState(null);
+  const [searchInput, setSearchInput] = useState('');
+  const [offset, setOffset] = useState(0); // Offset-based pagination
+  const [limit] = useState(20); // 20 products per load
+  const [hasMoreProducts, setHasMoreProducts] = useState(true); // Are there more products to load?
+  const [isLoadingMore, setIsLoadingMore] = useState(false); // Loading state for Load More button
+  const [totalSystemProducts, setTotalSystemProducts] = useState(0);
+  const [scrollY, setScrollY] = useState(0);
+  const [showAccountPopup, setShowAccountPopup] = useState(false);
   const { isAuthenticated, logout, user } = useAuth();
   const { cartCount, updateCartCount } = useCart();
   const { modal, closeModal, showError, showSuccess, showConfirm } = useModal();
@@ -157,93 +157,107 @@ const Products = () => {
   };
 
   /**
-   * Fetch products for pagination and category filtering
-   * Separate from search - handles normal browsing
-   * Implements client-side caching for instant page loads
+   * Fetch products - supports both initial load and "Load More"
+   * isLoadMore=true → append products (Load More)
+   * isLoadMore=false → replace products (reset on filter/search change)
    */
-  const fetchProducts = async (page = 1) => {
+  const fetchProducts = async (isLoadMore = false) => {
     try {
-      // Only show loading spinner for initial page load
-      if (products.length === 0) {
+      // Show loading state
+      if (isLoadMore) {
+        setIsLoadingMore(true);
+      } else {
         setLoading(true);
+        setOffset(0); // Reset offset for new filters
       }
       setError(null);
 
-      const pageSize = 20;
+      // Calculate offset based on current products
+      const currentOffset = isLoadMore ? offset + limit : 0;
       
-      // Create cache key based on page, category, and sale filter
-      const cacheKey = `page_${page}_category_${selectedCategory || 'all'}_sale_${onSaleOnly}`;
+      // Create cache key
+      const cacheKey = `offset_${currentOffset}_category_${selectedCategory || 'all'}_sale_${onSaleOnly}`;
 
-      // Check if page is in cache
-      if (productsCacheRef.current.has(cacheKey)) {
-        console.log(`[CACHE HIT] Loading page ${page} from cache (category: ${selectedCategory || 'all'})`);
+      // Check cache (only for initial loads, not Load More to ensure fresh data)
+      if (!isLoadMore && productsCacheRef.current.has(cacheKey)) {
+        console.log(`[CACHE HIT] Loading from cache (offset: ${currentOffset})`);
         const cachedData = productsCacheRef.current.get(cacheKey);
         setProducts(cachedData.products);
-        setCurrentPage(cachedData.currentPage);
-        setTotalPages(cachedData.totalPages);
-        setTotalProducts(cachedData.total);
+        setHasMoreProducts(cachedData.hasMore);
+        setOffset(currentOffset);
         setLoading(false);
         return;
       }
 
       const params = new URLSearchParams();
-      params.append('page', page);
-      params.append('pageSize', pageSize);
-      
+      params.append('limit', limit);
+      params.append('offset', currentOffset);
       if (selectedCategory) params.append('category', selectedCategory);
       if (onSaleOnly) params.append('onSale', 'true');
 
-      console.log(`[CACHE MISS] Fetching page ${page} from API (category: ${selectedCategory || 'all'})`);
+      console.log(`[PRODUCTS FETCH] ${isLoadMore ? 'Load More' : 'Initial'} | Offset: ${currentOffset} | Limit: ${limit} | Category: ${selectedCategory || 'all'}`);
       
       const response = await api.get(`/products?${params.toString()}`);
       const data = response.data;
 
       if (!data.products || !Array.isArray(data.products)) {
-        throw new Error('Invalid response schema: expected { products: [...] }');
+        throw new Error('Invalid response schema');
       }
 
-      console.log(`[PRODUCTS FETCH] Page ${page}/${data.pagination?.totalPages || 1} | Total: ${data.pagination?.total || 0} | Category: ${selectedCategory || 'all'}`);
-      
       const fetchedProducts = data.products;
       
-      // Cache the page data (reuse the cacheKey defined earlier in this function)
+      // Determine if there are more products
+      const hasMore = fetchedProducts.length === limit;
+      
+      // Cache the data
       productsCacheRef.current.set(cacheKey, {
         products: fetchedProducts,
-        currentPage: data.pagination?.currentPage || page,
-        totalPages: data.pagination?.totalPages || 1,
-        total: data.pagination?.total || 0
+        hasMore: hasMore
       });
 
-      setProducts(fetchedProducts);
-      
-      // Update pagination state
-      if (data.pagination) {
-        setCurrentPage(data.pagination.currentPage);
-        setTotalPages(data.pagination.totalPages);
-        setTotalProducts(data.pagination.total);
+      // If Load More, append; otherwise replace
+      if (isLoadMore) {
+        setProducts(prev => [...prev, ...fetchedProducts]);
+      } else {
+        setProducts(fetchedProducts);
       }
       
-      // Update URL
-      const newParams = new URLSearchParams(searchParams);
-      newParams.set('page', page);
-      setSearchParams(newParams);
+      setHasMoreProducts(hasMore);
+      setOffset(currentOffset);
 
       // Clear search when browsing
-      setSearchInput('');
-      searchCacheRef.current.clear();
+      if (!isLoadMore) {
+        setSearchInput('');
+        searchCacheRef.current.clear();
+      }
+      
+      console.log(`[PRODUCTS LOADED] ${isLoadMore ? 'Appended' : 'Loaded'} ${fetchedProducts.length} products | Has more: ${hasMore}`);
     } catch (err) {
       console.error('❌ Error fetching products:', err.message);
-      // Only show error if we don't have any products displayed
+      // Only show error if we have no products
       if (products.length === 0) {
         setError(err.message);
         setProducts([]);
       } else {
-        // If we already have products, fail silently and keep them visible
-        console.warn('[PAGINATION SILENT FAIL] Keeping current products visible');
+        console.warn('[LOAD MORE SILENT FAIL] Keeping current products visible');
       }
     } finally {
+      setIsLoadingMore(false);
       setLoading(false);
     }
+  };
+
+  /**
+   * Handle Load More button click
+   * Appends next batch of products without clearing search results
+   */
+  const handleLoadMore = async () => {
+    if (!hasMoreProducts || isLoadingMore) {
+      return; // Prevent multiple concurrent requests
+    }
+    
+    // Append mode: Load More
+    await fetchProducts(true);
   };
 
   // Fetch categories on component mount
@@ -293,8 +307,13 @@ const Products = () => {
 
   // Initial product load on category/filter change
   useEffect(() => {
-    const page = parseInt(searchParams.get('page')) || 1;
-    fetchProducts(page);
+    // Reset to initial state when filters change
+    setProducts([]);
+    setOffset(0);
+    setHasMoreProducts(true);
+    
+    // Load initial products with new filters
+    fetchProducts(false); // isLoadMore = false to replace products
   }, [selectedCategory, onSaleOnly]);
 
   // Scroll event listener for back-to-top button
@@ -332,14 +351,6 @@ const Products = () => {
 
     fetchTotalCount();
   }, []);
-
-  // Fetch on pagination change
-  useEffect(() => {
-    const page = parseInt(searchParams.get('page')) || 1;
-    if (page !== currentPage) {
-      fetchProducts(page);
-    }
-  }, [searchParams]);
 
   /**
    * Update displayed products based on current products
@@ -571,16 +582,6 @@ const Products = () => {
     }
     newParams.set('page', '1'); // Reset to page 1 when changing filters
     setSearchParams(newParams);
-  };
-
-  /**
-   * Handle page change
-   */
-  const handlePageChange = (newPage) => {
-    const params = new URLSearchParams(searchParams);
-    params.set('page', newPage);
-    setSearchParams(params);
-    fetchProducts(newPage);
   };
 
   /**
@@ -1131,15 +1132,68 @@ const Products = () => {
             </div>
           )}
         </div>
+        
+        {/* LOAD MORE BUTTON - Show when there are more products to load */}
+        {hasMoreProducts && (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            padding: '2rem 1rem',
+            borderTop: '1px solid #eee'
+          }}>
+            <button
+              onClick={handleLoadMore}
+              disabled={isLoadingMore}
+              style={{
+                padding: '0.75rem 2.5rem',
+                backgroundColor: isLoadingMore ? '#cfcfcf' : '#5B4B8A',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '1rem',
+                fontWeight: '600',
+                cursor: isLoadingMore ? 'not-allowed' : 'pointer',
+                transition: 'all 0.3s ease',
+                opacity: isLoadingMore ? 0.7 : 1
+              }}
+              onMouseEnter={(e) => {
+                if (!isLoadingMore) {
+                  e.target.style.backgroundColor = '#4A3A7A';
+                  e.target.style.transform = 'translateY(-2px)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isLoadingMore) {
+                  e.target.style.backgroundColor = '#5B4B8A';
+                  e.target.style.transform = 'translateY(0)';
+                }
+              }}
+            >
+              {isLoadingMore ? (
+                <>
+                  <i className="fas fa-spinner" style={{ animation: 'spin 1s linear infinite', marginRight: '0.5rem' }}></i>
+                  Loading more...
+                </>
+              ) : (
+                'Load More Products'
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* "NO MORE PRODUCTS" MESSAGE - Show when all products loaded */}
+        {!hasMoreProducts && filteredProducts.length > 0 && (
+          <div style={{
+            textAlign: 'center',
+            padding: '2rem 1rem',
+            color: '#999',
+            fontSize: '0.95rem',
+            borderTop: '1px solid #eee'
+          }}>
+            No more products to load
+          </div>
+        )}
       </div>
-      
-      {/* PAGINATION - Below scrollable section */}
-      <Pagination 
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPageChange={handlePageChange}
-        total={totalProducts}
-      />
 
       {/* FLOATING BACK-TO-TOP BUTTON */}
       {scrollY > 600 && (
