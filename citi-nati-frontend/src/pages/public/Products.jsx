@@ -78,6 +78,7 @@ const Products = () => {
    * - Previous requests cancelled
    * - Products remain visible
    * - No loading UI
+   * - INSTANT: Clearing search shows all products immediately (no debounce)
    */
   const handlePredictiveSearch = (query) => {
     // Clear previous debounce timer
@@ -85,24 +86,24 @@ const Products = () => {
       clearTimeout(debounceTimerRef.current);
     }
 
+    // INSTANT: If query is empty, show all products immediately (no debounce)
+    if (!query.trim()) {
+      const visible = productsRef.current.filter(p => !p.hideFromProductsPage);
+      setFilteredProducts(visible);
+      console.log(`[SEARCH CLEARED] Showing all ${visible.length} products`);
+      return;
+    }
   
     // Check cache first - return instantly if cached
-    if (query && searchCacheRef.current.has(query)) {
+    if (searchCacheRef.current.has(query)) {
       console.log(`[SEARCH CACHE HIT] "${query}"`);
       const cachedResults = searchCacheRef.current.get(query);
       setFilteredProducts(cachedResults);
       return;
     }
 
-    // Debounce the API call (200ms)
+    // Debounce the API call (200ms) only for actual search queries
     debounceTimerRef.current = setTimeout(() => {
-      if (!query.trim()) {
-        // No search term - show all products
-        const visible = productsRef.current.filter(p => !p.hideFromProductsPage);
-        setFilteredProducts(visible);
-        return;
-      }
-
       // Cancel previous request
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
