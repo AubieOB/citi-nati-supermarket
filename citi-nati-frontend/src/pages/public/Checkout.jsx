@@ -86,20 +86,19 @@ const CheckoutContent = () => {
 
     try {
       setIsValidatingStock(true);
-      const productIds = cartItems.map(item => item.productId);
-      
-      // Fetch latest product data from backend
-      const response = await api.get(`/products`, {
-        params: {
-          ids: productIds.join(',')
-        }
-      });
-
-      const products = response.data.products || [];
       const productsMap = {};
-      products.forEach(p => {
-        productsMap[p.id] = p;
-      });
+
+      // Fetch latest product data for each cart item
+      for (const item of cartItems) {
+        try {
+          const response = await api.get(`/products/${item.productId}`);
+          productsMap[item.productId] = response.data;
+        } catch (err) {
+          console.warn(`Failed to fetch product ${item.productId}:`, err);
+          // Product fetch failed - will be marked as unavailable
+        }
+      }
+
       setBackendProducts(productsMap);
 
       // Validate stock for each cart item
@@ -109,7 +108,7 @@ const CheckoutContent = () => {
         if (!product) {
           unavailableItems.push({
             ...item,
-            reason: 'Product not found',
+            reason: 'Product not found in stock',
             availableStock: 0
           });
         } else if (item.quantity > product.stock) {
