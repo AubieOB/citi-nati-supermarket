@@ -1354,6 +1354,12 @@ body.menu-open {
     padding: 1.5rem 1rem;
     font-size: 1.25rem;
   }
+
+  /* Reduce button size on tablet */
+  .cart-table button {
+    padding: 0.5rem 1rem !important;
+    font-size: 0.85rem !important;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1369,6 +1375,13 @@ body.menu-open {
   .cart-table__total {
     padding: 1rem 0.5rem;
     font-size: 1.1rem;
+  }
+
+  /* Reduce button size on mobile */
+  .cart-table button {
+    padding: 0.4rem 0.75rem !important;
+    font-size: 0.75rem !important;
+    white-space: nowrap;
   }
 }
 
