@@ -1010,7 +1010,7 @@ const Products = () => {
               </p>
             </div>
           ) : (
-            <div className="products-grid" style={{ padding: '1rem', marginTop: '1rem' }}>
+            <div className="products-grid" style={{ padding: '1rem', marginTop: '2.5rem' }}>
               {filteredProducts.map((product) => {
                 // Calculate discount percentage if on sale
                 const discountPercent = product.isOnSale && product.originalPrice
