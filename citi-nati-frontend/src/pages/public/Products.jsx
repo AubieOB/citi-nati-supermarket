@@ -3,7 +3,6 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import Container from '../../components/ui/Container.jsx';
 import Button from '../../components/ui/Button.jsx';
 import MobileBottomNav from '../../components/common/MobileBottomNav.jsx';
-import logo from '../../assets/citi-nati-logo.png.png';
 import api from '../../utils/api.js';
 import { getSocket } from '../../utils/socket.js';
 import { useAuth } from '../../context/AuthContext.jsx';
