@@ -733,22 +733,23 @@ const Products = () => {
           display: 'flex',
           gap: '1rem',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: 'flex-start',
           flexWrap: 'nowrap'
         }}>
-          {/* DESKTOP NAVIGATION & LOGO - Only visible on largescreen */}
-          <div style={{ 
-            display: window.innerWidth > 768 ? 'flex' : 'none',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}>
-            <DesktopFilterNav 
-              onCartClick={handleNavCartClick}
-              onAccountClick={handleNavAccountClick}
-            />
-          </div>
+          {/* LOGO - Only visible on large screens */}
+          <img 
+            src={require('../../assets/citi-nati-logo.png.png')} 
+            alt="Citi-Nati Logo" 
+            className="filter-container__logo"
+            onClick={() => navigate('/')}
+            title="Go to Home"
+            style={{
+              display: window.innerWidth > 768 ? 'block' : 'none',
+              cursor: 'pointer'
+            }}
+          />
 
-          {/* SEARCH BAR - ALWAYS ON LEFT, NO STACKING */}
+          {/* SEARCH BAR */}
           <input
             type="text"
             placeholder={`Search products (${totalSystemProducts})`}
@@ -774,7 +775,7 @@ const Products = () => {
             }}
           />
 
-          {/* CATEGORY FILTER - ALWAYS ON RIGHT, NO STACKING */}
+          {/* CATEGORY FILTER */}
           <select
             value={selectedCategory}
             onChange={handleCategoryChange}
@@ -804,6 +805,18 @@ const Products = () => {
               <option key={cat} value={cat}>{cat}</option>
             ))}
           </select>
+
+          {/* DESKTOP NAVIGATION - Only visible on large screens */}
+          <div style={{ 
+            display: window.innerWidth > 768 ? 'flex' : 'none',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            <DesktopFilterNav 
+              onCartClick={handleNavCartClick}
+              onAccountClick={handleNavAccountClick}
+            />
+          </div>
         </div>
       </div>
 

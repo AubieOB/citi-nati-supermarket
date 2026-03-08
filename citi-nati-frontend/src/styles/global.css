@@ -1899,22 +1899,21 @@ body.menu-open {
 
 .desktop-filter-nav {
   display: flex;
-  gap: 1rem;
+  gap: 1.5rem;
   align-items: center;
   flex-wrap: nowrap;
-  margin-left: 0;
-  padding-left: 0;
+  margin-left: auto;
+  padding: 0;
 }
 
 .desktop-filter-nav__item {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: auto;
-  padding: 0.5rem 0.4rem;
-  border-radius: 8px;
+  height: 40px;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
   background-color: transparent;
   border: none;
   cursor: pointer;
@@ -1922,16 +1921,15 @@ body.menu-open {
   color: #666;
   text-decoration: none;
   position: relative;
-  font-size: 1.2rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  font-size: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  font-weight: 500;
 }
 
 .desktop-filter-nav__label {
-  font-size: 0.65rem;
-  font-weight: 600;
-  margin-top: 0.25rem;
+  font-size: 1rem;
+  font-weight: 500;
   white-space: nowrap;
-  display: none;
   color: inherit;
   text-transform: capitalize;
 }
@@ -1939,19 +1937,19 @@ body.menu-open {
 .desktop-filter-nav__item:hover {
   background-color: #5B4B8A;
   color: white;
-  transform: scale(1.08) translateY(-2px);
-  box-shadow: 0 6px 16px rgba(91, 75, 138, 0.3);
+  transform: scale(1.05) translateY(-1px);
+  box-shadow: 0 4px 12px rgba(91, 75, 138, 0.25);
 }
 
 .desktop-filter-nav__item:active {
-  transform: scale(0.96) translateY(0);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transform: scale(0.98) translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
 }
 
 .desktop-filter-nav__item--active {
   background-color: #5B4B8A;
   color: white;
-  box-shadow: 0 4px 12px rgba(91, 75, 138, 0.25);
+  box-shadow: 0 3px 8px rgba(91, 75, 138, 0.2);
 }
 
 .desktop-filter-nav__badge {
@@ -1974,15 +1972,16 @@ body.menu-open {
 }
 
 .filter-container__logo {
-  height: 52px;
+  height: 64px;
   width: auto;
-  max-width: 60px;
+  max-width: 75px;
   cursor: pointer;
   transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   object-fit: contain;
   flex-shrink: 0;
   margin: 0;
   padding: 0;
+  margin-right: auto;
 }
 
 .filter-container__logo:hover {
@@ -2015,23 +2014,25 @@ body.menu-open {
   }
 }
 
-/* Large screens - make logo even bigger and adjust icons */
+/* Large screens - make logo even bigger and adjust buttons */
 @media (min-width: 1200px) {
   .filter-container__logo {
-    height: 64px;
-    max-width: 75px;
+    height: 72px;
+    max-width: 85px;
   }
 
   .desktop-filter-nav__item {
-    width: auto;
-    min-width: 60px;
-    padding: 0.6rem 0.5rem;
+    height: 44px;
+    padding: 0.5rem 1rem;
+    font-size: 1.05rem;
+  }
+
+  .desktop-filter-nav__item i {
     font-size: 1.3rem;
   }
 
   .desktop-filter-nav__label {
-    font-size: 0.75rem;
-    margin-top: 0.35rem;
+    font-size: 1.05rem;
   }
 
   .desktop-filter-nav__badge {
