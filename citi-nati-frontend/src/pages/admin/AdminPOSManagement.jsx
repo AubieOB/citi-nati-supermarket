@@ -390,52 +390,42 @@ const AdminPOSManagement = () => {
           <>
             {/* Search and Category Filters */}
             <div style={styles.filterSection}>
-              <div style={styles.searchBoxWrapper}>
-                <i className="fas fa-search" style={styles.searchIcon}></i>
-                <input
-                  type="text"
-                  placeholder="Search by product name, code, or category..."
-                  value={searchTerm}
-                  onChange={handleSearchChange}
-                  style={styles.searchInput}
-                />
+              <div style={{display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap'}}>
+                {/* Search Box */}
+                <div style={styles.searchBoxWrapper}>
+                  <i className="fas fa-search" style={styles.searchIcon}></i>
+                  <input
+                    type="text"
+                    placeholder="Search products..."
+                    value={searchTerm}
+                    onChange={handleSearchChange}
+                    style={styles.searchInput}
+                  />
+                </div>
+
+                {/* Category Dropdown */}
+                {categories.length > 0 && (
+                  <div style={styles.categoryDropdownWrapper}>
+                    <label style={styles.categoryDropdownLabel}>
+                      <i className="fas fa-filter" style={{ marginRight: '0.5rem' }}></i>
+                      Category:
+                    </label>
+                    <select
+                      value={selectedCategory}
+                      onChange={(e) => handleCategoryChange(e.target.value)}
+                      style={styles.categoryDropdown}
+                    >
+                      <option value="all">All Categories</option>
+                      {categories.map(category => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
             </div>
-
-            {/* Category Filter Pills */}
-            {categories.length > 0 && (
-              <div style={styles.categorySection}>
-                <label style={styles.categoryLabel}>
-                  <i className="fas fa-filter" style={{ marginRight: '0.5rem' }}></i>
-                  Filter by Category:
-                </label>
-                <div style={styles.categoryPills}>
-                  <button
-                    onClick={() => handleCategoryChange('all')}
-                    style={{
-                      ...styles.categoryPill,
-                      ...(selectedCategory === 'all' ? styles.categoryPillActive : {}),
-                    }}
-                  >
-                    <i className="fas fa-th" style={{ marginRight: '0.4rem' }}></i>
-                    All Categories
-                  </button>
-                  {categories.map(category => (
-                    <button
-                      key={category}
-                      onClick={() => handleCategoryChange(category)}
-                      style={{
-                        ...styles.categoryPill,
-                        ...(selectedCategory === category ? styles.categoryPillActive : {}),
-                      }}
-                    >
-                      <i className="fas fa-tag" style={{ marginRight: '0.4rem' }}></i>
-                      {category}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {/* Action Buttons */}
             <div style={styles.actionButtons}>
@@ -529,7 +519,6 @@ const AdminPOSManagement = () => {
                     </th>
                   </tr>
                 </thead>
-                <tbody>
                 <tbody>
                   {products.map((product) => (
                     <tr key={product.id} style={{
@@ -748,6 +737,7 @@ const styles = {
     position: 'relative',
     display: 'flex',
     alignItems: 'center',
+    flex: '0 0 350px',
   },
   searchIcon: {
     position: 'absolute',
@@ -757,8 +747,8 @@ const styles = {
   },
   searchInput: {
     width: '100%',
-    padding: '0.9rem 1rem 0.9rem 2.75rem',
-    fontSize: '1rem',
+    padding: '0.75rem 1rem 0.75rem 2.75rem',
+    fontSize: '0.95rem',
     border: '2px solid #e0e0e0',
     borderRadius: '8px',
     fontFamily: 'inherit',
@@ -766,41 +756,33 @@ const styles = {
     transition: 'all 0.3s ease',
     backgroundColor: '#fff',
   },
-  categorySection: {
-    marginBottom: '2rem',
-    padding: '1.5rem',
-    backgroundColor: '#f8f9fa',
-    borderRadius: '8px',
-  },
-  categoryLabel: {
-    display: 'block',
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: '1rem',
-    fontSize: '0.95rem',
-  },
-  categoryPills: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '0.75rem',
-  },
-  categoryPill: {
-    padding: '0.6rem 1.2rem',
-    borderRadius: '25px',
-    border: '2px solid #ddd',
-    backgroundColor: '#fff',
-    color: '#666',
-    fontWeight: '500',
-    cursor: 'pointer',
-    transition: 'all 0.3s ease',
-    fontSize: '0.9rem',
+  categoryDropdownWrapper: {
     display: 'flex',
     alignItems: 'center',
+    gap: '0.75rem',
+    flex: '0 0 auto',
   },
-  categoryPillActive: {
-    backgroundColor: '#5B4B8A',
-    color: '#fff',
-    borderColor: '#5B4B8A',
+  categoryDropdownLabel: {
+    fontWeight: '600',
+    color: '#333',
+    fontSize: '0.95rem',
+    whiteSpace: 'nowrap',
+    display: 'flex',
+    alignItems: 'center',
+    margin: '0',
+  },
+  categoryDropdown: {
+    padding: '0.75rem 1rem',
+    fontSize: '0.95rem',
+    border: '2px solid #e0e0e0',
+    borderRadius: '8px',
+    backgroundColor: '#fff',
+    color: '#333',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    fontWeight: '500',
+    transition: 'all 0.3s ease',
+    minWidth: '200px',
   },
   actionButtons: {
     display: 'flex',
