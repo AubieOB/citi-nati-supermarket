@@ -713,7 +713,7 @@ const Products = () => {
       {/* Promotion Banner - Appears at top if global or category promotion is active */}
       <PromotionBanner category={selectedCategory || null} />
 
-      {/* TRULY FIXED FILTER CONTAINER - Stays at viewport top, no scroll */}
+      {/* FIXED HEADER CONTAINER - Two-tier layout */}
       <div style={{
         position: 'fixed',
         top: 0,
@@ -722,101 +722,133 @@ const Products = () => {
         zIndex: 1000,
         backgroundColor: 'white',
         borderBottom: '1px solid #eee',
-        padding: window.innerWidth <= 480 ? '0.75rem' : '1rem',
         boxShadow: scrollY > 0 ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
-        transition: 'box-shadow 0.3s ease',
-        justifyContent: 'center'
+        transition: 'box-shadow 0.3s ease'
       }}>
-        <div style={{
-          maxWidth: '1200px',
-          width: '100%',
-          margin: '0 auto',
-          display: 'flex',
-          gap: '1rem',
-          alignItems: 'center',
-          justifyContent: 'flex-start',
-          flexWrap: 'nowrap'
-        }}>
-          {/* LOGO - Only visible on large screens */}
-          <img 
-            src={logo} 
-            alt="Citi-Nati Logo" 
-            className="filter-container__logo"
-            onClick={() => navigate('/')}
-            title="Go to Home"
-            style={{
-              display: window.innerWidth > 768 ? 'block' : 'none',
-              cursor: 'pointer'
-            }}
-          />
-
-          {/* SEARCH BAR */}
-          <input
-            type="text"
-            placeholder={`Search products (${totalSystemProducts})`}
-            value={searchInput}
-            onChange={handleSearchChange}
-            style={{
-              flex: '1 1 auto',
-              minWidth: window.innerWidth <= 768 ? '120px' : '180px',
-              maxWidth: window.innerWidth > 768 ? '400px' : '600px',
-              padding: '0.6rem 1rem',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              fontSize: window.innerWidth <= 480 ? '0.85rem' : '0.95rem',
-              boxSizing: 'border-box',
-              backgroundColor: '#fff',
-              transition: 'box-shadow 0.3s ease, background-color 0.3s ease'
-            }}
-            onFocus={(e) => {
-              e.target.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-            }}
-            onBlur={(e) => {
-              e.target.style.boxShadow = 'none';
-            }}
-          />
-
-          {/* CATEGORY FILTER */}
-          <select
-            value={selectedCategory}
-            onChange={handleCategoryChange}
-            style={{
-              flex: '0 1 auto',
-              minWidth: window.innerWidth <= 480 ? '140px' : '180px',
-              padding: '0.6rem 0.75rem',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: window.innerWidth <= 480 ? '0.85rem' : '0.95rem',
-              backgroundColor: '#f5f5f5',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              transition: 'box-shadow 0.3s ease, background-color 0.3s ease'
-            }}
-            onFocus={(e) => {
-              e.target.style.backgroundColor = '#fff';
-              e.target.style.boxShadow = '0 4px 12px rgba(91, 75, 138, 0.2)';
-            }}
-            onBlur={(e) => {
-              e.target.style.backgroundColor = '#f5f5f5';
-              e.target.style.boxShadow = 'none';
-            }}
-          >
-            <option value="">All Categories</option>
-            {categories.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
-
-          {/* DESKTOP NAVIGATION - Only visible on large screens */}
-          <div style={{ 
-            display: window.innerWidth > 768 ? 'flex' : 'none',
+        {/* TOP TIER - Logo + Text on left, Nav buttons on right */}
+        {window.innerWidth > 768 && (
+          <div style={{
+            display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem'
+            justifyContent: 'space-between',
+            padding: '0.75rem 1.5rem',
+            borderBottom: '1px solid #f0f0f0'
           }}>
-            <DesktopFilterNav 
-              onCartClick={handleNavCartClick}
-              onAccountClick={handleNavAccountClick}
+            {/* Logo + Brand Text Left Section */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              cursor: 'pointer',
+              flex: 'none'
+            }} onClick={() => navigate('/')}>
+              <img 
+                src={logo} 
+                alt="Citi-Nati Logo" 
+                style={{
+                  height: '48px',
+                  width: 'auto',
+                  maxWidth: '60px',
+                  objectFit: 'contain'
+                }}
+              />
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0',
+                lineHeight: '1'
+              }}>
+                <span style={{ fontSize: '0.9rem', fontWeight: '700', color: '#5B4B8A' }}>Citi</span>
+                <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#2D8659' }}>Supermarket</span>
+              </div>
+            </div>
+
+            {/* Navigation Buttons Right Section */}
+            <div style={{
+              flex: 'none'
+            }}>
+              <DesktopFilterNav 
+                onCartClick={handleNavCartClick}
+                onAccountClick={handleNavAccountClick}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* BOTTOM TIER - Filters (Search + Category) */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          padding: window.innerWidth <= 480 ? '0.75rem' : '0.75rem 1.5rem',
+          backgroundColor: '#fafafa'
+        }}>
+          <div style={{
+            maxWidth: '1200px',
+            width: '100%',
+            display: 'flex',
+            gap: '0.75rem',
+            alignItems: 'center',
+            justifyContent: 'flex-start',
+            flexWrap: 'nowrap'
+          }}>
+            {/* SEARCH BAR */}
+            <input
+              type="text"
+              placeholder={`Search products (${totalSystemProducts})`}
+              value={searchInput}
+              onChange={handleSearchChange}
+              style={{
+                flex: '1 1 auto',
+                minWidth: window.innerWidth <= 768 ? '120px' : '180px',
+                maxWidth: window.innerWidth > 768 ? '450px' : '600px',
+                padding: '0.5rem 0.9rem',
+                border: '1px solid #d0d0d0',
+                borderRadius: '6px',
+                fontSize: window.innerWidth <= 480 ? '0.85rem' : '0.95rem',
+                boxSizing: 'border-box',
+                backgroundColor: '#fff',
+                transition: 'box-shadow 0.2s ease, border-color 0.2s ease'
+              }}
+              onFocus={(e) => {
+                e.target.style.boxShadow = '0 2px 8px rgba(91, 75, 138, 0.15)';
+                e.target.style.borderColor = '#5B4B8A';
+              }}
+              onBlur={(e) => {
+                e.target.style.boxShadow = 'none';
+                e.target.style.borderColor = '#d0d0d0';
+              }}
             />
+
+            {/* CATEGORY FILTER */}
+            <select
+              value={selectedCategory}
+              onChange={handleCategoryChange}
+              style={{
+                flex: '0 1 auto',
+                minWidth: window.innerWidth <= 480 ? '130px' : '160px',
+                padding: '0.5rem 0.65rem',
+                border: '1px solid #d0d0d0',
+                borderRadius: '6px',
+                fontSize: window.innerWidth <= 480 ? '0.85rem' : '0.95rem',
+                backgroundColor: '#fff',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                transition: 'box-shadow 0.2s ease, border-color 0.2s ease'
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#5B4B8A';
+                e.target.style.boxShadow = '0 2px 8px rgba(91, 75, 138, 0.15)';
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = '#d0d0d0';
+                e.target.style.boxShadow = 'none';
+              }}
+            >
+              <option value="">All Categories</option>
+              {categories.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
           </div>
         </div>
       </div>
@@ -825,7 +857,7 @@ const Products = () => {
       {showAccountPopup && isAuthenticated && (
         <div style={{
           position: 'fixed',
-          top: window.innerWidth > 768 ? '70px' : 'auto',
+          top: window.innerWidth > 768 ? '112px' : 'auto',
           bottom: window.innerWidth <= 768 ? '70px' : 'auto',
           right: '1rem',
           left: window.innerWidth <= 768 ? '1rem' : 'auto',
@@ -902,12 +934,12 @@ const Products = () => {
         />
       )}
 
-      {/* PRODUCTS GRID SECTION - Account for fixed filter height */}
+      {/* PRODUCTS GRID SECTION - Account for fixed header height */}
       <div style={{
         display: 'flex',
         flexDirection: 'column',
         minHeight: '100vh',
-        marginTop: window.innerWidth <= 480 ? '3rem' : '3.6rem',
+        marginTop: window.innerWidth > 768 ? '7rem' : '3.25rem',
         paddingTop: '0'
       }}>
         {/* SCROLLABLE PRODUCTS SECTION */}
