@@ -829,11 +829,9 @@ const Products = () => {
                   whiteSpace: 'nowrap'
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#5B4B8A';
-                  e.target.style.color = 'white';
+                  e.target.style.color = '#5B4B8A';
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = 'transparent';
                   e.target.style.color = '#666';
                 }}
                 title="Go to Home"
@@ -862,11 +860,9 @@ const Products = () => {
                   whiteSpace: 'nowrap'
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#5B4B8A';
-                  e.target.style.color = 'white';
+                  e.target.style.color = '#5B4B8A';
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = 'transparent';
                   e.target.style.color = '#666';
                 }}
                 title="View Cart"
