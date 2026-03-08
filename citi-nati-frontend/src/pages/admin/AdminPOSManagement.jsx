@@ -5,18 +5,22 @@ import Container from '../../components/ui/Container.jsx';
 import { useModal } from '../../hooks/useModal.js';
 import { formatMWK } from '../../utils/currency.js';
 import Pagination from '../../components/ui/Pagination.jsx';
+import { getSocket } from '../../utils/socket.js';
 import '../../styles/global.css';
 
 /**
- * AdminPOSManagement - POS Products Management Panel
+ * AdminPOSManagement - Professional POS Products Management Panel
  * 
  * Features:
  * - View all POS synced products with pagination
  * - Search products by name, sourceCode, or category
+ * - Filter by category with visual pills
  * - Toggle visibility (hide/show from products page)
- * - Delete selected products
+ * - Bulk actions: hide/unhide, delete selected products
  * - Delete all POS products at once
- * - Real-time updates
+ * - Real-time updates via Socket.io
+ * - Professional responsive design with icons
+ * - Stats cards showing product overview
  */
 
 const AdminPOSManagement = () => {
@@ -25,6 +29,8 @@ const AdminPOSManagement = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [categories, setCategories] = useState([]);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(50);
   const [limit] = useState(5000);
@@ -36,7 +42,7 @@ const AdminPOSManagement = () => {
   /**
    * Fetch POS products with search and pagination
    */
-  const fetchProducts = async (searchValue = '', pageNum = 1) => {
+  const fetchProducts = async (searchValue = '', pageNum = 1, categoryFilter = '') => {
     try {
       // only show spinner if we have no data yet
       if (products.length === 0) setLoading(true);
@@ -50,7 +56,18 @@ const AdminPOSManagement = () => {
       const response = await api.get(`/admin/pos-products?${params.toString()}`);
       
       if (response.data.success) {
-        setProducts(response.data.products);
+        let items = response.data.products;
+        
+        // Extract unique categories from all products
+        const uniqueCategories = [...new Set(items.map(p => p.category).filter(Boolean))];
+        setCategories(uniqueCategories.sort());
+        
+        // Filter by category if selected
+        if (categoryFilter && categoryFilter !== 'all') {
+          items = items.filter(p => p.category === categoryFilter);
+        }
+        
+        setProducts(items);
         setTotal(response.data.total);
         setTotalPages(response.data.totalPages);
       }
@@ -61,6 +78,39 @@ const AdminPOSManagement = () => {
       setLoading(false);
     }
   };
+
+  /**
+   * Real-time socket updates for product visibility changes
+   */
+  useEffect(() => {
+    try {
+      const socket = getSocket();
+      if (!socket) {
+        console.warn('[AdminPOS] Socket not initialized');
+        return;
+      }
+
+      const handleProductUpdate = (updatedProduct) => {
+        // Update product in list if visibility changed
+        setProducts(prevProducts =>
+          prevProducts.map(p =>
+            p.id === updatedProduct.id
+              ? { ...p, hideFromProductsPage: updatedProduct.hideFromProductsPage }
+              : p
+          )
+        );
+      };
+
+      socket.on('product_updated', handleProductUpdate);
+      console.log('[AdminPOS] Socket listener attached');
+
+      return () => {
+        socket.off('product_updated', handleProductUpdate);
+      };
+    } catch (err) {
+      console.error('[AdminPOS] Socket setup error:', err);
+    }
+  }, []);
 
   // Handle search with debounce
   const handleSearchChange = (e) => {
@@ -73,22 +123,33 @@ const AdminPOSManagement = () => {
       clearTimeout(searchTimeoutRef.current);
     }
     
-    // Debounce the search by 500ms
-    searchTimeoutRef.current = setTimeout(() => {
-      fetchProducts(value, 1);
-    }, 500);
+    // Debounce the search by 300ms (no delay for clearing)
+    if (value === '') {
+      fetchProducts('', 1, selectedCategory);
+    } else {
+      searchTimeoutRef.current = setTimeout(() => {
+        fetchProducts(value, 1, selectedCategory);
+      }, 300);
+    }
+  };
+
+  // Handle category filter
+  const handleCategoryChange = (category) => {
+    setSelectedCategory(category);
+    setPage(1);
+    fetchProducts(searchTerm, 1, category);
   };
 
   // Initial fetch
   useEffect(() => {
-    fetchProducts('', 1);
+    fetchProducts('', 1, 'all');
   }, []);
 
   // Handle pagination
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages) {
       setPage(newPage);
-      fetchProducts(searchTerm, newPage);
+      fetchProducts(searchTerm, newPage, selectedCategory);
     }
   };
 
@@ -111,6 +172,49 @@ const AdminPOSManagement = () => {
       setSelectedProducts(new Set());
     } else {
       setSelectedProducts(new Set(products.map(p => p.id)));
+    }
+  };
+
+  /**
+   * Bulk hide/unhide all selected products
+   */
+  const handleBulkVisibilityChange = async (hideFromProducts) => {
+    if (selectedProducts.size === 0) {
+      showError('No products selected');
+      return;
+    }
+
+    const action = hideFromProducts ? 'hide' : 'unhide';
+    if (!window.confirm(`${hideFromProducts ? 'Hide' : 'Show'} ${selectedProducts.size} product(s)? This will ${action} them from the products page.`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // Update each product individually
+      for (const productId of selectedProducts) {
+        const product = products.find(p => p.id === productId);
+        if (product) {
+          await api.put(`/admin/pos-products/${productId}/visibility`, {
+            hideFromProductsPage: hideFromProducts,
+          });
+        }
+      }
+
+      // Update local state
+      setProducts(prev => prev.map(p =>
+        selectedProducts.has(p.id)
+          ? { ...p, hideFromProductsPage: hideFromProducts }
+          : p
+      ));
+
+      showSuccess(`Successfully ${action}d ${selectedProducts.size} product(s)`);
+      setSelectedProducts(new Set());
+    } catch (err) {
+      console.error(`Error updating visibility:`, err);
+      showError(err.response?.data?.error || `Failed to ${action} products`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -162,7 +266,7 @@ const AdminPOSManagement = () => {
       if (response.data.success) {
         showSuccess(`Deleted ${response.data.deletedCount} products`);
         setSelectedProducts(new Set());
-        fetchProducts(searchTerm, page);
+        fetchProducts(searchTerm, page, selectedCategory);
       }
     } catch (err) {
       console.error('Error deleting products:', err);
@@ -188,7 +292,7 @@ const AdminPOSManagement = () => {
         showSuccess(`Deleted all ${response.data.deletedCount} POS products`);
         setSelectedProducts(new Set());
         setPage(1);
-        fetchProducts('', 1);
+        fetchProducts('', 1, selectedCategory);
       }
     } catch (err) {
       console.error('Error deleting all products:', err);
@@ -198,72 +302,190 @@ const AdminPOSManagement = () => {
     }
   };
 
-  if (loading && products.length === 0) {
-    return (
-      <Container>
-        <div style={{ padding: '40px 20px', textAlign: 'center' }}>
-          <p>Loading POS products...</p>
-        </div>
-      </Container>
-    );
-  }
+  // Calculate stats
+  const hiddenCount = products.filter(p => p.hideFromProductsPage).length;
+  const visibleCount = products.length - hiddenCount;
 
   return (
     <Container>
       <div style={styles.container}>
+        {/* Professional Header */}
         <div style={styles.header}>
-          <h1 style={styles.title}>POS Products Management</h1>
-          <p style={styles.description}>
-            Manage which POS synced products appear on your website
-          </p>
+          <div style={styles.headerTop}>
+            <h1 style={styles.title}>
+              <i className="fas fa-boxes" style={styles.titleIcon}></i>
+              POS Products Management
+            </h1>
+            <p style={styles.subtitle}>
+              <i className="fas fa-info-circle" style={{ marginRight: '0.5rem' }}></i>
+              Manage which POS synced products appear on your website
+            </p>
+          </div>
         </div>
 
+        {/* Error Alert */}
         {error && (
           <div style={styles.errorAlert}>
-            <p>{error}</p>
+            <i className="fas fa-exclamation-triangle" style={{ marginRight: '0.75rem' }}></i>
+            <span>{error}</span>
           </div>
         )}
 
-        <div style={styles.controls}>
-          <div style={styles.searchBox}>
-            <input
-              type="text"
-              placeholder="Search by product name, code, or category..."
-              value={searchTerm}
-              onChange={handleSearchChange}
-              style={styles.searchInput}
-            />
+        {/* Loading Indicator */}
+        {loading && products.length === 0 && (
+          <div style={styles.loadingContainer}>
+            <i className="fas fa-spinner fa-spin" style={styles.spinnerIcon}></i>
+            <p>Loading POS products...</p>
           </div>
+        )}
 
-          <div style={styles.actionButtons}>
-            <button
-              onClick={handleDeleteSelected}
-              disabled={selectedProducts.size === 0}
-              style={{
-                ...styles.button,
-                ...styles.deleteSelectedBtn,
-                opacity: selectedProducts.size === 0 ? 0.5 : 1,
-                cursor: selectedProducts.size === 0 ? 'not-allowed' : 'pointer',
-              }}
-            >
-              🗑️ Delete Selected ({selectedProducts.size})
-            </button>
-
-            <button
-              onClick={handleDeleteAll}
-              style={{ ...styles.button, ...styles.deleteAllBtn }}
-            >
-              ⚠️ Delete All POS Products ({total})
-            </button>
+        {/* Stats Cards */}
+        {products.length > 0 && (
+          <div style={styles.statsGrid}>
+            <div style={styles.statCard}>
+              <div style={{...styles.statIcon, backgroundColor: '#2196F3'}}>
+                <i className="fas fa-cube"></i>
+              </div>
+              <div>
+                <p style={styles.statLabel}>Total Products</p>
+                <h3 style={styles.statValue}>{total}</h3>
+              </div>
+            </div>
+            <div style={styles.statCard}>
+              <div style={{...styles.statIcon, backgroundColor: '#28a745'}}>
+                <i className="fas fa-eye"></i>
+              </div>
+              <div>
+                <p style={styles.statLabel}>Visible</p>
+                <h3 style={styles.statValue}>{visibleCount}</h3>
+              </div>
+            </div>
+            <div style={styles.statCard}>
+              <div style={{...styles.statIcon, backgroundColor: '#ffc107'}}>
+                <i className="fas fa-eye-slash"></i>
+              </div>
+              <div>
+                <p style={styles.statLabel}>Hidden</p>
+                <h3 style={styles.statValue}>{hiddenCount}</h3>
+              </div>
+            </div>
+            <div style={styles.statCard}>
+              <div style={{...styles.statIcon, backgroundColor: '#6f42c1'}}>
+                <i className="fas fa-check"></i>
+              </div>
+              <div>
+                <p style={styles.statLabel}>Selected</p>
+                <h3 style={styles.statValue}>{selectedProducts.size}</h3>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
 
-        {products.length === 0 ? (
+        {products.length === 0 && !loading ? (
           <div style={styles.emptyState}>
-            <p>No POS products found</p>
+            <i className="fas fa-inbox" style={styles.emptyIcon}></i>
+            <p style={styles.emptyText}>No POS products found</p>
           </div>
         ) : (
           <>
+            {/* Search and Category Filters */}
+            <div style={styles.filterSection}>
+              <div style={styles.searchBoxWrapper}>
+                <i className="fas fa-search" style={styles.searchIcon}></i>
+                <input
+                  type="text"
+                  placeholder="Search by product name, code, or category..."
+                  value={searchTerm}
+                  onChange={handleSearchChange}
+                  style={styles.searchInput}
+                />
+              </div>
+            </div>
+
+            {/* Category Filter Pills */}
+            {categories.length > 0 && (
+              <div style={styles.categorySection}>
+                <label style={styles.categoryLabel}>
+                  <i className="fas fa-filter" style={{ marginRight: '0.5rem' }}></i>
+                  Filter by Category:
+                </label>
+                <div style={styles.categoryPills}>
+                  <button
+                    onClick={() => handleCategoryChange('all')}
+                    style={{
+                      ...styles.categoryPill,
+                      ...(selectedCategory === 'all' ? styles.categoryPillActive : {}),
+                    }}
+                  >
+                    <i className="fas fa-th" style={{ marginRight: '0.4rem' }}></i>
+                    All Categories
+                  </button>
+                  {categories.map(category => (
+                    <button
+                      key={category}
+                      onClick={() => handleCategoryChange(category)}
+                      style={{
+                        ...styles.categoryPill,
+                        ...(selectedCategory === category ? styles.categoryPillActive : {}),
+                      }}
+                    >
+                      <i className="fas fa-tag" style={{ marginRight: '0.4rem' }}></i>
+                      {category}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div style={styles.actionButtons}>
+              {selectedProducts.size > 0 && (
+                <>
+                  <button
+                    onClick={() => handleBulkVisibilityChange(true)}
+                    style={{
+                      ...styles.actionButton,
+                      ...styles.hideButton,
+                    }}
+                  >
+                    <i className="fas fa-eye-slash" style={{ marginRight: '0.5rem' }}></i>
+                    Hide Selected ({selectedProducts.size})
+                  </button>
+                  <button
+                    onClick={() => handleBulkVisibilityChange(false)}
+                    style={{
+                      ...styles.actionButton,
+                      ...styles.showButton,
+                    }}
+                  >
+                    <i className="fas fa-eye" style={{ marginRight: '0.5rem' }}></i>
+                    Show Selected ({selectedProducts.size})
+                  </button>
+                  <button
+                    onClick={handleDeleteSelected}
+                    style={{
+                      ...styles.actionButton,
+                      ...styles.deleteButton,
+                    }}
+                  >
+                    <i className="fas fa-trash" style={{ marginRight: '0.5rem' }}></i>
+                    Delete Selected ({selectedProducts.size})
+                  </button>
+                </>
+              )}
+              <button
+                onClick={handleDeleteAll}
+                style={{
+                  ...styles.actionButton,
+                  ...styles.deleteAllButton,
+                }}
+              >
+                <i className="fas fa-nuclear" style={{ marginRight: '0.5rem' }}></i>
+                Delete All ({total})
+              </button>
+            </div>
+
+            {/* Table */}
             <div style={styles.tableWrapper}>
               <table style={styles.table}>
                 <thead>
@@ -274,21 +496,46 @@ const AdminPOSManagement = () => {
                         checked={selectedProducts.size === products.length && products.length > 0}
                         onChange={toggleAllProducts}
                         style={styles.checkbox}
+                        title="Select all products on this page"
                       />
                     </th>
-                    <th style={styles.cell}>Product Name</th>
-                    <th style={styles.cell}>Source Code</th>
-                    <th style={styles.cell}>Category</th>
-                    <th style={styles.cell}>Price</th>
-                    <th style={styles.cell}>Stock</th>
-                    <th style={styles.cell}>Availability</th>
-                    <th style={styles.cell}>Visibility</th>
-                    <th style={styles.cell}>Actions</th>
+                    <th style={styles.cell}>
+                      <i className="fas fa-box" style={{ marginRight: '0.5rem' }}></i>
+                      Product Name
+                    </th>
+                    <th style={styles.cell}>
+                      <i className="fas fa-barcode" style={{ marginRight: '0.5rem' }}></i>
+                      Source Code
+                    </th>
+                    <th style={styles.cell}>
+                      <i className="fas fa-tag" style={{ marginRight: '0.5rem' }}></i>
+                      Category
+                    </th>
+                    <th style={styles.cell}>
+                      <i className="fas fa-dollar-sign" style={{ marginRight: '0.5rem' }}></i>
+                      Price
+                    </th>
+                    <th style={styles.cell}>
+                      <i className="fas fa-warehouse" style={{ marginRight: '0.5rem' }}></i>
+                      Stock
+                    </th>
+                    <th style={styles.cell}>
+                      <i className="fas fa-eye" style={{ marginRight: '0.5rem' }}></i>
+                      Visibility
+                    </th>
+                    <th style={styles.cell}>
+                      <i className="fas fa-cog" style={{ marginRight: '0.5rem' }}></i>
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
+                <tbody>
                   {products.map((product) => (
-                    <tr key={product.id} style={styles.bodyRow}>
+                    <tr key={product.id} style={{
+                      ...styles.bodyRow,
+                      backgroundColor: selectedProducts.has(product.id) ? '#f0f8ff' : 'transparent',
+                    }}>
                       <td style={{ ...styles.cell, ...styles.checkboxCell }}>
                         <input
                           type="checkbox"
@@ -298,50 +545,67 @@ const AdminPOSManagement = () => {
                         />
                       </td>
                       <td style={styles.cell}>
-                        <div style={styles.productName}>{product.name}</div>
+                        <div style={styles.productName}>
+                          <i className="fas fa-box" style={{ marginRight: '0.5rem', color: '#5B4B8A' }}></i>
+                          {product.name}
+                        </div>
                       </td>
                       <td style={styles.cell}>
                         <code style={styles.sourceCode}>{product.sourceCode}</code>
                       </td>
-                      <td style={styles.cell}>{product.category || '-'}</td>
-                      <td style={styles.cell}>{formatMWK(product.price)}</td>
+                      <td style={styles.cell}>
+                        <span style={styles.categoryBadge}>
+                          <i className="fas fa-tag" style={{ marginRight: '0.3rem' }}></i>
+                          {product.category || 'N/A'}
+                        </span>
+                      </td>
+                      <td style={styles.cell}>
+                        <span style={styles.priceValue}>{formatMWK(product.price)}</span>
+                      </td>
                       <td style={styles.cell}>
                         <span style={{
-                          padding: '4px 8px',
-                          borderRadius: '4px',
-                          backgroundColor: product.stock > 0 ? '#d4edda' : '#f8d7da',
-                          color: product.stock > 0 ? '#155724' : '#721c24',
-                          fontWeight: 'bold',
+                          padding: '0.4rem 0.8rem',
+                          borderRadius: '6px',
+                          backgroundColor: product.stock > 10 ? '#d4edda' : product.stock > 0 ? '#fff3cd' : '#f8d7da',
+                          color: product.stock > 10 ? '#155724' : product.stock > 0 ? '#856404' : '#721c24',
+                          fontWeight: '600',
+                          fontSize: '0.9rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.4rem',
                         }}>
-                          {product.stock}
+                          <i className={`fas ${product.stock > 0 ? 'fa-check-circle' : 'fa-times-circle'}`}></i>
+                          {product.stock} units
                         </span>
                       </td>
                       <td style={styles.cell}>
                         <span style={{
-                          padding: '4px 8px',
-                          borderRadius: '4px',
-                          backgroundColor: product.hideFromProductsPage ? '#fff3cd' : '#d4edda',
-                          color: product.hideFromProductsPage ? '#856404' : '#155724',
-                          fontSize: '12px',
-                          fontWeight: 'bold',
+                          padding: '0.4rem 0.8rem',
+                          borderRadius: '6px',
+                          backgroundColor: product.hideFromProductsPage ? '#ffe5e5' : '#e5f5e5',
+                          color: product.hideFromProductsPage ? '#c41e3a' : '#28a745',
+                          fontWeight: '600',
+                          fontSize: '0.9rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.4rem',
                         }}>
-                          <i style={{ marginRight: '6px' }} className={product.hideFromProductsPage ? 'fas fa-eye-slash' : 'fas fa-eye'} />
+                          <i className={`fas ${product.hideFromProductsPage ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                           {product.hideFromProductsPage ? 'HIDDEN' : 'VISIBLE'}
                         </span>
                       </td>
                       <td style={styles.cell}>
-                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        <div style={styles.actionCell}>
                           <button
                             onClick={() => handleToggleVisibility(product.id, product.hideFromProductsPage)}
                             title={product.hideFromProductsPage ? 'Show on products page' : 'Hide from products page'}
                             style={{
-                              ...styles.toggleButton,
+                              ...styles.iconButton,
                               backgroundColor: product.hideFromProductsPage ? '#28a745' : '#ffc107',
-                              padding: '5px 10px',
-                              fontSize: '11px',
+                              borderColor: product.hideFromProductsPage ? '#218838' : '#e0a800',
                             }}
                           >
-                            {product.hideFromProductsPage ? 'Show' : 'Hide'}
+                            <i className={`fas ${product.hideFromProductsPage ? 'fa-eye' : 'fa-eye-slash'}`}></i>
                           </button>
                         </div>
                       </td>
@@ -356,128 +620,252 @@ const AdminPOSManagement = () => {
               <button
                 onClick={() => handlePageChange(page - 1)}
                 disabled={page === 1}
-                style={{ ...styles.paginationButton, opacity: page === 1 ? 0.5 : 1 }}
+                style={{ ...styles.paginationButton, opacity: page === 1 ? 0.5 : 1, cursor: page === 1 ? 'not-allowed' : 'pointer' }}
               >
+                <i className="fas fa-chevron-left" style={{ marginRight: '0.5rem' }}></i>
                 Previous
               </button>
 
               <div style={styles.pageInfo}>
-                Page <strong>{page}</strong> of <strong>{totalPages}</strong>
-                {' '}
-                ({total} total products)
+                <i className="fas fa-file-alt" style={{ marginRight: '0.5rem' }}></i>
+                Page <strong>{page}</strong> of <strong>{totalPages}</strong> ({total} total products)
               </div>
 
               <button
                 onClick={() => handlePageChange(page + 1)}
                 disabled={page === totalPages}
-                style={{ ...styles.paginationButton, opacity: page === totalPages ? 0.5 : 1 }}
+                style={{ ...styles.paginationButton, opacity: page === totalPages ? 0.5 : 1, cursor: page === totalPages ? 'not-allowed' : 'pointer' }}
               >
                 Next
+                <i className="fas fa-chevron-right" style={{ marginLeft: '0.5rem' }}></i>
               </button>
             </div>
           </>
-        )}
-
-        {modal.isOpen && (
-          <div style={styles.modalOverlay} onClick={closeModal}>
-            <div style={styles.modalContent} onClick={e => e.stopPropagation()}>
-              <h2 style={styles.modalTitle}>
-                <i style={{ marginRight: '8px' }} className={modal.type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle'} />
-                {modal.title}
-              </h2>
-              <p style={styles.modalMessage}>{modal.message}</p>
-              <button onClick={closeModal} style={styles.modalButton}>
-                Close
-              </button>
-            </div>
-          </div>
         )}
       </div>
     </Container>
   );
 };
+};
 
 const styles = {
   container: {
-    padding: '40px 20px',
-    maxWidth: '1200px',
+    padding: '2rem',
+    maxWidth: '1400px',
     margin: '0 auto',
   },
   header: {
-    marginBottom: '40px',
+    marginBottom: '2.5rem',
+  },
+  headerTop: {
+    marginBottom: '1.5rem',
   },
   title: {
-    fontSize: '32px',
-    fontWeight: 'bold',
-    margin: '0 0 10px 0',
+    fontSize: '2.5rem',
+    fontWeight: '800',
+    margin: '0 0 0.75rem 0',
+    color: '#2c3e50',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '1rem',
   },
-  description: {
-    fontSize: '16px',
+  titleIcon: {
+    color: '#5B4B8A',
+    fontSize: '2.2rem',
+  },
+  subtitle: {
+    fontSize: '1.1rem',
     color: '#666',
     margin: '0',
+    display: 'flex',
+    alignItems: 'center',
   },
   errorAlert: {
-    padding: '12px 16px',
+    padding: '1rem 1.25rem',
     backgroundColor: '#f8d7da',
     color: '#721c24',
     border: '1px solid #f5c6cb',
-    borderRadius: '4px',
-    marginBottom: '20px',
-  },
-  controls: {
-    marginBottom: '30px',
+    borderRadius: '8px',
+    marginBottom: '1.5rem',
     display: 'flex',
-    flexDirection: 'column',
-    gap: '20px',
+    alignItems: 'center',
+    fontSize: '0.95rem',
   },
-  searchBox: {
-    flex: 1,
+  loadingContainer: {
+    padding: '3rem 2rem',
+    textAlign: 'center',
+    backgroundColor: '#f8f9fa',
+    borderRadius: '8px',
+    marginBottom: '2rem',
+  },
+  spinnerIcon: {
+    fontSize: '2.5rem',
+    color: '#5B4B8A',
+    marginBottom: '1rem',
+  },
+  statsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: '1.5rem',
+    marginBottom: '2.5rem',
+  },
+  statCard: {
+    backgroundColor: '#fff',
+    border: '1px solid #e0e0e0',
+    borderRadius: '12px',
+    padding: '1.5rem',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '1.25rem',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+    transition: 'all 0.3s ease',
+  },
+  statIcon: {
+    width: '60px',
+    height: '60px',
+    borderRadius: '10px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '1.5rem',
+    color: '#fff',
+  },
+  statLabel: {
+    margin: '0',
+    fontSize: '0.9rem',
+    color: '#666',
+    fontWeight: '500',
+  },
+  statValue: {
+    margin: '0.25rem 0 0 0',
+    fontSize: '2rem',
+    fontWeight: '800',
+    color: '#2c3e50',
+  },
+  filterSection: {
+    marginBottom: '2rem',
+  },
+  searchBoxWrapper: {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+  },
+  searchIcon: {
+    position: 'absolute',
+    left: '1rem',
+    color: '#999',
+    pointerEvents: 'none',
   },
   searchInput: {
     width: '100%',
-    padding: '10px 15px',
-    fontSize: '14px',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
+    padding: '0.9rem 1rem 0.9rem 2.75rem',
+    fontSize: '1rem',
+    border: '2px solid #e0e0e0',
+    borderRadius: '8px',
     fontFamily: 'inherit',
     boxSizing: 'border-box',
+    transition: 'all 0.3s ease',
+    backgroundColor: '#fff',
+  },
+  categorySection: {
+    marginBottom: '2rem',
+    padding: '1.5rem',
+    backgroundColor: '#f8f9fa',
+    borderRadius: '8px',
+  },
+  categoryLabel: {
+    display: 'block',
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: '1rem',
+    fontSize: '0.95rem',
+  },
+  categoryPills: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '0.75rem',
+  },
+  categoryPill: {
+    padding: '0.6rem 1.2rem',
+    borderRadius: '25px',
+    border: '2px solid #ddd',
+    backgroundColor: '#fff',
+    color: '#666',
+    fontWeight: '500',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    fontSize: '0.9rem',
+    display: 'flex',
+    alignItems: 'center',
+  },
+  categoryPillActive: {
+    backgroundColor: '#5B4B8A',
+    color: '#fff',
+    borderColor: '#5B4B8A',
   },
   actionButtons: {
     display: 'flex',
-    gap: '10px',
     flexWrap: 'wrap',
+    gap: '0.75rem',
+    marginBottom: '2rem',
   },
-  button: {
-    padding: '10px 20px',
-    fontSize: '14px',
-    fontWeight: 'bold',
+  actionButton: {
+    padding: '0.75rem 1.5rem',
+    fontSize: '0.95rem',
+    fontWeight: '600',
     border: 'none',
-    borderRadius: '4px',
+    borderRadius: '8px',
     cursor: 'pointer',
     transition: 'all 0.3s ease',
+    color: '#fff',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
   },
-  deleteSelectedBtn: {
+  hideButton: {
+    backgroundColor: '#ffc107',
+    borderColor: '#e0a800',
+  },
+  showButton: {
+    backgroundColor: '#28a745',
+    borderColor: '#1e7e34',
+  },
+  deleteButton: {
     backgroundColor: '#dc3545',
-    color: 'white',
+    borderColor: '#bd2130',
   },
-  deleteAllBtn: {
+  deleteAllButton: {
     backgroundColor: '#6f42c1',
-    color: 'white',
+    borderColor: '#5a32a3',
   },
   emptyState: {
-    padding: '40px 20px',
+    padding: '3rem 2rem',
     textAlign: 'center',
     color: '#999',
+    backgroundColor: '#f8f9fa',
+    borderRadius: '8px',
+  },
+  emptyIcon: {
+    fontSize: '3rem',
+    color: '#ddd',
+    marginBottom: '1rem',
+    display: 'block',
+  },
+  emptyText: {
+    fontSize: '1.1rem',
+    margin: '0',
   },
   tableWrapper: {
     overflowX: 'auto',
-    marginBottom: '30px',
+    marginBottom: '2rem',
+    borderRadius: '8px',
+    boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
   },
   table: {
     width: '100%',
     borderCollapse: 'collapse',
     backgroundColor: '#fff',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
   },
   headerRow: {
     backgroundColor: '#f8f9fa',
@@ -485,106 +873,105 @@ const styles = {
   },
   bodyRow: {
     borderBottom: '1px solid #dee2e6',
+    transition: 'background-color 0.2s ease',
   },
   cell: {
-    padding: '12px 15px',
+    padding: '1.25rem',
     textAlign: 'left',
-    fontSize: '14px',
+    fontSize: '0.95rem',
+    color: '#333',
   },
   checkboxCell: {
-    width: '40px',
-    padding: '12px 8px',
+    width: '50px',
+    padding: '1.25rem 0.75rem',
     textAlign: 'center',
   },
   checkbox: {
     cursor: 'pointer',
-    width: '18px',
-    height: '18px',
+    width: '20px',
+    height: '20px',
   },
   productName: {
-    fontWeight: '500',
-    color: '#333',
-    maxWidth: '250px',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
+    fontWeight: '600',
+    color: '#2c3e50',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
   },
   sourceCode: {
     backgroundColor: '#f0f0f0',
-    padding: '2px 6px',
-    borderRadius: '3px',
-    fontSize: '12px',
-  },
-  toggleButton: {
-    padding: '6px 12px',
-    fontSize: '12px',
-    fontWeight: 'bold',
-    border: 'none',
+    padding: '0.3rem 0.6rem',
     borderRadius: '4px',
+    fontSize: '0.85rem',
+    fontFamily: 'monospace',
+    color: '#555',
+  },
+  categoryBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '0.4rem',
+    padding: '0.4rem 0.8rem',
+    backgroundColor: '#e8f4f8',
+    color: '#0277bd',
+    borderRadius: '6px',
+    fontSize: '0.9rem',
+    fontWeight: '500',
+  },
+  priceValue: {
+    fontWeight: '700',
+    color: '#28a745',
+    fontSize: '1rem',
+  },
+  actionCell: {
+    display: 'flex',
+    gap: '0.5rem',
+  },
+  iconButton: {
+    width: '40px',
+    height: '40px',
+    borderRadius: '8px',
+    border: '2px solid',
     cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '1rem',
     transition: 'all 0.3s ease',
-    color: 'white',
+    fontWeight: '600',
+    color: '#fff',
   },
   pagination: {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: '20px',
-    padding: '20px',
+    gap: '2rem',
+    padding: '2rem 1rem',
+    backgroundColor: '#f8f9fa',
+    borderRadius: '8px',
+    flexWrap: 'wrap',
   },
   paginationButton: {
-    padding: '8px 16px',
-    fontSize: '14px',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
+    padding: '0.75rem 1.5rem',
+    fontSize: '0.95rem',
+    border: '2px solid #dee2e6',
+    borderRadius: '8px',
     backgroundColor: '#fff',
     cursor: 'pointer',
     transition: 'all 0.3s ease',
-  },
-  pageInfo: {
-    fontSize: '14px',
-    color: '#666',
-  },
-  modalOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    fontWeight: '600',
+    color: '#333',
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
+    gap: '0.5rem',
   },
-  modalContent: {
-    backgroundColor: '#fff',
-    padding: '30px',
-    borderRadius: '8px',
-    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
-    maxWidth: '500px',
-    width: '90%',
-  },
-  modalTitle: {
-    fontSize: '20px',
-    fontWeight: 'bold',
-    marginTop: 0,
-    marginBottom: '10px',
-  },
-  modalMessage: {
-    fontSize: '16px',
+  pageInfo: {
+    fontSize: '0.95rem',
     color: '#666',
-    marginBottom: '20px',
-  },
-  modalButton: {
-    padding: '10px 20px',
-    fontSize: '14px',
-    backgroundColor: '#007bff',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontWeight: 'bold',
+    fontWeight: '500',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    whiteSpace: 'nowrap',
   },
 };
 
