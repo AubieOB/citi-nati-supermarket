@@ -15,16 +15,16 @@ const Header = () => {
   const popupRef = useRef(null);
   const menuRef = useRef(null);
   const { user, isAuthenticated, logout, isLoading: authLoading } = useAuth();
-  const { cartCount, fetchCartCount } = useCart();
+  const { cartCount, fetchCartCount, resetCart } = useCart();
   const navigate = useNavigate();
   const { modal, closeModal, showConfirm } = useModal();
 
-  // Fetch cart count on mount and when auth is ready
+  // Fetch cart count on mount and when auth is ready (only if authenticated)
   useEffect(() => {
-    if (!authLoading) {
+    if (!authLoading && isAuthenticated) {
       fetchCartCount();
     }
-  }, [authLoading, fetchCartCount]);
+  }, [authLoading, isAuthenticated, fetchCartCount]);
 
   // Close account popup when clicking outside
   useEffect(() => {
@@ -100,6 +100,7 @@ const Header = () => {
       'Are you sure you want to log out?',
       () => {
         logout();
+        resetCart();
         closeMenu();
         setShowEmailPopup(false);
         navigate('/login');

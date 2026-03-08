@@ -55,6 +55,13 @@ export const CartProvider = ({ children }) => {
     setCartCount(prev => Math.max(0, prev - quantity));
   }, []);
 
+  /**
+   * Reset cart count (called on logout)
+   */
+  const resetCart = useCallback(() => {
+    setCartCount(0);
+  }, []);
+
   return (
     <CartContext.Provider
       value={{
@@ -63,7 +70,8 @@ export const CartProvider = ({ children }) => {
         fetchCartCount,
         updateCartCount,
         incrementCart,
-        decrementCart
+        decrementCart,
+        resetCart
       }}
     >
       {children}
