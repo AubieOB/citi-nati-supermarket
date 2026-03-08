@@ -410,9 +410,9 @@ const Cart = () => {
                   variant="primary"
                   size="large"
                   style={{ width: '100%' }}
-                  disabled={cart.items.length === 0 || updating}
+                  disabled={cart.items.length === 0}
                 >
-                  {updating ? 'Updating...' : 'Proceed to Checkout'}
+                  Proceed to Checkout
                 </Button>
               </Link>
             </div>
