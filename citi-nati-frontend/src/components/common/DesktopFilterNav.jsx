@@ -2,11 +2,10 @@ import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useCart } from '../../context/CartContext.jsx';
-import logo from '../../assets/citi-nati-logo.png.png';
 
 const DesktopFilterNav = ({ onCartClick, onAccountClick }) => {
   const location = useLocation();
-  const navigate = useNavigate();
+
   const { isAuthenticated, user } = useAuth();
   const { cartCount } = useCart();
 
@@ -23,21 +22,8 @@ const DesktopFilterNav = ({ onCartClick, onAccountClick }) => {
 
   const dashboardPath = getDashboardPath();
 
-  const handleLogoClick = () => {
-    navigate('/');
-  };
-
   return (
     <div className="desktop-filter-nav">
-      {/* Logo */}
-      <img 
-        src={logo} 
-        alt="Citi-Nati Logo" 
-        className="filter-container__logo"
-        onClick={handleLogoClick}
-        title="Go to Home"
-      />
-
       {/* Home */}
       <Link 
         to="/" 
