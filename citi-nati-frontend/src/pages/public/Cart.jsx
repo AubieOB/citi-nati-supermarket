@@ -107,6 +107,7 @@ const Cart = () => {
    * - quantity = 0 → delete item
    * - Don't calculate totals
    * - Trust backend response
+   * - IMPORTANT: Maintain item order (no sorting)
    */
   const handleQuantityChange = async (productId, newQuantity) => {
     if (newQuantity === undefined || newQuantity === null) return;
@@ -138,10 +139,28 @@ const Cart = () => {
         quantity
       });
 
-      // 7️⃣ REFRESH: Fetch updated cart from backend
+      // 7️⃣ REFRESH: Fetch updated cart from backend AND MAINTAIN ORDER
       // Never update local state manually
       const cartResponse = await api.get('/cart');
-      setCart(cartResponse.data);
+      const backendCart = cartResponse.data;
+
+      // Map backend items to maintain original order
+      // This ensures items stay in their original position
+      const orderedItems = cart.items
+        .map(oldItem => {
+          // Find this item in the backend response
+          const backendItem = backendCart.items.find(bi => bi.productId === oldItem.productId);
+          // If found, use backend values; if not found, item was deleted
+          return backendItem || null;
+        })
+        .filter(item => item !== null); // Remove deleted items
+
+      // Update cart with reordered items but backend totals
+      setCart({
+        ...backendCart,
+        items: orderedItems
+      });
+
       // Update cart count in header
       await updateCartCount();
     } catch (err) {
