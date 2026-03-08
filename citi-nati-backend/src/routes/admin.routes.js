@@ -15,6 +15,7 @@ const { verifyAdmin } = require('../middleware/admin.middleware');
 const { PrismaClient } = require('@prisma/client');
 const { getRefundPendingOrders, markOrderAsRefunded } = require('../controllers/order.controller');
 const { getCurrentPromotions, updatePromotion, previewPromotion, applyPromotion, removePromotion } = require('../controllers/promotion.controller');
+const { emitProductUpdate } = require('../utils/socket');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -403,10 +404,23 @@ router.put('/pos-products/:id/visibility', verifyTokenMiddleware, verifyAdmin, a
         id: true,
         name: true,
         hideFromProductsPage: true,
+        price: true,
+        originalPrice: true,
+        discountPrice: true,
+        isOnSale: true,
+        stock: true,
+        category: true,
+        image: true,
+        expiryDate: true,
+        expiryStatus: true,
+        updatedAt: true,
       },
     });
 
     console.log(`[ADMIN POS] Product ${id} visibility updated: ${product.hideFromProductsPage ? 'HIDDEN' : 'VISIBLE'}`);
+
+    // Broadcast visibility change to all connected clients
+    emitProductUpdate(product);
 
     res.json({
       success: true,

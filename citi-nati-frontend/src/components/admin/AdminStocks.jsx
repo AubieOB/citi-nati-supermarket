@@ -59,11 +59,35 @@ const AdminStocks = () => {
         );
       };
 
+      const handleProductUpdate = (updatedProduct) => {
+        console.log('[AdminStocks] Product updated via Socket.io:', updatedProduct.id);
+        
+        // If product is now hidden, remove it from display
+        if (updatedProduct.hideFromProductsPage) {
+          console.log('[AdminStocks] Product hidden, removing from list:', updatedProduct.name);
+          setAllProducts(prevProducts =>
+            prevProducts.filter(p => p.id !== updatedProduct.id)
+          );
+          return;
+        }
+        
+        // Update product details
+        setAllProducts(prevProducts =>
+          prevProducts.map(p =>
+            p.id === updatedProduct.id 
+              ? { ...p, ...updatedProduct }
+              : p
+          )
+        );
+      };
+
       socket.on('stock_update', handleStockUpdate);
-      console.log('[AdminStocks] Socket.io listener registered for stock_update');
+      socket.on('product_updated', handleProductUpdate);
+      console.log('[AdminStocks] Socket.io listeners registered');
 
       return () => {
         socket.off('stock_update', handleStockUpdate);
+        socket.off('product_updated', handleProductUpdate);
       };
     } catch (err) {
       console.error('[AdminStocks] Socket.io setup error:', err);
@@ -162,11 +186,13 @@ const AdminStocks = () => {
   };
 
   // Filter products with debounced search
-  const filteredProducts = allProducts.filter(product => {
-    const matchesSearch = !searchTerm || product.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = filterCategory === 'all' || product.category === filterCategory;
-    return matchesSearch && matchesCategory;
-  });
+  const filteredProducts = allProducts
+    .filter(product => !product.hideFromProductsPage) // Exclude hidden products
+    .filter(product => {
+      const matchesSearch = !searchTerm || product.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = filterCategory === 'all' || product.category === filterCategory;
+      return matchesSearch && matchesCategory;
+    });
 
   // Paginate filtered results
   const totalPages = Math.ceil(filteredProducts.length / pageSize);

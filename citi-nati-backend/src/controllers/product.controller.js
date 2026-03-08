@@ -266,7 +266,8 @@ const getProducts = async (req, res) => {
         isOnSale: true,
         originalPrice: true,
         discountPrice: true,
-        expiryDate: true
+        expiryDate: true,
+        hideFromProductsPage: true
       },
       skip,
       take,
@@ -317,7 +318,8 @@ const getProductById = async (req, res) => {
         isOnSale: true,
         originalPrice: true,
         discountPrice: true,
-        expiryDate: true
+        expiryDate: true,
+        hideFromProductsPage: true
       }
     });
 

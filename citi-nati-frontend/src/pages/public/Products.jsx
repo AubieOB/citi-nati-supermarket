@@ -204,20 +204,23 @@ const Products = () => {
 
       const fetchedProducts = data.products;
       
+      // Filter out hidden products
+      const visibleProducts = fetchedProducts.filter(p => !p.hideFromProductsPage);
+      
       // Determine if there are more products
       const hasMore = fetchedProducts.length === limit;
       
       // Cache the data
       productsCacheRef.current.set(cacheKey, {
-        products: fetchedProducts,
+        products: visibleProducts,
         hasMore: hasMore
       });
 
       // If Load More, append; otherwise replace
       if (isLoadMore) {
-        setProducts(prev => [...prev, ...fetchedProducts]);
+        setProducts(prev => [...prev, ...visibleProducts]);
       } else {
-        setProducts(fetchedProducts);
+        setProducts(visibleProducts);
       }
       
       setHasMoreProducts(hasMore);
@@ -229,7 +232,7 @@ const Products = () => {
         searchCacheRef.current.clear();
       }
       
-      console.log(`[PRODUCTS LOADED] ${isLoadMore ? 'Appended' : 'Loaded'} ${fetchedProducts.length} products | Has more: ${hasMore}`);
+      console.log(`[PRODUCTS LOADED] ${isLoadMore ? 'Appended' : 'Loaded'} ${visibleProducts.length} products | Has more: ${hasMore}`);
     } catch (err) {
       console.error('❌ Error fetching products:', err.message);
       // Only show error if we have no products
@@ -414,6 +417,19 @@ const Products = () => {
           return; // Skip products from other categories when filter is active
         }
         
+        // Check if product visibility has changed
+        if (updatedProduct.hideFromProductsPage) {
+          // Product is now hidden - remove it from display
+          console.log('[PRODUCTS] 🙈 Product hidden:', updatedProduct.name);
+          setProducts(prevProducts =>
+            prevProducts.filter(product => product.id !== updatedProduct.id)
+          );
+          setFilteredProducts(prevFiltered =>
+            prevFiltered.filter(product => product.id !== updatedProduct.id)
+          );
+          return;
+        }
+        
         // Update the products list with complete product details
         setProducts(prevProducts =>
           prevProducts.map(product =>
@@ -431,6 +447,7 @@ const Products = () => {
                   image: updatedProduct.image,
                   expiryDate: updatedProduct.expiryDate,
                   expiryStatus: updatedProduct.expiryStatus,
+                  hideFromProductsPage: updatedProduct.hideFromProductsPage || false,
                   updatedAt: updatedProduct.updatedAt,
                 }
               : product
@@ -743,7 +760,7 @@ const Products = () => {
             {/* SEARCH BAR */}
             <input
               type="text"
-              placeholder={`Search products (${totalSystemProducts})`}
+              placeholder={`Search products (${filteredProducts.length})`}
               value={searchInput}
               onChange={handleSearchChange}
               style={{

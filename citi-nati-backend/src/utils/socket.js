@@ -171,6 +171,7 @@ const emitOrderStatusUpdated = (order) => {
  * 1. Admin updates product details via AdminProducts
  * 2. Stock changes
  * 3. Price or promotional details change
+ * 4. Product visibility changes (hideFromProductsPage)
  */
 const emitProductUpdate = (product) => {
   try {
@@ -194,6 +195,7 @@ const emitProductUpdate = (product) => {
         image: product.image,
         expiryDate: product.expiryDate,
         expiryStatus: product.expiryStatus,
+        hideFromProductsPage: product.hideFromProductsPage || false,
         updatedAt: product.updatedAt,
       };
 
@@ -204,7 +206,8 @@ const emitProductUpdate = (product) => {
         price: product.price,
         finalPrice: finalPrice,
         stock: product.stock,
-        isOnSale: product.isOnSale
+        isOnSale: product.isOnSale,
+        hideFromProductsPage: product.hideFromProductsPage || false
       });
     }
   } catch (err) {
