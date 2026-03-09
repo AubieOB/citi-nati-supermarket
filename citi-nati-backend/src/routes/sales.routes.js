@@ -5,7 +5,8 @@ const {
   getCurrentSalesDay,
   getSalesDayById,
   getSalesDayHistory,
-  exportSaleDayCSV
+  exportSaleDayCSV,
+  clearSalesHistory
 } = require('../controllers/sales.controller');
 const { verifyTokenMiddleware } = require('../middleware/auth.middleware');
 const { verifyAdmin } = require('../middleware/admin.middleware');
@@ -59,6 +60,14 @@ router.get(
   verifyTokenMiddleware,
   verifyAdmin,
   exportSaleDayCSV
+);
+
+// DELETE /api/sales/history - Clear all sales history
+router.delete(
+  '/history',
+  verifyTokenMiddleware,
+  verifyAdmin,
+  clearSalesHistory
 );
 
 module.exports = router;

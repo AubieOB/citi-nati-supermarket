@@ -246,4 +246,26 @@ const exportSaleDayCSV = async (req, res) => {
   }
 };
 
-module.exports = { startSalesDay, endSalesDay, getCurrentSalesDay, getSalesDayById, getSalesDayHistory, exportSaleDayCSV };
+/**
+ * Clear all sales history (delete all closed sales days)
+ * DELETE /admin/sales/history
+ */
+const clearSalesHistory = async (req, res) => {
+  try {
+    // Delete all closed sales days
+    const result = await prisma.salesDay.deleteMany({
+      where: { status: 'CLOSED' }
+    });
+
+    console.log('[SALES] Sales history cleared:', { deleted: result.count });
+    res.json({
+      message: 'Sales history cleared successfully',
+      deletedCount: result.count
+    });
+  } catch (err) {
+    console.error('[SALES] Error clearing sales history:', err);
+    res.status(500).json({ message: 'Failed to clear sales history' });
+  }
+};
+
+module.exports = { startSalesDay, endSalesDay, getCurrentSalesDay, getSalesDayById, getSalesDayHistory, exportSaleDayCSV, clearSalesHistory };

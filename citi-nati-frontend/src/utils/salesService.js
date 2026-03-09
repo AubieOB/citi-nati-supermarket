@@ -111,3 +111,16 @@ export const getDriverPerformanceByDay = async (salesDayId, token) => {
     throw error;
   }
 };
+
+// Clear all sales history (delete closed sales days)
+export const clearSalesHistory = async (token) => {
+  try {
+    const response = await axios.delete(`${API_BASE_URL}/sales/history`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('[SALES_SERVICE] Error clearing sales history:', error);
+    throw error;
+  }
+};
