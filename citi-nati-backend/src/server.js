@@ -20,8 +20,6 @@ const driversOrdersRoutes = require('./routes/drivers.orders.routes');
 const salesRoutes = require('./routes/sales.routes');
 const supportRoutes = require('./routes/support.routes');
 
-const prisma = new PrismaClient();
-
 async function start() {
   try {
     // Ensure upload directories exist
