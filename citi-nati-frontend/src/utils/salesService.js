@@ -124,3 +124,16 @@ export const clearSalesHistory = async (token) => {
     throw error;
   }
 };
+
+// Clear driver performance data (unassign drivers from current sales day)
+export const clearDriverPerformance = async (token) => {
+  try {
+    const response = await axios.delete(`${API_BASE_URL}/drivers/performance`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('[SALES_SERVICE] Error clearing driver performance:', error);
+    throw error;
+  }
+};

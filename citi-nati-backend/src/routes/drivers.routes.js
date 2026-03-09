@@ -1,5 +1,5 @@
 const express = require('express');
-const { createDriver, createDriverWithAccount, getDrivers, updateDriver, deleteDriver, getDriverPerformance, getDriverPerformanceByDay } = require('../controllers/drivers.controller');
+const { createDriver, createDriverWithAccount, getDrivers, updateDriver, deleteDriver, getDriverPerformance, getDriverPerformanceByDay, clearDriverPerformance } = require('../controllers/drivers.controller');
 const { verifyTokenMiddleware } = require('../middleware/auth.middleware');
 const { verifyAdmin } = require('../middleware/admin.middleware');
 
@@ -14,6 +14,9 @@ router.get('/performance', verifyTokenMiddleware, verifyAdmin, getDriverPerforma
 
 // GET /api/drivers/performance/:salesDayId - Get driver performance for specific sales day (ADMIN only)
 router.get('/performance/:salesDayId', verifyTokenMiddleware, verifyAdmin, getDriverPerformanceByDay);
+
+// DELETE /api/drivers/performance - Clear driver performance data (ADMIN only)
+router.delete('/performance', verifyTokenMiddleware, verifyAdmin, clearDriverPerformance);
 
 // POST /api/drivers - Create a new driver (ADMIN only - legacy, without user account)
 router.post('/', verifyTokenMiddleware, verifyAdmin, createDriver);

@@ -525,4 +525,41 @@ const getDriverPerformanceByDay = async (req, res) => {
   }
 };
 
-module.exports = { createDriver, createDriverWithAccount, getDrivers, updateDriver, deleteDriver, getDriverOrders, updateDriverOrderStatus, getDriverPerformance, getDriverPerformanceByDay };
+/**
+ * Clear driver performance data (unassign drivers from open sales day orders)
+ * DELETE /admin/drivers/performance
+ */
+const clearDriverPerformance = async (req, res) => {
+  try {
+    // Get the current open sales day
+    const openSalesDay = await prisma.salesDay.findFirst({
+      where: { status: 'OPEN' }
+    });
+
+    if (!openSalesDay) {
+      return res.status(400).json({ message: 'No open sales day found' });
+    }
+
+    // Unassign all drivers from orders in the current open sales day
+    const result = await prisma.order.updateMany({
+      where: {
+        salesDayId: openSalesDay.id,
+        driverId: { not: null }
+      },
+      data: {
+        driverId: null
+      }
+    });
+
+    console.log('[DRIVER_PERF] Driver performance cleared:', { updated: result.count, salesDayId: openSalesDay.id });
+    res.json({
+      message: 'Driver performance cleared successfully',
+      updatedCount: result.count
+    });
+  } catch (err) {
+    console.error('[DRIVER_PERF] Error clearing driver performance:', err);
+    res.status(500).json({ message: 'Failed to clear driver performance' });
+  }
+};
+
+module.exports = { createDriver, createDriverWithAccount, getDrivers, updateDriver, deleteDriver, getDriverOrders, updateDriverOrderStatus, getDriverPerformance, getDriverPerformanceByDay, clearDriverPerformance };

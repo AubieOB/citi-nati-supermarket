@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getDriverPerformance } from '../../utils/salesService.js';
+import toast from 'react-hot-toast';
+import { getDriverPerformance, clearDriverPerformance } from '../../utils/salesService.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 
 const DriverPerformanceTable = ({ refreshTrigger }) => {
@@ -7,6 +8,8 @@ const DriverPerformanceTable = ({ refreshTrigger }) => {
   const [drivers, setDrivers] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [clearing, setClearing] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   useEffect(() => {
     const fetchPerformance = async () => {
@@ -27,6 +30,25 @@ const DriverPerformanceTable = ({ refreshTrigger }) => {
     fetchPerformance();
   }, [token, refreshTrigger]);
 
+  const handleClearPerformance = async () => {
+    if (!token) return;
+
+    try {
+      setClearing(true);
+      await clearDriverPerformance(token);
+      setDrivers([]);
+      setSummary(null);
+      setShowClearConfirm(false);
+      toast.success('Driver performance cleared successfully', { position: 'top-right' });
+    } catch (error) {
+      console.error('Error clearing driver performance:', error);
+      const message = error.response?.data?.message || 'Failed to clear driver performance';
+      toast.error(message, { position: 'top-right' });
+    } finally {
+      setClearing(false);
+    }
+  };
+
   if (loading) {
     return (
       <div style={{
@@ -46,9 +68,42 @@ const DriverPerformanceTable = ({ refreshTrigger }) => {
       padding: '2rem',
       borderRadius: '8px'
     }}>
-      <h2 style={{ marginTop: 0, marginBottom: '1.5rem', color: '#333' }}>
-        Driver Performance
-      </h2>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '1.5rem'
+      }}>
+        <h2 style={{ marginTop: 0, marginBottom: 0, color: '#333' }}>
+          Driver Performance
+        </h2>
+        {drivers.length > 0 && (
+          <button
+            onClick={() => setShowClearConfirm(true)}
+            disabled={clearing}
+            style={{
+              padding: '0.75rem 1.5rem',
+              backgroundColor: clearing ? '#ccc' : '#dc3545',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: clearing ? 'not-allowed' : 'pointer',
+              fontWeight: '600',
+              fontSize: '0.9rem',
+              transition: 'background-color 0.2s'
+            }}
+            onMouseOver={(e) => {
+              if (!clearing) e.target.style.backgroundColor = '#c82333';
+            }}
+            onMouseOut={(e) => {
+              if (!clearing) e.target.style.backgroundColor = '#dc3545';
+            }}
+          >
+            <i className="fas fa-redo" style={{ marginRight: '0.5rem' }}></i>
+            {clearing ? 'Clearing...' : 'Clear Performance'}
+          </button>
+        )}
+      </div>
 
       {/* Summary Stats */}
       {summary && (
@@ -200,6 +255,97 @@ const DriverPerformanceTable = ({ refreshTrigger }) => {
           color: '#666'
         }}>
           No drivers found
+        </div>
+      )}
+
+      {/* Clear Confirmation Modal */}
+      {showClearConfirm && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: '#fff',
+            padding: '2rem',
+            borderRadius: '8px',
+            maxWidth: '400px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+            textAlign: 'center'
+          }}>
+            <i className="fas fa-exclamation-triangle" style={{
+              fontSize: '2.5rem',
+              color: '#dc3545',
+              marginBottom: '1rem',
+              display: 'block'
+            }}></i>
+            <h3 style={{ margin: '1rem 0', color: '#333' }}>
+              Clear Driver Performance?
+            </h3>
+            <p style={{ margin: '1rem 0', color: '#666', fontSize: '0.9rem' }}>
+              This will unassign {drivers.length} driver{drivers.length !== 1 ? 's' : ''} from current orders and reset their performance metrics.
+            </p>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '1rem',
+              marginTop: '1.5rem'
+            }}>
+              <button
+                onClick={() => setShowClearConfirm(false)}
+                disabled={clearing}
+                style={{
+                  padding: '0.75rem',
+                  backgroundColor: '#f0f0f0',
+                  color: '#333',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: clearing ? 'not-allowed' : 'pointer',
+                  fontWeight: '600',
+                  fontSize: '0.9rem',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseOver={(e) => {
+                  if (!clearing) e.target.style.backgroundColor = '#e0e0e0';
+                }}
+                onMouseOut={(e) => {
+                  if (!clearing) e.target.style.backgroundColor = '#f0f0f0';
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleClearPerformance}
+                disabled={clearing}
+                style={{
+                  padding: '0.75rem',
+                  backgroundColor: clearing ? '#ccc' : '#dc3545',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: clearing ? 'not-allowed' : 'pointer',
+                  fontWeight: '600',
+                  fontSize: '0.9rem',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseOver={(e) => {
+                  if (!clearing) e.target.style.backgroundColor = '#c82333';
+                }}
+                onMouseOut={(e) => {
+                  if (!clearing) e.target.style.backgroundColor = '#dc3545';
+                }}
+              >
+                {clearing ? 'Clearing...' : 'Clear All'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
