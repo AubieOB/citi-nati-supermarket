@@ -122,22 +122,29 @@ const createSystemAlert = async (title, message) => {
 
 /**
  * Create message for low stock or out of stock warning
+ * ✅ Supports POS products even without images (sourceCode products)
+ * This function ALWAYS triggers alerts for products <= 10 units, regardless of image availability
  */
 const notifyLowStock = async (product) => {
   try {
+    // Build message with POS indicator if applicable
+    const isPOSProduct = !!product.sourceCode;
+    const posIndicator = isPOSProduct ? ' [POS]' : '';
+    
     if (product.stock === 0) {
-      // Out of stock notification
+      // Out of stock notification - Works for all products including POS without images
       await createMessage(
         'system',
-        'Out of Stock Alert',
-        `Product "${product.name}" is now out of stock.`
+        `Out of Stock Alert${posIndicator}`,
+        `Product "${product.name}"${posIndicator} is now out of stock.${isPOSProduct ? ` (POS Code: ${product.sourceCode})` : ''}`
       );
     } else if (product.stock <= 10) {
-      // Low stock notification
+      // Low stock notification - Works for all products including POS without images
+      // NOTE: POS products with null image are still notified
       await createMessage(
         'system',
-        'Low Stock Alert',
-        `Product "${product.name}" stock is running low (${product.stock} units remaining).`
+        `Low Stock Alert${posIndicator}`,
+        `Product "${product.name}"${posIndicator} stock is running low (${product.stock} units remaining).${isPOSProduct ? ` (POS Code: ${product.sourceCode})` : ''}`
       );
     }
   } catch (error) {

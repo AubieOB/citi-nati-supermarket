@@ -101,7 +101,7 @@ async function syncProductsFromPOS() {
           category: 'POS Import', // Default category for synced products
           sourceCode: posProduct.ProductCode, // Store original POS code
           barcode: posProduct.Barcode || null,
-          image: null, // POS doesn't provide images
+          image: null, // POS doesn't provide images - but products will still trigger low stock alerts
           isOnSale: false,
           discountPrice: null,
           originalPrice: posProduct.SellingPrice || 0,

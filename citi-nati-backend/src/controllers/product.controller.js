@@ -175,10 +175,12 @@ const createProduct = async (req, res) => {
     console.log('[PRODUCT CREATE] ✅ Product created in database:', {
       id: product.id,
       name: product.name,
-      hasImage: !!product.image
+      hasImage: !!product.image,
+      isPOSProduct: !!product.sourceCode
     });
 
     // Notify if stock is low (10 or below) or out of stock
+    // ✅ This works for all products including POS products without images
     if (product.stock <= 10) {
       await notifyLowStock(product);
     }
@@ -454,10 +456,12 @@ const updateProduct = async (req, res) => {
       name: updatedProduct.name,
       imageSavedToDB: updatedProduct.image,
       imageIsCloudinary: updatedProduct.image?.startsWith('http'),
+      isPOSProduct: !!updatedProduct.sourceCode,
       updatedFields: Object.keys(updateData)
     });
 
     // Notify if stock was updated and is now low (10 or below) or out of stock
+    // ✅ This works for all products including POS products without images
     if (updateData.stock !== undefined && updatedProduct.stock <= 10) {
       await notifyLowStock(updatedProduct);
     }
