@@ -424,11 +424,11 @@ const updateDriverOrderStatus = async (req, res) => {
  */
 const getDriverPerformance = async (req, res) => {
   try {
-    // Get all drivers with their delivered orders
+    // Get all drivers with their PAID delivered orders
     const drivers = await prisma.driver.findMany({
       include: {
         assignedOrders: {
-          where: { status: 'DELIVERED' },
+          where: { status: 'DELIVERED', paymentStatus: 'PAID' },
           include: { items: true }
         }
       }
@@ -481,7 +481,8 @@ const getDriverPerformanceByDay = async (req, res) => {
         assignedOrders: {
           where: {
             salesDayId: parseInt(salesDayId),
-            status: 'DELIVERED'
+            status: 'DELIVERED',
+            paymentStatus: 'PAID'
           },
           include: { items: true }
         }

@@ -58,12 +58,13 @@ const endSalesDay = async (req, res) => {
       return res.status(400).json({ message: 'No open sales day found' });
     }
 
-    // Calculate totals
-    const totalSales = openDay.orders.reduce(
+    // Calculate totals - ONLY COUNT PAID ORDERS
+    const paidOrders = openDay.orders.filter(order => order.paymentStatus === 'PAID');
+    const totalSales = paidOrders.reduce(
       (sum, order) => sum + (order.total || 0),
       0
     );
-    const totalOrders = openDay.orders.length;
+    const totalOrders = paidOrders.length;
 
     // Update sales day to CLOSED
     const closedDay = await prisma.salesDay.update({
@@ -96,7 +97,11 @@ const getCurrentSalesDay = async (req, res) => {
   try {
     const currentDay = await prisma.salesDay.findFirst({
       where: { status: 'OPEN' },
-      include: { orders: true }
+      include: {
+        orders: {
+          where: { paymentStatus: 'PAID' }
+        }
+      }
     });
 
     res.json({ salesDay: currentDay });
@@ -118,6 +123,7 @@ const getSalesDayById = async (req, res) => {
       where: { id: parseInt(id) },
       include: {
         orders: {
+          where: { paymentStatus: 'PAID' },
           include: {
             user: { select: { id: true, name: true, email: true } },
             driver: { select: { id: true, name: true, email: true } },
@@ -149,6 +155,7 @@ const getSalesDayHistory = async (req, res) => {
       orderBy: { closedAt: 'desc' },
       include: {
         orders: {
+          where: { paymentStatus: 'PAID' },
           include: {
             items: {
               include: {
@@ -187,6 +194,7 @@ const exportSaleDayCSV = async (req, res) => {
       where: { id: parseInt(id) },
       include: {
         orders: {
+          where: { paymentStatus: 'PAID' },
           include: {
             user: { select: { name: true, email: true } },
             driver: { select: { name: true, email: true } },
