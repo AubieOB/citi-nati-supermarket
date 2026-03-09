@@ -302,117 +302,43 @@ const Cart = () => {
         <h1 style={{ marginTop: '2rem', marginBottom: '2rem' }}>Shopping Cart</h1>
 
         <div className="cart-layout">
-          {/* Desktop Table View */}
-          <div className="cart-table-wrapper">
-            <table className="cart-table">
-              <thead>
-                <tr>
-                  <th>Product</th>
-                  <th>Unit Price</th>
-                  <th>Quantity</th>
-                  <th>Subtotal</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {cart.items.map((item) => (
-                  <tr key={item.productId}>
-                    {/* FIELD: name (from backend cart response) */}
-                    <td>{item.name}</td>
+          {/* CART TABLE: Display items with backend prices */}
+          <table className="cart-table">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Unit Price</th>
+                <th>Quantity</th>
+                <th>Subtotal</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cart.items.map((item) => (
+                <tr key={item.productId}>
+                  {/* FIELD: name (from backend cart response) */}
+                  <td>{item.name}</td>
 
-                    {/* FIELD: price (LOCKED at time of add - never manipulate) */}
-                    {/* ✅ Trust backend price, not product price from Products page */}
-                    <td>{formatMWK(item.price)}</td>
+                  {/* FIELD: price (LOCKED at time of add - never manipulate) */}
+                  {/* ✅ Trust backend price, not product price from Products page */}
+                  <td>{formatMWK(item.price)}</td>
 
-                    {/* FIELD: quantity (editable via handleQuantityChange) */}
-                    <td>
-                      <input
-                        type="number"
-                        min="0"
-                        value={item.quantity}
-                        onChange={(e) => handleQuantityChange(item.productId, e.target.value)}
-                        className="cart-quantity-input"
-                        style={{
-                          width: '70px',
-                          padding: '0.5rem 0.25rem',
-                          border: '2px solid #e0e0e0',
-                          borderRadius: '4px',
-                          backgroundColor: '#f5f5f5',
-                          transition: 'box-shadow 0.3s ease, background-color 0.3s ease, border-color 0.3s ease',
-                          cursor: 'text',
-                          fontSize: '1rem',
-                          textAlign: 'center'
-                        }}
-                        onFocus={(e) => {
-                          e.target.style.backgroundColor = '#fff';
-                          e.target.style.borderColor = '#5b4b8a';
-                          e.target.style.boxShadow = '0 4px 12px rgba(91, 75, 138, 0.2)';
-                        }}
-                        onBlur={(e) => {
-                          e.target.style.backgroundColor = '#f5f5f5';
-                          e.target.style.borderColor = '#e0e0e0';
-                          e.target.style.boxShadow = 'none';
-                        }}
-                      />
-                    </td>
-
-                    {/* FIELD: subtotal (from backend - NEVER calculate on frontend) */}
-                    {/* ✅ This is item.quantity * item.price, calculated by backend */}
-                    <td>{formatMWK(item.subtotal)}</td>
-
-                    {/* ACTION: Remove button */}
-                    <td>
-                      <Button
-                        size="small"
-                        variant="outline"
-                        onClick={() => handleRemove(item.productId)}
-                      >
-                        Remove
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Mobile Card View */}
-          <div className="cart-mobile-cards">
-            {cart.items.map((item) => (
-              <div key={item.productId} className="cart-card">
-                <div className="cart-card-header">
-                  <h3 className="cart-card-title">{item.name}</h3>
-                  <Button
-                    size="small"
-                    variant="outline"
-                    onClick={() => handleRemove(item.productId)}
-                    className="cart-card-remove"
-                  >
-                    Remove
-                  </Button>
-                </div>
-
-                <div className="cart-card-body">
-                  <div className="cart-card-row">
-                    <span className="cart-card-label">Unit Price:</span>
-                    <span className="cart-card-value">{formatMWK(item.price)}</span>
-                  </div>
-
-                  <div className="cart-card-row">
-                    <span className="cart-card-label">Quantity:</span>
+                  {/* FIELD: quantity (editable via handleQuantityChange) */}
+                  <td>
                     <input
                       type="number"
                       min="0"
                       value={item.quantity}
                       onChange={(e) => handleQuantityChange(item.productId, e.target.value)}
-                      className="cart-quantity-input-mobile"
+                      className="cart-quantity-input"
                       style={{
-                        width: '60px',
-                        padding: '0.4rem',
+                        width: '70px',
+                        padding: '0.5rem 0.25rem',
                         border: '2px solid #e0e0e0',
                         borderRadius: '4px',
                         backgroundColor: '#f5f5f5',
                         transition: 'box-shadow 0.3s ease, background-color 0.3s ease, border-color 0.3s ease',
+                        cursor: 'text',
                         fontSize: '1rem',
                         textAlign: 'center'
                       }}
@@ -427,16 +353,26 @@ const Cart = () => {
                         e.target.style.boxShadow = 'none';
                       }}
                     />
-                  </div>
+                  </td>
 
-                  <div className="cart-card-row cart-card-subtotal">
-                    <span className="cart-card-label">Subtotal:</span>
-                    <span className="cart-card-value">{formatMWK(item.subtotal)}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+                  {/* FIELD: subtotal (from backend - NEVER calculate on frontend) */}
+                  {/* ✅ This is item.quantity * item.price, calculated by backend */}
+                  <td>{formatMWK(item.subtotal)}</td>
+
+                  {/* ACTION: Remove button */}
+                  <td>
+                    <Button
+                      size="small"
+                      variant="outline"
+                      onClick={() => handleRemove(item.productId)}
+                    >
+                      Remove
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
 
           {/* ORDER SUMMARY: Backend totals (NOT calculated) */}
           <div className="cart-summary-grid" style={{

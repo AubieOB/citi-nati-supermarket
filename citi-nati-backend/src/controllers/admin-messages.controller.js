@@ -1,4 +1,5 @@
-const prisma = require('../prisma'); // Use shared Prisma instance
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
 /**
  * Deduplication cache to prevent duplicate notifications

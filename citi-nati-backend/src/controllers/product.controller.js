@@ -1,6 +1,8 @@
-const prisma = require('../prisma'); // Use shared Prisma instance
+const { PrismaClient } = require('@prisma/client');
 const { computeExpiryStatus, suggestDiscount } = require('../utils/expiryStatus');
 const { notifyLowStock } = require('../utils/messageService');
+
+const prisma = new PrismaClient();
 
 // ensure a trigram index for fast case-insensitive name searches (autocomplete)
 (async () => {

@@ -7,9 +7,10 @@
 
 const express = require('express');
 const bcrypt = require('bcrypt');
-const prisma = require('../prisma'); // Use shared Prisma instance
+const { PrismaClient } = require('@prisma/client');
 
 const router = express.Router();
+const prisma = new PrismaClient();
 
 /**
  * GET /api/admin/setup

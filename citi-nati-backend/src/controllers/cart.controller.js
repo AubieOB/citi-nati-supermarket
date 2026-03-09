@@ -1,4 +1,6 @@
-const prisma = require('../prisma'); // Use shared Prisma instance
+const { PrismaClient } = require('@prisma/client');
+
+const prisma = new PrismaClient();
 
 const addToCart = async (req, res) => {
   try {

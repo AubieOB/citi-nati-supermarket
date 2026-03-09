@@ -1,11 +1,13 @@
 require('dotenv').config();
 const crypto = require('crypto');
 const axios = require('axios');
-const prisma = require('../prisma'); // Use shared Prisma instance
+const { PrismaClient } = require('@prisma/client');
 const { emitNewOrder, emitOrderUpdated } = require('../utils/socket');
 const { notifyPaymentSuccess, notifyOrderPlaced, notifyRefundRequired } = require('../utils/messageService');
 const { sendOrderConfirmationEmail, sendPaymentConfirmationEmail, sendRefundNotificationEmail } = require('../utils/emailService');
 const { cacheWebhookEvent } = require('../utils/webhookCache');
+
+const prisma = new PrismaClient();
 
 /**
  * Verify payment with Paychangu - extract orderId from reference

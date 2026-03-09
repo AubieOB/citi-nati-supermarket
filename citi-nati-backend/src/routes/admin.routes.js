@@ -12,12 +12,13 @@
 const express = require('express');
 const { verifyTokenMiddleware } = require('../middleware/auth.middleware');
 const { verifyAdmin } = require('../middleware/admin.middleware');
-const prisma = require('../prisma'); // Use shared Prisma instance
+const { PrismaClient } = require('@prisma/client');
 const { getRefundPendingOrders, markOrderAsRefunded } = require('../controllers/order.controller');
 const { getCurrentPromotions, updatePromotion, previewPromotion, applyPromotion, removePromotion } = require('../controllers/promotion.controller');
 const { emitProductUpdate } = require('../utils/socket');
 
 const router = express.Router();
+const prisma = new PrismaClient();
 
 /**
  * GET /api/admin/test
