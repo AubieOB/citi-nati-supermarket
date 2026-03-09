@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import api from '../../utils/api.js';
 import { getSocket } from '../../utils/socket.js';
+import { playNotificationSound } from '../../utils/notifications.js';
 import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
 
@@ -31,49 +32,6 @@ const AdminInbox = () => {
   const { modal, closeModal, showConfirm } = useModal();
   const notificationAudioRef = useRef(null);
   const soundedMessagesRef = useRef(new Set());
-
-  /**
-   * Play notification sound for critical alerts
-   */
-  const playNotificationSound = () => {
-    try {
-      const audio = new Audio('/classic-door-bell.wav');
-      audio.volume = 0.8;
-      
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            console.log('[AdminInbox] ✅ Notification sound played');
-          })
-          .catch((err) => {
-            console.warn('[AdminInbox] ⚠️ Audio playback blocked:', err.message);
-            // Fallback: Web Audio API beep
-            try {
-              const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-              const osc = audioContext.createOscillator();
-              const gain = audioContext.createGain();
-              
-              osc.connect(gain);
-              gain.connect(audioContext.destination);
-              osc.frequency.value = 1000;
-              osc.type = 'sine';
-              gain.gain.setValueAtTime(0.3, audioContext.currentTime);
-              gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
-              
-              osc.start(audioContext.currentTime);
-              osc.stop(audioContext.currentTime + 0.2);
-              
-              console.log('[AdminInbox] ✅ Fallback beep played');
-            } catch (beepErr) {
-              console.warn('[AdminInbox] Beep also failed:', beepErr.message);
-            }
-          });
-      }
-    } catch (err) {
-      console.error('[AdminInbox] Audio error:', err.message);
-    }
-  };
 
   // Message types
   const messageTypes = [

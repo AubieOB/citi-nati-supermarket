@@ -4,63 +4,14 @@ import { useNavigate } from 'react-router-dom';
 import Container from '../../components/ui/Container.jsx';
 import api from '../../utils/api.js';
 import { getSocket } from '../../utils/socket.js';
-import { notifyInfo, notifyError, notifySuccess } from '../../utils/notifications.js';
+import { notifyInfo, notifyError, notifySuccess, playNotificationSound } from '../../utils/notifications.js';
 import Modal from '../../components/common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
 import '../../styles/global.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 
 /**
- * 🔔 PLAY NOTIFICATION SOUND (with file + Web Audio fallback)
- */
-const playNotificationBeep = async () => {
-  try {
-    // Try file-based audio first
-    const audio = new Audio('/classic-door-bell.wav');
-    audio.volume = 0.8;
-    
-    const playPromise = audio.play();
-    if (playPromise !== undefined) {
-      playPromise
-        .then(() => {
-          console.log('[HelpCenter] ✅ Notification sound played');
-        })
-        .catch(() => {
-          // Fallback to Web Audio API beep
-          console.log('[HelpCenter] ⚠️ File audio blocked, using beep fallback');
-          playWebAudioBeep();
-        });
-    }
-  } catch (err) {
-    console.warn('[HelpCenter] Audio initialization failed:', err.message);
-    playWebAudioBeep();
-  }
-};
-
-/**
- * Web Audio API fallback beep
- */
-const playWebAudioBeep = () => {
-  try {
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = audioContext.createOscillator();
-    const gain = audioContext.createGain();
-    osc.connect(gain);
-    gain.connect(audioContext.destination);
-    osc.frequency.value = 800;
-    osc.type = 'sine';
-    gain.gain.setValueAtTime(0.3, audioContext.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
-    osc.start(audioContext.currentTime);
-    osc.stop(audioContext.currentTime + 0.1);
-    console.log('[HelpCenter] ✅ Beep played using Web Audio API');
-  } catch (e) {
-    console.warn('[HelpCenter] Sound notification disabled:', e.message);
-  }
-};
-
-/**
- * 💬 HELP CENTER PAGE (Phase 2: Real-Time)
+ *  HELP CENTER PAGE (Phase 2: Real-Time)
  * 
  * Customer support ticket system with real-time chat
  * 1. Create new support tickets
@@ -125,7 +76,7 @@ const HelpCenter = () => {
         };
         // Play sound for new message
         if (reply.senderId !== user.id) {
-          playNotificationBeep();
+          playNotificationSound();
           notifyInfo('Admin replied to your ticket!');
         }
         return updatedTicket;
@@ -170,7 +121,7 @@ const HelpCenter = () => {
               : t
           )
         );
-        playNotificationBeep();
+        playNotificationSound();
         notifyInfo(`Ticket status updated to ${data.status}`);
       }
     };
@@ -183,7 +134,7 @@ const HelpCenter = () => {
         if (selectedTicket?.id === data.ticketId) {
           setSelectedTicket(null);
         }
-        playNotificationBeep();
+        playNotificationSound();
         notifyInfo('Your ticket was deleted');
       }
     };

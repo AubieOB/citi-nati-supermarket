@@ -4,60 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import Container from '../../components/ui/Container.jsx';
 import api from '../../utils/api.js';
 import { getSocket } from '../../utils/socket.js';
-import { notifyInfo, notifyError } from '../../utils/notifications.js';
+import { notifyInfo, notifyError, playNotificationSound } from '../../utils/notifications.js';
 import Modal from '../../components/common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
 import '../../styles/global.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
-
-/**
- * 🔔 PLAY NOTIFICATION SOUND (with file + Web Audio fallback)
- */
-const playNotificationBeep = async () => {
-  try {
-    // Try file-based audio first
-    const audio = new Audio('/classic-door-bell.wav');
-    audio.volume = 0.8;
-    
-    const playPromise = audio.play();
-    if (playPromise !== undefined) {
-      playPromise
-        .then(() => {
-          console.log('[SupportDashboard] ✅ Notification sound played');
-        })
-        .catch(() => {
-          // Fallback to Web Audio API beep
-          console.log('[SupportDashboard] ⚠️ File audio blocked, using beep fallback');
-          playWebAudioBeep();
-        });
-    }
-  } catch (err) {
-    console.warn('[SupportDashboard] Audio initialization failed:', err.message);
-    playWebAudioBeep();
-  }
-};
-
-/**
- * Web Audio API fallback beep
- */
-const playWebAudioBeep = () => {
-  try {
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = audioContext.createOscillator();
-    const gain = audioContext.createGain();
-    osc.connect(gain);
-    gain.connect(audioContext.destination);
-    osc.frequency.value = 1000;
-    osc.type = 'sine';
-    gain.gain.setValueAtTime(0.3, audioContext.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
-    osc.start(audioContext.currentTime);
-    osc.stop(audioContext.currentTime + 0.1);
-    console.log('[SupportDashboard] ✅ Beep played using Web Audio API');
-  } catch (e) {
-    console.warn('[SupportDashboard] Sound notification disabled:', e.message);
-  }
-};
 
 /**
  * 🎯 ADMIN SUPPORT DASHBOARD (Phase 2: Real-Time)
@@ -122,7 +73,7 @@ const SupportDashboard = () => {
         };
         // Play sound for new message from customer
         if (reply.senderId !== user.id) {
-          playNotificationBeep();
+          playNotificationSound();
           notifyInfo('New message from customer!');
         }
         return updatedTicket;
@@ -173,7 +124,7 @@ const SupportDashboard = () => {
       
       setTickets(prev => [newTicket, ...prev]);
       setUnattendedCount(prev => prev + 1);
-      playNotificationBeep();
+      playNotificationSound();
       notifyInfo(`New Support Ticket from ${ticketData.userName}`);
     };
 

@@ -5,6 +5,7 @@ import api from '../../utils/api.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useOrderUpdates } from '../../hooks/useOrderUpdates.js';
 import { formatMWK } from '../../utils/currency.js';
+import { playNotificationSound } from '../../utils/notifications.js';
 import Modal from '../../components/common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
 
@@ -34,57 +35,6 @@ const DriverDashboard = () => {
   useEffect(() => {
     fetchDriverOrders();
   }, []);
-
-  /**
-   * Fallback beep using Web Audio API
-   */
-  const playFallbackBeep = useCallback(() => {
-    try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = audioContext.createOscillator();
-      const gain = audioContext.createGain();
-      
-      osc.connect(gain);
-      gain.connect(audioContext.destination);
-      osc.frequency.value = 800;
-      osc.type = 'sine';
-      gain.gain.setValueAtTime(0.3, audioContext.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
-      
-      osc.start(audioContext.currentTime);
-      osc.stop(audioContext.currentTime + 0.15);
-      
-      console.log('[Driver] ✅ Fallback beep played');
-    } catch (err) {
-      console.warn('[Driver] Beep failed:', err.message);
-    }
-  }, []);
-
-  /**
-   * Play notification sound with fallback
-   */
-  const playSound = useCallback(() => {
-    try {
-      const audio = new Audio('/classic-door-bell.wav');
-      audio.volume = 0.8; // Increased volume for better audibility
-      
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            console.log('[Driver] ✅ Notification sound played');
-          })
-          .catch((err) => {
-            console.warn('[Driver] ⚠️ Audio playback blocked:', err.message);
-            // Fallback to beep if audio blocked
-            playFallbackBeep();
-          });
-      }
-    } catch (err) {
-      console.error('[Driver] Audio error:', err.message);
-      playFallbackBeep();
-    }
-  }, [playFallbackBeep]);
 
   /**
    * Fetch driver's assigned orders
@@ -120,7 +70,7 @@ const DriverDashboard = () => {
     // New order assigned to this driver
     if (updatedOrder.status === 'ASSIGNED') {
       console.log('[DRIVER] Notification: New order assigned');
-      playSound();
+      playNotificationSound();
       toast.success(`🎉 New order assigned: #${updatedOrder.id}`, {
         duration: 4000,
       });
@@ -141,14 +91,14 @@ const DriverDashboard = () => {
     // Order delivered
     if (updatedOrder.status === 'DELIVERED') {
       console.log('[DRIVER] Notification: Order delivered');
-      playSound();
+      playNotificationSound();
       toast.success(`✅ Order #${updatedOrder.id} delivered successfully! 🎉`, {
         duration: 4000,
       });
       // Refresh orders to update completed list
       fetchDriverOrders();
     }
-  }, [playSound, fetchDriverOrders]);
+  }, [playNotificationSound, fetchDriverOrders]);
 
   useOrderUpdates(handleOrderUpdated, {
     role: 'driver',

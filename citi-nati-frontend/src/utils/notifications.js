@@ -6,18 +6,34 @@ import toast from 'react-hot-toast';
  */
 const NOTIFICATION_SOUND_URL = '/classic-door-bell.wav';
 
-// Cache audio element and context for better performance
-let cachedAudio = null;
+// Create multiple audio instances for simultaneous notifications
+let audioPool = [];
+let currentAudioIndex = 0;
+const AUDIO_POOL_SIZE = 3;
 
 /**
- * Pre-load and cache the audio element on first use
+ * Initialize audio pool on first use
  */
-const getCachedAudio = () => {
-  if (!cachedAudio) {
-    cachedAudio = new Audio(NOTIFICATION_SOUND_URL);
-    cachedAudio.preload = 'auto';
+const initializeAudioPool = () => {
+  if (audioPool.length === 0) {
+    for (let i = 0; i < AUDIO_POOL_SIZE; i++) {
+      const audio = new Audio(NOTIFICATION_SOUND_URL);
+      audio.preload = 'auto';
+      audio.volume = 0.8;
+      audioPool.push(audio);
+    }
+    console.log('[Notification] Audio pool initialized with', AUDIO_POOL_SIZE, 'instances');
   }
-  return cachedAudio;
+};
+
+/**
+ * Get next available audio instance from pool
+ */
+const getPooledAudio = () => {
+  initializeAudioPool();
+  const audio = audioPool[currentAudioIndex];
+  currentAudioIndex = (currentAudioIndex + 1) % AUDIO_POOL_SIZE;
+  return audio;
 };
 
 /**
@@ -32,14 +48,18 @@ const playFallbackBeep = () => {
     osc.connect(gain);
     gain.connect(audioContext.destination);
     
-    // Beep pattern: high-low beep
+    // Double beep pattern for better audibility
     osc.frequency.value = 800;
     osc.type = 'sine';
-    gain.gain.setValueAtTime(0.3, audioContext.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.4, audioContext.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
     
     osc.start(audioContext.currentTime);
-    osc.stop(audioContext.currentTime + 0.15);
+    osc.stop(audioContext.currentTime + 0.1);
+    
+    // Second beep
+    osc.start(audioContext.currentTime + 0.15);
+    osc.stop(audioContext.currentTime + 0.25);
     
     console.log('[Notification] ✅ Fallback beep played (Web Audio API)');
   } catch (err) {
@@ -48,18 +68,23 @@ const playFallbackBeep = () => {
 };
 
 /**
- * Play notification sound
- * Tries file first, falls back to Web Audio API beep if file fails
+ * Play notification sound in real-time
+ * Uses audio pool for simultaneous notifications
+ * With fallback to Web Audio API beep
  */
 const playNotificationSound = () => {
   try {
-    const audio = getCachedAudio();
+    // Initialize pool on first use
+    initializeAudioPool();
     
-    // Reset currentTime to allow rapid replays
+    // Get next audio from pool
+    const audio = getPooledAudio();
+    
+    // Pause and reset to beginning
+    audio.pause();
     audio.currentTime = 0;
-    audio.volume = 0.8; // Increased volume from 0.6 to 0.8
     
-    // Attempt to play and log result
+    // Play with proper error handling
     const playPromise = audio.play();
     
     if (playPromise !== undefined) {
@@ -69,14 +94,16 @@ const playNotificationSound = () => {
         })
         .catch((err) => {
           console.warn('[Notification] ⚠️ File audio failed:', err.message);
-          console.log('[Notification] Attempting fallback beep...');
           // Fallback to Web Audio API beep
           playFallbackBeep();
         });
+    } else {
+      // Browser doesn't support Promise on play
+      console.log('[Notification] Browser does not support play() promise');
     }
   } catch (err) {
     console.error('[Notification] Sound initialization failed:', err.message);
-    console.log('[Notification] Attempting fallback beep...');
+    // Fallback to beep
     playFallbackBeep();
   }
 };
@@ -127,9 +154,13 @@ export const notify = (message, type = 'info', duration = 3000) => {
   }
 };
 
+// Export playNotificationSound as named export for use in components
+export { playNotificationSound };
+
 export default {
   notifySuccess,
   notifyInfo,
   notifyError,
   notify,
+  playNotificationSound,
 };
