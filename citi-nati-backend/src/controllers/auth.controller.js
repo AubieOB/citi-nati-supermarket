@@ -1,12 +1,10 @@
 const bcrypt = require('bcrypt');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../prisma'); // Use shared Prisma instance
 const axios = require('axios');
 const { generateToken } = require('../utils/jwt');
 const { notifyNewUserRegistration } = require('../utils/messageService');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/emailService');
 const { generateVerificationCode } = require('../utils/verificationCode');
-
-const prisma = new PrismaClient();
 
 /**
  * LOGIN ENDPOINT

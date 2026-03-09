@@ -1,8 +1,6 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../prisma'); // Use shared Prisma instance
 const bcrypt = require('bcryptjs');
 const { emitOrderStatusUpdated, emitOrderUpdated } = require('../utils/socket');
-
-const prisma = new PrismaClient();
 
 /**
  * Create a new driver WITH user account (can login)

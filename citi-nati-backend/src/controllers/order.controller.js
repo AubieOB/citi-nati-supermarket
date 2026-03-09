@@ -1,12 +1,10 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../prisma'); // Use shared Prisma instance
 const axios = require('axios');
 const PDFDocument = require('pdfkit');
 const { emitNewOrder, emitOrderAssigned, emitOrderStatusUpdated, emitOrderUpdated, emitOrderUpdatedToAdminAndCustomer } = require('../utils/socket');
 const { notifyDriverAssigned, notifyOrderCompleted } = require('../utils/messageService');
 const { sendDriverAssignedEmail, sendDeliveryStatusEmail, sendRefundNotificationEmail } = require('../utils/emailService');
 const { isPaymentConfirmedInCache } = require('../utils/webhookCache');
-
-const prisma = new PrismaClient();
 
 const createOrder = async (req, res) => {
   try {

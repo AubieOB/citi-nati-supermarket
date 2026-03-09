@@ -13,10 +13,9 @@
 
 const express = require('express');
 const bcrypt = require('bcrypt');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../prisma'); // Use shared Prisma instance
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 /**
  * GET /api/setup/create-admin

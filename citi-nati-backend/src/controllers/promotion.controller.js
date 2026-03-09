@@ -6,8 +6,7 @@
  * 3. Selective product promotions
  */
 
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../prisma'); // Use shared Prisma instance
 
 /**
  * Emit promotion update to all connected clients (both admin and users) via Socket.io
