@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Container from '../../components/ui/Container.jsx';
 import Button from '../../components/ui/Button.jsx';
 import api from '../../utils/api.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useCart } from '../../context/CartContext.jsx';
 import { formatMWK } from '../../utils/currency.js';
 import ProtectedRoute from '../../components/ProtectedRoute.jsx';
 import toast from 'react-hot-toast';
@@ -23,9 +25,12 @@ import '../../styles/global.css';
 
 const MyOrdersContent = () => {
   const { isLoading: authLoading, user } = useAuth();
+  const navigate = useNavigate();
+  const { updateCartCount } = useCart();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [retryingOrderId, setRetryingOrderId] = useState(null);
 
   // Reusable fetch function
   const fetchOrders = useCallback(async () => {
@@ -58,6 +63,69 @@ const MyOrdersContent = () => {
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  /**
+   * Retry payment for unpaid order
+   * Adds items to cart and navigates to checkout
+   */
+  const handleRetryPayment = async (order) => {
+    if (!order.items || order.items.length === 0) {
+      toast.error('No items in this order to retry', { position: 'top-right' });
+      return;
+    }
+
+    try {
+      setRetryingOrderId(order.id);
+
+      // Add each item to cart
+      let addedCount = 0;
+      const failedItems = [];
+
+      for (const item of order.items) {
+        try {
+          await api.post('/cart', {
+            productId: item.productId,
+            quantity: item.quantity
+          });
+          addedCount++;
+        } catch (err) {
+          const itemName = item.product?.name || `Product #${item.productId}`;
+          failedItems.push({
+            name: itemName,
+            reason: err.response?.data?.error || 'Failed to add to cart'
+          });
+        }
+      }
+
+      if (addedCount > 0) {
+        // Update cart count
+        await updateCartCount();
+
+        // Show success message
+        const message = failedItems.length === 0 
+          ? `Added ${addedCount} item${addedCount !== 1 ? 's' : ''} to cart`
+          : `Added ${addedCount} item${addedCount !== 1 ? 's' : ''} to cart. Failed: ${failedItems.map(f => f.name).join(', ')}`;
+        
+        toast.success(message, { position: 'top-right' });
+
+        // Navigate to checkout
+        setTimeout(() => {
+          navigate('/checkout');
+        }, 800);
+      } else {
+        // All items failed
+        const errorMsg = failedItems.length > 0
+          ? `Could not add items: ${failedItems.map(f => f.name).join(', ')}`
+          : 'Failed to add items to cart. Please try again.';
+        toast.error(errorMsg, { position: 'top-right' });
+      }
+    } catch (err) {
+      console.error('Error retrying payment:', err);
+      toast.error('Failed to retry payment. Please try again.', { position: 'top-right' });
+    } finally {
+      setRetryingOrderId(null);
+    }
+  };
 
   // Format date for display
   const formatDate = (dateString) => {
@@ -331,6 +399,45 @@ const MyOrdersContent = () => {
           >
             <i className="fas fa-receipt" style={{ marginRight: '0.5rem' }}></i>
             Download Receipt
+          </Button>
+        </div>
+      )}
+
+      {/* Retry Payment Button - Only for Unpaid Orders */}
+      {order.paymentStatus === 'PENDING' && (
+        <div style={{
+          marginTop: '1.5rem',
+          paddingTop: '1rem',
+          borderTop: '1px solid #eee',
+          display: 'flex',
+          gap: '0.75rem',
+        }}>
+          <Button
+            variant="secondary"
+            size="medium"
+            onClick={() => handleRetryPayment(order)}
+            disabled={retryingOrderId === order.id}
+            style={{
+              backgroundColor: retryingOrderId === order.id ? '#ccc' : '#ff9800',
+              color: '#fff',
+              border: 'none',
+              cursor: retryingOrderId === order.id ? 'not-allowed' : 'pointer',
+              flex: 1,
+              transition: 'background-color 0.2s'
+            }}
+            onMouseOver={(e) => {
+              if (retryingOrderId !== order.id) {
+                e.target.style.backgroundColor = '#e68900';
+              }
+            }}
+            onMouseOut={(e) => {
+              if (retryingOrderId !== order.id) {
+                e.target.style.backgroundColor = '#ff9800';
+              }
+            }}
+          >
+            <i className="fas fa-sync" style={{ marginRight: '0.5rem' }}></i>
+            {retryingOrderId === order.id ? 'Processing...' : 'Retry Payment'}
           </Button>
         </div>
       )}
