@@ -485,6 +485,7 @@ const googleAuth = async (req, res) => {
         passwordHash,
         role: 'user',
         emailVerified: true, // Google emails are pre-verified
+        isActive: true, // ✅ Ensure Google users are active and visible in admin dashboard
       },
     });
 

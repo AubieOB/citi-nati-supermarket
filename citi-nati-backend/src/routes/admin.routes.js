@@ -169,7 +169,8 @@ router.put('/users/:userId/role', verifyTokenMiddleware, verifyAdmin, async (req
 
 /**
  * DELETE /api/admin/users/:userId
- * Soft delete user from system (marks as inactive)
+ * Permanently delete user account and all associated data (cart, orders, driver record)
+ * CASCADE DELETE handles cart/order cleanup automatically
  * Protected: Admin only
  */
 router.delete('/users/:userId', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
@@ -181,24 +182,42 @@ router.delete('/users/:userId', verifyTokenMiddleware, verifyAdmin, async (req, 
       return res.status(400).json({ error: 'Cannot delete your own account' });
     }
 
-    // Soft delete - mark as inactive instead of hard delete
-    const user = await prisma.user.update({
+    // Check if user exists first
+    const existingUser = await prisma.user.findUnique({
       where: { id: userId },
-      data: { isActive: false },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        isActive: true,
-        role: true
-      }
+      select: { id: true, email: true, name: true, role: true }
     });
 
-    console.log('[ADMIN] User soft deleted:', { userId, email: user.email, admin: req.user.email });
+    if (!existingUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // If user is a driver, delete the Driver record first (before cascade)
+    if (existingUser.role === 'driver') {
+      await prisma.driver.deleteMany({
+        where: { email: existingUser.email },
+      });
+      console.log('[ADMIN DELETE USER] Deleted associated Driver record for:', existingUser.email);
+    }
+
+    // Hard delete user - CASCADE DELETE automatically removes:
+    // - Cart (and CartItems via CASCADE)
+    // - Orders (and OrderItems via CASCADE)
+    // - SalesDay relationships
+    await prisma.user.delete({
+      where: { id: userId },
+    });
+
+    console.log('[ADMIN] User permanently deleted:', { 
+      userId, 
+      email: existingUser.email, 
+      name: existingUser.name,
+      admin: req.user.email 
+    });
+    
     res.json({ 
       success: true, 
-      message: 'User deactivated',
-      user
+      message: 'User account permanently deleted. All associated data (cart, orders) has been removed.'
     });
   } catch (err) {
     console.error('Delete user error:', err);
