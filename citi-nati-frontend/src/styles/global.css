@@ -1087,7 +1087,7 @@ body.menu-open {
 
 .products-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 280px));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 240px));
   gap: 1rem;
   margin: 0;
   width: 100%;
@@ -1099,14 +1099,14 @@ body.menu-open {
 /* Tablet and larger screens - Adjust columns based on available space */
 @media (min-width: 1200px) {
   .products-grid {
-    grid-template-columns: repeat(auto-fit, minmax(240px, 300px));
+    grid-template-columns: repeat(auto-fit, minmax(200px, 220px));
     justify-content: start;
   }
 }
 
 @media (min-width: 1024px) and (max-width: 1199px) {
   .products-grid {
-    grid-template-columns: repeat(auto-fit, minmax(220px, 280px));
+    grid-template-columns: repeat(auto-fit, minmax(190px, 210px));
     justify-content: start;
   }
 }
@@ -1182,7 +1182,7 @@ body.menu-open {
 
 .product-card__image {
   width: 100%;
-  height: 160px;
+  height: 140px;
   background-color: #ffffff;
   display: flex;
   align-items: center;
@@ -1198,25 +1198,53 @@ body.menu-open {
 }
 
 .product-card__content {
-  padding: 0.9rem;
+  padding: 0.7rem;
   display: flex;
   flex-direction: column;
   flex: 1;
 }
 
 .product-card__title {
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 600;
-  margin-bottom: 0.4rem;
-  line-height: 1.3;
-  min-height: 2.4rem;
+  margin-bottom: 0.3rem;
+  line-height: 1.2;
+  min-height: 2.2rem;
 }
 
 .product-card__price {
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   font-weight: 700;
   color: #2D8659;
-  margin-bottom: 0.6rem;
+  margin-bottom: 0.4rem;
+}
+
+/* Reduce card sizes on smaller desktop screens */
+@media (min-width: 1200px) {
+  .product-card__image {
+    height: 140px;
+  }
+
+  .product-card__content {
+    padding: 0.6rem;
+  }
+
+  .product-card__title {
+    font-size: 0.85rem;
+    min-height: 2rem;
+    margin-bottom: 0.2rem;
+  }
+
+  .product-card__price {
+    font-size: 1rem;
+    margin-bottom: 0.3rem;
+  }
+
+  .product-card__button {
+    padding: 0.5rem;
+    font-size: 0.8rem;
+  }
+}
 }
 
 .product-card__button {
