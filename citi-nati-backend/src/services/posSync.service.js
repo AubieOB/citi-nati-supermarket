@@ -271,6 +271,46 @@ async function getStockFromPOSByCode(productCode) {
 }
 
 /**
+ * Send manual price updates to POS Sync Agent
+ *
+ * @param {Array<{productCode: string, newPrice: number}>} updates
+ * @returns {Promise<{success: boolean, data?: any, error?: string}>}
+ */
+async function updatePrices(updates = []) {
+  if (!ENABLE_POS_SYNC) {
+    return { success: false, error: 'POS Sync is disabled' };
+  }
+
+  if (!Array.isArray(updates) || updates.length === 0) {
+    return { success: false, error: 'No price updates provided' };
+  }
+
+  const locationCode = process.env.POS_LOCATION_CODE || 'SH';
+
+  try {
+    const payload = {
+      updates: updates.map((item) => ({
+        productCode: item.productCode,
+        newPrice: Number(item.newPrice),
+      })),
+      locationCode,
+    };
+
+    const response = await posAgent.post('/pos-sync/update-prices', payload);
+
+    return {
+      success: true,
+      data: response.data,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.response?.data?.error || error.message,
+    };
+  }
+}
+
+/**
  * Get POS service configuration (for debugging)
  */
 function getConfig() {
@@ -289,5 +329,6 @@ module.exports = {
   getStockFromPOS,
   getPriceFromPOS,
   getStockFromPOSByCode,
+  updatePrices,
   getConfig,
 };

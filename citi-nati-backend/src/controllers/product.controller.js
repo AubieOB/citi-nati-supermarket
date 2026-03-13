@@ -1,6 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const { computeExpiryStatus, suggestDiscount } = require('../utils/expiryStatus');
 const { notifyLowStock } = require('../utils/messageService');
+const posSyncService = require('../services/posSync.service');
 
 const prisma = new PrismaClient();
 
@@ -355,6 +356,8 @@ const getProductById = async (req, res) => {
 
 const updateProduct = async (req, res) => {
   try {
+    console.log('[BACKEND PRODUCT EDIT] updateProduct hit');
+
     // Extract and convert id to integer
     const id = parseInt(req.params.id);
 
@@ -371,9 +374,17 @@ const updateProduct = async (req, res) => {
 
     // Prepare update data with only provided fields
     const updateData = {};
+    const changedFields = [];
+
+    const incomingPriceProvided = req.body.price !== undefined && req.body.price !== '';
+    let incomingParsedPrice;
+    let priceChanged = false;
 
     if (req.body.name !== undefined && req.body.name !== '') {
       updateData.name = req.body.name;
+      if (req.body.name !== existingProduct.name) {
+        changedFields.push('name');
+      }
     }
     if (req.body.price !== undefined && req.body.price !== '') {
       const parsedPrice = parseFloat(req.body.price);
@@ -381,6 +392,11 @@ const updateProduct = async (req, res) => {
         return res.status(400).json({ error: 'Invalid price value' });
       }
       updateData.price = parsedPrice;
+      incomingParsedPrice = parsedPrice;
+      priceChanged = parsedPrice !== Number(existingProduct.price);
+      if (priceChanged) {
+        changedFields.push('price');
+      }
     }
     if (req.body.stock !== undefined && req.body.stock !== '') {
       const parsedStock = parseInt(req.body.stock, 10);
@@ -388,9 +404,15 @@ const updateProduct = async (req, res) => {
         return res.status(400).json({ error: 'Invalid stock value' });
       }
       updateData.stock = parsedStock;
+      if (parsedStock !== Number(existingProduct.stock)) {
+        changedFields.push('stock');
+      }
     }
     if (req.body.category !== undefined && req.body.category !== '') {
       updateData.category = req.body.category;
+      if (req.body.category !== existingProduct.category) {
+        changedFields.push('category');
+      }
     }
     
     // Debug: Log file info before processing
@@ -404,6 +426,9 @@ const updateProduct = async (req, res) => {
       });
       updateData.image = req.file.secure_url; // Cloudinary URL
       console.log('[PRODUCT UPDATE] ✅ Image URL set to:', updateData.image);
+      if (updateData.image !== existingProduct.image) {
+        changedFields.push('image');
+      }
     } else {
       console.log('[PRODUCT UPDATE] ⚠️ No image file in request (optional)');
     }
@@ -411,6 +436,11 @@ const updateProduct = async (req, res) => {
     // Handle expiryDate
     if (req.body.expiryDate !== undefined) {
       updateData.expiryDate = req.body.expiryDate ? new Date(req.body.expiryDate) : null;
+      const existingExpiry = existingProduct.expiryDate ? new Date(existingProduct.expiryDate).toISOString() : null;
+      const incomingExpiry = updateData.expiryDate ? new Date(updateData.expiryDate).toISOString() : null;
+      if (existingExpiry !== incomingExpiry) {
+        changedFields.push('expiryDate');
+      }
     }
 
     // Handle originalPrice
@@ -421,6 +451,9 @@ const updateProduct = async (req, res) => {
         const parsedOriginalPrice = parseFloat(req.body.originalPrice);
         if (!isNaN(parsedOriginalPrice) && parsedOriginalPrice >= 0) {
           updateData.originalPrice = parsedOriginalPrice;
+          if (parsedOriginalPrice !== Number(existingProduct.originalPrice)) {
+            changedFields.push('originalPrice');
+          }
         }
       }
     }
@@ -430,11 +463,23 @@ const updateProduct = async (req, res) => {
       if (req.body.discountPrice === '' || req.body.discountPrice === null) {
         updateData.discountPrice = null;
         updateData.isOnSale = false;
+        if (existingProduct.discountPrice !== null) {
+          changedFields.push('discountPrice');
+        }
+        if (existingProduct.isOnSale !== false) {
+          changedFields.push('isOnSale');
+        }
       } else {
         const parsedDiscountPrice = parseFloat(req.body.discountPrice);
         if (!isNaN(parsedDiscountPrice) && parsedDiscountPrice >= 0) {
           updateData.discountPrice = parsedDiscountPrice;
           updateData.isOnSale = true;
+          if (parsedDiscountPrice !== Number(existingProduct.discountPrice)) {
+            changedFields.push('discountPrice');
+          }
+          if (existingProduct.isOnSale !== true) {
+            changedFields.push('isOnSale');
+          }
         }
       }
     }
@@ -442,13 +487,61 @@ const updateProduct = async (req, res) => {
     // Handle explicit isOnSale toggle (only if discountPrice is already set)
     if (req.body.isOnSale !== undefined && updateData.discountPrice) {
       updateData.isOnSale = req.body.isOnSale === true || req.body.isOnSale === 'true';
+      if (updateData.isOnSale !== existingProduct.isOnSale) {
+        changedFields.push('isOnSale');
+      }
     }
+
+    console.log('[BACKEND PRODUCT EDIT] changedFields:', [...new Set(changedFields)]);
 
     // Update product in database
     const updatedProduct = await prisma.product.update({
       where: { id },
       data: updateData,
     });
+
+    let posWriteback = {
+      attempted: false,
+      success: null,
+      error: null,
+      payload: null,
+    };
+
+    // Phase 1: manual price write-back only for POS-linked products with actual price changes
+    if (updatedProduct.sourceCode && incomingPriceProvided && priceChanged) {
+      const payload = {
+        updates: [
+          {
+            productCode: updatedProduct.sourceCode,
+            newPrice: incomingParsedPrice,
+          },
+        ],
+        locationCode: process.env.POS_LOCATION_CODE || 'SH',
+      };
+
+      posWriteback.attempted = true;
+      posWriteback.payload = payload;
+
+      console.log('[BACKEND POS WRITE] price sync start');
+      console.log('[BACKEND POS WRITE] price sync payload:', payload);
+
+      try {
+        const writeResult = await posSyncService.updatePrices(payload.updates);
+
+        if (writeResult.success) {
+          posWriteback.success = true;
+          console.log('[BACKEND POS WRITE] price sync success');
+        } else {
+          posWriteback.success = false;
+          posWriteback.error = writeResult.error || 'Unknown POS write-back error';
+          console.error('[BACKEND POS WRITE ERROR] price sync failed:', posWriteback.error);
+        }
+      } catch (writeErr) {
+        posWriteback.success = false;
+        posWriteback.error = writeErr.message;
+        console.error('[BACKEND POS WRITE ERROR] price sync failed:', writeErr.message);
+      }
+    }
 
     // Debug: Log what was actually saved to database
     console.log('[PRODUCT UPDATE] ✅ Product updated in database:', {
@@ -481,6 +574,7 @@ const updateProduct = async (req, res) => {
     return res.status(200).json({
       message: 'Product updated successfully',
       product: formattedProduct,
+      posWriteback,
     });
   } catch (err) {
     console.error('Error updating product:', err);
