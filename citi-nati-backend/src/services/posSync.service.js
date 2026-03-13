@@ -18,6 +18,10 @@ const prisma = new PrismaClient();
 const POS_AGENT_URL = process.env.POS_AGENT_URL || 'http://localhost:3001';
 const POS_SECRET = process.env.POS_SECRET || '';
 const ENABLE_POS_SYNC = process.env.ENABLE_POS_SYNC !== 'false'; // Enabled by default
+const parsedPosAgentTimeoutMs = parseInt(process.env.POS_AGENT_TIMEOUT_MS || '15000', 10);
+const POS_AGENT_TIMEOUT_MS = Number.isFinite(parsedPosAgentTimeoutMs) && parsedPosAgentTimeoutMs > 0
+  ? parsedPosAgentTimeoutMs
+  : 15000;
 
 /**
  * Axios instance for POS Agent communication
@@ -28,8 +32,26 @@ const posAgent = axios.create({
     'Content-Type': 'application/json',
     'x-pos-secret': POS_SECRET,
   },
-  timeout: 15000,
+  timeout: POS_AGENT_TIMEOUT_MS,
 });
+
+function formatPosAgentError(error, endpoint) {
+  const target = `${POS_AGENT_URL}${endpoint}`;
+
+  if (error.code === 'ECONNABORTED') {
+    return `Request to POS agent timed out after ${POS_AGENT_TIMEOUT_MS}ms (${target}). Verify the POS Sync Agent is running and the endpoint is responsive.`;
+  }
+
+  if (error.code === 'ECONNREFUSED') {
+    return `Could not connect to POS agent at ${target}. Verify the POS Sync Agent is running and POS_AGENT_URL is correct.`;
+  }
+
+  if (error.response) {
+    return error.response.data?.error || `POS agent request failed with status ${error.response.status} (${target})`;
+  }
+
+  return error.message;
+}
 
 /**
  * Check if POS Agent is reachable
@@ -47,7 +69,7 @@ async function checkPOSHealth() {
     console.log('[POS Sync] ✅ POS Agent is healthy');
     return response.data.success === true;
   } catch (error) {
-    console.warn('[POS Sync] ⚠️ POS Agent health check failed:', error.message);
+    console.warn('[POS Sync] ⚠️ POS Agent health check failed:', formatPosAgentError(error, '/health'));
     return false;
   }
 }
@@ -157,10 +179,10 @@ async function syncProductsFromPOS() {
       errors: errors.length > 0 ? errors : undefined,
     };
   } catch (error) {
-    console.error('[POS Sync] ❌ Sync failed:', error.message);
+    console.error('[POS Sync] ❌ Sync failed:', formatPosAgentError(error, '/pos-sync/products'));
     return {
       success: false,
-      error: error.message,
+      error: formatPosAgentError(error, '/pos-sync/products'),
     };
   }
 }
@@ -186,7 +208,7 @@ async function getCategoriesFromPOS() {
     console.log(`[POS Sync] Fetched ${response.data.count} categories`);
     return response.data.data || [];
   } catch (error) {
-    console.error('[POS Sync] Error fetching categories:', error.message);
+    console.error('[POS Sync] Error fetching categories:', formatPosAgentError(error, '/pos-sync/categories'));
     return [];
   }
 }
@@ -212,7 +234,7 @@ async function getStockFromPOS() {
     console.log(`[POS Sync] Fetched stock for ${response.data.count} products`);
     return response.data.data || [];
   } catch (error) {
-    console.error('[POS Sync] Error fetching stock:', error.message);
+    console.error('[POS Sync] Error fetching stock:', formatPosAgentError(error, '/pos-sync/stock-by-location'));
     return [];
   }
 }
@@ -239,7 +261,7 @@ async function getPriceFromPOS(productCode) {
     const product = response.data.data?.find(p => p.ProductCode === productCode);
     return product?.SellingPrice || null;
   } catch (error) {
-    console.warn(`[POS Sync] Error fetching price for ${productCode}:`, error.message);
+    console.warn(`[POS Sync] Error fetching price for ${productCode}:`, formatPosAgentError(error, '/pos-sync/products'));
     return null;
   }
 }
@@ -265,7 +287,7 @@ async function getStockFromPOSByCode(productCode) {
     const stock = response.data.data?.find(s => s.ProductCode === productCode);
     return stock?.AvailableStock || null;
   } catch (error) {
-    console.warn(`[POS Sync] Error fetching stock for ${productCode}:`, error.message);
+    console.warn(`[POS Sync] Error fetching stock for ${productCode}:`, formatPosAgentError(error, '/pos-sync/stock-by-location'));
     return null;
   }
 }
@@ -305,7 +327,7 @@ async function updatePrices(updates = []) {
   } catch (error) {
     return {
       success: false,
-      error: error.response?.data?.error || error.message,
+      error: formatPosAgentError(error, '/pos-sync/update-prices'),
     };
   }
 }
@@ -317,6 +339,7 @@ function getConfig() {
   return {
     enabled: ENABLE_POS_SYNC,
     agentUrl: POS_AGENT_URL,
+    timeoutMs: POS_AGENT_TIMEOUT_MS,
     hasSecret: !!POS_SECRET,
     secretLength: POS_SECRET?.length || 0,
   };
