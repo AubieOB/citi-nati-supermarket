@@ -247,6 +247,7 @@ model PosWriteCommand {
   processedAt       DateTime?
   retryCount        Int              @default(0)
   maxRetries        Int              @default(5)
+  nextRetryAt       DateTime?
   errorMessage      String?
   resultSummary     Json?
   agentId           String?
@@ -254,4 +255,5 @@ model PosWriteCommand {
 
   @@index([status, createdAt])
   @@index([agentId, status])
+  @@index([status, nextRetryAt])
 }

@@ -1,0 +1,5 @@
+ALTER TABLE "PosWriteCommand"
+  ADD COLUMN "nextRetryAt" TIMESTAMP(3);
+
+CREATE INDEX "PosWriteCommand_status_nextRetryAt_idx"
+  ON "PosWriteCommand"("status", "nextRetryAt");

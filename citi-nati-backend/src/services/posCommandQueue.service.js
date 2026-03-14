@@ -10,6 +10,17 @@ const POS_COMMAND_STATUS = {
   FAILED: 'FAILED',
 };
 
+const DEFAULT_RETRY_DELAY_MS = Number.parseInt(process.env.POS_COMMAND_RETRY_DELAY_MS || '30000', 10);
+
+function getNextRetryAt(retryCount) {
+  const baseDelay = Number.isFinite(DEFAULT_RETRY_DELAY_MS) && DEFAULT_RETRY_DELAY_MS > 0
+    ? DEFAULT_RETRY_DELAY_MS
+    : 30000;
+  const backoffMultiplier = Math.min(8, Math.max(1, retryCount));
+  const delayMs = baseDelay * backoffMultiplier;
+  return new Date(Date.now() + delayMs);
+}
+
 async function enqueueCommand(commandType, payload, meta = {}) {
   try {
     const command = await prisma.posWriteCommand.create({
@@ -22,6 +33,7 @@ async function enqueueCommand(commandType, payload, meta = {}) {
         relatedEntityId: meta.relatedEntityId ? String(meta.relatedEntityId) : null,
         createdBy: meta.createdBy || null,
         maxRetries: Number.isFinite(meta.maxRetries) ? meta.maxRetries : 5,
+        nextRetryAt: null,
       },
     });
 
@@ -47,6 +59,10 @@ async function claimPendingCommands(limit = 10, agentId = 'unknown-agent') {
       const candidates = await tx.posWriteCommand.findMany({
         where: {
           status: POS_COMMAND_STATUS.PENDING,
+          OR: [
+            { nextRetryAt: null },
+            { nextRetryAt: { lte: new Date() } },
+          ],
         },
         orderBy: {
           createdAt: 'asc',
@@ -72,6 +88,7 @@ async function claimPendingCommands(limit = 10, agentId = 'unknown-agent') {
             agentId,
             lockToken,
             errorMessage: null,
+            nextRetryAt: null,
           },
         });
 
@@ -123,6 +140,7 @@ async function markCommandCompleted(id, resultSummary = {}, agentId = null) {
         errorMessage: null,
         lockToken: null,
         agentId: agentId || null,
+        nextRetryAt: null,
       },
     });
 
@@ -139,8 +157,11 @@ async function markCommandCompleted(id, resultSummary = {}, agentId = null) {
 
 async function markCommandFailed(id, errorMessage, retryable = true, agentId = null) {
   try {
-    const command = await prisma.posWriteCommand.findUnique({
-      where: { id },
+    const command = await prisma.posWriteCommand.findFirst({
+      where: {
+        id,
+        status: POS_COMMAND_STATUS.PROCESSING,
+      },
     });
 
     if (!command) {
@@ -149,6 +170,7 @@ async function markCommandFailed(id, errorMessage, retryable = true, agentId = n
 
     const nextRetryCount = command.retryCount + 1;
     const canRetry = retryable && nextRetryCount < command.maxRetries;
+    const nextRetryAt = canRetry ? getNextRetryAt(nextRetryCount) : null;
 
     const data = canRetry
       ? {
@@ -158,6 +180,7 @@ async function markCommandFailed(id, errorMessage, retryable = true, agentId = n
           pickedAt: null,
           lockToken: null,
           agentId: null,
+          nextRetryAt,
         }
       : {
           status: POS_COMMAND_STATUS.FAILED,
@@ -166,6 +189,7 @@ async function markCommandFailed(id, errorMessage, retryable = true, agentId = n
           errorMessage,
           lockToken: null,
           agentId: agentId || command.agentId,
+          nextRetryAt: null,
         };
 
     await prisma.posWriteCommand.update({
@@ -179,6 +203,7 @@ async function markCommandFailed(id, errorMessage, retryable = true, agentId = n
       canRetry,
       retryCount: nextRetryCount,
       maxRetries: command.maxRetries,
+      nextRetryAt,
     });
   } catch (error) {
     console.error('[POS COMMAND QUEUE ERROR] failed to mark command failed:', error.message);

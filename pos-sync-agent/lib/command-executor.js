@@ -7,6 +7,13 @@ async function executeUpdatePrice(pool, payload) {
   const priceTypeCode = payload.priceTypeCode || '1';
   const newPrice = Number(payload.newPrice);
 
+  console.log('[PRICE] UPDATE_PRICE payload:', {
+    productCode,
+    locationCode,
+    priceTypeCode,
+    newPrice,
+  });
+
   if (!productCode) {
     throw new Error('NON_RETRYABLE: UPDATE_PRICE payload missing productCode');
   }
@@ -21,7 +28,7 @@ async function executeUpdatePrice(pool, payload) {
     await transaction.begin();
 
     const request = new sql.Request(transaction);
-    await priceUpdates.updateStandardPrice(
+    const updateSummary = await priceUpdates.updateStandardPrice(
       request,
       productCode,
       newPrice,
@@ -32,11 +39,8 @@ async function executeUpdatePrice(pool, payload) {
     await transaction.commit();
 
     return {
-      message: 'Price updated in productprices',
-      productCode,
-      locationCode,
-      priceTypeCode,
-      newPrice,
+      message: 'Price write executed in productprices',
+      ...updateSummary,
       globalPricesLogged: true,
     };
   } catch (error) {

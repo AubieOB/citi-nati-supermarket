@@ -6,6 +6,75 @@
 
 const sql = require('mssql');
 
+function shouldDebugProduct(productCode) {
+  return String(productCode || '').toUpperCase() === 'STRAWB';
+}
+
+async function getPriceLookupDiagnostics(request, productCode, locationCode, priceTypeCode) {
+  const safeLocation = locationCode || 'SH';
+  const safePriceType = priceTypeCode || '1';
+
+  const diagnostics = {
+    productCode,
+    locationCode: safeLocation,
+    priceTypeCode: safePriceType,
+    exactMatchCount: 0,
+    codeOnlyCount: 0,
+    locationOnlyCount: 0,
+    priceTypeOnlyCount: 0,
+    sampleRows: [],
+  };
+
+  const countResult = await request
+    .input('DiagProductCode', sql.VarChar(50), productCode)
+    .input('DiagLocationCode', sql.VarChar(10), safeLocation)
+    .input('DiagPriceTypeCode', sql.VarChar(10), safePriceType)
+    .query(`
+      SELECT
+        SUM(CASE WHEN ProductCode = @DiagProductCode
+                  AND LocationCode = @DiagLocationCode
+                  AND PriceTypeCode = @DiagPriceTypeCode THEN 1 ELSE 0 END) AS ExactMatchCount,
+        SUM(CASE WHEN ProductCode = @DiagProductCode THEN 1 ELSE 0 END) AS CodeOnlyCount,
+        SUM(CASE WHEN ProductCode = @DiagProductCode AND LocationCode = @DiagLocationCode THEN 1 ELSE 0 END) AS LocationOnlyCount,
+        SUM(CASE WHEN ProductCode = @DiagProductCode AND PriceTypeCode = @DiagPriceTypeCode THEN 1 ELSE 0 END) AS PriceTypeOnlyCount
+      FROM POS.dbo.productprices
+    `);
+
+  if (countResult.recordset && countResult.recordset[0]) {
+    diagnostics.exactMatchCount = Number(countResult.recordset[0].ExactMatchCount || 0);
+    diagnostics.codeOnlyCount = Number(countResult.recordset[0].CodeOnlyCount || 0);
+    diagnostics.locationOnlyCount = Number(countResult.recordset[0].LocationOnlyCount || 0);
+    diagnostics.priceTypeOnlyCount = Number(countResult.recordset[0].PriceTypeOnlyCount || 0);
+  }
+
+  if (shouldDebugProduct(productCode)) {
+    const sampleResult = await request
+      .input('DiagSampleProductCode', sql.VarChar(50), productCode)
+      .query(`
+        SELECT TOP 10
+          PriceID,
+          ProductCode,
+          LocationCode,
+          PriceTypeCode,
+          FPrice,
+          PriceDate
+        FROM POS.dbo.productprices
+        WHERE ProductCode = @DiagSampleProductCode
+        ORDER BY PriceID DESC
+      `);
+
+    diagnostics.sampleRows = sampleResult.recordset || [];
+    console.log('[PRICE] STRAWB lookup keys:', {
+      productCode,
+      locationCode: safeLocation,
+      priceTypeCode: safePriceType,
+    });
+    console.log('[PRICE] STRAWB rows in productprices:', diagnostics.sampleRows);
+  }
+
+  return diagnostics;
+}
+
 /**
  * Get current price for a product (standard price)
  * @param {sql.Request} request - SQL request object
@@ -16,29 +85,32 @@ const sql = require('mssql');
  */
 async function getCurrentPrice(request, productCode, locationCode, priceTypeCode) {
   try {
+    const safeLocation = locationCode || 'SH';
+    const safePriceType = priceTypeCode || '1';
+
     const query = `
       SELECT TOP 1
           PriceID,
           FPrice
       FROM POS.dbo.productprices
       WHERE ProductCode = @ProductCode
-      ${locationCode ? 'AND LocationCode = @LocationCode' : ''}
-      ${priceTypeCode ? 'AND PriceTypeCode = @PriceTypeCode' : ''}
+      AND LocationCode = @LocationCode
+      AND PriceTypeCode = @PriceTypeCode
       ORDER BY PriceID DESC
     `;
 
     request.input('ProductCode', sql.VarChar(50), productCode);
-    if (locationCode) {
-      request.input('LocationCode', sql.VarChar(10), locationCode);
-    }
-    if (priceTypeCode) {
-      request.input('PriceTypeCode', sql.VarChar(10), priceTypeCode);
-    }
+    request.input('LocationCode', sql.VarChar(10), safeLocation);
+    request.input('PriceTypeCode', sql.VarChar(10), safePriceType);
+
+    const diagnostics = await getPriceLookupDiagnostics(request, productCode, safeLocation, safePriceType);
+    console.log('[PRICE] lookup diagnostics:', diagnostics);
 
     const result = await request.query(query);
 
     if (!result.recordset || result.recordset.length === 0) {
-      throw new Error(`No price record found for product ${productCode}`);
+      const details = `No price record found for product ${productCode} (location=${safeLocation}, priceType=${safePriceType}, exactMatchCount=${diagnostics.exactMatchCount}, codeOnlyCount=${diagnostics.codeOnlyCount}, locationOnlyCount=${diagnostics.locationOnlyCount}, priceTypeOnlyCount=${diagnostics.priceTypeOnlyCount})`;
+      throw new Error(details);
     }
 
     const priceRecord = result.recordset[0];
@@ -47,9 +119,10 @@ async function getCurrentPrice(request, productCode, locationCode, priceTypeCode
     return {
       price: priceRecord.FPrice,
       priceId: priceRecord.PriceID,
+      diagnostics,
     };
   } catch (error) {
-    console.error('[PRICE] Error getting current price:', error.message);
+    console.error('[PRICE ERROR] Error getting current price:', error.message);
     throw error;
   }
 }
@@ -66,13 +139,24 @@ async function getCurrentPrice(request, productCode, locationCode, priceTypeCode
 async function updateStandardPrice(request, productCode, newPrice, locationCode, priceTypeCode = '1') {
   try {
     const safeLocation = locationCode || 'SH';
+    const safePriceType = priceTypeCode || '1';
+    console.log('[PRICE] UPDATE_PRICE start:', {
+      productCode,
+      locationCode: safeLocation,
+      priceTypeCode: safePriceType,
+      newPrice,
+    });
+
     let currentPriceInfo = null;
+    let diagnostics = null;
 
     try {
-      currentPriceInfo = await getCurrentPrice(request, productCode, safeLocation, priceTypeCode);
+      currentPriceInfo = await getCurrentPrice(request, productCode, safeLocation, safePriceType);
+      diagnostics = currentPriceInfo.diagnostics || null;
     } catch (error) {
       if (error.message && error.message.includes('No price record found for product')) {
-        console.warn(`[PRICE] No existing productprices row for ${productCode} at ${safeLocation}. A new row will be inserted.`);
+        diagnostics = await getPriceLookupDiagnostics(request, productCode, safeLocation, safePriceType);
+        console.warn('[PRICE] No exact productprices row found. Fallback insert will be attempted.', diagnostics);
       } else {
         throw error;
       }
@@ -84,7 +168,7 @@ async function updateStandardPrice(request, productCode, newPrice, locationCode,
         FROM POS.dbo.productprices
         WHERE ProductCode = @ProductCode
         AND LocationCode = @LocationCode
-        ${priceTypeCode ? 'AND PriceTypeCode = @PriceTypeCode' : ''}
+        AND PriceTypeCode = @PriceTypeCode
         ORDER BY PriceID DESC
       )
       UPDATE pp
@@ -99,15 +183,20 @@ async function updateStandardPrice(request, productCode, newPrice, locationCode,
     request.input('LocationCode', sql.VarChar(10), safeLocation);
     request.input('NewPrice', sql.Decimal(18, 2), newPrice);
     request.input('PriceDate', sql.DateTime, new Date());
-    if (priceTypeCode) {
-      request.input('PriceTypeCode', sql.VarChar(10), priceTypeCode);
-    }
+    request.input('PriceTypeCode', sql.VarChar(10), safePriceType);
 
     const updateResult = await request.query(updateQuery);
+    const updateAffectedRows = updateResult.rowsAffected && updateResult.rowsAffected[0]
+      ? updateResult.rowsAffected[0]
+      : 0;
+    console.log('[PRICE] update affected rows:', updateAffectedRows);
 
     let writeAction = 'updated';
+    let fallbackInsertAttempted = false;
 
-    if (!updateResult.rowsAffected || updateResult.rowsAffected[0] === 0) {
+    if (updateAffectedRows === 0) {
+      fallbackInsertAttempted = true;
+      console.log('[PRICE] fallback insert attempt: true');
       const insertQuery = `
         INSERT INTO POS.dbo.productprices (
           ProductCode,
@@ -127,6 +216,8 @@ async function updateStandardPrice(request, productCode, newPrice, locationCode,
 
       await request.query(insertQuery);
       writeAction = 'inserted';
+    } else {
+      console.log('[PRICE] fallback insert attempt: false');
     }
 
     // GlobalPrices logging is best-effort and should not block a successful price update.
@@ -137,7 +228,7 @@ async function updateStandardPrice(request, productCode, newPrice, locationCode,
       await logRequest
         .input('LocationCode', sql.VarChar(10), safeLocation)
         .input('ProductCode', sql.VarChar(50), productCode)
-        .input('PriceTypeCode', sql.VarChar(10), priceTypeCode || '1')
+        .input('PriceTypeCode', sql.VarChar(10), safePriceType)
         .input('OldPrice', sql.Decimal(18, 2), Number((currentPriceInfo && currentPriceInfo.price) || 0))
         .input('NewPrice', sql.Decimal(18, 2), Number(newPrice))
         .query(`
@@ -164,8 +255,21 @@ async function updateStandardPrice(request, productCode, newPrice, locationCode,
       ? `${currentPriceInfo.price}`
       : 'N/A';
     console.log(`[PRICE] ✅ ${writeAction} price for ${productCode}: ${oldPriceText} → ${newPrice}`);
+
+    return {
+      productCode,
+      locationCode: safeLocation,
+      priceTypeCode: safePriceType,
+      newPrice,
+      oldPrice: currentPriceInfo ? currentPriceInfo.price : null,
+      existingRowFound: !!currentPriceInfo,
+      matchingRowCount: diagnostics ? diagnostics.exactMatchCount : null,
+      updateAffectedRows,
+      fallbackInsertAttempted,
+      writeAction,
+    };
   } catch (error) {
-    console.error('[PRICE] Error updating standard price:', error.message);
+    console.error('[PRICE ERROR] Error updating standard price:', error.message);
     throw error;
   }
 }
