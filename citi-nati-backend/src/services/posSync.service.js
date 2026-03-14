@@ -18,6 +18,7 @@ const prisma = new PrismaClient();
 const POS_AGENT_URL = process.env.POS_AGENT_URL || 'http://localhost:3001';
 const POS_SECRET = process.env.POS_SECRET || '';
 const ENABLE_POS_SYNC = process.env.ENABLE_POS_SYNC !== 'false'; // Enabled by default
+const ENABLE_DIRECT_POS_WRITEBACK_DEBUG = process.env.ENABLE_DIRECT_POS_WRITEBACK_DEBUG === 'true';
 const parsedPosAgentTimeoutMs = parseInt(process.env.POS_AGENT_TIMEOUT_MS || '15000', 10);
 const POS_AGENT_TIMEOUT_MS = Number.isFinite(parsedPosAgentTimeoutMs) && parsedPosAgentTimeoutMs > 0
   ? parsedPosAgentTimeoutMs
@@ -299,6 +300,13 @@ async function getStockFromPOSByCode(productCode) {
  * @returns {Promise<{success: boolean, data?: any, error?: string}>}
  */
 async function updatePrices(updates = []) {
+  if (!ENABLE_DIRECT_POS_WRITEBACK_DEBUG) {
+    return {
+      success: false,
+      error: 'Direct backend-to-agent write-back is disabled in production. Use POS command queue polling flow.',
+    };
+  }
+
   if (!ENABLE_POS_SYNC) {
     return { success: false, error: 'POS Sync is disabled' };
   }

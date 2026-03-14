@@ -3,8 +3,18 @@ const express = require('express');
 const sql = require('mssql');
 const axios = require('axios');
 
+// Import modules for POS write-back
+const transactionManager = require('./lib/transaction-manager');
+const invoiceWriteback = require('./lib/invoice-writeback');
+const stockUpdates = require('./lib/stock-updates');
+const priceUpdates = require('./lib/price-updates');
+const commandQueueClient = require('./lib/command-queue-client');
+const commandExecutor = require('./lib/command-executor');
+
 const app = express();
 app.use(express.json());
+
+const ENABLE_DIRECT_WRITEBACK_DEBUG = process.env.ENABLE_DIRECT_POS_WRITEBACK_DEBUG === 'true';
 
 // SQL Server configuration
 const sqlConfig = {
@@ -124,6 +134,17 @@ async function sendProductsToLiveServer(products) {
     console.error(error.message);
     return { success: false, error: error.message };
   }
+}
+
+function rejectDirectWritebackInProduction(req, res, next) {
+  if (ENABLE_DIRECT_WRITEBACK_DEBUG) {
+    return next();
+  }
+
+  return res.status(410).json({
+    success: false,
+    error: 'Direct write-back endpoint is DEBUG_ONLY. Production uses command queue polling.',
+  });
 }
 
 /** Fetch products from POS with category information */
@@ -409,6 +430,432 @@ app.get('/pos-sync/stock-by-location', validateApiKey, async (req, res) => {
   }
 });
 
+/**
+ * ============================================================================
+ * POS WRITE-BACK ENDPOINTS - INVOICE, STOCK, AND PRICE UPDATES
+ * ============================================================================
+ */
+
+/**
+ * POST /pos-sync/write-invoice
+ * Write back invoice with items to POS database
+ * 
+ * Request body:
+ * {
+ *   "customerCode": "CUST001",
+ *   "locationCode": "SH",
+ *   "invoiceDate": "2026-03-10",
+ *   "invoiceTime": "14:30",
+ *   "items": [
+ *     {
+ *       "productCode": "PROD001",
+ *       "productName": "Product Name",
+ *       "qty": 2,
+ *       "unitPrice": 100.00,
+ *       "bulkPrice": 0,
+ *       "discount": 0,
+ *       "discountAmount": 0,
+ *       "taxRate": 0.15,
+ *       "taxAmount": 30.00,
+ *       "isHidden": false
+ *     }
+ *   ],
+ *   "grossSale": 230.00,
+ *   "vat": 30.00,
+ *   "discount": 0,
+ *   "netSale": 230.00,
+ *   "payMethod1": "CASH",
+ *   "tenAmt1": 250.00,
+ *   "userName": "CASHIER01",
+ *   "priceTypeCode": "1"
+ * }
+ */
+app.post('/pos-sync/write-invoice', validateApiKey, rejectDirectWritebackInProduction, async (req, res) => {
+  try {
+    console.log('[WRITEBACK] POST /pos-sync/write-invoice called');
+
+    if (!pool) await initializePool();
+
+    // Validate input
+    const validation = transactionManager.validateInvoiceData(req.body);
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid invoice data',
+        errors: validation.errors,
+      });
+    }
+
+    // Execute transaction
+    const result = await transactionManager.executeTransaction(pool, async (request) => {
+      // Validate stock availability before proceeding
+      const stockValidation = await stockUpdates.validateStockAvailability(
+        request,
+        req.body.items,
+        req.body.locationCode
+      );
+
+      if (!stockValidation.valid) {
+        throw new Error(`Stock validation failed: ${stockValidation.errors.join(', ')}`);
+      }
+
+      // Write back invoice
+      const invoiceResult = await invoiceWriteback.writeBackInvoice(request, req.body);
+
+      // Update stock for all items
+      await stockUpdates.updateStockForInvoiceItems(request, req.body.items, req.body.locationCode);
+
+      return invoiceResult;
+    });
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to write invoice to POS',
+        details: result.error,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Invoice written to POS successfully',
+      invoiceCode: result.result.invoiceCode,
+      cashSaleNo: result.result.cashSaleNo,
+      itemCount: result.result.itemCount,
+    });
+  } catch (err) {
+    console.error('[WRITEBACK] Error in /pos-sync/write-invoice:', err.message);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error: Failed to write invoice',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined,
+    });
+  }
+});
+
+/**
+ * POST /pos-sync/update-stock
+ * Update stock for multiple products (e.g., stock adjustment)
+ * 
+ * Request body:
+ * {
+ *   "updates": [
+ *     {
+ *       "productCode": "PROD001",
+ *       "locationCode": "SH",
+ *       "qtyReduction": 5
+ *     }
+ *   ]
+ * }
+ */
+app.post('/pos-sync/update-stock', validateApiKey, rejectDirectWritebackInProduction, async (req, res) => {
+  try {
+    console.log('[WRITEBACK] POST /pos-sync/update-stock called');
+
+    if (!pool) await initializePool();
+
+    const { updates } = req.body;
+
+    if (!Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'updates must be a non-empty array',
+      });
+    }
+
+    // Validate each update
+    const errors = [];
+    for (let i = 0; i < updates.length; i++) {
+      const validation = transactionManager.validateStockData(updates[i]);
+      if (!validation.valid) {
+        errors.push(`Update ${i}: ${validation.errors.join(', ')}`);
+      }
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid stock update data',
+        errors,
+      });
+    }
+
+    // Execute transaction
+    const result = await transactionManager.executeTransaction(pool, async (request) => {
+      const results = {
+        successful: 0,
+        failed: 0,
+        failedItems: [],
+      };
+
+      for (const update of updates) {
+        try {
+          await stockUpdates.reduceStockOnSale(
+            request,
+            update.productCode,
+            update.locationCode,
+            update.qtyReduction
+          );
+          results.successful++;
+        } catch (error) {
+          console.error(`[STOCK UPDATE] Failed for ${update.productCode}:`, error.message);
+          results.failed++;
+          results.failedItems.push({
+            productCode: update.productCode,
+            error: error.message,
+          });
+        }
+      }
+
+      if (results.failed > 0) {
+        throw new Error(`Failed to update ${results.failed} items`);
+      }
+
+      return results;
+    });
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to update stock',
+        details: result.error,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Stock updated successfully',
+      successful: result.result.successful,
+      failed: result.result.failed,
+    });
+  } catch (err) {
+    console.error('[WRITEBACK] Error in /pos-sync/update-stock:', err.message);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error: Failed to update stock',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined,
+    });
+  }
+});
+
+/**
+ * POST /pos-sync/update-prices
+ * Update prices for multiple products
+ * 
+ * Request body:
+ * {
+ *   "updates": [
+ *     {
+ *       "productCode": "PROD001",
+ *       "newPrice": 125.50
+ *     }
+ *   ],
+ *   "locationCode": "SH"
+ * }
+ */
+app.post('/pos-sync/update-prices', validateApiKey, rejectDirectWritebackInProduction, async (req, res) => {
+  try {
+    console.log('[WRITEBACK] POST /pos-sync/update-prices called');
+
+    if (!pool) await initializePool();
+
+    const { updates, locationCode } = req.body;
+
+    if (!Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'updates must be a non-empty array',
+      });
+    }
+
+    // Validate each update
+    const errors = [];
+    for (let i = 0; i < updates.length; i++) {
+      const validation = transactionManager.validatePriceData(updates[i]);
+      if (!validation.valid) {
+        errors.push(`Update ${i}: ${validation.errors.join(', ')}`);
+      }
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid price update data',
+        errors,
+      });
+    }
+
+    // Execute transaction
+    const result = await transactionManager.executeTransaction(pool, async (request) => {
+      return await priceUpdates.updateBulkPrices(request, updates, locationCode || 'SH');
+    });
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to update prices',
+        details: result.error,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Prices updated successfully',
+      successful: result.result.successful,
+      failed: result.result.failed,
+    });
+  } catch (err) {
+    console.error('[WRITEBACK] Error in /pos-sync/update-prices:', err.message);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error: Failed to update prices',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined,
+    });
+  }
+});
+
+/**
+ * POST /pos-sync/apply-promotion
+ * Apply promotional price to a product
+ * 
+ * Request body:
+ * {
+ *   "productCode": "PROD001",
+ *   "promotionalPrice": 79.99,
+ *   "locationCode": "SH"
+ * }
+ */
+app.post('/pos-sync/apply-promotion', validateApiKey, rejectDirectWritebackInProduction, async (req, res) => {
+  try {
+    console.log('[WRITEBACK] POST /pos-sync/apply-promotion called');
+
+    if (!pool) await initializePool();
+
+    const { productCode, promotionalPrice, locationCode } = req.body;
+
+    if (!productCode || typeof promotionalPrice !== 'number' || promotionalPrice < 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'productCode and promotionalPrice (non-negative number) are required',
+      });
+    }
+
+    // Execute transaction
+    const result = await transactionManager.executeTransaction(pool, async (request) => {
+      await priceUpdates.applyPromotionalPrice(request, productCode, promotionalPrice, locationCode || 'SH');
+      return { productCode, promotionalPrice };
+    });
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to apply promotion',
+        details: result.error,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Promotion applied successfully',
+      productCode: result.result.productCode,
+      promotionalPrice: result.result.promotionalPrice,
+    });
+  } catch (err) {
+    console.error('[WRITEBACK] Error in /pos-sync/apply-promotion:', err.message);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error: Failed to apply promotion',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined,
+    });
+  }
+});
+
+/**
+ * POST /pos-sync/revert-promotion
+ * Revert product to standard price (disable promotion)
+ * 
+ * Request body:
+ * {
+ *   "productCode": "PROD001",
+ *   "locationCode": "SH"
+ * }
+ */
+app.post('/pos-sync/revert-promotion', validateApiKey, rejectDirectWritebackInProduction, async (req, res) => {
+  try {
+    console.log('[WRITEBACK] POST /pos-sync/revert-promotion called');
+
+    if (!pool) await initializePool();
+
+    const { productCode, locationCode } = req.body;
+
+    if (!productCode) {
+      return res.status(400).json({
+        success: false,
+        error: 'productCode is required',
+      });
+    }
+
+    // Execute transaction
+    const result = await transactionManager.executeTransaction(pool, async (request) => {
+      await priceUpdates.revertToStandardPrice(request, productCode, locationCode || 'SH');
+      return { productCode };
+    });
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to revert promotion',
+        details: result.error,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Promotion reverted successfully',
+      productCode: result.result.productCode,
+    });
+  } catch (err) {
+    console.error('[WRITEBACK] Error in /pos-sync/revert-promotion:', err.message);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error: Failed to revert promotion',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined,
+    });
+  }
+});
+
+/**
+ * GET /pos-sync/get-resolved-price/:productCode
+ * Get current resolved price (promotional if active, otherwise standard)
+ */
+app.get('/pos-sync/get-resolved-price/:productCode', validateApiKey, rejectDirectWritebackInProduction, async (req, res) => {
+  try {
+    console.log('[WRITEBACK] GET /pos-sync/get-resolved-price called');
+
+    if (!pool) await initializePool();
+
+    const { productCode } = req.params;
+    const locationCode = process.env.POS_LOCATION_CODE || 'SH';
+
+    const request = pool.request();
+    const resolvedPrice = await priceUpdates.getResolvedPrice(request, productCode, locationCode);
+
+    res.json({
+      success: true,
+      productCode,
+      price: resolvedPrice.price,
+      isPromotional: resolvedPrice.isPromotional,
+    });
+  } catch (err) {
+    console.error('[WRITEBACK] Error in /pos-sync/get-resolved-price:', err.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get resolved price',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined,
+    });
+  }
+});
+
 /** Health check endpoint */
 app.get('/health', (req, res) => {
   res.json({ success: true, message: 'POS Sync Agent is running', timestamp: new Date().toISOString() });
@@ -430,6 +877,10 @@ async function gracefulShutdown() {
     clearInterval(autoSyncInterval);
     console.log('Auto-sync interval cleared');
   }
+  if (commandPollInterval) {
+    clearInterval(commandPollInterval);
+    console.log('Command poll interval cleared');
+  }
   if (pool) {
     await pool.close();
     console.log('Database connection pool closed');
@@ -442,11 +893,24 @@ process.on('SIGINT', gracefulShutdown);
 /** Auto-sync interval */
 let autoSyncInterval;
 const SYNC_INTERVAL_MS = process.env.SYNC_INTERVAL_MS || 60000; // 60 seconds default
+let isAutoSyncRunning = false;
+
+/** Command polling interval */
+let commandPollInterval;
+const COMMAND_POLL_INTERVAL_MS = parseInt(process.env.COMMAND_POLL_INTERVAL_MS || '5000', 10);
+const ENABLE_POS_COMMAND_POLLING = process.env.ENABLE_POS_COMMAND_POLLING !== 'false';
+let isCommandPollRunning = false;
 
 /**
  * Automatic sync function - runs on interval
  */
 async function autoSync() {
+  if (isAutoSyncRunning) {
+    console.log('[AUTO SYNC] Skipped tick - previous cycle still running');
+    return;
+  }
+
+  isAutoSyncRunning = true;
   try {
     const products = await fetchProductsFromPOS();
     if (products.length > 0) {
@@ -455,6 +919,59 @@ async function autoSync() {
     }
   } catch (err) {
     console.error('[AUTO SYNC] Error:', err.message);
+  } finally {
+    isAutoSyncRunning = false;
+  }
+}
+
+async function pollAndProcessCommands() {
+  if (isCommandPollRunning) {
+    console.log('[POS COMMAND POLLER] Skipped tick - previous cycle still running');
+    return;
+  }
+
+  isCommandPollRunning = true;
+
+  try {
+    const commands = await commandQueueClient.pollCommands(10);
+
+    if (!Array.isArray(commands) || commands.length === 0) {
+      return;
+    }
+
+    console.log(`[POS COMMAND POLLER] Claimed ${commands.length} command(s)`);
+
+    for (const command of commands) {
+      try {
+        console.log('[POS COMMAND EXECUTOR] start:', {
+          id: command.id,
+          commandType: command.commandType,
+        });
+
+        const resultSummary = await commandExecutor.executeCommand(pool, command);
+
+        await commandQueueClient.completeCommand(command.id, resultSummary || {
+          message: 'Command executed successfully',
+        });
+
+        console.log('[POS COMMAND EXECUTOR] success:', {
+          id: command.id,
+          commandType: command.commandType,
+        });
+      } catch (error) {
+        console.error('[POS COMMAND EXECUTOR ERROR] command failed:', {
+          id: command.id,
+          commandType: command.commandType,
+          error: error.message,
+        });
+
+        await commandQueueClient.failCommand(command.id, error.message, true);
+      }
+    }
+  } catch (err) {
+    console.error('[POS COMMAND POLLER ERROR]', err.message);
+  } finally {
+    isCommandPollRunning = false;
   }
 }
 
@@ -478,6 +995,13 @@ async function startServer() {
         autoSyncInterval = setInterval(autoSync, SYNC_INTERVAL_MS);
         autoSyncStarted = true;
         console.log('[AUTO SYNC] ✅ Auto-sync enabled');
+      }
+
+      if (ENABLE_POS_COMMAND_POLLING && process.env.LIVE_SERVER_URL && process.env.POS_SECRET) {
+        commandPollInterval = setInterval(pollAndProcessCommands, COMMAND_POLL_INTERVAL_MS);
+        console.log(`[POS COMMAND POLLER] ✅ Polling enabled (${COMMAND_POLL_INTERVAL_MS}ms)`);
+      } else {
+        console.log('[POS COMMAND POLLER] ⚠️ Polling disabled (requires ENABLE_POS_COMMAND_POLLING=true, LIVE_SERVER_URL, POS_SECRET)');
       }
     });
   } catch (err) {

@@ -7,6 +7,21 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum PosCommandType {
+  UPDATE_PRICE
+  UPDATE_STOCK
+  APPLY_PROMOTION
+  REVERT_PROMOTION
+  WRITE_INVOICE
+}
+
+enum PosCommandStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
 model User {
   id                      String   @id @default(uuid())
   name                    String
@@ -215,4 +230,28 @@ model PasswordReset {
   resetCode String
   expiresAt DateTime
   createdAt DateTime @default(now())
+}
+
+model PosWriteCommand {
+  id                String           @id @default(cuid())
+  commandType       PosCommandType
+  status            PosCommandStatus @default(PENDING)
+  payload           Json
+  source            String
+  relatedEntityType String?
+  relatedEntityId   String?
+  createdBy         String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  pickedAt          DateTime?
+  processedAt       DateTime?
+  retryCount        Int              @default(0)
+  maxRetries        Int              @default(5)
+  errorMessage      String?
+  resultSummary     Json?
+  agentId           String?
+  lockToken         String?
+
+  @@index([status, createdAt])
+  @@index([agentId, status])
 }

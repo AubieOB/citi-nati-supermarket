@@ -1,7 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const { computeExpiryStatus, suggestDiscount } = require('../utils/expiryStatus');
 const { notifyLowStock } = require('../utils/messageService');
-const posSyncService = require('../services/posSync.service');
+const posCommandQueueService = require('../services/posCommandQueue.service');
 
 const prisma = new PrismaClient();
 
@@ -500,46 +500,45 @@ const updateProduct = async (req, res) => {
       data: updateData,
     });
 
-    let posWriteback = {
+    let posCommand = {
       attempted: false,
       success: null,
       error: null,
       payload: null,
+      commandId: null,
     };
 
-    // Phase 1: manual price write-back only for POS-linked products with actual price changes
+    // Phase 1: enqueue UPDATE_PRICE command for POS-linked products with actual price changes
     if (updatedProduct.sourceCode && incomingPriceProvided && priceChanged) {
       const payload = {
-        updates: [
-          {
-            productCode: updatedProduct.sourceCode,
-            newPrice: incomingParsedPrice,
-          },
-        ],
+        productId: String(updatedProduct.id),
+        productCode: updatedProduct.sourceCode,
+        newPrice: incomingParsedPrice,
+        oldPrice: Number(existingProduct.price),
         locationCode: process.env.POS_LOCATION_CODE || 'SH',
+        priceTypeCode: '1',
       };
 
-      posWriteback.attempted = true;
-      posWriteback.payload = payload;
+      posCommand.attempted = true;
+      posCommand.payload = payload;
 
-      console.log('[BACKEND POS WRITE] price sync start');
-      console.log('[BACKEND POS WRITE] price sync payload:', payload);
+      console.log('[POS COMMAND QUEUE] enqueue UPDATE_PRICE start');
+      console.log('[POS COMMAND QUEUE] enqueue payload:', payload);
 
       try {
-        const writeResult = await posSyncService.updatePrices(payload.updates);
+        const queued = await posCommandQueueService.enqueueCommand('UPDATE_PRICE', payload, {
+          source: 'product.updateProduct',
+          relatedEntityType: 'Product',
+          relatedEntityId: updatedProduct.id,
+        });
 
-        if (writeResult.success) {
-          posWriteback.success = true;
-          console.log('[BACKEND POS WRITE] price sync success');
-        } else {
-          posWriteback.success = false;
-          posWriteback.error = writeResult.error || 'Unknown POS write-back error';
-          console.error('[BACKEND POS WRITE ERROR] price sync failed:', posWriteback.error);
-        }
-      } catch (writeErr) {
-        posWriteback.success = false;
-        posWriteback.error = writeErr.message;
-        console.error('[BACKEND POS WRITE ERROR] price sync failed:', writeErr.message);
+        posCommand.success = true;
+        posCommand.commandId = queued.id;
+        console.log('[POS COMMAND QUEUE] enqueue UPDATE_PRICE success:', { commandId: queued.id });
+      } catch (queueErr) {
+        posCommand.success = false;
+        posCommand.error = queueErr.message;
+        console.error('[POS COMMAND QUEUE ERROR] enqueue UPDATE_PRICE failed:', queueErr.message);
       }
     }
 
@@ -574,7 +573,7 @@ const updateProduct = async (req, res) => {
     return res.status(200).json({
       message: 'Product updated successfully',
       product: formattedProduct,
-      posWriteback,
+      posCommand,
     });
   } catch (err) {
     console.error('Error updating product:', err);

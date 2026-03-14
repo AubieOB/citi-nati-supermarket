@@ -19,6 +19,7 @@ const driversRoutes = require('./routes/drivers.routes');
 const driversOrdersRoutes = require('./routes/drivers.orders.routes');
 const salesRoutes = require('./routes/sales.routes');
 const supportRoutes = require('./routes/support.routes');
+const posCommandsRoutes = require('./routes/posCommands.routes');
 
 const prisma = new PrismaClient();
 
@@ -421,6 +422,9 @@ async function start() {
 
     // Support routes
     app.use('/api/support', supportRoutes);
+
+    // POS command queue routes (polled by local POS Sync Agent)
+    app.use('/api/pos-commands', posCommandsRoutes);
 
     const PORT = process.env.PORT || 5000;
     server.listen(PORT, () => {
