@@ -6,8 +6,97 @@ const { emitNewOrder, emitOrderUpdated } = require('../utils/socket');
 const { notifyPaymentSuccess, notifyOrderPlaced, notifyRefundRequired } = require('../utils/messageService');
 const { sendOrderConfirmationEmail, sendPaymentConfirmationEmail, sendRefundNotificationEmail } = require('../utils/emailService');
 const { cacheWebhookEvent } = require('../utils/webhookCache');
+const posCommandQueueService = require('../services/posCommandQueue.service');
 
 const prisma = new PrismaClient();
+
+function formatInvoiceDate(date = new Date()) {
+  return date.toISOString().slice(0, 10);
+}
+
+function formatInvoiceTime(date = new Date()) {
+  return date.toTimeString().slice(0, 8);
+}
+
+function buildWriteInvoicePayload(order, paymentReference) {
+  const locationCode = process.env.POS_LOCATION_CODE || 'SH';
+  const priceTypeCode = process.env.POS_PRICE_TYPE_CODE || 'RT';
+
+  const posItems = [];
+
+  for (const item of order.items || []) {
+    const sourceCode = item.product && item.product.sourceCode;
+
+    if (!sourceCode) {
+      console.log('[BACKEND POS WRITE SKIP] skipped item missing sourceCode:', {
+        orderId: order.id,
+        orderItemId: item.id,
+        productId: item.productId,
+        productName: item.product && item.product.name,
+      });
+      continue;
+    }
+
+    const qty = Number(item.quantity);
+    const unitPrice = Number(item.price);
+
+    if (!Number.isFinite(qty) || qty <= 0 || !Number.isFinite(unitPrice) || unitPrice < 0) {
+      console.log('[BACKEND POS WRITE SKIP] skipped invalid POS item values:', {
+        orderId: order.id,
+        orderItemId: item.id,
+        sourceCode,
+        qty,
+        unitPrice,
+      });
+      continue;
+    }
+
+    const amount = Number((qty * unitPrice).toFixed(2));
+
+    posItems.push({
+      productCode: sourceCode,
+      productName: (item.product && item.product.name) || `PRODUCT-${sourceCode}`,
+      qty,
+      unitPrice,
+      discount: 0,
+      amount,
+      taxRate: 0,
+      taxAmount: 0,
+      fPrice: unitPrice,
+      locationCode,
+      costPrice: 0,
+      priceTypeCode,
+    });
+  }
+
+  if (posItems.length === 0) {
+    return null;
+  }
+
+  const grossSale = Number(posItems.reduce((sum, item) => sum + Number(item.amount), 0).toFixed(2));
+
+  return {
+    orderId: String(order.id),
+    reference: paymentReference || order.paymentReference || `ORDER-${order.id}`,
+    locationCode,
+    customerCode: 'CASH',
+    invoiceDate: formatInvoiceDate(new Date()),
+    invoiceTime: formatInvoiceTime(new Date()),
+    grossSale,
+    vat: 0,
+    discount: 0,
+    netSale: grossSale,
+    payMethod1: 'CARD',
+    tenAmt1: grossSale,
+    payMethod2: '',
+    tenAmt2: 0,
+    userName: 'ONLINE',
+    priceTypeCode,
+    invoiceType: 'CS',
+    tillId: 'WEB',
+    items: posItems,
+  };
+}
 
 /**
  * Verify payment with Paychangu - extract orderId from reference
@@ -476,6 +565,57 @@ const handleWebhook = async (req, res) => {
       console.log(`[Webhook] ✅ Atomic transaction completed: Order ${orderId} PAID, ${updatedProducts.length} products decremented`);
       return updatedOrder;
     });
+
+    console.log('[BACKEND PAYMENT FLOW] payment confirmed:', {
+      orderId: result.id,
+      reference,
+      paymentStatus: result.paymentStatus,
+    });
+
+    console.log('[BACKEND ORDER FLOW] order finalized:', {
+      orderId: result.id,
+      status: result.status,
+      totalItems: (result.items || []).length,
+    });
+
+    try {
+      const writeInvoicePayload = buildWriteInvoicePayload(result, reference);
+
+      if (!writeInvoicePayload) {
+        console.log('[BACKEND POS WRITE SKIP] no POS-linked items, WRITE_INVOICE not queued:', {
+          orderId: result.id,
+        });
+      } else {
+        console.log('[POS COMMAND QUEUE] enqueue WRITE_INVOICE start:', {
+          orderId: result.id,
+          reference,
+          itemCount: writeInvoicePayload.items.length,
+        });
+
+        const queuedWriteInvoice = await posCommandQueueService.enqueueCommand(
+          'WRITE_INVOICE',
+          writeInvoicePayload,
+          {
+            source: 'payments_webhook',
+            relatedEntityType: 'order',
+            relatedEntityId: result.id,
+            createdBy: 'payments.controller.handleWebhook',
+            maxRetries: 5,
+          }
+        );
+
+        console.log('[POS COMMAND QUEUE] WRITE_INVOICE queued:', {
+          commandId: queuedWriteInvoice.id,
+          orderId: result.id,
+          itemCount: writeInvoicePayload.items.length,
+        });
+      }
+    } catch (queueErr) {
+      console.error('[POS COMMAND QUEUE ERROR] failed to queue WRITE_INVOICE:', {
+        orderId: result.id,
+        error: queueErr.message,
+      });
+    }
 
     // 8️⃣ Cache the webhook event for fast polling
     cacheWebhookEvent(reference, 'completed', {

@@ -1,6 +1,7 @@
 const sql = require('mssql');
 const priceUpdates = require('./price-updates');
 const stockUpdates = require('./stock-updates');
+const invoiceWriteback = require('./invoice-writeback');
 
 async function executeUpdatePrice(pool, payload) {
   const productCode = payload.productCode;
@@ -157,8 +158,79 @@ async function executeRevertPromotion() {
   throw new Error('REVERT_PROMOTION not implemented yet in queue flow');
 }
 
-async function executeWriteInvoice() {
-  throw new Error('WRITE_INVOICE not implemented yet in queue flow');
+function isLikelyNonRetryableInvoiceError(message) {
+  const text = String(message || '').toLowerCase();
+  return (
+    text.includes('permission')
+    || text.includes('denied')
+    || text.includes('invalid column')
+    || text.includes('invalid object')
+    || text.includes('cannot insert')
+    || text.includes('conversion failed')
+    || text.includes('string or binary data would be truncated')
+    || text.includes('required')
+    || text.includes('missing')
+    || text.includes('unsupported')
+    || text.includes('schema')
+  );
+}
+
+async function executeWriteInvoice(pool, payload, commandId) {
+  const orderId = payload.orderId;
+  const reference = payload.reference || `WEB-REF-${commandId}`;
+  const itemCount = Array.isArray(payload.items) ? payload.items.length : 0;
+
+  console.log('[INVOICE] WRITE_INVOICE start:', {
+    commandId,
+    orderId,
+    reference,
+    itemCount,
+  });
+
+  if (!orderId) {
+    throw new Error('NON_RETRYABLE: WRITE_INVOICE payload missing orderId');
+  }
+
+  if (!Array.isArray(payload.items) || payload.items.length === 0) {
+    throw new Error('NON_RETRYABLE: WRITE_INVOICE payload has no items');
+  }
+
+  const transaction = new sql.Transaction(pool);
+
+  try {
+    await transaction.begin();
+    console.log('[INVOICE] transaction start');
+
+    const request = new sql.Request(transaction);
+    const resultSummary = await invoiceWriteback.writeBackInvoice(request, {
+      ...payload,
+      reference,
+      commandId,
+    });
+
+    await transaction.commit();
+    console.log('[INVOICE] transaction committed');
+
+    return {
+      message: 'WRITE_INVOICE executed successfully',
+      ...resultSummary,
+      orderId,
+      reference,
+    };
+  } catch (error) {
+    try {
+      await transaction.rollback();
+      console.log('[INVOICE ERROR] rollback completed');
+    } catch (rollbackErr) {
+      console.error('[INVOICE ERROR] rollback failed:', rollbackErr.message);
+    }
+
+    if (String(error.message || '').startsWith('NON_RETRYABLE:') || isLikelyNonRetryableInvoiceError(error.message)) {
+      throw new Error(`NON_RETRYABLE: ${String(error.message || '').replace(/^NON_RETRYABLE:\s*/, '')}`);
+    }
+
+    throw error;
+  }
 }
 
 async function executeCommand(pool, command) {
@@ -174,7 +246,7 @@ async function executeCommand(pool, command) {
     case 'REVERT_PROMOTION':
       return executeRevertPromotion(pool, payload);
     case 'WRITE_INVOICE':
-      return executeWriteInvoice(pool, payload);
+      return executeWriteInvoice(pool, payload, command.id);
     default:
       throw new Error(`Unsupported command type: ${commandType}`);
   }
