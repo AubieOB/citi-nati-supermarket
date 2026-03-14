@@ -25,7 +25,11 @@ async function getPriceLookupDiagnostics(request, productCode, locationCode, pri
     sampleRows: [],
   };
 
-  const countResult = await request
+  const countRequest = request.transaction
+    ? new sql.Request(request.transaction)
+    : request;
+
+  const countResult = await countRequest
     .input('DiagProductCode', sql.VarChar(50), productCode)
     .input('DiagLocationCode', sql.VarChar(10), safeLocation)
     .input('DiagPriceTypeCode', sql.VarChar(10), safePriceType)
@@ -48,7 +52,11 @@ async function getPriceLookupDiagnostics(request, productCode, locationCode, pri
   }
 
   if (shouldDebugProduct(productCode)) {
-    const sampleResult = await request
+    const sampleRequest = request.transaction
+      ? new sql.Request(request.transaction)
+      : request;
+
+    const sampleResult = await sampleRequest
       .input('DiagSampleProductCode', sql.VarChar(50), productCode)
       .query(`
         SELECT TOP 10
