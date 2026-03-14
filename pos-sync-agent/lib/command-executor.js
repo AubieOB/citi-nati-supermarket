@@ -4,7 +4,7 @@ const priceUpdates = require('./price-updates');
 async function executeUpdatePrice(pool, payload) {
   const productCode = payload.productCode;
   const locationCode = payload.locationCode || process.env.POS_LOCATION_CODE || 'SH';
-  const priceTypeCode = payload.priceTypeCode || '1';
+  const priceTypeCode = payload.priceTypeCode || null;
   const newPrice = Number(payload.newPrice);
 
   console.log('[PRICE] UPDATE_PRICE payload:', {
