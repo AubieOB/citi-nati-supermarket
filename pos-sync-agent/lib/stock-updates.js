@@ -274,7 +274,7 @@ async function validateStockAvailability(request, items, locationCode) {
 
 /**
  * Manual admin stock decrease (Phase 2)
- * Uses existing local stock helper path through dbo.stocks updates.
+ * Uses ProductActivity QtyOut ledger updates to match the active POS schema.
  * This path intentionally avoids derived/reporting tables.
  */
 async function applyManualStockDecrease(request, payload) {
@@ -319,33 +319,32 @@ async function applyManualStockDecrease(request, payload) {
     throw new Error(`NON_RETRYABLE: Product ${productCode} not found in productsmaster`);
   }
 
+  const currentStockRequest = request.transaction
+    ? new sql.Request(request.transaction)
+    : request;
+  const currentStock = await getCurrentStock(currentStockRequest, productCode, locationCode);
+
+  if (currentStock < qtyReduction) {
+    throw new Error(
+      `NON_RETRYABLE: Insufficient stock. Product: ${productCode}, Available: ${currentStock}, Required: ${qtyReduction}`
+    );
+  }
+
   const helperRequest = request.transaction
     ? new sql.Request(request.transaction)
     : request;
 
-  console.log('[STOCK] using existing stock adjustment helper');
-  console.log('[STOCK] SQL tables/functions used:', ['dbo.stocks']);
+  console.log('[STOCK] using ProductActivity QtyOut adjustment helper');
+  console.log('[STOCK] SQL tables/functions used:', ['dbo.ProductActivity']);
 
-  await updateStocksTable(helperRequest, productCode, locationCode, qtyReduction, null);
+  await reduceStockOnSale(helperRequest, productCode, locationCode, qtyReduction);
 
   const verifyRequest = request.transaction
     ? new sql.Request(request.transaction)
     : request;
-  const verifyResult = await verifyRequest
-    .input('VerifyProductCode', sql.VarChar(50), productCode)
-    .input('VerifyLocationCode', sql.VarChar(10), locationCode)
-    .query(`
-      SELECT TOP 1 StockQty
-      FROM POS.dbo.stocks
-      WHERE ProductCode = @VerifyProductCode
-      AND LocationCode = @VerifyLocationCode
-    `);
+  const resultingStock = await getCurrentStock(verifyRequest, productCode, locationCode);
 
-  const resultingStock = verifyResult.recordset && verifyResult.recordset[0]
-    ? Number(verifyResult.recordset[0].StockQty)
-    : null;
-
-  console.log('[STOCK] adjustment path selected: existing stock helper (stocks decrement)');
+  console.log('[STOCK] adjustment path selected: ProductActivity QtyOut ledger insert');
   console.log('[STOCK] rows affected / resulting stock:', {
     productCode,
     locationCode,
@@ -359,8 +358,8 @@ async function applyManualStockDecrease(request, payload) {
     newStock,
     qtyReduction,
     reason,
-    adjustmentPath: 'existing_stock_helper_stocks_table',
-    tablesTouched: ['dbo.stocks'],
+    adjustmentPath: 'product_activity_qtyout_ledger',
+    tablesTouched: ['dbo.ProductActivity'],
     resultingStock,
   };
 }
