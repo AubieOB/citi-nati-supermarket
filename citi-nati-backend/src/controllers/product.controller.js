@@ -379,6 +379,11 @@ const updateProduct = async (req, res) => {
     const incomingPriceProvided = req.body.price !== undefined && req.body.price !== '';
     let incomingParsedPrice;
     let priceChanged = false;
+    const incomingStockProvided = req.body.stock !== undefined && req.body.stock !== '';
+    let incomingParsedStock;
+    let stockChanged = false;
+    const oldStock = Number(existingProduct.stock);
+    let newStock = oldStock;
 
     if (req.body.name !== undefined && req.body.name !== '') {
       updateData.name = req.body.name;
@@ -404,7 +409,10 @@ const updateProduct = async (req, res) => {
         return res.status(400).json({ error: 'Invalid stock value' });
       }
       updateData.stock = parsedStock;
-      if (parsedStock !== Number(existingProduct.stock)) {
+      incomingParsedStock = parsedStock;
+      newStock = parsedStock;
+      stockChanged = parsedStock !== Number(existingProduct.stock);
+      if (stockChanged) {
         changedFields.push('stock');
       }
     }
@@ -500,12 +508,15 @@ const updateProduct = async (req, res) => {
       data: updateData,
     });
 
+    const posCommands = [];
+
     let posCommand = {
       attempted: false,
       success: null,
       error: null,
       payload: null,
       commandId: null,
+      commandType: null,
     };
 
     // Phase 1: enqueue UPDATE_PRICE command for POS-linked products with actual price changes
@@ -520,6 +531,7 @@ const updateProduct = async (req, res) => {
       };
 
       posCommand.attempted = true;
+      posCommand.commandType = 'UPDATE_PRICE';
       posCommand.payload = payload;
 
       console.log('[POS COMMAND QUEUE] enqueue UPDATE_PRICE start');
@@ -540,6 +552,76 @@ const updateProduct = async (req, res) => {
         posCommand.error = queueErr.message;
         console.error('[POS COMMAND QUEUE ERROR] enqueue UPDATE_PRICE failed:', queueErr.message);
       }
+
+      posCommands.push({ ...posCommand });
+    }
+
+    if (updatedProduct.sourceCode && incomingStockProvided && stockChanged) {
+      console.log('[BACKEND PRODUCT EDIT] stockChanged detected', {
+        productId: updatedProduct.id,
+        sourceCode: updatedProduct.sourceCode,
+        oldStock,
+        newStock,
+      });
+
+      if (newStock < oldStock) {
+        const qtyReduction = oldStock - newStock;
+        const stockPayload = {
+          productId: String(updatedProduct.id),
+          productCode: updatedProduct.sourceCode,
+          locationCode: process.env.POS_LOCATION_CODE || 'SH',
+          oldStock,
+          newStock,
+          qtyReduction,
+          adjustmentType: 'DECREASE',
+          reason: 'manual_admin_adjustment',
+        };
+
+        console.log('[POS COMMAND QUEUE] enqueue UPDATE_STOCK start', {
+          oldStock,
+          newStock,
+          qtyReduction,
+        });
+        console.log('[POS COMMAND QUEUE] enqueue payload:', stockPayload);
+
+        const stockPosCommand = {
+          attempted: true,
+          success: null,
+          error: null,
+          payload: stockPayload,
+          commandId: null,
+          commandType: 'UPDATE_STOCK',
+        };
+
+        try {
+          const queuedStock = await posCommandQueueService.enqueueCommand('UPDATE_STOCK', stockPayload, {
+            source: 'product.updateProduct',
+            relatedEntityType: 'Product',
+            relatedEntityId: updatedProduct.id,
+          });
+
+          stockPosCommand.success = true;
+          stockPosCommand.commandId = queuedStock.id;
+          console.log('[POS COMMAND QUEUE] enqueue UPDATE_STOCK success:', { commandId: queuedStock.id });
+        } catch (queueErr) {
+          stockPosCommand.success = false;
+          stockPosCommand.error = queueErr.message;
+          console.error('[POS COMMAND QUEUE ERROR] enqueue UPDATE_STOCK failed:', queueErr.message);
+        }
+
+        posCommands.push(stockPosCommand);
+      } else if (newStock > oldStock) {
+        console.log('[BACKEND POS WRITE SKIP] stock increase detected; UPDATE_STOCK is decrease-only for Phase 2', {
+          oldStock,
+          newStock,
+        });
+      }
+    } else if (incomingStockProvided && stockChanged && !updatedProduct.sourceCode) {
+      console.log('[BACKEND POS WRITE SKIP] non-POS product stock change skipped', {
+        productId: updatedProduct.id,
+        oldStock,
+        newStock,
+      });
     }
 
     // Debug: Log what was actually saved to database
@@ -574,6 +656,7 @@ const updateProduct = async (req, res) => {
       message: 'Product updated successfully',
       product: formattedProduct,
       posCommand,
+      posCommands,
     });
   } catch (err) {
     console.error('Error updating product:', err);

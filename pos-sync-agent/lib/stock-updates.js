@@ -272,10 +272,104 @@ async function validateStockAvailability(request, items, locationCode) {
   }
 }
 
+/**
+ * Manual admin stock decrease (Phase 2)
+ * Uses existing local stock helper path through dbo.stocks updates.
+ * This path intentionally avoids derived/reporting tables.
+ */
+async function applyManualStockDecrease(request, payload) {
+  const {
+    productCode,
+    locationCode,
+    oldStock,
+    newStock,
+    qtyReduction,
+    reason,
+  } = payload;
+
+  console.log('[STOCK] UPDATE_STOCK payload:', {
+    productCode,
+    locationCode,
+    oldStock,
+    newStock,
+    qtyReduction,
+    reason,
+  });
+
+  if (!productCode || !locationCode) {
+    throw new Error('NON_RETRYABLE: productCode and locationCode are required');
+  }
+
+  if (!Number.isFinite(qtyReduction) || qtyReduction <= 0) {
+    throw new Error('NON_RETRYABLE: qtyReduction must be a positive number');
+  }
+
+  const productCheckRequest = request.transaction
+    ? new sql.Request(request.transaction)
+    : request;
+  const productResult = await productCheckRequest
+    .input('CheckProductCode', sql.VarChar(50), productCode)
+    .query(`
+      SELECT TOP 1 ProductCode
+      FROM POS.dbo.productsmaster
+      WHERE ProductCode = @CheckProductCode
+    `);
+
+  if (!productResult.recordset || productResult.recordset.length === 0) {
+    throw new Error(`NON_RETRYABLE: Product ${productCode} not found in productsmaster`);
+  }
+
+  const helperRequest = request.transaction
+    ? new sql.Request(request.transaction)
+    : request;
+
+  console.log('[STOCK] using existing stock adjustment helper');
+  console.log('[STOCK] SQL tables/functions used:', ['dbo.stocks']);
+
+  await updateStocksTable(helperRequest, productCode, locationCode, qtyReduction, null);
+
+  const verifyRequest = request.transaction
+    ? new sql.Request(request.transaction)
+    : request;
+  const verifyResult = await verifyRequest
+    .input('VerifyProductCode', sql.VarChar(50), productCode)
+    .input('VerifyLocationCode', sql.VarChar(10), locationCode)
+    .query(`
+      SELECT TOP 1 StockQty
+      FROM POS.dbo.stocks
+      WHERE ProductCode = @VerifyProductCode
+      AND LocationCode = @VerifyLocationCode
+    `);
+
+  const resultingStock = verifyResult.recordset && verifyResult.recordset[0]
+    ? Number(verifyResult.recordset[0].StockQty)
+    : null;
+
+  console.log('[STOCK] adjustment path selected: existing stock helper (stocks decrement)');
+  console.log('[STOCK] rows affected / resulting stock:', {
+    productCode,
+    locationCode,
+    resultingStock,
+  });
+
+  return {
+    productCode,
+    locationCode,
+    oldStock,
+    newStock,
+    qtyReduction,
+    reason,
+    adjustmentPath: 'existing_stock_helper_stocks_table',
+    tablesTouched: ['dbo.stocks'],
+    resultingStock,
+  };
+}
+
 module.exports = {
   getCurrentStock,
   reduceStockOnSale,
   updateStocksTable,
   updateStockForInvoiceItems,
   validateStockAvailability,
+  applyManualStockDecrease,
 };
