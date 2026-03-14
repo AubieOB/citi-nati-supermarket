@@ -6,6 +6,18 @@
 
 const sql = require('mssql');
 
+function createScopedRequest(request) {
+  if (request && request.transaction) {
+    return new sql.Request(request.transaction);
+  }
+
+  if (request && request.parent) {
+    return new sql.Request(request.parent);
+  }
+
+  return request;
+}
+
 /**
  * Get current stock quantity for a product at a location
  * @param {sql.Request} request - SQL request object
@@ -15,6 +27,7 @@ const sql = require('mssql');
  */
 async function getCurrentStock(request, productCode, locationCode) {
   try {
+    const stockRequest = createScopedRequest(request);
     const query = `
       SELECT TOP 1
           ISNULL(SUM(pa.QtyIn), 0) - ISNULL(SUM(pa.QtyOut), 0) AS CurrentStock
@@ -23,10 +36,10 @@ async function getCurrentStock(request, productCode, locationCode) {
       AND pa.LocationCode = @LocationCode
     `;
 
-    request.input('ProductCode', sql.VarChar(50), productCode);
-    request.input('LocationCode', sql.VarChar(10), locationCode);
+    stockRequest.input('ProductCode', sql.VarChar(50), productCode);
+    stockRequest.input('LocationCode', sql.VarChar(10), locationCode);
 
-    const result = await request.query(query);
+    const result = await stockRequest.query(query);
 
     if (!result.recordset || result.recordset.length === 0) {
       return 0;
@@ -81,12 +94,13 @@ async function reduceStockOnSale(request, productCode, locationCode, qtyReductio
       )
     `;
 
-    request.input('ProductCode', sql.VarChar(50), productCode);
-    request.input('LocationCode', sql.VarChar(10), locationCode);
-    request.input('QtyOut', sql.Decimal(18, 2), qtyReduction);
-    request.input('ActivityDate', sql.DateTime, new Date());
+    const insertRequest = createScopedRequest(request);
+    insertRequest.input('ProductCode', sql.VarChar(50), productCode);
+    insertRequest.input('LocationCode', sql.VarChar(10), locationCode);
+    insertRequest.input('QtyOut', sql.Decimal(18, 2), qtyReduction);
+    insertRequest.input('ActivityDate', sql.DateTime, new Date());
 
-    await request.query(query);
+    await insertRequest.query(query);
 
     console.log(`[STOCK] ✅ Reduced stock for ${productCode} by ${qtyReduction} units at ${locationCode}`);
   } catch (error) {
@@ -107,6 +121,7 @@ async function reduceStockOnSale(request, productCode, locationCode, qtyReductio
  */
 async function updateStocksTable(request, productCode, locationCode, qtyReduction, unitPrice) {
   try {
+    const checkRequest = createScopedRequest(request);
     // Check if stock exists in stocks table
     const checkQuery = `
       SELECT TOP 1 StockQty
@@ -115,10 +130,10 @@ async function updateStocksTable(request, productCode, locationCode, qtyReductio
       AND LocationCode = @LocationCode
     `;
 
-    request.input('ProductCode', sql.VarChar(50), productCode);
-    request.input('LocationCode', sql.VarChar(10), locationCode);
+    checkRequest.input('ProductCode', sql.VarChar(50), productCode);
+    checkRequest.input('LocationCode', sql.VarChar(10), locationCode);
 
-    const checkResult = await request.query(checkQuery);
+    const checkResult = await checkRequest.query(checkQuery);
 
     if (!checkResult.recordset || checkResult.recordset.length === 0) {
       console.warn(`[STOCK] No stock record found for ${productCode} at ${locationCode}. Creating new record.`);
@@ -141,11 +156,14 @@ async function updateStocksTable(request, productCode, locationCode, qtyReductio
         )
       `;
 
-      request.input('StockQty', sql.Decimal(18, 2), -qtyReduction);
-      request.input('LastPrice', sql.Decimal(18, 2), unitPrice || 0);
-      request.input('StockDate', sql.DateTime, new Date());
+      const insertRequest = createScopedRequest(request);
+      insertRequest.input('ProductCode', sql.VarChar(50), productCode);
+      insertRequest.input('LocationCode', sql.VarChar(10), locationCode);
+      insertRequest.input('StockQty', sql.Decimal(18, 2), -qtyReduction);
+      insertRequest.input('LastPrice', sql.Decimal(18, 2), unitPrice || 0);
+      insertRequest.input('StockDate', sql.DateTime, new Date());
 
-      await request.query(insertQuery);
+      await insertRequest.query(insertQuery);
       console.log(`[STOCK] ✅ Created new stock record for ${productCode}`);
     } else {
       // Update existing stock record
@@ -166,11 +184,14 @@ async function updateStocksTable(request, productCode, locationCode, qtyReductio
         AND LocationCode = @LocationCode
       `;
 
-      request.input('QtyReduction', sql.Decimal(18, 2), qtyReduction);
-      request.input('LastPrice', sql.Decimal(18, 2), unitPrice || 0);
-      request.input('StockDate', sql.DateTime, new Date());
+      const updateRequest = createScopedRequest(request);
+      updateRequest.input('ProductCode', sql.VarChar(50), productCode);
+      updateRequest.input('LocationCode', sql.VarChar(10), locationCode);
+      updateRequest.input('QtyReduction', sql.Decimal(18, 2), qtyReduction);
+      updateRequest.input('LastPrice', sql.Decimal(18, 2), unitPrice || 0);
+      updateRequest.input('StockDate', sql.DateTime, new Date());
 
-      await request.query(updateQuery);
+      await updateRequest.query(updateQuery);
       console.log(`[STOCK] ✅ Updated stocks table for ${productCode}. Qty reduced by ${qtyReduction}`);
     }
   } catch (error) {
@@ -304,9 +325,7 @@ async function applyManualStockDecrease(request, payload) {
     throw new Error('NON_RETRYABLE: qtyReduction must be a positive number');
   }
 
-  const productCheckRequest = request.transaction
-    ? new sql.Request(request.transaction)
-    : request;
+  const productCheckRequest = createScopedRequest(request);
   const productResult = await productCheckRequest
     .input('CheckProductCode', sql.VarChar(50), productCode)
     .query(`
@@ -319,9 +338,7 @@ async function applyManualStockDecrease(request, payload) {
     throw new Error(`NON_RETRYABLE: Product ${productCode} not found in productsmaster`);
   }
 
-  const currentStockRequest = request.transaction
-    ? new sql.Request(request.transaction)
-    : request;
+  const currentStockRequest = createScopedRequest(request);
   const currentStock = await getCurrentStock(currentStockRequest, productCode, locationCode);
 
   if (currentStock < qtyReduction) {
@@ -330,18 +347,14 @@ async function applyManualStockDecrease(request, payload) {
     );
   }
 
-  const helperRequest = request.transaction
-    ? new sql.Request(request.transaction)
-    : request;
+  const helperRequest = createScopedRequest(request);
 
   console.log('[STOCK] using ProductActivity QtyOut adjustment helper');
   console.log('[STOCK] SQL tables/functions used:', ['dbo.ProductActivity']);
 
   await reduceStockOnSale(helperRequest, productCode, locationCode, qtyReduction);
 
-  const verifyRequest = request.transaction
-    ? new sql.Request(request.transaction)
-    : request;
+  const verifyRequest = createScopedRequest(request);
   const resultingStock = await getCurrentStock(verifyRequest, productCode, locationCode);
 
   console.log('[STOCK] adjustment path selected: ProductActivity QtyOut ledger insert');
