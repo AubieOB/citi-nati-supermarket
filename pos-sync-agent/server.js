@@ -15,13 +15,16 @@ const app = express();
 app.use(express.json());
 
 const ENABLE_DIRECT_WRITEBACK_DEBUG = process.env.ENABLE_DIRECT_POS_WRITEBACK_DEBUG === 'true';
+const SQL_SERVER = process.env.DB_SERVER || 'localhost';
+const SQL_DATABASE = process.env.DB_NAME || process.env.DB_DATABASE || 'POS';
+const SQL_USER = process.env.DB_USER || '';
 
 // SQL Server configuration
 const sqlConfig = {
-  user: process.env.DB_USER,
+  user: SQL_USER,
   password: process.env.DB_PASSWORD,
-  server: process.env.DB_SERVER,
-  database: process.env.DB_DATABASE,
+  server: SQL_SERVER,
+  database: SQL_DATABASE,
   options: {
     encrypt: false,
     trustServerCertificate: true, // needed for local SQL Server
@@ -40,10 +43,14 @@ let pool;
 async function initializePool() {
   if (!pool) {
     try {
+      console.log(`[DB CONFIG] SQL user: ${SQL_USER || '(not set)'}`);
+      console.log(`[DB CONFIG] SQL server: ${SQL_SERVER}`);
+      console.log(`[DB CONFIG] SQL database: ${SQL_DATABASE}`);
       pool = new sql.ConnectionPool(sqlConfig);
       await pool.connect();
       console.log('Connected to SQL Server');
     } catch (err) {
+      console.error('[DB CONFIG ERROR] Failed to connect to SQL Server with configured credentials');
       console.error('Failed to create connection pool:', err.message);
       throw err;
     }
@@ -991,7 +998,7 @@ async function startServer() {
     app.listen(PORT, () => {
       console.log(`POS Sync Agent listening on port ${PORT}`);
       console.log(`API Key validation: ENABLED`);
-      console.log(`Database: ${process.env.DB_SERVER}/${process.env.DB_DATABASE}`);
+      console.log(`Database: ${SQL_SERVER}/${SQL_DATABASE}`);
       console.log(`Live Server: ${process.env.LIVE_SERVER_URL || 'NOT CONFIGURED'}`);
       console.log(`Auto-sync interval: ${SYNC_INTERVAL_MS}ms (${Math.round(SYNC_INTERVAL_MS / 1000)}s)`);
 
