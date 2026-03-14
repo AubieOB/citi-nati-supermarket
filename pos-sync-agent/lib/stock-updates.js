@@ -295,8 +295,11 @@ async function validateStockAvailability(request, items, locationCode) {
 
 /**
  * Manual admin stock decrease (Phase 2)
- * Uses ProductActivity QtyOut ledger updates to match the active POS schema.
- * This path intentionally avoids derived/reporting tables.
+ * Writes to dbo.stockadjustments (header) + dbo.stockadjdetails (detail).
+ * ProductActivity direct-write path is intentionally NOT used here.
+ * Confirmed schema:
+ *   stockadjustments: StockAdjID (identity PK), LocationCode varchar(6), RefNo varchar(255), AdjDate datetime
+ *   stockadjdetails:  DetailID (identity PK), AdjustID int, ProductCode varchar(6), Quantity decimal
  */
 async function applyManualStockDecrease(request, payload) {
   const {
@@ -305,15 +308,17 @@ async function applyManualStockDecrease(request, payload) {
     oldStock,
     newStock,
     qtyReduction,
+    commandId,
     reason,
   } = payload;
 
-  console.log('[STOCK] UPDATE_STOCK payload:', {
+  console.log('[STOCK] applyManualStockDecrease payload:', {
     productCode,
     locationCode,
     oldStock,
     newStock,
     qtyReduction,
+    commandId,
     reason,
   });
 
@@ -325,55 +330,61 @@ async function applyManualStockDecrease(request, payload) {
     throw new Error('NON_RETRYABLE: qtyReduction must be a positive number');
   }
 
-  const productCheckRequest = createScopedRequest(request);
-  const productResult = await productCheckRequest
-    .input('CheckProductCode', sql.VarChar(50), productCode)
-    .query(`
-      SELECT TOP 1 ProductCode
-      FROM POS.dbo.productsmaster
-      WHERE ProductCode = @CheckProductCode
-    `);
+  const refNo = `WEB-ADJ-${commandId || Date.now()}`;
+  const adjDate = new Date();
 
-  if (!productResult.recordset || productResult.recordset.length === 0) {
-    throw new Error(`NON_RETRYABLE: Product ${productCode} not found in productsmaster`);
+  // ── Step 1: insert header into dbo.stockadjustments ──────────────────────
+  console.log('[STOCK] inserting header into dbo.stockadjustments:', { locationCode, refNo, adjDate });
+  console.log('[STOCK] schema fields used (header): LocationCode, RefNo, AdjDate');
+
+  const headerRequest = createScopedRequest(request);
+  headerRequest.input('HeaderLocationCode', sql.VarChar(6), locationCode);
+  headerRequest.input('HeaderRefNo', sql.VarChar(255), refNo);
+  headerRequest.input('HeaderAdjDate', sql.DateTime, adjDate);
+
+  const headerResult = await headerRequest.query(`
+    INSERT INTO POS.dbo.stockadjustments (LocationCode, RefNo, AdjDate)
+    OUTPUT INSERTED.StockAdjID
+    VALUES (@HeaderLocationCode, @HeaderRefNo, @HeaderAdjDate)
+  `);
+
+  if (!headerResult.recordset || headerResult.recordset.length === 0) {
+    throw new Error('Failed to insert stockadjustments header: no StockAdjID returned');
   }
 
-  const currentStockRequest = createScopedRequest(request);
-  const currentStock = await getCurrentStock(currentStockRequest, productCode, locationCode);
+  const stockAdjId = headerResult.recordset[0].StockAdjID;
+  console.log('[STOCK] inserted StockAdjID:', stockAdjId);
 
-  if (currentStock < qtyReduction) {
-    throw new Error(
-      `NON_RETRYABLE: Insufficient stock. Product: ${productCode}, Available: ${currentStock}, Required: ${qtyReduction}`
-    );
-  }
+  // ── Step 2: insert detail into dbo.stockadjdetails ───────────────────────
+  console.log('[STOCK] inserting detail into dbo.stockadjdetails:', { stockAdjId, productCode, qtyReduction });
+  console.log('[STOCK] schema fields used (detail): AdjustID, ProductCode, Quantity');
 
-  const helperRequest = createScopedRequest(request);
+  const detailRequest = createScopedRequest(request);
+  detailRequest.input('DetailAdjustID', sql.Int, stockAdjId);
+  // ProductCode column is varchar(6) in confirmed schema; use VarChar(50) param to pass value
+  // SQL Server will enforce its own column length at insert time
+  detailRequest.input('DetailProductCode', sql.VarChar(50), productCode);
+  detailRequest.input('DetailQuantity', sql.Decimal(18, 2), qtyReduction);
 
-  console.log('[STOCK] using ProductActivity QtyOut adjustment helper');
-  console.log('[STOCK] SQL tables/functions used:', ['dbo.ProductActivity']);
+  const detailResult = await detailRequest.query(`
+    INSERT INTO POS.dbo.stockadjdetails (AdjustID, ProductCode, Quantity)
+    VALUES (@DetailAdjustID, @DetailProductCode, @DetailQuantity)
+  `);
 
-  await reduceStockOnSale(helperRequest, productCode, locationCode, qtyReduction);
-
-  const verifyRequest = createScopedRequest(request);
-  const resultingStock = await getCurrentStock(verifyRequest, productCode, locationCode);
-
-  console.log('[STOCK] adjustment path selected: ProductActivity QtyOut ledger insert');
-  console.log('[STOCK] rows affected / resulting stock:', {
-    productCode,
-    locationCode,
-    resultingStock,
-  });
+  const detailRowsAffected = detailResult.rowsAffected && detailResult.rowsAffected[0];
+  console.log('[STOCK] detail rows affected:', detailRowsAffected);
+  console.log('[STOCK] adjustment path: dbo.stockadjustments + dbo.stockadjdetails (NOT ProductActivity)');
 
   return {
+    stockAdjId,
     productCode,
     locationCode,
+    qtyReduction,
+    refNo,
     oldStock,
     newStock,
-    qtyReduction,
     reason,
-    adjustmentPath: 'product_activity_qtyout_ledger',
-    tablesTouched: ['dbo.ProductActivity'],
-    resultingStock,
+    tablesTouched: ['dbo.stockadjustments', 'dbo.stockadjdetails'],
   };
 }
 

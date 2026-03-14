@@ -68,7 +68,7 @@ function isLikelyNonRetryableStockError(message) {
   );
 }
 
-async function executeUpdateStock(pool, payload) {
+async function executeUpdateStock(pool, payload, commandId) {
   const productCode = payload.productCode;
   const locationCode = payload.locationCode || process.env.POS_LOCATION_CODE || 'SH';
   const oldStock = Number(payload.oldStock);
@@ -123,6 +123,7 @@ async function executeUpdateStock(pool, payload) {
       oldStock,
       newStock,
       qtyReduction,
+      commandId,
       reason,
     });
 
@@ -167,7 +168,7 @@ async function executeCommand(pool, command) {
     case 'UPDATE_PRICE':
       return executeUpdatePrice(pool, payload);
     case 'UPDATE_STOCK':
-      return executeUpdateStock(pool, payload);
+      return executeUpdateStock(pool, payload, command.id);
     case 'APPLY_PROMOTION':
       return executeApplyPromotion(pool, payload);
     case 'REVERT_PROMOTION':
