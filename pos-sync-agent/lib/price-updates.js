@@ -66,7 +66,17 @@ async function getCurrentPrice(request, productCode, locationCode, priceTypeCode
 async function updateStandardPrice(request, productCode, newPrice, locationCode, priceTypeCode = '1') {
   try {
     const safeLocation = locationCode || 'SH';
-    const currentPriceInfo = await getCurrentPrice(request, productCode, safeLocation, priceTypeCode);
+    let currentPriceInfo = null;
+
+    try {
+      currentPriceInfo = await getCurrentPrice(request, productCode, safeLocation, priceTypeCode);
+    } catch (error) {
+      if (error.message && error.message.includes('No price record found for product')) {
+        console.warn(`[PRICE] No existing productprices row for ${productCode} at ${safeLocation}. A new row will be inserted.`);
+      } else {
+        throw error;
+      }
+    }
 
     const updateQuery = `
       ;WITH LatestPrice AS (
@@ -95,8 +105,28 @@ async function updateStandardPrice(request, productCode, newPrice, locationCode,
 
     const updateResult = await request.query(updateQuery);
 
+    let writeAction = 'updated';
+
     if (!updateResult.rowsAffected || updateResult.rowsAffected[0] === 0) {
-      throw new Error(`No productprices row matched for ${productCode} at location ${safeLocation}`);
+      const insertQuery = `
+        INSERT INTO POS.dbo.productprices (
+          ProductCode,
+          FPrice,
+          LocationCode,
+          PriceTypeCode,
+          PriceDate
+        )
+        VALUES (
+          @ProductCode,
+          @NewPrice,
+          @LocationCode,
+          @PriceTypeCode,
+          @PriceDate
+        )
+      `;
+
+      await request.query(insertQuery);
+      writeAction = 'inserted';
     }
 
     // GlobalPrices logging is best-effort and should not block a successful price update.
@@ -108,7 +138,7 @@ async function updateStandardPrice(request, productCode, newPrice, locationCode,
         .input('LocationCode', sql.VarChar(10), safeLocation)
         .input('ProductCode', sql.VarChar(50), productCode)
         .input('PriceTypeCode', sql.VarChar(10), priceTypeCode || '1')
-        .input('OldPrice', sql.Decimal(18, 2), Number(currentPriceInfo.price || 0))
+        .input('OldPrice', sql.Decimal(18, 2), Number((currentPriceInfo && currentPriceInfo.price) || 0))
         .input('NewPrice', sql.Decimal(18, 2), Number(newPrice))
         .query(`
           INSERT INTO POS.dbo.GlobalPrices (
@@ -130,7 +160,10 @@ async function updateStandardPrice(request, productCode, newPrice, locationCode,
       console.warn('[PRICE] GlobalPrices log skipped:', globalPriceError.message);
     }
 
-    console.log(`[PRICE] ✅ Updated price for ${productCode}: ${currentPriceInfo.price} → ${newPrice}`);
+    const oldPriceText = currentPriceInfo && currentPriceInfo.price != null
+      ? `${currentPriceInfo.price}`
+      : 'N/A';
+    console.log(`[PRICE] ✅ ${writeAction} price for ${productCode}: ${oldPriceText} → ${newPrice}`);
   } catch (error) {
     console.error('[PRICE] Error updating standard price:', error.message);
     throw error;

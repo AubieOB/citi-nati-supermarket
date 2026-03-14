@@ -965,7 +965,12 @@ async function pollAndProcessCommands() {
           error: error.message,
         });
 
-        await commandQueueClient.failCommand(command.id, error.message, true);
+        const isNonRetryable = typeof error.message === 'string' && error.message.startsWith('NON_RETRYABLE:');
+        const errorMessage = isNonRetryable
+          ? error.message.replace('NON_RETRYABLE:', '').trim()
+          : error.message;
+
+        await commandQueueClient.failCommand(command.id, errorMessage, !isNonRetryable);
       }
     }
   } catch (err) {

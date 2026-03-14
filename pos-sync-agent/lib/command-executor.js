@@ -8,11 +8,11 @@ async function executeUpdatePrice(pool, payload) {
   const newPrice = Number(payload.newPrice);
 
   if (!productCode) {
-    throw new Error('UPDATE_PRICE payload missing productCode');
+    throw new Error('NON_RETRYABLE: UPDATE_PRICE payload missing productCode');
   }
 
   if (!Number.isFinite(newPrice) || newPrice < 0) {
-    throw new Error('UPDATE_PRICE payload has invalid newPrice');
+    throw new Error('NON_RETRYABLE: UPDATE_PRICE payload has invalid newPrice');
   }
 
   const transaction = new sql.Transaction(pool);
