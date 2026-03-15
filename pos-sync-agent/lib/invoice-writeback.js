@@ -101,7 +101,6 @@ async function updateLastCashSaleNo(request, newCashSaleNo) {
 async function insertInvoiceHeader(request, invoiceHeader) {
   try {
     const {
-      invoiceNo,
       invoiceSerialNo,
       refNo,
       cashSaleNo,
@@ -123,10 +122,34 @@ async function insertInvoiceHeader(request, invoiceHeader) {
       tillId,
     } = invoiceHeader;
 
+    const invoiceInsertColumns = [
+      'InvoiceSerialNo',
+      'RefNo',
+      'CashSaleNo',
+      'InvoiceDate',
+      'InvoiceTime',
+      'CustomerCode',
+      'LocationCode',
+      'GrossSale',
+      'VAT',
+      'Discount',
+      'NetSale',
+      'PayMethod1',
+      'TenAmt1',
+      'PayMethod2',
+      'TenAmt2',
+      'UserName',
+      'PriceTypeCode',
+      'InvoiceType',
+      'TillID',
+    ];
+
+    console.log('[INVOICE] invoice header columns being inserted:', invoiceInsertColumns);
+    console.log('[INVOICE] InvoiceNo excluded from invoice insert because it is an identity column');
+
     const headerRequest = createScopedRequest(request);
     const query = `
       INSERT INTO POS.dbo.invoice (
-        InvoiceNo,
         InvoiceSerialNo,
         RefNo,
         CashSaleNo,
@@ -149,7 +172,6 @@ async function insertInvoiceHeader(request, invoiceHeader) {
       )
       OUTPUT INSERTED.InvoiceNo AS InvoiceCode
       VALUES (
-        @InvoiceNo,
         @InvoiceSerialNo,
         @RefNo,
         @CashSaleNo,
@@ -172,7 +194,6 @@ async function insertInvoiceHeader(request, invoiceHeader) {
       )
     `;
 
-    headerRequest.input('InvoiceNo', sql.Int, invoiceNo);
     headerRequest.input('InvoiceSerialNo', sql.Int, invoiceSerialNo);
     headerRequest.input('RefNo', sql.VarChar(255), refNo);
     headerRequest.input('CashSaleNo', sql.Int, cashSaleNo);
@@ -200,6 +221,7 @@ async function insertInvoiceHeader(request, invoiceHeader) {
     }
 
     const invoiceCode = Number(result.recordset[0].InvoiceCode);
+    console.log(`[INVOICE] generated InvoiceNo from identity: ${invoiceCode}`);
     console.log(`[INVOICE] inserted invoice header; InvoiceCode=${invoiceCode}; CashSaleNo=${cashSaleNo}`);
 
     return invoiceCode;
@@ -221,6 +243,25 @@ async function insertInvoiceDetails(request, invoiceCode, items, locationCode) {
   try {
     let insertedCount = 0;
     const detailIds = [];
+    const detailInsertColumns = [
+      'InvoiceCode',
+      'ProductCode',
+      'Qty',
+      'PriceTypeCode',
+      'UnitPrice',
+      'Discount',
+      'Amount',
+      'TaxRate',
+      'TaxAmount',
+      'FPrice',
+      'UploadStatus',
+      'ProductName',
+      'LocationCode',
+      'CostPrice',
+    ];
+
+    console.log('[INVOICE] detail columns being inserted:', detailInsertColumns);
+    console.log('[INVOICE] InvDetailID excluded from invoicedetails insert because it is an identity column');
 
     for (const item of items) {
       const {
@@ -302,7 +343,7 @@ async function insertInvoiceDetails(request, invoiceCode, items, locationCode) {
       console.log(`[INVOICE] inserted detail row for ${productCode}; qty=${qty}`);
     }
 
-    console.log(`[INVOICE] inserted ${insertedCount} invoice detail row(s)`);
+    console.log(`[INVOICE] inserted detail count: ${insertedCount}`);
     return {
       insertedCount,
       detailIds,
@@ -323,7 +364,6 @@ async function insertInvoiceDetails(request, invoiceCode, items, locationCode) {
 async function writeBackInvoice(request, invoiceData) {
   try {
     console.log('[INVOICE] schema fields used (header):', [
-      'InvoiceNo',
       'InvoiceSerialNo',
       'RefNo',
       'InvoiceDate',
@@ -404,12 +444,10 @@ async function writeBackInvoice(request, invoiceData) {
     const safeInvoiceDate = toSqlDate(invoiceDate, invoiceTime);
     const safeInvoiceTime = normalizeTime(invoiceTime);
 
-    const invoiceNo = cashSaleNo;
     const invoiceSerialNo = cashSaleNo;
     const refNo = reference || `WEB-ORDER-${orderId}`;
 
     const invoiceHeader = {
-      invoiceNo,
       invoiceSerialNo,
       refNo,
       cashSaleNo,
@@ -443,7 +481,7 @@ async function writeBackInvoice(request, invoiceData) {
     const itemCount = detailResult.insertedCount;
 
     await updateLastCashSaleNo(request, nextLastCashSaleNo);
-    console.log('[INVOICE] updated LastCashSaleNo');
+    console.log(`[INVOICE] LastCashSaleNo update success: ${nextLastCashSaleNo}`);
 
     console.log('[INVOICE] transaction-ready summary:', {
       orderId,
