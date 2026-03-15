@@ -6,6 +6,8 @@
 
 const sql = require('mssql');
 
+let cachedLastCashSaleNoColumn = null;
+
 function createScopedRequest(request) {
   if (request && request.transaction) {
     return new sql.Request(request.transaction);
@@ -32,6 +34,55 @@ function normalizeTime(invoiceTime) {
   return new Date().toTimeString().slice(0, 8);
 }
 
+function escapeSqlIdentifier(identifier) {
+  return `[${String(identifier).replace(/]/g, ']]')}]`;
+}
+
+async function resolveLastCashSaleNoColumn(request) {
+  if (cachedLastCashSaleNoColumn) {
+    return cachedLastCashSaleNoColumn;
+  }
+
+  const schemaRequest = createScopedRequest(request);
+  const result = await schemaRequest.query(`
+    SELECT
+      c.name AS columnName,
+      t.name AS typeName,
+      c.column_id AS columnId
+    FROM POS.sys.columns c
+    INNER JOIN POS.sys.types t ON c.user_type_id = t.user_type_id
+    WHERE c.object_id = OBJECT_ID('POS.dbo.LastCashSaleNo')
+    ORDER BY c.column_id ASC
+  `);
+
+  if (!result.recordset || result.recordset.length === 0) {
+    throw new Error('NON_RETRYABLE: dbo.LastCashSaleNo has no columns');
+  }
+
+  const columns = result.recordset.map((row) => ({
+    columnName: String(row.columnName || ''),
+    typeName: String(row.typeName || '').toLowerCase(),
+    columnId: Number(row.columnId || 0),
+  }));
+
+  const numericTypes = new Set(['tinyint', 'smallint', 'int', 'bigint', 'numeric', 'decimal']);
+
+  const preferredByName = columns.find((col) => /cashsale/i.test(col.columnName) && numericTypes.has(col.typeName));
+  const preferredNumeric = columns.find((col) => numericTypes.has(col.typeName));
+  const chosen = preferredByName || preferredNumeric;
+
+  if (!chosen) {
+    throw new Error('NON_RETRYABLE: Could not find numeric sale number column in dbo.LastCashSaleNo');
+  }
+
+  cachedLastCashSaleNoColumn = chosen.columnName;
+
+  console.log('[INVOICE] LastCashSaleNo schema columns discovered:', columns);
+  console.log('[INVOICE] using LastCashSaleNo column:', cachedLastCashSaleNoColumn);
+
+  return cachedLastCashSaleNoColumn;
+}
+
 /**
  * Get next CashSaleNo from LastCashSaleNo table
  * @param {sql.Request} request - SQL request object within a transaction
@@ -39,9 +90,12 @@ function normalizeTime(invoiceTime) {
  */
 async function getNextCashSaleNo(request) {
   try {
+    const saleNoColumn = await resolveLastCashSaleNoColumn(request);
+    const escapedSaleNoColumn = escapeSqlIdentifier(saleNoColumn);
+
     const selectRequest = createScopedRequest(request);
     const result = await selectRequest.query(`
-      SELECT TOP 1 LastCashSaleNo
+      SELECT TOP 1 ${escapedSaleNoColumn} AS SaleNo
       FROM POS.dbo.LastCashSaleNo WITH (UPDLOCK, HOLDLOCK)
     `);
 
@@ -49,7 +103,7 @@ async function getNextCashSaleNo(request) {
       throw new Error('LastCashSaleNo table is empty. Initialize it with a starting value.');
     }
 
-    const currentNo = Number(result.recordset[0].LastCashSaleNo);
+    const currentNo = Number(result.recordset[0].SaleNo);
 
     if (!Number.isFinite(currentNo)) {
       throw new Error('LastCashSaleNo value is invalid');
@@ -76,10 +130,13 @@ async function getNextCashSaleNo(request) {
  */
 async function updateLastCashSaleNo(request, newCashSaleNo) {
   try {
+    const saleNoColumn = await resolveLastCashSaleNoColumn(request);
+    const escapedSaleNoColumn = escapeSqlIdentifier(saleNoColumn);
+
     const updateRequest = createScopedRequest(request);
     const query = `
       UPDATE POS.dbo.LastCashSaleNo
-      SET LastCashSaleNo = @CashSaleNo
+      SET ${escapedSaleNoColumn} = @CashSaleNo
     `;
 
     updateRequest.input('CashSaleNo', sql.Int, newCashSaleNo);
