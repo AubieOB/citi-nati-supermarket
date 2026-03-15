@@ -222,7 +222,7 @@ async function executeWriteInvoice(pool, payload, commandId) {
       await transaction.rollback();
       console.log('[INVOICE ERROR] rollback completed');
     } catch (rollbackErr) {
-      console.error('[INVOICE ERROR] rollback failed:', rollbackErr.message);
+      console.log('[INVOICE ERROR] rollback note (transaction already aborted by SQL Server):', rollbackErr.message);
     }
 
     if (String(error.message || '').startsWith('NON_RETRYABLE:') || isLikelyNonRetryableInvoiceError(error.message)) {

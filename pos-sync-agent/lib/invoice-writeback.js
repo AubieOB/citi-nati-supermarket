@@ -147,6 +147,20 @@ async function insertInvoiceHeader(request, invoiceHeader) {
     console.log('[INVOICE] invoice header columns being inserted:', invoiceInsertColumns);
     console.log('[INVOICE] InvoiceNo excluded from invoice insert because it is an identity column');
 
+    const inspect = (label, value) => {
+      const str = value === null || value === undefined ? '' : String(value);
+      console.log(`[INVOICE][LEN] ${label}="${str}" length=${str.length}`);
+    };
+    console.log('[INVOICE] header values:', invoiceHeader);
+    inspect('RefNo', refNo);
+    inspect('CustomerCode', customerCode);
+    inspect('LocationCode', locationCode);
+    inspect('PayMethod1', payMethod1);
+    inspect('PayMethod2', payMethod2);
+    inspect('UserName', userName);
+    inspect('PriceTypeCode', priceTypeCode);
+    inspect('InvoiceType', invoiceType);
+
     const headerRequest = createScopedRequest(request);
     const query = `
       INSERT INTO POS.dbo.invoice (
@@ -198,21 +212,21 @@ async function insertInvoiceHeader(request, invoiceHeader) {
     headerRequest.input('RefNo', sql.VarChar(255), refNo);
     headerRequest.input('CashSaleNo', sql.Int, cashSaleNo);
     headerRequest.input('InvoiceDate', sql.DateTime, invoiceDate);
-    headerRequest.input('InvoiceTime', sql.VarChar(8), invoiceTime);
-    headerRequest.input('CustomerCode', sql.VarChar(50), customerCode);
-    headerRequest.input('LocationCode', sql.VarChar(10), locationCode);
+    headerRequest.input('InvoiceTime', sql.DateTime, invoiceTime);
+    headerRequest.input('CustomerCode', sql.VarChar(15), customerCode);
+    headerRequest.input('LocationCode', sql.VarChar(6), locationCode);
     headerRequest.input('GrossSale', sql.Decimal(18, 2), grossSale);
     headerRequest.input('VAT', sql.Decimal(18, 2), vat);
     headerRequest.input('Discount', sql.Decimal(18, 2), discount);
     headerRequest.input('NetSale', sql.Decimal(18, 2), netSale);
     headerRequest.input('PayMethod1', sql.VarChar(20), payMethod1);
     headerRequest.input('TenAmt1', sql.Decimal(18, 2), tenAmt1);
-    headerRequest.input('PayMethod2', sql.VarChar(20), payMethod2 || '');
-    headerRequest.input('TenAmt2', sql.Decimal(18, 2), tenAmt2 || 0);
-    headerRequest.input('UserName', sql.VarChar(50), userName);
-    headerRequest.input('PriceTypeCode', sql.VarChar(10), priceTypeCode);
-    headerRequest.input('InvoiceType', sql.VarChar(10), invoiceType);
-    headerRequest.input('TillID', sql.VarChar(20), tillId);
+    headerRequest.input('PayMethod2', sql.VarChar(20), payMethod2);
+    headerRequest.input('TenAmt2', sql.Decimal(18, 2), tenAmt2);
+    headerRequest.input('UserName', sql.VarChar(20), userName);
+    headerRequest.input('PriceTypeCode', sql.VarChar(5), priceTypeCode);
+    headerRequest.input('InvoiceType', sql.Char(1), invoiceType);
+    headerRequest.input('TillID', sql.Int, tillId);
 
     const result = await headerRequest.query(query);
 
@@ -427,10 +441,6 @@ async function writeBackInvoice(request, invoiceData) {
       throw new Error('NON_RETRYABLE: orderId is required');
     }
 
-    if (!locationCode || !customerCode) {
-      throw new Error('NON_RETRYABLE: locationCode and customerCode are required');
-    }
-
     if (!Array.isArray(items) || items.length === 0) {
       throw new Error('NON_RETRYABLE: items must be a non-empty array');
     }
@@ -442,31 +452,28 @@ async function writeBackInvoice(request, invoiceData) {
     const nextLastCashSaleNo = cashSale.nextLastCashSaleNo;
 
     const safeInvoiceDate = toSqlDate(invoiceDate, invoiceTime);
-    const safeInvoiceTime = normalizeTime(invoiceTime);
-
-    const invoiceSerialNo = cashSaleNo;
-    const refNo = reference || `WEB-ORDER-${orderId}`;
+    const refNo = String(reference || `ORD${orderId}`).slice(0, 255);
 
     const invoiceHeader = {
-      invoiceSerialNo,
+      invoiceSerialNo: Number(cashSaleNo),
       refNo,
-      cashSaleNo,
+      cashSaleNo: Number(cashSaleNo),
       invoiceDate: safeInvoiceDate,
-      invoiceTime: safeInvoiceTime,
-      customerCode,
-      locationCode,
-      grossSale: Number(grossSale),
-      vat: Number(vat),
-      discount: Number(discount),
-      netSale: Number(netSale),
-      payMethod1: payMethod1 || 'CARD',
-      tenAmt1: Number(tenAmt1),
-      payMethod2: payMethod2 || '',
-      tenAmt2: Number(tenAmt2),
-      userName: userName || 'ONLINE',
-      priceTypeCode: priceTypeCode || 'RT',
-      invoiceType: invoiceType || 'CS',
-      tillId: tillId || 'WEB',
+      invoiceTime: safeInvoiceDate,
+      customerCode: String('CASH').slice(0, 15),
+      locationCode: String('SH').slice(0, 6),
+      grossSale: Number(grossSale) || 0,
+      vat: Number(vat) || 0,
+      discount: Number(discount) || 0,
+      netSale: Number(netSale) || 0,
+      payMethod1: String('CASH').slice(0, 20),
+      tenAmt1: Number(netSale) || 0,
+      payMethod2: String('CHEQUE').slice(0, 20),
+      tenAmt2: Number(0),
+      userName: String('cooperate').slice(0, 20),
+      priceTypeCode: String('RT').slice(0, 5),
+      invoiceType: String('C').slice(0, 1),
+      tillId: Number(tillId) || 1,
     };
 
     const invoiceCode = await insertInvoiceHeader(request, invoiceHeader);
@@ -476,7 +483,7 @@ async function writeBackInvoice(request, invoiceData) {
       request,
       invoiceCode,
       items,
-      locationCode
+      'SH'
     );
     const itemCount = detailResult.insertedCount;
 
