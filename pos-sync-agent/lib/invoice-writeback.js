@@ -465,7 +465,7 @@ async function writeBackInvoice(request, invoiceData) {
       tenAmt1: Number(netSale) || 0,
       payMethod2: String('CHEQUE').slice(0, 20),
       tenAmt2: Number(0),
-      userName: String('cooperate').slice(0, 20),
+      userName: String('online').slice(0, 20),
       priceTypeCode: String('RT').slice(0, 5),
       invoiceType: String('C').slice(0, 1),
       tillId: Number(tillId) || 1,
