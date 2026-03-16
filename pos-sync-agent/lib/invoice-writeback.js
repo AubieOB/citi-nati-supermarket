@@ -314,7 +314,6 @@ async function insertInvoiceDetails(request, invoiceCode, items, locationCode) {
           LocationCode,
           CostPrice
         )
-        OUTPUT INSERTED.InvDetailID AS DetailID
         VALUES (
           @InvoiceCode,
           @ProductCode,
@@ -347,12 +346,8 @@ async function insertInvoiceDetails(request, invoiceCode, items, locationCode) {
       detailRequest.input('LocationCode', sql.VarChar(10), locationCode);
       detailRequest.input('CostPrice', sql.Decimal(18, 2), Number.isFinite(Number(costPrice)) ? Number(costPrice) : 0);
 
-      const detailResult = await detailRequest.query(query);
+      await detailRequest.query(query);
       insertedCount++;
-
-      if (detailResult.recordset && detailResult.recordset[0] && detailResult.recordset[0].DetailID) {
-        detailIds.push(Number(detailResult.recordset[0].DetailID));
-      }
 
       console.log(`[INVOICE] inserted detail row for ${productCode}; qty=${qty}`);
     }
