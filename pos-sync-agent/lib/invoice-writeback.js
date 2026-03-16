@@ -40,6 +40,16 @@ function normalizeTime(invoiceTime) {
 async function getNextCashSaleNo(request) {
   try {
     const selectRequest = createScopedRequest(request);
+    const countResult = await selectRequest.query(`
+      SELECT COUNT(1) AS RowCount
+      FROM dbo.LastCashSaleNo WITH (UPDLOCK, HOLDLOCK)
+    `);
+
+    const rowCount = Number(countResult.recordset?.[0]?.RowCount || 0);
+    if (rowCount !== 1) {
+      throw new Error(`LastCashSaleNo table must contain exactly 1 row; found ${rowCount}`);
+    }
+
     const result = await selectRequest.query(`
       SELECT TOP 1 CashSaleNo
       FROM dbo.LastCashSaleNo WITH (UPDLOCK, HOLDLOCK)
@@ -76,16 +86,28 @@ async function getNextCashSaleNo(request) {
  */
 async function updateLastCashSaleNo(request, newCashSaleNo) {
   try {
+    const expectedCashSaleNo = Number(newCashSaleNo) - 1;
+    if (!Number.isFinite(expectedCashSaleNo)) {
+      throw new Error('Expected previous CashSaleNo is invalid');
+    }
+
     const updateRequest = createScopedRequest(request);
     const query = `
       UPDATE dbo.LastCashSaleNo
       SET CashSaleNo = @CashSaleNo
+      WHERE CashSaleNo = @ExpectedCashSaleNo
     `;
 
     updateRequest.input('CashSaleNo', sql.Int, newCashSaleNo);
-    await updateRequest.query(query);
+    updateRequest.input('ExpectedCashSaleNo', sql.Int, expectedCashSaleNo);
+    const updateResult = await updateRequest.query(query);
 
-    console.log(`[INVOICE] updated LastCashSaleNo to ${newCashSaleNo}`);
+    const affectedRows = Number(updateResult.rowsAffected?.[0] || 0);
+    if (affectedRows !== 1) {
+      throw new Error(`LastCashSaleNo compare-and-set update failed; affected rows: ${affectedRows}`);
+    }
+
+    console.log(`[INVOICE] updated LastCashSaleNo to ${newCashSaleNo} (from ${expectedCashSaleNo})`);
   } catch (error) {
     console.error('[INVOICE ERROR] Error updating LastCashSaleNo:', error.message);
     throw error;
