@@ -608,19 +608,19 @@ export const generateAdminProductsTablePDF = (products, options = {}) => {
 
     return `
       <tr style="background-color: ${idx % 2 === 0 ? '#fff' : '#f9f9f9'};">
-        <td style="padding: 8px; border: 1px solid #ddd;">#${escapeHtml(product.id)}</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(product.name)}</td>
-        <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">${escapeHtml(productCode)}</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(product.category || 'N/A')}</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(pricingText)}</td>
-        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${escapeHtml(product.stock)}</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(expiryText)}</td>
+        <td style="padding: 10px; border: 1px solid #ddd;">#${escapeHtml(product.id)}</td>
+        <td style="padding: 10px; border: 1px solid #ddd; word-break: break-word;">${escapeHtml(product.name)}</td>
+        <td style="padding: 10px; border: 1px solid #ddd; font-family: monospace; word-break: break-all;">${escapeHtml(productCode)}</td>
+        <td style="padding: 10px; border: 1px solid #ddd; word-break: break-word;">${escapeHtml(product.category || 'N/A')}</td>
+        <td style="padding: 10px; border: 1px solid #ddd; word-break: break-word;">${escapeHtml(pricingText)}</td>
+        <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">${escapeHtml(product.stock)}</td>
+        <td style="padding: 10px; border: 1px solid #ddd; word-break: break-word;">${escapeHtml(expiryText)}</td>
       </tr>
     `;
   }).join('');
 
   const html = `
-    <div style="font-family: Arial, sans-serif; color: #222; padding: 16px; width: 1600px; box-sizing: border-box;">
+    <div style="font-family: Arial, sans-serif; color: #222; padding: 16px; width: 1120px; box-sizing: border-box;">
       <div style="border-bottom: 3px solid #2D8659; padding-bottom: 12px; margin-bottom: 16px;">
         <h1 style="margin: 0; color: #2D8659; font-size: 22px;">Citi-Nati Supermarket</h1>
         <p style="margin: 6px 0 0 0; font-size: 13px;">Admin Products Table Export</p>
@@ -629,7 +629,16 @@ export const generateAdminProductsTablePDF = (products, options = {}) => {
         <p style="margin: 4px 0 0 0; font-size: 12px; color: #666;">Generated: ${escapeHtml(dateText)} ${escapeHtml(timeText)}</p>
       </div>
 
-      <table style="width: 100%; border-collapse: collapse; font-size: 11px; page-break-inside: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 12px; page-break-inside: auto; table-layout: fixed;">
+        <colgroup>
+          <col style="width: 9%;" />
+          <col style="width: 24%;" />
+          <col style="width: 17%;" />
+          <col style="width: 15%;" />
+          <col style="width: 16%;" />
+          <col style="width: 8%;" />
+          <col style="width: 11%;" />
+        </colgroup>
         <thead>
           <tr style="background-color: #2D8659; color: white;">
             <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">ID</th>
@@ -662,9 +671,9 @@ export const generateAdminProductsTablePDF = (products, options = {}) => {
       useCORS: true,
       backgroundColor: '#ffffff',
       letterRendering: true,
-      windowWidth: 1800
+      windowWidth: 1200
     },
-    jsPDF: { orientation: 'landscape', unit: 'mm', format: 'a3', compress: false },
+    jsPDF: { orientation: 'landscape', unit: 'mm', format: 'a4', compress: false },
     pagebreak: { mode: ['css', 'legacy'] }
   };
 
