@@ -615,7 +615,6 @@ export const generateAdminProductsTablePDF = (products, options = {}) => {
         <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(pricingText)}</td>
         <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${escapeHtml(product.stock)}</td>
         <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(expiryText)}</td>
-        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">Edit / Delete</td>
       </tr>
     `;
   }).join('');
@@ -640,7 +639,6 @@ export const generateAdminProductsTablePDF = (products, options = {}) => {
             <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Pricing</th>
             <th style="padding: 10px; border: 1px solid #ddd; text-align: center;">Stock</th>
             <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Expiry Status</th>
-            <th style="padding: 10px; border: 1px solid #ddd; text-align: center;">Actions</th>
           </tr>
         </thead>
         <tbody>
