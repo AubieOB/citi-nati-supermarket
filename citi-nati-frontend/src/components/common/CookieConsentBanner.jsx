@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 const CONSENT_KEY = 'cookie_consent_preferences_v1';
 
@@ -29,10 +29,23 @@ const saveConsent = (consent) => {
 
 const CookieConsentBanner = () => {
   const initialConsent = useMemo(() => getInitialConsent(), []);
-  const [visible, setVisible] = useState(!initialConsent);
+  const [visible, setVisible] = useState(false);
   const [showPreferences, setShowPreferences] = useState(false);
   const [analytics, setAnalytics] = useState(Boolean(initialConsent?.analytics));
   const [marketing, setMarketing] = useState(Boolean(initialConsent?.marketing));
+
+  useEffect(() => {
+    if (initialConsent) {
+      setVisible(false);
+      return undefined;
+    }
+
+    const timer = setTimeout(() => {
+      setVisible(true);
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, [initialConsent]);
 
   if (!visible) {
     return null;
@@ -99,7 +112,7 @@ const CookieConsentBanner = () => {
             </button>
           )}
           <button className="cookie-banner__btn cookie-banner__btn--ghost" type="button" onClick={handleRejectOptional}>
-            Reject Optional
+            Reject [Optional]
           </button>
           <button className="cookie-banner__btn cookie-banner__btn--primary" type="button" onClick={handleAcceptAll}>
             Accept All
