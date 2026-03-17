@@ -3,22 +3,56 @@ import api from '../../utils/api.js';
 import { useModal } from '../../hooks/useModal.js';
 import Modal from '../common/Modal.jsx';
 
+const emptyFormState = {
+  currentSecurityKey: '',
+  securityKey: '',
+  confirmSecurityKey: '',
+};
+
+const validateSecurityForm = ({ hasExistingKey, formData, showError, label }) => {
+  if (!formData.securityKey || !formData.confirmSecurityKey) {
+    showError('Validation', `Enter and confirm ${label} security key are required`);
+    return false;
+  }
+
+  if (formData.securityKey !== formData.confirmSecurityKey) {
+    showError('Validation', `${label} security key confirmation does not match`);
+    return false;
+  }
+
+  if (formData.securityKey.trim().length < 4) {
+    showError('Validation', `${label} security key must be at least 4 characters`);
+    return false;
+  }
+
+  if (hasExistingKey && !formData.currentSecurityKey) {
+    showError('Validation', `Current ${label} security key is required to change key`);
+    return false;
+  }
+
+  return true;
+};
+
 const AdminSecurity = () => {
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [hasSecurityKey, setHasSecurityKey] = useState(false);
-  const [formData, setFormData] = useState({
-    currentSecurityKey: '',
-    securityKey: '',
-    confirmSecurityKey: '',
-  });
+  const [savingAdmin, setSavingAdmin] = useState(false);
+  const [savingDriver, setSavingDriver] = useState(false);
+  const [hasAdminSecurityKey, setHasAdminSecurityKey] = useState(false);
+  const [hasDriverSecurityKey, setHasDriverSecurityKey] = useState(false);
+  const [adminFormData, setAdminFormData] = useState(emptyFormState);
+  const [driverFormData, setDriverFormData] = useState(emptyFormState);
   const { modal, showError, showSuccess, closeModal } = useModal();
 
   useEffect(() => {
     const fetchStatus = async () => {
       try {
-        const response = await api.get('/admin/security-key/status');
-        setHasSecurityKey(Boolean(response.data?.hasSecurityKey));
+        const [adminStatus, driverStatus] = await Promise.all([
+          api.get('/admin/security-key/status'),
+          api.get('/admin/security-key/driver/status'),
+        ]);
+
+        setHasAdminSecurityKey(Boolean(adminStatus.data?.hasSecurityKey));
+        setHasDriverSecurityKey(Boolean(driverStatus.data?.hasSecurityKey));
       } catch (err) {
         showError('Security setup failed', err.response?.data?.error || 'Unable to load security key status');
       } finally {
@@ -29,53 +63,86 @@ const AdminSecurity = () => {
     fetchStatus();
   }, [showError]);
 
-  const handleInputChange = (event) => {
+  const handleInputChange = (event, scope) => {
     const { name, value } = event.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    if (scope === 'admin') {
+      setAdminFormData((prev) => ({ ...prev, [name]: value }));
+      return;
+    }
+
+    setDriverFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (event) => {
+  const handleAdminSubmit = async (event) => {
     event.preventDefault();
 
-    if (!formData.securityKey || !formData.confirmSecurityKey) {
-      showError('Validation', 'Enter and confirm security key are required');
-      return;
-    }
+    const isValid = validateSecurityForm({
+      hasExistingKey: hasAdminSecurityKey,
+      formData: adminFormData,
+      showError,
+      label: 'admin',
+    });
 
-    if (formData.securityKey !== formData.confirmSecurityKey) {
-      showError('Validation', 'Security key confirmation does not match');
-      return;
-    }
-
-    if (formData.securityKey.trim().length < 4) {
-      showError('Validation', 'Security key must be at least 4 characters');
-      return;
-    }
-
-    if (hasSecurityKey && !formData.currentSecurityKey) {
-      showError('Validation', 'Current security key is required to change key');
+    if (!isValid) {
       return;
     }
 
     try {
-      setSaving(true);
+      setSavingAdmin(true);
       const payload = {
-        securityKey: formData.securityKey,
-        confirmSecurityKey: formData.confirmSecurityKey,
+        securityKey: adminFormData.securityKey,
+        confirmSecurityKey: adminFormData.confirmSecurityKey,
       };
 
-      if (hasSecurityKey) {
-        payload.currentSecurityKey = formData.currentSecurityKey;
+      if (hasAdminSecurityKey) {
+        payload.currentSecurityKey = adminFormData.currentSecurityKey;
       }
 
       const response = await api.put('/admin/security-key', payload);
-      showSuccess('Success', response.data?.message || 'Security key saved successfully');
-      setHasSecurityKey(true);
-      setFormData({ currentSecurityKey: '', securityKey: '', confirmSecurityKey: '' });
+      showSuccess('Success', response.data?.message || 'Admin security key saved successfully');
+      setHasAdminSecurityKey(true);
+      setAdminFormData(emptyFormState);
     } catch (err) {
-      showError('Failed', err.response?.data?.error || 'Unable to save security key');
+      showError('Failed', err.response?.data?.error || 'Unable to save admin security key');
     } finally {
-      setSaving(false);
+      setSavingAdmin(false);
+    }
+  };
+
+  const handleDriverSubmit = async (event) => {
+    event.preventDefault();
+
+    const isValid = validateSecurityForm({
+      hasExistingKey: hasDriverSecurityKey,
+      formData: driverFormData,
+      showError,
+      label: 'driver',
+    });
+
+    if (!isValid) {
+      return;
+    }
+
+    try {
+      setSavingDriver(true);
+      const payload = {
+        securityKey: driverFormData.securityKey,
+        confirmSecurityKey: driverFormData.confirmSecurityKey,
+      };
+
+      if (hasDriverSecurityKey) {
+        payload.currentSecurityKey = driverFormData.currentSecurityKey;
+      }
+
+      const response = await api.put('/admin/security-key/driver', payload);
+      showSuccess('Success', response.data?.message || 'Driver security key saved successfully');
+      setHasDriverSecurityKey(true);
+      setDriverFormData(emptyFormState);
+    } catch (err) {
+      showError('Failed', err.response?.data?.error || 'Unable to save driver security key');
+    } finally {
+      setSavingDriver(false);
     }
   };
 
@@ -84,69 +151,136 @@ const AdminSecurity = () => {
   }
 
   return (
-    <div style={{ maxWidth: '700px', margin: '0 auto', backgroundColor: '#fff', borderRadius: '10px', padding: '1.5rem', boxShadow: '0 2px 10px rgba(0,0,0,0.08)' }}>
-      <h2 style={{ marginTop: 0, color: '#333' }}>Admin Security Panel</h2>
-      <p style={{ color: '#666', marginBottom: '1.25rem' }}>
-        {hasSecurityKey
-          ? 'Change your admin security key. You must enter your current key before setting a new one.'
-          : 'Set your admin security key. This will be required before entering the admin dashboard on future logins.'}
-      </p>
+    <div style={{ maxWidth: '900px', margin: '0 auto', display: 'grid', gap: '1rem' }}>
+      <div style={{ backgroundColor: '#fff', borderRadius: '10px', padding: '1.5rem', boxShadow: '0 2px 10px rgba(0,0,0,0.08)' }}>
+        <h2 style={{ marginTop: 0, color: '#333' }}>Admin Security Key</h2>
+        <p style={{ color: '#666', marginBottom: '1.25rem' }}>
+          {hasAdminSecurityKey
+            ? 'Change the admin security key. Current key is required before setting a new one.'
+            : 'Set the first admin security key. Admins will be prompted before entering the dashboard.'}
+        </p>
 
-      <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '1rem' }}>
-        {hasSecurityKey && (
+        <form onSubmit={handleAdminSubmit} style={{ display: 'grid', gap: '1rem' }}>
+          {hasAdminSecurityKey && (
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.45rem', fontWeight: 600 }}>Current Admin Security Key</label>
+              <input
+                type="password"
+                name="currentSecurityKey"
+                value={adminFormData.currentSecurityKey}
+                onChange={(event) => handleInputChange(event, 'admin')}
+                placeholder="Enter current key"
+                style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #ddd' }}
+              />
+            </div>
+          )}
+
           <div>
-            <label style={{ display: 'block', marginBottom: '0.45rem', fontWeight: 600 }}>Current Security Key</label>
+            <label style={{ display: 'block', marginBottom: '0.45rem', fontWeight: 600 }}>Enter Admin Security Key</label>
             <input
               type="password"
-              name="currentSecurityKey"
-              value={formData.currentSecurityKey}
-              onChange={handleInputChange}
-              placeholder="Enter current key"
+              name="securityKey"
+              value={adminFormData.securityKey}
+              onChange={(event) => handleInputChange(event, 'admin')}
+              placeholder="Enter new key"
               style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #ddd' }}
             />
           </div>
-        )}
 
-        <div>
-          <label style={{ display: 'block', marginBottom: '0.45rem', fontWeight: 600 }}>Enter Security Key</label>
-          <input
-            type="password"
-            name="securityKey"
-            value={formData.securityKey}
-            onChange={handleInputChange}
-            placeholder="Enter new key"
-            style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #ddd' }}
-          />
-        </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.45rem', fontWeight: 600 }}>Confirm Admin Security Key</label>
+            <input
+              type="password"
+              name="confirmSecurityKey"
+              value={adminFormData.confirmSecurityKey}
+              onChange={(event) => handleInputChange(event, 'admin')}
+              placeholder="Confirm new key"
+              style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #ddd' }}
+            />
+          </div>
 
-        <div>
-          <label style={{ display: 'block', marginBottom: '0.45rem', fontWeight: 600 }}>Confirm Security Key</label>
-          <input
-            type="password"
-            name="confirmSecurityKey"
-            value={formData.confirmSecurityKey}
-            onChange={handleInputChange}
-            placeholder="Confirm new key"
-            style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #ddd' }}
-          />
-        </div>
+          <button
+            type="submit"
+            disabled={savingAdmin}
+            style={{
+              border: 'none',
+              borderRadius: '6px',
+              padding: '0.8rem 1rem',
+              backgroundColor: savingAdmin ? '#8898aa' : '#2D8659',
+              color: '#fff',
+              fontWeight: 600,
+              cursor: savingAdmin ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {savingAdmin ? 'Saving...' : hasAdminSecurityKey ? 'Change Admin Security Key' : 'Set Admin Security Key'}
+          </button>
+        </form>
+      </div>
 
-        <button
-          type="submit"
-          disabled={saving}
-          style={{
-            border: 'none',
-            borderRadius: '6px',
-            padding: '0.8rem 1rem',
-            backgroundColor: saving ? '#8898aa' : '#2D8659',
-            color: '#fff',
-            fontWeight: 600,
-            cursor: saving ? 'not-allowed' : 'pointer'
-          }}
-        >
-          {saving ? 'Saving...' : hasSecurityKey ? 'Change Security Key' : 'Set Security Key'}
-        </button>
-      </form>
+      <div style={{ backgroundColor: '#fff', borderRadius: '10px', padding: '1.5rem', boxShadow: '0 2px 10px rgba(0,0,0,0.08)' }}>
+        <h2 style={{ marginTop: 0, color: '#333' }}>Driver Security Key</h2>
+        <p style={{ color: '#666', marginBottom: '1.25rem' }}>
+          {hasDriverSecurityKey
+            ? 'Change the global driver security key. Drivers will need it before entering the driver dashboard.'
+            : 'Set the first global driver security key. Drivers will be prompted for this key on dashboard access.'}
+        </p>
+
+        <form onSubmit={handleDriverSubmit} style={{ display: 'grid', gap: '1rem' }}>
+          {hasDriverSecurityKey && (
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.45rem', fontWeight: 600 }}>Current Driver Security Key</label>
+              <input
+                type="password"
+                name="currentSecurityKey"
+                value={driverFormData.currentSecurityKey}
+                onChange={(event) => handleInputChange(event, 'driver')}
+                placeholder="Enter current key"
+                style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #ddd' }}
+              />
+            </div>
+          )}
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.45rem', fontWeight: 600 }}>Enter Driver Security Key</label>
+            <input
+              type="password"
+              name="securityKey"
+              value={driverFormData.securityKey}
+              onChange={(event) => handleInputChange(event, 'driver')}
+              placeholder="Enter new key"
+              style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #ddd' }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.45rem', fontWeight: 600 }}>Confirm Driver Security Key</label>
+            <input
+              type="password"
+              name="confirmSecurityKey"
+              value={driverFormData.confirmSecurityKey}
+              onChange={(event) => handleInputChange(event, 'driver')}
+              placeholder="Confirm new key"
+              style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #ddd' }}
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={savingDriver}
+            style={{
+              border: 'none',
+              borderRadius: '6px',
+              padding: '0.8rem 1rem',
+              backgroundColor: savingDriver ? '#8898aa' : '#5B4B8A',
+              color: '#fff',
+              fontWeight: 600,
+              cursor: savingDriver ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {savingDriver ? 'Saving...' : hasDriverSecurityKey ? 'Change Driver Security Key' : 'Set Driver Security Key'}
+          </button>
+        </form>
+      </div>
 
       <Modal
         isOpen={modal.isOpen}

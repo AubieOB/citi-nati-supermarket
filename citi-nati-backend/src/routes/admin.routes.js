@@ -22,6 +22,7 @@ const router = express.Router();
 const prisma = new PrismaClient();
 const MAINTENANCE_MODE_KEY = 'maintenance_mode_enabled';
 const MAINTENANCE_MESSAGE_KEY = 'maintenance_mode_message';
+const DRIVER_SECURITY_KEY_HASH_KEY = 'driver_security_key_hash';
 const DEFAULT_MAINTENANCE_MESSAGE = 'We are currently carrying out maintenance to improve your experience. We apologize for the inconvenience.';
 
 const getSettingValue = async (key, fallbackValue) => {
@@ -238,6 +239,81 @@ router.put('/security-key', verifyTokenMiddleware, verifyAdmin, async (req, res)
   } catch (err) {
     console.error('[ADMIN SECURITY] Set/change key failed:', err.message);
     return res.status(500).json({ success: false, error: 'Failed to save security key' });
+  }
+});
+
+/**
+ * GET /api/admin/security-key/driver/status
+ * Returns whether a global driver security key has been configured
+ */
+router.get('/security-key/driver/status', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const setting = await prisma.siteSetting.findUnique({
+      where: { key: DRIVER_SECURITY_KEY_HASH_KEY },
+      select: { value: true },
+    });
+
+    return res.json({
+      success: true,
+      hasSecurityKey: Boolean(setting?.value),
+    });
+  } catch (err) {
+    console.error('[DRIVER SECURITY] Admin status check failed:', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to check driver security key status' });
+  }
+});
+
+/**
+ * PUT /api/admin/security-key/driver
+ * Set first global driver security key or change existing driver security key
+ */
+router.put('/security-key/driver', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const { securityKey, confirmSecurityKey, currentSecurityKey } = req.body;
+
+    if (!securityKey || !confirmSecurityKey) {
+      return res.status(400).json({ success: false, error: 'Enter and confirm driver security key are required' });
+    }
+
+    if (securityKey !== confirmSecurityKey) {
+      return res.status(400).json({ success: false, error: 'Driver security key confirmation does not match' });
+    }
+
+    if (securityKey.trim().length < 4) {
+      return res.status(400).json({ success: false, error: 'Driver security key must be at least 4 characters' });
+    }
+
+    const existingSetting = await prisma.siteSetting.findUnique({
+      where: { key: DRIVER_SECURITY_KEY_HASH_KEY },
+      select: { value: true },
+    });
+
+    if (existingSetting?.value) {
+      if (!currentSecurityKey) {
+        return res.status(400).json({ success: false, error: 'Current driver security key is required to change key' });
+      }
+
+      const currentMatches = await bcrypt.compare(currentSecurityKey, existingSetting.value);
+      if (!currentMatches) {
+        return res.status(401).json({ success: false, error: 'Current driver security key is incorrect' });
+      }
+    }
+
+    const newHash = await bcrypt.hash(securityKey, 10);
+
+    await prisma.siteSetting.upsert({
+      where: { key: DRIVER_SECURITY_KEY_HASH_KEY },
+      update: { value: newHash },
+      create: { key: DRIVER_SECURITY_KEY_HASH_KEY, value: newHash },
+    });
+
+    return res.json({
+      success: true,
+      message: existingSetting?.value ? 'Driver security key changed successfully' : 'Driver security key set successfully',
+    });
+  } catch (err) {
+    console.error('[DRIVER SECURITY] Admin set/change key failed:', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to save driver security key' });
   }
 });
 

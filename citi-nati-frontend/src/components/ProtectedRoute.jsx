@@ -32,11 +32,36 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     return Boolean(allowedRoles?.includes('admin') && user?.role === 'admin');
   }, [allowedRoles, user?.role]);
 
+  const requiresDriverSecurityGate = useMemo(() => {
+    return Boolean(allowedRoles?.includes('driver') && user?.role === 'driver');
+  }, [allowedRoles, user?.role]);
+
+  const securityGateConfig = useMemo(() => {
+    if (requiresAdminSecurityGate) {
+      return {
+        statusEndpoint: '/admin/security-key/status',
+        verifyEndpoint: '/admin/security-key/verify',
+        roleLabel: 'admin',
+      };
+    }
+
+    if (requiresDriverSecurityGate) {
+      return {
+        statusEndpoint: '/drivers/security-key/status',
+        verifyEndpoint: '/drivers/security-key/verify',
+        roleLabel: 'driver',
+      };
+    }
+
+    return null;
+  }, [requiresAdminSecurityGate, requiresDriverSecurityGate]);
+
   useEffect(() => {
     const loadSecurityStatus = async () => {
-      if (!isAuthenticated || !requiresAdminSecurityGate) {
+      if (!isAuthenticated || !securityGateConfig) {
         setSecurityVerified(false);
         setHasSecurityKey(false);
+        setSecurityError('');
         setSecurityStatusLoaded(true);
         return;
       }
@@ -45,14 +70,14 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
         setCheckingSecurityKey(true);
         setSecurityStatusLoaded(false);
         setSecurityError('');
-        const response = await api.get('/admin/security-key/status');
+        const response = await api.get(securityGateConfig.statusEndpoint);
         const keyExists = Boolean(response.data?.hasSecurityKey);
         setHasSecurityKey(keyExists);
 
-        // First login path: allow admin in when key has not been set yet
+        // First login path: allow role in when key has not been set yet
         setSecurityVerified(!keyExists);
       } catch (err) {
-        setSecurityError(err.response?.data?.error || 'Failed to check admin security key status');
+        setSecurityError(err.response?.data?.error || `Failed to check ${securityGateConfig.roleLabel} security key status`);
       } finally {
         setCheckingSecurityKey(false);
         setSecurityStatusLoaded(true);
@@ -60,7 +85,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     };
 
     loadSecurityStatus();
-  }, [isAuthenticated, requiresAdminSecurityGate]);
+  }, [isAuthenticated, securityGateConfig]);
 
   const handleVerifySecurityKey = async () => {
     try {
@@ -73,7 +98,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
         return;
       }
 
-      await api.post('/admin/security-key/verify', { securityKey: keyValue });
+      await api.post(securityGateConfig.verifyEndpoint, { securityKey: keyValue });
       setSecurityVerified(true);
       setSecurityKeyInput('');
     } catch (err) {
@@ -98,7 +123,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     return <Navigate to="/" replace />;
   }
 
-  const mustShowSecurityGate = requiresAdminSecurityGate && (
+  const mustShowSecurityGate = Boolean(securityGateConfig) && (
     checkingSecurityKey ||
     !securityStatusLoaded ||
     Boolean(securityError) ||
@@ -123,9 +148,9 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
           boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
           padding: '1.5rem',
         }}>
-          <h2 style={{ marginTop: 0, marginBottom: '0.6rem', color: '#333' }}>Admin Security Key</h2>
+          <h2 style={{ marginTop: 0, marginBottom: '0.6rem', color: '#333' }}>{securityGateConfig.roleLabel === 'admin' ? 'Admin Security Key' : 'Driver Security Key'}</h2>
           <p style={{ marginTop: 0, marginBottom: '1rem', color: '#666' }}>
-            Enter your admin security key to continue.
+            {`Enter your ${securityGateConfig.roleLabel} security key to continue.`}
           </p>
 
           {checkingSecurityKey && <p style={{ color: '#666' }}>Checking security status...</p>}
