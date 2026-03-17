@@ -211,9 +211,11 @@ const AdminProducts = () => {
     .filter(product => {
       // Search filter (AND logic - all search terms must match)
       const searchTerms = searchTerm.toLowerCase().trim().split(/\s+/).filter(t => t);
+      const searchableProductCode = String(product.productCode || product.sourceCode || product.code || '').toLowerCase();
       const matchesSearch = searchTerms.length === 0 || searchTerms.every(term => 
         product.name.toLowerCase().includes(term) || 
-        product.category.toLowerCase().includes(term)
+        product.category.toLowerCase().includes(term) ||
+        searchableProductCode.includes(term)
       );
 
       // Category filter
@@ -954,6 +956,7 @@ const AdminProducts = () => {
               <tr>
                 <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem' }}>ID</th>
                 <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem' }}>Name</th>
+                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem' }}>Product Code</th>
                 <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem' }}>Category</th>
                 <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem' }}>Pricing</th>
                 <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', fontSize: '0.9rem' }}>Stock</th>
@@ -967,6 +970,7 @@ const AdminProducts = () => {
                 const discountPct = product.originalPrice && product.discountPrice 
                   ? Math.round(((product.originalPrice - product.discountPrice) / product.originalPrice) * 100)
                   : null;
+                const productCode = product.productCode || product.sourceCode || product.code;
                 
                 return (
                   <tr 
@@ -978,6 +982,21 @@ const AdminProducts = () => {
                   >
                     <td style={{ padding: '1rem', fontSize: '0.9rem' }}>#{product.id}</td>
                     <td style={{ padding: '1rem', fontWeight: '500' }}>{product.name}</td>
+                    <td style={{ padding: '1rem', fontSize: '0.85rem' }}>
+                      {productCode ? (
+                        <span style={{
+                          fontFamily: 'monospace',
+                          backgroundColor: '#f3f4f6',
+                          padding: '0.2rem 0.45rem',
+                          borderRadius: '4px',
+                          color: '#374151',
+                        }}>
+                          {productCode}
+                        </span>
+                      ) : (
+                        <span style={{ color: '#999' }}>—</span>
+                      )}
+                    </td>
                     <td style={{ padding: '1rem', fontSize: '0.9rem', color: '#666' }}>{product.category}</td>
                     <td style={{ padding: '1rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
