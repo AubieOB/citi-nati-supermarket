@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import api from '../../utils/api.js';
 
 const CONSENT_KEY = 'cookie_consent_preferences_v1';
 
@@ -33,19 +34,57 @@ const CookieConsentBanner = () => {
   const [showPreferences, setShowPreferences] = useState(false);
   const [analytics, setAnalytics] = useState(Boolean(initialConsent?.analytics));
   const [marketing, setMarketing] = useState(Boolean(initialConsent?.marketing));
+  const [maintenanceChecked, setMaintenanceChecked] = useState(false);
+  const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
 
   useEffect(() => {
-    if (initialConsent) {
+    let isMounted = true;
+
+    const fetchMaintenanceStatus = async () => {
+      try {
+        const response = await api.get('/system/status');
+        if (!isMounted) {
+          return;
+        }
+
+        setMaintenanceEnabled(Boolean(response?.data?.maintenanceMode));
+      } catch {
+        if (!isMounted) {
+          return;
+        }
+
+        setMaintenanceEnabled(false);
+      } finally {
+        if (isMounted) {
+          setMaintenanceChecked(true);
+        }
+      }
+    };
+
+    fetchMaintenanceStatus();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!maintenanceChecked) {
+      setVisible(false);
+      return undefined;
+    }
+
+    if (initialConsent || maintenanceEnabled) {
       setVisible(false);
       return undefined;
     }
 
     const timer = setTimeout(() => {
       setVisible(true);
-    }, 1200);
+    }, 2500);
 
     return () => clearTimeout(timer);
-  }, [initialConsent]);
+  }, [initialConsent, maintenanceChecked, maintenanceEnabled]);
 
   if (!visible) {
     return null;
