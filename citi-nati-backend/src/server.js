@@ -7,6 +7,7 @@ const { PrismaClient } = require('@prisma/client');
 const fs = require('fs');
 const path = require('path');
 const authRoutes = require('./routes/auth.routes');
+const systemRoutes = require('./routes/system.routes');
 const adminSetupRoutes = require('./routes/admin.setup');
 const adminRoutes = require('./routes/admin.routes');
 const adminBootstrapRoutes = require('./routes/admin.bootstrap');
@@ -389,6 +390,9 @@ async function start() {
 
     // Auth routes
     app.use('/api/auth', authRoutes);
+
+    // Public system routes
+    app.use('/api/system', systemRoutes);
 
     // Admin Bootstrap routes (one-time admin creation for free tier) - MUST come before protected admin routes
     app.use('/api/admin', adminBootstrapRoutes);

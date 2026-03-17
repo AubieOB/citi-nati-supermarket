@@ -258,3 +258,10 @@ model PosWriteCommand {
   @@index([agentId, status])
   @@index([status, nextRetryAt])
 }
+
+model SiteSetting {
+  key       String   @id
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

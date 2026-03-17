@@ -20,6 +20,14 @@ const { emitProductUpdate } = require('../utils/socket');
 
 const router = express.Router();
 const prisma = new PrismaClient();
+const MAINTENANCE_MODE_KEY = 'maintenance_mode_enabled';
+const MAINTENANCE_MESSAGE_KEY = 'maintenance_mode_message';
+const DEFAULT_MAINTENANCE_MESSAGE = 'We are currently carrying out maintenance to improve your experience. We apologize for the inconvenience.';
+
+const getSettingValue = async (key, fallbackValue) => {
+  const setting = await prisma.siteSetting.findUnique({ where: { key } });
+  return setting ? setting.value : fallbackValue;
+};
 
 /**
  * GET /api/admin/test
@@ -58,6 +66,59 @@ router.get('/dashboard', verifyTokenMiddleware, verifyAdmin, async (req, res) =>
   } catch (err) {
     console.error('Dashboard error:', err);
     res.status(500).json({ error: 'Failed to fetch dashboard data' });
+  }
+});
+
+router.get('/system/settings', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const [maintenanceEnabled, maintenanceMessage] = await Promise.all([
+      getSettingValue(MAINTENANCE_MODE_KEY, 'false'),
+      getSettingValue(MAINTENANCE_MESSAGE_KEY, DEFAULT_MAINTENANCE_MESSAGE),
+    ]);
+
+    return res.json({
+      success: true,
+      settings: {
+        maintenanceMode: maintenanceEnabled === 'true',
+        maintenanceMessage,
+      },
+    });
+  } catch (err) {
+    console.error('[ADMIN SYSTEM] Failed to fetch settings:', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to fetch system settings' });
+  }
+});
+
+router.put('/system/maintenance', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const { maintenanceMode, maintenanceMessage } = req.body;
+
+    const messageToSave = (maintenanceMessage || DEFAULT_MAINTENANCE_MESSAGE).trim();
+
+    await prisma.$transaction([
+      prisma.siteSetting.upsert({
+        where: { key: MAINTENANCE_MODE_KEY },
+        update: { value: maintenanceMode ? 'true' : 'false' },
+        create: { key: MAINTENANCE_MODE_KEY, value: maintenanceMode ? 'true' : 'false' },
+      }),
+      prisma.siteSetting.upsert({
+        where: { key: MAINTENANCE_MESSAGE_KEY },
+        update: { value: messageToSave },
+        create: { key: MAINTENANCE_MESSAGE_KEY, value: messageToSave },
+      }),
+    ]);
+
+    return res.json({
+      success: true,
+      message: `Maintenance mode ${maintenanceMode ? 'enabled' : 'disabled'} successfully`,
+      settings: {
+        maintenanceMode: Boolean(maintenanceMode),
+        maintenanceMessage: messageToSave,
+      },
+    });
+  } catch (err) {
+    console.error('[ADMIN SYSTEM] Failed to update maintenance mode:', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to update maintenance mode' });
   }
 });
 
