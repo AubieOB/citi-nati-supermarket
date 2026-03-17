@@ -38,7 +38,11 @@ const AdminSecurity = () => {
   const [savingAdmin, setSavingAdmin] = useState(false);
   const [savingDriver, setSavingDriver] = useState(false);
   const [hasAdminSecurityKey, setHasAdminSecurityKey] = useState(false);
+  const [driverAccounts, setDriverAccounts] = useState([]);
+  const [selectedDriverId, setSelectedDriverId] = useState('');
+  const [selectedDriverName, setSelectedDriverName] = useState('');
   const [hasDriverSecurityKey, setHasDriverSecurityKey] = useState(false);
+  const [driverStatusLoading, setDriverStatusLoading] = useState(false);
   const [adminFormData, setAdminFormData] = useState(emptyFormState);
   const [driverFormData, setDriverFormData] = useState(emptyFormState);
   const { modal, showError, showSuccess, closeModal } = useModal();
@@ -46,13 +50,20 @@ const AdminSecurity = () => {
   useEffect(() => {
     const fetchStatus = async () => {
       try {
-        const [adminStatus, driverStatus] = await Promise.all([
+        const [adminStatus, usersResponse] = await Promise.all([
           api.get('/admin/security-key/status'),
-          api.get('/admin/security-key/driver/status'),
+          api.get('/admin/users'),
         ]);
 
+        const drivers = (usersResponse.data?.users || []).filter((user) => user.role === 'driver');
+
         setHasAdminSecurityKey(Boolean(adminStatus.data?.hasSecurityKey));
-        setHasDriverSecurityKey(Boolean(driverStatus.data?.hasSecurityKey));
+        setDriverAccounts(drivers);
+
+        if (drivers.length > 0) {
+          setSelectedDriverId(drivers[0].id);
+          setSelectedDriverName(drivers[0].name || drivers[0].email || 'Selected driver');
+        }
       } catch (err) {
         showError('Security setup failed', err.response?.data?.error || 'Unable to load security key status');
       } finally {
@@ -62,6 +73,29 @@ const AdminSecurity = () => {
 
     fetchStatus();
   }, [showError]);
+
+  useEffect(() => {
+    const fetchDriverStatus = async () => {
+      if (!selectedDriverId) {
+        setHasDriverSecurityKey(false);
+        setSelectedDriverName('');
+        return;
+      }
+
+      try {
+        setDriverStatusLoading(true);
+        const response = await api.get(`/admin/security-key/driver/${selectedDriverId}/status`);
+        setHasDriverSecurityKey(Boolean(response.data?.hasSecurityKey));
+        setSelectedDriverName(response.data?.driver?.name || driverAccounts.find((driver) => driver.id === selectedDriverId)?.name || 'Selected driver');
+      } catch (err) {
+        showError('Driver security setup failed', err.response?.data?.error || 'Unable to load selected driver security key status');
+      } finally {
+        setDriverStatusLoading(false);
+      }
+    };
+
+    fetchDriverStatus();
+  }, [selectedDriverId, driverAccounts, showError]);
 
   const handleInputChange = (event, scope) => {
     const { name, value } = event.target;
@@ -113,6 +147,11 @@ const AdminSecurity = () => {
   const handleDriverSubmit = async (event) => {
     event.preventDefault();
 
+    if (!selectedDriverId) {
+      showError('Validation', 'Select a driver account first');
+      return;
+    }
+
     const isValid = validateSecurityForm({
       hasExistingKey: hasDriverSecurityKey,
       formData: driverFormData,
@@ -135,7 +174,7 @@ const AdminSecurity = () => {
         payload.currentSecurityKey = driverFormData.currentSecurityKey;
       }
 
-      const response = await api.put('/admin/security-key/driver', payload);
+      const response = await api.put(`/admin/security-key/driver/${selectedDriverId}`, payload);
       showSuccess('Success', response.data?.message || 'Driver security key saved successfully');
       setHasDriverSecurityKey(true);
       setDriverFormData(emptyFormState);
@@ -220,12 +259,41 @@ const AdminSecurity = () => {
       <div style={{ backgroundColor: '#fff', borderRadius: '10px', padding: '1.5rem', boxShadow: '0 2px 10px rgba(0,0,0,0.08)' }}>
         <h2 style={{ marginTop: 0, color: '#333' }}>Driver Security Key</h2>
         <p style={{ color: '#666', marginBottom: '1.25rem' }}>
-          {hasDriverSecurityKey
-            ? 'Change the global driver security key. Drivers will need it before entering the driver dashboard.'
-            : 'Set the first global driver security key. Drivers will be prompted for this key on dashboard access.'}
+          {selectedDriverId
+            ? hasDriverSecurityKey
+              ? `Change the security key for ${selectedDriverName}. This affects only that driver account.`
+              : `Set the first security key for ${selectedDriverName}. Only that driver will be prompted for it.`
+            : 'Choose a driver account to create or change that driver\'s unique security key.'}
         </p>
 
         <form onSubmit={handleDriverSubmit} style={{ display: 'grid', gap: '1rem' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.45rem', fontWeight: 600 }}>Driver Account</label>
+            <select
+              value={selectedDriverId}
+              onChange={(event) => {
+                const nextId = event.target.value;
+                const selectedDriver = driverAccounts.find((driver) => driver.id === nextId);
+                setSelectedDriverId(nextId);
+                setSelectedDriverName(selectedDriver?.name || selectedDriver?.email || 'Selected driver');
+                setDriverFormData(emptyFormState);
+              }}
+              style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #ddd' }}
+            >
+              {driverAccounts.length === 0 ? (
+                <option value="">No driver accounts found</option>
+              ) : (
+                driverAccounts.map((driver) => (
+                  <option key={driver.id} value={driver.id}>
+                    {driver.name} ({driver.email})
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+
+          {driverStatusLoading && <div style={{ color: '#666' }}>Loading selected driver security status...</div>}
+
           {hasDriverSecurityKey && (
             <div>
               <label style={{ display: 'block', marginBottom: '0.45rem', fontWeight: 600 }}>Current Driver Security Key</label>
@@ -266,7 +334,7 @@ const AdminSecurity = () => {
 
           <button
             type="submit"
-            disabled={savingDriver}
+            disabled={savingDriver || !selectedDriverId || driverStatusLoading}
             style={{
               border: 'none',
               borderRadius: '6px',

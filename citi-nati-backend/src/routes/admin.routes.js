@@ -22,7 +22,6 @@ const router = express.Router();
 const prisma = new PrismaClient();
 const MAINTENANCE_MODE_KEY = 'maintenance_mode_enabled';
 const MAINTENANCE_MESSAGE_KEY = 'maintenance_mode_message';
-const DRIVER_SECURITY_KEY_HASH_KEY = 'driver_security_key_hash';
 const DEFAULT_MAINTENANCE_MESSAGE = 'We are currently carrying out maintenance to improve your experience. We apologize for the inconvenience.';
 
 const getSettingValue = async (key, fallbackValue) => {
@@ -243,19 +242,27 @@ router.put('/security-key', verifyTokenMiddleware, verifyAdmin, async (req, res)
 });
 
 /**
- * GET /api/admin/security-key/driver/status
- * Returns whether a global driver security key has been configured
+ * GET /api/admin/security-key/driver/:userId/status
+ * Returns whether the selected driver account has configured a security key
  */
-router.get('/security-key/driver/status', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+router.get('/security-key/driver/:userId/status', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
   try {
-    const setting = await prisma.siteSetting.findUnique({
-      where: { key: DRIVER_SECURITY_KEY_HASH_KEY },
-      select: { value: true },
+    const driverUser = await prisma.user.findUnique({
+      where: { id: req.params.userId },
+      select: { id: true, role: true, driverSecurityKeyHash: true, name: true },
     });
+
+    if (!driverUser || driverUser.role !== 'driver') {
+      return res.status(404).json({ success: false, error: 'Driver account not found' });
+    }
 
     return res.json({
       success: true,
-      hasSecurityKey: Boolean(setting?.value),
+      hasSecurityKey: Boolean(driverUser.driverSecurityKeyHash),
+      driver: {
+        id: driverUser.id,
+        name: driverUser.name,
+      },
     });
   } catch (err) {
     console.error('[DRIVER SECURITY] Admin status check failed:', err.message);
@@ -264,10 +271,10 @@ router.get('/security-key/driver/status', verifyTokenMiddleware, verifyAdmin, as
 });
 
 /**
- * PUT /api/admin/security-key/driver
- * Set first global driver security key or change existing driver security key
+ * PUT /api/admin/security-key/driver/:userId
+ * Set first security key or change existing key for a selected driver account
  */
-router.put('/security-key/driver', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+router.put('/security-key/driver/:userId', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
   try {
     const { securityKey, confirmSecurityKey, currentSecurityKey } = req.body;
 
@@ -283,17 +290,21 @@ router.put('/security-key/driver', verifyTokenMiddleware, verifyAdmin, async (re
       return res.status(400).json({ success: false, error: 'Driver security key must be at least 4 characters' });
     }
 
-    const existingSetting = await prisma.siteSetting.findUnique({
-      where: { key: DRIVER_SECURITY_KEY_HASH_KEY },
-      select: { value: true },
+    const driverUser = await prisma.user.findUnique({
+      where: { id: req.params.userId },
+      select: { id: true, role: true, name: true, driverSecurityKeyHash: true },
     });
 
-    if (existingSetting?.value) {
+    if (!driverUser || driverUser.role !== 'driver') {
+      return res.status(404).json({ success: false, error: 'Driver account not found' });
+    }
+
+    if (driverUser.driverSecurityKeyHash) {
       if (!currentSecurityKey) {
         return res.status(400).json({ success: false, error: 'Current driver security key is required to change key' });
       }
 
-      const currentMatches = await bcrypt.compare(currentSecurityKey, existingSetting.value);
+      const currentMatches = await bcrypt.compare(currentSecurityKey, driverUser.driverSecurityKeyHash);
       if (!currentMatches) {
         return res.status(401).json({ success: false, error: 'Current driver security key is incorrect' });
       }
@@ -301,15 +312,14 @@ router.put('/security-key/driver', verifyTokenMiddleware, verifyAdmin, async (re
 
     const newHash = await bcrypt.hash(securityKey, 10);
 
-    await prisma.siteSetting.upsert({
-      where: { key: DRIVER_SECURITY_KEY_HASH_KEY },
-      update: { value: newHash },
-      create: { key: DRIVER_SECURITY_KEY_HASH_KEY, value: newHash },
+    await prisma.user.update({
+      where: { id: driverUser.id },
+      data: { driverSecurityKeyHash: newHash },
     });
 
     return res.json({
       success: true,
-      message: existingSetting?.value ? 'Driver security key changed successfully' : 'Driver security key set successfully',
+      message: driverUser.driverSecurityKeyHash ? 'Driver security key changed successfully' : 'Driver security key set successfully',
     });
   } catch (err) {
     console.error('[DRIVER SECURITY] Admin set/change key failed:', err.message);

@@ -8,19 +8,18 @@ const { verifyDriver } = require('../middleware/driver.middleware');
 
 const router = express.Router();
 const prisma = new PrismaClient();
-const DRIVER_SECURITY_KEY_HASH_KEY = 'driver_security_key_hash';
 
-// GET /api/drivers/security-key/status - Check if driver security key exists (DRIVER only)
+// GET /api/drivers/security-key/status - Check if current driver account has a security key (DRIVER only)
 router.get('/security-key/status', verifyTokenMiddleware, verifyDriver, async (req, res) => {
 	try {
-		const setting = await prisma.siteSetting.findUnique({
-			where: { key: DRIVER_SECURITY_KEY_HASH_KEY },
-			select: { value: true },
+		const driverUser = await prisma.user.findUnique({
+			where: { id: req.user.userId },
+			select: { driverSecurityKeyHash: true },
 		});
 
 		return res.json({
 			success: true,
-			hasSecurityKey: Boolean(setting?.value),
+			hasSecurityKey: Boolean(driverUser?.driverSecurityKeyHash),
 		});
 	} catch (err) {
 		console.error('[DRIVER SECURITY] Status check failed:', err.message);
@@ -28,7 +27,7 @@ router.get('/security-key/status', verifyTokenMiddleware, verifyDriver, async (r
 	}
 });
 
-// POST /api/drivers/security-key/verify - Verify driver security key before dashboard access (DRIVER only)
+// POST /api/drivers/security-key/verify - Verify current driver's own security key before dashboard access (DRIVER only)
 router.post('/security-key/verify', verifyTokenMiddleware, verifyDriver, async (req, res) => {
 	try {
 		const { securityKey } = req.body;
@@ -37,16 +36,16 @@ router.post('/security-key/verify', verifyTokenMiddleware, verifyDriver, async (
 			return res.status(400).json({ success: false, error: 'Security key is required' });
 		}
 
-		const setting = await prisma.siteSetting.findUnique({
-			where: { key: DRIVER_SECURITY_KEY_HASH_KEY },
-			select: { value: true },
+		const driverUser = await prisma.user.findUnique({
+			where: { id: req.user.userId },
+			select: { driverSecurityKeyHash: true },
 		});
 
-		if (!setting?.value) {
+		if (!driverUser?.driverSecurityKeyHash) {
 			return res.status(400).json({ success: false, error: 'No driver security key configured yet' });
 		}
 
-		const isValid = await bcrypt.compare(securityKey, setting.value);
+		const isValid = await bcrypt.compare(securityKey, driverUser.driverSecurityKeyHash);
 		if (!isValid) {
 			return res.status(401).json({ success: false, error: 'Invalid security key' });
 		}
