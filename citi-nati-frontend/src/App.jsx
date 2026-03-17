@@ -131,16 +131,17 @@ function AppInner() {
   const loadingFallback = <div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>Loading...</div>;
   const isMaintenanceRoute = location.pathname === '/maintenance';
   const isExemptPath = MAINTENANCE_EXEMPT_PATHS.some((path) => location.pathname === path || location.pathname.startsWith(`${path}/`));
+  const isAdminDuringMaintenance = user?.role === 'admin';
 
   if (!maintenanceState.checked) {
     return loadingFallback;
   }
 
-  if (maintenanceState.enabled && !isExemptPath) {
+  if (maintenanceState.enabled && !isExemptPath && !isAdminDuringMaintenance) {
     return <Navigate to="/maintenance" replace state={{ from: location.pathname }} />;
   }
 
-  if (!maintenanceState.enabled && isMaintenanceRoute) {
+  if (!maintenanceState.enabled && (isMaintenanceRoute || location.pathname === '/admin-login')) {
     return <Navigate to="/" replace />;
   }
 
@@ -169,12 +170,12 @@ function AppInner() {
           <Route
             path="/maintenance"
             element={
-              maintenanceState.enabled ? (
+              maintenanceState.enabled && !isAdminDuringMaintenance ? (
                 <Suspense fallback={loadingFallback}>
                   <MaintenanceMode message={maintenanceState.message} />
                 </Suspense>
               ) : (
-                <Navigate to="/" replace />
+                <Navigate to={isAdminDuringMaintenance ? "/admin" : "/"} replace />
               )
             }
           />
@@ -182,9 +183,13 @@ function AppInner() {
             path="/admin-login"
             element={
               maintenanceState.enabled ? (
-                <Suspense fallback={loadingFallback}>
-                  <AdminMaintenanceLogin />
-                </Suspense>
+                isAdminDuringMaintenance ? (
+                  <Navigate to="/admin" replace />
+                ) : (
+                  <Suspense fallback={loadingFallback}>
+                    <AdminMaintenanceLogin />
+                  </Suspense>
+                )
               ) : (
                 <Navigate to="/login" replace />
               )
