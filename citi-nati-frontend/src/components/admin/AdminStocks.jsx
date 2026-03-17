@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import api from '../../utils/api.js';
 import { getSocket } from '../../utils/socket.js';
-import { notifySuccess, notifyError } from '../../utils/notifications.js';
+import { notifySuccess, notifyError, notifyInfo } from '../../utils/notifications.js';
 import Pagination from '../ui/Pagination.jsx';
 
 /**
@@ -53,9 +53,28 @@ const AdminStocks = () => {
         console.log('[AdminStocks] Stock updated via Socket.io:', updatedProduct.id);
         
         setAllProducts(prevProducts =>
-          prevProducts.map(p =>
-            p.id === updatedProduct.id ? { ...p, stock: updatedProduct.stock } : p
-          )
+          prevProducts.map((product) => {
+            if (product.id !== updatedProduct.id) return product;
+
+            const previousStock = Number(product.stock || 0);
+            const nextStock = Number(updatedProduct.stock || 0);
+
+            if (previousStock > 0 && nextStock === 0) {
+              notifyError(
+                `🔴 ${updatedProduct.name} is now out of stock`,
+                5000,
+                `Out of stock alert. ${updatedProduct.name} is now out of stock.`
+              );
+            } else if (previousStock > lowStockThreshold && nextStock > 0 && nextStock <= lowStockThreshold) {
+              notifyInfo(
+                `🟡 Low stock alert: ${updatedProduct.name} has ${nextStock} left`,
+                5000,
+                `Low stock alert. ${updatedProduct.name} has ${nextStock} items left.`
+              );
+            }
+
+            return { ...product, stock: updatedProduct.stock };
+          })
         );
       };
 

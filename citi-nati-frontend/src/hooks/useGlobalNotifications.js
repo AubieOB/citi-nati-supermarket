@@ -14,12 +14,12 @@ export const useGlobalNotifications = () => {
   // Create stable handler functions using useCallback
   const handleNewOrder = useCallback((order) => {
     console.log('[GLOBAL_NOTIFICATIONS] Admin: New order received:', order.id);
-    notifySuccess(`🎉 New order #${order.id} from customer`, 5000);
+    notifySuccess(`🎉 New order #${order.id} from customer`, 5000, `New order placed. Order number ${order.id}.`);
   }, []);
 
   const handleOrderAssigned = useCallback((order) => {
     console.log('[GLOBAL_NOTIFICATIONS] Driver: Order assigned:', order.id);
-    notifySuccess(`📦 New order assigned: #${order.id}`, 5000);
+    notifySuccess(`📦 New order assigned: #${order.id}`, 5000, `Driver assigned. New order ${order.id}.`);
   }, []);
 
   /**
@@ -31,11 +31,11 @@ export const useGlobalNotifications = () => {
     
     // For admin: Play sound for driver status updates (IN_TRANSIT, DELIVERED, etc)
     if (order.status === 'IN_TRANSIT') {
-      notifyInfo(`🚚 Order #${order.id} is in transit!`, 5000);
+      notifyInfo(`🚚 Order #${order.id} is in transit!`, 5000, `Order ${order.id} is now in transit.`);
     } else if (order.status === 'DELIVERED') {
-      notifySuccess(`✅ Order #${order.id} has been delivered!`, 5000);
+      notifySuccess(`✅ Order #${order.id} has been delivered!`, 5000, `Order ${order.id} has been delivered.`);
     } else if (order.status === 'FAILED') {
-      notifyInfo(`❌ Order #${order.id} delivery failed`, 5000);
+      notifyInfo(`❌ Order #${order.id} delivery failed`, 5000, `Delivery failed for order ${order.id}.`);
     }
   }, []);
 
@@ -43,11 +43,11 @@ export const useGlobalNotifications = () => {
     console.log('[GLOBAL_NOTIFICATIONS] Customer: Order update received:', order.id, order.status);
 
     if (order.status === 'ASSIGNED') {
-      notifyInfo(`📍 Driver assigned to your order #${order.id}`, 5000);
+      notifyInfo(`📍 Driver assigned to your order #${order.id}`, 5000, `Driver assigned to your order ${order.id}.`);
     } else if (order.status === 'IN_TRANSIT') {
-      notifyInfo(`🚚 Your order #${order.id} is on the way!`, 5000);
+      notifyInfo(`🚚 Your order #${order.id} is on the way!`, 5000, `Your order ${order.id} is on the way.`);
     } else if (order.status === 'DELIVERED') {
-      notifySuccess(`✅ Your order #${order.id} has been delivered!`, 5000);
+      notifySuccess(`✅ Your order #${order.id} has been delivered!`, 5000, `Your order ${order.id} has been delivered.`);
     }
   }, []);
 

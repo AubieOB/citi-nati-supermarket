@@ -5,11 +5,70 @@ import toast from 'react-hot-toast';
  * Place notification.wav or notification.mp3 in /public folder
  */
 const NOTIFICATION_SOUND_URL = '/classic-door-bell.wav';
+const NOTIFICATION_SPEECH_RATE = 1;
+const NOTIFICATION_SPEECH_PITCH = 1;
+const NOTIFICATION_SPEECH_VOLUME = 1;
 
 // Create multiple audio instances for simultaneous notifications
 let audioPool = [];
 let currentAudioIndex = 0;
 const AUDIO_POOL_SIZE = 3;
+let selectedSpeechVoice = null;
+
+const cleanSpeechText = (text) => String(text || '')
+  .replace(/[\u{1F300}-\u{1FAFF}]/gu, ' ')
+  .replace(/[#*_`~]+/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+const pickSpeechVoice = () => {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return null;
+
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+
+  const preferredVoice = voices.find((voice) =>
+    /en-(US|GB)/i.test(voice.lang) && /(Google|Microsoft|Samantha|Jenny|Aria|Guy|Sara|Libby|Zira|David)/i.test(voice.name)
+  );
+
+  return preferredVoice || voices.find((voice) => /en/i.test(voice.lang)) || voices[0];
+};
+
+const speakNotification = (text) => {
+  try {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+
+    const spokenText = cleanSpeechText(text);
+    if (!spokenText) return;
+
+    if (!selectedSpeechVoice) {
+      selectedSpeechVoice = pickSpeechVoice();
+    }
+
+    const utterance = new SpeechSynthesisUtterance(spokenText);
+    utterance.rate = NOTIFICATION_SPEECH_RATE;
+    utterance.pitch = NOTIFICATION_SPEECH_PITCH;
+    utterance.volume = NOTIFICATION_SPEECH_VOLUME;
+
+    if (selectedSpeechVoice) {
+      utterance.voice = selectedSpeechVoice;
+      utterance.lang = selectedSpeechVoice.lang;
+    } else {
+      utterance.lang = 'en-US';
+    }
+
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+  } catch (err) {
+    console.warn('[Notification] Speech synthesis failed:', err.message);
+  }
+};
+
+if (typeof window !== 'undefined' && window.speechSynthesis) {
+  window.speechSynthesis.onvoiceschanged = () => {
+    selectedSpeechVoice = pickSpeechVoice();
+  };
+}
 
 /**
  * Initialize audio pool on first use
@@ -113,8 +172,9 @@ const playNotificationSound = () => {
  * @param {string} message - The notification message
  * @param {number} duration - Duration in milliseconds (default: 4000)
  */
-export const notifySuccess = (message, duration = 4000) => {
+export const notifySuccess = (message, duration = 4000, speechText = message) => {
   playNotificationSound();
+  speakNotification(speechText);
   toast.success(message, { duration });
 };
 
@@ -123,8 +183,9 @@ export const notifySuccess = (message, duration = 4000) => {
  * @param {string} message - The notification message
  * @param {number} duration - Duration in milliseconds (default: 3000)
  */
-export const notifyInfo = (message, duration = 3000) => {
+export const notifyInfo = (message, duration = 3000, speechText = message) => {
   playNotificationSound();
+  speakNotification(speechText);
   toast(message, { duration });
 };
 
@@ -133,8 +194,9 @@ export const notifyInfo = (message, duration = 3000) => {
  * @param {string} message - The notification message
  * @param {number} duration - Duration in milliseconds (default: 4000)
  */
-export const notifyError = (message, duration = 4000) => {
+export const notifyError = (message, duration = 4000, speechText = message) => {
   playNotificationSound();
+  speakNotification(speechText);
   toast.error(message, { duration });
 };
 
@@ -144,18 +206,18 @@ export const notifyError = (message, duration = 4000) => {
  * @param {string} type - 'success', 'info', or 'error'
  * @param {number} duration - Duration in milliseconds
  */
-export const notify = (message, type = 'info', duration = 3000) => {
+export const notify = (message, type = 'info', duration = 3000, speechText = message) => {
   if (type === 'success') {
-    notifySuccess(message, duration);
+    notifySuccess(message, duration, speechText);
   } else if (type === 'error') {
-    notifyError(message, duration);
+    notifyError(message, duration, speechText);
   } else {
-    notifyInfo(message, duration);
+    notifyInfo(message, duration, speechText);
   }
 };
 
 // Export playNotificationSound as named export for use in components
-export { playNotificationSound };
+export { playNotificationSound, speakNotification };
 
 export default {
   notifySuccess,
@@ -163,4 +225,5 @@ export default {
   notifyError,
   notify,
   playNotificationSound,
+  speakNotification,
 };
