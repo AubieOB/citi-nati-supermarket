@@ -16,6 +16,7 @@ const AdminPOSManagement = React.lazy(() => import('./AdminPOSManagement.jsx'));
 const SupportDashboard = React.lazy(() => import('./SupportDashboard.jsx'));
 
 import { useOrderUpdates } from '../../hooks/useOrderUpdates.js';
+import { getSpeechAlertsEnabled, setSpeechAlertsEnabled } from '../../utils/notifications.js';
 import '../../styles/global.css';
 import '../../styles/admin-dashboard.css';
 
@@ -34,6 +35,7 @@ import '../../styles/admin-dashboard.css';
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('inbox');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [speechAlertsEnabled, setSpeechAlertsPreference] = useState(() => getSpeechAlertsEnabled());
   const navigate = useNavigate();
   const tabs = [
     { id: 'inbox', label: 'Inbox', icon: 'fa-inbox' },
@@ -56,6 +58,13 @@ const AdminDashboard = () => {
     console.log('[ADMIN] Order updated - refreshing orders:', updatedOrder.id);
     // Orders will be refetched in AdminOrders component via the hook
   }, []);
+
+  const handleToggleSpeechAlerts = useCallback(() => {
+    const nextValue = !speechAlertsEnabled;
+    setSpeechAlertsEnabled(nextValue);
+    setSpeechAlertsPreference(nextValue);
+    toast.success(`Spoken alerts ${nextValue ? 'enabled' : 'disabled'}`);
+  }, [speechAlertsEnabled]);
 
   useOrderUpdates(handleOrderUpdated, { listenAll: true, role: 'admin' });
 
@@ -142,16 +151,40 @@ const AdminDashboard = () => {
           ))}
         </div>
 
-        {/* Sidebar Footer - Home Button */}
+        {/* Sidebar Footer - Preferences and Home Button */}
         <div style={{
           padding: '1rem 1.5rem',
           borderTop: '1px solid #e0e0e0',
           backgroundColor: '#fff',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          flexDirection: 'column',
+          alignItems: 'stretch',
+          gap: '0.75rem',
           flexShrink: 0
         }}>
+          <button
+            onClick={handleToggleSpeechAlerts}
+            style={{
+              width: '100%',
+              padding: '0.75rem 1rem',
+              border: 'none',
+              backgroundColor: speechAlertsEnabled ? '#e8f7ee' : '#f5f5f5',
+              color: speechAlertsEnabled ? '#1f7a45' : '#666',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '0.9rem',
+              fontWeight: '500',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <i className={`fas ${speechAlertsEnabled ? 'fa-volume-up' : 'fa-volume-mute'}`}></i>
+            <span>{speechAlertsEnabled ? 'Spoken Alerts On' : 'Spoken Alerts Off'}</span>
+          </button>
+
           {/* Home Link */}
           <button
             onClick={() => navigate('/')}

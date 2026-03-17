@@ -8,6 +8,7 @@ const NOTIFICATION_SOUND_URL = '/classic-door-bell.wav';
 const NOTIFICATION_SPEECH_RATE = 1;
 const NOTIFICATION_SPEECH_PITCH = 1;
 const NOTIFICATION_SPEECH_VOLUME = 1;
+const SPEECH_ALERTS_STORAGE_KEY = 'citi-nati-speech-alerts-enabled';
 
 // Create multiple audio instances for simultaneous notifications
 let audioPool = [];
@@ -20,6 +21,19 @@ const cleanSpeechText = (text) => String(text || '')
   .replace(/[#*_`~]+/g, ' ')
   .replace(/\s+/g, ' ')
   .trim();
+
+const getSpeechAlertsEnabled = () => {
+  if (typeof window === 'undefined') return true;
+
+  const storedValue = window.localStorage.getItem(SPEECH_ALERTS_STORAGE_KEY);
+  if (storedValue === null) return true;
+  return storedValue === 'true';
+};
+
+const setSpeechAlertsEnabled = (enabled) => {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(SPEECH_ALERTS_STORAGE_KEY, String(Boolean(enabled)));
+};
 
 const pickSpeechVoice = () => {
   if (typeof window === 'undefined' || !window.speechSynthesis) return null;
@@ -37,6 +51,7 @@ const pickSpeechVoice = () => {
 const speakNotification = (text) => {
   try {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    if (!getSpeechAlertsEnabled()) return;
 
     const spokenText = cleanSpeechText(text);
     if (!spokenText) return;
@@ -217,7 +232,7 @@ export const notify = (message, type = 'info', duration = 3000, speechText = mes
 };
 
 // Export playNotificationSound as named export for use in components
-export { playNotificationSound, speakNotification };
+export { playNotificationSound, speakNotification, getSpeechAlertsEnabled, setSpeechAlertsEnabled };
 
 export default {
   notifySuccess,
@@ -226,4 +241,6 @@ export default {
   notify,
   playNotificationSound,
   speakNotification,
+  getSpeechAlertsEnabled,
+  setSpeechAlertsEnabled,
 };
