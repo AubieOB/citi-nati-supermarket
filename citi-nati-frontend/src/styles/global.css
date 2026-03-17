@@ -313,6 +313,117 @@ body.menu-open {
     z-index: 1000;
   }
 
+  /* ========================
+     COOKIE BANNER
+     ======================== */
+
+  .cookie-banner {
+    position: fixed;
+    left: 1rem;
+    right: 1rem;
+    bottom: 1rem;
+    z-index: 2000;
+    display: flex;
+    justify-content: center;
+  }
+
+  .cookie-banner__content {
+    width: 100%;
+    max-width: 980px;
+    background: linear-gradient(135deg, #ffffff 0%, #f4f7ff 100%);
+    border: 1px solid #d8e1f3;
+    border-radius: 14px;
+    box-shadow: 0 14px 40px rgba(29, 47, 87, 0.2);
+    padding: 1rem 1.2rem;
+  }
+
+  .cookie-banner__title {
+    margin: 0 0 0.4rem 0;
+    font-size: 1.1rem;
+    color: #24335b;
+  }
+
+  .cookie-banner__text {
+    margin: 0;
+    color: #415374;
+    font-size: 0.95rem;
+  }
+
+  .cookie-banner__preferences {
+    margin-top: 0.8rem;
+    display: grid;
+    gap: 0.45rem;
+  }
+
+  .cookie-banner__option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #2f3f5e;
+    font-size: 0.92rem;
+  }
+
+  .cookie-banner__actions {
+    margin-top: 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+  }
+
+  .cookie-banner__btn {
+    border-radius: 8px;
+    padding: 0.55rem 0.9rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border: 1px solid transparent;
+  }
+
+  .cookie-banner__btn--primary {
+    background-color: #1f6f4f;
+    color: #fff;
+  }
+
+  .cookie-banner__btn--primary:hover {
+    background-color: #15573c;
+  }
+
+  .cookie-banner__btn--ghost {
+    background-color: #eef2fa;
+    color: #24335b;
+    border-color: #d2dced;
+  }
+
+  .cookie-banner__btn--ghost:hover {
+    background-color: #e0e8f7;
+  }
+
+  .cookie-banner__btn--secondary {
+    background-color: #fff;
+    color: #32456c;
+    border-color: #c7d4ec;
+  }
+
+  .cookie-banner__btn--secondary:hover {
+    background-color: #f5f8ff;
+  }
+
+  @media (max-width: 640px) {
+    .cookie-banner {
+      left: 0.6rem;
+      right: 0.6rem;
+      bottom: 0.6rem;
+    }
+
+    .cookie-banner__content {
+      padding: 0.9rem;
+    }
+
+    .cookie-banner__actions {
+      display: grid;
+      grid-template-columns: 1fr;
+    }
+  }
+
   .header__mobile-menu .header__link {
     width: 100%;
     padding: 0.75rem 1rem;

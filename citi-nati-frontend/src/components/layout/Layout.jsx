@@ -2,6 +2,7 @@ import React from 'react';
 import { useLocation } from 'react-router-dom';
 import Header from './Header.jsx';
 import Footer from './Footer.jsx';
+import CookieConsentBanner from '../common/CookieConsentBanner.jsx';
 import '../../styles/global.css';
 
 const Layout = ({ children }) => {
@@ -35,6 +36,7 @@ const Layout = ({ children }) => {
           <Footer />
         </div>
       )}
+      <CookieConsentBanner />
     </div>
   );
 };
