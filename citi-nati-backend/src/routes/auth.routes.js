@@ -1,10 +1,11 @@
 const express = require('express');
-const { login, register, googleAuth, verifyEmail, resendVerificationCode, forgotPassword, resetPassword } = require('../controllers/auth.controller');
+const { login, register, googleAuth, verifyEmail, resendVerificationCode, forgotPassword, resetPassword, logout } = require('../controllers/auth.controller');
 
 const router = express.Router();
 
 // Email/Password Authentication
 router.post('/login', login);
+router.post('/logout', logout);
 router.post('/register', register);
 
 // Email Verification

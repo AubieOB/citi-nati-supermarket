@@ -1,7 +1,24 @@
 const { verifyToken } = require('../utils/jwt');
 
+const extractTokenFromCookies = (cookieHeader) => {
+  if (!cookieHeader || typeof cookieHeader !== 'string') {
+    return null;
+  }
+
+  const cookies = cookieHeader.split(';').map((part) => part.trim());
+  const authCookie = cookies.find((part) => part.startsWith('auth_token='));
+
+  if (!authCookie) {
+    return null;
+  }
+
+  return decodeURIComponent(authCookie.slice('auth_token='.length));
+};
+
 const verifyTokenMiddleware = (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
+  const bearerToken = req.headers.authorization?.split(' ')[1];
+  const cookieToken = req.cookies?.auth_token || extractTokenFromCookies(req.headers.cookie);
+  const token = bearerToken || cookieToken;
 
   if (!token) {
     return res.status(401).json({ error: 'No token provided' });

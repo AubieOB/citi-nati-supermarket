@@ -8,6 +8,31 @@ const { generateVerificationCode } = require('../utils/verificationCode');
 
 const prisma = new PrismaClient();
 
+const AUTH_COOKIE_NAME = 'auth_token';
+
+const getCookieOptions = () => {
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    maxAge: 24 * 60 * 60 * 1000,
+    path: '/',
+  };
+};
+
+const setAuthCookie = (res, token) => {
+  res.cookie(AUTH_COOKIE_NAME, token, getCookieOptions());
+};
+
+const clearAuthCookie = (res) => {
+  res.clearCookie(AUTH_COOKIE_NAME, {
+    ...getCookieOptions(),
+    maxAge: undefined,
+  });
+};
+
 /**
  * LOGIN ENDPOINT
  * Allows users to login regardless of email verification status
@@ -40,6 +65,7 @@ const login = async (req, res) => {
 
     // Generate JWT token
     const token = generateToken(user.id, user.role, user.email);
+    setAuthCookie(res, token);
 
     return res.json({
       token,
@@ -405,6 +431,7 @@ const resetPassword = async (req, res) => {
 
     // Generate JWT token for automatic login
     const token = generateToken(updatedUser.id, updatedUser.role, updatedUser.email);
+    setAuthCookie(res, token);
 
     return res.json({
       message: 'Password reset successful. You are now logged in.',
@@ -456,6 +483,7 @@ const googleAuth = async (req, res) => {
       console.log(`[AUTH] ✅ Google user found, logging in: ${email}`);
 
       const jwtToken = generateToken(user.id, user.role, user.email);
+      setAuthCookie(res, jwtToken);
 
       return res.json({
         token: jwtToken,
@@ -495,6 +523,7 @@ const googleAuth = async (req, res) => {
     await notifyNewUserRegistration(newUser);
 
     const jwtToken = generateToken(newUser.id, newUser.role, newUser.email);
+    setAuthCookie(res, jwtToken);
 
     return res.status(201).json({
       message: 'User registered and logged in successfully',
@@ -516,6 +545,20 @@ const googleAuth = async (req, res) => {
   }
 };
 
+/**
+ * LOGOUT ENDPOINT
+ * Clears cookie-based auth session
+ */
+const logout = async (req, res) => {
+  try {
+    clearAuthCookie(res);
+    return res.json({ success: true, message: 'Logged out successfully' });
+  } catch (err) {
+    console.error('[AUTH] Logout error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 module.exports = {
   login,
   register,
@@ -524,4 +567,5 @@ module.exports = {
   resendVerificationCode,
   forgotPassword,
   resetPassword,
+  logout,
 };

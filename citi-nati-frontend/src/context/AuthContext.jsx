@@ -85,6 +85,10 @@ export const AuthProvider = ({ children }) => {
    * - Redirect to home (will happen in calling component)
    */
   const logout = () => {
+    api.post('/auth/logout').catch((err) => {
+      console.warn('Logout cookie clear failed:', err?.response?.data?.error || err.message);
+    });
+
     tokenStorage.clear();
     clearAuthToken();
     setToken(null);
