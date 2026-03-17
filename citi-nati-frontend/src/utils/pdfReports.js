@@ -621,6 +621,32 @@ export const generateAdminProductsTablePDF = (products, options = {}) => {
 
   const html = `
     <div style="font-family: Arial, sans-serif; color: #222; padding: 16px; width: 1120px; box-sizing: border-box;">
+      <style>
+        .pdf-products-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 12px;
+          table-layout: fixed;
+          page-break-inside: auto;
+        }
+
+        .pdf-products-table thead {
+          display: table-header-group;
+        }
+
+        .pdf-products-table tr {
+          page-break-inside: avoid;
+          break-inside: avoid;
+          page-break-after: auto;
+        }
+
+        .pdf-products-table td,
+        .pdf-products-table th {
+          page-break-inside: avoid;
+          break-inside: avoid;
+        }
+      </style>
+
       <div style="border-bottom: 3px solid #2D8659; padding-bottom: 12px; margin-bottom: 16px;">
         <h1 style="margin: 0; color: #2D8659; font-size: 22px;">Citi-Nati Supermarket</h1>
         <p style="margin: 6px 0 0 0; font-size: 13px;">Admin Products Table Export</p>
@@ -629,7 +655,7 @@ export const generateAdminProductsTablePDF = (products, options = {}) => {
         <p style="margin: 4px 0 0 0; font-size: 12px; color: #666;">Generated: ${escapeHtml(dateText)} ${escapeHtml(timeText)}</p>
       </div>
 
-      <table style="width: 100%; border-collapse: collapse; font-size: 12px; page-break-inside: auto; table-layout: fixed;">
+      <table class="pdf-products-table">
         <colgroup>
           <col style="width: 9%;" />
           <col style="width: 24%;" />
@@ -674,7 +700,10 @@ export const generateAdminProductsTablePDF = (products, options = {}) => {
       windowWidth: 1200
     },
     jsPDF: { orientation: 'landscape', unit: 'mm', format: 'a4', compress: false },
-    pagebreak: { mode: ['css', 'legacy'] }
+    pagebreak: {
+      mode: ['avoid-all', 'css', 'legacy'],
+      avoid: ['tr', 'td', 'th', 'thead', 'tbody']
+    }
   };
 
   return html2pdf().set(opt).from(element).save();
