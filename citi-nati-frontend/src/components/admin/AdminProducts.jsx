@@ -55,6 +55,72 @@ const AdminProducts = () => {
   const voiceEnabledRef = useRef(false);
   const { modal, closeModal, showConfirm, showError, showSuccess } = useModal();
 
+  const voiceDigitMap = {
+    zero: '0',
+    one: '1',
+    two: '2',
+    three: '3',
+    four: '4',
+    five: '5',
+    six: '6',
+    seven: '7',
+    eight: '8',
+    nine: '9',
+    oh: '0'
+  };
+
+  const normalizeVoiceSearchText = (text) => {
+    if (!text) return '';
+
+    const cleanedText = text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, ' ')
+      .trim();
+
+    const tokens = cleanedText.split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) return text;
+
+    const numericTokenCount = tokens.filter(token =>
+      /^\d+$/.test(token) ||
+      Object.prototype.hasOwnProperty.call(voiceDigitMap, token) ||
+      token === 'double' ||
+      token === 'triple' ||
+      token === 'dash' ||
+      token === 'hyphen'
+    ).length;
+
+    const shouldConvertToDigits = numericTokenCount >= 2 && (numericTokenCount / tokens.length) >= 0.8;
+    if (!shouldConvertToDigits) return text;
+
+    const digits = [];
+
+    for (let i = 0; i < tokens.length; i += 1) {
+      const token = tokens[i];
+
+      if (/^\d+$/.test(token)) {
+        digits.push(token);
+        continue;
+      }
+
+      if (token === 'double' || token === 'triple') {
+        const nextToken = tokens[i + 1];
+        const mappedDigit = voiceDigitMap[nextToken] || (/^\d+$/.test(nextToken || '') ? nextToken : null);
+
+        if (mappedDigit) {
+          digits.push(token === 'double' ? mappedDigit.repeat(2) : mappedDigit.repeat(3));
+          i += 1;
+        }
+        continue;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(voiceDigitMap, token)) {
+        digits.push(voiceDigitMap[token]);
+      }
+    }
+
+    return digits.length > 0 ? digits.join('') : text;
+  };
+
   // Fetch products on mount
   useEffect(() => {
     fetchProducts();
@@ -83,7 +149,8 @@ const AdminProducts = () => {
         .trim();
 
       if (!spokenText) return;
-      setSearchTerm(spokenText);
+      const normalizedVoiceSearch = normalizeVoiceSearchText(spokenText);
+      setSearchTerm(normalizedVoiceSearch);
       setCurrentPage(1);
     };
 
