@@ -41,17 +41,17 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const tabs = [
     { id: 'inbox', label: 'Inbox', icon: 'fa-inbox' },
+    { id: 'orders', label: 'Orders', icon: 'fa-list' },
+    { id: 'refunds', label: 'Refunds', icon: 'fa-undo' },
+    { id: 'support', label: 'Support', icon: 'fa-life-ring' },
     { id: 'products', label: 'Products', icon: 'fa-box' },
     { id: 'stocks', label: 'Stocks', icon: 'fa-warehouse' },
-    { id: 'security', label: 'Security', icon: 'fa-key' },
     { id: 'promotions', label: 'Promotions', icon: 'fa-tags' },
     { id: 'pos-management', label: 'POS Management', icon: 'fa-database' },
-    { id: 'orders', label: 'Orders', icon: 'fa-list' },
     { id: 'users', label: 'Users', icon: 'fa-users' },
     { id: 'drivers', label: 'Drivers', icon: 'fa-car' },
     { id: 'sales', label: 'Sales', icon: 'fa-dollar-sign' },
-    { id: 'refunds', label: 'Refunds', icon: 'fa-undo' },
-    { id: 'support', label: 'Support', icon: 'fa-life-ring' },
+    { id: 'security', label: 'Security', icon: 'fa-key' },
   ];
 
   /**
