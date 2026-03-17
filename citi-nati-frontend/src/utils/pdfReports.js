@@ -621,7 +621,7 @@ export const generateAdminProductsTablePDF = (products, options = {}) => {
   }).join('');
 
   const html = `
-    <div style="font-family: Arial, sans-serif; color: #222; padding: 16px;">
+    <div style="font-family: Arial, sans-serif; color: #222; padding: 16px; width: 1600px; box-sizing: border-box;">
       <div style="border-bottom: 3px solid #2D8659; padding-bottom: 12px; margin-bottom: 16px;">
         <h1 style="margin: 0; color: #2D8659; font-size: 22px;">Citi-Nati Supermarket</h1>
         <p style="margin: 6px 0 0 0; font-size: 13px;">Admin Products Table Export</p>
@@ -630,17 +630,17 @@ export const generateAdminProductsTablePDF = (products, options = {}) => {
         <p style="margin: 4px 0 0 0; font-size: 12px; color: #666;">Generated: ${escapeHtml(dateText)} ${escapeHtml(timeText)}</p>
       </div>
 
-      <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 11px; page-break-inside: auto;">
         <thead>
           <tr style="background-color: #2D8659; color: white;">
-            <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">ID</th>
-            <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Name</th>
-            <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Product Code</th>
-            <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Category</th>
-            <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Pricing</th>
-            <th style="padding: 8px; border: 1px solid #ddd; text-align: center;">Stock</th>
-            <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Expiry Status</th>
-            <th style="padding: 8px; border: 1px solid #ddd; text-align: center;">Actions</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">ID</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Name</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Product Code</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Category</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Pricing</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: center;">Stock</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Expiry Status</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: center;">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -655,11 +655,19 @@ export const generateAdminProductsTablePDF = (products, options = {}) => {
 
   const safeCategory = categoryLabel.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
   const opt = {
-    margin: 8,
+    margin: 6,
     filename: `admin-products-${safeCategory || 'all-categories'}-${today.toISOString().split('T')[0]}.pdf`,
     image: { type: 'png', quality: 1.0 },
-    html2canvas: { scale: 2, logging: false, useCORS: true, backgroundColor: '#ffffff' },
-    jsPDF: { orientation: 'landscape', unit: 'mm', format: 'a4', compress: true }
+    html2canvas: {
+      scale: 4,
+      logging: false,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      letterRendering: true,
+      windowWidth: 1800
+    },
+    jsPDF: { orientation: 'landscape', unit: 'mm', format: 'a3', compress: false },
+    pagebreak: { mode: ['css', 'legacy'] }
   };
 
   return html2pdf().set(opt).from(element).save();
