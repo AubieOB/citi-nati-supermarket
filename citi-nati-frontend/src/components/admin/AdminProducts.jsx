@@ -6,6 +6,7 @@ import { getSocket } from '../../utils/socket.js';
 import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
 import Pagination from '../ui/Pagination.jsx';
+import { generateAdminProductsTablePDF } from '../../utils/pdfReports.js';
 
 /**
  * 📦 ADMIN PRODUCTS MANAGEMENT - ENHANCED
@@ -45,6 +46,7 @@ const AdminProducts = () => {
   const [onSaleOnly, setOnSaleOnly] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState('products'); // 'products' or 'expiry-alerts'
   const [currentPage, setCurrentPage] = useState(1);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const pageSize = 20;
   const searchTimeoutRef = useRef(null);
   const { modal, closeModal, showConfirm, showError, showSuccess } = useModal();
@@ -428,6 +430,28 @@ const AdminProducts = () => {
     setEditingId(null);
     setShowForm(false);
     setFormError('');
+  };
+
+  const handleDownloadProductsPdf = async () => {
+    try {
+      const productsForPdf = products
+        .filter(product => !product.hideFromProductsPage)
+        .filter(product => !selectedCategory || product.category === selectedCategory);
+
+      if (productsForPdf.length === 0) {
+        showError('No products to export', 'There are no products available for the selected category.');
+        return;
+      }
+
+      setIsExportingPdf(true);
+      await generateAdminProductsTablePDF(productsForPdf, { selectedCategory });
+      showSuccess('Success', `PDF downloaded with ${productsForPdf.length} product(s).`);
+    } catch (err) {
+      console.error('[ADMIN PRODUCTS] PDF export failed:', err);
+      showError('PDF export failed', 'Unable to generate products PDF. Please try again.');
+    } finally {
+      setIsExportingPdf(false);
+    }
   };
 
   return (
@@ -906,6 +930,28 @@ const AdminProducts = () => {
             />
             <span style={{ fontWeight: onSaleOnly ? '600' : '400' }}>Promotions</span>
           </label>
+
+          <button
+            onClick={handleDownloadProductsPdf}
+            disabled={isExportingPdf}
+            style={{
+              padding: '0.6rem 1rem',
+              border: 'none',
+              borderRadius: '6px',
+              backgroundColor: isExportingPdf ? '#6c757d' : '#2D8659',
+              color: '#fff',
+              fontSize: '0.9rem',
+              fontWeight: '600',
+              cursor: isExportingPdf ? 'not-allowed' : 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}
+            title="Download products table PDF"
+          >
+            <i className={`fas ${isExportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`}></i>
+            {isExportingPdf ? 'Generating PDF...' : 'Download PDF'}
+          </button>
 
           {/* Results Count */}
           <div style={{

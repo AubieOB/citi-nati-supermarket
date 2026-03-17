@@ -573,3 +573,94 @@ export const generateOrderReceiptPDF = (order) => {
 
   html2pdf().set(opt).from(element).save();
 };
+
+const escapeHtml = (value) => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const formatProductsCurrency = (amount) => {
+  const numericAmount = Number(amount || 0);
+  return `MWK ${new Intl.NumberFormat('en-US').format(numericAmount)}`;
+};
+
+export const generateAdminProductsTablePDF = (products, options = {}) => {
+  const { selectedCategory = '' } = options;
+  const today = new Date();
+  const dateText = today.toLocaleDateString();
+  const timeText = today.toLocaleTimeString();
+  const categoryLabel = selectedCategory || 'All Categories';
+
+  const rowsHtml = products.map((product, idx) => {
+    const productCode = product.productCode || product.sourceCode || product.code || '—';
+    const finalPrice = product.isOnSale && product.discountPrice ? product.discountPrice : product.price;
+    const pricingText = product.isOnSale && product.discountPrice && product.originalPrice
+      ? `${formatProductsCurrency(product.originalPrice)} -> ${formatProductsCurrency(finalPrice)}`
+      : formatProductsCurrency(finalPrice);
+
+    const expiryText = product.expiryStatus?.status
+      ? (product.expiryStatus.status === 'expired'
+        ? 'Expired'
+        : `${product.expiryStatus.daysRemaining ?? ''}d left`)
+      : '—';
+
+    return `
+      <tr style="background-color: ${idx % 2 === 0 ? '#fff' : '#f9f9f9'};">
+        <td style="padding: 8px; border: 1px solid #ddd;">#${escapeHtml(product.id)}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(product.name)}</td>
+        <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">${escapeHtml(productCode)}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(product.category || 'N/A')}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(pricingText)}</td>
+        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${escapeHtml(product.stock)}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(expiryText)}</td>
+        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">Edit / Delete</td>
+      </tr>
+    `;
+  }).join('');
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; color: #222; padding: 16px;">
+      <div style="border-bottom: 3px solid #2D8659; padding-bottom: 12px; margin-bottom: 16px;">
+        <h1 style="margin: 0; color: #2D8659; font-size: 22px;">Citi-Nati Supermarket</h1>
+        <p style="margin: 6px 0 0 0; font-size: 13px;">Admin Products Table Export</p>
+        <p style="margin: 4px 0 0 0; font-size: 12px; color: #666;">Category: ${escapeHtml(categoryLabel)}</p>
+        <p style="margin: 4px 0 0 0; font-size: 12px; color: #666;">Products: ${products.length}</p>
+        <p style="margin: 4px 0 0 0; font-size: 12px; color: #666;">Generated: ${escapeHtml(dateText)} ${escapeHtml(timeText)}</p>
+      </div>
+
+      <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+        <thead>
+          <tr style="background-color: #2D8659; color: white;">
+            <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">ID</th>
+            <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Name</th>
+            <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Product Code</th>
+            <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Category</th>
+            <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Pricing</th>
+            <th style="padding: 8px; border: 1px solid #ddd; text-align: center;">Stock</th>
+            <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Expiry Status</th>
+            <th style="padding: 8px; border: 1px solid #ddd; text-align: center;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  const element = document.createElement('div');
+  element.innerHTML = html;
+
+  const safeCategory = categoryLabel.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  const opt = {
+    margin: 8,
+    filename: `admin-products-${safeCategory || 'all-categories'}-${today.toISOString().split('T')[0]}.pdf`,
+    image: { type: 'png', quality: 1.0 },
+    html2canvas: { scale: 2, logging: false, useCORS: true, backgroundColor: '#ffffff' },
+    jsPDF: { orientation: 'landscape', unit: 'mm', format: 'a4', compress: true }
+  };
+
+  return html2pdf().set(opt).from(element).save();
+};
