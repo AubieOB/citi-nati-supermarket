@@ -25,6 +25,14 @@
   min-height: 100vh;
 }
 
+.admin-sidebar.collapsed {
+  width: 82px;
+}
+
+.admin-main-content.collapsed {
+  margin-left: 82px;
+}
+
 .admin-content-area {
   flex: 1;
   overflow: auto;
@@ -34,6 +42,10 @@
 
 .admin-hamburger {
   display: none;
+}
+
+.admin-collapse-button {
+  display: flex;
 }
 
 .mobile-overlay {
@@ -69,6 +81,10 @@
     transform: translateX(-100%);
   }
 
+  .admin-sidebar.collapsed {
+    width: 280px;
+  }
+
   .admin-sidebar.open {
     transform: translateX(0);
   }
@@ -91,6 +107,14 @@
   .admin-main-content {
     margin-left: 0;
     padding-top: 3.5rem;
+  }
+
+  .admin-main-content.collapsed {
+    margin-left: 0;
+  }
+
+  .admin-collapse-button {
+    display: none;
   }
 
   .admin-content-area {

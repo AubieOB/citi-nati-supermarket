@@ -36,6 +36,7 @@ import '../../styles/admin-dashboard.css';
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('inbox');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [speechAlertsEnabled, setSpeechAlertsPreference] = useState(() => getSpeechAlertsEnabled());
   const navigate = useNavigate();
   const tabs = [
@@ -89,10 +90,10 @@ const AdminDashboard = () => {
       )}
 
       {/* Fixed Left Sidebar Navigation */}
-      <div className={`admin-sidebar ${sidebarOpen ? 'open' : ''}`}>
+      <div className={`admin-sidebar ${sidebarOpen ? 'open' : ''} ${sidebarCollapsed ? 'collapsed' : ''}`}>
         {/* Sidebar Logo/Title */}
         <div style={{
-          padding: '1rem 1.5rem',
+          padding: sidebarCollapsed ? '1rem 0.75rem' : '1rem 1.5rem',
           borderBottom: '1px solid #e0e0e0',
           marginBottom: '1rem',
           color: '#5B4B8A',
@@ -100,11 +101,33 @@ const AdminDashboard = () => {
           fontSize: '1rem',
           display: 'flex',
           alignItems: 'center',
+          justifyContent: sidebarCollapsed ? 'center' : 'space-between',
           gap: '0.5rem',
           flexShrink: 0
         }}>
-          <i className="fas fa-shield-alt"></i>
-          <span>Citi-Nati - Admin</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <i className="fas fa-shield-alt"></i>
+            {!sidebarCollapsed && <span>Citi-Nati - Admin</span>}
+          </div>
+          <button
+            className="admin-collapse-button"
+            onClick={() => setSidebarCollapsed(prev => !prev)}
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            style={{
+              border: 'none',
+              backgroundColor: '#f3f0fa',
+              color: '#5B4B8A',
+              borderRadius: '4px',
+              width: '28px',
+              height: '28px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <i className={`fas ${sidebarCollapsed ? 'fa-angle-right' : 'fa-angle-left'}`}></i>
+          </button>
         </div>
 
         {/* Sidebar Menu Items Container - Grows to fill space */}
@@ -122,7 +145,7 @@ const AdminDashboard = () => {
               }}
               style={{
                 width: '100%',
-                padding: '1rem 1.5rem',
+                padding: sidebarCollapsed ? '1rem 0.75rem' : '1rem 1.5rem',
                 border: 'none',
                 backgroundColor: 'transparent',
                 borderLeft: activeTab === tab.id ? '4px solid #5B4B8A' : '4px solid transparent',
@@ -131,10 +154,11 @@ const AdminDashboard = () => {
                 cursor: 'pointer',
                 fontSize: '0.95rem',
                 transition: 'all 0.2s ease',
-                textAlign: 'left',
+                textAlign: sidebarCollapsed ? 'center' : 'left',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.75rem'
+                justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                gap: sidebarCollapsed ? '0' : '0.75rem'
               }}
               onMouseOver={(e) => {
                 if (activeTab !== tab.id) {
@@ -148,14 +172,14 @@ const AdminDashboard = () => {
               }}
             >
               <i className={`fas ${tab.icon}`} style={{ width: '20px', textAlign: 'center' }}></i>
-              <span>{tab.label}</span>
+              {!sidebarCollapsed && <span>{tab.label}</span>}
             </button>
           ))}
         </div>
 
         {/* Sidebar Footer - Preferences and Home Button */}
         <div style={{
-          padding: '1rem 1.5rem',
+          padding: sidebarCollapsed ? '1rem 0.75rem' : '1rem 1.5rem',
           borderTop: '1px solid #e0e0e0',
           backgroundColor: '#fff',
           display: 'flex',
@@ -179,12 +203,12 @@ const AdminDashboard = () => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '0.5rem',
+              gap: sidebarCollapsed ? '0' : '0.5rem',
               transition: 'all 0.2s ease'
             }}
           >
             <i className={`fas ${speechAlertsEnabled ? 'fa-volume-up' : 'fa-volume-mute'}`}></i>
-            <span>{speechAlertsEnabled ? 'Spoken Alerts On' : 'Spoken Alerts Off'}</span>
+            {!sidebarCollapsed && <span>{speechAlertsEnabled ? 'Spoken Alerts On' : 'Spoken Alerts Off'}</span>}
           </button>
 
           {/* Home Link */}
@@ -203,7 +227,7 @@ const AdminDashboard = () => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '0.5rem',
+              gap: sidebarCollapsed ? '0' : '0.5rem',
               transition: 'all 0.2s ease'
             }}
             onMouseOver={(e) => {
@@ -214,13 +238,13 @@ const AdminDashboard = () => {
             }}
           >
             <i className="fas fa-home" style={{ fontSize: '1rem' }}></i>
-            <span>Home</span>
+            {!sidebarCollapsed && <span>Home</span>}
           </button>
         </div>
       </div>
 
       {/* Main Content Area (with left margin for fixed sidebar) */}
-      <div className="admin-main-content">
+      <div className={`admin-main-content ${sidebarCollapsed ? 'collapsed' : ''}`}>
         {/* Scrollable Content */}
         <div className="admin-content-area">
           <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>Loading...</div>}>
