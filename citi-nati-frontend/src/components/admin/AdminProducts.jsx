@@ -47,14 +47,104 @@ const AdminProducts = () => {
   const [activeSubTab, setActiveSubTab] = useState('products'); // 'products' or 'expiry-alerts'
   const [currentPage, setCurrentPage] = useState(1);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isVoiceSearchEnabled, setIsVoiceSearchEnabled] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const pageSize = 20;
   const searchTimeoutRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const voiceEnabledRef = useRef(false);
   const { modal, closeModal, showConfirm, showError, showSuccess } = useModal();
 
   // Fetch products on mount
   useEffect(() => {
     fetchProducts();
   }, []);
+
+  useEffect(() => {
+    voiceEnabledRef.current = isVoiceSearchEnabled;
+  }, [isVoiceSearchEnabled]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return undefined;
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event) => {
+      const spokenText = Array.from(event.results)
+        .slice(event.resultIndex)
+        .map(result => result[0]?.transcript || '')
+        .join(' ')
+        .trim();
+
+      if (!spokenText) return;
+      setSearchTerm(spokenText);
+      setCurrentPage(1);
+    };
+
+    recognition.onerror = (event) => {
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        setIsVoiceSearchEnabled(false);
+        setIsListening(false);
+        showError('Microphone access denied', 'Please allow microphone access to use voice search.');
+      }
+    };
+
+    recognition.onend = () => {
+      if (!voiceEnabledRef.current) {
+        setIsListening(false);
+        return;
+      }
+
+      try {
+        recognition.start();
+        setIsListening(true);
+      } catch (err) {
+        console.warn('[AdminProducts] Voice recognition restart failed:', err.message);
+        setIsListening(false);
+      }
+    };
+
+    recognitionRef.current = recognition;
+
+    return () => {
+      recognition.onend = null;
+      recognition.onerror = null;
+      recognition.onresult = null;
+      try {
+        recognition.stop();
+      } catch (err) {
+        console.warn('[AdminProducts] Voice recognition stop failed:', err.message);
+      }
+      recognitionRef.current = null;
+    };
+  }, [showError]);
+
+  useEffect(() => {
+    const recognition = recognitionRef.current;
+    if (!recognition) return;
+
+    if (isVoiceSearchEnabled) {
+      try {
+        recognition.start();
+        setIsListening(true);
+      } catch (err) {
+        console.warn('[AdminProducts] Voice recognition start failed:', err.message);
+      }
+    } else {
+      try {
+        recognition.stop();
+      } catch (err) {
+        console.warn('[AdminProducts] Voice recognition stop failed:', err.message);
+      }
+      setIsListening(false);
+    }
+  }, [isVoiceSearchEnabled]);
 
   /**
    * Listen for real-time product updates from admin changes
@@ -266,6 +356,18 @@ const AdminProducts = () => {
   const handleSaleFilterChange = (value) => {
     setOnSaleOnly(value);
     setCurrentPage(1); // Reset to page 1
+  };
+
+  const handleToggleVoiceSearch = () => {
+    if (typeof window === 'undefined') return;
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      showError('Voice search unavailable', 'This browser does not support voice recognition. Try Chrome or Edge.');
+      return;
+    }
+
+    setIsVoiceSearchEnabled(prev => !prev);
   };
 
   const handleFormChange = (e) => {
@@ -891,6 +993,27 @@ const AdminProducts = () => {
               e.target.style.boxShadow = 'none';
             }}
           />
+
+          <button
+            onClick={handleToggleVoiceSearch}
+            style={{
+              padding: '0.6rem 0.9rem',
+              border: 'none',
+              borderRadius: '6px',
+              backgroundColor: isVoiceSearchEnabled ? '#dc3545' : '#0d6efd',
+              color: '#fff',
+              fontSize: '0.9rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+            }}
+            title={isVoiceSearchEnabled ? 'Disable voice search' : 'Enable voice search'}
+          >
+            <i className={`fas ${isListening ? 'fa-microphone-alt' : 'fa-microphone'}`}></i>
+            {isVoiceSearchEnabled ? (isListening ? 'Listening...' : 'Voice On') : 'Talk Search'}
+          </button>
 
           {/* Category Filter */}
           <select
