@@ -845,7 +845,7 @@ const AdminProducts = () => {
           {/* Search Input */}
           <input
             type="text"
-            placeholder="Search by name or category..."
+            placeholder="Search by name, category or product code..."
             value={searchTerm}
             onChange={handleSearchChange}
             style={{
