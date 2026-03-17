@@ -27,6 +27,7 @@ model User {
   name                    String
   email                   String   @unique
   passwordHash            String
+  adminSecurityKeyHash    String?
   role                    String   @default("user")
   isActive                Boolean  @default(true)
   emailVerified           Boolean  @default(false)

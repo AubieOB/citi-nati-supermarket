@@ -12,6 +12,7 @@ const AdminInbox = React.lazy(() => import('../../components/admin/AdminInbox.js
 const AdminRefunds = React.lazy(() => import('../../components/admin/AdminRefunds.jsx'));
 const AdminPromotions = React.lazy(() => import('../../components/admin/AdminPromotions.jsx'));
 const AdminStocks = React.lazy(() => import('../../components/admin/AdminStocks.jsx'));
+const AdminSecurity = React.lazy(() => import('../../components/admin/AdminSecurity.jsx'));
 const AdminPOSManagement = React.lazy(() => import('./AdminPOSManagement.jsx'));
 const SupportDashboard = React.lazy(() => import('./SupportDashboard.jsx'));
 
@@ -41,6 +42,7 @@ const AdminDashboard = () => {
     { id: 'inbox', label: 'Inbox', icon: 'fa-inbox' },
     { id: 'products', label: 'Products', icon: 'fa-box' },
     { id: 'stocks', label: 'Stocks', icon: 'fa-warehouse' },
+    { id: 'security', label: 'Security', icon: 'fa-key' },
     { id: 'promotions', label: 'Promotions', icon: 'fa-tags' },
     { id: 'pos-management', label: 'POS Management', icon: 'fa-database' },
     { id: 'orders', label: 'Orders', icon: 'fa-list' },
@@ -225,6 +227,7 @@ const AdminDashboard = () => {
             {activeTab === 'inbox' && <AdminInbox />}
             {activeTab === 'products' && <AdminProducts />}
             {activeTab === 'stocks' && <AdminStocks />}
+            {activeTab === 'security' && <AdminSecurity />}
             {activeTab === 'promotions' && <AdminPromotions />}
             {activeTab === 'pos-management' && <AdminPOSManagement />}
             {activeTab === 'orders' && <AdminOrders />}

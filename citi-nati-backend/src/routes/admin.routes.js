@@ -10,6 +10,7 @@
  */
 
 const express = require('express');
+const bcrypt = require('bcrypt');
 const { verifyTokenMiddleware } = require('../middleware/auth.middleware');
 const { verifyAdmin } = require('../middleware/admin.middleware');
 const { PrismaClient } = require('@prisma/client');
@@ -57,6 +58,125 @@ router.get('/dashboard', verifyTokenMiddleware, verifyAdmin, async (req, res) =>
   } catch (err) {
     console.error('Dashboard error:', err);
     res.status(500).json({ error: 'Failed to fetch dashboard data' });
+  }
+});
+
+/**
+ * GET /api/admin/security-key/status
+ * Returns whether current admin has configured a security key
+ */
+router.get('/security-key/status', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const adminUser = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { adminSecurityKeyHash: true }
+    });
+
+    if (!adminUser) {
+      return res.status(404).json({ success: false, error: 'Admin user not found' });
+    }
+
+    return res.json({
+      success: true,
+      hasSecurityKey: Boolean(adminUser.adminSecurityKeyHash),
+    });
+  } catch (err) {
+    console.error('[ADMIN SECURITY] Status check failed:', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to check security key status' });
+  }
+});
+
+/**
+ * POST /api/admin/security-key/verify
+ * Verify security key before allowing admin dashboard access
+ */
+router.post('/security-key/verify', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const { securityKey } = req.body;
+
+    if (!securityKey || typeof securityKey !== 'string') {
+      return res.status(400).json({ success: false, error: 'Security key is required' });
+    }
+
+    const adminUser = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { adminSecurityKeyHash: true }
+    });
+
+    if (!adminUser) {
+      return res.status(404).json({ success: false, error: 'Admin user not found' });
+    }
+
+    if (!adminUser.adminSecurityKeyHash) {
+      return res.status(400).json({ success: false, error: 'No security key configured yet' });
+    }
+
+    const isValid = await bcrypt.compare(securityKey, adminUser.adminSecurityKeyHash);
+    if (!isValid) {
+      return res.status(401).json({ success: false, error: 'Invalid security key' });
+    }
+
+    return res.json({ success: true, verified: true });
+  } catch (err) {
+    console.error('[ADMIN SECURITY] Verification failed:', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to verify security key' });
+  }
+});
+
+/**
+ * PUT /api/admin/security-key
+ * Set first security key or change existing security key
+ */
+router.put('/security-key', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const { securityKey, confirmSecurityKey, currentSecurityKey } = req.body;
+
+    if (!securityKey || !confirmSecurityKey) {
+      return res.status(400).json({ success: false, error: 'Enter and confirm security key are required' });
+    }
+
+    if (securityKey !== confirmSecurityKey) {
+      return res.status(400).json({ success: false, error: 'Security key confirmation does not match' });
+    }
+
+    if (securityKey.trim().length < 4) {
+      return res.status(400).json({ success: false, error: 'Security key must be at least 4 characters' });
+    }
+
+    const adminUser = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { id: true, adminSecurityKeyHash: true }
+    });
+
+    if (!adminUser) {
+      return res.status(404).json({ success: false, error: 'Admin user not found' });
+    }
+
+    if (adminUser.adminSecurityKeyHash) {
+      if (!currentSecurityKey) {
+        return res.status(400).json({ success: false, error: 'Current security key is required to change key' });
+      }
+
+      const currentMatches = await bcrypt.compare(currentSecurityKey, adminUser.adminSecurityKeyHash);
+      if (!currentMatches) {
+        return res.status(401).json({ success: false, error: 'Current security key is incorrect' });
+      }
+    }
+
+    const newHash = await bcrypt.hash(securityKey, 10);
+
+    await prisma.user.update({
+      where: { id: req.user.userId },
+      data: { adminSecurityKeyHash: newHash }
+    });
+
+    return res.json({
+      success: true,
+      message: adminUser.adminSecurityKeyHash ? 'Security key changed successfully' : 'Security key set successfully',
+    });
+  } catch (err) {
+    console.error('[ADMIN SECURITY] Set/change key failed:', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to save security key' });
   }
 });
 
