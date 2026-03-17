@@ -263,6 +263,7 @@ const getProducts = async (req, res) => {
       select: {
         id: true,
         name: true,
+        sourceCode: true,
         price: true,
         image: true,
         stock: true,
@@ -315,6 +316,7 @@ const getProductById = async (req, res) => {
       select: {
         id: true,
         name: true,
+        sourceCode: true,
         price: true,
         image: true,
         stock: true,
