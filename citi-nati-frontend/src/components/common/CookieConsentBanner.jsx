@@ -55,20 +55,20 @@ const CookieConsentBanner = () => {
   };
 
   return (
-    <div className="cookie-popup-overlay" role="dialog" aria-live="polite" aria-label="Cookie consent">
-      <div className="cookie-popup">
-        <h3 className="cookie-popup__title">We use cookies</h3>
-        <p className="cookie-popup__text">
+    <div className="cookie-banner" role="dialog" aria-live="polite" aria-label="Cookie consent">
+      <div className="cookie-banner__content">
+        <h3 className="cookie-banner__title">We use cookies</h3>
+        <p className="cookie-banner__text">
           We use essential cookies to keep the site secure and working. With your permission, we also use analytics and marketing cookies to improve your experience.
         </p>
 
         {showPreferences && (
-          <div className="cookie-popup__preferences">
-            <label className="cookie-popup__option">
+          <div className="cookie-banner__preferences">
+            <label className="cookie-banner__option">
               <input type="checkbox" checked disabled />
               <span>Necessary cookies (always on)</span>
             </label>
-            <label className="cookie-popup__option">
+            <label className="cookie-banner__option">
               <input
                 type="checkbox"
                 checked={analytics}
@@ -76,7 +76,7 @@ const CookieConsentBanner = () => {
               />
               <span>Analytics cookies</span>
             </label>
-            <label className="cookie-popup__option">
+            <label className="cookie-banner__option">
               <input
                 type="checkbox"
                 checked={marketing}
@@ -87,21 +87,21 @@ const CookieConsentBanner = () => {
           </div>
         )}
 
-        <div className="cookie-popup__actions">
+        <div className="cookie-banner__actions">
           {!showPreferences && (
-            <button className="cookie-popup__btn cookie-popup__btn--secondary" type="button" onClick={() => setShowPreferences(true)}>
+            <button className="cookie-banner__btn cookie-banner__btn--secondary" type="button" onClick={() => setShowPreferences(true)}>
               Preferences
             </button>
           )}
           {showPreferences && (
-            <button className="cookie-popup__btn cookie-popup__btn--secondary" type="button" onClick={handleSavePreferences}>
+            <button className="cookie-banner__btn cookie-banner__btn--secondary" type="button" onClick={handleSavePreferences}>
               Save Preferences
             </button>
           )}
-          <button className="cookie-popup__btn cookie-popup__btn--ghost" type="button" onClick={handleRejectOptional}>
+          <button className="cookie-banner__btn cookie-banner__btn--ghost" type="button" onClick={handleRejectOptional}>
             Reject Optional
           </button>
-          <button className="cookie-popup__btn cookie-popup__btn--primary" type="button" onClick={handleAcceptAll}>
+          <button className="cookie-banner__btn cookie-banner__btn--primary" type="button" onClick={handleAcceptAll}>
             Accept All
           </button>
         </div>
