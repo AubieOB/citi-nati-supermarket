@@ -15,10 +15,30 @@ let audioPool = [];
 let currentAudioIndex = 0;
 const AUDIO_POOL_SIZE = 3;
 let selectedSpeechVoice = null;
+const FEMALE_VOICE_HINTS = [
+  'female',
+  'samantha',
+  'victoria',
+  'karen',
+  'moira',
+  'zira',
+  'jenny',
+  'aria',
+  'sara',
+  'libby',
+  'sonia',
+  'natasha',
+  'ava',
+  'emma'
+];
 
 const cleanSpeechText = (text) => String(text || '')
   .replace(/[\u{1F300}-\u{1FAFF}]/gu, ' ')
+  .replace(/[\u{2600}-\u{27BF}]/gu, ' ')
   .replace(/[#*_`~]+/g, ' ')
+  .replace(/[✓✔✅☑☒✖❌⚠️⚠🚚📦📍🎉🔴🟡🟢]/gu, ' ')
+  .replace(/[|<>()[\]{}]/g, ' ')
+  .replace(/[:;]+/g, '. ')
   .replace(/\s+/g, ' ')
   .trim();
 
@@ -41,11 +61,17 @@ const pickSpeechVoice = () => {
   const voices = window.speechSynthesis.getVoices();
   if (!voices.length) return null;
 
-  const preferredVoice = voices.find((voice) =>
-    /en-(US|GB)/i.test(voice.lang) && /(Google|Microsoft|Samantha|Jenny|Aria|Guy|Sara|Libby|Zira|David)/i.test(voice.name)
+  const englishVoices = voices.filter((voice) => /en-(US|GB)|^en/i.test(voice.lang));
+
+  const preferredFemaleVoice = englishVoices.find((voice) =>
+    FEMALE_VOICE_HINTS.some((hint) => voice.name.toLowerCase().includes(hint))
   );
 
-  return preferredVoice || voices.find((voice) => /en/i.test(voice.lang)) || voices[0];
+  const preferredVoice = preferredFemaleVoice || englishVoices.find((voice) =>
+    /(Google|Microsoft|Samantha|Jenny|Aria|Sara|Libby|Zira)/i.test(voice.name)
+  );
+
+  return preferredVoice || englishVoices[0] || voices[0];
 };
 
 const speakNotification = (text) => {
