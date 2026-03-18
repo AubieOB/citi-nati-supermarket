@@ -486,7 +486,7 @@ const AdminStocks = () => {
         </div>
       </div>
 
-      <div style={{ height: `${filterBarHeight + 4}px` }}></div>
+      <div style={{ height: `${filterBarHeight}px` }}></div>
 
       {/* Stats Cards */}
       <div style={{
