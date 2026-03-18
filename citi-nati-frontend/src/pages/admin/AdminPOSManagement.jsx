@@ -414,48 +414,6 @@ const AdminPOSManagement = () => {
           </div>
         )}
 
-        {/* Stats Cards */}
-        {products.length > 0 && (
-          <div style={styles.statsGrid}>
-            <div style={styles.statCard}>
-              <div style={{...styles.statIcon, backgroundColor: '#2196F3'}}>
-                <i className="fas fa-cube"></i>
-              </div>
-              <div>
-                <p style={styles.statLabel}>Total Products</p>
-                <h3 style={styles.statValue}>{total}</h3>
-              </div>
-            </div>
-            <div style={styles.statCard}>
-              <div style={{...styles.statIcon, backgroundColor: '#28a745'}}>
-                <i className="fas fa-eye"></i>
-              </div>
-              <div>
-                <p style={styles.statLabel}>Visible</p>
-                <h3 style={styles.statValue}>{visibleCount}</h3>
-              </div>
-            </div>
-            <div style={styles.statCard}>
-              <div style={{...styles.statIcon, backgroundColor: '#ffc107'}}>
-                <i className="fas fa-eye-slash"></i>
-              </div>
-              <div>
-                <p style={styles.statLabel}>Hidden</p>
-                <h3 style={styles.statValue}>{hiddenCount}</h3>
-              </div>
-            </div>
-            <div style={styles.statCard}>
-              <div style={{...styles.statIcon, backgroundColor: '#6f42c1'}}>
-                <i className="fas fa-check"></i>
-              </div>
-              <div>
-                <p style={styles.statLabel}>Selected</p>
-                <h3 style={styles.statValue}>{selectedProducts.size}</h3>
-              </div>
-            </div>
-          </div>
-        )}
-
         {products.length === 0 && !loading ? (
           <div style={styles.emptyState}>
             <i className="fas fa-inbox" style={styles.emptyIcon}></i>
@@ -531,6 +489,46 @@ const AdminPOSManagement = () => {
             </div>
 
             <div style={{ height: `${filterBarHeight + 8}px` }}></div>
+
+            {/* Stats Cards */}
+            <div style={styles.statsGrid}>
+              <div style={styles.statCard}>
+                <div style={{...styles.statIcon, backgroundColor: '#2196F3'}}>
+                  <i className="fas fa-cube"></i>
+                </div>
+                <div>
+                  <p style={styles.statLabel}>Total Products</p>
+                  <h3 style={styles.statValue}>{total}</h3>
+                </div>
+              </div>
+              <div style={styles.statCard}>
+                <div style={{...styles.statIcon, backgroundColor: '#28a745'}}>
+                  <i className="fas fa-eye"></i>
+                </div>
+                <div>
+                  <p style={styles.statLabel}>Visible</p>
+                  <h3 style={styles.statValue}>{visibleCount}</h3>
+                </div>
+              </div>
+              <div style={styles.statCard}>
+                <div style={{...styles.statIcon, backgroundColor: '#ffc107'}}>
+                  <i className="fas fa-eye-slash"></i>
+                </div>
+                <div>
+                  <p style={styles.statLabel}>Hidden</p>
+                  <h3 style={styles.statValue}>{hiddenCount}</h3>
+                </div>
+              </div>
+              <div style={styles.statCard}>
+                <div style={{...styles.statIcon, backgroundColor: '#6f42c1'}}>
+                  <i className="fas fa-check"></i>
+                </div>
+                <div>
+                  <p style={styles.statLabel}>Selected</p>
+                  <h3 style={styles.statValue}>{selectedProducts.size}</h3>
+                </div>
+              </div>
+            </div>
 
             {/* Action Buttons */}
             <div style={styles.actionButtons}>
