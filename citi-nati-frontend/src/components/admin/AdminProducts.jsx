@@ -1285,7 +1285,7 @@ const AdminProducts = () => {
             {filteredProducts.length} / {products.length} products
           </div>
         </div>
-        <div style={{ height: `${filterBarHeight + 4}px` }}></div>
+        <div style={{ height: `${filterBarHeight}px` }}></div>
         </>
       )}
 
