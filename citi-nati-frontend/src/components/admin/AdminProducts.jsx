@@ -725,8 +725,10 @@ const AdminProducts = () => {
             backgroundColor: '#f8f9fa',
             padding: '1.5rem',
             borderRadius: '8px',
+            marginTop: `${filterBarHeight + 8}px`,
             marginBottom: '2rem',
             borderLeft: '4px solid #5B4B8A',
+            scrollMarginTop: `${filterBarHeight + 12}px`,
           }}
         >
           <h3 style={{ marginBottom: '1rem', color: '#5B4B8A' }}>
