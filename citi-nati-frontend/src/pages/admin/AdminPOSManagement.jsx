@@ -134,6 +134,33 @@ const AdminPOSManagement = () => {
     }
   };
 
+  const clearSearch = () => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    setSearchTerm('');
+    setPage(1);
+    fetchProducts('', 1, selectedCategory);
+  };
+
+  useEffect(() => {
+    const handleRightCtrlClear = (event) => {
+      if (event.repeat) return;
+      if (event.code !== 'ControlRight') return;
+      if (!searchTerm) return;
+
+      event.preventDefault();
+      clearSearch();
+    };
+
+    window.addEventListener('keydown', handleRightCtrlClear);
+
+    return () => {
+      window.removeEventListener('keydown', handleRightCtrlClear);
+    };
+  }, [searchTerm, selectedCategory]);
+
   // Handle category filter
   const handleCategoryChange = (category) => {
     setSelectedCategory(category);
@@ -409,6 +436,17 @@ const AdminPOSManagement = () => {
                     onChange={handleSearchChange}
                     style={styles.searchInput}
                   />
+                  {searchTerm && (
+                    <button
+                      type="button"
+                      onClick={clearSearch}
+                      title="Clear search (Right Ctrl)"
+                      aria-label="Clear search"
+                      style={styles.clearSearchButton}
+                    >
+                      <i className="fas fa-times"></i>
+                    </button>
+                  )}
                 </div>
 
                 {/* Category Dropdown */}
@@ -766,7 +804,7 @@ const styles = {
   },
   searchInput: {
     width: '100%',
-    padding: '0.75rem 1rem 0.75rem 2.75rem',
+    padding: '0.75rem 2.75rem 0.75rem 2.75rem',
     fontSize: '0.95rem',
     border: '2px solid #e0e0e0',
     borderRadius: '8px',
@@ -774,6 +812,22 @@ const styles = {
     boxSizing: 'border-box',
     transition: 'all 0.3s ease',
     backgroundColor: '#fff',
+  },
+  clearSearchButton: {
+    position: 'absolute',
+    right: '0.6rem',
+    width: '30px',
+    height: '30px',
+    borderRadius: '50%',
+    border: 'none',
+    backgroundColor: '#f1f3f5',
+    color: '#666',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    padding: 0,
   },
   categoryDropdownWrapper: {
     display: 'flex',
