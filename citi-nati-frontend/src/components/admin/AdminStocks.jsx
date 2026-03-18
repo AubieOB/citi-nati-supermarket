@@ -353,10 +353,16 @@ const AdminStocks = () => {
         border: '1px solid #eee',
         boxSizing: 'border-box',
       }}>
-        <h3 style={{ margin: '0 0 1rem 0', color: '#333', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <i className="fas fa-filter" style={{ color: '#5B4B8A' }}></i>
-          Filters
-        </h3>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+          <h3 style={{ margin: 0, color: '#333', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <i className="fas fa-warehouse" style={{ color: '#5B4B8A' }}></i>
+            Stock Management
+          </h3>
+          <span style={{ color: '#666', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <i className="fas fa-filter" style={{ color: '#5B4B8A' }}></i>
+            Filters
+          </span>
+        </div>
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
@@ -480,18 +486,7 @@ const AdminStocks = () => {
         </div>
       </div>
 
-      <div style={{ height: `${filterBarHeight + 8}px` }}></div>
-
-      {/* Header */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        marginBottom: '2rem',
-        gap: '0.75rem',
-      }}>
-        <i className="fas fa-warehouse" style={{ fontSize: '1.5rem', color: '#5B4B8A' }}></i>
-        <h1 style={{ margin: 0, color: '#333' }}>Stock Management</h1>
-      </div>
+      <div style={{ height: `${filterBarHeight + 4}px` }}></div>
 
       {/* Stats Cards */}
       <div style={{
