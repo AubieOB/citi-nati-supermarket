@@ -6,6 +6,7 @@ import { notifySuccess, notifyError, notifyInfo } from '../../utils/notification
 import Pagination from '../ui/Pagination.jsx';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import logo from '../../assets/citi-nati-logo.png.png';
 
 /**
  * 📊 ADMIN STOCKS MANAGEMENT
@@ -284,84 +285,91 @@ const AdminStocks = () => {
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       
-      // Add title
-      const statusLabel = stockStatusFilter === 'all' ? 'All Products' 
-        : stockStatusFilter === 'instock' ? 'In Stock Products'
-        : stockStatusFilter === 'lowstock' ? 'Low Stock Products'
-        : 'Out of Stock Products';
-      
-      pdf.setFontSize(16);
-      pdf.text('Stock Management Report', 14, 15);
-      
-      pdf.setFontSize(11);
-      pdf.setTextColor(100);
-      pdf.text(`Status: ${statusLabel}`, 14, 25);
-      pdf.text(`Generated: ${new Date().toLocaleString()}`, 14, 32);
-      pdf.setTextColor(0);
+      // Add logo
+      const img = new Image();
+      img.onload = () => {
+        pdf.addImage(img, 'PNG', 14, 10, 30, 15);
+        
+        // Add title
+        const statusLabel = stockStatusFilter === 'all' ? 'All Products' 
+          : stockStatusFilter === 'instock' ? 'In Stock Products'
+          : stockStatusFilter === 'lowstock' ? 'Low Stock Products'
+          : 'Out of Stock Products';
+        
+        pdf.setFontSize(16);
+        pdf.text('Stock Management Report', 50, 15);
+        
+        pdf.setFontSize(11);
+        pdf.setTextColor(100);
+        pdf.text(`Status: ${statusLabel}`, 50, 25);
+        pdf.text(`Generated: ${new Date().toLocaleString()}`, 50, 32);
+        pdf.setTextColor(0);
 
-      // Prepare table data - exclude Actions column
-      const tableData = filteredProducts.map(product => {
-        const status = getStockStatus(product.stock);
-        const productCode = product.productCode || product.sourceCode || product.code || '-';
-        return [
-          product.name,
-          productCode,
-          product.category,
-          product.stock,
-          status.label,
-        ];
-      });
+        // Prepare table data - exclude Actions column
+        const tableData = filteredProducts.map(product => {
+          const status = getStockStatus(product.stock);
+          const productCode = product.productCode || product.sourceCode || product.code || '-';
+          return [
+            product.name,
+            productCode,
+            product.category,
+            product.stock,
+            status.label,
+          ];
+        });
 
-      // Generate table
-      autoTable(pdf, {
-        startY: 40,
-        head: [['Product Name', 'Product Code', 'Category', 'Current Stock', 'Status']],
-        body: tableData,
-        theme: 'grid',
-        headStyles: {
-          fillColor: [91, 75, 138],
-          textColor: 255,
-          fontStyle: 'bold',
-          halign: 'center',
-          padding: 8,
-        },
-        bodyStyles: {
-          textColor: 50,
-          padding: 7,
-        },
-        alternateRowStyles: {
-          fillColor: [245, 245, 245],
-        },
-        columnStyles: {
-          0: { halign: 'left', cellWidth: 'auto' },
-          1: { halign: 'center', cellWidth: 30 },
-          2: { halign: 'center', cellWidth: 30 },
-          3: { halign: 'center', cellWidth: 25 },
-          4: { halign: 'center', cellWidth: 25 },
-        },
-        margin: { left: 14, right: 14 },
-      });
+        // Generate table
+        autoTable(pdf, {
+          startY: 40,
+          head: [['Product Name', 'Product Code', 'Category', 'Current Stock', 'Status']],
+          body: tableData,
+          theme: 'grid',
+          headStyles: {
+            fillColor: [91, 75, 138],
+            textColor: 255,
+            fontStyle: 'bold',
+            halign: 'center',
+            padding: 8,
+          },
+          bodyStyles: {
+            textColor: 50,
+            padding: 7,
+          },
+          alternateRowStyles: {
+            fillColor: [245, 245, 245],
+          },
+          columnStyles: {
+            0: { halign: 'left', cellWidth: 'auto' },
+            1: { halign: 'center', cellWidth: 30 },
+            2: { halign: 'center', cellWidth: 30 },
+            3: { halign: 'center', cellWidth: 25 },
+            4: { halign: 'center', cellWidth: 25 },
+          },
+          margin: { left: 14, right: 14 },
+        });
 
-      // Add page numbers to all pages
-      const pageCount = pdf.internal.pages.length - 1;
-      for (let i = 1; i <= pageCount; i++) {
-        pdf.setPage(i);
-        pdf.setFontSize(10);
-        pdf.setTextColor(150);
-        pdf.text(
-          `Page ${i} of ${pageCount}`,
-          pageWidth / 2,
-          pageHeight - 10,
-          { align: 'center' }
-        );
-      }
+        // Add page numbers to all pages
+        const pageCount = pdf.internal.pages.length - 1;
+        for (let i = 1; i <= pageCount; i++) {
+          pdf.setPage(i);
+          pdf.setFontSize(10);
+          pdf.setTextColor(150);
+          pdf.text(
+            `Page ${i} of ${pageCount}`,
+            pageWidth / 2,
+            pageHeight - 10,
+            { align: 'center' }
+          );
+        }
 
-      // Generate filename with date
-      const dateStr = new Date().toISOString().split('T')[0];
-      const filename = `stocks-${statusLabel.toLowerCase().replace(/\s+/g, '-')}-${dateStr}.pdf`;
-      
-      pdf.save(filename);
-      notifySuccess(`📥 Stock report downloaded: ${filename}`, 3000);
+        // Generate filename with date
+        const dateStr = new Date().toISOString().split('T')[0];
+        const filename = `stocks-${statusLabel.toLowerCase().replace(/\s+/g, '-')}-${dateStr}.pdf`;
+        
+        pdf.save(filename);
+        notifySuccess(`📥 Stock report downloaded: ${filename}`, 3000);
+      };
+      img.src = logo;
     } catch (err) {
       console.error('Error generating PDF:', err);
       notifyError('Failed to generate PDF', 3000);
