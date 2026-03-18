@@ -426,8 +426,8 @@ const AdminProducts = () => {
     const handleRightCtrlClear = (event) => {
       if (event.repeat) return;
 
-      const isRightCtrl = event.code === 'ControlRight' || (event.key === 'Control' && event.location === 2);
-      if (!isRightCtrl) return;
+      const isLeftCtrl = event.code === 'ControlLeft' || (event.key === 'Control' && event.location === 1);
+      if (!isLeftCtrl) return;
       if (activeSubTab !== 'products') return;
       if (!searchTerm) return;
 
@@ -1113,7 +1113,7 @@ const AdminProducts = () => {
               <button
                 type="button"
                 onClick={clearSearch}
-                title="Clear search (Right Ctrl)"
+                title="Clear search (Left Ctrl)"
                 aria-label="Clear search"
                 style={{
                   position: 'absolute',

@@ -147,7 +147,8 @@ const AdminPOSManagement = () => {
   useEffect(() => {
     const handleRightCtrlClear = (event) => {
       if (event.repeat) return;
-      if (event.code !== 'ControlRight') return;
+      const isLeftCtrl = event.code === 'ControlLeft' || (event.key === 'Control' && event.location === 1);
+      if (!isLeftCtrl) return;
       if (!searchTerm) return;
 
       event.preventDefault();
@@ -440,7 +441,7 @@ const AdminPOSManagement = () => {
                     <button
                       type="button"
                       onClick={clearSearch}
-                      title="Clear search (Right Ctrl)"
+                      title="Clear search (Left Ctrl)"
                       aria-label="Clear search"
                       style={styles.clearSearchButton}
                     >
