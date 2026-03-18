@@ -17,6 +17,10 @@ import { notifySuccess, notifyError } from '../../utils/notifications.js';
 
 const AdminOrders = () => {
   const [orders, setOrders] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [priceFilter, setPriceFilter] = useState('all');
+  const [driverFilter, setDriverFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [drivers, setDrivers] = useState([]);
@@ -234,15 +238,50 @@ const AdminOrders = () => {
     return orderDate.getTime() === today.getTime() && !order.driverId;
   };
 
+  const matchesPriceFilter = (orderTotal) => {
+    const total = Number(orderTotal || 0);
+
+    if (priceFilter === 'under_10000') return total < 10000;
+    if (priceFilter === '10000_50000') return total >= 10000 && total <= 50000;
+    if (priceFilter === '50001_100000') return total >= 50001 && total <= 100000;
+    if (priceFilter === 'over_100000') return total > 100000;
+    return true;
+  };
+
+  const filteredOrders = orders.filter((order) => {
+    const query = searchTerm.trim().toLowerCase();
+    const orderIdText = String(order.id || '');
+    const customerName = String(order.user?.name || '').toLowerCase();
+    const customerEmail = String(order.user?.email || '').toLowerCase();
+    const driverName = String(order.driver?.name || '').toLowerCase();
+    const status = String(order.status || '').toLowerCase();
+
+    const matchesSearch = !query
+      || orderIdText.includes(query)
+      || customerName.includes(query)
+      || customerEmail.includes(query)
+      || driverName.includes(query)
+      || status.includes(query);
+
+    const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
+
+    const matchesDriver = driverFilter === 'all'
+      || (driverFilter === 'assigned' && !!order.driverId)
+      || (driverFilter === 'unassigned' && !order.driverId)
+      || String(order.driverId || '') === driverFilter;
+
+    return matchesSearch && matchesStatus && matchesDriver && matchesPriceFilter(order.total);
+  });
+
   // Separate orders into new (today) and old (previous days)
-  const getGroupedOrders = () => {
+  const getGroupedOrders = (sourceOrders = orders) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const newOrders = [];
     const oldOrders = [];
 
-    orders.forEach((order) => {
+    sourceOrders.forEach((order) => {
       const orderDate = new Date(order.createdAt);
       orderDate.setHours(0, 0, 0, 0);
 
@@ -306,9 +345,127 @@ const AdminOrders = () => {
               <span>Loading more orders...</span>
             </div>
           )}
+
+          <div style={{
+            display: 'flex',
+            gap: '0.75rem',
+            alignItems: 'center',
+            marginBottom: '1rem',
+            flexWrap: 'wrap',
+          }}>
+            <input
+              type="text"
+              placeholder="Search by order #, customer, email, driver, status..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{
+                flex: 1,
+                minWidth: '240px',
+                padding: '0.75rem',
+                borderRadius: '6px',
+                border: '1px solid #ddd',
+                fontSize: '0.95rem',
+                backgroundColor: '#fff',
+              }}
+            />
+
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              style={{
+                padding: '0.75rem',
+                borderRadius: '6px',
+                border: '1px solid #ddd',
+                minWidth: '170px',
+                fontSize: '0.95rem',
+                backgroundColor: '#fff',
+                cursor: 'pointer',
+              }}
+            >
+              <option value="all">All Statuses</option>
+              <option value="PENDING">PENDING</option>
+              <option value="CONFIRMED">CONFIRMED</option>
+              <option value="IN_TRANSIT">IN_TRANSIT</option>
+              <option value="DELIVERED">DELIVERED</option>
+              <option value="CANCELLED">CANCELLED</option>
+              <option value="REFUND_PENDING">REFUND_PENDING</option>
+              <option value="REFUNDED">REFUNDED</option>
+            </select>
+
+            <select
+              value={priceFilter}
+              onChange={(e) => setPriceFilter(e.target.value)}
+              style={{
+                padding: '0.75rem',
+                borderRadius: '6px',
+                border: '1px solid #ddd',
+                minWidth: '180px',
+                fontSize: '0.95rem',
+                backgroundColor: '#fff',
+                cursor: 'pointer',
+              }}
+            >
+              <option value="all">All Totals</option>
+              <option value="under_10000">Under MWK 10,000</option>
+              <option value="10000_50000">MWK 10,000 - 50,000</option>
+              <option value="50001_100000">MWK 50,001 - 100,000</option>
+              <option value="over_100000">Over MWK 100,000</option>
+            </select>
+
+            <select
+              value={driverFilter}
+              onChange={(e) => setDriverFilter(e.target.value)}
+              style={{
+                padding: '0.75rem',
+                borderRadius: '6px',
+                border: '1px solid #ddd',
+                minWidth: '190px',
+                fontSize: '0.95rem',
+                backgroundColor: '#fff',
+                cursor: 'pointer',
+              }}
+            >
+              <option value="all">All Driver States</option>
+              <option value="assigned">Assigned Driver</option>
+              <option value="unassigned">Unassigned</option>
+              {drivers.map((driver) => (
+                <option key={driver.id} value={String(driver.id)}>
+                  Driver: {driver.name}
+                </option>
+              ))}
+            </select>
+
+            {(searchTerm || statusFilter !== 'all' || priceFilter !== 'all' || driverFilter !== 'all') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm('');
+                  setStatusFilter('all');
+                  setPriceFilter('all');
+                  setDriverFilter('all');
+                }}
+                style={{
+                  padding: '0.75rem 1rem',
+                  border: 'none',
+                  borderRadius: '6px',
+                  backgroundColor: '#dc3545',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                }}
+              >
+                Clear Filters
+              </button>
+            )}
+
+            <span style={{ color: '#666', fontSize: '0.9rem', marginLeft: 'auto' }}>
+              {filteredOrders.length} / {orders.length} orders
+            </span>
+          </div>
+
       {/* Get grouped orders */}
       {(() => {
-        const { newOrders, oldOrders } = getGroupedOrders();
+        const { newOrders, oldOrders } = getGroupedOrders(filteredOrders);
 
         return (
           <>
@@ -554,6 +711,18 @@ const AdminOrders = () => {
           </>
         );
       })()}
+
+          {!loading && filteredOrders.length === 0 && (
+            <div style={{
+              backgroundColor: '#f8f9fa',
+              borderRadius: '8px',
+              padding: '1rem',
+              textAlign: 'center',
+              color: '#666',
+            }}>
+              No orders match your current search/filter.
+            </div>
+          )}
         </>
       )}
 

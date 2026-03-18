@@ -15,6 +15,9 @@ import { useModal } from '../../hooks/useModal.js';
 const AdminUsers = () => {
   const { user: loggedInUser } = useAuth();
   const [users, setUsers] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [verificationFilter, setVerificationFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [updatingUserId, setUpdatingUserId] = useState(null);
@@ -110,6 +113,22 @@ const AdminUsers = () => {
     return userId !== loggedInUser?.id;
   };
 
+  const filteredUsers = users.filter((u) => {
+    const query = searchTerm.trim().toLowerCase();
+    const matchesSearch = !query
+      || String(u.name || '').toLowerCase().includes(query)
+      || String(u.email || '').toLowerCase().includes(query)
+      || String(u.role || '').toLowerCase().includes(query);
+
+    const matchesRole = roleFilter === 'all' || u.role === roleFilter;
+
+    const matchesVerification = verificationFilter === 'all'
+      || (verificationFilter === 'verified' && u.emailVerified)
+      || (verificationFilter === 'unverified' && !u.emailVerified);
+
+    return matchesSearch && matchesRole && matchesVerification;
+  });
+
   if (error) {
     return (
       <div style={{
@@ -158,6 +177,93 @@ const AdminUsers = () => {
         </div>
       )}
 
+      <div style={{
+        display: 'flex',
+        gap: '0.75rem',
+        alignItems: 'center',
+        marginBottom: '1rem',
+        flexWrap: 'wrap',
+      }}>
+        <input
+          type="text"
+          placeholder="Search users by name, email or role..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{
+            flex: 1,
+            minWidth: '220px',
+            padding: '0.75rem',
+            borderRadius: '6px',
+            border: '1px solid #ddd',
+            fontSize: '0.95rem',
+            backgroundColor: '#fff',
+          }}
+        />
+
+        <select
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value)}
+          style={{
+            padding: '0.75rem',
+            borderRadius: '6px',
+            border: '1px solid #ddd',
+            fontSize: '0.95rem',
+            minWidth: '160px',
+            backgroundColor: '#fff',
+            cursor: 'pointer',
+          }}
+        >
+          <option value="all">All Roles</option>
+          <option value="user">Users</option>
+          <option value="admin">Admins</option>
+          <option value="driver">Drivers</option>
+        </select>
+
+        <select
+          value={verificationFilter}
+          onChange={(e) => setVerificationFilter(e.target.value)}
+          style={{
+            padding: '0.75rem',
+            borderRadius: '6px',
+            border: '1px solid #ddd',
+            fontSize: '0.95rem',
+            minWidth: '180px',
+            backgroundColor: '#fff',
+            cursor: 'pointer',
+          }}
+        >
+          <option value="all">All Verification</option>
+          <option value="verified">Verified Email</option>
+          <option value="unverified">Unverified Email</option>
+        </select>
+
+        {(searchTerm || roleFilter !== 'all' || verificationFilter !== 'all') && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearchTerm('');
+              setRoleFilter('all');
+              setVerificationFilter('all');
+            }}
+            style={{
+              padding: '0.75rem 1rem',
+              border: 'none',
+              borderRadius: '6px',
+              backgroundColor: '#dc3545',
+              color: '#fff',
+              cursor: 'pointer',
+              fontWeight: '600',
+            }}
+          >
+            Clear Filters
+          </button>
+        )}
+
+        <span style={{ color: '#666', fontSize: '0.9rem', marginLeft: 'auto' }}>
+          {filteredUsers.length} / {users.length} users
+        </span>
+      </div>
+
       <div style={{ overflowX: 'auto' }}>
         <table style={{
           width: '100%',
@@ -177,7 +283,7 @@ const AdminUsers = () => {
             </tr>
           </thead>
           <tbody>
-            {users.map((u) => (
+            {filteredUsers.map((u) => (
               <tr key={u.id} style={{ borderBottom: '1px solid #eee' }}>
                 <td style={{ padding: '1rem' }}>
                   {u.name}
@@ -240,6 +346,19 @@ const AdminUsers = () => {
           </tbody>
         </table>
       </div>
+
+      {!loading && users.length > 0 && filteredUsers.length === 0 && (
+        <div style={{
+          marginTop: '1rem',
+          backgroundColor: '#f8f9fa',
+          borderRadius: '8px',
+          padding: '1rem',
+          textAlign: 'center',
+          color: '#666',
+        }}>
+          No users match your current search/filter.
+        </div>
+      )}
       <Modal
         isOpen={modal.isOpen}
         title={modal.title}
