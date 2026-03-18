@@ -22,6 +22,7 @@ const AdminStocks = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [stockStatusFilter, setStockStatusFilter] = useState('all');
   const [categories, setCategories] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [stockAction, setStockAction] = useState('');
@@ -229,7 +230,12 @@ const AdminStocks = () => {
     .filter(product => {
       const matchesSearch = !searchTerm || product.name.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesCategory = filterCategory === 'all' || product.category === filterCategory;
-      return matchesSearch && matchesCategory;
+      const matchesStockStatus =
+        stockStatusFilter === 'all' ||
+        (stockStatusFilter === 'instock' && product.stock > lowStockThreshold) ||
+        (stockStatusFilter === 'lowstock' && product.stock > 0 && product.stock <= lowStockThreshold) ||
+        (stockStatusFilter === 'outofstock' && product.stock === 0);
+      return matchesSearch && matchesCategory && matchesStockStatus;
     });
 
   // Paginate filtered results
@@ -482,6 +488,40 @@ const AdminStocks = () => {
               }}
               min="1"
             />
+          </div>
+          <div>
+            <label style={{
+              marginBottom: '0.5rem',
+              fontWeight: '600',
+              color: '#333',
+              fontSize: '0.9rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}>
+              <i className="fas fa-layer-group" style={{ color: '#5B4B8A' }}></i>
+              Stock Status
+            </label>
+            <select
+              value={stockStatusFilter}
+              onChange={(e) => {
+                setStockStatusFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                borderRadius: '4px',
+                border: '1px solid #ddd',
+                fontSize: '1rem',
+                cursor: 'pointer',
+              }}
+            >
+              <option value="all">All Stock Status</option>
+              <option value="instock">In Stock</option>
+              <option value="lowstock">Low Stock</option>
+              <option value="outofstock">Out of Stock</option>
+            </select>
           </div>
         </div>
       </div>
