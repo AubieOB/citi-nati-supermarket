@@ -206,6 +206,70 @@ async function fetchProductsFromPOS() {
   }
 }
 
+function normalizeExpiryFilter(value) {
+  return String(value || 'expiring').toLowerCase() === 'expired' ? 'expired' : 'expiring';
+}
+
+function normalizeExpirySource(value) {
+  return String(value || 'view').toLowerCase() === 'stockdetails' ? 'stockdetails' : 'view';
+}
+
+function normalizeExpiryDays(value) {
+  const parsed = parseInt(value, 10);
+  return [7, 14, 30].includes(parsed) ? parsed : 7;
+}
+
+async function fetchExpiryCandidates({ filter, days, source }) {
+  if (!pool) {
+    await initializePool();
+  }
+
+  const safeFilter = normalizeExpiryFilter(filter);
+  const safeSource = normalizeExpirySource(source);
+  const safeDays = normalizeExpiryDays(days);
+  const request = pool.request();
+  request.input('MinValidDate', sql.Date, new Date('2000-01-01T00:00:00.000Z'));
+  request.input('ExpiryDays', sql.Int, safeDays);
+
+  const whereClause = safeFilter === 'expired'
+    ? `ExpiryDate >= @MinValidDate AND ExpiryDate < CAST(GETDATE() AS date)`
+    : `ExpiryDate >= @MinValidDate
+       AND ExpiryDate >= CAST(GETDATE() AS date)
+       AND ExpiryDate < DATEADD(DAY, @ExpiryDays, CAST(GETDATE() AS date))`;
+
+  const query = safeSource === 'stockdetails'
+    ? `
+      SELECT
+        ProductCode,
+        StockQty,
+        StockOut,
+        ISNULL(StockQty, 0) - ISNULL(StockOut, 0) AS RemainingQty,
+        CostPrice,
+        ExpiryDate
+      FROM POS.dbo.stockdetails
+      WHERE ${whereClause}
+        AND ISNULL(StockQty, 0) > ISNULL(StockOut, 0)
+      ORDER BY ExpiryDate ASC, ProductCode ASC
+    `
+    : `
+      SELECT *
+      FROM POS.dbo.vw_WillExpire_Products
+      WHERE ${whereClause}
+      ORDER BY ExpiryDate ASC
+    `;
+
+  const result = await request.query(query);
+
+  console.log(`[EXPIRY] fetched ${result.recordset.length} ${safeFilter === 'expired' ? 'expired' : `expiring within ${safeDays} days`} products from ${safeSource}`);
+
+  return {
+    filter: safeFilter,
+    days: safeDays,
+    source: safeSource,
+    products: result.recordset || [],
+  };
+}
+
 /**
  * Manual endpoint: fetch and sync products
  */
@@ -239,6 +303,40 @@ app.get('/pos-sync/products', validateApiKey, async (req, res) => {
     res.status(500).json({
       success: false,
       error: err.message,
+    });
+  }
+});
+
+/**
+ * GET /pos-sync/expiry-products
+ * Fetch expired or near-expiry products from POS.
+ * Query params:
+ *   filter=expired|expiring
+ *   days=7|14|30
+ *   source=view|stockdetails
+ */
+app.get('/pos-sync/expiry-products', validateApiKey, async (req, res) => {
+  try {
+    const result = await fetchExpiryCandidates({
+      filter: req.query.filter,
+      days: req.query.days,
+      source: req.query.source,
+    });
+
+    return res.json({
+      success: true,
+      filter: result.filter,
+      days: result.days,
+      source: result.source,
+      count: result.products.length,
+      data: result.products,
+    });
+  } catch (err) {
+    console.error('[EXPIRY] Error in /pos-sync/expiry-products:', err.message);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to fetch expiry products',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined,
     });
   }
 });
@@ -738,19 +836,32 @@ app.post('/pos-sync/apply-promotion', validateApiKey, rejectDirectWritebackInPro
 
     if (!pool) await initializePool();
 
-    const { productCode, promotionalPrice, locationCode } = req.body;
+    const {
+      productCode,
+      promotionalPrice,
+      locationCode,
+      priceTypeCode,
+      reasonCode,
+      updatePromotionalFlag,
+    } = req.body;
 
-    if (!productCode || typeof promotionalPrice !== 'number' || promotionalPrice < 0) {
+    if (!productCode || typeof promotionalPrice !== 'number' || promotionalPrice <= 0) {
       return res.status(400).json({
         success: false,
-        error: 'productCode and promotionalPrice (non-negative number) are required',
+        error: 'productCode and promotionalPrice (> 0) are required',
       });
     }
 
     // Execute transaction
     const result = await transactionManager.executeTransaction(pool, async (request) => {
-      await priceUpdates.applyPromotionalPrice(request, productCode, promotionalPrice, locationCode || 'SH');
-      return { productCode, promotionalPrice };
+      return priceUpdates.applyPromotionalPrice(request, {
+        productCode,
+        promotionalPrice,
+        locationCode: locationCode || 'SH',
+        priceTypeCode: priceTypeCode || 'RT',
+        reasonCode: reasonCode || 'EXPIRY_CLEARANCE',
+        updatePromotionalFlag: updatePromotionalFlag === true,
+      });
     });
 
     if (!result.success) {
@@ -766,6 +877,9 @@ app.post('/pos-sync/apply-promotion', validateApiKey, rejectDirectWritebackInPro
       message: 'Promotion applied successfully',
       productCode: result.result.productCode,
       promotionalPrice: result.result.promotionalPrice,
+      priceId: result.result.insertedRow.priceId,
+      priceTypeCode: result.result.priceTypeCode,
+      locationCode: result.result.locationCode,
     });
   } catch (err) {
     console.error('[WRITEBACK] Error in /pos-sync/apply-promotion:', err.message);
@@ -793,7 +907,14 @@ app.post('/pos-sync/revert-promotion', validateApiKey, rejectDirectWritebackInPr
 
     if (!pool) await initializePool();
 
-    const { productCode, locationCode } = req.body;
+    const {
+      productCode,
+      locationCode,
+      priceTypeCode,
+      restorePrice,
+      reasonCode,
+      updatePromotionalFlag,
+    } = req.body;
 
     if (!productCode) {
       return res.status(400).json({
@@ -804,8 +925,14 @@ app.post('/pos-sync/revert-promotion', validateApiKey, rejectDirectWritebackInPr
 
     // Execute transaction
     const result = await transactionManager.executeTransaction(pool, async (request) => {
-      await priceUpdates.revertToStandardPrice(request, productCode, locationCode || 'SH');
-      return { productCode };
+      return priceUpdates.revertToStandardPrice(request, {
+        productCode,
+        locationCode: locationCode || 'SH',
+        priceTypeCode: priceTypeCode || 'RT',
+        restorePrice,
+        reasonCode: reasonCode || 'EXPIRY_CLEARANCE',
+        updatePromotionalFlag: updatePromotionalFlag === true,
+      });
     });
 
     if (!result.success) {
@@ -820,6 +947,10 @@ app.post('/pos-sync/revert-promotion', validateApiKey, rejectDirectWritebackInPr
       success: true,
       message: 'Promotion reverted successfully',
       productCode: result.result.productCode,
+      restorePrice: result.result.restorePrice,
+      priceId: result.result.insertedRow.priceId,
+      priceTypeCode: result.result.priceTypeCode,
+      locationCode: result.result.locationCode,
     });
   } catch (err) {
     console.error('[WRITEBACK] Error in /pos-sync/revert-promotion:', err.message);
@@ -832,30 +963,73 @@ app.post('/pos-sync/revert-promotion', validateApiKey, rejectDirectWritebackInPr
 });
 
 /**
- * GET /pos-sync/get-resolved-price/:productCode
- * Get current resolved price (promotional if active, otherwise standard)
+ * GET /pos-sync/promotion-preview/:productCode
+ * Preview the latest price row that currently resolves in POS.
  */
-app.get('/pos-sync/get-resolved-price/:productCode', validateApiKey, rejectDirectWritebackInProduction, async (req, res) => {
+app.get('/pos-sync/promotion-preview/:productCode', validateApiKey, async (req, res) => {
   try {
-    console.log('[WRITEBACK] GET /pos-sync/get-resolved-price called');
+    console.log('[PROMO] GET /pos-sync/promotion-preview called');
 
     if (!pool) await initializePool();
 
     const { productCode } = req.params;
-    const locationCode = process.env.POS_LOCATION_CODE || 'SH';
+    const locationCode = req.query.locationCode || process.env.POS_LOCATION_CODE || 'SH';
+    const priceTypeCode = req.query.priceTypeCode || 'RT';
 
     const request = pool.request();
-    const resolvedPrice = await priceUpdates.getResolvedPrice(request, productCode, locationCode);
+    const preview = await priceUpdates.previewPromotionPrice(request, productCode, locationCode, priceTypeCode);
+
+    if (!preview.productExists) {
+      return res.status(404).json({
+        success: false,
+        error: `Product ${productCode} does not exist in POS`,
+      });
+    }
 
     res.json({
       success: true,
       productCode,
-      price: resolvedPrice.price,
-      isPromotional: resolvedPrice.isPromotional,
+      locationCode,
+      priceTypeCode,
+      latestPriceRow: preview.latestPriceRow,
     });
   } catch (err) {
-    console.error('[WRITEBACK] Error in /pos-sync/get-resolved-price:', err.message);
+    console.error('[PROMO] Error in /pos-sync/promotion-preview:', err.message);
     res.status(500).json({
+      success: false,
+      error: 'Failed to preview promotion price',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined,
+    });
+  }
+});
+
+/**
+ * GET /pos-sync/get-resolved-price/:productCode
+ * Backward-compatible alias for price preview.
+ */
+app.get('/pos-sync/get-resolved-price/:productCode', validateApiKey, async (req, res) => {
+  try {
+    if (!pool) await initializePool();
+
+    const { productCode } = req.params;
+    const locationCode = req.query.locationCode || process.env.POS_LOCATION_CODE || 'SH';
+    const priceTypeCode = req.query.priceTypeCode || 'RT';
+    const request = pool.request();
+    const resolvedPrice = await priceUpdates.getResolvedPrice(request, productCode, locationCode, priceTypeCode);
+
+    return res.json({
+      success: true,
+      productCode,
+      price: resolvedPrice.price,
+      isPromotional: resolvedPrice.isPromotional,
+      priceId: resolvedPrice.priceId,
+      priceDate: resolvedPrice.priceDate,
+      locationCode: resolvedPrice.locationCode,
+      priceTypeCode: resolvedPrice.priceTypeCode,
+    });
+  } catch (err) {
+    console.error('[PROMO] Error in /pos-sync/get-resolved-price:', err.message);
+    return res.status(500).json({
       success: false,
       error: 'Failed to get resolved price',
       details: process.env.NODE_ENV === 'development' ? err.message : undefined,

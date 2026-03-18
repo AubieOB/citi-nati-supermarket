@@ -150,12 +150,96 @@ async function executeUpdateStock(pool, payload, commandId) {
   }
 }
 
-async function executeApplyPromotion() {
-  throw new Error('APPLY_PROMOTION not implemented yet in queue flow');
+function isLikelyNonRetryablePromotionError(message) {
+  const text = String(message || '').toLowerCase();
+  return (
+    text.includes('non_retryable')
+    || text.includes('product') && text.includes('does not exist')
+    || text.includes('required')
+    || text.includes('invalid column')
+    || text.includes('invalid object')
+    || text.includes('matches current latest price')
+    || text.includes('no prior price found')
+    || text.includes('must be greater than 0')
+  );
 }
 
-async function executeRevertPromotion() {
-  throw new Error('REVERT_PROMOTION not implemented yet in queue flow');
+async function executeApplyPromotion(pool, payload, commandId) {
+  console.log('[PROMO] APPLY_PROMOTION payload:', {
+    commandId,
+    productCode: payload.productCode,
+    locationCode: payload.locationCode || process.env.POS_LOCATION_CODE || 'SH',
+    priceTypeCode: payload.priceTypeCode || 'RT',
+    promotionalPrice: Number(payload.promotionalPrice),
+    reasonCode: payload.reasonCode || 'EXPIRY_CLEARANCE',
+    updatePromotionalFlag: payload.updatePromotionalFlag === true,
+  });
+
+  const transaction = new sql.Transaction(pool);
+
+  try {
+    await transaction.begin();
+    const request = new sql.Request(transaction);
+
+    const resultSummary = await priceUpdates.applyPromotionalPrice(request, payload);
+
+    await transaction.commit();
+    return {
+      message: 'Promotion write executed in productprices',
+      ...resultSummary,
+    };
+  } catch (error) {
+    try {
+      await transaction.rollback();
+    } catch (rollbackErr) {
+      console.error('[POS COMMAND EXECUTOR ERROR] rollback failed:', rollbackErr.message);
+    }
+
+    if (String(error.message || '').startsWith('NON_RETRYABLE:') || isLikelyNonRetryablePromotionError(error.message)) {
+      throw new Error(`NON_RETRYABLE: ${String(error.message || '').replace(/^NON_RETRYABLE:\s*/, '')}`);
+    }
+
+    throw error;
+  }
+}
+
+async function executeRevertPromotion(pool, payload, commandId) {
+  console.log('[PROMO] REVERT_PROMOTION payload:', {
+    commandId,
+    productCode: payload.productCode,
+    locationCode: payload.locationCode || process.env.POS_LOCATION_CODE || 'SH',
+    priceTypeCode: payload.priceTypeCode || 'RT',
+    restorePrice: payload.restorePrice == null ? null : Number(payload.restorePrice),
+    reasonCode: payload.reasonCode || 'EXPIRY_CLEARANCE',
+    updatePromotionalFlag: payload.updatePromotionalFlag === true,
+  });
+
+  const transaction = new sql.Transaction(pool);
+
+  try {
+    await transaction.begin();
+    const request = new sql.Request(transaction);
+
+    const resultSummary = await priceUpdates.revertToStandardPrice(request, payload);
+
+    await transaction.commit();
+    return {
+      message: 'Promotion revert executed in productprices',
+      ...resultSummary,
+    };
+  } catch (error) {
+    try {
+      await transaction.rollback();
+    } catch (rollbackErr) {
+      console.error('[POS COMMAND EXECUTOR ERROR] rollback failed:', rollbackErr.message);
+    }
+
+    if (String(error.message || '').startsWith('NON_RETRYABLE:') || isLikelyNonRetryablePromotionError(error.message)) {
+      throw new Error(`NON_RETRYABLE: ${String(error.message || '').replace(/^NON_RETRYABLE:\s*/, '')}`);
+    }
+
+    throw error;
+  }
 }
 
 function isLikelyNonRetryableInvoiceError(message) {
@@ -242,9 +326,9 @@ async function executeCommand(pool, command) {
     case 'UPDATE_STOCK':
       return executeUpdateStock(pool, payload, command.id);
     case 'APPLY_PROMOTION':
-      return executeApplyPromotion(pool, payload);
+      return executeApplyPromotion(pool, payload, command.id);
     case 'REVERT_PROMOTION':
-      return executeRevertPromotion(pool, payload);
+      return executeRevertPromotion(pool, payload, command.id);
     case 'WRITE_INVOICE':
       return executeWriteInvoice(pool, payload, command.id);
     default:

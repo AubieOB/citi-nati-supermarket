@@ -340,6 +340,61 @@ async function updatePrices(updates = []) {
   }
 }
 
+async function getExpiryProductsFromPOS({ filter = 'expiring', days = 7, source = 'view' } = {}) {
+  if (!ENABLE_POS_SYNC) {
+    return { success: false, error: 'POS Sync is disabled' };
+  }
+
+  try {
+    const response = await posAgent.get('/pos-sync/expiry-products', {
+      params: {
+        filter,
+        days,
+        source,
+      },
+    });
+
+    return {
+      success: true,
+      data: response.data,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: formatPosAgentError(error, '/pos-sync/expiry-products'),
+    };
+  }
+}
+
+async function previewPromotionPriceFromPOS(productCode, { locationCode = 'SH', priceTypeCode = 'RT' } = {}) {
+  if (!ENABLE_POS_SYNC) {
+    return { success: false, error: 'POS Sync is disabled' };
+  }
+
+  if (!productCode) {
+    return { success: false, error: 'productCode is required' };
+  }
+
+  try {
+    const response = await posAgent.get(`/pos-sync/promotion-preview/${encodeURIComponent(productCode)}`, {
+      params: {
+        locationCode,
+        priceTypeCode,
+      },
+    });
+
+    return {
+      success: true,
+      data: response.data,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: formatPosAgentError(error, `/pos-sync/promotion-preview/${encodeURIComponent(productCode)}`),
+    };
+  }
+}
+
 /**
  * Get POS service configuration (for debugging)
  */
@@ -361,5 +416,7 @@ module.exports = {
   getPriceFromPOS,
   getStockFromPOSByCode,
   updatePrices,
+  getExpiryProductsFromPOS,
+  previewPromotionPriceFromPOS,
   getConfig,
 };

@@ -13,6 +13,8 @@ function shouldDebugProduct(productCode) {
 function createQueryRequest(request) {
   return request && request.transaction
     ? new sql.Request(request.transaction)
+    : request && request.parent
+      ? new sql.Request(request.parent)
     : request;
 }
 
@@ -147,6 +149,189 @@ async function getCurrentPrice(request, productCode, locationCode, payloadPriceT
     console.error('[PRICE ERROR] Error getting current price:', error.message);
     throw error;
   }
+}
+
+async function productExists(request, productCode) {
+  const existenceRequest = createQueryRequest(request);
+  const result = await existenceRequest
+    .input('ExistsProductCode', sql.VarChar(50), productCode)
+    .query(`
+      SELECT TOP 1 ProductCode
+      FROM (
+        SELECT ProductCode FROM POS.dbo.products WHERE ProductCode = @ExistsProductCode
+        UNION ALL
+        SELECT ProductCode FROM POS.dbo.productsmaster WHERE ProductCode = @ExistsProductCode
+      ) AS product_lookup
+    `);
+
+  return !!(result.recordset && result.recordset[0]);
+}
+
+async function getLatestPriceRow(request, productCode, locationCode, priceTypeCode) {
+  const safeLocation = locationCode || 'SH';
+  const safePriceTypeCode = priceTypeCode || 'RT';
+  const latestRequest = createQueryRequest(request);
+
+  const result = await latestRequest
+    .input('LatestProductCode', sql.VarChar(50), productCode)
+    .input('LatestLocationCode', sql.VarChar(10), safeLocation)
+    .input('LatestPriceTypeCode', sql.VarChar(10), safePriceTypeCode)
+    .query(`
+      SELECT TOP 1
+          PriceID,
+          ProductCode,
+          LocationCode,
+          PriceTypeCode,
+          PriceDate,
+          AvgCost,
+          FPrice,
+          UploadStatus
+      FROM POS.dbo.productprices
+      WHERE ProductCode = @LatestProductCode
+        AND LocationCode = @LatestLocationCode
+        AND PriceTypeCode = @LatestPriceTypeCode
+      ORDER BY PriceID DESC, PriceDate DESC
+    `);
+
+  if (!result.recordset || result.recordset.length === 0) {
+    return null;
+  }
+
+  const row = result.recordset[0];
+  return {
+    priceId: row.PriceID,
+    productCode: row.ProductCode,
+    locationCode: row.LocationCode,
+    priceTypeCode: row.PriceTypeCode,
+    priceDate: row.PriceDate,
+    avgCost: Number(row.AvgCost || 0),
+    price: Number(row.FPrice || 0),
+    uploadStatus: row.UploadStatus,
+  };
+}
+
+async function getPreviousPriceRow(request, productCode, locationCode, priceTypeCode, currentPriceId) {
+  if (!currentPriceId) {
+    return null;
+  }
+
+  const safeLocation = locationCode || 'SH';
+  const safePriceTypeCode = priceTypeCode || 'RT';
+  const previousRequest = createQueryRequest(request);
+
+  const result = await previousRequest
+    .input('PreviousProductCode', sql.VarChar(50), productCode)
+    .input('PreviousLocationCode', sql.VarChar(10), safeLocation)
+    .input('PreviousPriceTypeCode', sql.VarChar(10), safePriceTypeCode)
+    .input('CurrentPriceID', sql.Int, currentPriceId)
+    .query(`
+      SELECT TOP 1
+          PriceID,
+          ProductCode,
+          LocationCode,
+          PriceTypeCode,
+          PriceDate,
+          AvgCost,
+          FPrice,
+          UploadStatus
+      FROM POS.dbo.productprices
+      WHERE ProductCode = @PreviousProductCode
+        AND LocationCode = @PreviousLocationCode
+        AND PriceTypeCode = @PreviousPriceTypeCode
+        AND PriceID <> @CurrentPriceID
+      ORDER BY PriceID DESC, PriceDate DESC
+    `);
+
+  if (!result.recordset || result.recordset.length === 0) {
+    return null;
+  }
+
+  const row = result.recordset[0];
+  return {
+    priceId: row.PriceID,
+    productCode: row.ProductCode,
+    locationCode: row.LocationCode,
+    priceTypeCode: row.PriceTypeCode,
+    priceDate: row.PriceDate,
+    avgCost: Number(row.AvgCost || 0),
+    price: Number(row.FPrice || 0),
+    uploadStatus: row.UploadStatus,
+  };
+}
+
+async function insertProductPriceRow(request, {
+  productCode,
+  locationCode,
+  priceTypeCode,
+  avgCost,
+  price,
+}) {
+  const insertRequest = createQueryRequest(request);
+  const result = await insertRequest
+    .input('InsertProductCode', sql.VarChar(50), productCode)
+    .input('InsertLocationCode', sql.VarChar(10), locationCode)
+    .input('InsertPriceTypeCode', sql.VarChar(10), priceTypeCode)
+    .input('InsertPriceDate', sql.DateTime, new Date())
+    .input('InsertAvgCost', sql.Decimal(18, 2), Number(avgCost || 0))
+    .input('InsertFPrice', sql.Decimal(18, 2), Number(price))
+    .input('InsertUploadStatus', sql.Int, 1)
+    .query(`
+      INSERT INTO POS.dbo.productprices (
+        ProductCode,
+        LocationCode,
+        PriceTypeCode,
+        PriceDate,
+        AvgCost,
+        FPrice,
+        UploadStatus
+      )
+      OUTPUT
+        INSERTED.PriceID,
+        INSERTED.ProductCode,
+        INSERTED.LocationCode,
+        INSERTED.PriceTypeCode,
+        INSERTED.PriceDate,
+        INSERTED.AvgCost,
+        INSERTED.FPrice,
+        INSERTED.UploadStatus
+      VALUES (
+        @InsertProductCode,
+        @InsertLocationCode,
+        @InsertPriceTypeCode,
+        @InsertPriceDate,
+        @InsertAvgCost,
+        @InsertFPrice,
+        @InsertUploadStatus
+      )
+    `);
+
+  const row = result.recordset[0];
+  return {
+    priceId: row.PriceID,
+    productCode: row.ProductCode,
+    locationCode: row.LocationCode,
+    priceTypeCode: row.PriceTypeCode,
+    priceDate: row.PriceDate,
+    avgCost: Number(row.AvgCost || 0),
+    price: Number(row.FPrice || 0),
+    uploadStatus: row.UploadStatus,
+  };
+}
+
+async function setPromotionalFlag(request, productCode, promotionalValue) {
+  const flagRequest = createQueryRequest(request);
+  const result = await flagRequest
+    .input('FlagProductCode', sql.VarChar(50), productCode)
+    .input('FlagValue', sql.Int, promotionalValue)
+    .query(`
+      UPDATE POS.dbo.products
+      SET Promotional = @FlagValue
+      WHERE ProductCode = @FlagProductCode
+    `);
+
+  return result.rowsAffected && result.rowsAffected[0]
+    ? result.rowsAffected[0]
+    : 0;
 }
 
 /**
@@ -314,193 +499,220 @@ async function updateStandardPrice(request, productCode, newPrice, locationCode,
 }
 
 /**
- * Get promotional price if active
+ * Preview the latest price row that currently drives POS price resolution.
  * @param {sql.Request} request - SQL request object
  * @param {string} productCode - Product code
- * @returns {Promise<{promotionalPrice: number|null, isActive: boolean, promotionId: number|null}>}
+ * @param {string} locationCode - Location code
+ * @param {string} priceTypeCode - Price type code
+ * @returns {Promise<Object>}
  */
-async function getPromotionalPrice(request, productCode) {
-  try {
-    const query = `
-      SELECT TOP 1
-          PromotionID,
-          PromoPrice,
-          IsActive,
-          ValidFrom,
-          ValidTo
-      FROM POS.dbo.ProductPromotions
-      WHERE ProductCode = @ProductCode
-      AND IsActive = 1
-      AND GETDATE() BETWEEN ValidFrom AND ValidTo
-      ORDER BY PromotionID DESC
-    `;
+async function previewPromotionPrice(request, productCode, locationCode, priceTypeCode) {
+  const safeLocation = locationCode || 'SH';
+  const safePriceTypeCode = priceTypeCode || 'RT';
+  const exists = await productExists(request, productCode);
 
-    request.input('ProductCode', sql.VarChar(50), productCode);
-
-    const result = await request.query(query);
-
-    if (!result.recordset || result.recordset.length === 0) {
-      console.log(`[PROMO] No active promotion for ${productCode}`);
-      return {
-        promotionalPrice: null,
-        isActive: false,
-        promotionId: null,
-      };
-    }
-
-    const promo = result.recordset[0];
-    console.log(`[PROMO] Active promotion for ${productCode}: ${promo.PromoPrice} (ID: ${promo.PromotionID})`);
-
+  if (!exists) {
     return {
-      promotionalPrice: promo.PromoPrice,
-      isActive: true,
-      promotionId: promo.PromotionID,
-    };
-  } catch (error) {
-    console.error('[PROMO] Error getting promotional price:', error.message);
-    // Return no promotion on error (fallback to standard price)
-    return {
-      promotionalPrice: null,
-      isActive: false,
-      promotionId: null,
+      productExists: false,
+      productCode,
+      locationCode: safeLocation,
+      priceTypeCode: safePriceTypeCode,
+      latestPriceRow: null,
     };
   }
+
+  const latestPriceRow = await getLatestPriceRow(request, productCode, safeLocation, safePriceTypeCode);
+  return {
+    productExists: true,
+    productCode,
+    locationCode: safeLocation,
+    priceTypeCode: safePriceTypeCode,
+    latestPriceRow,
+  };
 }
 
 /**
- * Apply promotional price (update ProductPriceMatrix to use promotional price)
+ * Apply a promotion by inserting a new row into POS.dbo.productprices.
  * @param {sql.Request} request - SQL request object
- * @param {string} productCode - Product code
- * @param {number} promotionalPrice - Promotional price
- * @param {string} locationCode - Location code
- * @returns {Promise<void>}
+ * @param {Object} payload - Promotion payload
+ * @returns {Promise<Object>}
  */
-async function applyPromotionalPrice(request, productCode, promotionalPrice, locationCode) {
-  try {
-    const query = `
-      INSERT INTO POS.dbo.productprices (
-        ProductCode,
-        FPrice,
-        LocationCode,
-        EffectiveDate,
-        CreatedBy,
-        IsPromotion
-      )
-      VALUES (
-        @ProductCode,
-        @FPrice,
-        @LocationCode,
-        @EffectiveDate,
-        'WEBSITE_PROMO',
-        1
-      )
-    `;
+async function applyPromotionalPrice(request, payload) {
+  const productCode = String(payload.productCode || '').trim();
+  const locationCode = payload.locationCode || 'SH';
+  const priceTypeCode = payload.priceTypeCode || 'RT';
+  const promotionalPrice = Number(payload.promotionalPrice);
+  const reasonCode = payload.reasonCode || 'EXPIRY_CLEARANCE';
+  const shouldUpdatePromotionalFlag = payload.updatePromotionalFlag === true;
 
-    request.input('ProductCode', sql.VarChar(50), productCode);
-    request.input('FPrice', sql.Decimal(18, 2), promotionalPrice);
-    request.input('LocationCode', sql.VarChar(10), locationCode || 'SH');
-    request.input('EffectiveDate', sql.DateTime, new Date());
-
-    await request.query(query);
-
-    console.log(`[PRICE PROMO] ✅ Applied promotional price for ${productCode}: ${promotionalPrice}`);
-  } catch (error) {
-    console.error('[PRICE PROMO] Error applying promotional price:', error.message);
-    throw error;
+  if (!productCode) {
+    throw new Error('NON_RETRYABLE: productCode is required');
   }
-}
 
-/**
- * Revert to standard price (disable promotion)
- * @param {sql.Request} request - SQL request object
- * @param {string} productCode - Product code
- * @param {string} locationCode - Location code
- * @returns {Promise<void>}
- */
-async function revertToStandardPrice(request, productCode, locationCode) {
-  try {
-    // Get the standard price (before any promotions)
-    const standardPriceQuery = `
-      SELECT TOP 1
-          FPrice
-      FROM POS.dbo.productprices
-      WHERE ProductCode = @ProductCode
-      AND ISNULL(IsPromotion, 0) = 0
-      ORDER BY PriceID DESC
-    `;
-
-    request.input('ProductCode', sql.VarChar(50), productCode);
-    if (locationCode) {
-      request.input('LocationCode', sql.VarChar(10), locationCode);
-    }
-
-    const result = await request.query(standardPriceQuery);
-
-    if (!result.recordset || result.recordset.length === 0) {
-      throw new Error(`No standard price found for ${productCode}`);
-    }
-
-    const standardPrice = result.recordset[0].FPrice;
-
-    // Insert standard price as current price
-    const insertQuery = `
-      INSERT INTO POS.dbo.productprices (
-        ProductCode,
-        FPrice,
-        LocationCode,
-        EffectiveDate,
-        CreatedBy,
-        IsPromotion
-      )
-      VALUES (
-        @ProductCode,
-        @FPrice,
-        @LocationCode,
-        @EffectiveDate,
-        'WEBSITE_PROMO_REVERTED',
-        0
-      )
-    `;
-
-    request.input('FPrice', sql.Decimal(18, 2), standardPrice);
-    request.input('LocationCode', sql.VarChar(10), locationCode || 'SH');
-    request.input('EffectiveDate', sql.DateTime, new Date());
-
-    await request.query(insertQuery);
-
-    console.log(`[PRICE REVERTED] ✅ Reverted to standard price for ${productCode}: ${standardPrice}`);
-  } catch (error) {
-    console.error('[PRICE REVERTED] Error reverting price:', error.message);
-    throw error;
+  if (!Number.isFinite(promotionalPrice) || promotionalPrice <= 0) {
+    throw new Error('NON_RETRYABLE: promotionalPrice must be greater than 0');
   }
+
+  const exists = await productExists(request, productCode);
+  if (!exists) {
+    throw new Error(`NON_RETRYABLE: Product ${productCode} does not exist in POS`);
+  }
+
+  const latestPriceRow = await getLatestPriceRow(request, productCode, locationCode, priceTypeCode);
+  const currentLatestPrice = latestPriceRow ? Number(latestPriceRow.price) : null;
+
+  console.log(`[PROMO] applying promotion for ProductCode ${productCode}`);
+  console.log(`[PROMO] current latest price = ${currentLatestPrice == null ? 'N/A' : currentLatestPrice}`);
+  console.log(`[PROMO] new promo price = ${promotionalPrice}`);
+  console.log(`[PROMO] reason = ${reasonCode}`);
+
+  if (currentLatestPrice != null && currentLatestPrice === promotionalPrice) {
+    throw new Error(`NON_RETRYABLE: Promo price matches current latest price for ${productCode}`);
+  }
+
+  const insertedRow = await insertProductPriceRow(request, {
+    productCode,
+    locationCode,
+    priceTypeCode,
+    avgCost: latestPriceRow ? latestPriceRow.avgCost : 0,
+    price: promotionalPrice,
+  });
+
+  console.log(`[PROMO] inserted productprices row PriceID=${insertedRow.priceId}`);
+
+  let promotionalFlagRowsAffected = 0;
+  if (shouldUpdatePromotionalFlag) {
+    promotionalFlagRowsAffected = await setPromotionalFlag(request, productCode, 1);
+    console.log('[PROMO] optional Promotional flag updated');
+  }
+
+  return {
+    action: 'APPLY_PROMOTION',
+    productCode,
+    locationCode,
+    priceTypeCode,
+    reasonCode,
+    previousPrice: currentLatestPrice,
+    promotionalPrice,
+    insertedRow,
+    promotionalFlagUpdated: shouldUpdatePromotionalFlag,
+    promotionalFlagRowsAffected,
+  };
 }
 
 /**
- * Get resolved price (promotional if active, otherwise standard)
+ * Revert a promotion by inserting a new row restoring the prior price.
+ * @param {sql.Request} request - SQL request object
+ * @param {Object} payload - Revert payload
+ * @returns {Promise<Object>}
+ */
+async function revertToStandardPrice(request, payload) {
+  const productCode = String(payload.productCode || '').trim();
+  const locationCode = payload.locationCode || 'SH';
+  const priceTypeCode = payload.priceTypeCode || 'RT';
+  const reasonCode = payload.reasonCode || 'EXPIRY_CLEARANCE';
+  const restorePrice = payload.restorePrice == null ? null : Number(payload.restorePrice);
+  const shouldUpdatePromotionalFlag = payload.updatePromotionalFlag === true;
+
+  if (!productCode) {
+    throw new Error('NON_RETRYABLE: productCode is required');
+  }
+
+  if (restorePrice != null && (!Number.isFinite(restorePrice) || restorePrice <= 0)) {
+    throw new Error('NON_RETRYABLE: restorePrice must be greater than 0 when provided');
+  }
+
+  const exists = await productExists(request, productCode);
+  if (!exists) {
+    throw new Error(`NON_RETRYABLE: Product ${productCode} does not exist in POS`);
+  }
+
+  const latestPriceRow = await getLatestPriceRow(request, productCode, locationCode, priceTypeCode);
+  const previousPriceRow = latestPriceRow
+    ? await getPreviousPriceRow(request, productCode, locationCode, priceTypeCode, latestPriceRow.priceId)
+    : null;
+
+  const currentLatestPrice = latestPriceRow ? Number(latestPriceRow.price) : null;
+  const targetRestorePrice = restorePrice != null
+    ? restorePrice
+    : previousPriceRow
+      ? Number(previousPriceRow.price)
+      : null;
+
+  console.log(`[PROMO] reverting promotion for ProductCode ${productCode}`);
+  console.log(`[PROMO] current latest price = ${currentLatestPrice == null ? 'N/A' : currentLatestPrice}`);
+  console.log(`[PROMO] reason = ${reasonCode}`);
+
+  if (targetRestorePrice == null) {
+    throw new Error(`NON_RETRYABLE: No prior price found to restore for ${productCode}`);
+  }
+
+  if (currentLatestPrice != null && currentLatestPrice === targetRestorePrice) {
+    throw new Error(`NON_RETRYABLE: Restore price matches current latest price for ${productCode}`);
+  }
+
+  const insertedRow = await insertProductPriceRow(request, {
+    productCode,
+    locationCode,
+    priceTypeCode,
+    avgCost: latestPriceRow
+      ? latestPriceRow.avgCost
+      : previousPriceRow
+        ? previousPriceRow.avgCost
+        : 0,
+    price: targetRestorePrice,
+  });
+
+  console.log(`[PROMO] revert inserted productprices row PriceID=${insertedRow.priceId}`);
+
+  let promotionalFlagRowsAffected = 0;
+  if (shouldUpdatePromotionalFlag) {
+    promotionalFlagRowsAffected = await setPromotionalFlag(request, productCode, 0);
+    console.log('[PROMO] optional Promotional flag updated');
+  }
+
+  return {
+    action: 'REVERT_PROMOTION',
+    productCode,
+    locationCode,
+    priceTypeCode,
+    reasonCode,
+    currentLatestPrice,
+    restorePrice: targetRestorePrice,
+    insertedRow,
+    previousPriceRow,
+    promotionalFlagUpdated: shouldUpdatePromotionalFlag,
+    promotionalFlagRowsAffected,
+  };
+}
+
+/**
+ * Get latest price row for a product.
  * @param {sql.Request} request - SQL request object
  * @param {string} productCode - Product code
  * @param {string} locationCode - Location code
- * @returns {Promise<{price: number, isPromotional: boolean}>}
+ * @param {string} priceTypeCode - Price type code
+ * @returns {Promise<{price: number, isPromotional: boolean|null}>}
  */
-async function getResolvedPrice(request, productCode, locationCode) {
+async function getResolvedPrice(request, productCode, locationCode, priceTypeCode) {
   try {
-    // Check for active promotion
-    const promo = await getPromotionalPrice(request, productCode);
+    const preview = await previewPromotionPrice(request, productCode, locationCode, priceTypeCode);
 
-    if (promo.isActive && promo.promotionalPrice) {
-      return {
-        price: promo.promotionalPrice,
-        isPromotional: true,
-        promotionId: promo.promotionId,
-      };
+    if (!preview.productExists) {
+      throw new Error(`Product ${productCode} does not exist in POS`);
     }
 
-    // Fall back to standard price
-    const standardPrice = await getCurrentPrice(request, productCode, locationCode);
+    if (!preview.latestPriceRow) {
+      throw new Error(`No price history found for ${productCode}`);
+    }
+
     return {
-      price: standardPrice.price,
-      isPromotional: false,
-      promotionId: null,
+      price: preview.latestPriceRow.price,
+      isPromotional: null,
+      priceId: preview.latestPriceRow.priceId,
+      priceDate: preview.latestPriceRow.priceDate,
+      locationCode: preview.locationCode,
+      priceTypeCode: preview.priceTypeCode,
     };
   } catch (error) {
     console.error('[PRICE RESOLVED] Error getting resolved price:', error.message);
@@ -554,8 +766,9 @@ async function updateBulkPrices(request, priceUpdates, locationCode) {
 
 module.exports = {
   getCurrentPrice,
+  getLatestPriceRow,
   updateStandardPrice,
-  getPromotionalPrice,
+  previewPromotionPrice,
   applyPromotionalPrice,
   revertToStandardPrice,
   getResolvedPrice,

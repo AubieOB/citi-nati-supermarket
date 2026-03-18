@@ -16,6 +16,12 @@ const { verifyAdmin } = require('../middleware/admin.middleware');
 const { PrismaClient } = require('@prisma/client');
 const { getRefundPendingOrders, markOrderAsRefunded } = require('../controllers/order.controller');
 const { getCurrentPromotions, updatePromotion, previewPromotion, applyPromotion, removePromotion } = require('../controllers/promotion.controller');
+const {
+  getExpiryCandidates,
+  previewPromotion: previewPosPromotion,
+  applyPromotion: applyPosPromotion,
+  revertPromotion: revertPosPromotion,
+} = require('../controllers/posExpiryPromotion.controller');
 const { emitProductUpdate } = require('../utils/socket');
 
 const router = express.Router();
@@ -608,6 +614,34 @@ router.post('/promotions/:type/preview', verifyTokenMiddleware, verifyAdmin, pre
  * Protected: Admin only
  */
 router.post('/promotions/:type', verifyTokenMiddleware, verifyAdmin, updatePromotion);
+
+/**
+ * GET /api/admin/pos-expiry
+ * Fetch expired or near-expiry products from POS.
+ * Protected: Admin only
+ */
+router.get('/pos-expiry', verifyTokenMiddleware, verifyAdmin, getExpiryCandidates);
+
+/**
+ * GET /api/admin/pos-promotions/:productCode/preview
+ * Preview the latest POS price row before applying a promotion.
+ * Protected: Admin only
+ */
+router.get('/pos-promotions/:productCode/preview', verifyTokenMiddleware, verifyAdmin, previewPosPromotion);
+
+/**
+ * POST /api/admin/pos-promotions/apply
+ * Queue an insert-only POS promotion write-back.
+ * Protected: Admin only
+ */
+router.post('/pos-promotions/apply', verifyTokenMiddleware, verifyAdmin, applyPosPromotion);
+
+/**
+ * POST /api/admin/pos-promotions/revert
+ * Queue an insert-only POS promotion revert write-back.
+ * Protected: Admin only
+ */
+router.post('/pos-promotions/revert', verifyTokenMiddleware, verifyAdmin, revertPosPromotion);
 
 /**
  * GET /api/admin/pos-products
