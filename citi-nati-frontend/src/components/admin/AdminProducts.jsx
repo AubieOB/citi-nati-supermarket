@@ -958,70 +958,7 @@ const AdminProducts = () => {
         </div>
       )}
 
-      {/* Sub-tab Navigation */}
-      <div style={{
-        display: 'flex',
-        gap: '0.5rem',
-        marginBottom: '2rem',
-        borderBottom: '2px solid #eee',
-      }}>
-        <button
-          onClick={() => setActiveSubTab('products')}
-          style={{
-            padding: '0.75rem 1.5rem',
-            border: 'none',
-            backgroundColor: activeSubTab === 'products' ? '#5B4B8A' : 'transparent',
-            color: activeSubTab === 'products' ? '#fff' : '#666',
-            fontWeight: activeSubTab === 'products' ? '600' : '500',
-            cursor: 'pointer',
-            fontSize: '0.95rem',
-            transition: 'all 0.2s ease',
-            borderBottom: activeSubTab === 'products' ? '3px solid #2D8659' : 'none',
-            marginBottom: '-2px',
-          }}
-        >
-          <i className="fas fa-box" style={{ marginRight: '0.5rem' }}></i>
-          Products
-        </button>
-        <button
-          onClick={() => setActiveSubTab('expiry-alerts')}
-          style={{
-            padding: '0.75rem 1.5rem',
-            border: 'none',
-            backgroundColor: activeSubTab === 'expiry-alerts' ? '#5B4B8A' : 'transparent',
-            color: activeSubTab === 'expiry-alerts' ? '#fff' : '#666',
-            fontWeight: activeSubTab === 'expiry-alerts' ? '600' : '500',
-            cursor: 'pointer',
-            fontSize: '0.95rem',
-            transition: 'all 0.2s ease',
-            borderBottom: activeSubTab === 'expiry-alerts' ? '3px solid #2D8659' : 'none',
-            marginBottom: '-2px',
-            position: 'relative',
-          }}
-        >
-          <i className="fas fa-exclamation-triangle" style={{ marginRight: '0.5rem' }}></i>
-          Expiry Alerts
-          {products.some(p => p.expiryStatus && p.expiryStatus.status) && (
-            <span style={{
-              position: 'absolute',
-              top: '0.5rem',
-              right: '0.5rem',
-              backgroundColor: '#f44336',
-              color: '#fff',
-              borderRadius: '50%',
-              width: '20px',
-              height: '20px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '0.75rem',
-              fontWeight: 'bold',
-            }}>
-              {products.filter(p => p.expiryStatus && p.expiryStatus.status).length}
-            </span>
-          )}
-        </button>
-      </div>
+
 
       {/* Expiry Alert Panel - Now under sub-tab */}
       {activeSubTab === 'expiry-alerts' && (
@@ -1099,28 +1036,86 @@ const AdminProducts = () => {
         )
       )}
 
-      {/* Search and Filter Bar - Only show in Products tab */}
-      {activeSubTab === 'products' && (
-        <>
+      {/* Fixed Header Bar - sub-tabs + filters */}
+      <>
         <div
           ref={filterBarRef}
           style={{
-          display: 'flex',
-          gap: '1rem',
-          alignItems: 'center',
-          marginBottom: '2rem',
           position: 'fixed',
           top: `${filterBarLayout.top}px`,
           left: `${filterBarLayout.left}px`,
           width: `${filterBarLayout.width}px`,
           zIndex: 80,
-          padding: '1rem',
           backgroundColor: '#fff',
           border: '1px solid #eee',
           borderRadius: '8px',
-          flexWrap: 'wrap',
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
           boxSizing: 'border-box',
+          overflow: 'hidden',
+        }}>
+          {/* Sub-tab row */}
+          <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid #eee' }}>
+            <button
+              onClick={() => setActiveSubTab('products')}
+              style={{
+                padding: '0.6rem 1.25rem',
+                border: 'none',
+                backgroundColor: activeSubTab === 'products' ? '#5B4B8A' : 'transparent',
+                color: activeSubTab === 'products' ? '#fff' : '#666',
+                fontWeight: activeSubTab === 'products' ? '600' : '500',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                borderBottom: activeSubTab === 'products' ? '3px solid #2D8659' : '3px solid transparent',
+                marginBottom: '-2px',
+              }}
+            >
+              <i className="fas fa-box" style={{ marginRight: '0.5rem' }}></i>Products
+            </button>
+            <button
+              onClick={() => setActiveSubTab('expiry-alerts')}
+              style={{
+                padding: '0.6rem 1.25rem',
+                border: 'none',
+                backgroundColor: activeSubTab === 'expiry-alerts' ? '#5B4B8A' : 'transparent',
+                color: activeSubTab === 'expiry-alerts' ? '#fff' : '#666',
+                fontWeight: activeSubTab === 'expiry-alerts' ? '600' : '500',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                borderBottom: activeSubTab === 'expiry-alerts' ? '3px solid #2D8659' : '3px solid transparent',
+                marginBottom: '-2px',
+                position: 'relative',
+              }}
+            >
+              <i className="fas fa-exclamation-triangle" style={{ marginRight: '0.5rem' }}></i>Expiry Alerts
+              {products.some(p => p.expiryStatus && p.expiryStatus.status) && (
+                <span style={{
+                  position: 'absolute',
+                  top: '0.4rem',
+                  right: '0.3rem',
+                  backgroundColor: '#f44336',
+                  color: '#fff',
+                  borderRadius: '50%',
+                  width: '18px',
+                  height: '18px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.7rem',
+                  fontWeight: 'bold',
+                }}>
+                  {products.filter(p => p.expiryStatus && p.expiryStatus.status).length}
+                </span>
+              )}
+            </button>
+          </div>
+          {/* Filter row - products tab only */}
+          {activeSubTab === 'products' && (
+          <div style={{
+          display: 'flex',
+          gap: '1rem',
+          alignItems: 'center',
+          padding: '0.75rem 1rem',
+          flexWrap: 'wrap',
         }}>
           {/* Search Input */}
           <div style={{
@@ -1284,10 +1279,11 @@ const AdminProducts = () => {
           }}>
             {filteredProducts.length} / {products.length} products
           </div>
+          </div>
+          )}
         </div>
         <div style={{ height: `${filterBarHeight}px` }}></div>
-        </>
-      )}
+      </>
 
       {/* Products Table - Only show in Products tab */}
       {activeSubTab === 'products' && (
