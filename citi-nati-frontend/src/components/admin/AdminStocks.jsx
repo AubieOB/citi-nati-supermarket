@@ -308,7 +308,7 @@ const AdminStocks = () => {
         // Add company name
         pdf.setFontSize(14);
         pdf.setFont(undefined, 'bold');
-        const brandLeft = 'citi';
+        const brandLeft = 'Citi';
         const brandRight = '- Nati Supermarket';
         const brandLeftWidth = pdf.getTextWidth(brandLeft);
         const brandRightWidth = pdf.getTextWidth(brandRight);
