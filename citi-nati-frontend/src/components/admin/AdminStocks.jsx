@@ -228,7 +228,11 @@ const AdminStocks = () => {
   const filteredProducts = allProducts
     .filter(product => !product.hideFromProductsPage) // Exclude hidden products
     .filter(product => {
-      const matchesSearch = !searchTerm || product.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const term = searchTerm.toLowerCase();
+      const searchableProductCode = String(product.productCode || product.sourceCode || product.code || '').toLowerCase();
+      const matchesSearch = !searchTerm ||
+        product.name.toLowerCase().includes(term) ||
+        searchableProductCode.includes(term);
       const matchesCategory = filterCategory === 'all' || product.category === filterCategory;
       const matchesStockStatus =
         stockStatusFilter === 'all' ||
@@ -390,7 +394,7 @@ const AdminStocks = () => {
             <div style={{ position: 'relative' }}>
               <input
                 type="text"
-                placeholder="Search by product name..."
+                placeholder="Search by product name or code..."
                 value={searchTerm}
                 onChange={handleSearchChange}
                 style={{
@@ -624,6 +628,9 @@ const AdminStocks = () => {
                 Product Name
               </th>
               <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', fontSize: '0.95rem' }}>
+                Product Code
+              </th>
+              <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', fontSize: '0.95rem' }}>
                 Category
               </th>
               <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', fontSize: '0.95rem' }}>
@@ -641,6 +648,7 @@ const AdminStocks = () => {
             {paginatedProducts.length > 0 ? (
               paginatedProducts.map((product) => {
                 const status = getStockStatus(product.stock);
+                const productCode = product.productCode || product.sourceCode || product.code;
                 return (
                   <tr
                     key={product.id}
@@ -651,6 +659,21 @@ const AdminStocks = () => {
                   >
                     <td style={{ padding: '1rem' }}>
                       <strong>{product.name}</strong>
+                    </td>
+                    <td style={{ padding: '1rem', textAlign: 'center', color: '#666', fontSize: '0.9rem' }}>
+                      {productCode ? (
+                        <span style={{
+                          backgroundColor: '#f5f5f5',
+                          borderRadius: '4px',
+                          padding: '0.2rem 0.4rem',
+                          fontFamily: 'monospace',
+                          fontSize: '0.82rem',
+                        }}>
+                          {productCode}
+                        </span>
+                      ) : (
+                        '-'
+                      )}
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'center', color: '#666', fontSize: '0.9rem' }}>
                       {product.category}
@@ -744,7 +767,7 @@ const AdminStocks = () => {
               })
             ) : (
               <tr>
-                <td colSpan="5" style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>
+                <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>
                   No products found matching your filters
                 </td>
               </tr>
