@@ -414,7 +414,7 @@ const AdminOrders = () => {
             display: 'flex',
             gap: '0.75rem',
             alignItems: 'center',
-            marginBottom: '1rem',
+            marginBottom: 0,
             flexWrap: 'wrap',
             position: 'fixed',
             top: `${filterBarLayout.top}px`,
@@ -567,7 +567,7 @@ const AdminOrders = () => {
             </span>
           </div>
 
-          <div style={{ height: `${filterBarHeight + 8}px` }}></div>
+          <div style={{ height: `${Math.max(filterBarHeight - 8, 0)}px` }}></div>
 
       {/* Get grouped orders */}
       {(() => {
