@@ -353,7 +353,6 @@ const AdminStocks = () => {
         gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
         gap: '1rem',
         marginBottom: '2rem',
-        marginTop: `${filterBarHeight + 12}px`,
       }}>
         {(() => {
           // use filteredProducts (all results matching current filters) instead
@@ -571,7 +570,7 @@ const AdminStocks = () => {
         </div>
       </div>
 
-      <div style={{ height: `${filterBarHeight + 24}px` }}></div>
+      <div style={{ height: `${filterBarHeight + 12}px` }}></div>
 
       {/* Products Table */}
       <div style={{
