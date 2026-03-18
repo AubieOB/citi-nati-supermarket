@@ -288,7 +288,13 @@ const AdminStocks = () => {
       // Add logo
       const img = new Image();
       img.onload = () => {
-        pdf.addImage(img, 'PNG', 14, 10, 30, 15);
+        pdf.addImage(img, 'PNG', 14, 8, 30, 15);
+        
+        // Add company name
+        pdf.setFontSize(14);
+        pdf.setFont(undefined, 'bold');
+        pdf.setTextColor(91, 75, 138);
+        pdf.text('CITI-NATI SUPERMARKET', 50, 12);
         
         // Add title
         const statusLabel = stockStatusFilter === 'all' ? 'All Products' 
@@ -296,13 +302,15 @@ const AdminStocks = () => {
           : stockStatusFilter === 'lowstock' ? 'Low Stock Products'
           : 'Out of Stock Products';
         
-        pdf.setFontSize(16);
-        pdf.text('Stock Management Report', 50, 15);
+        pdf.setFontSize(12);
+        pdf.setFont(undefined, 'normal');
+        pdf.setTextColor(0);
+        pdf.text('Stock Management Report', 50, 21);
         
-        pdf.setFontSize(11);
+        pdf.setFontSize(10);
         pdf.setTextColor(100);
-        pdf.text(`Status: ${statusLabel}`, 50, 25);
-        pdf.text(`Generated: ${new Date().toLocaleString()}`, 50, 32);
+        pdf.text(`Status: ${statusLabel}`, 50, 28);
+        pdf.text(`Generated: ${new Date().toLocaleString()}`, 50, 33);
         pdf.setTextColor(0);
 
         // Prepare table data - exclude Actions column
