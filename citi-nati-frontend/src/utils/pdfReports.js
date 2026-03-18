@@ -25,25 +25,26 @@ const buildBrandedHeader = ({
   accentColor = BRAND_PURPLE,
   compact = false,
 }) => {
-  const logoHeight = compact ? 58 : 78;
+  const logoHeight = compact ? 44 : 58;
   const brandFontSize = compact ? 22 : 28;
   const titleFontSize = compact ? 14 : 16;
-  const brandRowGap = compact ? 12 : 14;
+  const sideSpacer = compact ? 44 : 58;
 
   return `
     <div style="margin-bottom: 28px; border-bottom: 3px solid ${accentColor}; padding-bottom: 14px;">
-      <div style="display: flex; align-items: center; justify-content: center; gap: ${brandRowGap}px; margin-bottom: 8px;">
-        <img src="${logo}" alt="Citi-Nati logo" style="height: ${logoHeight}px; width: auto; object-fit: contain; display: block;" />
-        <h1 style="margin: 0; font-size: ${brandFontSize}px; font-weight: 700; line-height: 1.1;">
-          <span style="color: ${BRAND_PURPLE};">Citi</span><span style="color: ${BRAND_GREEN};">- Nati Supermarket</span>
-        </h1>
-      </div>
-      <div style="text-align: center;">
-        <p style="margin: 6px 0 0 0; color: #111; font-size: ${titleFontSize}px; font-weight: 600;">${reportTitle}</p>
-        ${subText ? `<p style="margin: 4px 0 0 0; color: #666; font-size: 12px;">${subText}</p>` : ''}
-        ${periodText ? `<p style="margin: 4px 0 0 0; color: #666; font-size: 12px;">${periodText}</p>` : ''}
-        ${generatedText ? `<p style="margin: 4px 0 0 0; color: #777; font-size: 12px;">${generatedText}</p>` : ''}
-        ${supportText ? `<p style="margin: 4px 0 0 0; color: #777; font-size: 11px;">${supportText}</p>` : ''}
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <img src="${logo}" alt="Citi-Nati logo" style="height: ${logoHeight}px; width: auto; object-fit: contain; flex: 0 0 auto;" />
+        <div style="flex: 1; text-align: center;">
+          <h1 style="margin: 0; font-size: ${brandFontSize}px; font-weight: 700; line-height: 1.2;">
+            <span style="color: ${BRAND_PURPLE};">Citi</span><span style="color: ${BRAND_GREEN};">- Nati Supermarket</span>
+          </h1>
+          <p style="margin: 6px 0 0 0; color: #111; font-size: ${titleFontSize}px; font-weight: 600;">${reportTitle}</p>
+          ${subText ? `<p style="margin: 4px 0 0 0; color: #666; font-size: 12px;">${subText}</p>` : ''}
+          ${periodText ? `<p style="margin: 4px 0 0 0; color: #666; font-size: 12px;">${periodText}</p>` : ''}
+          ${generatedText ? `<p style="margin: 4px 0 0 0; color: #777; font-size: 12px;">${generatedText}</p>` : ''}
+          ${supportText ? `<p style="margin: 4px 0 0 0; color: #777; font-size: 11px;">${supportText}</p>` : ''}
+        </div>
+        <div style="width: ${sideSpacer}px; flex: 0 0 ${sideSpacer}px;"></div>
       </div>
     </div>
   `;
