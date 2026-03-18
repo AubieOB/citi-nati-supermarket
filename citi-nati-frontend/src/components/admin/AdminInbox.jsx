@@ -424,6 +424,7 @@ const AdminInbox = () => {
   };
 
   const unreadCount = messages.filter(m => !m.read).length;
+  const messagesListHeight = `calc(100vh - ${filterBarLayout.top + filterBarHeight + 16}px)`;
 
   return (
     <div style={{ padding: '1rem 0' }}>
@@ -736,8 +737,9 @@ const AdminInbox = () => {
           display: 'flex',
           flexDirection: 'column',
           gap: '1rem',
-          maxHeight: '70vh',
+          height: messagesListHeight,
           overflowY: 'auto',
+          paddingBottom: '0.5rem',
         }}>
           {filteredMessages.map((message) => {
             const typeInfo = getMessageTypeInfo(message.type);
