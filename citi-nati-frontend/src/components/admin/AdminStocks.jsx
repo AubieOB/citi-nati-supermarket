@@ -288,7 +288,7 @@ const AdminStocks = () => {
       // Add logo
       const img = new Image();
       img.onload = () => {
-        pdf.addImage(img, 'PNG', 14, 8, 30, 15);
+          pdf.addImage(img, 'PNG', 14, 8, 20, 20);
         
         // Add company name
         pdf.setFontSize(14);
