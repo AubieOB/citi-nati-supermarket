@@ -1,4 +1,54 @@
 import html2pdf from 'html2pdf.js';
+import logo from '../assets/citi-nati-logo.png.png';
+
+const BRAND_PURPLE = '#5B4B8A';
+const BRAND_GREEN = '#2D8659';
+
+const escapeHtml = (value) => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const formatProductsCurrency = (amount) => {
+  const numericAmount = Number(amount || 0);
+  return `MWK ${new Intl.NumberFormat('en-US').format(numericAmount)}`;
+};
+
+const buildBrandedHeader = ({
+  reportTitle,
+  subText = '',
+  periodText = '',
+  generatedText = '',
+  supportText = '',
+  accentColor = BRAND_PURPLE,
+  compact = false,
+}) => {
+  const logoHeight = compact ? 34 : 44;
+  const brandFontSize = compact ? 22 : 28;
+  const titleFontSize = compact ? 14 : 16;
+  const sideSpacer = compact ? 34 : 44;
+
+  return `
+    <div style="margin-bottom: 28px; border-bottom: 3px solid ${accentColor}; padding-bottom: 14px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <img src="${logo}" alt="Citi-Nati logo" style="height: ${logoHeight}px; width: auto; object-fit: contain; flex: 0 0 auto;" />
+        <div style="flex: 1; text-align: center;">
+          <h1 style="margin: 0; font-size: ${brandFontSize}px; font-weight: 700; line-height: 1.2;">
+            <span style="color: ${BRAND_PURPLE};">Citi</span><span style="color: ${BRAND_GREEN};">- Nati Supermarket</span>
+          </h1>
+          <p style="margin: 6px 0 0 0; color: #111; font-size: ${titleFontSize}px; font-weight: 600;">${reportTitle}</p>
+          ${subText ? `<p style="margin: 4px 0 0 0; color: #666; font-size: 12px;">${subText}</p>` : ''}
+          ${periodText ? `<p style="margin: 4px 0 0 0; color: #666; font-size: 12px;">${periodText}</p>` : ''}
+          ${generatedText ? `<p style="margin: 4px 0 0 0; color: #777; font-size: 12px;">${generatedText}</p>` : ''}
+          ${supportText ? `<p style="margin: 4px 0 0 0; color: #777; font-size: 11px;">${supportText}</p>` : ''}
+        </div>
+        <div style="width: ${sideSpacer}px; flex: 0 0 ${sideSpacer}px;"></div>
+      </div>
+    </div>
+  `;
+};
 
 export const generateSummaryReportPDF = (salesDays, dateRange = {}) => {
   const today = new Date().toLocaleDateString();
@@ -7,13 +57,12 @@ export const generateSummaryReportPDF = (salesDays, dateRange = {}) => {
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px;">
-      <!-- Header -->
-      <div style="text-align: center; margin-bottom: 40px; border-bottom: 3px solid #2D8659; padding-bottom: 20px;">
-        <h1 style="margin: 0; color: #2D8659; font-size: 28px;">Citi-Nati Supermarket</h1>
-        <p style="margin: 5px 0; color: #666; font-size: 14px;">Sales Summary Report</p>
-        <p style="margin: 5px 0; color: #999; font-size: 12px;">Period: ${dateRange.fromDate} to ${dateRange.toDate}</p>
-        <p style="margin: 5px 0 0 0; color: #999; font-size: 12px;">Generated on ${today}</p>
-      </div>
+      ${buildBrandedHeader({
+        reportTitle: 'Sales Summary Report',
+        periodText: `Period: ${dateRange.fromDate} to ${dateRange.toDate}`,
+        generatedText: `Generated on ${today}`,
+        accentColor: BRAND_GREEN,
+      })}
 
       <!-- Executive Summary -->
       <div style="background-color: #f0f9f6; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
@@ -97,13 +146,12 @@ export const generateProductSalesReportPDF = (productSales, salesDays, dateRange
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px;">
-      <!-- Header -->
-      <div style="text-align: center; margin-bottom: 40px; border-bottom: 3px solid #2D8659; padding-bottom: 20px;">
-        <h1 style="margin: 0; color: #2D8659; font-size: 28px;">Citi-Nati Supermarket</h1>
-        <p style="margin: 5px 0; color: #666; font-size: 14px;">Sales by Product Report</p>
-        <p style="margin: 5px 0; color: #999; font-size: 12px;">Period: ${dateRange.fromDate} to ${dateRange.toDate}</p>
-        <p style="margin: 5px 0 0 0; color: #999; font-size: 12px;">Generated on ${today}</p>
-      </div>
+      ${buildBrandedHeader({
+        reportTitle: 'Sales by Product Report',
+        periodText: `Period: ${dateRange.fromDate} to ${dateRange.toDate}`,
+        generatedText: `Generated on ${today}`,
+        accentColor: BRAND_GREEN,
+      })}
 
       <!-- Executive Summary -->
       <div style="background-color: #f0f9f6; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
@@ -183,13 +231,12 @@ export const generateDetailedReportPDF = (salesDays, dateRange = {}) => {
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px;">
-      <!-- Header -->
-      <div style="text-align: center; margin-bottom: 40px; border-bottom: 3px solid #5B4B8A; padding-bottom: 20px;">
-        <h1 style="margin: 0; color: #5B4B8A; font-size: 28px;">Citi-Nati Supermarket</h1>
-        <p style="margin: 5px 0; color: #666; font-size: 14px;">Detailed Sales Report</p>
-        <p style="margin: 5px 0; color: #999; font-size: 12px;">Period: ${dateRange.fromDate} to ${dateRange.toDate}</p>
-        <p style="margin: 5px 0 0 0; color: #999; font-size: 12px;">Generated on ${today}</p>
-      </div>
+      ${buildBrandedHeader({
+        reportTitle: 'Detailed Sales Report',
+        periodText: `Period: ${dateRange.fromDate} to ${dateRange.toDate}`,
+        generatedText: `Generated on ${today}`,
+        accentColor: BRAND_PURPLE,
+      })}
 
       <!-- Report Overview -->
       <div style="background-color: #f5f5f5; padding: 15px; border-radius: 8px; margin-bottom: 30px;">
@@ -263,12 +310,11 @@ export const generateDriverReportPDF = (drivers, dateRange = {}) => {
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px;">
-      <!-- Header -->
-      <div style="text-align: center; margin-bottom: 40px; border-bottom: 3px solid #FF6B6B; padding-bottom: 20px;">
-        <h1 style="margin: 0; color: #FF6B6B; font-size: 28px;">Citi-Nati Supermarket</h1>
-        <p style="margin: 5px 0; color: #666; font-size: 14px;">Driver Performance Report</p>
-        <p style="margin: 5px 0 0 0; color: #999; font-size: 12px;">Generated on ${today}</p>
-      </div>
+      ${buildBrandedHeader({
+        reportTitle: 'Driver Performance Report',
+        generatedText: `Generated on ${today}`,
+        accentColor: '#FF6B6B',
+      })}
 
       <!-- Executive Summary -->
       <div style="background-color: #ffe6e6; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
@@ -347,13 +393,12 @@ export const generateDriverSalesReportPDF = (drivers, dateRange = {}) => {
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px;">
-      <!-- Header -->
-      <div style="text-align: center; margin-bottom: 40px; border-bottom: 3px solid #5B4B8A; padding-bottom: 20px;">
-        <h1 style="margin: 0; color: #5B4B8A; font-size: 28px;">Citi-Nati Supermarket</h1>
-        <p style="margin: 5px 0; color: #666; font-size: 14px;">Sales by Driver Report</p>
-        <p style="margin: 5px 0; color: #999; font-size: 12px;">Period: ${dateRange.fromDate} to ${dateRange.toDate}</p>
-        <p style="margin: 5px 0 0 0; color: #999; font-size: 12px;">Generated on ${today}</p>
-      </div>
+      ${buildBrandedHeader({
+        reportTitle: 'Sales by Driver Report',
+        periodText: `Period: ${dateRange.fromDate} to ${dateRange.toDate}`,
+        generatedText: `Generated on ${today}`,
+        accentColor: BRAND_PURPLE,
+      })}
 
       <!-- Executive Summary -->
       <div style="background-color: #f5f3f9; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
@@ -464,16 +509,17 @@ export const generateOrderReceiptPDF = (order) => {
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <!-- Header -->
-      <div style="text-align: center; margin-bottom: 30px; border-bottom: 3px solid #2D8659; padding-bottom: 20px;">
-        <h1 style="margin: 0; color: #2D8659; font-size: 24px;">Citi-Nati Supermarket</h1>
-        <p style="margin: 5px 0 0 0; color: #999; font-size: 12px; font-style: italic;">Your Trusted Supermarket</p>
-        <p style="margin: 10px 0 0 0; color: #999; font-size: 11px;">Phone: +265 888857188 | Email: info@citinati.com</p>
-      </div>
+      ${buildBrandedHeader({
+        reportTitle: 'Order Receipt',
+        subText: 'Your Trusted Supermarket',
+        generatedText: `Generated on ${today}`,
+        supportText: 'Phone: +265 888857188 | Email: info@citinati.com',
+        accentColor: BRAND_GREEN,
+        compact: true,
+      })}
 
       <!-- Receipt Title -->
       <div style="text-align: center; margin-bottom: 20px;">
-        <h2 style="margin: 0; color: #333; font-size: 18px;">ORDER RECEIPT</h2>
         <p style="margin: 5px 0 0 0; color: #666; font-size: 12px;">Thank you for your purchase!</p>
       </div>
 
@@ -574,18 +620,6 @@ export const generateOrderReceiptPDF = (order) => {
   html2pdf().set(opt).from(element).save();
 };
 
-const escapeHtml = (value) => String(value ?? '')
-  .replace(/&/g, '&amp;')
-  .replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;')
-  .replace(/"/g, '&quot;')
-  .replace(/'/g, '&#39;');
-
-const formatProductsCurrency = (amount) => {
-  const numericAmount = Number(amount || 0);
-  return `MWK ${new Intl.NumberFormat('en-US').format(numericAmount)}`;
-};
-
 export const generateAdminProductsTablePDF = (products, options = {}) => {
   const { selectedCategory = '' } = options;
   const today = new Date();
@@ -647,13 +681,12 @@ export const generateAdminProductsTablePDF = (products, options = {}) => {
         }
       </style>
 
-      <div style="border-bottom: 3px solid #2D8659; padding-bottom: 12px; margin-bottom: 16px;">
-        <h1 style="margin: 0; color: #2D8659; font-size: 22px;">Citi-Nati Supermarket</h1>
-        <p style="margin: 6px 0 0 0; font-size: 13px;">Admin Products Table Export</p>
-        <p style="margin: 4px 0 0 0; font-size: 12px; color: #666;">Category: ${escapeHtml(categoryLabel)}</p>
-        <p style="margin: 4px 0 0 0; font-size: 12px; color: #666;">Products: ${products.length}</p>
-        <p style="margin: 4px 0 0 0; font-size: 12px; color: #666;">Generated: ${escapeHtml(dateText)} ${escapeHtml(timeText)}</p>
-      </div>
+      ${buildBrandedHeader({
+        reportTitle: 'Admin Products Table Export',
+        periodText: `Category: ${escapeHtml(categoryLabel)} | Products: ${products.length}`,
+        generatedText: `Generated: ${escapeHtml(dateText)} ${escapeHtml(timeText)}`,
+        accentColor: BRAND_GREEN,
+      })}
 
       <table class="pdf-products-table">
         <colgroup>
