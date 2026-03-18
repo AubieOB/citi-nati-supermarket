@@ -384,20 +384,6 @@ const AdminPOSManagement = () => {
   return (
     <Container>
       <div style={styles.container}>
-        {/* Professional Header */}
-        <div style={styles.header}>
-          <div style={styles.headerTop}>
-            <h1 style={styles.title}>
-              <i className="fas fa-boxes" style={styles.titleIcon}></i>
-              POS Products Management
-            </h1>
-            <p style={styles.subtitle}>
-              <i className="fas fa-info-circle" style={{ marginRight: '0.5rem' }}></i>
-              Manage which POS synced products appear on your website
-            </p>
-          </div>
-        </div>
-
         {/* Error Alert */}
         {error && (
           <div style={styles.errorAlert}>
@@ -440,6 +426,18 @@ const AdminPOSManagement = () => {
                 marginBottom: 0,
               }}
             >
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.85rem', flexWrap: 'wrap' }}>
+                <div>
+                  <h1 style={{ margin: 0, color: '#2c3e50', display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '1.5rem', fontWeight: '800' }}>
+                    <i className="fas fa-boxes" style={{ color: '#5B4B8A' }}></i>
+                    POS Products Management
+                  </h1>
+                  <p style={{ margin: '0.35rem 0 0 0', color: '#666', display: 'flex', alignItems: 'center', fontSize: '0.92rem' }}>
+                    <i className="fas fa-info-circle" style={{ marginRight: '0.5rem' }}></i>
+                    Manage which POS synced products appear on your website
+                  </p>
+                </div>
+              </div>
               <div style={{display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap'}}>
                 {/* Search Box */}
                 <div style={styles.searchBoxWrapper}>
@@ -488,7 +486,7 @@ const AdminPOSManagement = () => {
               </div>
             </div>
 
-            <div style={{ height: `${filterBarHeight + 8}px` }}></div>
+            <div style={{ height: `${Math.max(filterBarHeight - 8, 0)}px` }}></div>
 
             {/* Stats Cards */}
             <div style={styles.statsGrid}>
