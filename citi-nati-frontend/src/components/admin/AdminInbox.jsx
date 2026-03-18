@@ -29,9 +29,12 @@ const AdminInbox = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('');
   const [dateFilter, setDateFilter] = useState('');
+  const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
+  const [filterBarHeight, setFilterBarHeight] = useState(0);
   const { modal, closeModal, showConfirm } = useModal();
   const notificationAudioRef = useRef(null);
   const soundedMessagesRef = useRef(new Set());
+  const filterBarRef = useRef(null);
 
   // Message types
   const messageTypes = [
@@ -173,6 +176,42 @@ const AdminInbox = () => {
       window.removeEventListener('keydown', handleLeftCtrlClear);
     };
   }, [searchTerm]);
+
+  useEffect(() => {
+    let resizeObserver;
+
+    const updateFilterBarLayout = () => {
+      const contentArea = document.querySelector('.admin-content-area');
+      if (!contentArea) return;
+
+      const rect = contentArea.getBoundingClientRect();
+      const mobileTopOffset = 56;
+
+      setFilterBarLayout({
+        left: rect.left,
+        width: rect.width,
+        top: window.innerWidth <= 768 ? mobileTopOffset : 0,
+      });
+
+      if (filterBarRef.current) {
+        setFilterBarHeight(filterBarRef.current.offsetHeight);
+      }
+    };
+
+    updateFilterBarLayout();
+    window.addEventListener('resize', updateFilterBarLayout);
+
+    const contentArea = document.querySelector('.admin-content-area');
+    if (contentArea && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(updateFilterBarLayout);
+      resizeObserver.observe(contentArea);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateFilterBarLayout);
+      if (resizeObserver) resizeObserver.disconnect();
+    };
+  }, []);
 
   const fetchMessages = async () => {
     try {
@@ -482,15 +521,26 @@ const AdminInbox = () => {
 
       {/* Filters */}
       {messages.length > 0 && (
-        <div style={{
+        <>
+        <div
+          ref={filterBarRef}
+          style={{
           display: 'flex',
           gap: '1rem',
           alignItems: 'center',
           marginBottom: '2rem',
+          position: 'fixed',
+          top: `${filterBarLayout.top}px`,
+          left: `${filterBarLayout.left}px`,
+          width: `${filterBarLayout.width}px`,
+          zIndex: 80,
           padding: '1rem',
-          backgroundColor: '#f8f9fa',
+          backgroundColor: '#fff',
+          border: '1px solid #eee',
           borderRadius: '8px',
           flexWrap: 'wrap',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+          boxSizing: 'border-box',
         }}>
           {/* Search Input */}
           <div style={{
@@ -639,6 +689,8 @@ const AdminInbox = () => {
             {filteredMessages.length} / {messages.length} messages
           </div>
         </div>
+        <div style={{ height: `${filterBarHeight + 12}px` }}></div>
+        </>
       )}
 
       {/* Loading State */}

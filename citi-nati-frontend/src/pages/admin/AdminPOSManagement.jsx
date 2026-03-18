@@ -37,7 +37,10 @@ const AdminPOSManagement = () => {
   const [limit] = useState(5000);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
+  const [filterBarHeight, setFilterBarHeight] = useState(0);
   const searchTimeoutRef = useRef(null);
+  const filterBarRef = useRef(null);
   const { modal, closeModal, showError, showSuccess, showConfirm } = useModal();
 
   /**
@@ -161,6 +164,42 @@ const AdminPOSManagement = () => {
       window.removeEventListener('keydown', handleRightCtrlClear);
     };
   }, [searchTerm, selectedCategory]);
+
+  useEffect(() => {
+    let resizeObserver;
+
+    const updateFilterBarLayout = () => {
+      const contentArea = document.querySelector('.admin-content-area');
+      if (!contentArea) return;
+
+      const rect = contentArea.getBoundingClientRect();
+      const mobileTopOffset = 56;
+
+      setFilterBarLayout({
+        left: rect.left,
+        width: rect.width,
+        top: window.innerWidth <= 768 ? mobileTopOffset : 0,
+      });
+
+      if (filterBarRef.current) {
+        setFilterBarHeight(filterBarRef.current.offsetHeight);
+      }
+    };
+
+    updateFilterBarLayout();
+    window.addEventListener('resize', updateFilterBarLayout);
+
+    const contentArea = document.querySelector('.admin-content-area');
+    if (contentArea && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(updateFilterBarLayout);
+      resizeObserver.observe(contentArea);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateFilterBarLayout);
+      if (resizeObserver) resizeObserver.disconnect();
+    };
+  }, []);
 
   // Handle category filter
   const handleCategoryChange = (category) => {
@@ -425,7 +464,24 @@ const AdminPOSManagement = () => {
         ) : (
           <>
             {/* Search and Category Filters */}
-            <div style={styles.filterSection}>
+            <div
+              ref={filterBarRef}
+              style={{
+                ...styles.filterSection,
+                position: 'fixed',
+                top: `${filterBarLayout.top}px`,
+                left: `${filterBarLayout.left}px`,
+                width: `${filterBarLayout.width}px`,
+                zIndex: 80,
+                backgroundColor: '#fff',
+                border: '1px solid #eee',
+                borderRadius: '8px',
+                padding: '1rem',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+                boxSizing: 'border-box',
+                marginBottom: 0,
+              }}
+            >
               <div style={{display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap'}}>
                 {/* Search Box */}
                 <div style={styles.searchBoxWrapper}>
@@ -473,6 +529,8 @@ const AdminPOSManagement = () => {
                 )}
               </div>
             </div>
+
+            <div style={{ height: `${filterBarHeight + 12}px` }}></div>
 
             {/* Action Buttons */}
             <div style={styles.actionButtons}>

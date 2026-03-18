@@ -30,8 +30,11 @@ const AdminStocks = () => {
   const [actionType, setActionType] = useState('add'); // 'add' or 'subtract'
   const [lowStockThreshold, setLowStockThreshold] = useState(5);
   const [currentPage, setCurrentPage] = useState(1);
+  const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
+  const [filterBarHeight, setFilterBarHeight] = useState(0);
   const pageSize = 20;
   const searchTimeoutRef = useRef(null);
+  const filterBarRef = useRef(null);
 
   useEffect(() => {
     fetchProducts();
@@ -281,6 +284,42 @@ const AdminStocks = () => {
     };
   }, [searchTerm]);
 
+  useEffect(() => {
+    let resizeObserver;
+
+    const updateFilterBarLayout = () => {
+      const contentArea = document.querySelector('.admin-content-area');
+      if (!contentArea) return;
+
+      const rect = contentArea.getBoundingClientRect();
+      const mobileTopOffset = 56;
+
+      setFilterBarLayout({
+        left: rect.left,
+        width: rect.width,
+        top: window.innerWidth <= 768 ? mobileTopOffset : 0,
+      });
+
+      if (filterBarRef.current) {
+        setFilterBarHeight(filterBarRef.current.offsetHeight);
+      }
+    };
+
+    updateFilterBarLayout();
+    window.addEventListener('resize', updateFilterBarLayout);
+
+    const contentArea = document.querySelector('.admin-content-area');
+    if (contentArea && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(updateFilterBarLayout);
+      resizeObserver.observe(contentArea);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateFilterBarLayout);
+      if (resizeObserver) resizeObserver.disconnect();
+    };
+  }, []);
+
   // Handle category change
   const handleCategoryChange = (category) => {
     setFilterCategory(category);
@@ -388,12 +427,21 @@ const AdminStocks = () => {
       </div>
 
       {/* Filters */}
-      <div style={{
+      <div
+        ref={filterBarRef}
+        style={{
         backgroundColor: '#fff',
+        position: 'fixed',
+        top: `${filterBarLayout.top}px`,
+        left: `${filterBarLayout.left}px`,
+        width: `${filterBarLayout.width}px`,
+        zIndex: 80,
         borderRadius: '8px',
         padding: '1.5rem',
         marginBottom: '2rem',
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+        border: '1px solid #eee',
+        boxSizing: 'border-box',
       }}>
         <h3 style={{ margin: '0 0 1rem 0', color: '#333', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <i className="fas fa-filter" style={{ color: '#5B4B8A' }}></i>
@@ -521,6 +569,8 @@ const AdminStocks = () => {
           </div>
         </div>
       </div>
+
+      <div style={{ height: `${filterBarHeight + 12}px` }}></div>
 
       {/* Products Table */}
       <div style={{
