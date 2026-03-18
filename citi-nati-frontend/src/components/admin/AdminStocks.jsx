@@ -486,7 +486,7 @@ const AdminStocks = () => {
         </div>
       </div>
 
-      <div style={{ height: `${filterBarHeight}px` }}></div>
+      <div style={{ height: `${Math.max(filterBarHeight - 8, 0)}px` }}></div>
 
       {/* Stats Cards */}
       <div style={{
