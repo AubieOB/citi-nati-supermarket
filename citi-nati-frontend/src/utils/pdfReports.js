@@ -25,10 +25,10 @@ const buildBrandedHeader = ({
   accentColor = BRAND_PURPLE,
   compact = false,
 }) => {
-  const logoHeight = compact ? 34 : 44;
+  const logoHeight = compact ? 44 : 58;
   const brandFontSize = compact ? 22 : 28;
   const titleFontSize = compact ? 14 : 16;
-  const sideSpacer = compact ? 34 : 44;
+  const sideSpacer = compact ? 44 : 58;
 
   return `
     <div style="margin-bottom: 28px; border-bottom: 3px solid ${accentColor}; padding-bottom: 14px;">

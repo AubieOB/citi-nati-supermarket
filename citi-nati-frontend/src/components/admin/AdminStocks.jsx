@@ -288,8 +288,8 @@ const AdminStocks = () => {
       // Add logo
       const img = new Image();
       img.onload = () => {
-        const logoMaxWidth = 24;
-        const logoMaxHeight = 20;
+        const logoMaxWidth = 34;
+        const logoMaxHeight = 28;
         const imageRatio = img.width && img.height ? img.width / img.height : 1;
         let logoWidth = logoMaxWidth;
         let logoHeight = logoWidth / imageRatio;
