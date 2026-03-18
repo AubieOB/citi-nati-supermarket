@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Button from '../ui/Button.jsx';
 import api from '../../utils/api.js';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -18,10 +18,13 @@ const AdminUsers = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [verificationFilter, setVerificationFilter] = useState('all');
+  const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
+  const [filterBarHeight, setFilterBarHeight] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [updatingUserId, setUpdatingUserId] = useState(null);
   const { modal, closeModal, showConfirm, showError } = useModal();
+  const filterBarRef = useRef(null);
 
   useEffect(() => {
     fetchUsers();
@@ -136,6 +139,42 @@ const AdminUsers = () => {
     };
   }, [searchTerm]);
 
+  useEffect(() => {
+    let resizeObserver;
+
+    const updateFilterBarLayout = () => {
+      const contentArea = document.querySelector('.admin-content-area');
+      if (!contentArea) return;
+
+      const rect = contentArea.getBoundingClientRect();
+      const mobileTopOffset = 56;
+
+      setFilterBarLayout({
+        left: rect.left,
+        width: rect.width,
+        top: window.innerWidth <= 768 ? mobileTopOffset : 0,
+      });
+
+      if (filterBarRef.current) {
+        setFilterBarHeight(filterBarRef.current.offsetHeight);
+      }
+    };
+
+    updateFilterBarLayout();
+    window.addEventListener('resize', updateFilterBarLayout);
+
+    const contentArea = document.querySelector('.admin-content-area');
+    if (contentArea && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(updateFilterBarLayout);
+      resizeObserver.observe(contentArea);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateFilterBarLayout);
+      if (resizeObserver) resizeObserver.disconnect();
+    };
+  }, []);
+
   const filteredUsers = users.filter((u) => {
     const query = searchTerm.trim().toLowerCase();
     const matchesSearch = !query
@@ -200,20 +239,25 @@ const AdminUsers = () => {
         </div>
       )}
 
-      <div style={{
+      <div
+        ref={filterBarRef}
+        style={{
         display: 'flex',
         gap: '0.75rem',
         alignItems: 'center',
         marginBottom: '1rem',
         flexWrap: 'wrap',
-        position: 'sticky',
-        top: 0,
-        zIndex: 40,
+        position: 'fixed',
+        top: `${filterBarLayout.top}px`,
+        left: `${filterBarLayout.left}px`,
+        width: `${filterBarLayout.width}px`,
+        zIndex: 80,
         backgroundColor: '#fff',
         border: '1px solid #eee',
         borderRadius: '8px',
         padding: '0.75rem',
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+        boxSizing: 'border-box',
       }}>
         <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
           <input
@@ -323,6 +367,8 @@ const AdminUsers = () => {
           {filteredUsers.length} / {users.length} users
         </span>
       </div>
+
+      <div style={{ height: `${filterBarHeight + 12}px` }}></div>
 
       <div style={{ overflowX: 'auto' }}>
         <table style={{
