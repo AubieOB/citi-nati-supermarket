@@ -368,7 +368,7 @@ const AdminUsers = () => {
         </span>
       </div>
 
-      <div style={{ height: `${filterBarHeight + 12}px` }}></div>
+      <div style={{ height: `${filterBarHeight + 24}px` }}></div>
 
       <div style={{ overflowX: 'auto' }}>
         <table style={{

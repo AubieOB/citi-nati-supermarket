@@ -530,7 +530,7 @@ const AdminPOSManagement = () => {
               </div>
             </div>
 
-            <div style={{ height: `${filterBarHeight + 12}px` }}></div>
+            <div style={{ height: `${filterBarHeight + 24}px` }}></div>
 
             {/* Action Buttons */}
             <div style={styles.actionButtons}>
