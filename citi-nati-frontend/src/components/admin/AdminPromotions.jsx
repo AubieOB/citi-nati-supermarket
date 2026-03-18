@@ -28,6 +28,29 @@ const AdminPromotions = () => {
   const [previewProducts, setPreviewProducts] = useState([]);
   const [showPreview, setShowPreview] = useState(false);
 
+  const clearSearch = () => {
+    setSearchTerm('');
+  };
+
+  useEffect(() => {
+    const handleLeftCtrlClear = (event) => {
+      if (event.repeat) return;
+
+      const isLeftCtrl = event.code === 'ControlLeft' || (event.key === 'Control' && event.location === 1);
+      if (!isLeftCtrl) return;
+      if (!searchTerm) return;
+
+      event.preventDefault();
+      clearSearch();
+    };
+
+    window.addEventListener('keydown', handleLeftCtrlClear);
+
+    return () => {
+      window.removeEventListener('keydown', handleLeftCtrlClear);
+    };
+  }, [searchTerm]);
+
   useEffect(() => {
     fetchPromotionCatalog();
     fetchCurrentPromotions();
@@ -380,20 +403,49 @@ const AdminPromotions = () => {
               <i className="fas fa-search" style={{ marginRight: '0.5rem', color: '#5B4B8A' }}></i>
               Search & Select Products ({selectedCount} selected)
             </label>
-            <input
-              type="text"
-              placeholder="Search products to promote..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                borderRadius: '4px',
-                border: '1px solid #ddd',
-                fontSize: '0.95rem',
-                marginBottom: '0.75rem',
-              }}
-            />
+            <div style={{ position: 'relative', marginBottom: '0.75rem' }}>
+              <input
+                type="text"
+                placeholder="Search products to promote..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem 2.25rem 0.75rem 0.75rem',
+                  borderRadius: '4px',
+                  border: '1px solid #ddd',
+                  fontSize: '0.95rem',
+                }}
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={clearSearch}
+                  title="Clear search (Left Ctrl)"
+                  aria-label="Clear search"
+                  style={{
+                    position: 'absolute',
+                    right: '0.45rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    border: 'none',
+                    backgroundColor: '#e9ecef',
+                    color: '#555',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.85rem',
+                    padding: 0,
+                  }}
+                >
+                  <i className="fas fa-times"></i>
+                </button>
+              )}
+            </div>
             <div style={{
               maxHeight: '200px',
               overflowY: 'auto',

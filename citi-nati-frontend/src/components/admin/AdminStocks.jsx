@@ -253,6 +253,34 @@ const AdminStocks = () => {
     }, 300);
   };
 
+  const clearSearch = () => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    setSearchTerm('');
+    setCurrentPage(1);
+  };
+
+  useEffect(() => {
+    const handleLeftCtrlClear = (event) => {
+      if (event.repeat) return;
+
+      const isLeftCtrl = event.code === 'ControlLeft' || (event.key === 'Control' && event.location === 1);
+      if (!isLeftCtrl) return;
+      if (!searchTerm) return;
+
+      event.preventDefault();
+      clearSearch();
+    };
+
+    window.addEventListener('keydown', handleLeftCtrlClear);
+
+    return () => {
+      window.removeEventListener('keydown', handleLeftCtrlClear);
+    };
+  }, [searchTerm]);
+
   // Handle category change
   const handleCategoryChange = (category) => {
     setFilterCategory(category);
@@ -389,19 +417,49 @@ const AdminStocks = () => {
               <i className="fas fa-search" style={{ color: '#5B4B8A' }}></i>
               Search Product
             </label>
-            <input
-              type="text"
-              placeholder="Search by product name..."
-              value={searchTerm}
-              onChange={handleSearchChange}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                borderRadius: '4px',
-                border: '1px solid #ddd',
-                fontSize: '1rem',
-              }}
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                type="text"
+                placeholder="Search by product name..."
+                value={searchTerm}
+                onChange={handleSearchChange}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem 2.25rem 0.75rem 0.75rem',
+                  borderRadius: '4px',
+                  border: '1px solid #ddd',
+                  fontSize: '1rem',
+                }}
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={clearSearch}
+                  title="Clear search (Left Ctrl)"
+                  aria-label="Clear search"
+                  style={{
+                    position: 'absolute',
+                    right: '0.45rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    border: 'none',
+                    backgroundColor: '#e9ecef',
+                    color: '#555',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.85rem',
+                    padding: 0,
+                  }}
+                >
+                  <i className="fas fa-times"></i>
+                </button>
+              )}
+            </div>
           </div>
           <div>
             <label style={{

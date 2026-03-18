@@ -151,6 +151,29 @@ const AdminInbox = () => {
     applyFilters();
   }, [messages, searchTerm, selectedType, dateFilter]);
 
+  const clearSearch = () => {
+    setSearchTerm('');
+  };
+
+  useEffect(() => {
+    const handleLeftCtrlClear = (event) => {
+      if (event.repeat) return;
+
+      const isLeftCtrl = event.code === 'ControlLeft' || (event.key === 'Control' && event.location === 1);
+      if (!isLeftCtrl) return;
+      if (!searchTerm) return;
+
+      event.preventDefault();
+      clearSearch();
+    };
+
+    window.addEventListener('keydown', handleLeftCtrlClear);
+
+    return () => {
+      window.removeEventListener('keydown', handleLeftCtrlClear);
+    };
+  }, [searchTerm]);
+
   const fetchMessages = async () => {
     try {
       setLoading(true);
@@ -470,30 +493,63 @@ const AdminInbox = () => {
           flexWrap: 'wrap',
         }}>
           {/* Search Input */}
-          <input
-            type="text"
-            placeholder="Search messages..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{
-              flex: 1,
-              minWidth: '200px',
-              padding: '0.75rem',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '1rem',
-              backgroundColor: '#f5f5f5',
-              transition: 'box-shadow 0.3s ease, background-color 0.3s ease'
-            }}
-            onFocus={(e) => {
-              e.target.style.backgroundColor = '#fff';
-              e.target.style.boxShadow = '0 4px 12px rgba(91, 75, 138, 0.2)';
-            }}
-            onBlur={(e) => {
-              e.target.style.backgroundColor = '#f5f5f5';
-              e.target.style.boxShadow = 'none';
-            }}
-          />
+          <div style={{
+            position: 'relative',
+            flex: 1,
+            minWidth: '200px',
+          }}>
+            <input
+              type="text"
+              placeholder="Search messages..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.75rem 2.25rem 0.75rem 0.75rem',
+                border: 'none',
+                borderRadius: '4px',
+                fontSize: '1rem',
+                backgroundColor: '#f5f5f5',
+                transition: 'box-shadow 0.3s ease, background-color 0.3s ease'
+              }}
+              onFocus={(e) => {
+                e.target.style.backgroundColor = '#fff';
+                e.target.style.boxShadow = '0 4px 12px rgba(91, 75, 138, 0.2)';
+              }}
+              onBlur={(e) => {
+                e.target.style.backgroundColor = '#f5f5f5';
+                e.target.style.boxShadow = 'none';
+              }}
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                title="Clear search (Left Ctrl)"
+                aria-label="Clear search"
+                style={{
+                  position: 'absolute',
+                  right: '0.45rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '50%',
+                  border: 'none',
+                  backgroundColor: '#e9ecef',
+                  color: '#555',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.85rem',
+                  padding: 0,
+                }}
+              >
+                <i className="fas fa-times"></i>
+              </button>
+            )}
+          </div>
 
           {/* Type Filter */}
           <select

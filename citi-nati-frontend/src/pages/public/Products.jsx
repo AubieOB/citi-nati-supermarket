@@ -571,6 +571,38 @@ const Products = () => {
     console.log(`[PRODUCTS SEARCH] User typing: "${value}"`);
   };
 
+  const clearSearch = () => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    setSearchInput('');
+    handlePredictiveSearch('');
+  };
+
+  useEffect(() => {
+    const handleLeftCtrlClear = (event) => {
+      if (event.repeat) return;
+
+      const isLeftCtrl = event.code === 'ControlLeft' || (event.key === 'Control' && event.location === 1);
+      if (!isLeftCtrl) return;
+      if (!searchInput) return;
+
+      event.preventDefault();
+      clearSearch();
+    };
+
+    window.addEventListener('keydown', handleLeftCtrlClear);
+
+    return () => {
+      window.removeEventListener('keydown', handleLeftCtrlClear);
+    };
+  }, [searchInput]);
+
   /**
    * Handle category filter change
    */
@@ -759,32 +791,65 @@ const Products = () => {
             minWidth: 0
           }}>
             {/* SEARCH BAR */}
-            <input
-              type="text"
-              placeholder={`Search products (${totalSystemProducts})`}
-              value={searchInput}
-              onChange={handleSearchChange}
-              style={{
-                flex: '1 1 auto',
-                minWidth: window.innerWidth <= 768 ? '120px' : '180px',
-                maxWidth: window.innerWidth > 768 ? '450px' : '600px',
-                padding: '0.5rem 0.9rem',
-                border: '1px solid #d0d0d0',
-                borderRadius: '6px',
-                fontSize: window.innerWidth <= 480 ? '0.85rem' : '0.95rem',
-                boxSizing: 'border-box',
-                backgroundColor: '#fff',
-                transition: 'box-shadow 0.2s ease, border-color 0.2s ease'
-              }}
-              onFocus={(e) => {
-                e.target.style.boxShadow = '0 2px 8px rgba(91, 75, 138, 0.15)';
-                e.target.style.borderColor = '#5B4B8A';
-              }}
-              onBlur={(e) => {
-                e.target.style.boxShadow = 'none';
-                e.target.style.borderColor = '#d0d0d0';
-              }}
-            />
+            <div style={{
+              position: 'relative',
+              flex: '1 1 auto',
+              minWidth: window.innerWidth <= 768 ? '120px' : '180px',
+              maxWidth: window.innerWidth > 768 ? '450px' : '600px',
+            }}>
+              <input
+                type="text"
+                placeholder={`Search products (${totalSystemProducts})`}
+                value={searchInput}
+                onChange={handleSearchChange}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem 2.1rem 0.5rem 0.9rem',
+                  border: '1px solid #d0d0d0',
+                  borderRadius: '6px',
+                  fontSize: window.innerWidth <= 480 ? '0.85rem' : '0.95rem',
+                  boxSizing: 'border-box',
+                  backgroundColor: '#fff',
+                  transition: 'box-shadow 0.2s ease, border-color 0.2s ease'
+                }}
+                onFocus={(e) => {
+                  e.target.style.boxShadow = '0 2px 8px rgba(91, 75, 138, 0.15)';
+                  e.target.style.borderColor = '#5B4B8A';
+                }}
+                onBlur={(e) => {
+                  e.target.style.boxShadow = 'none';
+                  e.target.style.borderColor = '#d0d0d0';
+                }}
+              />
+              {searchInput && (
+                <button
+                  type="button"
+                  onClick={clearSearch}
+                  title="Clear search (Left Ctrl)"
+                  aria-label="Clear search"
+                  style={{
+                    position: 'absolute',
+                    right: '0.35rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: '26px',
+                    height: '26px',
+                    borderRadius: '50%',
+                    border: 'none',
+                    backgroundColor: '#eef0f2',
+                    color: '#555',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.8rem',
+                    padding: 0,
+                  }}
+                >
+                  <i className="fas fa-times"></i>
+                </button>
+              )}
+            </div>
 
             {/* CATEGORY FILTER */}
             <select
