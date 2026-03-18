@@ -288,8 +288,9 @@ const AdminStocks = () => {
       // Add logo
       const img = new Image();
       img.onload = () => {
-        const logoMaxWidth = 34;
-        const logoMaxHeight = 28;
+        const logoMaxWidth = 44;
+        const logoMaxHeight = 34;
+        const logoGap = 5;
         const imageRatio = img.width && img.height ? img.width / img.height : 1;
         let logoWidth = logoMaxWidth;
         let logoHeight = logoWidth / imageRatio;
@@ -299,12 +300,8 @@ const AdminStocks = () => {
           logoWidth = logoHeight * imageRatio;
         }
 
-        const logoX = 14;
-        const logoY = 8 + ((logoMaxHeight - logoHeight) / 2);
-        pdf.addImage(img, 'PNG', logoX, logoY, logoWidth, logoHeight);
-
         const centerX = pageWidth / 2;
-        
+
         // Add company name
         pdf.setFontSize(14);
         pdf.setFont(undefined, 'bold');
@@ -312,12 +309,20 @@ const AdminStocks = () => {
         const brandRight = '- Nati Supermarket';
         const brandLeftWidth = pdf.getTextWidth(brandLeft);
         const brandRightWidth = pdf.getTextWidth(brandRight);
-        const brandStartX = centerX - ((brandLeftWidth + brandRightWidth) / 2);
+        const brandTextWidth = brandLeftWidth + brandRightWidth;
+        const brandBaselineY = 20;
+        const groupWidth = logoWidth + logoGap + brandTextWidth;
+        const groupStartX = centerX - (groupWidth / 2);
+        const logoX = groupStartX;
+        const logoY = brandBaselineY - (logoHeight / 2) - 2;
+        const brandStartX = groupStartX + logoWidth + logoGap;
+
+        pdf.addImage(img, 'PNG', logoX, logoY, logoWidth, logoHeight);
 
         pdf.setTextColor(91, 75, 138);
-        pdf.text(brandLeft, brandStartX, 12);
+        pdf.text(brandLeft, brandStartX, brandBaselineY);
         pdf.setTextColor(56, 142, 60);
-        pdf.text(brandRight, brandStartX + brandLeftWidth, 12);
+        pdf.text(brandRight, brandStartX + brandLeftWidth, brandBaselineY);
         
         // Add title
         const statusLabel = stockStatusFilter === 'all' ? 'All Products' 
@@ -328,12 +333,12 @@ const AdminStocks = () => {
         pdf.setFontSize(12);
         pdf.setFont(undefined, 'normal');
         pdf.setTextColor(0);
-        pdf.text('Stock Management Report', centerX, 21, { align: 'center' });
+        pdf.text('Stock Management Report', centerX, 43, { align: 'center' });
         
         pdf.setFontSize(10);
         pdf.setTextColor(100);
-        pdf.text(`Status: ${statusLabel}`, centerX, 28, { align: 'center' });
-        pdf.text(`Generated: ${new Date().toLocaleString()}`, centerX, 33, { align: 'center' });
+        pdf.text(`Status: ${statusLabel}`, centerX, 49, { align: 'center' });
+        pdf.text(`Generated: ${new Date().toLocaleString()}`, centerX, 54, { align: 'center' });
         pdf.setTextColor(0);
 
         // Prepare table data - exclude Actions column
@@ -351,7 +356,7 @@ const AdminStocks = () => {
 
         // Generate table
         autoTable(pdf, {
-          startY: 40,
+          startY: 60,
           head: [['Product Name', 'Product Code', 'Category', 'Current Stock', 'Status']],
           body: tableData,
           theme: 'grid',
