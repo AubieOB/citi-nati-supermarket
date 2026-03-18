@@ -590,31 +590,31 @@ const AdminPOSManagement = () => {
                         title="Select all products on this page"
                       />
                     </th>
-                    <th style={styles.cell}>
+                    <th style={{ ...styles.cell, ...styles.nameCell }}>
                       <i className="fas fa-box" style={{ marginRight: '0.5rem' }}></i>
                       Product Name
                     </th>
-                    <th style={styles.cell}>
+                    <th style={{ ...styles.cell, ...styles.sourceCodeCell }}>
                       <i className="fas fa-barcode" style={{ marginRight: '0.5rem' }}></i>
                       Source Code
                     </th>
-                    <th style={styles.cell}>
+                    <th style={{ ...styles.cell, ...styles.categoryCell }}>
                       <i className="fas fa-tag" style={{ marginRight: '0.5rem' }}></i>
                       Category
                     </th>
-                    <th style={styles.cell}>
+                    <th style={{ ...styles.cell, ...styles.priceCell }}>
                       <i className="fas fa-dollar-sign" style={{ marginRight: '0.5rem' }}></i>
                       Price
                     </th>
-                    <th style={styles.cell}>
+                    <th style={{ ...styles.cell, ...styles.stockCell }}>
                       <i className="fas fa-warehouse" style={{ marginRight: '0.5rem' }}></i>
                       Stock
                     </th>
-                    <th style={styles.cell}>
+                    <th style={{ ...styles.cell, ...styles.visibilityCell }}>
                       <i className="fas fa-eye" style={{ marginRight: '0.5rem' }}></i>
                       Visibility
                     </th>
-                    <th style={styles.cell}>
+                    <th style={{ ...styles.cell, ...styles.actionsHeaderCell }}>
                       <i className="fas fa-cog" style={{ marginRight: '0.5rem' }}></i>
                       Actions
                     </th>
@@ -634,32 +634,32 @@ const AdminPOSManagement = () => {
                           style={styles.checkbox}
                         />
                       </td>
-                      <td style={styles.cell}>
+                      <td style={{ ...styles.cell, ...styles.nameCell }}>
                         <div style={styles.productName}>
                           <i className="fas fa-box" style={{ marginRight: '0.5rem', color: '#5B4B8A' }}></i>
                           {product.name}
                         </div>
                       </td>
-                      <td style={styles.cell}>
+                      <td style={{ ...styles.cell, ...styles.sourceCodeCell }}>
                         <code style={styles.sourceCode}>{product.sourceCode}</code>
                       </td>
-                      <td style={styles.cell}>
+                      <td style={{ ...styles.cell, ...styles.categoryCell }}>
                         <span style={styles.categoryBadge}>
                           <i className="fas fa-tag" style={{ marginRight: '0.3rem' }}></i>
                           {product.category || 'N/A'}
                         </span>
                       </td>
-                      <td style={styles.cell}>
+                      <td style={{ ...styles.cell, ...styles.priceCell }}>
                         <span style={styles.priceValue}>{formatMWK(product.price)}</span>
                       </td>
-                      <td style={styles.cell}>
+                      <td style={{ ...styles.cell, ...styles.stockCell }}>
                         <span style={{
-                          padding: '0.4rem 0.8rem',
+                          padding: '0.3rem 0.6rem',
                           borderRadius: '6px',
                           backgroundColor: product.stock > 10 ? '#d4edda' : product.stock > 0 ? '#fff3cd' : '#f8d7da',
                           color: product.stock > 10 ? '#155724' : product.stock > 0 ? '#856404' : '#721c24',
                           fontWeight: '600',
-                          fontSize: '0.9rem',
+                          fontSize: '0.82rem',
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '0.4rem',
@@ -668,14 +668,14 @@ const AdminPOSManagement = () => {
                           {product.stock} units
                         </span>
                       </td>
-                      <td style={styles.cell}>
+                      <td style={{ ...styles.cell, ...styles.visibilityCell }}>
                         <span style={{
-                          padding: '0.4rem 0.8rem',
+                          padding: '0.3rem 0.6rem',
                           borderRadius: '6px',
                           backgroundColor: product.hideFromProductsPage ? '#ffe5e5' : '#e5f5e5',
                           color: product.hideFromProductsPage ? '#c41e3a' : '#28a745',
                           fontWeight: '600',
-                          fontSize: '0.9rem',
+                          fontSize: '0.82rem',
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '0.4rem',
@@ -684,7 +684,7 @@ const AdminPOSManagement = () => {
                           {product.hideFromProductsPage ? 'HIDDEN' : 'VISIBLE'}
                         </span>
                       </td>
-                      <td style={styles.cell}>
+                      <td style={{ ...styles.cell, ...styles.actionsCell }}>
                         <div style={styles.actionCell}>
                           <button
                             onClick={() => handleToggleVisibility(product.id, product.hideFromProductsPage)}
@@ -970,11 +970,13 @@ const styles = {
     marginBottom: '2rem',
     borderRadius: '8px',
     boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+    position: 'relative',
   },
   table: {
     width: '100%',
     borderCollapse: 'collapse',
     backgroundColor: '#fff',
+    tableLayout: 'auto',
   },
   headerRow: {
     backgroundColor: '#f8f9fa',
@@ -985,14 +987,15 @@ const styles = {
     transition: 'background-color 0.2s ease',
   },
   cell: {
-    padding: '1.25rem',
+    padding: '0.9rem 0.75rem',
     textAlign: 'left',
-    fontSize: '0.95rem',
+    fontSize: '0.9rem',
     color: '#333',
+    verticalAlign: 'middle',
   },
   checkboxCell: {
-    width: '50px',
-    padding: '1.25rem 0.75rem',
+    width: '42px',
+    padding: '0.9rem 0.5rem',
     textAlign: 'center',
   },
   checkbox: {
@@ -1006,12 +1009,41 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '0.5rem',
+    whiteSpace: 'nowrap',
+  },
+  nameCell: {
+    maxWidth: '220px',
+    whiteSpace: 'nowrap',
+  },
+  sourceCodeCell: {
+    whiteSpace: 'nowrap',
+    width: '1%',
+  },
+  categoryCell: {
+    whiteSpace: 'nowrap',
+  },
+  priceCell: {
+    whiteSpace: 'nowrap',
+  },
+  stockCell: {
+    whiteSpace: 'nowrap',
+  },
+  visibilityCell: {
+    whiteSpace: 'nowrap',
+  },
+  actionsHeaderCell: {
+    position: 'sticky',
+    right: 0,
+    backgroundColor: '#f8f9fa',
+    zIndex: 2,
+    whiteSpace: 'nowrap',
+    width: '1%',
   },
   sourceCode: {
     backgroundColor: '#f0f0f0',
-    padding: '0.3rem 0.6rem',
+    padding: '0.2rem 0.45rem',
     borderRadius: '4px',
-    fontSize: '0.85rem',
+    fontSize: '0.78rem',
     fontFamily: 'monospace',
     color: '#555',
   },
@@ -1019,21 +1051,31 @@ const styles = {
     display: 'inline-flex',
     alignItems: 'center',
     gap: '0.4rem',
-    padding: '0.4rem 0.8rem',
+    padding: '0.3rem 0.55rem',
     backgroundColor: '#e8f4f8',
     color: '#0277bd',
     borderRadius: '6px',
-    fontSize: '0.9rem',
+    fontSize: '0.82rem',
     fontWeight: '500',
+    whiteSpace: 'nowrap',
   },
   priceValue: {
     fontWeight: '700',
     color: '#28a745',
-    fontSize: '1rem',
+    fontSize: '0.92rem',
   },
   actionCell: {
     display: 'flex',
     gap: '0.5rem',
+    justifyContent: 'center',
+  },
+  actionsCell: {
+    position: 'sticky',
+    right: 0,
+    backgroundColor: '#fff',
+    zIndex: 1,
+    whiteSpace: 'nowrap',
+    boxShadow: '-6px 0 8px -8px rgba(0,0,0,0.25)',
   },
   iconButton: {
     width: '40px',
