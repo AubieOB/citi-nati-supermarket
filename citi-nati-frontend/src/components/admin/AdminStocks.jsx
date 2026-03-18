@@ -288,7 +288,20 @@ const AdminStocks = () => {
       // Add logo
       const img = new Image();
       img.onload = () => {
-          pdf.addImage(img, 'PNG', 14, 8, 20, 20);
+        const logoMaxWidth = 24;
+        const logoMaxHeight = 20;
+        const imageRatio = img.width && img.height ? img.width / img.height : 1;
+        let logoWidth = logoMaxWidth;
+        let logoHeight = logoWidth / imageRatio;
+
+        if (logoHeight > logoMaxHeight) {
+          logoHeight = logoMaxHeight;
+          logoWidth = logoHeight * imageRatio;
+        }
+
+        const logoX = 14;
+        const logoY = 8 + ((logoMaxHeight - logoHeight) / 2);
+        pdf.addImage(img, 'PNG', logoX, logoY, logoWidth, logoHeight);
 
         const centerX = pageWidth / 2;
         
