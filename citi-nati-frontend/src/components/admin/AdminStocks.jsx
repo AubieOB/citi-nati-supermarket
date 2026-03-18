@@ -340,19 +340,21 @@ const AdminStocks = () => {
           4: { halign: 'center', cellWidth: 25 },
         },
         margin: { left: 14, right: 14 },
-        didDrawPage: () => {
-          // Footer with page number
-          const pageCount = pdf.internal.getPages().length;
-          pdf.setFontSize(10);
-          pdf.setTextColor(150);
-          pdf.text(
-            `Page ${pdf.internal.getPageNumbers().length} of ${pageCount}`,
-            pageWidth / 2,
-            pageHeight - 10,
-            { align: 'center' }
-          );
-        },
       });
+
+      // Add page numbers to all pages
+      const pageCount = pdf.internal.pages.length - 1;
+      for (let i = 1; i <= pageCount; i++) {
+        pdf.setPage(i);
+        pdf.setFontSize(10);
+        pdf.setTextColor(150);
+        pdf.text(
+          `Page ${i} of ${pageCount}`,
+          pageWidth / 2,
+          pageHeight - 10,
+          { align: 'center' }
+        );
+      }
 
       // Generate filename with date
       const dateStr = new Date().toISOString().split('T')[0];
