@@ -289,12 +289,22 @@ const AdminStocks = () => {
       const img = new Image();
       img.onload = () => {
           pdf.addImage(img, 'PNG', 14, 8, 20, 20);
+
+        const centerX = pageWidth / 2;
         
         // Add company name
         pdf.setFontSize(14);
         pdf.setFont(undefined, 'bold');
+        const brandLeft = 'citi';
+        const brandRight = '- Nati Supermarket';
+        const brandLeftWidth = pdf.getTextWidth(brandLeft);
+        const brandRightWidth = pdf.getTextWidth(brandRight);
+        const brandStartX = centerX - ((brandLeftWidth + brandRightWidth) / 2);
+
         pdf.setTextColor(91, 75, 138);
-        pdf.text('CITI-NATI SUPERMARKET', 50, 12);
+        pdf.text(brandLeft, brandStartX, 12);
+        pdf.setTextColor(56, 142, 60);
+        pdf.text(brandRight, brandStartX + brandLeftWidth, 12);
         
         // Add title
         const statusLabel = stockStatusFilter === 'all' ? 'All Products' 
@@ -305,12 +315,12 @@ const AdminStocks = () => {
         pdf.setFontSize(12);
         pdf.setFont(undefined, 'normal');
         pdf.setTextColor(0);
-        pdf.text('Stock Management Report', 50, 21);
+        pdf.text('Stock Management Report', centerX, 21, { align: 'center' });
         
         pdf.setFontSize(10);
         pdf.setTextColor(100);
-        pdf.text(`Status: ${statusLabel}`, 50, 28);
-        pdf.text(`Generated: ${new Date().toLocaleString()}`, 50, 33);
+        pdf.text(`Status: ${statusLabel}`, centerX, 28, { align: 'center' });
+        pdf.text(`Generated: ${new Date().toLocaleString()}`, centerX, 33, { align: 'center' });
         pdf.setTextColor(0);
 
         // Prepare table data - exclude Actions column
