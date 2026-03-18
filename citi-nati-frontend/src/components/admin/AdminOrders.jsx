@@ -569,7 +569,7 @@ const AdminOrders = () => {
 
           <div style={{ height: `${filterBarHeight + 8}px` }}></div>
 
-      {/* Get grouped orders */
+      {/* Get grouped orders */}
       {(() => {
         const { newOrders, oldOrders } = getGroupedOrders(filteredOrders);
 
