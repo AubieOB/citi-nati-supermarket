@@ -8,6 +8,8 @@
  * - user_${userId}: Specific customer
  */
 
+const { computeExpiryStatus } = require('./expiryStatus');
+
 /**
  * Emit new order event to all admin clients
  */
@@ -182,6 +184,8 @@ const emitProductUpdate = (product) => {
         finalPrice = product.discountPrice;
       }
 
+      const expiryStatus = computeExpiryStatus(product.expiryDate);
+
       const productUpdateData = {
         id: product.id,
         name: product.name,
@@ -194,7 +198,7 @@ const emitProductUpdate = (product) => {
         category: product.category,
         image: product.image,
         expiryDate: product.expiryDate,
-        expiryStatus: product.expiryStatus,
+        expiryStatus,
         hideFromProductsPage: product.hideFromProductsPage || false,
         updatedAt: product.updatedAt,
       };

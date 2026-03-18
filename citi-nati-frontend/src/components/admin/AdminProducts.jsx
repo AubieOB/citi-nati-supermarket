@@ -439,10 +439,25 @@ const AdminProducts = () => {
 
   const handleFormChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData(prev => {
+      const next = {
+        ...prev,
+        [name]: value,
+      };
+
+      if (name === 'price') {
+        const previousOriginal = String(prev.originalPrice || '').trim();
+        const previousPrice = String(prev.price || '').trim();
+        const isOriginalEmpty = previousOriginal === '';
+        const isOriginalFollowingBase = previousOriginal === previousPrice;
+
+        if (isOriginalEmpty || isOriginalFollowingBase) {
+          next.originalPrice = value;
+        }
+      }
+
+      return next;
+    });
     if (formError) setFormError('');
   };
 
@@ -507,8 +522,9 @@ const AdminProducts = () => {
       }
       
       // Optional: original price (for promotions display)
-      if (formData.originalPrice) {
-        formPayload.append('originalPrice', String(parseFloat(formData.originalPrice)));
+      const resolvedOriginalPrice = formData.originalPrice || formData.price;
+      if (resolvedOriginalPrice) {
+        formPayload.append('originalPrice', String(parseFloat(resolvedOriginalPrice)));
       }
       
       // Always send discount price (empty string clears it on backend)
@@ -554,7 +570,7 @@ const AdminProducts = () => {
     setFormData({
       name: product.name,
       price: product.price.toString(),
-      originalPrice: product.originalPrice?.toString() || '',
+      originalPrice: product.originalPrice?.toString() || product.price?.toString() || '',
       discountPrice: product.discountPrice?.toString() || '',
       stock: String(parseInt(product.stock, 10)),
       category: product.category,
@@ -1203,9 +1219,10 @@ const AdminProducts = () => {
             <tbody>
               {paginatedProducts.map((product) => {
                 const finalPrice = product.isOnSale && product.discountPrice ? product.discountPrice : product.price;
-                const discountPct = product.originalPrice && product.discountPrice 
+                const discountPct = product.originalPrice && product.discountPrice
                   ? Math.round(((product.originalPrice - product.discountPrice) / product.originalPrice) * 100)
-                  : null;
+                  : 0;
+                const hasValidDiscount = discountPct > 0;
                 const productCode = product.productCode || product.sourceCode || product.code;
                 
                 return (
@@ -1236,7 +1253,7 @@ const AdminProducts = () => {
                     <td style={{ padding: '1rem', fontSize: '0.9rem', color: '#666' }}>{product.category}</td>
                     <td style={{ padding: '1rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                        {product.isOnSale && product.discountPrice && product.originalPrice && (
+                        {product.isOnSale && product.discountPrice && product.originalPrice && hasValidDiscount && (
                           <span style={{ textDecoration: 'line-through', color: '#666', fontWeight: '500', fontSize: '0.8rem' }}>
                             {formatMWK(product.originalPrice)}
                           </span>
@@ -1248,7 +1265,7 @@ const AdminProducts = () => {
                         }}>
                           {formatMWK(finalPrice)}
                         </span>
-                        {discountPct && (
+                        {hasValidDiscount && (
                           <span style={{ 
                             padding: '0.2rem 0.5rem',
                             backgroundColor: '#ff6b6b',
@@ -1262,7 +1279,7 @@ const AdminProducts = () => {
                           </span>
                         )}
                       </div>
-                      {product.isOnSale && (
+                      {product.isOnSale && hasValidDiscount && (
                         <div style={{ fontSize: '0.75rem', color: '#ff6b6b', marginTop: '0.25rem' }}>
                           🏷 On Sale
                         </div>

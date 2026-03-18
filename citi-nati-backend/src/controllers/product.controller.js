@@ -137,6 +137,7 @@ const createProduct = async (req, res) => {
     const productData = {
       name: name.trim(),
       price: parsedPrice,
+      originalPrice: parsedPrice,
       stock: parsedStock,
       category: category.trim(),
       image: req.file ? req.file.secure_url : null, // Cloudinary URL
@@ -150,7 +151,7 @@ const createProduct = async (req, res) => {
     });
 
     // Handle originalPrice (optional)
-    if (originalPrice) {
+    if (originalPrice !== undefined && originalPrice !== null && originalPrice !== '') {
       const parsedOriginalPrice = parseFloat(originalPrice);
       if (!isNaN(parsedOriginalPrice) && parsedOriginalPrice >= 0) {
         productData.originalPrice = parsedOriginalPrice;
@@ -404,6 +405,13 @@ const updateProduct = async (req, res) => {
       if (priceChanged) {
         changedFields.push('price');
       }
+
+      if (req.body.originalPrice === undefined || req.body.originalPrice === null || req.body.originalPrice === '') {
+        updateData.originalPrice = parsedPrice;
+        if (parsedPrice !== Number(existingProduct.originalPrice)) {
+          changedFields.push('originalPrice');
+        }
+      }
     }
     if (req.body.stock !== undefined && req.body.stock !== '') {
       const parsedStock = parseInt(req.body.stock, 10);
@@ -456,7 +464,12 @@ const updateProduct = async (req, res) => {
     // Handle originalPrice
     if (req.body.originalPrice !== undefined) {
       if (req.body.originalPrice === '' || req.body.originalPrice === null) {
-        updateData.originalPrice = null;
+        updateData.originalPrice = req.body.price !== undefined && req.body.price !== ''
+          ? updateData.price
+          : Number(existingProduct.price);
+        if (Number(updateData.originalPrice) !== Number(existingProduct.originalPrice)) {
+          changedFields.push('originalPrice');
+        }
       } else {
         const parsedOriginalPrice = parseFloat(req.body.originalPrice);
         if (!isNaN(parsedOriginalPrice) && parsedOriginalPrice >= 0) {

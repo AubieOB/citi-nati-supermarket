@@ -1026,15 +1026,17 @@ const Products = () => {
           ) : (
             <div className="products-grid" style={{ padding: '1rem', marginTop: '2.5rem' }}>
               {filteredProducts.map((product) => {
-                // Calculate discount percentage if on sale
-                const discountPercent = product.isOnSale && product.originalPrice
-                  ? calculateDiscount(product.originalPrice, product.finalPrice)
+                const originalPrice = Number(product.originalPrice || 0);
+                const finalPrice = Number(product.finalPrice || product.price || 0);
+                const discountPercent = product.isOnSale && originalPrice > 0 && finalPrice > 0 && finalPrice < originalPrice
+                  ? calculateDiscount(originalPrice, finalPrice)
                   : 0;
+                const hasValidDiscount = discountPercent > 0;
 
                 return (
                   <div key={product.id} className="product-card" style={{ position: 'relative' }}>
                     {/* Sale Badge */}
-                    {product.isOnSale && (
+                    {hasValidDiscount && (
                       <div style={{
                         position: 'absolute',
                         top: window.innerWidth <= 480 ? '5px' : '10px',
@@ -1092,7 +1094,7 @@ const Products = () => {
 
                       {/* Pricing Section */}
                       <div style={{ marginBottom: '1rem' }}>
-                        {product.isOnSale && product.originalPrice ? (
+                        {hasValidDiscount ? (
                           <div>
                             {/* Original Price (Crossed Out) */}
                             <div style={{
@@ -1102,16 +1104,16 @@ const Products = () => {
                               marginBottom: '0.25rem',
                               fontWeight: '500'
                             }}>
-                              {formatMWK(product.originalPrice)}
+                              {formatMWK(originalPrice)}
                             </div>
                             {/* Discount Price (Primary) */}
                             <div className="product-card__price" style={{ color: '#ff6b6b', fontWeight: 'bold', fontSize: window.innerWidth <= 480 ? '1rem' : '1.2rem' }}>
-                              {formatMWK(product.finalPrice)}
+                              {formatMWK(finalPrice)}
                             </div>
                           </div>
                         ) : (
                           <div className="product-card__price">
-                            {formatMWK(product.finalPrice)}
+                            {formatMWK(finalPrice)}
                           </div>
                         )}
                       </div>
