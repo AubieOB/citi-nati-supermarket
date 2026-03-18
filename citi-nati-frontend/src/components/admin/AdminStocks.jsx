@@ -4,6 +4,8 @@ import api from '../../utils/api.js';
 import { getSocket } from '../../utils/socket.js';
 import { notifySuccess, notifyError, notifyInfo } from '../../utils/notifications.js';
 import Pagination from '../ui/Pagination.jsx';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 /**
  * 📊 ADMIN STOCKS MANAGEMENT
@@ -275,6 +277,95 @@ const AdminStocks = () => {
     setCurrentPage(1);
   };
 
+  // Download filtered products as PDF
+  const downloadStocksPDF = () => {
+    try {
+      const pdf = new jsPDF();
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      
+      // Add title
+      const statusLabel = stockStatusFilter === 'all' ? 'All Products' 
+        : stockStatusFilter === 'instock' ? 'In Stock Products'
+        : stockStatusFilter === 'lowstock' ? 'Low Stock Products'
+        : 'Out of Stock Products';
+      
+      pdf.setFontSize(16);
+      pdf.text('Stock Management Report', 14, 15);
+      
+      pdf.setFontSize(11);
+      pdf.setTextColor(100);
+      pdf.text(`Status: ${statusLabel}`, 14, 25);
+      pdf.text(`Generated: ${new Date().toLocaleString()}`, 14, 32);
+      pdf.setTextColor(0);
+
+      // Prepare table data - exclude Actions column
+      const tableData = filteredProducts.map(product => {
+        const status = getStockStatus(product.stock);
+        const productCode = product.productCode || product.sourceCode || product.code || '-';
+        return [
+          product.name,
+          productCode,
+          product.category,
+          product.stock,
+          status.label,
+        ];
+      });
+
+      // Generate table
+      autoTable(pdf, {
+        startY: 40,
+        head: [['Product Name', 'Product Code', 'Category', 'Current Stock', 'Status']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: {
+          fillColor: [91, 75, 138],
+          textColor: 255,
+          fontStyle: 'bold',
+          halign: 'center',
+          padding: 8,
+        },
+        bodyStyles: {
+          textColor: 50,
+          padding: 7,
+        },
+        alternateRowStyles: {
+          fillColor: [245, 245, 245],
+        },
+        columnStyles: {
+          0: { halign: 'left', cellWidth: 'auto' },
+          1: { halign: 'center', cellWidth: 30 },
+          2: { halign: 'center', cellWidth: 30 },
+          3: { halign: 'center', cellWidth: 25 },
+          4: { halign: 'center', cellWidth: 25 },
+        },
+        margin: { left: 14, right: 14 },
+        didDrawPage: () => {
+          // Footer with page number
+          const pageCount = pdf.internal.getPages().length;
+          pdf.setFontSize(10);
+          pdf.setTextColor(150);
+          pdf.text(
+            `Page ${pdf.internal.getPageNumbers().length} of ${pageCount}`,
+            pageWidth / 2,
+            pageHeight - 10,
+            { align: 'center' }
+          );
+        },
+      });
+
+      // Generate filename with date
+      const dateStr = new Date().toISOString().split('T')[0];
+      const filename = `stocks-${statusLabel.toLowerCase().replace(/\s+/g, '-')}-${dateStr}.pdf`;
+      
+      pdf.save(filename);
+      notifySuccess(`📥 Stock report downloaded: ${filename}`, 3000);
+    } catch (err) {
+      console.error('Error generating PDF:', err);
+      notifyError('Failed to generate PDF', 3000);
+    }
+  };
+
   useEffect(() => {
     const handleLeftCtrlClear = (event) => {
       if (event.repeat) return;
@@ -368,10 +459,35 @@ const AdminStocks = () => {
             <i className="fas fa-warehouse" style={{ color: '#5B4B8A' }}></i>
             Stock Management
           </h3>
-          <span style={{ color: '#666', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <i className="fas fa-filter" style={{ color: '#5B4B8A' }}></i>
-            Filters
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <button
+              onClick={downloadStocksPDF}
+              title="Download stocks as PDF"
+              style={{
+                padding: '0.6rem 1rem',
+                borderRadius: '4px',
+                border: 'none',
+                backgroundColor: '#5B4B8A',
+                color: '#fff',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '0.9rem',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+              }}
+              onMouseOver={(e) => e.target.style.opacity = '0.8'}
+              onMouseOut={(e) => e.target.style.opacity = '1'}
+            >
+              <i className="fas fa-file-pdf"></i>
+              Download PDF
+            </button>
+            <span style={{ color: '#666', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <i className="fas fa-filter" style={{ color: '#5B4B8A' }}></i>
+              Filters
+            </span>
+          </div>
         </div>
         <div style={{
           display: 'grid',
