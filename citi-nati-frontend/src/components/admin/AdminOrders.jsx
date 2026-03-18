@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import Button from '../ui/Button.jsx';
 import api from '../../utils/api.js';
@@ -273,6 +273,29 @@ const AdminOrders = () => {
     return matchesSearch && matchesStatus && matchesDriver && matchesPriceFilter(order.total);
   });
 
+  const clearSearch = () => {
+    setSearchTerm('');
+  };
+
+  useEffect(() => {
+    const handleLeftCtrlClear = (event) => {
+      if (event.repeat) return;
+
+      const isLeftCtrl = event.code === 'ControlLeft' || (event.key === 'Control' && event.location === 1);
+      if (!isLeftCtrl) return;
+      if (!searchTerm) return;
+
+      event.preventDefault();
+      clearSearch();
+    };
+
+    window.addEventListener('keydown', handleLeftCtrlClear);
+
+    return () => {
+      window.removeEventListener('keydown', handleLeftCtrlClear);
+    };
+  }, [searchTerm]);
+
   // Separate orders into new (today) and old (previous days)
   const getGroupedOrders = (sourceOrders = orders) => {
     const today = new Date();
@@ -352,22 +375,59 @@ const AdminOrders = () => {
             alignItems: 'center',
             marginBottom: '1rem',
             flexWrap: 'wrap',
+            position: 'sticky',
+            top: 0,
+            zIndex: 40,
+            backgroundColor: '#fff',
+            border: '1px solid #eee',
+            borderRadius: '8px',
+            padding: '0.75rem',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
           }}>
-            <input
-              type="text"
-              placeholder="Search by order #, customer, email, driver, status..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                flex: 1,
-                minWidth: '240px',
-                padding: '0.75rem',
-                borderRadius: '6px',
-                border: '1px solid #ddd',
-                fontSize: '0.95rem',
-                backgroundColor: '#fff',
-              }}
-            />
+            <div style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
+              <input
+                type="text"
+                placeholder="Search by order #, customer, email, driver, status..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem 2.25rem 0.75rem 0.75rem',
+                  borderRadius: '6px',
+                  border: '1px solid #ddd',
+                  fontSize: '0.95rem',
+                  backgroundColor: '#fff',
+                }}
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={clearSearch}
+                  title="Clear search (Left Ctrl)"
+                  aria-label="Clear search"
+                  style={{
+                    position: 'absolute',
+                    right: '0.45rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    border: 'none',
+                    backgroundColor: '#e9ecef',
+                    color: '#555',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.85rem',
+                    padding: 0,
+                  }}
+                >
+                  <i className="fas fa-times"></i>
+                </button>
+              )}
+            </div>
 
             <select
               value={statusFilter}
