@@ -620,6 +620,148 @@ export const generateOrderReceiptPDF = (order) => {
   html2pdf().set(opt).from(element).save();
 };
 
+export const generateAdminOrdersTablePDF = (orders, options = {}) => {
+  const {
+    statusFilter = 'all',
+    priceFilter = 'all',
+    driverFilter = 'all',
+    selectedDriverName = '',
+  } = options;
+
+  const today = new Date();
+  const generatedDate = today.toLocaleDateString();
+  const generatedTime = today.toLocaleTimeString();
+
+  const statusLabel = statusFilter === 'all' ? 'All Statuses' : statusFilter;
+  const priceLabel = priceFilter === 'all'
+    ? 'All Totals'
+    : priceFilter === 'under_10000'
+      ? 'Under MWK 10,000'
+      : priceFilter === '10000_50000'
+        ? 'MWK 10,000 - 50,000'
+        : priceFilter === '50001_100000'
+          ? 'MWK 50,001 - 100,000'
+          : 'Over MWK 100,000';
+  const driverLabel = driverFilter === 'all'
+    ? 'All Driver States'
+    : driverFilter === 'assigned'
+      ? 'Assigned Driver'
+      : driverFilter === 'unassigned'
+        ? 'Unassigned'
+        : `Driver ${selectedDriverName || driverFilter}`;
+
+  const rowsHtml = orders.map((order, idx) => {
+    const bgColor = idx % 2 === 0 ? '#fff' : '#f9f9f9';
+    const createdAt = new Date(order.createdAt).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    return `
+      <tr style="background-color: ${bgColor};">
+        <td style="padding: 10px; border: 1px solid #ddd;">#${escapeHtml(order.id)}</td>
+        <td style="padding: 10px; border: 1px solid #ddd; word-break: break-word;">${escapeHtml(order.user?.name || 'N/A')}</td>
+        <td style="padding: 10px; border: 1px solid #ddd; word-break: break-all;">${escapeHtml(order.user?.email || 'N/A')}</td>
+        <td style="padding: 10px; border: 1px solid #ddd; text-align: right;">MWK ${new Intl.NumberFormat('en-US').format(Number(order.total || 0))}</td>
+        <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">${escapeHtml(order.status || 'N/A')}</td>
+        <td style="padding: 10px; border: 1px solid #ddd; word-break: break-word;">${escapeHtml(order.driver?.name || 'Unassigned')}</td>
+        <td style="padding: 10px; border: 1px solid #ddd;">${escapeHtml(createdAt)}</td>
+      </tr>
+    `;
+  }).join('');
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; color: #222; padding: 16px; width: 1120px; box-sizing: border-box;">
+      <style>
+        .pdf-orders-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 12px;
+          table-layout: fixed;
+          page-break-inside: auto;
+        }
+
+        .pdf-orders-table thead {
+          display: table-header-group;
+        }
+
+        .pdf-orders-table tr {
+          page-break-inside: avoid;
+          break-inside: avoid;
+          page-break-after: auto;
+        }
+
+        .pdf-orders-table td,
+        .pdf-orders-table th {
+          page-break-inside: avoid;
+          break-inside: avoid;
+        }
+      </style>
+
+      ${buildBrandedHeader({
+        reportTitle: 'Orders Report',
+        periodText: `Status: ${escapeHtml(statusLabel)} | Total: ${escapeHtml(priceLabel)} | Driver: ${escapeHtml(driverLabel)}`,
+        generatedText: `Generated: ${escapeHtml(generatedDate)} ${escapeHtml(generatedTime)} | Orders: ${orders.length}`,
+        accentColor: BRAND_PURPLE,
+      })}
+
+      <table class="pdf-orders-table">
+        <colgroup>
+          <col style="width: 9%;" />
+          <col style="width: 15%;" />
+          <col style="width: 22%;" />
+          <col style="width: 11%;" />
+          <col style="width: 12%;" />
+          <col style="width: 13%;" />
+          <col style="width: 18%;" />
+        </colgroup>
+        <thead>
+          <tr style="background-color: #5B4B8A; color: white;">
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Order ID</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Customer</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Email</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: right;">Total</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: center;">Status</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Driver</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  const element = document.createElement('div');
+  element.innerHTML = html;
+
+  const safeStatus = String(statusLabel || 'all-statuses').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  const opt = {
+    margin: 6,
+    filename: `orders-${safeStatus || 'all-statuses'}-${today.toISOString().split('T')[0]}.pdf`,
+    image: { type: 'png', quality: 1.0 },
+    html2canvas: {
+      scale: 4,
+      logging: false,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      letterRendering: true,
+      windowWidth: 1200,
+    },
+    jsPDF: { orientation: 'landscape', unit: 'mm', format: 'a4', compress: false },
+    pagebreak: {
+      mode: ['avoid-all', 'css', 'legacy'],
+      avoid: ['tr', 'td', 'th', 'thead', 'tbody'],
+    },
+  };
+
+  return html2pdf().set(opt).from(element).save();
+};
+
 export const generateAdminProductsTablePDF = (products, options = {}) => {
   const { selectedCategory = '' } = options;
   const today = new Date();
