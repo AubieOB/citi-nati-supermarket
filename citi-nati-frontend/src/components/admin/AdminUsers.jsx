@@ -191,6 +191,9 @@ const AdminUsers = () => {
     return matchesSearch && matchesRole && matchesVerification;
   });
 
+  // Guard against occasional oversized measurements from the fixed filter bar.
+  const usersFilterSpacerHeight = Math.max(Math.min(filterBarHeight, 72) - 8, 0);
+
   if (error) {
     return (
       <div style={{
@@ -368,7 +371,7 @@ const AdminUsers = () => {
         </span>
       </div>
 
-      <div style={{ height: `${Math.max(filterBarHeight - 8, 0)}px` }}></div>
+      <div style={{ height: `${usersFilterSpacerHeight}px` }}></div>
 
       <div style={{ overflowX: 'auto' }}>
         <table style={{
