@@ -380,6 +380,7 @@ const AdminPOSManagement = () => {
   // Calculate stats
   const hiddenCount = products.filter(p => p.hideFromProductsPage).length;
   const visibleCount = products.length - hiddenCount;
+  const hasActiveFilters = Boolean(searchTerm) || selectedCategory !== 'all';
 
   return (
     <Container>
@@ -400,7 +401,7 @@ const AdminPOSManagement = () => {
           </div>
         )}
 
-        {products.length === 0 && !loading ? (
+        {products.length === 0 && !loading && !hasActiveFilters ? (
           <div style={styles.emptyState}>
             <i className="fas fa-inbox" style={styles.emptyIcon}></i>
             <p style={styles.emptyText}>No POS products found</p>
@@ -577,6 +578,12 @@ const AdminPOSManagement = () => {
             </div>
 
             {/* Table */}
+            {products.length === 0 ? (
+              <div style={styles.emptyState}>
+                <i className="fas fa-search" style={styles.emptyIcon}></i>
+                <p style={styles.emptyText}>No products match your current search or filters</p>
+              </div>
+            ) : (
             <div style={styles.tableWrapper}>
               <table style={styles.table}>
                 <thead>
@@ -704,6 +711,7 @@ const AdminPOSManagement = () => {
                 </tbody>
               </table>
             </div>
+            )}
 
             {/* Pagination */}
             <div style={styles.pagination}>
