@@ -440,85 +440,6 @@ const AdminInbox = () => {
         </div>
       )}
 
-      {/* Header with unread count */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '1.5rem',
-      }}>
-        <div>
-          <h2 style={{ margin: 0, marginBottom: '0.5rem' }}>Inbox</h2>
-          {unreadCount > 0 && (
-            <p style={{ margin: 0, fontSize: '0.9rem', color: '#666' }}>
-              <span style={{
-                backgroundColor: '#F44336',
-                color: '#fff',
-                padding: '0.2rem 0.6rem',
-                borderRadius: '12px',
-                fontWeight: '600',
-                marginRight: '0.5rem',
-              }}>
-                {unreadCount}
-              </span>
-              unread message{unreadCount !== 1 ? 's' : ''}
-            </p>
-          )}
-        </div>
-        {messages.length > 0 && (
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            {unreadCount > 0 && (
-              <button
-                onClick={handleMarkAllAsRead}
-                style={{
-                  padding: '0.5rem 1rem',
-                  backgroundColor: '#4CAF50',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '0.9rem',
-                  color: '#fff',
-                  fontWeight: '600',
-                  transition: 'all 0.2s',
-                }}
-                onMouseOver={(e) => {
-                  e.target.style.backgroundColor = '#45a049';
-                }}
-                onMouseOut={(e) => {
-                  e.target.style.backgroundColor = '#4CAF50';
-                }}
-                title={`Mark all ${unreadCount} unread message${unreadCount !== 1 ? 's' : ''} as read`}
-              >
-                <i className="fas fa-check-double" style={{ marginRight: '0.5rem' }}></i>
-                Mark All Read
-              </button>
-            )}
-            <button
-              onClick={handleDeleteAll}
-              style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: '#f8f9fa',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '0.9rem',
-                color: '#666',
-                transition: 'all 0.2s',
-              }}
-              onMouseOver={(e) => {
-                e.target.style.backgroundColor = '#eee';
-              }}
-              onMouseOut={(e) => {
-                e.target.style.backgroundColor = '#f8f9fa';
-              }}
-            >
-              <i className="fas fa-trash" style={{ marginRight: '0.5rem' }}></i>
-              Clear All
-            </button>
-          </div>
-        )}
-      </div>
-
       {/* Filters */}
       {messages.length > 0 && (
         <>
@@ -541,7 +462,83 @@ const AdminInbox = () => {
           flexWrap: 'wrap',
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
           boxSizing: 'border-box',
+          marginBottom: 0,
         }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '1rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <h2 style={{ margin: 0, fontSize: '1.4rem', color: '#333', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <i className="fas fa-inbox" style={{ color: '#5B4B8A' }}></i>
+                Inbox
+              </h2>
+              <p style={{ margin: 0, fontSize: '0.9rem', color: '#666' }}>
+                <span style={{
+                  backgroundColor: unreadCount > 0 ? '#F44336' : '#6c757d',
+                  color: '#fff',
+                  padding: '0.2rem 0.6rem',
+                  borderRadius: '12px',
+                  fontWeight: '600',
+                  marginRight: '0.5rem',
+                }}>
+                  {unreadCount}
+                </span>
+                unread message{unreadCount !== 1 ? 's' : ''}
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              {unreadCount > 0 && (
+                <button
+                  onClick={handleMarkAllAsRead}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    backgroundColor: '#4CAF50',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    color: '#fff',
+                    fontWeight: '600',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.backgroundColor = '#45a049';
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.backgroundColor = '#4CAF50';
+                  }}
+                  title={`Mark all ${unreadCount} unread message${unreadCount !== 1 ? 's' : ''} as read`}
+                >
+                  <i className="fas fa-check-double" style={{ marginRight: '0.5rem' }}></i>
+                  Mark All Read
+                </button>
+              )}
+              <button
+                onClick={handleDeleteAll}
+                style={{
+                  padding: '0.5rem 1rem',
+                  backgroundColor: '#f8f9fa',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  color: '#666',
+                  transition: 'all 0.2s',
+                }}
+                onMouseOver={(e) => {
+                  e.target.style.backgroundColor = '#eee';
+                }}
+                onMouseOut={(e) => {
+                  e.target.style.backgroundColor = '#f8f9fa';
+                }}
+              >
+                <i className="fas fa-trash" style={{ marginRight: '0.5rem' }}></i>
+                Clear All
+              </button>
+            </div>
+          </div>
+
+          <div style={{ width: '100%', height: '1px', backgroundColor: '#eee' }}></div>
+
           {/* Search Input */}
           <div style={{
             position: 'relative',
@@ -689,7 +686,7 @@ const AdminInbox = () => {
             {filteredMessages.length} / {messages.length} messages
           </div>
         </div>
-        <div style={{ height: `${filterBarHeight + 8}px` }}></div>
+        <div style={{ height: `${Math.max(filterBarHeight - 8, 0)}px` }}></div>
         </>
       )}
 
