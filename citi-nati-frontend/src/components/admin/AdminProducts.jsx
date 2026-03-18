@@ -943,15 +943,7 @@ const AdminProducts = () => {
         </div>
       )}
 
-      {!showForm && (
-        <Button
-          variant="primary"
-          onClick={() => setShowForm(true)}
-          style={{ marginBottom: '2rem' }}
-        >
-          + Create New Product
-        </Button>
-      )}
+
 
       {/* Error Message */}
       {error && (
@@ -1271,6 +1263,17 @@ const AdminProducts = () => {
             {isExportingPdf ? 'Generating PDF...' : 'Download PDF'}
           </button>
 
+          {/* Create Product Button */}
+          {!showForm && (
+            <Button
+              variant="primary"
+              onClick={() => setShowForm(true)}
+              style={{ flexShrink: 0 }}
+            >
+              + Create New Product
+            </Button>
+          )}
+
           {/* Results Count */}
           <div style={{
             marginLeft: 'auto',
@@ -1282,7 +1285,7 @@ const AdminProducts = () => {
             {filteredProducts.length} / {products.length} products
           </div>
         </div>
-        <div style={{ height: `${filterBarHeight + 8}px` }}></div>
+        <div style={{ height: `${filterBarHeight + 4}px` }}></div>
         </>
       )}
 
