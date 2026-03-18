@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../../utils/api.js';
 import Button from '../../components/ui/Button.jsx';
-import Container from '../../components/ui/Container.jsx';
 import Modal from '../../components/common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
 import { formatMWK } from '../../utils/currency.js';
@@ -383,7 +382,7 @@ const AdminPOSManagement = () => {
   const hasActiveFilters = Boolean(searchTerm) || selectedCategory !== 'all';
 
   return (
-    <Container>
+    <div style={{ width: '100%' }}>
       <div style={styles.container}>
         {/* Error Alert */}
         {error && (
@@ -752,7 +751,7 @@ const AdminPOSManagement = () => {
         cancelText={modal.cancelText}
         showCancelButton={modal.showCancelButton}
       />
-    </Container>
+    </div>
   );
 };
 
