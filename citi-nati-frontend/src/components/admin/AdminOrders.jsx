@@ -8,6 +8,9 @@ import OrderDetailsModal from './OrderDetailsModal.jsx';
 import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
 import { notifySuccess, notifyError } from '../../utils/notifications.js';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import logo from '../../assets/citi-nati-logo.png.png';
 
 /**
  * 📋 ADMIN ORDERS MANAGEMENT
@@ -278,6 +281,148 @@ const AdminOrders = () => {
 
   const clearSearch = () => {
     setSearchTerm('');
+  };
+
+  const downloadOrdersPDF = () => {
+    if (filteredOrders.length === 0) {
+      notifyError('No orders found for current filters', 3000);
+      return;
+    }
+
+    try {
+      const pdf = new jsPDF();
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      const img = new Image();
+      img.onload = () => {
+        const logoMaxWidth = 44;
+        const logoMaxHeight = 34;
+        const logoGap = 5;
+        const imageRatio = img.width && img.height ? img.width / img.height : 1;
+        let logoWidth = logoMaxWidth;
+        let logoHeight = logoWidth / imageRatio;
+
+        if (logoHeight > logoMaxHeight) {
+          logoHeight = logoMaxHeight;
+          logoWidth = logoHeight * imageRatio;
+        }
+
+        const centerX = pageWidth / 2;
+        pdf.setFontSize(14);
+        pdf.setFont(undefined, 'bold');
+        const brandLeft = 'Citi';
+        const brandRight = '- Nati Supermarket';
+        const brandLeftWidth = pdf.getTextWidth(brandLeft);
+        const brandRightWidth = pdf.getTextWidth(brandRight);
+        const brandTextWidth = brandLeftWidth + brandRightWidth;
+        const brandBaselineY = 20;
+        const groupWidth = logoWidth + logoGap + brandTextWidth;
+        const groupStartX = centerX - (groupWidth / 2);
+        const logoX = groupStartX;
+        const logoY = brandBaselineY - (logoHeight / 2) - 2;
+        const brandStartX = groupStartX + logoWidth + logoGap;
+
+        pdf.addImage(img, 'PNG', logoX, logoY, logoWidth, logoHeight);
+        pdf.setTextColor(91, 75, 138);
+        pdf.text(brandLeft, brandStartX, brandBaselineY);
+        pdf.setTextColor(56, 142, 60);
+        pdf.text(brandRight, brandStartX + brandLeftWidth, brandBaselineY);
+
+        pdf.setFont(undefined, 'normal');
+        pdf.setFontSize(12);
+        pdf.setTextColor(0);
+        pdf.text('Orders Report', centerX, 43, { align: 'center' });
+
+        const statusLabel = statusFilter === 'all' ? 'All Statuses' : statusFilter;
+        const priceLabel = priceFilter === 'all'
+          ? 'All Totals'
+          : priceFilter === 'under_10000'
+            ? 'Under MWK 10,000'
+            : priceFilter === '10000_50000'
+              ? 'MWK 10,000 - 50,000'
+              : priceFilter === '50001_100000'
+                ? 'MWK 50,001 - 100,000'
+                : 'Over MWK 100,000';
+        const driverLabel = driverFilter === 'all'
+          ? 'All Driver States'
+          : driverFilter === 'assigned'
+            ? 'Assigned Driver'
+            : driverFilter === 'unassigned'
+              ? 'Unassigned'
+              : `Driver ${drivers.find((d) => String(d.id) === driverFilter)?.name || driverFilter}`;
+
+        pdf.setFontSize(10);
+        pdf.setTextColor(100);
+        pdf.text(`Status: ${statusLabel}`, centerX, 49, { align: 'center' });
+        pdf.text(`Total: ${priceLabel} | Driver: ${driverLabel}`, centerX, 54, { align: 'center' });
+        pdf.text(`Generated: ${new Date().toLocaleString()} | Orders: ${filteredOrders.length}`, centerX, 59, { align: 'center' });
+
+        const tableData = filteredOrders.map((order) => [
+          `#${order.id}`,
+          order.user?.name || 'N/A',
+          order.user?.email || 'N/A',
+          formatMWK(order.total),
+          order.status || 'N/A',
+          order.driver?.name || 'Unassigned',
+          formatDate(order.createdAt),
+        ]);
+
+        autoTable(pdf, {
+          startY: 65,
+          head: [['Order ID', 'Customer', 'Email', 'Total', 'Status', 'Driver', 'Date']],
+          body: tableData,
+          theme: 'grid',
+          headStyles: {
+            fillColor: [91, 75, 138],
+            textColor: 255,
+            fontStyle: 'bold',
+            halign: 'center',
+            fontSize: 9,
+          },
+          bodyStyles: {
+            textColor: 50,
+            fontSize: 8.5,
+            valign: 'middle',
+          },
+          alternateRowStyles: {
+            fillColor: [245, 245, 245],
+          },
+          columnStyles: {
+            0: { halign: 'left', cellWidth: 18 },
+            1: { halign: 'left', cellWidth: 28 },
+            2: { halign: 'left', cellWidth: 42 },
+            3: { halign: 'right', cellWidth: 22 },
+            4: { halign: 'center', cellWidth: 24 },
+            5: { halign: 'left', cellWidth: 26 },
+            6: { halign: 'left', cellWidth: 28 },
+          },
+          margin: { left: 10, right: 10 },
+        });
+
+        const pageCount = pdf.internal.pages.length - 1;
+        for (let i = 1; i <= pageCount; i++) {
+          pdf.setPage(i);
+          pdf.setFontSize(9);
+          pdf.setTextColor(150);
+          pdf.text(`Page ${i} of ${pageCount}`, pageWidth / 2, pageHeight - 8, { align: 'center' });
+        }
+
+        const dateStr = new Date().toISOString().split('T')[0];
+        const filename = `orders-${statusLabel.toLowerCase().replace(/\s+/g, '-')}-${dateStr}.pdf`;
+        pdf.save(filename);
+        notifySuccess(`Orders PDF downloaded: ${filename}`, 3000);
+      };
+
+      img.onerror = () => {
+        notifyError('Failed to load logo for PDF export', 3000);
+      };
+
+      img.src = logo;
+    } catch (err) {
+      console.error('Error generating orders PDF:', err);
+      notifyError('Failed to generate Orders PDF', 3000);
+    }
   };
 
   useEffect(() => {
@@ -561,6 +706,27 @@ const AdminOrders = () => {
                 Clear Filters
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={downloadOrdersPDF}
+              style={{
+                padding: '0.75rem 1rem',
+                border: 'none',
+                borderRadius: '6px',
+                backgroundColor: '#5B4B8A',
+                color: '#fff',
+                cursor: 'pointer',
+                fontWeight: '600',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+              }}
+              title="Download filtered orders as PDF"
+            >
+              <i className="fas fa-file-pdf"></i>
+              Download PDF
+            </button>
 
             <span style={{ color: '#666', fontSize: '0.9rem', marginLeft: 'auto' }}>
               {filteredOrders.length} / {orders.length} orders
