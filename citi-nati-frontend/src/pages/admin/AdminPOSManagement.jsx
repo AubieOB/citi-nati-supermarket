@@ -758,9 +758,10 @@ const AdminPOSManagement = () => {
 
 const styles = {
   container: {
-    padding: '2rem',
-    maxWidth: '1400px',
-    margin: '0 auto',
+    padding: '1rem',
+    maxWidth: 'none',
+    width: '100%',
+    margin: 0,
   },
   header: {
     marginBottom: '2.5rem',
@@ -979,6 +980,7 @@ const styles = {
     borderRadius: '8px',
     boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
     position: 'relative',
+    width: '100%',
   },
   table: {
     width: '100%',
