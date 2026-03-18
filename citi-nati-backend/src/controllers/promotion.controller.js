@@ -9,6 +9,49 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
+const ACTIVE_PRODUCT_FILTER = {
+  isActive: true,
+  enabled: true,
+  hideFromProductsPage: false,
+};
+
+function parseProductIds(ids = []) {
+  return ids
+    .map((id) => parseInt(id, 10))
+    .filter((id) => Number.isInteger(id) && id > 0);
+}
+
+function getPromotionProductWhere(type, categoryId, selectedProducts) {
+  if (type === 'global') {
+    return { ...ACTIVE_PRODUCT_FILTER };
+  }
+
+  if (type === 'category') {
+    return {
+      ...ACTIVE_PRODUCT_FILTER,
+      category: categoryId,
+    };
+  }
+
+  const parsedIds = parseProductIds(selectedProducts);
+  return {
+    ...ACTIVE_PRODUCT_FILTER,
+    id: { in: parsedIds },
+  };
+}
+
+function buildPromotionUpdateData(product, percentage) {
+  const numericPercentage = parseInt(percentage, 10) || 0;
+  const discountAmount = (product.price * numericPercentage) / 100;
+  const discountedPrice = product.price - discountAmount;
+  return {
+    originalPrice: product.originalPrice ?? product.price,
+    discountPrice: discountedPrice,
+    isOnSale: true,
+    updatedAt: new Date(),
+  };
+}
+
 /**
  * Emit promotion update to all connected clients (both admin and users) via Socket.io
  */
@@ -88,6 +131,7 @@ const updatePromotion = async (req, res) => {
   try {
     const { type } = req.params;
     const { enabled, percentage, categoryId, selectedProducts } = req.body;
+    const parsedSelectedProducts = parseProductIds(selectedProducts || []);
 
     // Validate promotion type
     if (!['global', 'category', 'selective'].includes(type)) {
@@ -115,11 +159,7 @@ const updatePromotion = async (req, res) => {
 
     // Validate selectedProducts are valid integers if provided
     if (selectedProducts && selectedProducts.length > 0) {
-      const validIds = selectedProducts.filter(id => {
-        const parsed = parseInt(id);
-        return !isNaN(parsed) && parsed > 0;
-      });
-      if (validIds.length === 0) {
+      if (parsedSelectedProducts.length === 0) {
         return res.status(400).json({
           success: false,
           error: 'Invalid product IDs provided'
@@ -130,6 +170,7 @@ const updatePromotion = async (req, res) => {
     // First, reset all products (remove promotional pricing) if disabling
     if (!enabled) {
       await prisma.product.updateMany({
+        where: ACTIVE_PRODUCT_FILTER,
         data: {
           discountPrice: null,
           isOnSale: false,
@@ -149,7 +190,7 @@ const updatePromotion = async (req, res) => {
     if (type === 'category') {
       promotionData.categoryId = categoryId;
     } else if (type === 'selective') {
-      promotionData.selectedProductIds = (selectedProducts || []).map(id => parseInt(id));
+      promotionData.selectedProductIds = parsedSelectedProducts;
     }
 
     console.log('[Promotions] Upserting promotion:', { type, enabled, percentage, selectedProductIds: promotionData.selectedProductIds });
@@ -167,35 +208,26 @@ const updatePromotion = async (req, res) => {
       let productsToUpdate = [];
 
       if (type === 'global') {
-        // Get all products
-        productsToUpdate = await prisma.product.findMany();
-      } else if (type === 'category') {
-        // Get products in specific category
         productsToUpdate = await prisma.product.findMany({
-          where: { category: categoryId }
+          where: getPromotionProductWhere('global', null, []),
+        });
+      } else if (type === 'category') {
+        productsToUpdate = await prisma.product.findMany({
+          where: getPromotionProductWhere('category', categoryId, []),
         });
       } else if (type === 'selective') {
-        // Get selected products - use parsed IDs
-        const validIds = (selectedProducts || []).map(id => parseInt(id)).filter(id => !isNaN(id) && id > 0);
-        if (validIds.length > 0) {
+        if (parsedSelectedProducts.length > 0) {
           productsToUpdate = await prisma.product.findMany({
-            where: { id: { in: validIds } }
+            where: getPromotionProductWhere('selective', null, parsedSelectedProducts),
           });
         }
       }
 
       // Update each product with discount price
       for (const product of productsToUpdate) {
-        const discountAmount = (product.price * percentage) / 100;
-        const discountedPrice = product.price - discountAmount;
-
         await prisma.product.update({
           where: { id: product.id },
-          data: {
-            discountPrice: discountedPrice,
-            isOnSale: true,
-            updatedAt: new Date(),
-          },
+          data: buildPromotionUpdateData(product, percentage),
         });
       }
 
@@ -241,6 +273,7 @@ const previewPromotion = async (req, res) => {
   try {
     const { type } = req.params;
     const { percentage, categoryId, selectedProducts } = req.body;
+    const parsedSelectedProducts = parseProductIds(selectedProducts || []);
 
     // Validate type
     if (!['global', 'category', 'selective'].includes(type)) {
@@ -254,7 +287,9 @@ const previewPromotion = async (req, res) => {
 
     if (type === 'global') {
       // Get all products
-      products = await prisma.product.findMany();
+      products = await prisma.product.findMany({
+        where: getPromotionProductWhere('global', null, []),
+      });
     } else if (type === 'category') {
       // Get products in specific category
       if (!categoryId) {
@@ -264,7 +299,7 @@ const previewPromotion = async (req, res) => {
         });
       }
       products = await prisma.product.findMany({
-        where: { category: categoryId }
+        where: getPromotionProductWhere('category', categoryId, []),
       });
     } else if (type === 'selective') {
       // Get selected products
@@ -275,7 +310,7 @@ const previewPromotion = async (req, res) => {
         });
       }
       products = await prisma.product.findMany({
-        where: { id: { in: selectedProducts } }
+        where: getPromotionProductWhere('selective', null, parsedSelectedProducts),
       });
     }
 
@@ -326,32 +361,27 @@ const applyPromotion = async (req, res) => {
       let products = [];
 
       if (promotion.type === 'global') {
-        products = await prisma.product.findMany();
+        products = await prisma.product.findMany({
+          where: getPromotionProductWhere('global', null, []),
+        });
       } else if (promotion.type === 'category') {
         products = await prisma.product.findMany({
-          where: { category: promotion.categoryId }
+          where: getPromotionProductWhere('category', promotion.categoryId, []),
         });
       } else if (promotion.type === 'selective') {
         // Use selectedProductIds from database
-        const selectedIds = promotion.selectedProductIds || [];
+        const selectedIds = parseProductIds(promotion.selectedProductIds || []);
         if (selectedIds.length === 0) continue; // Skip if no products selected
         products = await prisma.product.findMany({
-          where: { id: { in: selectedIds } }
+          where: getPromotionProductWhere('selective', null, selectedIds),
         });
       }
 
       // Update each product with discount price
       for (const product of products) {
-        const discountAmount = (product.price * promotion.percentage) / 100;
-        const discountedPrice = product.price - discountAmount;
-
         await prisma.product.update({
           where: { id: product.id },
-          data: {
-            discountPrice: discountedPrice,
-            isOnSale: true,
-            updatedAt: new Date(),
-          },
+          data: buildPromotionUpdateData(product, promotion.percentage),
         });
 
         updatedCount++;
@@ -386,6 +416,7 @@ const removePromotion = async (req, res) => {
 
     // Reset all product discount prices
     await prisma.product.updateMany({
+      where: ACTIVE_PRODUCT_FILTER,
       data: {
         discountPrice: null,
         isOnSale: false,

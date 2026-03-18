@@ -29,9 +29,15 @@ const AdminPromotions = () => {
   const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
-    fetchCategories();
+    fetchPromotionCatalog();
     fetchCurrentPromotions();
-    setupSocketListeners();
+
+    const cleanupSocket = setupSocketListeners();
+    return () => {
+      if (typeof cleanupSocket === 'function') {
+        cleanupSocket();
+      }
+    };
   }, []);
 
   /**
@@ -64,14 +70,32 @@ const AdminPromotions = () => {
     }
   };
 
-  const fetchCategories = async () => {
+  const fetchPromotionCatalog = async () => {
     try {
-      const response = await api.get('/products');
-      const uniqueCategories = [...new Set(response.data.products.map(p => p.category))];
-      setCategories(uniqueCategories.filter(Boolean));
-      setAllProducts(response.data.products || []);
+      const perPage = 200;
+      let page = 1;
+      const all = [];
+
+      while (true) {
+        const response = await api.get(`/products?page=${page}&pageSize=${perPage}`);
+        const items = response.data.products || [];
+        all.push(...items);
+
+        if (items.length < perPage) {
+          break;
+        }
+
+        page += 1;
+      }
+
+      const visibleProducts = all.filter((product) => !product.hideFromProductsPage);
+      const uniqueCategories = [...new Set(visibleProducts.map((p) => p.category).filter(Boolean))].sort();
+
+      setAllProducts(visibleProducts);
+      setCategories(uniqueCategories);
     } catch (err) {
-      console.error('Error fetching categories:', err);
+      console.error('Error fetching promotions catalog:', err);
+      notifyError('Failed to load products for promotions', 3000);
     }
   };
 
@@ -176,9 +200,18 @@ const AdminPromotions = () => {
   const renderPromotionCard = (type, label, description, icon) => {
     const promo = promotions[type];
     const isActive = promo.enabled;
-    const filteredProducts = allProducts.filter(p =>
-      p.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const query = searchTerm.toLowerCase().trim();
+    const filteredProducts = allProducts.filter((p) => {
+      if (!query) return true;
+      const productCode = String(p.productCode || p.sourceCode || p.code || '').toLowerCase();
+      const productName = String(p.name || '').toLowerCase();
+      const category = String(p.category || '').toLowerCase();
+      return (
+        productName.includes(query)
+        || productCode.includes(query)
+        || category.includes(query)
+      );
+    });
     const selectedCount = (promo.selectedProducts || []).length;
 
     return (
@@ -398,6 +431,9 @@ const AdminPromotions = () => {
                     )}
                     <div style={{ flex: 1 }}>
                       <strong>{product.name}</strong>
+                      <div style={{ fontSize: '0.8rem', color: '#666' }}>
+                        {product.productCode || product.sourceCode || 'No Code'}
+                      </div>
                       <div style={{ fontSize: '0.85rem', color: '#666' }}>
                         {formatMWK(product.price)} → {formatMWK(product.price - (product.price * promo.percentage) / 100)}
                       </div>
@@ -479,6 +515,14 @@ const AdminPromotions = () => {
         <p style={{ margin: 0 }}>
           <strong>Tip:</strong> Use promotions to boost sales. Preview products before activating to ensure correct targeting.
         </p>
+      </div>
+
+      <div style={{
+        marginBottom: '1rem',
+        color: '#666',
+        fontSize: '0.9rem',
+      }}>
+        Catalog loaded: {allProducts.length} products across {categories.length} categories
       </div>
 
       {/* Promotion Cards */}
