@@ -340,7 +340,7 @@ async function updatePrices(updates = []) {
   }
 }
 
-async function getExpiryProductsFromPOS({ days = 14, locationCode = 'SH', includeExpired = false, source = 'view' } = {}) {
+async function getExpiryProductsFromPOS({ days = 14, locationCode = 'SH', includeExpired = false, source = 'view', requestTimeoutMs } = {}) {
   if (!ENABLE_POS_SYNC) {
     return { success: false, error: 'POS Sync is disabled' };
   }
@@ -361,6 +361,9 @@ async function getExpiryProductsFromPOS({ days = 14, locationCode = 'SH', includ
         includeExpired,
         source,
       },
+      timeout: Number.isFinite(Number(requestTimeoutMs)) && Number(requestTimeoutMs) > 0
+        ? Number(requestTimeoutMs)
+        : POS_AGENT_TIMEOUT_MS,
     });
 
     console.log('[BACKEND -> AGENT][EXPIRY] success', {
