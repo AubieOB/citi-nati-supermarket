@@ -248,11 +248,14 @@ function pickPreferredExpiryRow(rows) {
 
 async function fetchPosExpiryMap(products) {
   const now = Date.now();
+  console.log('[ADMIN PRODUCTS] expiry enrichment start');
   const productCodeSet = new Set(
     products
-      .map((product) => normalizeProductCode(product.sourceCode || product.productCode || product.code))
+      .map((product) => normalizeProductCode(product.sourceCode))
       .filter(Boolean)
   );
+
+  console.log('[ADMIN PRODUCTS] merge key used', 'product.sourceCode -> expiry.ProductCode (normalized trim+uppercase)');
 
   if (productCodeSet.size === 0) {
     console.log('[ADMIN PRODUCTS] expiry rows fetched count', 0);
@@ -260,45 +263,43 @@ async function fetchPosExpiryMap(products) {
   }
 
   const hasFreshCache = adminExpiryFetchState.fetchedAt > 0 && (now - adminExpiryFetchState.fetchedAt) < ADMIN_EXPIRY_CACHE_TTL_MS;
-  const inCooldown = adminExpiryFetchState.lastFailureAt > 0 && (now - adminExpiryFetchState.lastFailureAt) < ADMIN_EXPIRY_FAILURE_COOLDOWN_MS;
 
   let expiryRows = [];
 
-  if (hasFreshCache) {
-    expiryRows = adminExpiryFetchState.rows;
-    console.log('[ADMIN PRODUCTS] using cached expiry rows', expiryRows.length);
-  } else if (inCooldown) {
-    console.warn('[ADMIN PRODUCTS] expiry fetch skipped (cooldown active)', {
-      lastFailureReason: adminExpiryFetchState.lastFailureReason,
-      cooldownMsRemaining: ADMIN_EXPIRY_FAILURE_COOLDOWN_MS - (now - adminExpiryFetchState.lastFailureAt),
-    });
-  } else {
-    const expiryResult = await posSyncService.getExpiryProductsFromPOS({
-      days: 3650,
-      locationCode: process.env.POS_LOCATION_CODE || 'SH',
-      includeExpired: true,
-      source: 'view',
-      requestTimeoutMs: ADMIN_EXPIRY_REQUEST_TIMEOUT_MS,
-    });
+  console.log('[ADMIN PRODUCTS] calling POS expiry endpoint', {
+    endpoint: '/pos-sync/expiry-products',
+    source: 'view',
+    includeExpired: true,
+    requestTimeoutMs: ADMIN_EXPIRY_REQUEST_TIMEOUT_MS,
+  });
 
-    if (!expiryResult.success) {
-      adminExpiryFetchState.lastFailureAt = Date.now();
-      adminExpiryFetchState.lastFailureReason = expiryResult.error;
-      console.warn('[ADMIN PRODUCTS] expiry fetch failed', expiryResult.error);
-      if (adminExpiryFetchState.rows.length > 0) {
-        expiryRows = adminExpiryFetchState.rows;
-        console.log('[ADMIN PRODUCTS] using stale cached expiry rows', expiryRows.length);
-      }
-    } else {
-      expiryRows = Array.isArray(expiryResult.data?.data) ? expiryResult.data.data : [];
-      adminExpiryFetchState.rows = expiryRows;
-      adminExpiryFetchState.fetchedAt = Date.now();
-      adminExpiryFetchState.lastFailureAt = 0;
-      adminExpiryFetchState.lastFailureReason = null;
+  const expiryResult = await posSyncService.getExpiryProductsFromPOS({
+    days: 3650,
+    locationCode: process.env.POS_LOCATION_CODE || 'SH',
+    includeExpired: true,
+    source: 'view',
+    requestTimeoutMs: ADMIN_EXPIRY_REQUEST_TIMEOUT_MS,
+  });
+
+  if (!expiryResult.success) {
+    adminExpiryFetchState.lastFailureAt = Date.now();
+    adminExpiryFetchState.lastFailureReason = expiryResult.error;
+    console.warn('[ADMIN PRODUCTS] expiry fetch failed', expiryResult.error);
+    if (hasFreshCache || adminExpiryFetchState.rows.length > 0) {
+      expiryRows = adminExpiryFetchState.rows;
+      console.log('[ADMIN PRODUCTS] using cached expiry rows', expiryRows.length);
     }
+  } else {
+    expiryRows = Array.isArray(expiryResult.data?.data) ? expiryResult.data.data : [];
+    console.log('[ADMIN PRODUCTS] POS expiry response count', expiryRows.length);
+    adminExpiryFetchState.rows = expiryRows;
+    adminExpiryFetchState.fetchedAt = Date.now();
+    adminExpiryFetchState.lastFailureAt = 0;
+    adminExpiryFetchState.lastFailureReason = null;
   }
 
   console.log('[ADMIN PRODUCTS] expiry rows fetched count', expiryRows.length);
+  console.log('[ADMIN PRODUCTS] first expiry row', expiryRows[0] || null);
 
   const groupedRows = new Map();
 
@@ -330,10 +331,14 @@ async function fetchPosExpiryMap(products) {
 }
 
 async function enrichProductsWithExpiry(products) {
+  console.log('[ADMIN PRODUCTS] products fetched count', products.length);
+  console.log('[ADMIN PRODUCTS] first product keys', products[0] ? Object.keys(products[0]) : []);
+  console.log('[ADMIN PRODUCTS] first product sourceCode', products[0]?.sourceCode || null);
+
   const expiryMap = await fetchPosExpiryMap(products);
 
-  return products.map((product) => {
-    const productCode = normalizeProductCode(product.sourceCode || product.productCode || product.code);
+  const mergedProducts = products.map((product) => {
+    const productCode = normalizeProductCode(product.sourceCode);
     const posExpiryFields = productCode ? expiryMap.get(productCode) : null;
     const fallbackExpiryFields = createMergedExpiryFields(product.expiryDate, 'database');
     const mergedExpiryFields = posExpiryFields || fallbackExpiryFields;
@@ -356,6 +361,11 @@ async function enrichProductsWithExpiry(products) {
       expirySource: mergedExpiryFields.expirySource,
     };
   });
+
+  const mergedWithExpiryCount = mergedProducts.filter((product) => Boolean(product.expiryDate)).length;
+  console.log('[ADMIN PRODUCTS] merged products with expiry count', mergedWithExpiryCount);
+
+  return mergedProducts;
 }
 
 const createProduct = async (req, res) => {
@@ -552,7 +562,6 @@ const getProducts = async (req, res) => {
 
     let enrichedProducts = products;
     if (shouldIncludePosExpiry) {
-      console.log('[ADMIN PRODUCTS] products fetched count', products.length);
       try {
         enrichedProducts = await enrichProductsWithExpiry(products);
         console.log('[ADMIN PRODUCTS] merged products count', enrichedProducts.length);
