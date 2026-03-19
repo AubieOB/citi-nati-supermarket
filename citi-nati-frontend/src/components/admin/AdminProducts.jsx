@@ -1154,7 +1154,7 @@ const AdminProducts = () => {
                         <div style={{ fontSize: '0.8rem', color: '#666' }}>
                           POS item (manage from POS sync tools)
                         </div>
-                      </div>
+                      )}
                     </div>
                   );
                 })}
