@@ -432,6 +432,48 @@ async function start() {
     // POS command queue routes (polled by local POS Sync Agent)
     app.use('/api/pos-commands', posCommandsRoutes);
 
+    // Ensure unknown API routes never return HTML to API clients
+    app.use('/api/*', (req, res) => {
+      const requestId = `api_404_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      console.warn('[API 404] Unknown API route hit', {
+        requestId,
+        method: req.method,
+        path: req.originalUrl,
+        origin: req.headers.origin || null,
+        referer: req.headers.referer || null,
+      });
+
+      return res.status(404).json({
+        error: 'API route not found',
+        requestId,
+      });
+    });
+
+    // API error handler: always return JSON for uncaught server errors on /api
+    app.use((err, req, res, next) => {
+      if (!req.originalUrl.startsWith('/api/')) {
+        return next(err);
+      }
+
+      const requestId = `api_err_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      console.error('[API ERROR] Unhandled API exception', {
+        requestId,
+        method: req.method,
+        path: req.originalUrl,
+        message: err.message,
+        stack: err.stack,
+      });
+
+      if (res.headersSent) {
+        return next(err);
+      }
+
+      return res.status(500).json({
+        error: 'Internal server error',
+        requestId,
+      });
+    });
+
     const PORT = process.env.PORT || 5000;
     server.listen(PORT, () => {
       console.log(`Server listening on port ${PORT}`);
