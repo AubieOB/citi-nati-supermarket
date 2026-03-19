@@ -42,7 +42,7 @@ async function getNextCashSaleNo(request) {
     const selectRequest = createScopedRequest(request);
     const countResult = await selectRequest.query(`
       SELECT COUNT(1) AS RowCount
-      FROM dbo.LastCashSaleNo WITH (UPDLOCK, HOLDLOCK)
+      FROM dbo.LastCashSaleNo (UPDLOCK, HOLDLOCK)
     `);
 
     const rowCount = Number(countResult.recordset?.[0]?.RowCount || 0);
@@ -52,7 +52,7 @@ async function getNextCashSaleNo(request) {
 
     const result = await selectRequest.query(`
       SELECT TOP 1 CashSaleNo
-      FROM dbo.LastCashSaleNo WITH (UPDLOCK, HOLDLOCK)
+      FROM dbo.LastCashSaleNo (UPDLOCK, HOLDLOCK)
     `);
 
     if (!result.recordset || result.recordset.length === 0) {
