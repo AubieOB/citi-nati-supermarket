@@ -86,10 +86,12 @@ const Register = () => {
         // Could be missing fields or user already exists
         const errorMsg = err.response.data?.error || 'Invalid input';
         setError(errorMsg);
-      } else if (err.response?.status === 500) {
-        setError('Server error. Please try again later');
+      } else if (err.response?.status >= 500) {
+        const errorMsg = err.response?.data?.error || 'Server error. Please try again later';
+        setError(errorMsg);
       } else {
-        setError('Registration failed. Please try again');
+        const errorMsg = err.response?.data?.error || 'Registration failed. Please try again';
+        setError(errorMsg);
       }
     } finally {
       setLoading(false);

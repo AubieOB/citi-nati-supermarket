@@ -9,6 +9,32 @@ const sgMail = require('@sendgrid/mail');
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
 const FROM_EMAIL = process.env.FROM_EMAIL || 'renewableenergyh@gmail.com';
 
+const classifyEmailError = (err) => {
+  const details = err?.response?.body?.errors || [];
+  const combined = [err?.message || '', ...details.map((d) => d?.message || '')]
+    .join(' ')
+    .toLowerCase();
+
+  if (combined.includes('maximum credits exceeded')) {
+    return {
+      errorCode: 'EMAIL_PROVIDER_CREDITS_EXCEEDED',
+      userMessage: 'Email service quota exceeded. Please try again later or contact support.',
+    };
+  }
+
+  if (combined.includes('unauthorized') || combined.includes('invalid api key')) {
+    return {
+      errorCode: 'EMAIL_PROVIDER_UNAUTHORIZED',
+      userMessage: 'Email service is temporarily unavailable. Please try again later.',
+    };
+  }
+
+  return {
+    errorCode: 'EMAIL_SEND_FAILED',
+    userMessage: 'Failed to send email. Please try again.',
+  };
+};
+
 // Initialize SendGrid
 if (SENDGRID_API_KEY) {
   sgMail.setApiKey(SENDGRID_API_KEY);
@@ -45,7 +71,14 @@ const sendEmail = async (to, subject, html) => {
     if (err.response) {
       console.error(`[EMAIL] SendGrid Error Details:`, err.response.body);
     }
-    return { success: false, error: err.message };
+    const classifiedError = classifyEmailError(err);
+    return {
+      success: false,
+      error: err.message,
+      errorCode: classifiedError.errorCode,
+      userMessage: classifiedError.userMessage,
+      providerErrors: err?.response?.body?.errors || [],
+    };
   }
 };
 

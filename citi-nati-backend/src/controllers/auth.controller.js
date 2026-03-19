@@ -10,6 +10,30 @@ const prisma = new PrismaClient();
 
 const AUTH_COOKIE_NAME = 'auth_token';
 
+const getEmailFailureResponse = (emailResult, defaultMessage) => {
+  if (emailResult?.errorCode === 'EMAIL_PROVIDER_CREDITS_EXCEEDED') {
+    return {
+      status: 503,
+      error: emailResult.userMessage || 'Email service quota exceeded. Please try again later.',
+      code: emailResult.errorCode,
+    };
+  }
+
+  if (emailResult?.errorCode === 'EMAIL_PROVIDER_UNAUTHORIZED') {
+    return {
+      status: 503,
+      error: emailResult.userMessage || 'Email service is temporarily unavailable. Please try again later.',
+      code: emailResult.errorCode,
+    };
+  }
+
+  return {
+    status: 500,
+    error: emailResult?.userMessage || defaultMessage,
+    code: emailResult?.errorCode || 'EMAIL_SEND_FAILED',
+  };
+};
+
 const getCookieOptions = () => {
   const isProduction = process.env.NODE_ENV === 'production';
 
@@ -124,8 +148,13 @@ const register = async (req, res) => {
 
     if (!emailResult.success) {
       console.error(`[AUTH] ❌ Failed to send verification email to ${email}`);
-      return res.status(500).json({
-        error: 'Failed to send verification email. Please try again.',
+      const emailFailure = getEmailFailureResponse(
+        emailResult,
+        'Failed to send verification email. Please try again.',
+      );
+      return res.status(emailFailure.status).json({
+        error: emailFailure.error,
+        code: emailFailure.code,
       });
     }
 
@@ -267,8 +296,13 @@ const resendVerificationCode = async (req, res) => {
 
     if (!emailResult.success) {
       console.error(`[AUTH] ❌ Failed to resend verification email to ${email}`);
-      return res.status(500).json({
-        error: 'Failed to send verification email. Please try again.',
+      const emailFailure = getEmailFailureResponse(
+        emailResult,
+        'Failed to send verification email. Please try again.',
+      );
+      return res.status(emailFailure.status).json({
+        error: emailFailure.error,
+        code: emailFailure.code,
       });
     }
 
@@ -343,8 +377,13 @@ const forgotPassword = async (req, res) => {
       // Delete the reset record if email fails
       await prisma.passwordReset.delete({ where: { id: resetRecord.id } });
       console.error(`[AUTH] ❌ Failed to send password reset email to ${email}`);
-      return res.status(500).json({
-        error: 'Failed to send reset email. Please try again.',
+      const emailFailure = getEmailFailureResponse(
+        emailResult,
+        'Failed to send reset email. Please try again.',
+      );
+      return res.status(emailFailure.status).json({
+        error: emailFailure.error,
+        code: emailFailure.code,
       });
     }
 
