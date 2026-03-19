@@ -6,7 +6,7 @@ const posSyncService = require('../services/posSync.service');
 
 const prisma = new PrismaClient();
 const MIN_VALID_EXPIRY_DATE = new Date('2000-01-01T00:00:00.000Z');
-const ADMIN_EXPIRY_REQUEST_TIMEOUT_MS = 2500;
+const ADMIN_EXPIRY_REQUEST_TIMEOUT_MS = 800;
 const ADMIN_EXPIRY_CACHE_TTL_MS = 5 * 60 * 1000;
 const ADMIN_EXPIRY_FAILURE_COOLDOWN_MS = 60 * 1000;
 

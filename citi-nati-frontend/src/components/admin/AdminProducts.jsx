@@ -419,8 +419,9 @@ const AdminProducts = () => {
 
       const fetchProductsPage = async (pageNumber) => {
         const basePath = `/products?page=${pageNumber}&pageSize=${perPage}`;
+        const shouldUseExpiryEnrichment = usePosExpiry && pageNumber === 1;
 
-        if (usePosExpiry) {
+        if (shouldUseExpiryEnrichment) {
           try {
             return await api.get(`${basePath}&includePosExpiry=true`);
           } catch (posExpiryErr) {
