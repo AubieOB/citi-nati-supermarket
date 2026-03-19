@@ -433,7 +433,7 @@ async function start() {
     app.use('/api/pos-commands', posCommandsRoutes);
 
     // Ensure unknown API routes never return HTML to API clients
-    app.use('/api/*', (req, res) => {
+    app.use('/api', (req, res) => {
       const requestId = `api_404_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       console.warn('[API 404] Unknown API route hit', {
         requestId,
@@ -479,7 +479,7 @@ async function start() {
       console.log(`Server listening on port ${PORT}`);
     });
   } catch (err) {
-    console.error('Unable to start server — failed to connect to DB');
+    console.error('Unable to start server');
     console.error(err);
     process.exit(1);
   }
