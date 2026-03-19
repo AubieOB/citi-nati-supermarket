@@ -80,36 +80,61 @@ async function queueSelectivePosPromotionCommands({
   percentage,
   selectedProductIds,
   previousSelectedProductIds,
+  productCandidates,
   actor,
 }) {
-  const targetIds = enabled
-    ? parseProductIds(selectedProductIds || [])
-    : parseProductIds(previousSelectedProductIds || selectedProductIds || []);
+  let products = [];
 
-  if (targetIds.length === 0) {
-    console.log('[PROMO][POS QUEUE] No selective products available for POS command queue');
-    return { enqueued: 0, skippedNoSourceCode: 0, skippedInvalidPrice: 0, targetCount: 0 };
+  if (enabled && Array.isArray(productCandidates) && productCandidates.length > 0) {
+    products = productCandidates
+      .map((product) => ({
+        id: product.id,
+        name: product.name,
+        sourceCode: product.sourceCode,
+        price: product.price,
+        originalPrice: product.originalPrice,
+      }));
+  } else {
+    const targetIds = enabled
+      ? parseProductIds(selectedProductIds || [])
+      : parseProductIds(previousSelectedProductIds || selectedProductIds || []);
+
+    if (targetIds.length === 0) {
+      console.log('[PROMO][POS QUEUE] No selective products available for POS command queue');
+      return { enqueued: 0, skippedNoSourceCode: 0, skippedInvalidPrice: 0, targetCount: 0 };
+    }
+
+    products = await prisma.product.findMany({
+      where: {
+        id: { in: targetIds },
+      },
+      select: {
+        id: true,
+        name: true,
+        sourceCode: true,
+        price: true,
+        originalPrice: true,
+      },
+    });
   }
 
-  const products = await prisma.product.findMany({
-    where: {
-      id: { in: targetIds },
-    },
-    select: {
-      id: true,
-      sourceCode: true,
-      price: true,
-      originalPrice: true,
-    },
-  });
+  if (products.length === 0) {
+    console.log('[PROMO][POS QUEUE] No products resolved for POS command queue');
+    return { enqueued: 0, skippedNoSourceCode: 0, skippedInvalidPrice: 0, targetCount: 0 };
+  }
 
   let enqueued = 0;
   let skippedNoSourceCode = 0;
   let skippedInvalidPrice = 0;
+  const skippedNoSourceCodeSamples = [];
+  const skippedInvalidPriceSamples = [];
 
   for (const product of products) {
     if (!product.sourceCode) {
       skippedNoSourceCode++;
+      if (skippedNoSourceCodeSamples.length < 10) {
+        skippedNoSourceCodeSamples.push({ id: product.id, name: product.name || null });
+      }
       continue;
     }
 
@@ -118,6 +143,13 @@ async function queueSelectivePosPromotionCommands({
 
       if (!Number.isFinite(promotionalPrice) || promotionalPrice <= 0) {
         skippedInvalidPrice++;
+        if (skippedInvalidPriceSamples.length < 10) {
+          skippedInvalidPriceSamples.push({
+            id: product.id,
+            sourceCode: product.sourceCode,
+            promotionalPrice,
+          });
+        }
         continue;
       }
 
@@ -139,6 +171,13 @@ async function queueSelectivePosPromotionCommands({
 
       if (!Number.isFinite(restorePrice) || restorePrice <= 0) {
         skippedInvalidPrice++;
+        if (skippedInvalidPriceSamples.length < 10) {
+          skippedInvalidPriceSamples.push({
+            id: product.id,
+            sourceCode: product.sourceCode,
+            restorePrice,
+          });
+        }
         continue;
       }
 
@@ -160,12 +199,28 @@ async function queueSelectivePosPromotionCommands({
     enqueued++;
   }
 
-  return {
+  const summary = {
     enqueued,
     skippedNoSourceCode,
     skippedInvalidPrice,
-    targetCount: targetIds.length,
+    targetCount: products.length,
+    skippedNoSourceCodeSamples,
+    skippedInvalidPriceSamples,
   };
+
+  console.log(
+    `[PROMO][POS QUEUE] summary enabled=${enabled} target=${summary.targetCount} enqueued=${summary.enqueued} skippedNoSourceCode=${summary.skippedNoSourceCode} skippedInvalidPrice=${summary.skippedInvalidPrice}`
+  );
+
+  if (summary.skippedNoSourceCode > 0) {
+    console.warn('[PROMO][POS QUEUE] skipped products missing sourceCode (sample):', summary.skippedNoSourceCodeSamples);
+  }
+
+  if (summary.skippedInvalidPrice > 0) {
+    console.warn('[PROMO][POS QUEUE] skipped products with invalid computed price (sample):', summary.skippedInvalidPriceSamples);
+  }
+
+  return summary;
 }
 
 /**
@@ -327,10 +382,10 @@ const updatePromotion = async (req, res) => {
 
     console.log('[Promotions] Promotion upserted:', promotion);
 
+    let productsToUpdate = [];
+
     // Apply promotions if enabled
     if (enabled) {
-      let productsToUpdate = [];
-
       if (type === 'global') {
         productsToUpdate = await prisma.product.findMany({
           where: getPromotionProductWhere('global', null, []),
@@ -376,6 +431,7 @@ const updatePromotion = async (req, res) => {
         percentage: promotion.percentage,
         selectedProductIds: promotion.selectedProductIds || [],
         previousSelectedProductIds: previousPromotion?.selectedProductIds || [],
+        productCandidates: promotion.enabled ? productsToUpdate : null,
         actor,
       });
 
