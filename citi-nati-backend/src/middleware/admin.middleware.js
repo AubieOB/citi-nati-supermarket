@@ -15,7 +15,7 @@ const verifyAdmin = (req, res, next) => {
     return res.status(403).json({ message: "Access denied. Admin only." });
   }
 
-  console.log('[ADMIN_AUTH] Admin verified:', { id: req.user.userId, email: req.user.email });
+  console.log('[ADMIN_AUTH] Admin verified:', { id: req.user.id, email: req.user.email });
   // User is admin, proceed to next middleware/controller
   next();
 };

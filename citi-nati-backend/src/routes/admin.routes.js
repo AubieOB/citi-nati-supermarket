@@ -45,7 +45,7 @@ router.get('/test', verifyTokenMiddleware, verifyAdmin, (req, res) => {
     success: true,
     message: 'Admin access granted',
     user: { 
-      id: req.user.userId,
+      id: req.user.id, 
       email: req.user.email,
       role: req.user.role 
     }
@@ -381,7 +381,7 @@ router.put('/users/:userId/role', verifyTokenMiddleware, verifyAdmin, async (req
     }
 
     // Prevent changing own role
-    if (userId === req.user.userId) {
+    if (userId === req.user.id) {
       return res.status(400).json({ error: 'Cannot change your own role' });
     }
 
@@ -451,7 +451,7 @@ router.delete('/users/:userId', verifyTokenMiddleware, verifyAdmin, async (req, 
     const { userId } = req.params;
 
     // Prevent deleting self
-    if (userId === req.user.userId) {
+    if (userId === req.user.id) {
       return res.status(400).json({ error: 'Cannot delete your own account' });
     }
 
