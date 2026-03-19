@@ -7,7 +7,12 @@
  */
 
 const { PrismaClient } = require('@prisma/client');
+const posCommandQueueService = require('../services/posCommandQueue.service');
 const prisma = new PrismaClient();
+
+const POS_DEFAULT_LOCATION_CODE = process.env.POS_LOCATION_CODE || 'SH';
+const POS_DEFAULT_PRICE_TYPE_CODE = process.env.POS_PRICE_TYPE_CODE || 'RT';
+const POS_PROMO_REASON_CODE = 'WEBSITE_SELECTIVE_PROMO';
 
 const ACTIVE_PRODUCT_FILTER = {
   isActive: true,
@@ -49,6 +54,117 @@ function buildPromotionUpdateData(product, percentage) {
     discountPrice: discountedPrice,
     isOnSale: true,
     updatedAt: new Date(),
+  };
+}
+
+function roundPrice(value) {
+  return Number(Number(value).toFixed(2));
+}
+
+function getBaseProductPrice(product) {
+  if (Number.isFinite(Number(product.originalPrice)) && Number(product.originalPrice) > 0) {
+    return Number(product.originalPrice);
+  }
+  return Number(product.price || 0);
+}
+
+function getPromotionalPrice(product, percentage) {
+  const base = getBaseProductPrice(product);
+  const numericPercentage = Number(percentage || 0);
+  const discounted = base - ((base * numericPercentage) / 100);
+  return roundPrice(discounted);
+}
+
+async function queueSelectivePosPromotionCommands({
+  enabled,
+  percentage,
+  selectedProductIds,
+  previousSelectedProductIds,
+  actor,
+}) {
+  const targetIds = enabled
+    ? parseProductIds(selectedProductIds || [])
+    : parseProductIds(previousSelectedProductIds || selectedProductIds || []);
+
+  if (targetIds.length === 0) {
+    console.log('[PROMO][POS QUEUE] No selective products available for POS command queue');
+    return { enqueued: 0, skippedNoSourceCode: 0, skippedInvalidPrice: 0, targetCount: 0 };
+  }
+
+  const products = await prisma.product.findMany({
+    where: {
+      id: { in: targetIds },
+    },
+    select: {
+      id: true,
+      sourceCode: true,
+      price: true,
+      originalPrice: true,
+    },
+  });
+
+  let enqueued = 0;
+  let skippedNoSourceCode = 0;
+  let skippedInvalidPrice = 0;
+
+  for (const product of products) {
+    if (!product.sourceCode) {
+      skippedNoSourceCode++;
+      continue;
+    }
+
+    if (enabled) {
+      const promotionalPrice = getPromotionalPrice(product, percentage);
+
+      if (!Number.isFinite(promotionalPrice) || promotionalPrice <= 0) {
+        skippedInvalidPrice++;
+        continue;
+      }
+
+      await posCommandQueueService.enqueueCommand('APPLY_PROMOTION', {
+        productCode: product.sourceCode,
+        promotionalPrice,
+        locationCode: POS_DEFAULT_LOCATION_CODE,
+        priceTypeCode: POS_DEFAULT_PRICE_TYPE_CODE,
+        reasonCode: POS_PROMO_REASON_CODE,
+        updatePromotionalFlag: false,
+      }, {
+        source: 'admin.promotions.updatePromotion.selective.apply',
+        relatedEntityType: 'POS_PRODUCT',
+        relatedEntityId: product.sourceCode,
+        createdBy: actor,
+      });
+    } else {
+      const restorePrice = roundPrice(getBaseProductPrice(product));
+
+      if (!Number.isFinite(restorePrice) || restorePrice <= 0) {
+        skippedInvalidPrice++;
+        continue;
+      }
+
+      await posCommandQueueService.enqueueCommand('REVERT_PROMOTION', {
+        productCode: product.sourceCode,
+        restorePrice,
+        locationCode: POS_DEFAULT_LOCATION_CODE,
+        priceTypeCode: POS_DEFAULT_PRICE_TYPE_CODE,
+        reasonCode: POS_PROMO_REASON_CODE,
+        updatePromotionalFlag: false,
+      }, {
+        source: 'admin.promotions.updatePromotion.selective.revert',
+        relatedEntityType: 'POS_PRODUCT',
+        relatedEntityId: product.sourceCode,
+        createdBy: actor,
+      });
+    }
+
+    enqueued++;
+  }
+
+  return {
+    enqueued,
+    skippedNoSourceCode,
+    skippedInvalidPrice,
+    targetCount: targetIds.length,
   };
 }
 
@@ -132,6 +248,14 @@ const updatePromotion = async (req, res) => {
     const { type } = req.params;
     const { enabled, percentage, categoryId, selectedProducts } = req.body;
     const parsedSelectedProducts = parseProductIds(selectedProducts || []);
+    const actor = req.user?.email || String(req.user?.userId || req.user?.id || 'admin');
+
+    const previousPromotion = await prisma.promotion.findUnique({
+      where: { type },
+      select: {
+        selectedProductIds: true,
+      },
+    });
 
     // Validate promotion type
     if (!['global', 'category', 'selective'].includes(type)) {
@@ -244,6 +368,23 @@ const updatePromotion = async (req, res) => {
       categoryId: promotion.categoryId || null,
       selectedProducts: promotion.selectedProductIds || [],
     };
+
+    let posQueueSummary = null;
+    if (type === 'selective') {
+      posQueueSummary = await queueSelectivePosPromotionCommands({
+        enabled: promotion.enabled,
+        percentage: promotion.percentage,
+        selectedProductIds: promotion.selectedProductIds || [],
+        previousSelectedProductIds: previousPromotion?.selectedProductIds || [],
+        actor,
+      });
+
+      console.log('[PROMO][POS QUEUE] selective promotion bridge summary:', {
+        type,
+        enabled: promotion.enabled,
+        ...posQueueSummary,
+      });
+    }
     
     try {
       emitPromotionUpdate(promotionResponse);
@@ -255,6 +396,7 @@ const updatePromotion = async (req, res) => {
     return res.json({
       success: true,
       promotion: promotionResponse,
+      posQueue: posQueueSummary,
     });
   } catch (err) {
     console.error('[Promotions] Error updating promotion:', err.message || err);
