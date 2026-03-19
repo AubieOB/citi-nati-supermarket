@@ -30,16 +30,23 @@ const verifyTokenMiddleware = (req, res, next) => {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 
-  // Backward compatibility: some routes read req.user.id while newer code uses req.user.userId.
+  // Backward compatibility: ensure both userId and id are set
+  // Use userId as the canonical source of truth
+  const userId = decoded.userId || decoded.id;
+  if (!userId) {
+    console.error('[AUTH] Token missing both userId and id:', decoded);
+    return res.status(401).json({ error: 'Invalid token: missing user ID' });
+  }
+
+  // Set req.user with normalized identity fields
   req.user = {
     ...decoded,
-    userId: decoded.userId || decoded.id,
-    id: decoded.id || decoded.userId,
+    userId,
+    id: userId,
   };
 
   console.log('[AUTH] Token verified for user:', {
     userId: req.user.userId,
-    id: req.user.id,
     role: req.user.role,
     email: req.user.email,
   });
