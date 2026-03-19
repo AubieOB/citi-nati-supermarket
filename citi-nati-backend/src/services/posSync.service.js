@@ -345,16 +345,20 @@ async function getExpiryProductsFromPOS({ days = 14, locationCode = 'SH', includ
     return { success: false, error: 'POS Sync is disabled' };
   }
 
+  const endpoint = '/pos-sync/expiry-products';
+  const targetUrl = `${POS_AGENT_URL}${endpoint}`;
+
   try {
     console.log('[BACKEND -> AGENT][EXPIRY] requesting expiry candidates', {
-      endpoint: '/pos-sync/expiry-products',
+      endpoint,
+      targetUrl,
       days,
       locationCode,
       includeExpired,
       source,
     });
 
-    const response = await posAgent.get('/pos-sync/expiry-products', {
+    const response = await posAgent.get(endpoint, {
       params: {
         days,
         locationCode,
@@ -367,7 +371,9 @@ async function getExpiryProductsFromPOS({ days = 14, locationCode = 'SH', includ
     });
 
     console.log('[BACKEND -> AGENT][EXPIRY] success', {
-      endpoint: '/pos-sync/expiry-products',
+      endpoint,
+      targetUrl,
+      status: response.status,
       count: response.data?.count || 0,
       source: response.data?.source || source,
     });
@@ -375,15 +381,34 @@ async function getExpiryProductsFromPOS({ days = 14, locationCode = 'SH', includ
     return {
       success: true,
       data: response.data,
+      meta: {
+        endpoint,
+        targetUrl,
+        status: response.status,
+      },
     };
   } catch (error) {
+    const status = error.response?.status || null;
+    const rawBody = error.response?.data ?? null;
+    const formattedError = formatPosAgentError(error, endpoint);
+
     console.error('[BACKEND -> AGENT][EXPIRY] failed', {
-      endpoint: '/pos-sync/expiry-products',
-      error: formatPosAgentError(error, '/pos-sync/expiry-products'),
+      endpoint,
+      targetUrl,
+      status,
+      error: formattedError,
+      rawBody,
     });
+
     return {
       success: false,
-      error: formatPosAgentError(error, '/pos-sync/expiry-products'),
+      error: formattedError,
+      meta: {
+        endpoint,
+        targetUrl,
+        status,
+        rawBody,
+      },
     };
   }
 }
