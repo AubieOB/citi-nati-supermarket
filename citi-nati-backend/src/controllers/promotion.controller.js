@@ -12,7 +12,7 @@ const prisma = new PrismaClient();
 
 const POS_DEFAULT_LOCATION_CODE = process.env.POS_LOCATION_CODE || 'SH';
 const POS_DEFAULT_PRICE_TYPE_CODE = process.env.POS_PRICE_TYPE_CODE || 'RT';
-const POS_PROMO_REASON_CODE = 'WEBSITE_SELECTIVE_PROMO';
+const POS_PROMO_REASON_CODE = 'WEBSITE_PROMOTION';
 
 const ACTIVE_PRODUCT_FILTER = {
   isActive: true,
@@ -75,39 +75,26 @@ function getPromotionalPrice(product, percentage) {
   return roundPrice(discounted);
 }
 
-async function queueSelectivePosPromotionCommands({
+async function resolveProductsForPosQueue({
+  type,
   enabled,
-  percentage,
-  selectedProductIds,
-  previousSelectedProductIds,
+  promotion,
+  previousPromotion,
   productCandidates,
-  actor,
 }) {
-  let products = [];
-
   if (enabled && Array.isArray(productCandidates) && productCandidates.length > 0) {
-    products = productCandidates
-      .map((product) => ({
-        id: product.id,
-        name: product.name,
-        sourceCode: product.sourceCode,
-        price: product.price,
-        originalPrice: product.originalPrice,
-      }));
-  } else {
-    const targetIds = enabled
-      ? parseProductIds(selectedProductIds || [])
-      : parseProductIds(previousSelectedProductIds || selectedProductIds || []);
+    return productCandidates.map((product) => ({
+      id: product.id,
+      name: product.name,
+      sourceCode: product.sourceCode,
+      price: product.price,
+      originalPrice: product.originalPrice,
+    }));
+  }
 
-    if (targetIds.length === 0) {
-      console.log('[PROMO][POS QUEUE] No selective products available for POS command queue');
-      return { enqueued: 0, skippedNoSourceCode: 0, skippedInvalidPrice: 0, targetCount: 0 };
-    }
-
-    products = await prisma.product.findMany({
-      where: {
-        id: { in: targetIds },
-      },
+  if (type === 'global') {
+    return prisma.product.findMany({
+      where: getPromotionProductWhere('global', null, []),
       select: {
         id: true,
         name: true,
@@ -118,10 +105,77 @@ async function queueSelectivePosPromotionCommands({
     });
   }
 
-  if (products.length === 0) {
-    console.log('[PROMO][POS QUEUE] No products resolved for POS command queue');
-    return { enqueued: 0, skippedNoSourceCode: 0, skippedInvalidPrice: 0, targetCount: 0 };
+  if (type === 'category') {
+    const categoryToUse = previousPromotion?.categoryId || promotion?.categoryId || null;
+    if (!categoryToUse) {
+      return [];
+    }
+
+    return prisma.product.findMany({
+      where: getPromotionProductWhere('category', categoryToUse, []),
+      select: {
+        id: true,
+        name: true,
+        sourceCode: true,
+        price: true,
+        originalPrice: true,
+      },
+    });
   }
+
+  const selectiveIds = parseProductIds(
+    (previousPromotion?.selectedProductIds && previousPromotion.selectedProductIds.length > 0)
+      ? previousPromotion.selectedProductIds
+      : (promotion?.selectedProductIds || [])
+  );
+
+  if (selectiveIds.length === 0) {
+    return [];
+  }
+
+  return prisma.product.findMany({
+    where: {
+      id: { in: selectiveIds },
+    },
+    select: {
+      id: true,
+      name: true,
+      sourceCode: true,
+      price: true,
+      originalPrice: true,
+    },
+  });
+}
+
+async function queuePosPromotionCommands({
+  type,
+  enabled,
+  percentage,
+  promotion,
+  previousPromotion,
+  productCandidates,
+  actor,
+}) {
+  const products = await resolveProductsForPosQueue({
+    type,
+    enabled,
+    promotion,
+    previousPromotion,
+    productCandidates,
+  });
+
+  if (products.length === 0) {
+    console.log(`[PROMO][QUEUE] ${type} resolved product count = 0`);
+    return { enqueued: 0, skippedNoSourceCode: 0, skippedInvalidPrice: 0, targetCount: 0, commandType: enabled ? 'APPLY_PROMOTION' : 'REVERT_PROMOTION' };
+  }
+
+  const commandType = enabled ? 'APPLY_PROMOTION' : 'REVERT_PROMOTION';
+
+  console.log(`[PROMO][QUEUE] ${type} resolved product count = ${products.length}`);
+  console.log(`[PROMO][QUEUE] ${type} resolved source codes (sample):`, products.slice(0, 10).map((p) => ({
+    id: p.id,
+    sourceCode: p.sourceCode || null,
+  })));
 
   let enqueued = 0;
   let skippedNoSourceCode = 0;
@@ -153,15 +207,22 @@ async function queueSelectivePosPromotionCommands({
         continue;
       }
 
-      await posCommandQueueService.enqueueCommand('APPLY_PROMOTION', {
+      const payload = {
         productCode: product.sourceCode,
         promotionalPrice,
+        promoPrice: promotionalPrice,
         locationCode: POS_DEFAULT_LOCATION_CODE,
         priceTypeCode: POS_DEFAULT_PRICE_TYPE_CODE,
         reasonCode: POS_PROMO_REASON_CODE,
         updatePromotionalFlag: false,
-      }, {
-        source: 'admin.promotions.updatePromotion.selective.apply',
+      };
+
+      if (enqueued === 0) {
+        console.log(`[PROMO][QUEUE] ${type} commandType=${commandType} sample payload:`, payload);
+      }
+
+      await posCommandQueueService.enqueueCommand(commandType, payload, {
+        source: `admin.promotions.updatePromotion.${type}.apply`,
         relatedEntityType: 'POS_PRODUCT',
         relatedEntityId: product.sourceCode,
         createdBy: actor,
@@ -181,15 +242,22 @@ async function queueSelectivePosPromotionCommands({
         continue;
       }
 
-      await posCommandQueueService.enqueueCommand('REVERT_PROMOTION', {
+      const payload = {
         productCode: product.sourceCode,
         restorePrice,
+        originalPrice: restorePrice,
         locationCode: POS_DEFAULT_LOCATION_CODE,
         priceTypeCode: POS_DEFAULT_PRICE_TYPE_CODE,
         reasonCode: POS_PROMO_REASON_CODE,
         updatePromotionalFlag: false,
-      }, {
-        source: 'admin.promotions.updatePromotion.selective.revert',
+      };
+
+      if (enqueued === 0) {
+        console.log(`[PROMO][QUEUE] ${type} commandType=${commandType} sample payload:`, payload);
+      }
+
+      await posCommandQueueService.enqueueCommand(commandType, payload, {
+        source: `admin.promotions.updatePromotion.${type}.revert`,
         relatedEntityType: 'POS_PRODUCT',
         relatedEntityId: product.sourceCode,
         createdBy: actor,
@@ -200,6 +268,8 @@ async function queueSelectivePosPromotionCommands({
   }
 
   const summary = {
+    type,
+    commandType,
     enqueued,
     skippedNoSourceCode,
     skippedInvalidPrice,
@@ -209,7 +279,7 @@ async function queueSelectivePosPromotionCommands({
   };
 
   console.log(
-    `[PROMO][POS QUEUE] summary enabled=${enabled} target=${summary.targetCount} enqueued=${summary.enqueued} skippedNoSourceCode=${summary.skippedNoSourceCode} skippedInvalidPrice=${summary.skippedInvalidPrice}`
+    `[PROMO][QUEUE] ${type} summary target=${summary.targetCount} enqueued=${summary.enqueued} skippedNoSourceCode=${summary.skippedNoSourceCode} skippedInvalidPrice=${summary.skippedInvalidPrice}`
   );
 
   if (summary.skippedNoSourceCode > 0) {
@@ -308,6 +378,10 @@ const updatePromotion = async (req, res) => {
     const previousPromotion = await prisma.promotion.findUnique({
       where: { type },
       select: {
+        type: true,
+        enabled: true,
+        percentage: true,
+        categoryId: true,
         selectedProductIds: true,
       },
     });
@@ -425,21 +499,18 @@ const updatePromotion = async (req, res) => {
     };
 
     let posQueueSummary = null;
-    if (type === 'selective') {
-      posQueueSummary = await queueSelectivePosPromotionCommands({
+    if (['global', 'category', 'selective'].includes(type)) {
+      posQueueSummary = await queuePosPromotionCommands({
+        type,
         enabled: promotion.enabled,
         percentage: promotion.percentage,
-        selectedProductIds: promotion.selectedProductIds || [],
-        previousSelectedProductIds: previousPromotion?.selectedProductIds || [],
+        promotion,
+        previousPromotion,
         productCandidates: promotion.enabled ? productsToUpdate : null,
         actor,
       });
 
-      console.log('[PROMO][POS QUEUE] selective promotion bridge summary:', {
-        type,
-        enabled: promotion.enabled,
-        ...posQueueSummary,
-      });
+      console.log(`[PROMO][QUEUE] ${type} bridge summary:`, posQueueSummary);
     }
     
     try {

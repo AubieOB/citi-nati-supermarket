@@ -45,6 +45,9 @@ const AdminProducts = () => {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [onSaleOnly, setOnSaleOnly] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState('products'); // 'products' or 'expiry-alerts'
+  const [posExpiryItems, setPosExpiryItems] = useState([]);
+  const [posExpiryLoading, setPosExpiryLoading] = useState(false);
+  const [posExpiryError, setPosExpiryError] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isVoiceSearchEnabled, setIsVoiceSearchEnabled] = useState(false);
@@ -124,10 +127,88 @@ const AdminProducts = () => {
     return digits.length > 0 ? digits.join('') : text;
   };
 
+  const toNumberOrNull = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const getDaysUntil = (dateValue) => {
+    if (!dateValue) return null;
+    const target = new Date(dateValue);
+    if (Number.isNaN(target.getTime())) return null;
+    const now = new Date();
+    const dayMs = 24 * 60 * 60 * 1000;
+    return Math.ceil((target.getTime() - now.getTime()) / dayMs);
+  };
+
+  const mapPosExpiryToAlert = (row) => {
+    const daysRemaining = getDaysUntil(row?.ExpiryDate);
+    const qty = toNumberOrNull(row?.RemainingQty);
+    const isExpired = daysRemaining != null && daysRemaining < 0;
+    const isUrgent = daysRemaining != null && daysRemaining >= 0 && daysRemaining <= 14;
+
+    return {
+      key: `${row?.ProductCode || 'UNKNOWN'}-${row?.ExpiryDate || ''}`,
+      productCode: row?.ProductCode || '',
+      name: row?.ProductName || row?.ProductCode || 'Unknown Product',
+      message: isExpired
+        ? 'Already expired in POS stock'
+        : daysRemaining == null
+          ? 'Expiry date available in POS'
+          : `Expires in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'}`,
+      isExpired,
+      isUrgent,
+      remainingQty: qty,
+      expiryDate: row?.ExpiryDate || null,
+    };
+  };
+
+  const fetchPosExpiryAlerts = async () => {
+    try {
+      setPosExpiryLoading(true);
+      setPosExpiryError('');
+      console.log('[UI EXPIRY] fetch start', {
+        endpoint: '/admin/pos-expiry',
+        days: 14,
+        includeExpired: false,
+        source: 'view',
+      });
+
+      const response = await api.get('/admin/pos-expiry', {
+        params: {
+          days: 14,
+          includeExpired: false,
+          source: 'view',
+        },
+      });
+
+      const rows = Array.isArray(response?.data?.data) ? response.data.data : [];
+      console.log('[UI EXPIRY] fetch response', {
+        success: response?.data?.success === true,
+        count: rows.length,
+      });
+
+      setPosExpiryItems(rows.map(mapPosExpiryToAlert));
+    } catch (err) {
+      const message = err?.response?.data?.error || err?.message || 'Failed to load POS expiry alerts';
+      console.error('[UI EXPIRY] fetch error', message);
+      setPosExpiryError(message);
+      setPosExpiryItems([]);
+    } finally {
+      setPosExpiryLoading(false);
+    }
+  };
+
   // Fetch products on mount
   useEffect(() => {
     fetchProducts();
   }, []);
+
+  useEffect(() => {
+    if (activeSubTab === 'expiry-alerts') {
+      fetchPosExpiryAlerts();
+    }
+  }, [activeSubTab]);
 
   useEffect(() => {
     voiceEnabledRef.current = isVoiceSearchEnabled;
@@ -398,6 +479,26 @@ const AdminProducts = () => {
 
   // Get unique categories for filter dropdown
   const categories = [...new Set(products.map(p => p.category))].sort();
+
+  const fallbackExpiryAlerts = products
+    .filter(p => p.expiryStatus && p.expiryStatus.status)
+    .sort((a, b) => {
+      const statusOrder = { expired: 0, '1_week_warning': 1, '2_weeks_warning': 2, '1_month_warning': 3 };
+      return (statusOrder[a.expiryStatus?.status] || 999) - (statusOrder[b.expiryStatus?.status] || 999);
+    })
+    .map((product) => ({
+      key: String(product.id),
+      name: product.name,
+      message: product.expiryStatus?.message || 'Expiry warning',
+      isExpired: product.expiryStatus?.status === 'expired',
+      isUrgent: product.expiryStatus?.status === '1_week_warning' || product.expiryStatus?.status === '2_weeks_warning',
+      remainingQty: toNumberOrNull(product.stock),
+      expiryDate: product.expiryDate || null,
+      sourceProduct: product,
+    }));
+
+  const expiryAlerts = posExpiryError ? fallbackExpiryAlerts : posExpiryItems;
+  const expiryAlertCount = expiryAlerts.length;
 
   // Handle search with debounce
   const handleSearchChange = (e) => {
@@ -964,7 +1065,18 @@ const AdminProducts = () => {
 
       {/* Expiry Alert Panel - Now under sub-tab */}
       {activeSubTab === 'expiry-alerts' && (
-        products.some(p => p.expiryStatus && p.expiryStatus.status) ? (
+        posExpiryLoading ? (
+          <div style={{
+            backgroundColor: '#f8f9fa',
+            padding: '2rem',
+            borderRadius: '8px',
+            textAlign: 'center',
+            color: '#666',
+            marginBottom: '2rem',
+          }}>
+            Loading POS expiry alerts...
+          </div>
+        ) : expiryAlertCount > 0 ? (
           <div style={{
             backgroundColor: '#fff3cd',
             border: '2px solid #ffc107',
@@ -973,22 +1085,30 @@ const AdminProducts = () => {
             marginBottom: '2rem',
           }}>
             <h3 style={{ color: '#856404', marginTop: 0, marginBottom: '1rem' }}>
-              <i className="fas fa-exclamation-triangle" style={{marginRight: '0.5rem'}}></i>Expiry Alerts ({products.filter(p => p.expiryStatus && p.expiryStatus.status).length})
+              <i className="fas fa-exclamation-triangle" style={{marginRight: '0.5rem'}}></i>Expiry Alerts ({expiryAlertCount})
             </h3>
+            {posExpiryError && (
+              <div style={{
+                backgroundColor: '#fff8e1',
+                color: '#8a6d3b',
+                border: '1px solid #ffe08a',
+                borderRadius: '6px',
+                padding: '0.75rem',
+                marginBottom: '1rem',
+                fontSize: '0.9rem',
+              }}>
+                POS expiry fetch failed, showing local alerts: {posExpiryError}
+              </div>
+            )}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
-              {products
-                .filter(p => p.expiryStatus && p.expiryStatus.status)
-                .sort((a, b) => {
-                  const statusOrder = { expired: 0, '1_week_warning': 1, '2_weeks_warning': 2, '1_month_warning': 3 };
-                  return (statusOrder[a.expiryStatus?.status] || 999) - (statusOrder[b.expiryStatus?.status] || 999);
-                })
-                .map((product) => {
-                  const isExpired = product.expiryStatus.status === 'expired';
-                  const isUrgent = product.expiryStatus.status === '1_week_warning' || product.expiryStatus.status === '2_weeks_warning';
+              {expiryAlerts
+                .map((alert) => {
+                  const isExpired = alert.isExpired;
+                  const isUrgent = alert.isUrgent;
                   
                   return (
                     <div
-                      key={product.id}
+                      key={alert.key}
                       style={{
                         padding: '1rem',
                         borderRadius: '6px',
@@ -997,28 +1117,44 @@ const AdminProducts = () => {
                       }}
                     >
                       <div style={{ fontWeight: '600', marginBottom: '0.5rem' }}>
-                        {product.name}
+                        {alert.name}
                       </div>
                       <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '0.5rem' }}>
-                        {product.expiryStatus.message}
+                        {alert.message}
                       </div>
-                      <button
-                        onClick={() => {
-                          handleEdit(product);
-                          setActiveSubTab('products');
-                        }}
-                        style={{
-                          padding: '0.4rem 0.8rem',
-                          backgroundColor: isExpired ? '#dc3545' : '#ffc107',
-                          color: isExpired ? '#fff' : '#000',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '0.85rem',
-                        }}
-                      >
-                        {isExpired ? 'Remove' : 'Apply Discount'}
-                      </button>
+                      {alert.remainingQty != null && (
+                        <div style={{ fontSize: '0.85rem', color: '#555', marginBottom: '0.5rem' }}>
+                          Remaining Qty: {alert.remainingQty}
+                        </div>
+                      )}
+                      {alert.expiryDate && (
+                        <div style={{ fontSize: '0.85rem', color: '#555', marginBottom: '0.75rem' }}>
+                          Expiry Date: {new Date(alert.expiryDate).toLocaleDateString()}
+                        </div>
+                      )}
+                      {alert.sourceProduct ? (
+                        <button
+                          onClick={() => {
+                            handleEdit(alert.sourceProduct);
+                            setActiveSubTab('products');
+                          }}
+                          style={{
+                            padding: '0.4rem 0.8rem',
+                            backgroundColor: isExpired ? '#dc3545' : '#ffc107',
+                            color: isExpired ? '#fff' : '#000',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '0.85rem',
+                          }}
+                        >
+                          {isExpired ? 'Remove' : 'Apply Discount'}
+                        </button>
+                      ) : (
+                        <div style={{ fontSize: '0.8rem', color: '#666' }}>
+                          POS item (manage from POS sync tools)
+                        </div>
+                      </div>
                     </div>
                   );
                 })}
@@ -1089,7 +1225,7 @@ const AdminProducts = () => {
               }}
             >
               <i className="fas fa-exclamation-triangle" style={{ marginRight: '0.5rem' }}></i>Expiry Alerts
-              {products.some(p => p.expiryStatus && p.expiryStatus.status) && (
+              {expiryAlertCount > 0 && (
                 <span style={{
                   position: 'absolute',
                   top: '0.4rem',
@@ -1105,7 +1241,7 @@ const AdminProducts = () => {
                   fontSize: '0.7rem',
                   fontWeight: 'bold',
                 }}>
-                  {products.filter(p => p.expiryStatus && p.expiryStatus.status).length}
+                  {expiryAlertCount}
                 </span>
               )}
             </button>

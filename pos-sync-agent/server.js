@@ -332,7 +332,7 @@ function toIsoDateOrNull(value) {
 
 function mapExpiryRow(row, fallbackLocationCode) {
   const expiryDate = pickFirstValue(row, ['ExpiryDate', 'expiryDate']);
-  const quantity = pickFirstValue(row, [
+  const remainingQty = pickFirstValue(row, [
     'RemainingQty',
     'remainingQty',
     'Quantity',
@@ -344,9 +344,9 @@ function mapExpiryRow(row, fallbackLocationCode) {
 
   return {
     ProductCode: pickFirstValue(row, ['ProductCode', 'productCode']),
-    ProductName: pickFirstValue(row, ['ProductName', 'productName', 'Description', 'description']),
     ExpiryDate: toIsoDateOrNull(expiryDate),
-    quantity: quantity == null ? null : Number(quantity),
+    RemainingQty: remainingQty == null ? null : Number(remainingQty),
+    ProductName: pickFirstValue(row, ['ProductName', 'productName', 'Description', 'description']),
     locationCode: pickFirstValue(row, ['LocationCode', 'locationCode']) || fallbackLocationCode,
     currentPrice: (() => {
       const value = pickFirstValue(row, ['FPrice', 'CurrentPrice', 'SellingPrice', 'currentPrice']);
@@ -372,7 +372,7 @@ async function fetchExpiryCandidates({ days, locationCode, includeExpired, sourc
   request.input('LocationCode', sql.VarChar(10), safeLocationCode);
 
   const rangeClause = safeIncludeExpired
-    ? `ExpiryDate >= @MinValidDate AND ExpiryDate < DATEADD(DAY, @ExpiryDays, CAST(GETDATE() AS date))`
+    ? `ExpiryDate >= @MinValidDate`
     : `ExpiryDate >= @MinValidDate
        AND ExpiryDate >= CAST(GETDATE() AS date)
        AND ExpiryDate < DATEADD(DAY, @ExpiryDays, CAST(GETDATE() AS date))`;
@@ -380,36 +380,12 @@ async function fetchExpiryCandidates({ days, locationCode, includeExpired, sourc
   const stockDetailsQuery = `
       SELECT
         sd.ProductCode,
-        pm.ProductName,
-        s.LocationCode,
         sd.ExpiryDate,
-        SUM(ISNULL(sd.StockQty, 0) - ISNULL(sd.StockOut, 0)) AS RemainingQty,
-        AVG(ISNULL(sd.CostPrice, 0)) AS AvgCostPrice,
-        latestPrice.PriceTypeCode,
-        latestPrice.FPrice,
-        pm.Promotional
+        SUM(ISNULL(sd.StockQty, 0) - ISNULL(sd.StockOut, 0)) AS RemainingQty
       FROM POS.dbo.stockdetails sd
-      LEFT JOIN POS.dbo.stocks s
-        ON s.GRNNo = sd.GRNNo
-      LEFT JOIN POS.dbo.productsmaster pm
-        ON pm.ProductCode = sd.ProductCode
-      OUTER APPLY (
-        SELECT TOP 1 pp.PriceTypeCode, pp.FPrice
-        FROM POS.dbo.productprices pp
-        WHERE pp.ProductCode = sd.ProductCode
-          AND pp.LocationCode = ISNULL(s.LocationCode, @LocationCode)
-        ORDER BY pp.PriceID DESC, pp.PriceDate DESC
-      ) latestPrice
       WHERE ${rangeClause}
-        AND (@LocationCode IS NULL OR s.LocationCode = @LocationCode OR s.LocationCode IS NULL)
-      GROUP BY
-        sd.ProductCode,
-        pm.ProductName,
-        s.LocationCode,
-        sd.ExpiryDate,
-        latestPrice.PriceTypeCode,
-        latestPrice.FPrice,
-        pm.Promotional
+        AND sd.ExpiryDate IS NOT NULL
+      GROUP BY sd.ProductCode, sd.ExpiryDate
       HAVING SUM(ISNULL(sd.StockQty, 0) - ISNULL(sd.StockOut, 0)) > 0
       ORDER BY sd.ExpiryDate ASC, sd.ProductCode ASC
     `;
@@ -418,6 +394,7 @@ async function fetchExpiryCandidates({ days, locationCode, includeExpired, sourc
       SELECT *
       FROM POS.dbo.vw_WillExpire_Products
       WHERE ${rangeClause}
+        AND ExpiryDate IS NOT NULL
       ORDER BY ExpiryDate ASC
     `;
 
@@ -432,6 +409,15 @@ async function fetchExpiryCandidates({ days, locationCode, includeExpired, sourc
 
   try {
     result = await request.query(query);
+    if (safeSource !== 'stockdetails' && (!result.recordset || result.recordset.length === 0)) {
+      console.warn('[EXPIRY] primary vw_WillExpire_Products returned 0 rows, falling back to stockdetails');
+      const fallbackRequest = pool.request();
+      fallbackRequest.input('MinValidDate', sql.Date, new Date('2000-01-01T00:00:00.000Z'));
+      fallbackRequest.input('ExpiryDays', sql.Int, safeDays);
+      fallbackRequest.input('LocationCode', sql.VarChar(10), safeLocationCode);
+      result = await fallbackRequest.query(stockDetailsQuery);
+      resolvedSource = 'stockdetails';
+    }
   } catch (error) {
     if (safeSource !== 'stockdetails') {
       console.warn('[EXPIRY] primary vw_WillExpire_Products query failed, falling back to stockdetails:', error.message);
@@ -449,8 +435,8 @@ async function fetchExpiryCandidates({ days, locationCode, includeExpired, sourc
   const products = (result.recordset || [])
     .map((row) => mapExpiryRow(row, safeLocationCode))
     .filter((row) => row.ProductCode && row.ExpiryDate)
-    .filter((row) => row.quantity == null || row.quantity > 0)
-    .filter((row) => !row.locationCode || row.locationCode === safeLocationCode);
+    .filter((row) => !row.ExpiryDate.startsWith('1900-01-01'))
+    .filter((row) => row.RemainingQty == null || row.RemainingQty > 0);
 
   console.log(`[EXPIRY] fetched ${products.length} expiry rows within ${safeDays} days from ${resolvedSource} (includeExpired=${safeIncludeExpired})`);
 
@@ -515,15 +501,13 @@ app.get('/pos-sync/products', validateApiKey, async (req, res) => {
 app.get('/pos-sync/expiry-products', validateApiKey, async (req, res) => {
   try {
     const validation = validateExpiryRequest(req.query);
-    console.log('[EXPIRY] /expiry-products request received:', {
-      endpoint: '/pos-sync/expiry-products',
-      query: {
-        days: validation.requested.days,
-        locationCode: validation.requested.locationCode,
-        includeExpired: validation.requested.includeExpired,
-        source: validation.requested.source,
-        filter: validation.requested.filter,
-      },
+    console.log('[EXPIRY] request received');
+    console.log('[EXPIRY] params', {
+      days: validation.requested.days,
+      locationCode: validation.requested.locationCode,
+      includeExpired: validation.requested.includeExpired,
+      source: validation.requested.source,
+      filter: validation.requested.filter,
     });
 
     if (validation.valid) {
@@ -535,15 +519,9 @@ app.get('/pos-sync/expiry-products', validateApiKey, async (req, res) => {
       });
     }
 
-    console.log('[EXPIRY] /expiry-products DB query start');
+    console.log('[EXPIRY] DB query start');
     const result = await fetchExpiryCandidates(validation.normalized);
-    console.log('[EXPIRY] /expiry-products DB query success:', {
-      days: result.days,
-      locationCode: result.locationCode,
-      includeExpired: result.includeExpired,
-      source: result.source,
-      count: result.products.length,
-    });
+    console.log('[EXPIRY] DB query result count', result.products.length);
 
     return res.json({
       success: true,

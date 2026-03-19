@@ -44,12 +44,17 @@ function getPreviewFailureStatus(errorMessage) {
 
 async function getExpiryCandidates(req, res) {
   try {
+    console.log('[ADMIN EXPIRY] request start', {
+      endpoint: '/api/admin/pos-expiry',
+      query: req.query,
+    });
+
     const days = normalizeExpiryDays(req.query.days);
     const locationCode = normalizeLocationCode(req.query.locationCode);
     const includeExpired = normalizeIncludeExpired(req.query.includeExpired, req.query.filter);
     const source = normalizeExpirySource(req.query.source);
 
-    console.log('[EXPIRY][BACKEND] admin dashboard -> backend -> POS agent', {
+    console.log('[ADMIN EXPIRY] agent call', {
       endpoint: '/api/admin/pos-expiry',
       days,
       locationCode,
@@ -67,7 +72,8 @@ async function getExpiryCandidates(req, res) {
     }
 
     const payload = result.data || {};
-    console.log(`[EXPIRY] fetched ${payload.count || 0} expiring products`, {
+    console.log('[ADMIN EXPIRY] response count', {
+      count: payload.count || 0,
       days,
       locationCode,
       includeExpired,
