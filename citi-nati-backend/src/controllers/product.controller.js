@@ -2,8 +2,10 @@ const { PrismaClient } = require('@prisma/client');
 const { computeExpiryStatus, suggestDiscount } = require('../utils/expiryStatus');
 const { notifyLowStock } = require('../utils/messageService');
 const posCommandQueueService = require('../services/posCommandQueue.service');
+const posSyncService = require('../services/posSync.service');
 
 const prisma = new PrismaClient();
+const MIN_VALID_EXPIRY_DATE = new Date('2000-01-01T00:00:00.000Z');
 
 // ensure a trigram index for fast case-insensitive name searches (autocomplete)
 (async () => {
@@ -52,7 +54,12 @@ const prisma = new PrismaClient();
  * - Includes suggestDiscount for admin use
  */
 const formatProduct = (product, req, includeDiscountSuggestion = false) => {
-  const expiryStatus = computeExpiryStatus(product.expiryDate);
+  const expiryStatus = product.expiryStatus !== undefined
+    ? product.expiryStatus
+    : computeExpiryStatus(product.expiryDate);
+  const daysToExpiry = product.daysToExpiry !== undefined
+    ? product.daysToExpiry
+    : (expiryStatus?.daysRemaining ?? null);
   
   // Calculate final price: if on sale and discount exists, use discount
   let finalPrice = product.price;
@@ -79,6 +86,8 @@ const formatProduct = (product, req, includeDiscountSuggestion = false) => {
     ...product,
     imageUrl,
     expiryStatus,
+    daysToExpiry,
+    expirySource: product.expirySource || null,
     finalPrice
   };
 
@@ -93,6 +102,225 @@ const formatProduct = (product, req, includeDiscountSuggestion = false) => {
 
   return formatted;
 };
+
+function normalizeProductCode(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  return normalized || null;
+}
+
+function normalizeExpiryDate(value) {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  if (date < MIN_VALID_EXPIRY_DATE) {
+    return null;
+  }
+
+  const isoDate = date.toISOString().slice(0, 10);
+  if (isoDate === '1900-01-01') {
+    return null;
+  }
+
+  return date;
+}
+
+function getStartOfToday() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today;
+}
+
+function calculateDaysToExpiry(expiryDate) {
+  const normalizedDate = normalizeExpiryDate(expiryDate);
+  if (!normalizedDate) {
+    return null;
+  }
+
+  const today = getStartOfToday();
+  const target = new Date(normalizedDate);
+  target.setHours(0, 0, 0, 0);
+
+  return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function buildAdminExpiryStatus(daysToExpiry) {
+  if (daysToExpiry == null) {
+    return null;
+  }
+
+  if (daysToExpiry < 0) {
+    return {
+      status: 'expired',
+      label: 'Expired',
+      daysRemaining: daysToExpiry,
+      message: 'Expired',
+    };
+  }
+
+  if (daysToExpiry <= 7) {
+    return {
+      status: 'expiring_soon',
+      label: 'Expiring Soon',
+      daysRemaining: daysToExpiry,
+      message: 'Expiring Soon',
+    };
+  }
+
+  if (daysToExpiry <= 30) {
+    return {
+      status: 'near_expiry',
+      label: 'Near Expiry',
+      daysRemaining: daysToExpiry,
+      message: 'Near Expiry',
+    };
+  }
+
+  return null;
+}
+
+function createMergedExpiryFields(expiryDate, expirySource) {
+  const normalizedDate = normalizeExpiryDate(expiryDate);
+  if (!normalizedDate) {
+    return null;
+  }
+
+  const daysToExpiry = calculateDaysToExpiry(normalizedDate);
+  return {
+    expiryDate: normalizedDate.toISOString(),
+    expiryStatus: buildAdminExpiryStatus(daysToExpiry),
+    daysToExpiry,
+    expirySource,
+  };
+}
+
+function pickPreferredExpiryRow(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return null;
+  }
+
+  const normalizedRows = rows
+    .map((row) => {
+      const normalizedDate = normalizeExpiryDate(row.ExpiryDate || row.expiryDate);
+      const remainingQty = Number(row.RemainingQty ?? row.remainingQty ?? row.quantity ?? row.Quantity ?? 0);
+
+      return {
+        normalizedDate,
+        remainingQty,
+      };
+    })
+    .filter((row) => row.normalizedDate && Number.isFinite(row.remainingQty) && row.remainingQty > 0);
+
+  if (normalizedRows.length === 0) {
+    return null;
+  }
+
+  const today = getStartOfToday();
+  const upcomingRows = normalizedRows
+    .filter((row) => row.normalizedDate >= today)
+    .sort((left, right) => left.normalizedDate - right.normalizedDate);
+
+  if (upcomingRows.length > 0) {
+    return upcomingRows[0].normalizedDate;
+  }
+
+  const expiredRows = normalizedRows
+    .filter((row) => row.normalizedDate < today)
+    .sort((left, right) => right.normalizedDate - left.normalizedDate);
+
+  return expiredRows[0]?.normalizedDate || null;
+}
+
+async function fetchPosExpiryMap(products) {
+  const productCodeSet = new Set(
+    products
+      .map((product) => normalizeProductCode(product.sourceCode || product.productCode || product.code))
+      .filter(Boolean)
+  );
+
+  if (productCodeSet.size === 0) {
+    console.log('[ADMIN PRODUCTS] expiry rows fetched count', 0);
+    return new Map();
+  }
+
+  const expiryResult = await posSyncService.getExpiryProductsFromPOS({
+    days: 3650,
+    locationCode: process.env.POS_LOCATION_CODE || 'SH',
+    includeExpired: true,
+    source: 'view',
+  });
+
+  if (!expiryResult.success) {
+    console.warn('[ADMIN PRODUCTS] expiry fetch failed', expiryResult.error);
+    console.log('[ADMIN PRODUCTS] expiry rows fetched count', 0);
+    return new Map();
+  }
+
+  const expiryRows = Array.isArray(expiryResult.data?.data) ? expiryResult.data.data : [];
+  console.log('[ADMIN PRODUCTS] expiry rows fetched count', expiryRows.length);
+
+  const groupedRows = new Map();
+
+  for (const row of expiryRows) {
+    const productCode = normalizeProductCode(row.ProductCode || row.productCode);
+    if (!productCode || !productCodeSet.has(productCode)) {
+      continue;
+    }
+
+    if (!groupedRows.has(productCode)) {
+      groupedRows.set(productCode, []);
+    }
+
+    groupedRows.get(productCode).push(row);
+  }
+
+  const expiryMap = new Map();
+
+  for (const [productCode, rows] of groupedRows.entries()) {
+    const preferredExpiryDate = pickPreferredExpiryRow(rows);
+    const mergedFields = createMergedExpiryFields(preferredExpiryDate, 'pos');
+
+    if (mergedFields) {
+      expiryMap.set(productCode, mergedFields);
+    }
+  }
+
+  return expiryMap;
+}
+
+async function enrichProductsWithExpiry(products) {
+  const expiryMap = await fetchPosExpiryMap(products);
+
+  return products.map((product) => {
+    const productCode = normalizeProductCode(product.sourceCode || product.productCode || product.code);
+    const posExpiryFields = productCode ? expiryMap.get(productCode) : null;
+    const fallbackExpiryFields = createMergedExpiryFields(product.expiryDate, 'database');
+    const mergedExpiryFields = posExpiryFields || fallbackExpiryFields;
+
+    if (!mergedExpiryFields) {
+      return {
+        ...product,
+        expiryDate: null,
+        expiryStatus: null,
+        daysToExpiry: null,
+        expirySource: null,
+      };
+    }
+
+    return {
+      ...product,
+      expiryDate: mergedExpiryFields.expiryDate,
+      expiryStatus: mergedExpiryFields.expiryStatus,
+      daysToExpiry: mergedExpiryFields.daysToExpiry,
+      expirySource: mergedExpiryFields.expirySource,
+    };
+  });
+}
 
 const createProduct = async (req, res) => {
   try {
@@ -207,7 +435,8 @@ const getProducts = async (req, res) => {
   try {
     // Extract query parameters for filtering and pagination
     // Support both offset-based (offset, limit) and page-based (page, pageSize) for backwards compatibility
-    const { search, category, onSale, page, pageSize, offset, limit } = req.query;
+    const { search, category, onSale, page, pageSize, offset, limit, includePosExpiry } = req.query;
+    const shouldIncludePosExpiry = String(includePosExpiry || '').trim().toLowerCase() === 'true';
 
     // Determine pagination mode and calculate skip/take
     let skip, take;
@@ -285,8 +514,24 @@ const getProducts = async (req, res) => {
     // Debug logging
     console.log(`[PRODUCTS] Retrieved: ${products.length}, Total: ${total}, Category: ${category || 'all'}, Search: ${search || 'none'}`);
 
+    let enrichedProducts = products;
+    if (shouldIncludePosExpiry) {
+      console.log('[ADMIN PRODUCTS] products fetched count', products.length);
+      enrichedProducts = await enrichProductsWithExpiry(products);
+      console.log('[ADMIN PRODUCTS] merged products count', enrichedProducts.length);
+      console.log('[ADMIN PRODUCTS] sample merged row', enrichedProducts[0] ? {
+        id: enrichedProducts[0].id,
+        name: enrichedProducts[0].name,
+        sourceCode: enrichedProducts[0].sourceCode,
+        expiryDate: enrichedProducts[0].expiryDate,
+        expiryStatus: enrichedProducts[0].expiryStatus,
+        daysToExpiry: enrichedProducts[0].daysToExpiry,
+        expirySource: enrichedProducts[0].expirySource,
+      } : null);
+    }
+
     // Map over products and format with computed fields
-    const productsWithFormatted = products.map((product) =>
+    const productsWithFormatted = enrichedProducts.map((product) =>
       formatProduct(product, req, false)
     );
 

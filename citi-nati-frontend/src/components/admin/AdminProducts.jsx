@@ -163,6 +163,52 @@ const AdminProducts = () => {
     };
   };
 
+  const getExpirySeverity = (product) => {
+    const status = product?.expiryStatus?.status;
+
+    if (status === 'expired') return 0;
+    if (status === 'expiring_soon' || status === '1_week_warning' || status === '2_weeks_warning') return 1;
+    if (status === 'near_expiry' || status === '1_month_warning' || status === '2_months_warning') return 2;
+    if (status) return 3;
+    if (product?.expiryDate) return 4;
+    return 5;
+  };
+
+  const getExpiryBadge = (product) => {
+    const status = product?.expiryStatus?.status;
+    const label = product?.expiryStatus?.label;
+    const daysToExpiry = product?.daysToExpiry ?? product?.expiryStatus?.daysRemaining ?? null;
+
+    if (status === 'expired') {
+      return {
+        label: label || 'Expired',
+        backgroundColor: '#f8d7da',
+        color: '#721c24',
+        icon: 'fas fa-times-circle',
+      };
+    }
+
+    if (status === 'expiring_soon' || status === '1_week_warning' || status === '2_weeks_warning') {
+      return {
+        label: label || (daysToExpiry != null ? `Expiring Soon (${daysToExpiry}d)` : 'Expiring Soon'),
+        backgroundColor: '#fff3cd',
+        color: '#856404',
+        icon: 'fas fa-exclamation-triangle',
+      };
+    }
+
+    if (status === 'near_expiry' || status === '1_month_warning' || status === '2_months_warning') {
+      return {
+        label: label || 'Near Expiry',
+        backgroundColor: '#e8f4fd',
+        color: '#0c5460',
+        icon: 'fas fa-clock',
+      };
+    }
+
+    return null;
+  };
+
   const fetchPosExpiryAlerts = async () => {
     try {
       setPosExpiryLoading(true);
@@ -371,26 +417,24 @@ const AdminProducts = () => {
       let all = [];
 
       // Fetch first page to show something immediately
-      const firstResp = await api.get(`/products?page=${page}&pageSize=${perPage}`);
+      const firstResp = await api.get(`/products?page=${page}&pageSize=${perPage}&includePosExpiry=true`);
       const firstItems = firstResp.data.products || [];
       all = all.concat(firstItems);
 
+      console.log('[ADMIN PRODUCTS UI] first product row', firstItems[0] || null);
+      console.log('[ADMIN PRODUCTS UI] expiry fields received', firstItems.slice(0, 5).map((product) => ({
+        id: product.id,
+        name: product.name,
+        sourceCode: product.sourceCode || null,
+        expiryDate: product.expiryDate || null,
+        expiryStatus: product.expiryStatus || null,
+        daysToExpiry: product.daysToExpiry ?? null,
+        expirySource: product.expirySource || null,
+      })));
+
       // Sort by expiry status
       let sorted = all.sort((a, b) => {
-        if (!a.expiryStatus && !b.expiryStatus) return 0;
-        if (!a.expiryStatus) return 1;
-        if (!b.expiryStatus) return -1;
-        
-        const statusPriority = {
-          expired: 0,
-          '1_week_warning': 1,
-          '2_weeks_warning': 2,
-          '1_month_warning': 3,
-          '2_months_warning': 4,
-          null: 5
-        };
-        
-        return (statusPriority[a.expiryStatus.status] || 5) - (statusPriority[b.expiryStatus.status] || 5);
+        return getExpirySeverity(a) - getExpirySeverity(b);
       });
 
       setProducts(sorted);
@@ -404,7 +448,7 @@ const AdminProducts = () => {
           try {
             page += 1;
             while (true) {
-              const resp = await api.get(`/products?page=${page}&pageSize=${perPage}`);
+              const resp = await api.get(`/products?page=${page}&pageSize=${perPage}&includePosExpiry=true`);
               const items = resp.data.products || [];
               if (items.length === 0) break;
               
@@ -412,20 +456,7 @@ const AdminProducts = () => {
               
               // Re-sort and update state
               sorted = all.sort((a, b) => {
-                if (!a.expiryStatus && !b.expiryStatus) return 0;
-                if (!a.expiryStatus) return 1;
-                if (!b.expiryStatus) return -1;
-                
-                const statusPriority = {
-                  expired: 0,
-                  '1_week_warning': 1,
-                  '2_weeks_warning': 2,
-                  '1_month_warning': 3,
-                  '2_months_warning': 4,
-                  null: 5
-                };
-                
-                return (statusPriority[a.expiryStatus.status] || 5) - (statusPriority[b.expiryStatus.status] || 5);
+                return getExpirySeverity(a) - getExpirySeverity(b);
               });
               
               setProducts(sorted);
@@ -483,15 +514,14 @@ const AdminProducts = () => {
   const fallbackExpiryAlerts = products
     .filter(p => p.expiryStatus && p.expiryStatus.status)
     .sort((a, b) => {
-      const statusOrder = { expired: 0, '1_week_warning': 1, '2_weeks_warning': 2, '1_month_warning': 3 };
-      return (statusOrder[a.expiryStatus?.status] || 999) - (statusOrder[b.expiryStatus?.status] || 999);
+      return getExpirySeverity(a) - getExpirySeverity(b);
     })
     .map((product) => ({
       key: String(product.id),
       name: product.name,
-      message: product.expiryStatus?.message || 'Expiry warning',
+      message: product.expiryStatus?.label || product.expiryStatus?.message || 'Expiry warning',
       isExpired: product.expiryStatus?.status === 'expired',
-      isUrgent: product.expiryStatus?.status === '1_week_warning' || product.expiryStatus?.status === '2_weeks_warning',
+      isUrgent: ['expiring_soon', '1_week_warning', '2_weeks_warning'].includes(product.expiryStatus?.status),
       remainingQty: toNumberOrNull(product.stock),
       expiryDate: product.expiryDate || null,
       sourceProduct: product,
@@ -1475,13 +1505,14 @@ const AdminProducts = () => {
                   : 0;
                 const hasValidDiscount = discountPct > 0;
                 const productCode = product.productCode || product.sourceCode || product.code;
+                const expiryBadge = getExpiryBadge(product);
                 
                 return (
                   <tr 
                     key={product.id} 
                     style={{ 
                       borderBottom: '1px solid #eee',
-                      backgroundColor: product.expiryStatus?.status === 'expired' ? '#ffebee' : product.expiryStatus?.status === '1_week_warning' ? '#fff3e0' : 'transparent'
+                      backgroundColor: product.expiryStatus?.status === 'expired' ? '#ffebee' : ['expiring_soon', '1_week_warning', '2_weeks_warning'].includes(product.expiryStatus?.status) ? '#fff3e0' : 'transparent'
                     }}
                   >
                     <td style={{ padding: '1rem', fontSize: '0.9rem' }}>#{product.id}</td>
@@ -1545,18 +1576,19 @@ const AdminProducts = () => {
                       {product.stock}
                     </td>
                     <td style={{ padding: '1rem', fontSize: '0.9rem' }}>
-                      {product.expiryStatus?.status ? (
+                      {expiryBadge ? (
                         <span style={{
                           padding: '0.4rem 0.6rem',
                           borderRadius: '4px',
-                          backgroundColor: product.expiryStatus.status === 'expired' ? '#f8d7da' : '#fff3cd',
-                          color: product.expiryStatus.status === 'expired' ? '#721c24' : '#856404',
+                          backgroundColor: expiryBadge.backgroundColor,
+                          color: expiryBadge.color,
                           fontSize: '0.85rem',
                         }}>
-                          {product.expiryStatus.status === 'expired' ? 
-                            <><i className="fas fa-times-circle"></i> Expired</> : 
-                            <><i className="fas fa-exclamation-triangle"></i> {product.expiryStatus.daysRemaining}d left</>
-                          }
+                          <><i className={expiryBadge.icon}></i> {expiryBadge.label}</>
+                        </span>
+                      ) : product.expiryDate ? (
+                        <span style={{ color: '#4b5563' }}>
+                          {new Date(product.expiryDate).toLocaleDateString()}
                         </span>
                       ) : (
                         <span style={{ color: '#999' }}>—</span>
