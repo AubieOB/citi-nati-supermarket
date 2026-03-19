@@ -219,6 +219,53 @@ function normalizeExpiryDays(value) {
   return [7, 14, 30].includes(parsed) ? parsed : 7;
 }
 
+function summarizeExpiryRequest(query) {
+  return {
+    filter: query.filter,
+    days: query.days,
+    source: query.source,
+  };
+}
+
+function validateExpiryRequest(query) {
+  const requested = summarizeExpiryRequest(query);
+  const normalized = {
+    filter: normalizeExpiryFilter(query.filter),
+    days: normalizeExpiryDays(query.days),
+    source: normalizeExpirySource(query.source),
+  };
+
+  const issues = [];
+  if (requested.filter != null && requested.filter !== normalized.filter) {
+    issues.push(`filter normalized to ${normalized.filter}`);
+  }
+  if (requested.days != null && String(requested.days) !== String(normalized.days)) {
+    issues.push(`days normalized to ${normalized.days}`);
+  }
+  if (requested.source != null && requested.source !== normalized.source) {
+    issues.push(`source normalized to ${normalized.source}`);
+  }
+
+  return {
+    valid: issues.length === 0,
+    requested,
+    normalized,
+    issues,
+  };
+}
+
+function summarizePromotionRequest(body) {
+  return {
+    productCode: body.productCode,
+    promotionalPrice: body.promotionalPrice,
+    restorePrice: body.restorePrice,
+    locationCode: body.locationCode,
+    priceTypeCode: body.priceTypeCode,
+    reasonCode: body.reasonCode,
+    updatePromotionalFlag: body.updatePromotionalFlag === true,
+  };
+}
+
 async function fetchExpiryCandidates({ filter, days, source }) {
   if (!pool) {
     await initializePool();
@@ -317,10 +364,28 @@ app.get('/pos-sync/products', validateApiKey, async (req, res) => {
  */
 app.get('/pos-sync/expiry-products', validateApiKey, async (req, res) => {
   try {
-    const result = await fetchExpiryCandidates({
-      filter: req.query.filter,
-      days: req.query.days,
-      source: req.query.source,
+    const validation = validateExpiryRequest(req.query);
+    console.log('[EXPIRY] /expiry-products request received:', {
+      endpoint: '/pos-sync/expiry-products',
+      query: validation.requested,
+    });
+
+    if (validation.valid) {
+      console.log('[EXPIRY] /expiry-products validation success:', validation.normalized);
+    } else {
+      console.warn('[EXPIRY] /expiry-products validation fallback:', {
+        issues: validation.issues,
+        normalized: validation.normalized,
+      });
+    }
+
+    console.log('[EXPIRY] /expiry-products DB query start');
+    const result = await fetchExpiryCandidates(validation.normalized);
+    console.log('[EXPIRY] /expiry-products DB query success:', {
+      filter: result.filter,
+      days: result.days,
+      source: result.source,
+      count: result.products.length,
     });
 
     return res.json({
@@ -332,6 +397,7 @@ app.get('/pos-sync/expiry-products', validateApiKey, async (req, res) => {
       data: result.products,
     });
   } catch (err) {
+    console.error('[EXPIRY] /expiry-products DB query failed:', err.message);
     console.error('[EXPIRY] Error in /pos-sync/expiry-products:', err.message);
     return res.status(500).json({
       success: false,
@@ -832,7 +898,10 @@ app.post('/pos-sync/update-prices', validateApiKey, rejectDirectWritebackInProdu
  */
 app.post('/pos-sync/apply-promotion', validateApiKey, rejectDirectWritebackInProduction, async (req, res) => {
   try {
-    console.log('[WRITEBACK] POST /pos-sync/apply-promotion called');
+    console.log('[PROMO] /apply-promotion request received:', {
+      endpoint: '/pos-sync/apply-promotion',
+      body: summarizePromotionRequest(req.body),
+    });
 
     if (!pool) await initializePool();
 
@@ -846,13 +915,27 @@ app.post('/pos-sync/apply-promotion', validateApiKey, rejectDirectWritebackInPro
     } = req.body;
 
     if (!productCode || typeof promotionalPrice !== 'number' || promotionalPrice <= 0) {
+      console.warn('[PROMO] /apply-promotion validation failed:', {
+        productCode,
+        promotionalPrice,
+      });
       return res.status(400).json({
         success: false,
         error: 'productCode and promotionalPrice (> 0) are required',
       });
     }
 
+    console.log('[PROMO] /apply-promotion validation success:', {
+      productCode,
+      promotionalPrice,
+      locationCode: locationCode || 'SH',
+      priceTypeCode: priceTypeCode || 'RT',
+      reasonCode: reasonCode || 'EXPIRY_CLEARANCE',
+      updatePromotionalFlag: updatePromotionalFlag === true,
+    });
+
     // Execute transaction
+    console.log('[PROMO] /apply-promotion DB query start');
     const result = await transactionManager.executeTransaction(pool, async (request) => {
       return priceUpdates.applyPromotionalPrice(request, {
         productCode,
@@ -862,6 +945,13 @@ app.post('/pos-sync/apply-promotion', validateApiKey, rejectDirectWritebackInPro
         reasonCode: reasonCode || 'EXPIRY_CLEARANCE',
         updatePromotionalFlag: updatePromotionalFlag === true,
       });
+    });
+
+    console.log('[PROMO] /apply-promotion DB query success:', {
+      productCode: result?.result?.productCode,
+      priceId: result?.result?.insertedRow?.priceId,
+      locationCode: result?.result?.locationCode,
+      priceTypeCode: result?.result?.priceTypeCode,
     });
 
     if (!result.success) {
@@ -882,6 +972,7 @@ app.post('/pos-sync/apply-promotion', validateApiKey, rejectDirectWritebackInPro
       locationCode: result.result.locationCode,
     });
   } catch (err) {
+    console.error('[PROMO] /apply-promotion DB query failed:', err.message);
     console.error('[WRITEBACK] Error in /pos-sync/apply-promotion:', err.message);
     res.status(500).json({
       success: false,
@@ -903,7 +994,10 @@ app.post('/pos-sync/apply-promotion', validateApiKey, rejectDirectWritebackInPro
  */
 app.post('/pos-sync/revert-promotion', validateApiKey, rejectDirectWritebackInProduction, async (req, res) => {
   try {
-    console.log('[WRITEBACK] POST /pos-sync/revert-promotion called');
+    console.log('[PROMO] /revert-promotion request received:', {
+      endpoint: '/pos-sync/revert-promotion',
+      body: summarizePromotionRequest(req.body),
+    });
 
     if (!pool) await initializePool();
 
@@ -917,13 +1011,27 @@ app.post('/pos-sync/revert-promotion', validateApiKey, rejectDirectWritebackInPr
     } = req.body;
 
     if (!productCode) {
+      console.warn('[PROMO] /revert-promotion validation failed:', {
+        productCode,
+        restorePrice,
+      });
       return res.status(400).json({
         success: false,
         error: 'productCode is required',
       });
     }
 
+    console.log('[PROMO] /revert-promotion validation success:', {
+      productCode,
+      locationCode: locationCode || 'SH',
+      priceTypeCode: priceTypeCode || 'RT',
+      restorePrice,
+      reasonCode: reasonCode || 'EXPIRY_CLEARANCE',
+      updatePromotionalFlag: updatePromotionalFlag === true,
+    });
+
     // Execute transaction
+    console.log('[PROMO] /revert-promotion DB query start');
     const result = await transactionManager.executeTransaction(pool, async (request) => {
       return priceUpdates.revertToStandardPrice(request, {
         productCode,
@@ -933,6 +1041,13 @@ app.post('/pos-sync/revert-promotion', validateApiKey, rejectDirectWritebackInPr
         reasonCode: reasonCode || 'EXPIRY_CLEARANCE',
         updatePromotionalFlag: updatePromotionalFlag === true,
       });
+    });
+
+    console.log('[PROMO] /revert-promotion DB query success:', {
+      productCode: result?.result?.productCode,
+      priceId: result?.result?.insertedRow?.priceId,
+      locationCode: result?.result?.locationCode,
+      priceTypeCode: result?.result?.priceTypeCode,
     });
 
     if (!result.success) {
@@ -953,6 +1068,7 @@ app.post('/pos-sync/revert-promotion', validateApiKey, rejectDirectWritebackInPr
       locationCode: result.result.locationCode,
     });
   } catch (err) {
+    console.error('[PROMO] /revert-promotion DB query failed:', err.message);
     console.error('[WRITEBACK] Error in /pos-sync/revert-promotion:', err.message);
     res.status(500).json({
       success: false,
@@ -1175,6 +1291,13 @@ async function startServer() {
       console.log(`Database: ${SQL_SERVER}/${SQL_DATABASE}`);
       console.log(`Live Server: ${process.env.LIVE_SERVER_URL || 'NOT CONFIGURED'}`);
       console.log(`Auto-sync interval: ${SYNC_INTERVAL_MS}ms (${Math.round(SYNC_INTERVAL_MS / 1000)}s)`);
+      console.log('[PHASE 3 ROUTES] Registered:', [
+        'GET /pos-sync/expiry-products',
+        'POST /pos-sync/apply-promotion',
+        'POST /pos-sync/revert-promotion',
+        'GET /pos-sync/promotion-preview/:productCode',
+        'GET /pos-sync/get-resolved-price/:productCode',
+      ]);
 
       // Start automatic sync if not already started
       if (!autoSyncStarted) {

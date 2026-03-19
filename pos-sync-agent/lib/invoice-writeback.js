@@ -42,7 +42,7 @@ async function getNextCashSaleNo(request) {
     const selectRequest = createScopedRequest(request);
     const countResult = await selectRequest.query(`
       SELECT COUNT(1) AS [RecordCount]
-      FROM dbo.LastCashSaleNo (UPDLOCK, HOLDLOCK)
+      FROM dbo.LastCashSaleNo WITH (UPDLOCK, HOLDLOCK)
     `);
 
     const rowCount = Number(countResult.recordset?.[0]?.RecordCount || 0);
@@ -51,15 +51,26 @@ async function getNextCashSaleNo(request) {
     }
 
     const result = await selectRequest.query(`
-      SELECT TOP 1 CashSaleNo
-      FROM dbo.LastCashSaleNo (UPDLOCK, HOLDLOCK)
+      SELECT TOP 1 *
+      FROM dbo.LastCashSaleNo WITH (UPDLOCK, HOLDLOCK)
     `);
 
     if (!result.recordset || result.recordset.length === 0) {
       throw new Error('LastCashSaleNo table is empty. Initialize it with a starting value.');
     }
 
-    const currentNo = Number(result.recordset[0].CashSaleNo);
+    const row = result.recordset[0];
+    const counterColumn = Object.prototype.hasOwnProperty.call(row, 'LastCashSaleNo')
+      ? 'LastCashSaleNo'
+      : Object.prototype.hasOwnProperty.call(row, 'CashSaleNo')
+        ? 'CashSaleNo'
+        : null;
+
+    if (!counterColumn) {
+      throw new Error('LastCashSaleNo table is missing both LastCashSaleNo and CashSaleNo columns');
+    }
+
+    const currentNo = Number(row[counterColumn]);
 
     if (!Number.isFinite(currentNo)) {
       throw new Error('LastCashSaleNo value is invalid');
@@ -67,10 +78,11 @@ async function getNextCashSaleNo(request) {
 
     const nextNo = currentNo + 1;
 
-    console.log(`[INVOICE] using CashSaleNo=${currentNo}; next LastCashSaleNo will be ${nextNo}`);
+    console.log(`[INVOICE] using ${counterColumn}=${currentNo}; next LastCashSaleNo will be ${nextNo}`);
     return {
       cashSaleNo: currentNo,
       nextLastCashSaleNo: nextNo,
+      counterColumn,
     };
   } catch (error) {
     console.error('[INVOICE ERROR] Error reading LastCashSaleNo:', error.message);
@@ -92,10 +104,25 @@ async function updateLastCashSaleNo(request, newCashSaleNo) {
     }
 
     const updateRequest = createScopedRequest(request);
+    const schemaResult = await updateRequest.query(`
+      SELECT TOP 1 *
+      FROM dbo.LastCashSaleNo
+    `);
+    const schemaRow = schemaResult.recordset?.[0] || {};
+    const counterColumn = Object.prototype.hasOwnProperty.call(schemaRow, 'LastCashSaleNo')
+      ? 'LastCashSaleNo'
+      : Object.prototype.hasOwnProperty.call(schemaRow, 'CashSaleNo')
+        ? 'CashSaleNo'
+        : null;
+
+    if (!counterColumn) {
+      throw new Error('LastCashSaleNo table is missing both LastCashSaleNo and CashSaleNo columns');
+    }
+
     const query = `
       UPDATE dbo.LastCashSaleNo
-      SET CashSaleNo = @CashSaleNo
-      WHERE CashSaleNo = @ExpectedCashSaleNo
+      SET ${counterColumn} = @CashSaleNo
+      WHERE ${counterColumn} = @ExpectedCashSaleNo
     `;
 
     updateRequest.input('CashSaleNo', sql.Int, newCashSaleNo);
@@ -107,7 +134,7 @@ async function updateLastCashSaleNo(request, newCashSaleNo) {
       throw new Error(`LastCashSaleNo compare-and-set update failed; affected rows: ${affectedRows}`);
     }
 
-    console.log(`[INVOICE] updated LastCashSaleNo to ${newCashSaleNo} (from ${expectedCashSaleNo})`);
+    console.log(`[INVOICE] updated ${counterColumn} to ${newCashSaleNo} (from ${expectedCashSaleNo})`);
   } catch (error) {
     console.error('[INVOICE ERROR] Error updating LastCashSaleNo:', error.message);
     throw error;
