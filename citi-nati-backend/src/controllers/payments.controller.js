@@ -277,9 +277,31 @@ const refundPaychanguPayment = async ({ transactionId, amount, reason }) => {
 
 const initializePayment = async (req, res) => {
   try {
+    const paymentInitRequestId = `pay_init_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    console.log('[PaymentInit] Entry', {
+      paymentInitRequestId,
+      method: req.method,
+      path: req.originalUrl,
+      backendRequestUrl: `${req.protocol}://${req.get('host')}${req.originalUrl}`,
+      origin: req.headers.origin || null,
+      referer: req.headers.referer || null,
+    });
+
     // Get orderId from request body
     const { orderId } = req.body;
-    const userId = req.user.userId;
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      console.error('[PaymentInit] Missing userId on authenticated request', {
+        paymentInitRequestId,
+        reqUserKeys: req.user ? Object.keys(req.user) : [],
+      });
+      return res.status(401).json({
+        error: 'Invalid authentication context for payment initialization',
+        requestId: paymentInitRequestId,
+      });
+    }
 
     if (!orderId) {
       return res.status(400).json({
@@ -287,9 +309,21 @@ const initializePayment = async (req, res) => {
       });
     }
 
+    const parsedOrderId = Number.parseInt(orderId, 10);
+    if (!Number.isInteger(parsedOrderId) || parsedOrderId <= 0) {
+      console.error('[PaymentInit] Invalid orderId provided', {
+        paymentInitRequestId,
+        orderId,
+      });
+      return res.status(400).json({
+        error: 'Invalid Order ID',
+        requestId: paymentInitRequestId,
+      });
+    }
+
     // Find order and ensure it belongs to authenticated user
     const order = await prisma.order.findUnique({
-      where: { id: parseInt(orderId) },
+      where: { id: parsedOrderId },
     });
 
     if (!order) {
@@ -327,56 +361,147 @@ const initializePayment = async (req, res) => {
       select: { email: true, name: true }
     });
 
-    console.log('[Payment] Initializing Paychangu payment for order:', order.id);
+    const callbackBaseUrl = process.env.FRONTEND_URL || process.env.RENDER_EXTERNAL_URL_FRONTEND || 'http://localhost:3001';
+    const callbackUrl = `${callbackBaseUrl}/payment-success?reference=${paymentReference}`;
+    const paychanguEndpoint = 'https://api.paychangu.com/payment';
+
+    const envPresence = {
+      PAYCHANGU_SECRET_KEY: Boolean(process.env.PAYCHANGU_SECRET_KEY),
+      PAYCHANGU_PUBLIC_KEY: Boolean(process.env.PAYCHANGU_PUBLIC_KEY),
+      PAYCHANGU_WEBHOOK_SECRET: Boolean(process.env.PAYCHANGU_WEBHOOK_SECRET),
+      FRONTEND_URL: Boolean(process.env.FRONTEND_URL),
+      RENDER_EXTERNAL_URL_FRONTEND: Boolean(process.env.RENDER_EXTERNAL_URL_FRONTEND),
+      BACKEND_URL: Boolean(process.env.BACKEND_URL),
+      API_BASE_URL: Boolean(process.env.API_BASE_URL),
+    };
+
+    console.log('[PaymentInit] Diagnostics', {
+      paymentInitRequestId,
+      orderId: order.id,
+      userId,
+      backendUrlUsed: `${req.protocol}://${req.get('host')}${req.originalUrl}`,
+      paychanguEndpoint,
+      callbackUrl,
+      envPresence,
+    });
 
     try {
       // Validate environment variables
       if (!process.env.PAYCHANGU_SECRET_KEY) {
-        console.error('[Payment] PAYCHANGU_SECRET_KEY is missing from environment variables');
+        console.error('[PaymentInit] PAYCHANGU_SECRET_KEY is missing from environment variables', {
+          paymentInitRequestId,
+        });
         return res.status(500).json({
-          error: 'Payment gateway not configured - missing secret key'
+          error: 'Payment gateway not configured - missing secret key',
+          requestId: paymentInitRequestId,
         });
       }
 
+      if (!user || !user.email || !user.name) {
+        console.error('[PaymentInit] Missing user profile fields required by PayChangu', {
+          paymentInitRequestId,
+          foundUser: Boolean(user),
+          hasEmail: Boolean(user?.email),
+          hasName: Boolean(user?.name),
+        });
+        return res.status(500).json({
+          error: 'User profile is incomplete for payment initialization',
+          requestId: paymentInitRequestId,
+        });
+      }
+
+      const [firstName = '', lastName = ''] = String(user.name).trim().split(/\s+/, 2);
+
+      const paychanguPayload = {
+        amount: order.total.toString(),
+        currency: 'MWK',
+        email: user.email,
+        phone_number: order.phone,
+        first_name: firstName,
+        last_name: lastName,
+        tx_ref: paymentReference,
+        callback_url: callbackUrl,
+        description: `Order #${order.id} - Citi-Nati Supermarket`
+      };
+
+      console.log('[PaymentInit] PayChangu request body', {
+        paymentInitRequestId,
+        payload: paychanguPayload,
+      });
+
       // Call actual Paychangu API with correct field names
       const response = await axios.post(
-        'https://api.paychangu.com/payment',
-        {
-          amount: order.total.toString(),
-          currency: 'MWK',
-          email: user.email,
-          phone_number: order.phone,
-          first_name: user.name.split(' ')[0],
-          last_name: user.name.split(' ')[1] || '',
-          tx_ref: paymentReference,  // Use tx_ref (not reference) - Paychangu will echo this back in webhook
-          callback_url: `${process.env.FRONTEND_URL || process.env.RENDER_EXTERNAL_URL_FRONTEND || 'http://localhost:3001'}/payment-success?reference=${paymentReference}`,
-          description: `Order #${order.id} - Citi-Nati Supermarket`
-        },
+        paychanguEndpoint,
+        paychanguPayload,
         {
           headers: {
             Authorization: `Bearer ${process.env.PAYCHANGU_SECRET_KEY}`,
             'Content-Type': 'application/json'
-          }
+          },
+          responseType: 'text',
+          transformResponse: [(data) => data],
+          validateStatus: () => true,
         }
       );
 
-      console.log('[Payment] FULL PAYCHANGU RESPONSE:', JSON.stringify(response.data, null, 2));
+      const rawResponseBody = typeof response.data === 'string'
+        ? response.data
+        : JSON.stringify(response.data);
+
+      console.log('[PaymentInit] PayChangu response received', {
+        paymentInitRequestId,
+        status: response.status,
+        rawBody: rawResponseBody,
+      });
+
+      if (!response.status || response.status < 200 || response.status >= 300) {
+        console.error('[PaymentInit] Non-success PayChangu status', {
+          paymentInitRequestId,
+          status: response.status,
+          rawBody: rawResponseBody,
+        });
+        return res.status(502).json({
+          error: 'PayChangu returned an unexpected response status',
+          requestId: paymentInitRequestId,
+        });
+      }
+
+      let parsedResponse;
+      try {
+        parsedResponse = JSON.parse(rawResponseBody);
+      } catch (parseError) {
+        console.error('[PaymentInit] Failed to parse PayChangu JSON response', {
+          paymentInitRequestId,
+          status: response.status,
+          parseError: parseError.message,
+          rawBody: rawResponseBody,
+        });
+        return res.status(502).json({
+          error: 'Payment gateway returned a non-JSON response',
+          requestId: paymentInitRequestId,
+        });
+      }
+
+      console.log('[Payment] FULL PAYCHANGU RESPONSE:', JSON.stringify(parsedResponse, null, 2));
 
       // Safely extract checkout URL from possible structures
       const checkoutUrl =
-        response.data?.checkout_url ||
-        response.data?.data?.checkout_url ||
-        response.data?.authorization_url ||
-        response.data?.data?.authorization_url ||
-        response.data?.link ||
-        response.data?.data?.link;
+        parsedResponse?.checkout_url ||
+        parsedResponse?.data?.checkout_url ||
+        parsedResponse?.authorization_url ||
+        parsedResponse?.data?.authorization_url ||
+        parsedResponse?.link ||
+        parsedResponse?.data?.link;
 
       if (!checkoutUrl) {
-        console.error('[Payment] Checkout URL missing in Paychangu response');
-        console.error('[Payment] Response keys:', Object.keys(response.data));
-        return res.status(500).json({
+        console.error('[PaymentInit] Checkout URL missing in Paychangu response', {
+          paymentInitRequestId,
+          responseKeys: parsedResponse && typeof parsedResponse === 'object' ? Object.keys(parsedResponse) : [],
+          rawBody: rawResponseBody,
+        });
+        return res.status(502).json({
           error: 'No checkout URL received from Paychangu',
-          rawResponse: response.data
+          requestId: paymentInitRequestId,
         });
       }
 
@@ -398,17 +523,29 @@ const initializePayment = async (req, res) => {
       });
 
     } catch (apiError) {
-      console.error('[Payment] Paychangu API Error:', apiError.response?.data || apiError.message);
+      console.error('[PaymentInit] Paychangu API Error', {
+        paymentInitRequestId,
+        message: apiError.message,
+        stack: apiError.stack,
+        status: apiError.response?.status,
+        rawBody: typeof apiError.response?.data === 'string'
+          ? apiError.response?.data
+          : JSON.stringify(apiError.response?.data || null),
+      });
       
       // Return user-friendly error message
       return res.status(500).json({
         error: 'Failed to initialize payment. Please try again.',
+        requestId: paymentInitRequestId,
         details: process.env.NODE_ENV === 'development' ? apiError.message : undefined
       });
     }
 
   } catch (err) {
-    console.error('[Payment] Error initializing payment:', err);
+    console.error('[PaymentInit] Error initializing payment', {
+      message: err.message,
+      stack: err.stack,
+    });
     return res.status(500).json({
       error: 'Server error while initializing payment',
     });
