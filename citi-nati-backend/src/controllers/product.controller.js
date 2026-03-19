@@ -517,17 +517,22 @@ const getProducts = async (req, res) => {
     let enrichedProducts = products;
     if (shouldIncludePosExpiry) {
       console.log('[ADMIN PRODUCTS] products fetched count', products.length);
-      enrichedProducts = await enrichProductsWithExpiry(products);
-      console.log('[ADMIN PRODUCTS] merged products count', enrichedProducts.length);
-      console.log('[ADMIN PRODUCTS] sample merged row', enrichedProducts[0] ? {
-        id: enrichedProducts[0].id,
-        name: enrichedProducts[0].name,
-        sourceCode: enrichedProducts[0].sourceCode,
-        expiryDate: enrichedProducts[0].expiryDate,
-        expiryStatus: enrichedProducts[0].expiryStatus,
-        daysToExpiry: enrichedProducts[0].daysToExpiry,
-        expirySource: enrichedProducts[0].expirySource,
-      } : null);
+      try {
+        enrichedProducts = await enrichProductsWithExpiry(products);
+        console.log('[ADMIN PRODUCTS] merged products count', enrichedProducts.length);
+        console.log('[ADMIN PRODUCTS] sample merged row', enrichedProducts[0] ? {
+          id: enrichedProducts[0].id,
+          name: enrichedProducts[0].name,
+          sourceCode: enrichedProducts[0].sourceCode,
+          expiryDate: enrichedProducts[0].expiryDate,
+          expiryStatus: enrichedProducts[0].expiryStatus,
+          daysToExpiry: enrichedProducts[0].daysToExpiry,
+          expirySource: enrichedProducts[0].expirySource,
+        } : null);
+      } catch (expiryMergeError) {
+        console.error('[ADMIN PRODUCTS] expiry enrichment failed, returning base products', expiryMergeError.message);
+        enrichedProducts = products;
+      }
     }
 
     // Map over products and format with computed fields

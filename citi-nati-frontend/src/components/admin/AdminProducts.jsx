@@ -415,9 +415,25 @@ const AdminProducts = () => {
       let page = 1;
       const perPage = 100;
       let all = [];
+      let usePosExpiry = true;
+
+      const fetchProductsPage = async (pageNumber) => {
+        const basePath = `/products?page=${pageNumber}&pageSize=${perPage}`;
+
+        if (usePosExpiry) {
+          try {
+            return await api.get(`${basePath}&includePosExpiry=true`);
+          } catch (posExpiryErr) {
+            console.warn('[ADMIN PRODUCTS UI] includePosExpiry request failed, retrying without enrichment', posExpiryErr?.response?.data || posExpiryErr.message);
+            usePosExpiry = false;
+          }
+        }
+
+        return api.get(basePath);
+      };
 
       // Fetch first page to show something immediately
-      const firstResp = await api.get(`/products?page=${page}&pageSize=${perPage}&includePosExpiry=true`);
+      const firstResp = await fetchProductsPage(page);
       const firstItems = firstResp.data.products || [];
       all = all.concat(firstItems);
 
@@ -448,7 +464,7 @@ const AdminProducts = () => {
           try {
             page += 1;
             while (true) {
-              const resp = await api.get(`/products?page=${page}&pageSize=${perPage}&includePosExpiry=true`);
+              const resp = await fetchProductsPage(page);
               const items = resp.data.products || [];
               if (items.length === 0) break;
               
