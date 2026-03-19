@@ -41,11 +41,11 @@ async function getNextCashSaleNo(request) {
   try {
     const selectRequest = createScopedRequest(request);
     const countResult = await selectRequest.query(`
-      SELECT COUNT(1) AS RowCount
+      SELECT COUNT(1) AS [RecordCount]
       FROM dbo.LastCashSaleNo (UPDLOCK, HOLDLOCK)
     `);
 
-    const rowCount = Number(countResult.recordset?.[0]?.RowCount || 0);
+    const rowCount = Number(countResult.recordset?.[0]?.RecordCount || 0);
     if (rowCount !== 1) {
       throw new Error(`LastCashSaleNo table must contain exactly 1 row; found ${rowCount}`);
     }
