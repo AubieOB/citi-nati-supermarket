@@ -165,7 +165,7 @@ function isLikelyNonRetryablePromotionError(message) {
 }
 
 async function executeApplyPromotion(pool, payload, commandId) {
-  console.log('[PROMO] APPLY_PROMOTION payload:', {
+  console.log('[PROMO COMMAND] APPLY_PROMOTION start', {
     commandId,
     productCode: payload.productCode,
     locationCode: payload.locationCode || process.env.POS_LOCATION_CODE || 'SH',
@@ -184,6 +184,15 @@ async function executeApplyPromotion(pool, payload, commandId) {
     const resultSummary = await priceUpdates.applyPromotionalPrice(request, payload);
 
     await transaction.commit();
+    console.log('[PROMO COMMAND] success', {
+      commandId,
+      action: 'APPLY_PROMOTION',
+      productCode: payload.productCode,
+      locationCode: payload.locationCode || process.env.POS_LOCATION_CODE || 'SH',
+      priceTypeCode: payload.priceTypeCode || 'RT',
+      promotionalPrice: Number(payload.promotionalPrice),
+      priceId: resultSummary?.insertedRow?.priceId,
+    });
     return {
       message: 'Promotion write executed in productprices',
       ...resultSummary,
@@ -196,15 +205,33 @@ async function executeApplyPromotion(pool, payload, commandId) {
     }
 
     if (String(error.message || '').startsWith('NON_RETRYABLE:') || isLikelyNonRetryablePromotionError(error.message)) {
+      console.error('[PROMO COMMAND ERROR] failure', {
+        commandId,
+        action: 'APPLY_PROMOTION',
+        productCode: payload.productCode,
+        locationCode: payload.locationCode || process.env.POS_LOCATION_CODE || 'SH',
+        priceTypeCode: payload.priceTypeCode || 'RT',
+        promotionalPrice: Number(payload.promotionalPrice),
+        error: error.message,
+      });
       throw new Error(`NON_RETRYABLE: ${String(error.message || '').replace(/^NON_RETRYABLE:\s*/, '')}`);
     }
 
+    console.error('[PROMO COMMAND ERROR] failure', {
+      commandId,
+      action: 'APPLY_PROMOTION',
+      productCode: payload.productCode,
+      locationCode: payload.locationCode || process.env.POS_LOCATION_CODE || 'SH',
+      priceTypeCode: payload.priceTypeCode || 'RT',
+      promotionalPrice: Number(payload.promotionalPrice),
+      error: error.message,
+    });
     throw error;
   }
 }
 
 async function executeRevertPromotion(pool, payload, commandId) {
-  console.log('[PROMO] REVERT_PROMOTION payload:', {
+  console.log('[PROMO COMMAND] REVERT_PROMOTION start', {
     commandId,
     productCode: payload.productCode,
     locationCode: payload.locationCode || process.env.POS_LOCATION_CODE || 'SH',
@@ -223,6 +250,15 @@ async function executeRevertPromotion(pool, payload, commandId) {
     const resultSummary = await priceUpdates.revertToStandardPrice(request, payload);
 
     await transaction.commit();
+    console.log('[PROMO COMMAND] success', {
+      commandId,
+      action: 'REVERT_PROMOTION',
+      productCode: payload.productCode,
+      locationCode: payload.locationCode || process.env.POS_LOCATION_CODE || 'SH',
+      priceTypeCode: payload.priceTypeCode || 'RT',
+      restorePrice: payload.restorePrice == null ? null : Number(payload.restorePrice),
+      priceId: resultSummary?.insertedRow?.priceId,
+    });
     return {
       message: 'Promotion revert executed in productprices',
       ...resultSummary,
@@ -235,9 +271,27 @@ async function executeRevertPromotion(pool, payload, commandId) {
     }
 
     if (String(error.message || '').startsWith('NON_RETRYABLE:') || isLikelyNonRetryablePromotionError(error.message)) {
+      console.error('[PROMO COMMAND ERROR] failure', {
+        commandId,
+        action: 'REVERT_PROMOTION',
+        productCode: payload.productCode,
+        locationCode: payload.locationCode || process.env.POS_LOCATION_CODE || 'SH',
+        priceTypeCode: payload.priceTypeCode || 'RT',
+        restorePrice: payload.restorePrice == null ? null : Number(payload.restorePrice),
+        error: error.message,
+      });
       throw new Error(`NON_RETRYABLE: ${String(error.message || '').replace(/^NON_RETRYABLE:\s*/, '')}`);
     }
 
+    console.error('[PROMO COMMAND ERROR] failure', {
+      commandId,
+      action: 'REVERT_PROMOTION',
+      productCode: payload.productCode,
+      locationCode: payload.locationCode || process.env.POS_LOCATION_CODE || 'SH',
+      priceTypeCode: payload.priceTypeCode || 'RT',
+      restorePrice: payload.restorePrice == null ? null : Number(payload.restorePrice),
+      error: error.message,
+    });
     throw error;
   }
 }

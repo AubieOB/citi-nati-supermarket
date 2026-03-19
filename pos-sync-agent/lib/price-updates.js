@@ -266,8 +266,17 @@ async function insertProductPriceRow(request, {
   avgCost,
   price,
 }) {
+  console.log('[PROMO] insert productprices start', {
+    productCode,
+    locationCode,
+    priceTypeCode,
+    avgCost: Number(avgCost || 0),
+    fPrice: Number(price),
+    uploadStatus: 1,
+  });
+
   const insertRequest = createQueryRequest(request);
-  const result = await insertRequest
+  await insertRequest
     .input('InsertProductCode', sql.VarChar(50), productCode)
     .input('InsertLocationCode', sql.VarChar(10), locationCode)
     .input('InsertPriceTypeCode', sql.VarChar(10), priceTypeCode)
@@ -285,15 +294,6 @@ async function insertProductPriceRow(request, {
         FPrice,
         UploadStatus
       )
-      OUTPUT
-        INSERTED.PriceID,
-        INSERTED.ProductCode,
-        INSERTED.LocationCode,
-        INSERTED.PriceTypeCode,
-        INSERTED.PriceDate,
-        INSERTED.AvgCost,
-        INSERTED.FPrice,
-        INSERTED.UploadStatus
       VALUES (
         @InsertProductCode,
         @InsertLocationCode,
@@ -305,17 +305,18 @@ async function insertProductPriceRow(request, {
       )
     `);
 
-  const row = result.recordset[0];
-  return {
-    priceId: row.PriceID,
-    productCode: row.ProductCode,
-    locationCode: row.LocationCode,
-    priceTypeCode: row.PriceTypeCode,
-    priceDate: row.PriceDate,
-    avgCost: Number(row.AvgCost || 0),
-    price: Number(row.FPrice || 0),
-    uploadStatus: row.UploadStatus,
-  };
+  const insertedRow = await getLatestPriceRow(request, productCode, locationCode, priceTypeCode);
+  if (!insertedRow) {
+    console.error('[PROMO] insert productprices failed: latest row not found after insert', {
+      productCode,
+      locationCode,
+      priceTypeCode,
+    });
+    throw new Error(`Failed to resolve inserted productprices row for ${productCode}`);
+  }
+
+  console.log(`[PROMO] insert productprices success: new PriceID=${insertedRow.priceId}`);
+  return insertedRow;
 }
 
 async function setPromotionalFlag(request, productCode, promotionalValue) {
@@ -558,8 +559,20 @@ async function applyPromotionalPrice(request, payload) {
     throw new Error(`NON_RETRYABLE: Product ${productCode} does not exist in POS`);
   }
 
+  console.log('[PROMO] latest price lookup start', {
+    productCode,
+    locationCode,
+    priceTypeCode,
+    action: 'APPLY_PROMOTION',
+  });
   const latestPriceRow = await getLatestPriceRow(request, productCode, locationCode, priceTypeCode);
   const currentLatestPrice = latestPriceRow ? Number(latestPriceRow.price) : null;
+  console.log('[PROMO] latest price lookup success', {
+    productCode,
+    locationCode,
+    priceTypeCode,
+    latestPriceRow,
+  });
 
   console.log(`[PROMO] applying promotion for ProductCode ${productCode}`);
   console.log(`[PROMO] current latest price = ${currentLatestPrice == null ? 'N/A' : currentLatestPrice}`);
@@ -578,12 +591,12 @@ async function applyPromotionalPrice(request, payload) {
     price: promotionalPrice,
   });
 
-  console.log(`[PROMO] inserted productprices row PriceID=${insertedRow.priceId}`);
-
   let promotionalFlagRowsAffected = 0;
   if (shouldUpdatePromotionalFlag) {
     promotionalFlagRowsAffected = await setPromotionalFlag(request, productCode, 1);
     console.log('[PROMO] optional Promotional flag updated');
+  } else {
+    console.log('[PROMO] optional Promotional flag left untouched');
   }
 
   return {
@@ -627,10 +640,23 @@ async function revertToStandardPrice(request, payload) {
     throw new Error(`NON_RETRYABLE: Product ${productCode} does not exist in POS`);
   }
 
+  console.log('[PROMO] latest price lookup start', {
+    productCode,
+    locationCode,
+    priceTypeCode,
+    action: 'REVERT_PROMOTION',
+  });
   const latestPriceRow = await getLatestPriceRow(request, productCode, locationCode, priceTypeCode);
   const previousPriceRow = latestPriceRow
     ? await getPreviousPriceRow(request, productCode, locationCode, priceTypeCode, latestPriceRow.priceId)
     : null;
+  console.log('[PROMO] latest price lookup success', {
+    productCode,
+    locationCode,
+    priceTypeCode,
+    latestPriceRow,
+    previousPriceRow,
+  });
 
   const currentLatestPrice = latestPriceRow ? Number(latestPriceRow.price) : null;
   const targetRestorePrice = restorePrice != null
@@ -663,12 +689,12 @@ async function revertToStandardPrice(request, payload) {
     price: targetRestorePrice,
   });
 
-  console.log(`[PROMO] revert inserted productprices row PriceID=${insertedRow.priceId}`);
-
   let promotionalFlagRowsAffected = 0;
   if (shouldUpdatePromotionalFlag) {
     promotionalFlagRowsAffected = await setPromotionalFlag(request, productCode, 0);
     console.log('[PROMO] optional Promotional flag updated');
+  } else {
+    console.log('[PROMO] optional Promotional flag left untouched');
   }
 
   return {

@@ -206,41 +206,80 @@ async function fetchProductsFromPOS() {
   }
 }
 
-function normalizeExpiryFilter(value) {
-  return String(value || 'expiring').toLowerCase() === 'expired' ? 'expired' : 'expiring';
-}
-
 function normalizeExpirySource(value) {
   return String(value || 'view').toLowerCase() === 'stockdetails' ? 'stockdetails' : 'view';
 }
 
 function normalizeExpiryDays(value) {
   const parsed = parseInt(value, 10);
-  return [7, 14, 30].includes(parsed) ? parsed : 7;
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 14;
+}
+
+function normalizeLocationCode(value) {
+  const normalized = String(value || process.env.POS_LOCATION_CODE || 'SH').trim().toUpperCase();
+  return normalized || 'SH';
+}
+
+function normalizeBooleanFlag(value, fallback = false) {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (value == null || value === '') {
+    return fallback;
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  if (['true', '1', 'yes', 'y'].includes(normalized)) {
+    return true;
+  }
+  if (['false', '0', 'no', 'n'].includes(normalized)) {
+    return false;
+  }
+
+  return fallback;
+}
+
+function normalizeExpiryIncludeExpired(query) {
+  if (query.includeExpired != null) {
+    return normalizeBooleanFlag(query.includeExpired, false);
+  }
+
+  if (query.filter != null) {
+    return String(query.filter).toLowerCase() === 'expired';
+  }
+
+  return false;
 }
 
 function summarizeExpiryRequest(query) {
   return {
-    filter: query.filter,
     days: query.days,
+    locationCode: query.locationCode,
+    includeExpired: query.includeExpired,
     source: query.source,
+    filter: query.filter,
   };
 }
 
 function validateExpiryRequest(query) {
   const requested = summarizeExpiryRequest(query);
   const normalized = {
-    filter: normalizeExpiryFilter(query.filter),
     days: normalizeExpiryDays(query.days),
+    locationCode: normalizeLocationCode(query.locationCode),
+    includeExpired: normalizeExpiryIncludeExpired(query),
     source: normalizeExpirySource(query.source),
   };
 
   const issues = [];
-  if (requested.filter != null && requested.filter !== normalized.filter) {
-    issues.push(`filter normalized to ${normalized.filter}`);
-  }
   if (requested.days != null && String(requested.days) !== String(normalized.days)) {
     issues.push(`days normalized to ${normalized.days}`);
+  }
+  if (requested.locationCode != null && String(requested.locationCode).trim().toUpperCase() !== normalized.locationCode) {
+    issues.push(`locationCode normalized to ${normalized.locationCode}`);
+  }
+  if (requested.includeExpired != null && normalizeBooleanFlag(requested.includeExpired, normalized.includeExpired) !== normalized.includeExpired) {
+    issues.push(`includeExpired normalized to ${normalized.includeExpired}`);
   }
   if (requested.source != null && requested.source !== normalized.source) {
     issues.push(`source normalized to ${normalized.source}`);
@@ -255,10 +294,13 @@ function validateExpiryRequest(query) {
 }
 
 function summarizePromotionRequest(body) {
+  const promotionalPrice = body.promotionalPrice != null ? body.promotionalPrice : body.promoPrice;
+  const restorePrice = body.restorePrice != null ? body.restorePrice : body.originalPrice;
+
   return {
     productCode: body.productCode,
-    promotionalPrice: body.promotionalPrice,
-    restorePrice: body.restorePrice,
+    promotionalPrice,
+    restorePrice,
     locationCode: body.locationCode,
     priceTypeCode: body.priceTypeCode,
     reasonCode: body.reasonCode,
@@ -266,54 +308,162 @@ function summarizePromotionRequest(body) {
   };
 }
 
-async function fetchExpiryCandidates({ filter, days, source }) {
+function pickFirstValue(row, candidates) {
+  for (const key of candidates) {
+    if (row[key] !== undefined && row[key] !== null && row[key] !== '') {
+      return row[key];
+    }
+  }
+  return null;
+}
+
+function toIsoDateOrNull(value) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed.toISOString();
+}
+
+function mapExpiryRow(row, fallbackLocationCode) {
+  const expiryDate = pickFirstValue(row, ['ExpiryDate', 'expiryDate']);
+  const quantity = pickFirstValue(row, [
+    'RemainingQty',
+    'remainingQty',
+    'Quantity',
+    'quantity',
+    'StockBalance',
+    'AvailableStock',
+    'StockQty',
+  ]);
+
+  return {
+    ProductCode: pickFirstValue(row, ['ProductCode', 'productCode']),
+    ProductName: pickFirstValue(row, ['ProductName', 'productName', 'Description', 'description']),
+    ExpiryDate: toIsoDateOrNull(expiryDate),
+    quantity: quantity == null ? null : Number(quantity),
+    locationCode: pickFirstValue(row, ['LocationCode', 'locationCode']) || fallbackLocationCode,
+    currentPrice: (() => {
+      const value = pickFirstValue(row, ['FPrice', 'CurrentPrice', 'SellingPrice', 'currentPrice']);
+      return value == null ? null : Number(value);
+    })(),
+    priceTypeCode: pickFirstValue(row, ['PriceTypeCode', 'priceTypeCode']),
+    promoStatus: pickFirstValue(row, ['Promotional', 'promoStatus', 'PromotionStatus', 'IsPromotional']),
+  };
+}
+
+async function fetchExpiryCandidates({ days, locationCode, includeExpired, source }) {
   if (!pool) {
     await initializePool();
   }
 
-  const safeFilter = normalizeExpiryFilter(filter);
   const safeSource = normalizeExpirySource(source);
   const safeDays = normalizeExpiryDays(days);
+  const safeLocationCode = normalizeLocationCode(locationCode);
+  const safeIncludeExpired = normalizeBooleanFlag(includeExpired, false);
   const request = pool.request();
   request.input('MinValidDate', sql.Date, new Date('2000-01-01T00:00:00.000Z'));
   request.input('ExpiryDays', sql.Int, safeDays);
+  request.input('LocationCode', sql.VarChar(10), safeLocationCode);
 
-  const whereClause = safeFilter === 'expired'
-    ? `ExpiryDate >= @MinValidDate AND ExpiryDate < CAST(GETDATE() AS date)`
+  const rangeClause = safeIncludeExpired
+    ? `ExpiryDate >= @MinValidDate AND ExpiryDate < DATEADD(DAY, @ExpiryDays, CAST(GETDATE() AS date))`
     : `ExpiryDate >= @MinValidDate
        AND ExpiryDate >= CAST(GETDATE() AS date)
        AND ExpiryDate < DATEADD(DAY, @ExpiryDays, CAST(GETDATE() AS date))`;
 
-  const query = safeSource === 'stockdetails'
-    ? `
+  const stockDetailsQuery = `
       SELECT
-        ProductCode,
-        StockQty,
-        StockOut,
-        ISNULL(StockQty, 0) - ISNULL(StockOut, 0) AS RemainingQty,
-        CostPrice,
-        ExpiryDate
-      FROM POS.dbo.stockdetails
-      WHERE ${whereClause}
-        AND ISNULL(StockQty, 0) > ISNULL(StockOut, 0)
-      ORDER BY ExpiryDate ASC, ProductCode ASC
-    `
-    : `
+        sd.ProductCode,
+        pm.ProductName,
+        s.LocationCode,
+        sd.ExpiryDate,
+        SUM(ISNULL(sd.StockQty, 0) - ISNULL(sd.StockOut, 0)) AS RemainingQty,
+        AVG(ISNULL(sd.CostPrice, 0)) AS AvgCostPrice,
+        latestPrice.PriceTypeCode,
+        latestPrice.FPrice,
+        pm.Promotional
+      FROM POS.dbo.stockdetails sd
+      LEFT JOIN POS.dbo.stocks s
+        ON s.GRNNo = sd.GRNNo
+      LEFT JOIN POS.dbo.productsmaster pm
+        ON pm.ProductCode = sd.ProductCode
+      OUTER APPLY (
+        SELECT TOP 1 pp.PriceTypeCode, pp.FPrice
+        FROM POS.dbo.productprices pp
+        WHERE pp.ProductCode = sd.ProductCode
+          AND pp.LocationCode = ISNULL(s.LocationCode, @LocationCode)
+        ORDER BY pp.PriceID DESC, pp.PriceDate DESC
+      ) latestPrice
+      WHERE ${rangeClause}
+        AND (@LocationCode IS NULL OR s.LocationCode = @LocationCode OR s.LocationCode IS NULL)
+      GROUP BY
+        sd.ProductCode,
+        pm.ProductName,
+        s.LocationCode,
+        sd.ExpiryDate,
+        latestPrice.PriceTypeCode,
+        latestPrice.FPrice,
+        pm.Promotional
+      HAVING SUM(ISNULL(sd.StockQty, 0) - ISNULL(sd.StockOut, 0)) > 0
+      ORDER BY sd.ExpiryDate ASC, sd.ProductCode ASC
+    `;
+
+  const viewQuery = `
       SELECT *
       FROM POS.dbo.vw_WillExpire_Products
-      WHERE ${whereClause}
+      WHERE ${rangeClause}
       ORDER BY ExpiryDate ASC
     `;
 
-  const result = await request.query(query);
+  const query = safeSource === 'stockdetails'
+    ? `
+      ${stockDetailsQuery}
+    `
+    : viewQuery;
 
-  console.log(`[EXPIRY] fetched ${result.recordset.length} ${safeFilter === 'expired' ? 'expired' : `expiring within ${safeDays} days`} products from ${safeSource}`);
+  let result;
+  let resolvedSource = safeSource;
+
+  try {
+    result = await request.query(query);
+  } catch (error) {
+    if (safeSource !== 'stockdetails') {
+      console.warn('[EXPIRY] primary vw_WillExpire_Products query failed, falling back to stockdetails:', error.message);
+      const fallbackRequest = pool.request();
+      fallbackRequest.input('MinValidDate', sql.Date, new Date('2000-01-01T00:00:00.000Z'));
+      fallbackRequest.input('ExpiryDays', sql.Int, safeDays);
+      fallbackRequest.input('LocationCode', sql.VarChar(10), safeLocationCode);
+      result = await fallbackRequest.query(stockDetailsQuery);
+      resolvedSource = 'stockdetails';
+    } else {
+      throw error;
+    }
+  }
+
+  const products = (result.recordset || [])
+    .map((row) => mapExpiryRow(row, safeLocationCode))
+    .filter((row) => row.ProductCode && row.ExpiryDate)
+    .filter((row) => row.quantity == null || row.quantity > 0)
+    .filter((row) => !row.locationCode || row.locationCode === safeLocationCode);
+
+  console.log(`[EXPIRY] fetched ${products.length} expiry rows within ${safeDays} days from ${resolvedSource} (includeExpired=${safeIncludeExpired})`);
 
   return {
-    filter: safeFilter,
     days: safeDays,
-    source: safeSource,
-    products: result.recordset || [],
+    locationCode: safeLocationCode,
+    includeExpired: safeIncludeExpired,
+    source: resolvedSource,
+    products,
+    sql: {
+      primary: safeSource === 'stockdetails' ? stockDetailsQuery.trim() : viewQuery.trim(),
+      fallback: stockDetailsQuery.trim(),
+    },
   };
 }
 
@@ -367,7 +517,13 @@ app.get('/pos-sync/expiry-products', validateApiKey, async (req, res) => {
     const validation = validateExpiryRequest(req.query);
     console.log('[EXPIRY] /expiry-products request received:', {
       endpoint: '/pos-sync/expiry-products',
-      query: validation.requested,
+      query: {
+        days: validation.requested.days,
+        locationCode: validation.requested.locationCode,
+        includeExpired: validation.requested.includeExpired,
+        source: validation.requested.source,
+        filter: validation.requested.filter,
+      },
     });
 
     if (validation.valid) {
@@ -382,16 +538,18 @@ app.get('/pos-sync/expiry-products', validateApiKey, async (req, res) => {
     console.log('[EXPIRY] /expiry-products DB query start');
     const result = await fetchExpiryCandidates(validation.normalized);
     console.log('[EXPIRY] /expiry-products DB query success:', {
-      filter: result.filter,
       days: result.days,
+      locationCode: result.locationCode,
+      includeExpired: result.includeExpired,
       source: result.source,
       count: result.products.length,
     });
 
     return res.json({
       success: true,
-      filter: result.filter,
       days: result.days,
+      locationCode: result.locationCode,
+      includeExpired: result.includeExpired,
       source: result.source,
       count: result.products.length,
       data: result.products,
@@ -896,7 +1054,7 @@ app.post('/pos-sync/update-prices', validateApiKey, rejectDirectWritebackInProdu
  *   "locationCode": "SH"
  * }
  */
-app.post('/pos-sync/apply-promotion', validateApiKey, rejectDirectWritebackInProduction, async (req, res) => {
+app.post('/pos-sync/apply-promotion', validateApiKey, async (req, res) => {
   try {
     console.log('[PROMO] /apply-promotion request received:', {
       endpoint: '/pos-sync/apply-promotion',
@@ -905,16 +1063,14 @@ app.post('/pos-sync/apply-promotion', validateApiKey, rejectDirectWritebackInPro
 
     if (!pool) await initializePool();
 
-    const {
-      productCode,
-      promotionalPrice,
-      locationCode,
-      priceTypeCode,
-      reasonCode,
-      updatePromotionalFlag,
-    } = req.body;
+    const productCode = req.body.productCode;
+    const promotionalPrice = Number(req.body.promotionalPrice != null ? req.body.promotionalPrice : req.body.promoPrice);
+    const locationCode = req.body.locationCode;
+    const priceTypeCode = req.body.priceTypeCode;
+    const reasonCode = req.body.reasonCode;
+    const updatePromotionalFlag = req.body.updatePromotionalFlag;
 
-    if (!productCode || typeof promotionalPrice !== 'number' || promotionalPrice <= 0) {
+    if (!productCode || !Number.isFinite(promotionalPrice) || promotionalPrice <= 0) {
       console.warn('[PROMO] /apply-promotion validation failed:', {
         productCode,
         promotionalPrice,
@@ -992,7 +1148,7 @@ app.post('/pos-sync/apply-promotion', validateApiKey, rejectDirectWritebackInPro
  *   "locationCode": "SH"
  * }
  */
-app.post('/pos-sync/revert-promotion', validateApiKey, rejectDirectWritebackInProduction, async (req, res) => {
+app.post('/pos-sync/revert-promotion', validateApiKey, async (req, res) => {
   try {
     console.log('[PROMO] /revert-promotion request received:', {
       endpoint: '/pos-sync/revert-promotion',
@@ -1001,14 +1157,13 @@ app.post('/pos-sync/revert-promotion', validateApiKey, rejectDirectWritebackInPr
 
     if (!pool) await initializePool();
 
-    const {
-      productCode,
-      locationCode,
-      priceTypeCode,
-      restorePrice,
-      reasonCode,
-      updatePromotionalFlag,
-    } = req.body;
+    const productCode = req.body.productCode;
+    const locationCode = req.body.locationCode;
+    const priceTypeCode = req.body.priceTypeCode;
+    const restorePriceValue = req.body.restorePrice != null ? req.body.restorePrice : req.body.originalPrice;
+    const restorePrice = restorePriceValue == null ? null : Number(restorePriceValue);
+    const reasonCode = req.body.reasonCode;
+    const updatePromotionalFlag = req.body.updatePromotionalFlag;
 
     if (!productCode) {
       console.warn('[PROMO] /revert-promotion validation failed:', {
@@ -1018,6 +1173,17 @@ app.post('/pos-sync/revert-promotion', validateApiKey, rejectDirectWritebackInPr
       return res.status(400).json({
         success: false,
         error: 'productCode is required',
+      });
+    }
+
+    if (restorePrice != null && (!Number.isFinite(restorePrice) || restorePrice <= 0)) {
+      console.warn('[PROMO] /revert-promotion validation failed:', {
+        productCode,
+        restorePrice,
+      });
+      return res.status(400).json({
+        success: false,
+        error: 'restorePrice/originalPrice must be greater than 0 when provided',
       });
     }
 
@@ -1297,6 +1463,10 @@ async function startServer() {
         'POST /pos-sync/revert-promotion',
         'GET /pos-sync/promotion-preview/:productCode',
         'GET /pos-sync/get-resolved-price/:productCode',
+      ]);
+      console.log('[PHASE 3 COMMAND TYPES] Supported:', [
+        'APPLY_PROMOTION',
+        'REVERT_PROMOTION',
       ]);
 
       // Start automatic sync if not already started

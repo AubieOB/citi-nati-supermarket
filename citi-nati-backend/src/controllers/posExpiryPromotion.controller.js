@@ -1,14 +1,8 @@
 const posSyncService = require('../services/posSync.service');
 const posCommandQueueService = require('../services/posCommandQueue.service');
 
-const VALID_EXPIRY_FILTERS = new Set(['expired', 'expiring']);
 const VALID_EXPIRY_SOURCES = new Set(['view', 'stockdetails']);
-const VALID_EXPIRY_DAYS = new Set([7, 14, 30]);
-
-function normalizeExpiryFilter(value) {
-  const filter = String(value || 'expiring').toLowerCase();
-  return VALID_EXPIRY_FILTERS.has(filter) ? filter : 'expiring';
-}
+const DEFAULT_EXPIRY_DAYS = 14;
 
 function normalizeExpirySource(value) {
   const source = String(value || 'view').toLowerCase();
@@ -17,7 +11,26 @@ function normalizeExpirySource(value) {
 
 function normalizeExpiryDays(value) {
   const parsed = parseInt(value, 10);
-  return VALID_EXPIRY_DAYS.has(parsed) ? parsed : 7;
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_EXPIRY_DAYS;
+}
+
+function normalizeLocationCode(value) {
+  const normalized = String(value || process.env.POS_LOCATION_CODE || 'SH').trim().toUpperCase();
+  return normalized || 'SH';
+}
+
+function normalizeIncludeExpired(value, legacyFilter) {
+  if (value != null) {
+    const normalized = String(value).trim().toLowerCase();
+    if (['true', '1', 'yes', 'y'].includes(normalized)) {
+      return true;
+    }
+    if (['false', '0', 'no', 'n'].includes(normalized)) {
+      return false;
+    }
+  }
+
+  return String(legacyFilter || '').trim().toLowerCase() === 'expired';
 }
 
 function normalizeReasonCode(value) {
@@ -31,11 +44,20 @@ function getPreviewFailureStatus(errorMessage) {
 
 async function getExpiryCandidates(req, res) {
   try {
-    const filter = normalizeExpiryFilter(req.query.filter);
-    const source = normalizeExpirySource(req.query.source);
     const days = normalizeExpiryDays(req.query.days);
+    const locationCode = normalizeLocationCode(req.query.locationCode);
+    const includeExpired = normalizeIncludeExpired(req.query.includeExpired, req.query.filter);
+    const source = normalizeExpirySource(req.query.source);
 
-    const result = await posSyncService.getExpiryProductsFromPOS({ filter, days, source });
+    console.log('[EXPIRY][BACKEND] admin dashboard -> backend -> POS agent', {
+      endpoint: '/api/admin/pos-expiry',
+      days,
+      locationCode,
+      includeExpired,
+      source,
+    });
+
+    const result = await posSyncService.getExpiryProductsFromPOS({ days, locationCode, includeExpired, source });
 
     if (!result.success) {
       return res.status(getPreviewFailureStatus(result.error)).json({
@@ -46,15 +68,17 @@ async function getExpiryCandidates(req, res) {
 
     const payload = result.data || {};
     console.log(`[EXPIRY] fetched ${payload.count || 0} expiring products`, {
-      filter,
       days,
+      locationCode,
+      includeExpired,
       source,
     });
 
     return res.json({
       success: true,
-      filter: payload.filter || filter,
       days: payload.days || days,
+      locationCode: payload.locationCode || locationCode,
+      includeExpired: payload.includeExpired != null ? payload.includeExpired : includeExpired,
       source: payload.source || source,
       count: payload.count || 0,
       data: payload.data || [],
@@ -162,6 +186,15 @@ async function applyPromotion(req, res) {
       updatePromotionalFlag,
     };
 
+    console.log('[PROMO][BACKEND] queue APPLY_PROMOTION', {
+      productCode,
+      locationCode,
+      priceTypeCode,
+      promotionalPrice,
+      reasonCode,
+      updatePromotionalFlag,
+    });
+
     const queued = await posCommandQueueService.enqueueCommand('APPLY_PROMOTION', payload, {
       source: 'admin.posExpiryPromotion.applyPromotion',
       relatedEntityType: 'POS_PRODUCT',
@@ -237,6 +270,15 @@ async function revertPromotion(req, res) {
       reasonCode,
       updatePromotionalFlag,
     };
+
+    console.log('[PROMO][BACKEND] queue REVERT_PROMOTION', {
+      productCode,
+      locationCode,
+      priceTypeCode,
+      restorePrice,
+      reasonCode,
+      updatePromotionalFlag,
+    });
 
     const queued = await posCommandQueueService.enqueueCommand('REVERT_PROMOTION', payload, {
       source: 'admin.posExpiryPromotion.revertPromotion',

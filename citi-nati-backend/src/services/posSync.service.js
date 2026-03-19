@@ -340,18 +340,33 @@ async function updatePrices(updates = []) {
   }
 }
 
-async function getExpiryProductsFromPOS({ filter = 'expiring', days = 7, source = 'view' } = {}) {
+async function getExpiryProductsFromPOS({ days = 14, locationCode = 'SH', includeExpired = false, source = 'view' } = {}) {
   if (!ENABLE_POS_SYNC) {
     return { success: false, error: 'POS Sync is disabled' };
   }
 
   try {
+    console.log('[BACKEND -> AGENT][EXPIRY] requesting expiry candidates', {
+      endpoint: '/pos-sync/expiry-products',
+      days,
+      locationCode,
+      includeExpired,
+      source,
+    });
+
     const response = await posAgent.get('/pos-sync/expiry-products', {
       params: {
-        filter,
         days,
+        locationCode,
+        includeExpired,
         source,
       },
+    });
+
+    console.log('[BACKEND -> AGENT][EXPIRY] success', {
+      endpoint: '/pos-sync/expiry-products',
+      count: response.data?.count || 0,
+      source: response.data?.source || source,
     });
 
     return {
@@ -359,6 +374,10 @@ async function getExpiryProductsFromPOS({ filter = 'expiring', days = 7, source 
       data: response.data,
     };
   } catch (error) {
+    console.error('[BACKEND -> AGENT][EXPIRY] failed', {
+      endpoint: '/pos-sync/expiry-products',
+      error: formatPosAgentError(error, '/pos-sync/expiry-products'),
+    });
     return {
       success: false,
       error: formatPosAgentError(error, '/pos-sync/expiry-products'),

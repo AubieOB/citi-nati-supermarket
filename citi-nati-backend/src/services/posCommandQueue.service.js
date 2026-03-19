@@ -41,6 +41,15 @@ async function enqueueCommand(commandType, payload, meta = {}) {
       id: command.id,
       commandType: command.commandType,
       source: command.source,
+      relatedEntityId: command.relatedEntityId,
+      payloadSummary: {
+        productCode: payload?.productCode,
+        locationCode: payload?.locationCode,
+        priceTypeCode: payload?.priceTypeCode,
+        promotionalPrice: payload?.promotionalPrice,
+        restorePrice: payload?.restorePrice,
+        orderId: payload?.orderId,
+      },
     });
 
     return command;
