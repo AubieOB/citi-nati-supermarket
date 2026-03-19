@@ -432,10 +432,47 @@ const AdminProducts = () => {
         return api.get(basePath);
       };
 
+      const normalizeAdminPosProduct = (product) => ({
+        id: product.id,
+        name: product.name,
+        sourceCode: product.sourceCode || null,
+        productCode: product.sourceCode || null,
+        category: product.category || 'Uncategorized',
+        price: Number(product.price || 0),
+        stock: Number(product.stock || 0),
+        image: product.image || null,
+        originalPrice: Number(product.price || 0),
+        discountPrice: null,
+        isOnSale: false,
+        finalPrice: Number(product.price || 0),
+        expiryDate: product.expiryDate || null,
+        expiryStatus: product.expiryStatus || null,
+        daysToExpiry: product.daysToExpiry ?? null,
+        expirySource: product.expirySource || null,
+        hideFromProductsPage: Boolean(product.hideFromProductsPage),
+      });
+
       // Fetch first page to show something immediately
       const firstResp = await fetchProductsPage(page);
       const firstItems = firstResp.data.products || [];
-      all = all.concat(firstItems);
+
+      if (firstItems.length === 0) {
+        try {
+          console.warn('[ADMIN PRODUCTS UI] /products returned 0; trying /admin/pos-products fallback');
+          const adminResp = await api.get('/admin/pos-products?page=1&limit=5000');
+          const adminItems = Array.isArray(adminResp?.data?.products)
+            ? adminResp.data.products.map(normalizeAdminPosProduct)
+            : [];
+
+          console.log('[ADMIN PRODUCTS UI] /admin/pos-products fallback count', adminItems.length);
+          all = adminItems;
+        } catch (adminFallbackErr) {
+          console.warn('[ADMIN PRODUCTS UI] /admin/pos-products fallback failed', adminFallbackErr?.response?.data || adminFallbackErr.message);
+          all = firstItems;
+        }
+      } else {
+        all = all.concat(firstItems);
+      }
 
       console.log('[ADMIN PRODUCTS UI] first product row', firstItems[0] || null);
       console.log('[ADMIN PRODUCTS UI] expiry fields received', firstItems.slice(0, 5).map((product) => ({
