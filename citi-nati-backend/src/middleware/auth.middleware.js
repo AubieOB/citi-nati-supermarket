@@ -30,8 +30,19 @@ const verifyTokenMiddleware = (req, res, next) => {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 
-  req.user = decoded;
-  console.log('[AUTH] Token verified for user:', { userId: req.user.userId, role: req.user.role, email: req.user.email });
+  // Backward compatibility: some routes read req.user.id while newer code uses req.user.userId.
+  req.user = {
+    ...decoded,
+    userId: decoded.userId || decoded.id,
+    id: decoded.id || decoded.userId,
+  };
+
+  console.log('[AUTH] Token verified for user:', {
+    userId: req.user.userId,
+    id: req.user.id,
+    role: req.user.role,
+    email: req.user.email,
+  });
   next();
 };
 
