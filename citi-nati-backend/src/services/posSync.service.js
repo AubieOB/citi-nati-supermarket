@@ -36,11 +36,11 @@ const posAgent = axios.create({
   timeout: POS_AGENT_TIMEOUT_MS,
 });
 
-function formatPosAgentError(error, endpoint) {
+function formatPosAgentError(error, endpoint, timeoutMs = POS_AGENT_TIMEOUT_MS) {
   const target = `${POS_AGENT_URL}${endpoint}`;
 
   if (error.code === 'ECONNABORTED') {
-    return `Request to POS agent timed out after ${POS_AGENT_TIMEOUT_MS}ms (${target}). Verify the POS Sync Agent is running and the endpoint is responsive.`;
+    return `Request to POS agent timed out after ${timeoutMs}ms (${target}). Verify the POS Sync Agent is running and the endpoint is responsive.`;
   }
 
   if (error.code === 'ECONNREFUSED') {
@@ -347,6 +347,9 @@ async function getExpiryProductsFromPOS({ days = 14, locationCode = 'SH', includ
 
   const endpoint = '/pos-sync/expiry-products';
   const targetUrl = `${POS_AGENT_URL}${endpoint}`;
+  const effectiveTimeoutMs = Number.isFinite(Number(requestTimeoutMs)) && Number(requestTimeoutMs) > 0
+    ? Number(requestTimeoutMs)
+    : POS_AGENT_TIMEOUT_MS;
 
   try {
     console.log('[BACKEND -> AGENT][EXPIRY] requesting expiry candidates', {
@@ -365,9 +368,7 @@ async function getExpiryProductsFromPOS({ days = 14, locationCode = 'SH', includ
         includeExpired,
         source,
       },
-      timeout: Number.isFinite(Number(requestTimeoutMs)) && Number(requestTimeoutMs) > 0
-        ? Number(requestTimeoutMs)
-        : POS_AGENT_TIMEOUT_MS,
+      timeout: effectiveTimeoutMs,
     });
 
     console.log('[BACKEND -> AGENT][EXPIRY] success', {
@@ -390,7 +391,7 @@ async function getExpiryProductsFromPOS({ days = 14, locationCode = 'SH', includ
   } catch (error) {
     const status = error.response?.status || null;
     const rawBody = error.response?.data ?? null;
-    const formattedError = formatPosAgentError(error, endpoint);
+    const formattedError = formatPosAgentError(error, endpoint, effectiveTimeoutMs);
 
     console.error('[BACKEND -> AGENT][EXPIRY] failed', {
       endpoint,
