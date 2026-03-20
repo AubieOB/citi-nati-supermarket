@@ -235,9 +235,11 @@ async function fetchProductsFromPOS() {
           ? 'Expired'
           : (daysToExpiry <= 7 ? 'Expiring Soon' : (daysToExpiry <= 30 ? 'Near Expiry' : 'OK')));
 
+      const nearestExpiryDate = nearestBatch ? new Date(nearestBatch.expiryDate) : null;
+
       return {
         ...product,
-        ExpiryDate: nearestBatch ? nearestBatch.expiryDate : null,
+        ExpiryDate: nearestExpiryDate,
         ExpirySource: nearestBatch ? nearestBatch.source : null,
         ExpiryBatchCount: batches.length,
         DaysToExpiry: daysToExpiry,
@@ -248,9 +250,10 @@ async function fetchProductsFromPOS() {
     console.log(`[POS FETCH][EXPIRY] products enriched with expiry=${enrichedWithExpiry}`);
     const sampleEnriched = enrichedRecords.find(p => p.ExpiryDate || (Array.isArray(p.ExpiryBatches) && p.ExpiryBatches.length > 0));
     if (sampleEnriched) {
+      const sampleNearestExpiry = sampleEnriched.ExpiryDate ? new Date(sampleEnriched.ExpiryDate) : null;
       console.log(`[POS FETCH][EXPIRY] sample enriched product:`, {
         productCode: sampleEnriched.ProductCode,
-        nearestExpiryDate: sampleEnriched.ExpiryDate ? sampleEnriched.ExpiryDate.toISOString().slice(0, 10) : null,
+        nearestExpiryDate: sampleNearestExpiry && !Number.isNaN(sampleNearestExpiry.getTime()) ? sampleNearestExpiry.toISOString().slice(0, 10) : null,
         expiryBatchCount: sampleEnriched.ExpiryBatchCount || 0,
         daysToExpiry: sampleEnriched.DaysToExpiry,
         expiryStatus: sampleEnriched.ExpiryStatus,
