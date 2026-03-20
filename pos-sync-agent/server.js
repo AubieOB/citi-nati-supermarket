@@ -275,6 +275,12 @@ async function buildExpiryMapFromPOS() {
     const expiryMap = new Map();
     let totalSkipped = 0;
 
+    const toGrnRank = (value) => {
+      if (value == null) return Number.MIN_SAFE_INTEGER;
+      const parsed = Number(String(value).trim());
+      return Number.isFinite(parsed) ? parsed : Number.MIN_SAFE_INTEGER;
+    };
+
     for (const [code, entries] of grouped.entries()) {
       // Keep only rows with positive remaining stock (active batches)
       const activeRows = entries.filter(
@@ -289,15 +295,19 @@ async function buildExpiryMapFromPOS() {
         continue;
       }
 
-      // Sort DESC by ExpiryDate — pick the LATEST active stock batch
-      activeRows.sort((a, b) => new Date(b.ExpiryDate) - new Date(a.ExpiryDate));
+      // Sort by latest stock add first (GRNNo DESC), expiry date DESC as tie-breaker.
+      activeRows.sort((a, b) => {
+        const grnDiff = toGrnRank(b.LatestGRNNo) - toGrnRank(a.LatestGRNNo);
+        if (grnDiff !== 0) return grnDiff;
+        return new Date(b.ExpiryDate) - new Date(a.ExpiryDate);
+      });
       const chosen = activeRows[0];
       const chosenDate = new Date(chosen.ExpiryDate);
 
       expiryMap.set(code, { expiryDate: chosenDate, source });
 
       if (expiryMap.size <= 3) {
-        console.log(`[POS FETCH][EXPIRY] selected latest stock-add row: productCode=${code} expiryDate=${chosenDate.toISOString().slice(0,10)} activeRows=${activeRows.length} skipped=${skippedCount}`);
+        console.log(`[POS FETCH][EXPIRY] selected latest stock-add row: productCode=${code} grnNo=${chosen.LatestGRNNo || 'n/a'} expiryDate=${chosenDate.toISOString().slice(0,10)} activeRows=${activeRows.length} skipped=${skippedCount}`);
       }
     }
 
@@ -467,6 +477,7 @@ function mapExpiryRow(row, fallbackLocationCode) {
     ProductCode: pickFirstValue(row, ['ProductCode', 'productCode']),
     ExpiryDate: toIsoDateOrNull(expiryDate),
     RemainingQty: remainingQty == null ? null : Number(remainingQty),
+    LatestGRNNo: pickFirstValue(row, ['LatestGRNNo', 'latestGRNNo', 'GRNNo', 'grnNo']),
     ProductName: pickFirstValue(row, ['ProductName', 'productName', 'Description', 'description']),
     locationCode: pickFirstValue(row, ['LocationCode', 'locationCode']) || fallbackLocationCode,
     currentPrice: (() => {
@@ -519,6 +530,7 @@ async function fetchExpiryCandidates({ days, locationCode, includeExpired, sourc
       SELECT
         sd.ProductCode,
         sd.ExpiryDate,
+        MAX(sd.GRNNo) AS LatestGRNNo,
         SUM(ISNULL(sd.StockQty, 0) - ISNULL(sd.StockOut, 0)) AS RemainingQty
       FROM POS.dbo.stockdetails sd
       WHERE ${rangeClause}
