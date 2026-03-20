@@ -105,6 +105,8 @@ async function sendProductsToLiveServer(products) {
               stock: p.QuantityAvailable,
               barcode: p.Barcode || '',
               category: p.CategoryName || 'Uncategorized',
+              expiryDate: p.ExpiryDate ? (p.ExpiryDate instanceof Date ? p.ExpiryDate.toISOString() : p.ExpiryDate) : null,
+              expirySource: p.ExpirySource || null,
             })),
           },
           {
@@ -198,11 +200,94 @@ async function fetchProductsFromPOS() {
         console.log(`  - ${product.ProductCode}: ${product.ProductName} | Stock: ${product.QuantityAvailable} | Price: ${product.SellingPrice}`);
       });
     }
-    
-    return result.recordset;
+
+    // Enrich each product with expiry data from the same SQL Server
+    const expiryMap = await buildExpiryMapFromPOS();
+    let enrichedWithExpiry = 0;
+    const enrichedRecords = result.recordset.map(product => {
+      const code = String(product.ProductCode || '').trim();
+      const expiry = expiryMap.get(code);
+      if (expiry) enrichedWithExpiry++;
+      return {
+        ...product,
+        ExpiryDate: expiry ? expiry.expiryDate : null,
+        ExpirySource: expiry ? expiry.source : null,
+      };
+    });
+    console.log(`[POS FETCH][EXPIRY] products enriched with expiry=${enrichedWithExpiry}`);
+    const sampleEnriched = enrichedRecords.find(p => p.ExpiryDate);
+    if (sampleEnriched) {
+      const daysToExpiry = Math.round((sampleEnriched.ExpiryDate - new Date()) / (1000 * 60 * 60 * 24));
+      console.log(`[POS FETCH][EXPIRY] sample enriched product:`, {
+        productCode: sampleEnriched.ProductCode,
+        expiryDate: sampleEnriched.ExpiryDate.toISOString().slice(0, 10),
+        daysToExpiry,
+        expirySource: sampleEnriched.ExpirySource,
+      });
+    }
+
+    return enrichedRecords;
   } catch (err) {
     console.error('[POS FETCH] Error fetching products:', err.message);
     return [];
+  }
+}
+
+/**
+ * Builds a Map<ProductCode, { expiryDate: Date, source: string }> from SQL Server.
+ * Primary: vw_WillExpire_Products  Fallback: stockdetails
+ * Picks the earliest upcoming valid expiry with positive stock per product.
+ */
+async function buildExpiryMapFromPOS() {
+  try {
+    if (!pool) await initializePool();
+    const locationCode = process.env.POS_LOCATION_CODE || 'SH';
+    const result = await fetchExpiryCandidates({
+      days: 3650,
+      locationCode,
+      includeExpired: true,
+      source: 'view',
+      productCodes: [],
+    });
+    const source = result.source;
+    const rows = result.products || [];
+    console.log(`[POS FETCH][EXPIRY] expiry rows fetched: count=${rows.length}`);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Group by ProductCode
+    const grouped = new Map();
+    for (const row of rows) {
+      const code = String(row.ProductCode || '').trim();
+      if (!code || !row.ExpiryDate) continue;
+      if (!grouped.has(code)) grouped.set(code, []);
+      grouped.get(code).push(row);
+    }
+
+    const expiryMap = new Map();
+    for (const [code, entries] of grouped.entries()) {
+      // Prefer earliest upcoming date with positive (or unknown) stock
+      const upcoming = entries
+        .filter(e => new Date(e.ExpiryDate) >= today && (e.RemainingQty == null || e.RemainingQty > 0))
+        .sort((a, b) => new Date(a.ExpiryDate) - new Date(b.ExpiryDate));
+      if (upcoming.length > 0) {
+        expiryMap.set(code, { expiryDate: new Date(upcoming[0].ExpiryDate), source });
+        continue;
+      }
+      // Fallback: most recent expired row
+      const expired = entries
+        .filter(e => new Date(e.ExpiryDate) < today)
+        .sort((a, b) => new Date(b.ExpiryDate) - new Date(a.ExpiryDate));
+      if (expired.length > 0) {
+        expiryMap.set(code, { expiryDate: new Date(expired[0].ExpiryDate), source });
+      }
+    }
+    console.log(`[POS FETCH][EXPIRY] expiry map size=${expiryMap.size}`);
+    return expiryMap;
+  } catch (err) {
+    console.error('[POS FETCH][EXPIRY] buildExpiryMapFromPOS failed:', err.message);
+    return new Map();
   }
 }
 
@@ -1399,47 +1484,6 @@ async function autoSync() {
   }
 }
 
-/** Auto expiry push - sends expiry rows to live server every 5 minutes */
-let isExpiryPushRunning = false;
-const EXPIRY_PUSH_INTERVAL_MS = parseInt(process.env.EXPIRY_PUSH_INTERVAL_MS || String(5 * 60 * 1000), 10);
-
-async function autoExpiryPush() {
-  if (isExpiryPushRunning) {
-    console.log('[AUTO EXPIRY PUSH] Skipped tick - previous cycle still running');
-    return;
-  }
-  if (!process.env.LIVE_SERVER_URL || !process.env.POS_SECRET) {
-    return;
-  }
-
-  isExpiryPushRunning = true;
-  try {
-    const locationCode = process.env.POS_LOCATION_CODE || 'SH';
-    const expiryData = await fetchExpiryCandidates({
-      days: 3650,
-      locationCode,
-      includeExpired: true,
-      source: 'view',
-      productCodes: [],
-    });
-    const rows = expiryData.products || [];
-    console.log(`[AUTO EXPIRY PUSH] Fetched ${rows.length} expiry rows, pushing to live server...`);
-    const response = await axios.post(
-      `${process.env.LIVE_SERVER_URL}/api/products/pos-sync/expiry-push`,
-      { rows },
-      {
-        headers: { 'x-pos-secret': process.env.POS_SECRET },
-        timeout: 30000,
-      }
-    );
-    console.log('[AUTO EXPIRY PUSH] ✅ Push complete:', response.data);
-  } catch (err) {
-    console.error('[AUTO EXPIRY PUSH] ❌ Push failed:', err.message);
-  } finally {
-    isExpiryPushRunning = false;
-  }
-}
-
 async function pollAndProcessCommands() {
   if (isCommandPollRunning) {
     console.log('[POS COMMAND POLLER] Skipped tick - previous cycle still running');
@@ -1527,15 +1571,6 @@ async function startServer() {
         autoSyncInterval = setInterval(autoSync, SYNC_INTERVAL_MS);
         autoSyncStarted = true;
         console.log('[AUTO SYNC] ✅ Auto-sync enabled');
-      }
-
-      // Start expiry push (runs immediately then every EXPIRY_PUSH_INTERVAL_MS)
-      if (process.env.LIVE_SERVER_URL && process.env.POS_SECRET) {
-        autoExpiryPush();
-        setInterval(autoExpiryPush, EXPIRY_PUSH_INTERVAL_MS);
-        console.log(`[AUTO EXPIRY PUSH] ✅ Enabled (interval: ${EXPIRY_PUSH_INTERVAL_MS}ms)`);
-      } else {
-        console.log('[AUTO EXPIRY PUSH] ⚠️ Disabled (requires LIVE_SERVER_URL and POS_SECRET)');
       }
 
       if (ENABLE_POS_COMMAND_POLLING && process.env.LIVE_SERVER_URL && process.env.POS_SECRET) {

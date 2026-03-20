@@ -15,12 +15,6 @@ const adminExpiryFetchState = {
   fetchedAt: 0,
 };
 
-// Cache populated when POS agent pushes expiry data via POST /pos-sync/expiry-push
-const posExpiryPushCache = {
-  rows: [],
-  pushedAt: 0,
-};
-
 // ensure a trigram index for fast case-insensitive name searches (autocomplete)
 (async () => {
   try {
@@ -641,26 +635,8 @@ const getProducts = async (req, res) => {
     // Debug logging
     console.log(`[PRODUCTS] Retrieved: ${products.length}, Total: ${total}, Category: ${category || 'all'}, Search: ${search || 'none'}`);
 
-    let enrichedProducts = products;
-    if (shouldIncludePosExpiry) {
-      console.log('[ADMIN PRODUCTS] expiry enrichment branch entered');
-      try {
-        enrichedProducts = await enrichProductsWithExpiry(products);
-        console.log('[ADMIN PRODUCTS] merged products count', enrichedProducts.length);
-        console.log('[ADMIN PRODUCTS] sample merged row', enrichedProducts[0] ? {
-          id: enrichedProducts[0].id,
-          name: enrichedProducts[0].name,
-          sourceCode: enrichedProducts[0].sourceCode,
-          expiryDate: enrichedProducts[0].expiryDate,
-          expiryStatus: enrichedProducts[0].expiryStatus,
-          daysToExpiry: enrichedProducts[0].daysToExpiry,
-          expirySource: enrichedProducts[0].expirySource,
-        } : null);
-      } catch (expiryMergeError) {
-        console.error('[ADMIN PRODUCTS] expiry enrichment failed, returning base products', expiryMergeError.message);
-        enrichedProducts = products;
-      }
-    }
+    // expiryDate is stored on each product record via POS sync; formatProduct computes expiryStatus from it
+    const enrichedProducts = products;
 
     // Map over products and format with computed fields
     const productsWithFormatted = enrichedProducts.map((product) =>
@@ -1187,6 +1163,9 @@ const syncProductsFromPOSAgent = async (req, res) => {
               category: product.category || 'Uncategorized',
               description: product.description || '',
               barcode: product.barcode || '',
+              ...(product.expiryDate !== undefined
+                ? { expiryDate: product.expiryDate ? new Date(product.expiryDate) : null }
+                : {}),
               updatedAt: new Date(),
             },
             create: {
@@ -1197,6 +1176,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
               category: product.category || 'Uncategorized',
               description: product.description || '',
               barcode: product.barcode || '',
+              expiryDate: product.expiryDate ? new Date(product.expiryDate) : null,
               isActive: true,
               createdAt: new Date(),
               updatedAt: new Date(),
@@ -1392,35 +1372,6 @@ const toggleProductVisibility = async (req, res) => {
   }
 };
 
-/**
- * POST /api/products/pos-sync/expiry-push
- * Receives expiry rows pushed by the POS agent and stores them in memory.
- */
-const receivePosExpiryPush = async (req, res) => {
-  try {
-    const secret = req.headers['x-pos-secret'];
-    const expectedSecret = process.env.POS_SECRET;
-    if (!secret || secret !== expectedSecret) {
-      console.error('[EXPIRY PUSH] Unauthorized attempt');
-      return res.status(403).json({ success: false, error: 'Unauthorized' });
-    }
-
-    const { rows } = req.body;
-    if (!rows || !Array.isArray(rows)) {
-      return res.status(400).json({ success: false, error: 'Expected { rows: [] }' });
-    }
-
-    posExpiryPushCache.rows = rows;
-    posExpiryPushCache.pushedAt = Date.now();
-    console.log(`[EXPIRY PUSH] Stored ${rows.length} expiry rows from POS agent`);
-
-    return res.json({ success: true, received: rows.length });
-  } catch (err) {
-    console.error('[EXPIRY PUSH] Error:', err.message);
-    return res.status(500).json({ success: false, error: err.message });
-  }
-};
-
 module.exports = { 
   createProduct, 
   getProducts, 
@@ -1429,7 +1380,6 @@ module.exports = {
   deleteProduct, 
   syncFromPOS,
   syncProductsFromPOSAgent,
-  receivePosExpiryPush,
   deletePOSProducts,
   getCategories,
   toggleProductVisibility
