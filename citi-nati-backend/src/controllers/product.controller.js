@@ -111,6 +111,75 @@ const formatProduct = (product, req, includeDiscountSuggestion = false) => {
   return formatted;
 };
 
+function normalizeBatchForResponse(batch) {
+  const expiryDate = normalizeExpiryDate(batch?.expiryDate);
+  const remainingQty = Number(batch?.remainingQty ?? 0);
+
+  if (!expiryDate || !Number.isFinite(remainingQty)) {
+    return null;
+  }
+
+  return {
+    expiryDate: expiryDate.toISOString(),
+    remainingQty,
+    locationCode: batch?.locationCode || null,
+    batchNo: batch?.batchNo || null,
+    lastSyncedAt: batch?.lastSyncedAt ? new Date(batch.lastSyncedAt).toISOString() : null,
+  };
+}
+
+async function attachExpiryBatchesToProducts(products) {
+  if (!Array.isArray(products) || products.length === 0) {
+    return products;
+  }
+
+  const sourceCodes = Array.from(new Set(
+    products
+      .map((product) => normalizeProductCode(product.sourceCode))
+      .filter(Boolean)
+  ));
+
+  if (sourceCodes.length === 0) {
+    return products.map((product) => ({
+      ...product,
+      expiryBatches: [],
+    }));
+  }
+
+  const rawBatches = await prisma.productExpiryBatch.findMany({
+    where: {
+      productCode: { in: sourceCodes },
+    },
+    orderBy: [
+      { productCode: 'asc' },
+      { expiryDate: 'asc' },
+      { batchNo: 'asc' },
+    ],
+  });
+
+  const batchesByCode = new Map();
+
+  rawBatches.forEach((batch) => {
+    const code = normalizeProductCode(batch.productCode);
+    const normalizedBatch = normalizeBatchForResponse(batch);
+
+    if (!code || !normalizedBatch) {
+      return;
+    }
+
+    if (!batchesByCode.has(code)) {
+      batchesByCode.set(code, []);
+    }
+
+    batchesByCode.get(code).push(normalizedBatch);
+  });
+
+  return products.map((product) => ({
+    ...product,
+    expiryBatches: batchesByCode.get(normalizeProductCode(product.sourceCode)) || [],
+  }));
+}
+
 function normalizeProductCode(value) {
   const normalized = String(value || '').trim();
   return normalized || null;
@@ -637,7 +706,7 @@ const getProducts = async (req, res) => {
     console.log(`[PRODUCTS] Retrieved: ${products.length}, Total: ${total}, Category: ${category || 'all'}, Search: ${search || 'none'}`);
 
     // expiryDate is stored on each product record via POS sync; formatProduct computes expiryStatus from it
-    const enrichedProducts = products;
+    const enrichedProducts = await attachExpiryBatchesToProducts(products);
 
     // Map over products and format with computed fields
     const productsWithFormatted = enrichedProducts.map((product) =>
@@ -693,7 +762,8 @@ const getProductById = async (req, res) => {
     }
 
     // Format product with computed fields
-    const formattedProduct = formatProduct(product, req, true);
+    const productWithBatches = (await attachExpiryBatchesToProducts([product]))[0];
+    const formattedProduct = formatProduct(productWithBatches, req, true);
 
     return res.status(200).json(formattedProduct);
   } catch (err) {
@@ -1438,10 +1508,10 @@ const getExpiryBatchAlerts = async (req, res) => {
     const products = productCodes.length > 0
       ? await prisma.product.findMany({
           where: { sourceCode: { in: productCodes } },
-          select: { sourceCode: true, name: true },
+          select: { sourceCode: true, name: true, category: true },
         })
       : [];
-    const nameByCode = new Map(products.map((product) => [String(product.sourceCode || '').trim(), product.name]));
+    const productsByCode = new Map(products.map((product) => [String(product.sourceCode || '').trim(), product]));
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -1453,7 +1523,8 @@ const getExpiryBatchAlerts = async (req, res) => {
 
       return {
         productCode: row.productCode,
-        productName: nameByCode.get(String(row.productCode || '').trim()) || row.productCode,
+        productName: productsByCode.get(String(row.productCode || '').trim())?.name || row.productCode,
+        category: productsByCode.get(String(row.productCode || '').trim())?.category || null,
         expiryDate: row.expiryDate.toISOString(),
         remainingQty: row.remainingQty,
         locationCode: row.locationCode,

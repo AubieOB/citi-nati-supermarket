@@ -883,3 +883,102 @@ export const generateAdminProductsTablePDF = (products, options = {}) => {
 
   return html2pdf().set(opt).from(element).save();
 };
+
+const formatExpiryPdfDate = (value) => {
+  if (!value) return 'No expiry date';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'No expiry date';
+  return parsed.toLocaleDateString('en-GB');
+};
+
+export const generateExpiryAlertsPDF = (alertCards, options = {}) => {
+  const {
+    selectedCategory = '',
+    selectedStockFilter = 'all',
+  } = options;
+  const today = new Date();
+  const dateText = today.toLocaleDateString();
+  const timeText = today.toLocaleTimeString();
+  const categoryLabel = selectedCategory || 'All Categories';
+  const stockFilterLabel = selectedStockFilter === 'all'
+    ? 'All Stock Levels'
+    : selectedStockFilter === 'in-stock'
+      ? 'In Stock'
+      : selectedStockFilter === 'low-stock'
+        ? 'Low Stock'
+        : 'Out of Stock';
+
+  const cardsHtml = alertCards.map((card, index) => {
+    const batchesHtml = card.batches.map((batch, batchIndex) => `
+      <tr>
+        <td style="padding: 8px; border: 1px solid #ddd;">Batch ${batchIndex + 1}${batch.batchNo ? ` (${escapeHtml(batch.batchNo)})` : ''}</td>
+        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${escapeHtml(batch.remainingQty)}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(formatExpiryPdfDate(batch.expiryDate))}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(batch.statusLabel)}</td>
+      </tr>
+    `).join('');
+
+    return `
+      <div style="page-break-inside: avoid; break-inside: avoid; border: 1px solid #ddd; border-left: 6px solid ${card.isExpired ? '#dc3545' : card.isUrgent ? '#ffc107' : '#2D8659'}; border-radius: 10px; padding: 16px; margin-bottom: 18px; background: ${index % 2 === 0 ? '#fff' : '#fafafa'};">
+        <div style="display: flex; justify-content: space-between; gap: 16px; margin-bottom: 12px; align-items: flex-start;">
+          <div>
+            <h3 style="margin: 0 0 4px 0; color: #222; font-size: 18px;">${escapeHtml(card.name)}</h3>
+            <p style="margin: 0; color: #666; font-size: 12px;">Code: ${escapeHtml(card.productCode || 'N/A')} | Category: ${escapeHtml(card.category || 'Uncategorized')}</p>
+          </div>
+          <div style="text-align: right;">
+            <p style="margin: 0; color: #111; font-size: 12px; font-weight: 700;">Total Batch Qty: ${escapeHtml(card.totalQty)}</p>
+            <p style="margin: 4px 0 0 0; color: #666; font-size: 12px;">${escapeHtml(card.stockLabel)}</p>
+          </div>
+        </div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+          <thead>
+            <tr style="background: #2D8659; color: white;">
+              <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Batch</th>
+              <th style="padding: 8px; border: 1px solid #ddd; text-align: center;">Quantity</th>
+              <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Expiry Date</th>
+              <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${batchesHtml}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }).join('');
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; color: #222; padding: 16px; width: 1120px; box-sizing: border-box;">
+      ${buildBrandedHeader({
+        reportTitle: 'Expiry Alert Cards Export',
+        periodText: `Category: ${escapeHtml(categoryLabel)} | Stock Filter: ${escapeHtml(stockFilterLabel)} | Products: ${alertCards.length}`,
+        generatedText: `Generated: ${escapeHtml(dateText)} ${escapeHtml(timeText)}`,
+        accentColor: '#dc3545',
+      })}
+      ${cardsHtml || '<p style="color: #666;">No expiry cards matched the selected filters.</p>'}
+    </div>
+  `;
+
+  const element = document.createElement('div');
+  element.innerHTML = html;
+
+  const opt = {
+    margin: 6,
+    filename: `expiry-alerts-${today.toISOString().split('T')[0]}.pdf`,
+    image: { type: 'png', quality: 1.0 },
+    html2canvas: {
+      scale: 3,
+      logging: false,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      windowWidth: 1200,
+    },
+    jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4', compress: true },
+    pagebreak: {
+      mode: ['css', 'legacy'],
+      avoid: ['table', 'tr', 'td', 'th'],
+    },
+  };
+
+  return html2pdf().set(opt).from(element).save();
+};

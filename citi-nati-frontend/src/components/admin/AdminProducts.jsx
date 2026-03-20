@@ -6,7 +6,7 @@ import { getSocket } from '../../utils/socket.js';
 import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
 import Pagination from '../ui/Pagination.jsx';
-import { generateAdminProductsTablePDF } from '../../utils/pdfReports.js';
+import { generateAdminProductsTablePDF, generateExpiryAlertsPDF } from '../../utils/pdfReports.js';
 
 /**
  * 📦 ADMIN PRODUCTS MANAGEMENT - ENHANCED
@@ -50,10 +50,14 @@ const AdminProducts = () => {
   const [posExpiryError, setPosExpiryError] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isExportingExpiryPdf, setIsExportingExpiryPdf] = useState(false);
   const [isVoiceSearchEnabled, setIsVoiceSearchEnabled] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
   const [filterBarHeight, setFilterBarHeight] = useState(0);
+  const [expandedBatchRows, setExpandedBatchRows] = useState({});
+  const [expiryAlertCategory, setExpiryAlertCategory] = useState('');
+  const [expiryAlertStockFilter, setExpiryAlertStockFilter] = useState('all');
   const pageSize = 20;
   const searchTimeoutRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -141,6 +145,112 @@ const AdminProducts = () => {
     return Math.ceil((target.getTime() - now.getTime()) / dayMs);
   };
 
+  const formatExpiryDate = (value) => {
+    if (!value) return 'No expiry date';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return 'No expiry date';
+    return parsed.toLocaleDateString('en-GB');
+  };
+
+  const getExpiryBatchStatus = (expiryDate) => {
+    const daysRemaining = getDaysUntil(expiryDate);
+
+    if (daysRemaining == null) {
+      return {
+        label: 'Date available',
+        tone: '#6b7280',
+        background: '#f3f4f6',
+        daysRemaining: null,
+      };
+    }
+
+    if (daysRemaining < 0) {
+      return {
+        label: 'Expired',
+        tone: '#991b1b',
+        background: '#fee2e2',
+        daysRemaining,
+      };
+    }
+
+    if (daysRemaining <= 14) {
+      return {
+        label: `Expiring in ${daysRemaining}d`,
+        tone: '#92400e',
+        background: '#fef3c7',
+        daysRemaining,
+      };
+    }
+
+    if (daysRemaining <= 30) {
+      return {
+        label: `Near expiry (${daysRemaining}d)`,
+        tone: '#0c5460',
+        background: '#dbeafe',
+        daysRemaining,
+      };
+    }
+
+    return {
+      label: `Fresh (${daysRemaining}d)`,
+      tone: '#166534',
+      background: '#dcfce7',
+      daysRemaining,
+    };
+  };
+
+  const normalizeProductExpiryBatches = (batches) => {
+    if (!Array.isArray(batches)) return [];
+
+    return batches
+      .map((batch) => {
+        const remainingQty = toNumberOrNull(batch?.remainingQty);
+        const expiryDate = batch?.expiryDate || null;
+        const parsed = expiryDate ? new Date(expiryDate) : null;
+
+        if (!parsed || Number.isNaN(parsed.getTime()) || remainingQty == null) {
+          return null;
+        }
+
+        return {
+          expiryDate,
+          remainingQty,
+          batchNo: batch?.batchNo || null,
+          locationCode: batch?.locationCode || null,
+          timestamp: parsed.getTime(),
+        };
+      })
+      .filter(Boolean)
+      .sort((left, right) => left.timestamp - right.timestamp);
+  };
+
+  const getDefaultBatchForProduct = (product) => {
+    const batches = normalizeProductExpiryBatches(product?.expiryBatches);
+    return batches.length > 0 ? batches[batches.length - 1] : null;
+  };
+
+  const getProductBatchTotalQty = (product) => {
+    const batches = normalizeProductExpiryBatches(product?.expiryBatches);
+    if (batches.length === 0) {
+      return toNumberOrNull(product?.stock) ?? 0;
+    }
+
+    return batches.reduce((sum, batch) => sum + (batch.remainingQty || 0), 0);
+  };
+
+  const getStockBucket = (qty) => {
+    const normalizedQty = Number(qty || 0);
+    if (normalizedQty <= 0) return 'out-of-stock';
+    if (normalizedQty <= 20) return 'low-stock';
+    return 'in-stock';
+  };
+
+  const getStockBucketLabel = (bucket) => {
+    if (bucket === 'out-of-stock') return 'Out of Stock';
+    if (bucket === 'low-stock') return 'Low Stock';
+    return 'In Stock';
+  };
+
   const mapPosExpiryToAlert = (row) => {
     const expiryDateValue = row?.expiryDate || row?.ExpiryDate || null;
     const daysRemaining = getDaysUntil(expiryDateValue);
@@ -155,6 +265,7 @@ const AdminProducts = () => {
       key: `${productCode || 'UNKNOWN'}-${expiryDateValue || ''}-${batchNo || ''}`,
       productCode,
       name: productName,
+      category: row?.category || row?.Category || 'Uncategorized',
       message: isExpired
         ? 'Already expired in POS stock'
         : daysRemaining == null
@@ -165,6 +276,7 @@ const AdminProducts = () => {
       remainingQty: qty,
       expiryDate: expiryDateValue,
       batchNo,
+      daysToExpiry: daysRemaining,
     };
   };
 
@@ -377,6 +489,8 @@ const AdminProducts = () => {
                   image: updatedProduct.image,
                   expiryDate: updatedProduct.expiryDate,
                   expiryStatus: updatedProduct.expiryStatus,
+                  expiryBatchCount: Number(updatedProduct.expiryBatchCount ?? product.expiryBatchCount ?? 0),
+                  expiryBatches: Array.isArray(updatedProduct.expiryBatches) ? updatedProduct.expiryBatches : (product.expiryBatches || []),
                   hideFromProductsPage: updatedProduct.hideFromProductsPage || false,
                   updatedAt: updatedProduct.updatedAt,
                 }
@@ -442,6 +556,8 @@ const AdminProducts = () => {
         expiryStatus: product.expiryStatus || null,
         daysToExpiry: product.daysToExpiry ?? null,
         expirySource: product.expirySource || null,
+        expiryBatchCount: Number(product.expiryBatchCount ?? 0),
+        expiryBatches: Array.isArray(product.expiryBatches) ? product.expiryBatches : [],
         hideFromProductsPage: Boolean(product.hideFromProductsPage),
       });
 
@@ -564,17 +680,86 @@ const AdminProducts = () => {
     })
     .map((product) => ({
       key: String(product.id),
+      productCode: product.productCode || product.sourceCode || '',
       name: product.name,
+      category: product.category || 'Uncategorized',
       message: product.expiryStatus?.label || product.expiryStatus?.message || 'Expiry warning',
       isExpired: product.expiryStatus?.status === 'expired',
       isUrgent: ['expiring_soon', '1_week_warning', '2_weeks_warning'].includes(product.expiryStatus?.status),
       remainingQty: toNumberOrNull(product.stock),
       expiryDate: product.expiryDate || null,
+      batchNo: null,
+      daysToExpiry: product.daysToExpiry ?? null,
       sourceProduct: product,
     }));
 
   const expiryAlerts = posExpiryError ? fallbackExpiryAlerts : posExpiryItems;
-  const expiryAlertCount = expiryAlerts.length;
+  const expiryAlertCards = Array.from(
+    expiryAlerts.reduce((accumulator, alert) => {
+      const key = String(alert.productCode || alert.name || alert.key);
+      const current = accumulator.get(key) || {
+        key,
+        productCode: alert.productCode || '',
+        name: alert.name || alert.productCode || 'Unknown Product',
+        category: alert.category || 'Uncategorized',
+        sourceProduct: alert.sourceProduct || null,
+        batches: [],
+      };
+
+      current.batches.push({
+        key: alert.key,
+        expiryDate: alert.expiryDate,
+        remainingQty: alert.remainingQty ?? 0,
+        batchNo: alert.batchNo || null,
+        daysToExpiry: alert.daysToExpiry,
+        statusLabel: getExpiryBatchStatus(alert.expiryDate).label,
+      });
+
+      if (!current.sourceProduct && alert.sourceProduct) {
+        current.sourceProduct = alert.sourceProduct;
+      }
+
+      accumulator.set(key, current);
+      return accumulator;
+    }, new Map()).values()
+  )
+    .map((card) => {
+      const batches = card.batches
+        .map((batch) => ({
+          ...batch,
+          timestamp: batch.expiryDate ? new Date(batch.expiryDate).getTime() : Number.POSITIVE_INFINITY,
+        }))
+        .sort((left, right) => left.timestamp - right.timestamp);
+      const totalQty = batches.reduce((sum, batch) => sum + (Number(batch.remainingQty) || 0), 0);
+      const stockBucket = getStockBucket(totalQty);
+
+      return {
+        ...card,
+        batches,
+        totalQty,
+        stockBucket,
+        stockLabel: getStockBucketLabel(stockBucket),
+        isExpired: batches.some((batch) => (batch.daysToExpiry ?? getDaysUntil(batch.expiryDate)) < 0),
+        isUrgent: batches.some((batch) => {
+          const daysRemaining = batch.daysToExpiry ?? getDaysUntil(batch.expiryDate);
+          return daysRemaining != null && daysRemaining >= 0 && daysRemaining <= 14;
+        }),
+      };
+    })
+    .sort((left, right) => {
+      const leftSoonest = left.batches[0]?.timestamp ?? Number.POSITIVE_INFINITY;
+      const rightSoonest = right.batches[0]?.timestamp ?? Number.POSITIVE_INFINITY;
+      return leftSoonest - rightSoonest;
+    });
+
+  const expiryAlertCategories = [...new Set(expiryAlertCards.map((card) => card.category || 'Uncategorized'))].sort();
+  const filteredExpiryAlertCards = expiryAlertCards.filter((card) => {
+    const matchesCategory = !expiryAlertCategory || card.category === expiryAlertCategory;
+    const matchesStock = expiryAlertStockFilter === 'all' || card.stockBucket === expiryAlertStockFilter;
+    return matchesCategory && matchesStock;
+  });
+  const expiryAlertCount = filteredExpiryAlertCards.length;
+  const expiryAlertsSourceCount = expiryAlertCards.length;
 
   // Handle search with debounce
   const handleSearchChange = (e) => {
@@ -668,6 +853,13 @@ const AdminProducts = () => {
   const handleSaleFilterChange = (value) => {
     setOnSaleOnly(value);
     setCurrentPage(1); // Reset to page 1
+  };
+
+  const toggleBatchRow = (productId) => {
+    setExpandedBatchRows((prev) => ({
+      ...prev,
+      [productId]: !prev[productId],
+    }));
   };
 
   const handleToggleVoiceSearch = () => {
@@ -881,6 +1073,27 @@ const AdminProducts = () => {
       showError('PDF export failed', 'Unable to generate products PDF. Please try again.');
     } finally {
       setIsExportingPdf(false);
+    }
+  };
+
+  const handleDownloadExpiryAlertsPdf = async () => {
+    try {
+      if (filteredExpiryAlertCards.length === 0) {
+        showError('No expiry alerts to export', 'There are no expiry alert cards for the selected filters.');
+        return;
+      }
+
+      setIsExportingExpiryPdf(true);
+      await generateExpiryAlertsPDF(filteredExpiryAlertCards, {
+        selectedCategory: expiryAlertCategory,
+        selectedStockFilter: expiryAlertStockFilter,
+      });
+      showSuccess('Success', `PDF downloaded with ${filteredExpiryAlertCards.length} expiry alert card(s).`);
+    } catch (err) {
+      console.error('[ADMIN PRODUCTS] Expiry alerts PDF export failed:', err);
+      showError('PDF export failed', 'Unable to generate expiry alerts PDF. Please try again.');
+    } finally {
+      setIsExportingExpiryPdf(false);
     }
   };
 
@@ -1152,7 +1365,7 @@ const AdminProducts = () => {
           }}>
             Loading POS expiry alerts...
           </div>
-        ) : expiryAlertCount > 0 ? (
+        ) : filteredExpiryAlertCards.length > 0 ? (
           <div style={{
             backgroundColor: '#fff3cd',
             border: '2px solid #ffc107',
@@ -1161,7 +1374,7 @@ const AdminProducts = () => {
             marginBottom: '2rem',
           }}>
             <h3 style={{ color: '#856404', marginTop: 0, marginBottom: '1rem' }}>
-              <i className="fas fa-exclamation-triangle" style={{marginRight: '0.5rem'}}></i>Expiry Alerts ({expiryAlertCount})
+              <i className="fas fa-exclamation-triangle" style={{marginRight: '0.5rem'}}></i>Expiry Alerts ({filteredExpiryAlertCards.length})
             </h3>
             {posExpiryError && (
               <div style={{
@@ -1176,64 +1389,111 @@ const AdminProducts = () => {
                 POS expiry fetch failed, showing local alerts: {posExpiryError}
               </div>
             )}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
-              {expiryAlerts
-                .map((alert) => {
-                  const isExpired = alert.isExpired;
-                  const isUrgent = alert.isUrgent;
-                  
-                  return (
-                    <div
-                      key={alert.key}
-                      style={{
-                        padding: '1rem',
-                        borderRadius: '6px',
-                        backgroundColor: isExpired ? '#f8d7da' : isUrgent ? '#ffe5b4' : '#fff',
-                        border: `2px solid ${isExpired ? '#f5c6cb' : isUrgent ? '#ffc107' : '#ddd'}`,
-                      }}
-                    >
-                      <div style={{ fontWeight: '600', marginBottom: '0.5rem' }}>
-                        {alert.name}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
+              {filteredExpiryAlertCards.map((card) => (
+                <div
+                  key={card.key}
+                  style={{
+                    padding: '1rem',
+                    borderRadius: '10px',
+                    backgroundColor: card.isExpired ? '#f8d7da' : card.isUrgent ? '#fff4db' : '#fff',
+                    border: `2px solid ${card.isExpired ? '#f5c6cb' : card.isUrgent ? '#ffc107' : '#ddd'}`,
+                    boxShadow: '0 4px 14px rgba(0, 0, 0, 0.06)',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                    <div>
+                      <div style={{ fontWeight: '700', marginBottom: '0.35rem', color: '#1f2937' }}>
+                        {card.name}
                       </div>
-                      <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '0.5rem' }}>
-                        {alert.message}
+                      <div style={{ fontSize: '0.82rem', color: '#6b7280' }}>
+                        Code: {card.productCode || 'N/A'}
                       </div>
-                      {alert.remainingQty != null && (
-                        <div style={{ fontSize: '0.85rem', color: '#555', marginBottom: '0.5rem' }}>
-                          Remaining Qty: {alert.remainingQty}
-                        </div>
-                      )}
-                      {alert.expiryDate && (
-                        <div style={{ fontSize: '0.85rem', color: '#555', marginBottom: '0.75rem' }}>
-                          Expiry Date: {new Date(alert.expiryDate).toLocaleDateString()}
-                        </div>
-                      )}
-                      {alert.sourceProduct ? (
-                        <button
-                          onClick={() => {
-                            handleEdit(alert.sourceProduct);
-                            setActiveSubTab('products');
-                          }}
+                      <div style={{ fontSize: '0.82rem', color: '#6b7280' }}>
+                        Category: {card.category || 'Uncategorized'}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '0.82rem', color: '#374151', fontWeight: '700' }}>
+                        Total Qty: {card.totalQty}
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>
+                        {card.stockLabel}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                    {card.batches.map((batch, index) => {
+                      const batchStatus = getExpiryBatchStatus(batch.expiryDate);
+
+                      return (
+                        <div
+                          key={batch.key}
                           style={{
-                            padding: '0.4rem 0.8rem',
-                            backgroundColor: isExpired ? '#dc3545' : '#ffc107',
-                            color: isExpired ? '#fff' : '#000',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '0.85rem',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            gap: '0.75rem',
+                            alignItems: 'center',
+                            padding: '0.75rem',
+                            borderRadius: '8px',
+                            backgroundColor: '#fff',
+                            border: '1px solid #e5e7eb',
                           }}
                         >
-                          {isExpired ? 'Remove' : 'Apply Discount'}
-                        </button>
-                      ) : (
-                        <div style={{ fontSize: '0.8rem', color: '#666' }}>
-                          POS item (manage from POS sync tools)
+                          <div>
+                            <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#111827' }}>
+                              Batch {index + 1}{batch.batchNo ? ` (${batch.batchNo})` : ''}
+                            </div>
+                            <div style={{ fontSize: '0.82rem', color: '#4b5563' }}>
+                              Quantity {batch.remainingQty}
+                            </div>
+                            <div style={{ fontSize: '0.82rem', color: '#4b5563' }}>
+                              Expiry {formatExpiryDate(batch.expiryDate)}
+                            </div>
+                          </div>
+                          <span style={{
+                            padding: '0.35rem 0.6rem',
+                            borderRadius: '999px',
+                            backgroundColor: batchStatus.background,
+                            color: batchStatus.tone,
+                            fontSize: '0.78rem',
+                            fontWeight: '700',
+                            whiteSpace: 'nowrap',
+                          }}>
+                            {batchStatus.label}
+                          </span>
                         </div>
-                      )}
+                      );
+                    })}
+                  </div>
+
+                  {card.sourceProduct ? (
+                    <button
+                      onClick={() => {
+                        handleEdit(card.sourceProduct);
+                        setActiveSubTab('products');
+                      }}
+                      style={{
+                        marginTop: '0.9rem',
+                        padding: '0.45rem 0.85rem',
+                        backgroundColor: card.isExpired ? '#dc3545' : '#ffc107',
+                        color: card.isExpired ? '#fff' : '#000',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '0.85rem',
+                      }}
+                    >
+                      {card.isExpired ? 'Review Product' : 'Open Product'}
+                    </button>
+                  ) : (
+                    <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.9rem' }}>
+                      POS item (manage from POS sync tools)
                     </div>
-                  );
-                })}
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         ) : (
@@ -1245,7 +1505,7 @@ const AdminProducts = () => {
             color: '#999',
           }}>
             <i className="fas fa-check-circle" style={{ fontSize: '2rem', marginBottom: '1rem', display: 'block', color: '#4caf50' }}></i>
-            <p style={{ fontSize: '1rem', margin: 0 }}>No expiry alerts - all products are fresh!</p>
+            <p style={{ fontSize: '1rem', margin: 0 }}>No expiry alerts match the current filters.</p>
           </div>
         )
       )}
@@ -1495,6 +1755,83 @@ const AdminProducts = () => {
           </div>
           </div>
           )}
+          {activeSubTab === 'expiry-alerts' && (
+          <div style={{
+          display: 'flex',
+          gap: '1rem',
+          alignItems: 'center',
+          padding: '0.75rem 1rem',
+          flexWrap: 'wrap',
+        }}>
+          <select
+            value={expiryAlertCategory}
+            onChange={(e) => setExpiryAlertCategory(e.target.value)}
+            style={{
+              padding: '0.75rem',
+              border: 'none',
+              borderRadius: '4px',
+              fontSize: '1rem',
+              minWidth: '180px',
+              backgroundColor: '#fff',
+            }}
+          >
+            <option value="">All Categories</option>
+            {expiryAlertCategories.map(cat => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+
+          <select
+            value={expiryAlertStockFilter}
+            onChange={(e) => setExpiryAlertStockFilter(e.target.value)}
+            style={{
+              padding: '0.75rem',
+              border: 'none',
+              borderRadius: '4px',
+              fontSize: '1rem',
+              minWidth: '180px',
+              backgroundColor: '#fff',
+            }}
+          >
+            <option value="all">All Stock Levels</option>
+            <option value="in-stock">In Stock</option>
+            <option value="low-stock">Low Stock</option>
+            <option value="out-of-stock">Out of Stock</option>
+          </select>
+
+          <button
+            onClick={handleDownloadExpiryAlertsPdf}
+            disabled={isExportingExpiryPdf}
+            style={{
+              padding: '0.6rem 1rem',
+              border: 'none',
+              borderRadius: '6px',
+              backgroundColor: isExportingExpiryPdf ? '#6c757d' : '#dc3545',
+              color: '#fff',
+              fontSize: '0.9rem',
+              fontWeight: '600',
+              cursor: isExportingExpiryPdf ? 'not-allowed' : 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}
+            title="Download filtered expiry alert cards PDF"
+          >
+            <i className={`fas ${isExportingExpiryPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`}></i>
+            {isExportingExpiryPdf ? 'Generating PDF...' : 'Download Alerts PDF'}
+          </button>
+
+          <div style={{
+            marginLeft: 'auto',
+            fontSize: '0.9rem',
+            color: '#666',
+            minWidth: '140px',
+            textAlign: 'right',
+          }}>
+            {filteredExpiryAlertCards.length} / {expiryAlertsSourceCount} alert products
+          </div>
+          </div>
+          )}
         </div>
         <div style={{ height: `${filterBarHeight}px` }}></div>
       </>
@@ -1552,6 +1889,10 @@ const AdminProducts = () => {
                 const hasValidDiscount = discountPct > 0;
                 const productCode = product.productCode || product.sourceCode || product.code;
                 const expiryBadge = getExpiryBadge(product);
+                const productBatches = normalizeProductExpiryBatches(product.expiryBatches);
+                const defaultBatch = getDefaultBatchForProduct(product);
+                const isBatchListExpanded = Boolean(expandedBatchRows[product.id]);
+                const totalBatchQty = getProductBatchTotalQty(product);
                 
                 return (
                   <tr 
@@ -1616,13 +1957,135 @@ const AdminProducts = () => {
                     <td style={{
                       padding: '1rem',
                       textAlign: 'center',
-                      color: product.stock > 20 ? '#4caf50' : product.stock > 0 ? '#ff9800' : '#f44336',
+                      color: totalBatchQty > 20 ? '#4caf50' : totalBatchQty > 0 ? '#ff9800' : '#f44336',
                       fontWeight: '600',
                     }}>
-                      {product.stock}
+                      {totalBatchQty}
                     </td>
                     <td style={{ padding: '1rem', fontSize: '0.9rem' }}>
-                      {expiryBadge ? (
+                      {productBatches.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: '280px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <button
+                              type="button"
+                              onClick={() => toggleBatchRow(product.id)}
+                              style={{
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#374151',
+                                cursor: 'pointer',
+                                padding: 0,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                                fontWeight: '700',
+                              }}
+                            >
+                              <i className={`fas ${isBatchListExpanded ? 'fa-chevron-down' : 'fa-chevron-right'}`}></i>
+                              {defaultBatch ? `Freshest batch: ${formatExpiryDate(defaultBatch.expiryDate)}` : 'Show batches'}
+                            </button>
+                            <span style={{
+                              padding: '0.35rem 0.55rem',
+                              borderRadius: '999px',
+                              backgroundColor: '#eef2ff',
+                              color: '#3730a3',
+                              fontSize: '0.76rem',
+                              fontWeight: '700',
+                            }}>
+                              {productBatches.length} batch{productBatches.length === 1 ? '' : 'es'}
+                            </span>
+                          </div>
+
+                          {defaultBatch && (() => {
+                            const defaultBatchStatus = getExpiryBatchStatus(defaultBatch.expiryDate);
+
+                            return (
+                              <div style={{
+                                padding: '0.65rem 0.75rem',
+                                borderRadius: '8px',
+                                backgroundColor: '#f8fafc',
+                                border: '1px solid #e5e7eb',
+                              }}>
+                                <div style={{ fontSize: '0.82rem', color: '#4b5563', marginBottom: '0.25rem' }}>
+                                  Default visible batch
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                  <div style={{ color: '#111827', fontWeight: '700' }}>
+                                    Qty {defaultBatch.remainingQty}: {formatExpiryDate(defaultBatch.expiryDate)}
+                                  </div>
+                                  <span style={{
+                                    padding: '0.35rem 0.55rem',
+                                    borderRadius: '999px',
+                                    backgroundColor: defaultBatchStatus.background,
+                                    color: defaultBatchStatus.tone,
+                                    fontSize: '0.76rem',
+                                    fontWeight: '700',
+                                  }}>
+                                    {defaultBatchStatus.label}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          {isBatchListExpanded && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                              {productBatches.map((batch, batchIndex) => {
+                                const batchStatus = getExpiryBatchStatus(batch.expiryDate);
+
+                                return (
+                                  <div
+                                    key={`${product.id}-${batch.expiryDate}-${batch.batchNo || batchIndex}`}
+                                    style={{
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      gap: '0.75rem',
+                                      alignItems: 'center',
+                                      padding: '0.6rem 0.75rem',
+                                      borderRadius: '8px',
+                                      backgroundColor: '#ffffff',
+                                      border: '1px solid #e5e7eb',
+                                    }}
+                                  >
+                                    <div>
+                                      <div style={{ fontSize: '0.82rem', fontWeight: '700', color: '#111827' }}>
+                                        Batch {batchIndex + 1}{batch.batchNo ? ` (${batch.batchNo})` : ''}
+                                      </div>
+                                      <div style={{ fontSize: '0.8rem', color: '#4b5563' }}>
+                                        Quantity {batch.remainingQty}: {formatExpiryDate(batch.expiryDate)}
+                                      </div>
+                                    </div>
+                                    <span style={{
+                                      padding: '0.35rem 0.55rem',
+                                      borderRadius: '999px',
+                                      backgroundColor: batchStatus.background,
+                                      color: batchStatus.tone,
+                                      fontSize: '0.75rem',
+                                      fontWeight: '700',
+                                      whiteSpace: 'nowrap',
+                                    }}>
+                                      {batchStatus.label}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {expiryBadge && (
+                            <span style={{
+                              padding: '0.4rem 0.6rem',
+                              borderRadius: '4px',
+                              backgroundColor: expiryBadge.backgroundColor,
+                              color: expiryBadge.color,
+                              fontSize: '0.8rem',
+                              width: 'fit-content',
+                            }}>
+                              <><i className={expiryBadge.icon}></i> {expiryBadge.label}</>
+                            </span>
+                          )}
+                        </div>
+                      ) : expiryBadge ? (
                         <span style={{
                           padding: '0.4rem 0.6rem',
                           borderRadius: '4px',
