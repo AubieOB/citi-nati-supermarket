@@ -3,6 +3,7 @@ const { computeExpiryStatus, suggestDiscount } = require('../utils/expiryStatus'
 const { notifyLowStock } = require('../utils/messageService');
 const posCommandQueueService = require('../services/posCommandQueue.service');
 const posSyncService = require('../services/posSync.service');
+const { verifyToken } = require('../utils/jwt');
 
 const prisma = new PrismaClient();
 const MIN_VALID_EXPIRY_DATE = new Date('2000-01-01T00:00:00.000Z');
@@ -137,6 +138,24 @@ function normalizeExpiryDate(value) {
   return date;
 }
 
+function getDecodedTokenFromRequest(req) {
+  try {
+    const bearerToken = req.headers.authorization?.split(' ')[1];
+    if (bearerToken) {
+      return verifyToken(bearerToken);
+    }
+  } catch (error) {
+    return null;
+  }
+
+  return null;
+}
+
+function shouldForceAdminExpiryEnrichment(req) {
+  const decodedToken = getDecodedTokenFromRequest(req);
+  return Boolean(decodedToken && decodedToken.role === 'admin');
+}
+
 function getStartOfToday() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -257,7 +276,8 @@ async function fetchPosExpiryMap(products) {
   const hasFreshCache = adminExpiryFetchState.fetchedAt > 0 && (now - adminExpiryFetchState.fetchedAt) < ADMIN_EXPIRY_CACHE_TTL_MS;
 
   let expiryRows = [];
-  const targetUrl = `${process.env.POS_AGENT_URL || 'http://localhost:3001'}/pos-sync/expiry-products`;
+  const posConfig = posSyncService.getConfig();
+  const targetUrl = `${posConfig.agentUrl}/pos-sync/expiry-products`;
 
   console.log(`[ADMIN PRODUCTS] calling POS expiry endpoint: ${targetUrl}`);
   console.log('[ADMIN PRODUCTS] POS expiry request params', {
@@ -287,8 +307,8 @@ async function fetchPosExpiryMap(products) {
     }
   } else {
     expiryRows = Array.isArray(expiryResult.data?.data) ? expiryResult.data.data : [];
-    console.log('[ADMIN PRODUCTS] POS expiry response status', expiryResult.meta?.status || 200);
-    console.log('[ADMIN PRODUCTS] POS expiry rows count', expiryRows.length);
+    console.log('[ADMIN PRODUCTS] expiry response status', expiryResult.meta?.status || 200);
+    console.log('[ADMIN PRODUCTS] expiry rows count', expiryRows.length);
     console.log('[ADMIN PRODUCTS] first expiry row', expiryRows[0] || null);
     adminExpiryFetchState.rows = expiryRows;
     adminExpiryFetchState.fetchedAt = Date.now();
@@ -327,7 +347,7 @@ async function fetchPosExpiryMap(products) {
 
   for (const [productCode, rows] of groupedRows.entries()) {
     const preferredExpiryDate = pickPreferredExpiryRow(rows);
-    const mergedFields = createMergedExpiryFields(preferredExpiryDate, 'pos');
+    const mergedFields = createMergedExpiryFields(preferredExpiryDate, 'pos-agent');
 
     if (mergedFields) {
       expiryMap.set(productCode, mergedFields);
@@ -374,8 +394,12 @@ async function enrichProductsWithExpiry(products) {
   });
 
   const mergedWithExpiryCount = mergedProducts.filter((product) => Boolean(product.expiryDate)).length;
+  const sample6009603060415 = mergedProducts.find((product) => normalizeProductCode(product.sourceCode) === '6009603060415') || null;
+  const sample988251372310 = mergedProducts.find((product) => normalizeProductCode(product.sourceCode) === '988251372310') || null;
   console.log('[ADMIN PRODUCTS] merged products with expiry count', mergedWithExpiryCount);
   console.log('[ADMIN PRODUCTS] sample merged row with expiry', mergedProducts[0] || null);
+  console.log('[ADMIN PRODUCTS] sample merged row for sourceCode 6009603060415', sample6009603060415);
+  console.log('[ADMIN PRODUCTS] sample merged row for sourceCode 988251372310', sample988251372310);
 
   return mergedProducts;
 }
@@ -501,7 +525,16 @@ const getProducts = async (req, res) => {
     // Extract query parameters for filtering and pagination
     // Support both offset-based (offset, limit) and page-based (page, pageSize) for backwards compatibility
     const { search, category, onSale, page, pageSize, offset, limit, includePosExpiry } = req.query;
-    const shouldIncludePosExpiry = String(includePosExpiry || '').trim().toLowerCase() === 'true';
+    const requestedPosExpiry = String(includePosExpiry || '').trim().toLowerCase() === 'true';
+    const forceAdminPosExpiry = shouldForceAdminExpiryEnrichment(req);
+    const shouldIncludePosExpiry = requestedPosExpiry || forceAdminPosExpiry;
+
+    console.log('[ADMIN PRODUCTS] expiry enrichment decision', {
+      includePosExpiryQuery: includePosExpiry,
+      requestedPosExpiry,
+      forceAdminPosExpiry,
+      shouldIncludePosExpiry,
+    });
 
     // Determine pagination mode and calculate skip/take
     let skip, take;
