@@ -15,8 +15,45 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
-const POS_AGENT_URL = process.env.POS_AGENT_URL || 'http://localhost:3001';
-const POS_SECRET = process.env.POS_SECRET || '';
+function resolvePosAgentUrl() {
+  const candidates = [
+    { key: 'POS_AGENT_URL', value: process.env.POS_AGENT_URL },
+    { key: 'VITE_POS_AGENT_URL', value: process.env.VITE_POS_AGENT_URL },
+    { key: 'POS_SYNC_AGENT_URL', value: process.env.POS_SYNC_AGENT_URL },
+  ];
+
+  const found = candidates.find((candidate) => String(candidate.value || '').trim());
+  if (!found) {
+    return { value: 'http://localhost:3001', source: 'default' };
+  }
+
+  return {
+    value: String(found.value).trim(),
+    source: found.key,
+  };
+}
+
+function resolvePosSecret() {
+  const candidates = [
+    { key: 'POS_SECRET', value: process.env.POS_SECRET },
+    { key: 'POS_AGENT_SECRET', value: process.env.POS_AGENT_SECRET },
+    { key: 'POS_SYNC_SECRET', value: process.env.POS_SYNC_SECRET },
+    { key: 'VITE_POS_SECRET', value: process.env.VITE_POS_SECRET },
+  ];
+
+  const found = candidates.find((candidate) => String(candidate.value || '').trim());
+  if (!found) {
+    return { value: '', source: 'none' };
+  }
+
+  return {
+    value: String(found.value).trim(),
+    source: found.key,
+  };
+}
+
+const { value: POS_AGENT_URL, source: POS_AGENT_URL_SOURCE } = resolvePosAgentUrl();
+const { value: POS_SECRET, source: POS_SECRET_SOURCE } = resolvePosSecret();
 const ENABLE_POS_SYNC = process.env.ENABLE_POS_SYNC !== 'false'; // Enabled by default
 const ENABLE_DIRECT_POS_WRITEBACK_DEBUG = process.env.ENABLE_DIRECT_POS_WRITEBACK_DEBUG === 'true';
 const parsedPosAgentTimeoutMs = parseInt(process.env.POS_AGENT_TIMEOUT_MS || '15000', 10);
@@ -359,7 +396,9 @@ async function getExpiryProductsFromPOS({ days = 14, locationCode = 'SH', includ
     console.log('[BACKEND -> AGENT][EXPIRY] requesting expiry candidates', {
       endpoint,
       targetUrl,
+      agentUrlSource: POS_AGENT_URL_SOURCE,
       hasSecret: Boolean(POS_SECRET),
+      secretSource: POS_SECRET_SOURCE,
       days,
       locationCode,
       includeExpired,
@@ -455,8 +494,10 @@ function getConfig() {
   return {
     enabled: ENABLE_POS_SYNC,
     agentUrl: POS_AGENT_URL,
+    agentUrlSource: POS_AGENT_URL_SOURCE,
     timeoutMs: POS_AGENT_TIMEOUT_MS,
     hasSecret: !!POS_SECRET,
+    secretSource: POS_SECRET_SOURCE,
     secretLength: POS_SECRET?.length || 0,
   };
 }
