@@ -282,15 +282,30 @@ function reconcileBatchesWithLiveStock(batches, liveStockQty) {
 
   let remainingStockToAllocate = normalizedLiveStock;
 
-  return batches
+  const parseBatchRank = (batchNo) => {
+    if (batchNo == null) return Number.NEGATIVE_INFINITY;
+    const parsed = Number(batchNo);
+    return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
+  };
+
+  const normalizedBatches = batches
     .map((batch) => ({
       ...batch,
       remainingQty: Number(batch?.remainingQty || 0),
       expiryTimestamp: batch?.expiryDate ? new Date(batch.expiryDate).getTime() : Number.POSITIVE_INFINITY,
+      batchRank: parseBatchRank(batch?.batchNo),
     }))
-    .filter((batch) => Number.isFinite(batch.remainingQty) && batch.remainingQty > 0)
-    .sort((left, right) => left.expiryTimestamp - right.expiryTimestamp)
-    .map((batch) => {
+    .filter((batch) => Number.isFinite(batch.remainingQty) && batch.remainingQty > 0);
+
+  const allocationOrder = [...normalizedBatches].sort((left, right) => {
+    if (left.batchRank !== right.batchRank) {
+      return right.batchRank - left.batchRank;
+    }
+
+    return right.expiryTimestamp - left.expiryTimestamp;
+  });
+
+  const reconciled = allocationOrder.map((batch) => {
       if (remainingStockToAllocate <= 0) {
         return {
           ...batch,
@@ -305,8 +320,11 @@ function reconcileBatchesWithLiveStock(batches, liveStockQty) {
         ...batch,
         remainingQty: allocatedQty,
       };
-    })
+    });
+
+  return reconciled
     .filter((batch) => batch.remainingQty > 0)
+    .sort((left, right) => left.expiryTimestamp - right.expiryTimestamp)
     .map(({ expiryTimestamp, ...batch }) => batch);
 }
 
@@ -350,7 +368,7 @@ async function buildActiveExpiryBatchesFromPOS() {
     let totalSkipped = 0;
 
     for (const [code, entries] of grouped.entries()) {
-      // Keep only active rows and aggregate by ProductCode + ExpiryDate
+      // Keep only active rows and aggregate by ProductCode + GRN + ExpiryDate
       const activeRows = entries.filter((e) => e.RemainingQty != null && e.RemainingQty > 0);
       const skippedCount = entries.length - activeRows.length;
       totalSkipped += skippedCount;
@@ -359,24 +377,27 @@ async function buildActiveExpiryBatchesFromPOS() {
         continue;
       }
 
-      const byExpiryDate = new Map();
+      const byBatch = new Map();
       for (const row of activeRows) {
         const dateKey = new Date(row.ExpiryDate).toISOString().slice(0, 10);
-        if (!byExpiryDate.has(dateKey)) {
-          byExpiryDate.set(dateKey, {
+        const batchNo = row.LatestGRNNo != null ? String(row.LatestGRNNo) : null;
+        const batchKey = `${batchNo || 'NO-GRN'}|${dateKey}`;
+
+        if (!byBatch.has(batchKey)) {
+          byBatch.set(batchKey, {
             productCode: code,
             expiryDate: new Date(row.ExpiryDate).toISOString(),
             remainingQty: 0,
             locationCode,
-            batchNo: row.LatestGRNNo != null ? String(row.LatestGRNNo) : null,
+            batchNo,
             source,
           });
         }
-        const current = byExpiryDate.get(dateKey);
+        const current = byBatch.get(batchKey);
         current.remainingQty += Number(row.RemainingQty || 0);
       }
 
-      const batches = Array.from(byExpiryDate.values())
+      const batches = Array.from(byBatch.values())
         .filter((b) => b.remainingQty > 0)
         .sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
 
@@ -611,7 +632,7 @@ async function fetchExpiryCandidates({ days, locationCode, includeExpired, sourc
       SELECT
         sd.ProductCode,
         sd.ExpiryDate,
-        MAX(s.GRNNo) AS LatestGRNNo,
+        s.GRNNo AS LatestGRNNo,
         SUM(ISNULL(sd.StockQty, 0) - ISNULL(sd.StockOut, 0)) AS RemainingQty
       FROM POS.dbo.stockdetails sd
       INNER JOIN POS.dbo.stocks s
@@ -620,9 +641,9 @@ async function fetchExpiryCandidates({ days, locationCode, includeExpired, sourc
         AND sd.ExpiryDate IS NOT NULL
         AND s.LocationCode = @LocationCode
         ${buildProductCodeFilter('sd')}
-      GROUP BY sd.ProductCode, sd.ExpiryDate
+      GROUP BY sd.ProductCode, sd.ExpiryDate, s.GRNNo
       HAVING SUM(ISNULL(sd.StockQty, 0) - ISNULL(sd.StockOut, 0)) > 0
-      ORDER BY sd.ExpiryDate ASC, sd.ProductCode ASC
+      ORDER BY s.GRNNo DESC, sd.ExpiryDate DESC, sd.ProductCode ASC
     `;
 
   const viewQuery = `
