@@ -286,6 +286,20 @@ function reconcileBatchesWithLiveStock(batches, liveStockQty) {
     });
 }
 
+function encodeExpiryBatchReference(stockDetailId, grnNo) {
+  const normalizedStockDetailId = String(stockDetailId || '').trim();
+  const normalizedGrnNo = String(grnNo || '').trim();
+
+  if (!normalizedStockDetailId && !normalizedGrnNo) {
+    return null;
+  }
+
+  const parts = [];
+  if (normalizedStockDetailId) parts.push(`SD:${normalizedStockDetailId}`);
+  if (normalizedGrnNo) parts.push(`GRN:${normalizedGrnNo}`);
+  return parts.join('|');
+}
+
 function getExpiryBatchDebugProductCode() {
   const raw = process.env.EXPIRY_BATCH_DEBUG_PRODUCT_CODE || process.env.EXPIRY_BATCH_DEBUG_PRODUCT || '';
   const normalized = String(raw).trim();
@@ -341,27 +355,51 @@ async function buildActiveExpiryBatchesFromPOS() {
         continue;
       }
       
-      const StockBalance = Number(row.StockBalance || 0);
-      if (StockBalance <= 0) {
+      const stockBalance = Number(row.StockBalance || 0);
+      if (stockBalance <= 0) {
         skippedCount++;
         continue;
       }
 
-      // Use StockDetailID as the unique batch identifier
       const stockDetailId = row.StockDetailID != null ? String(row.StockDetailID).trim() : null;
+      const grnNo = row.GRNNo != null ? String(row.GRNNo).trim() : null;
+      const stockQty = row.StockQty == null ? null : Number(row.StockQty);
       const debugEnabled = shouldDebugExpiryBatch(code);
+
+      if (debugEnabled) {
+        console.log(`[EXPIRY BATCH] source rows from vw_WillExpire_Products for product ${code}`, {
+          stockDetailId,
+          expiryDate: d.toISOString(),
+          stockBalance,
+        });
+        console.log(`[EXPIRY BATCH] joined stockdetails rows for product ${code}`, {
+          stockDetailId,
+          grnNo,
+          stockQty,
+          stockBalance,
+        });
+      }
 
       const batch = {
         productCode: code,
+        stockDetailId,
+        grnNo,
         expiryDate: d.toISOString(),
-        remainingQty: StockBalance,
+        remainingQty: stockBalance,
         locationCode: locationCode,
-        batchNo: stockDetailId,  // StockDetailID is the unique batch key
+        batchNo: encodeExpiryBatchReference(stockDetailId, grnNo),
         source: result.source,
       };
 
       if (debugEnabled) {
-        console.log(`[EXPIRY BATCH] processing batch for ${code}:`, batch);
+        console.log(`[EXPIRY BATCH] final batch payload for product ${code}`, {
+          stockDetailId,
+          grnNo,
+          stockQty,
+          stockBalance,
+          finalRemainingQty: batch.remainingQty,
+          batch,
+        });
       }
 
       if (!expiryBatchesMap.has(code)) {
@@ -386,7 +424,7 @@ async function buildActiveExpiryBatchesFromPOS() {
       if (sampleLog < 3) {
         console.log(`[POS FETCH][EXPIRY] product ${code}: ${batches.length} batches`);
         batches.slice(0, 2).forEach((b, idx) => {
-          console.log(`  batch ${idx + 1}: StockDetailID=${b.batchNo} qty=${b.remainingQty} expiry=${new Date(b.expiryDate).toISOString().slice(0, 10)}`);
+          console.log(`  batch ${idx + 1}: StockDetailID=${b.stockDetailId || 'N/A'} GRN=${b.grnNo || 'N/A'} qty=${b.remainingQty} expiry=${new Date(b.expiryDate).toISOString().slice(0, 10)}`);
         });
         sampleLog++;
       }
@@ -542,21 +580,20 @@ function toIsoDateOrNull(value) {
 
 function mapExpiryRow(row, fallbackLocationCode) {
   const expiryDate = pickFirstValue(row, ['ExpiryDate', 'expiryDate']);
-  const remainingQty = pickFirstValue(row, [
-    'RemainingQty',
-    'remainingQty',
-    'Quantity',
-    'quantity',
-    'StockBalance',
-    'AvailableStock',
-    'StockQty',
-  ]);
+  const remainingQty = pickFirstValue(row, ['StockBalance', 'stockBalance', 'RemainingQty', 'remainingQty']);
 
   return {
     ProductCode: pickFirstValue(row, ['ProductCode', 'productCode']),
+    StockDetailID: pickFirstValue(row, ['StockDetailID', 'stockDetailId']),
     ExpiryDate: toIsoDateOrNull(expiryDate),
     RemainingQty: remainingQty == null ? null : Number(remainingQty),
-    LatestGRNNo: pickFirstValue(row, ['LatestGRNNo', 'latestGRNNo', 'GRNNo', 'grnNo']),
+    StockBalance: remainingQty == null ? null : Number(remainingQty),
+    StockQty: (() => {
+      const value = pickFirstValue(row, ['StockQty', 'stockQty']);
+      return value == null ? null : Number(value);
+    })(),
+    GRNNo: pickFirstValue(row, ['GRNNo', 'grnNo', 'LatestGRNNo', 'latestGRNNo']),
+    LatestGRNNo: pickFirstValue(row, ['GRNNo', 'grnNo', 'LatestGRNNo', 'latestGRNNo']),
     ProductName: pickFirstValue(row, ['ProductName', 'productName', 'Description', 'description']),
     locationCode: pickFirstValue(row, ['LocationCode', 'locationCode']) || fallbackLocationCode,
     currentPrice: (() => {
@@ -600,18 +637,22 @@ async function fetchExpiryCandidates({ days, locationCode, includeExpired, sourc
   };
 
   const rangeClause = safeIncludeExpired
-    ? `ExpiryDate >= @MinValidDate`
-    : `ExpiryDate >= @MinValidDate
-       AND ExpiryDate >= CAST(GETDATE() AS date)
-       AND ExpiryDate < DATEADD(DAY, @ExpiryDays, CAST(GETDATE() AS date))`;
+    ? `vw.ExpiryDate >= @MinValidDate`
+    : `vw.ExpiryDate >= @MinValidDate
+       AND vw.ExpiryDate >= CAST(GETDATE() AS date)
+       AND vw.ExpiryDate < DATEADD(DAY, @ExpiryDays, CAST(GETDATE() AS date))`;
 
   const viewQuery = `
       SELECT
-        ProductCode,
-        StockDetailID,
-        ExpiryDate,
-        StockBalance
+        vw.ProductCode,
+        vw.StockDetailID,
+        vw.ExpiryDate,
+        vw.StockBalance,
+        sd.GRNNo,
+        sd.StockQty
       FROM POS.dbo.vw_WillExpire_Products vw
+      LEFT JOIN POS.dbo.stockdetails sd
+        ON vw.StockDetailID = sd.StockDetailID
       WHERE ${rangeClause}
         AND vw.ExpiryDate IS NOT NULL
         AND vw.StockBalance > 0
@@ -638,6 +679,8 @@ async function fetchExpiryCandidates({ days, locationCode, includeExpired, sourc
       StockDetailID: row.StockDetailID,
       ExpiryDate: row.ExpiryDate,
       StockBalance: Number(row.StockBalance || 0),
+      StockQty: row.StockQty == null ? null : Number(row.StockQty),
+      GRNNo: row.GRNNo == null ? null : String(row.GRNNo).trim(),
     }))
     .filter((row) => row.ProductCode && row.ExpiryDate && row.StockBalance > 0);
 

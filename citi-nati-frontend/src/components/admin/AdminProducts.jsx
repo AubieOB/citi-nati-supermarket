@@ -215,6 +215,8 @@ const AdminProducts = () => {
         return {
           expiryDate,
           remainingQty,
+          stockDetailId: batch?.stockDetailId || null,
+          grnNo: batch?.grnNo || null,
           batchNo: batch?.batchNo || null,
           locationCode: batch?.locationCode || null,
           timestamp: parsed.getTime(),
@@ -226,7 +228,23 @@ const AdminProducts = () => {
 
   const getDefaultBatchForProduct = (product) => {
     const batches = normalizeProductExpiryBatches(product?.expiryBatches);
-    return batches.length > 0 ? batches[batches.length - 1] : null;
+    return batches.length > 0 ? batches[0] : null;
+  };
+
+  const formatBatchIdentity = (batch, batchIndex) => {
+    if (batch?.grnNo && batch?.stockDetailId) {
+      return `GRN ${batch.grnNo} / SD ${batch.stockDetailId}`;
+    }
+    if (batch?.grnNo) {
+      return `GRN ${batch.grnNo}`;
+    }
+    if (batch?.stockDetailId) {
+      return `Stock Detail ${batch.stockDetailId}`;
+    }
+    if (batch?.batchNo) {
+      return `Batch ${batch.batchNo}`;
+    }
+    return `Batch ${batchIndex + 1}`;
   };
 
   const getProductBatchTotalQty = (product) => {
@@ -254,12 +272,14 @@ const AdminProducts = () => {
   const mapPosExpiryToAlert = (row) => {
     const expiryDateValue = row?.expiryDate || row?.ExpiryDate || null;
     const daysRemaining = getDaysUntil(expiryDateValue);
-    const qty = toNumberOrNull(row?.remainingQty ?? row?.RemainingQty);
+    const qty = toNumberOrNull(row?.remainingQty ?? row?.RemainingQty ?? row?.stockBalance ?? row?.StockBalance);
     const isExpired = daysRemaining != null && daysRemaining < 0;
     const isUrgent = daysRemaining != null && daysRemaining >= 0 && daysRemaining <= 14;
     const productCode = row?.productCode || row?.ProductCode || '';
     const productName = row?.productName || row?.ProductName || productCode || 'Unknown Product';
-    const batchNo = row?.batchNo || null;
+    const stockDetailId = row?.stockDetailId || row?.StockDetailID || null;
+    const grnNo = row?.grnNo || row?.GRNNo || null;
+    const batchNo = row?.batchNo || grnNo || stockDetailId || null;
 
     return {
       key: `${productCode || 'UNKNOWN'}-${expiryDateValue || ''}-${batchNo || ''}`,
@@ -275,6 +295,8 @@ const AdminProducts = () => {
       isUrgent,
       remainingQty: qty,
       expiryDate: expiryDateValue,
+      stockDetailId,
+      grnNo,
       batchNo,
       daysToExpiry: daysRemaining,
     };
@@ -1982,7 +2004,7 @@ const AdminProducts = () => {
                               }}
                             >
                               <i className={`fas ${isBatchListExpanded ? 'fa-chevron-down' : 'fa-chevron-right'}`}></i>
-                              {defaultBatch ? `Freshest batch: ${formatExpiryDate(defaultBatch.expiryDate)}` : 'Show batches'}
+                              {defaultBatch ? `Earliest active batch: ${formatExpiryDate(defaultBatch.expiryDate)}` : 'Show batches'}
                             </button>
                             <span style={{
                               padding: '0.35rem 0.55rem',
@@ -2011,7 +2033,10 @@ const AdminProducts = () => {
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                                   <div style={{ color: '#111827', fontWeight: '700' }}>
-                                    Qty {defaultBatch.remainingQty}: {formatExpiryDate(defaultBatch.expiryDate)}
+                                    Remaining Qty {defaultBatch.remainingQty}: {formatExpiryDate(defaultBatch.expiryDate)}
+                                  </div>
+                                  <div style={{ fontSize: '0.8rem', color: '#4b5563' }}>
+                                    {formatBatchIdentity(defaultBatch, 0)}
                                   </div>
                                   <span style={{
                                     padding: '0.35rem 0.55rem',
@@ -2049,10 +2074,10 @@ const AdminProducts = () => {
                                   >
                                     <div>
                                       <div style={{ fontSize: '0.82rem', fontWeight: '700', color: '#111827' }}>
-                                        Batch {batchIndex + 1}{batch.batchNo ? ` (${batch.batchNo})` : ''}
+                                        {formatBatchIdentity(batch, batchIndex)}
                                       </div>
                                       <div style={{ fontSize: '0.8rem', color: '#4b5563' }}>
-                                        Quantity {batch.remainingQty}: {formatExpiryDate(batch.expiryDate)}
+                                        Remaining Qty {batch.remainingQty}: {formatExpiryDate(batch.expiryDate)}
                                       </div>
                                     </div>
                                     <span style={{
