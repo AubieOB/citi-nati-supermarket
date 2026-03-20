@@ -235,7 +235,8 @@ async function fetchProductsFromPOS() {
 
 /**
  * Builds a Map<ProductCode, { expiryDate: Date, source: string }> from SQL Server.
- * Primary: vw_WillExpire_Products  Fallback: stockdetails
+ * Primary: stockdetails (stock movement source of truth)
+ * Fallback: vw_WillExpire_Products
  * Business rule: for each ProductCode, pick the LATEST expiry date among rows
  * that have positive remaining stock. "Latest" = newest batch currently on shelf.
  * Never fall back to stale historical expired rows if active stock exists.
@@ -248,7 +249,7 @@ async function buildExpiryMapFromPOS() {
       days: 3650,
       locationCode,
       includeExpired: true,  // fetch all so we can apply our own selection rule
-      source: 'view',
+      source: 'stockdetails',
       productCodes: [],
     });
     const source = result.source;
@@ -296,7 +297,7 @@ async function buildExpiryMapFromPOS() {
       expiryMap.set(code, { expiryDate: chosenDate, source });
 
       if (expiryMap.size <= 3) {
-        console.log(`[POS FETCH][EXPIRY] selected current expiry row: productCode=${code} expiryDate=${chosenDate.toISOString().slice(0,10)} activeRows=${activeRows.length} skipped=${skippedCount}`);
+        console.log(`[POS FETCH][EXPIRY] selected latest stock-add row: productCode=${code} expiryDate=${chosenDate.toISOString().slice(0,10)} activeRows=${activeRows.length} skipped=${skippedCount}`);
       }
     }
 
