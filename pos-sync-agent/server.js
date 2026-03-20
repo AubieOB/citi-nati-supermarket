@@ -211,7 +211,8 @@ async function fetchProductsFromPOS() {
     let enrichedWithExpiry = 0;
     const enrichedRecords = result.recordset.map(product => {
       const code = String(product.ProductCode || '').trim();
-      const batches = expiryBatchesMap.get(code) || [];
+      const liveStockQty = Number(product.QuantityAvailable || 0);
+      const batches = reconcileBatchesWithLiveStock(expiryBatchesMap.get(code) || [], liveStockQty);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const upcomingBatches = batches
@@ -267,6 +268,46 @@ async function fetchProductsFromPOS() {
     console.error('[POS FETCH] Error fetching products:', err.message);
     return [];
   }
+}
+
+function reconcileBatchesWithLiveStock(batches, liveStockQty) {
+  if (!Array.isArray(batches) || batches.length === 0) {
+    return [];
+  }
+
+  const normalizedLiveStock = Number.isFinite(Number(liveStockQty)) ? Math.max(0, Number(liveStockQty)) : 0;
+  if (normalizedLiveStock <= 0) {
+    return [];
+  }
+
+  let remainingStockToAllocate = normalizedLiveStock;
+
+  return batches
+    .map((batch) => ({
+      ...batch,
+      remainingQty: Number(batch?.remainingQty || 0),
+      expiryTimestamp: batch?.expiryDate ? new Date(batch.expiryDate).getTime() : Number.POSITIVE_INFINITY,
+    }))
+    .filter((batch) => Number.isFinite(batch.remainingQty) && batch.remainingQty > 0)
+    .sort((left, right) => left.expiryTimestamp - right.expiryTimestamp)
+    .map((batch) => {
+      if (remainingStockToAllocate <= 0) {
+        return {
+          ...batch,
+          remainingQty: 0,
+        };
+      }
+
+      const allocatedQty = Math.min(batch.remainingQty, remainingStockToAllocate);
+      remainingStockToAllocate -= allocatedQty;
+
+      return {
+        ...batch,
+        remainingQty: allocatedQty,
+      };
+    })
+    .filter((batch) => batch.remainingQty > 0)
+    .map(({ expiryTimestamp, ...batch }) => batch);
 }
 
 /**

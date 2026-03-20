@@ -115,7 +115,7 @@ function normalizeBatchForResponse(batch) {
   const expiryDate = normalizeExpiryDate(batch?.expiryDate);
   const remainingQty = Number(batch?.remainingQty ?? 0);
 
-  if (!expiryDate || !Number.isFinite(remainingQty)) {
+  if (!expiryDate || !Number.isFinite(remainingQty) || remainingQty <= 0) {
     return null;
   }
 

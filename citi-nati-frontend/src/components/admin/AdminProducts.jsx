@@ -208,7 +208,7 @@ const AdminProducts = () => {
         const expiryDate = batch?.expiryDate || null;
         const parsed = expiryDate ? new Date(expiryDate) : null;
 
-        if (!parsed || Number.isNaN(parsed.getTime()) || remainingQty == null) {
+        if (!parsed || Number.isNaN(parsed.getTime()) || remainingQty == null || remainingQty <= 0) {
           return null;
         }
 
