@@ -474,16 +474,21 @@ async function fetchExpiryCandidates({ days, locationCode, includeExpired, sourc
   request.input('MinValidDate', sql.Date, new Date('2000-01-01T00:00:00.000Z'));
   request.input('ExpiryDays', sql.Int, safeDays);
   request.input('LocationCode', sql.VarChar(10), safeLocationCode);
-  request.input('ProductCodesCsv', sql.NVarChar(sql.MAX), productCodesCsv);
+  // Only add STRING_SPLIT filter when there are actual product codes to filter by.
+  // STRING_SPLIT requires SQL Server 2016+ (compat level 130); omitting it when
+  // the list is empty avoids a compile-time error on older instances.
+  if (productCodesCsv) {
+    request.input('ProductCodesCsv', sql.NVarChar(sql.MAX), productCodesCsv);
+  }
 
-  const buildProductCodeFilter = (alias) => `
-       AND (
-         @ProductCodesCsv IS NULL OR
-         LTRIM(RTRIM(CAST(${alias}.ProductCode AS NVARCHAR(100)))) IN (
-           SELECT LTRIM(RTRIM(value))
-           FROM STRING_SPLIT(@ProductCodesCsv, ',')
-         )
+  const buildProductCodeFilter = (alias) => {
+    if (!productCodesCsv) return '';
+    return `
+       AND LTRIM(RTRIM(CAST(${alias}.ProductCode AS NVARCHAR(100)))) IN (
+         SELECT LTRIM(RTRIM(value))
+         FROM STRING_SPLIT(@ProductCodesCsv, ',')
        )`;
+  };
 
   const rangeClause = safeIncludeExpired
     ? `ExpiryDate >= @MinValidDate`
@@ -531,7 +536,9 @@ async function fetchExpiryCandidates({ days, locationCode, includeExpired, sourc
       fallbackRequest.input('MinValidDate', sql.Date, new Date('2000-01-01T00:00:00.000Z'));
       fallbackRequest.input('ExpiryDays', sql.Int, safeDays);
       fallbackRequest.input('LocationCode', sql.VarChar(10), safeLocationCode);
-      fallbackRequest.input('ProductCodesCsv', sql.NVarChar(sql.MAX), productCodesCsv);
+      if (productCodesCsv) {
+        fallbackRequest.input('ProductCodesCsv', sql.NVarChar(sql.MAX), productCodesCsv);
+      }
       result = await fallbackRequest.query(stockDetailsQuery);
       resolvedSource = 'stockdetails';
     }
@@ -542,7 +549,9 @@ async function fetchExpiryCandidates({ days, locationCode, includeExpired, sourc
       fallbackRequest.input('MinValidDate', sql.Date, new Date('2000-01-01T00:00:00.000Z'));
       fallbackRequest.input('ExpiryDays', sql.Int, safeDays);
       fallbackRequest.input('LocationCode', sql.VarChar(10), safeLocationCode);
-      fallbackRequest.input('ProductCodesCsv', sql.NVarChar(sql.MAX), productCodesCsv);
+      if (productCodesCsv) {
+        fallbackRequest.input('ProductCodesCsv', sql.NVarChar(sql.MAX), productCodesCsv);
+      }
       result = await fallbackRequest.query(stockDetailsQuery);
       resolvedSource = 'stockdetails';
     } else {
