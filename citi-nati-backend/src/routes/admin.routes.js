@@ -22,6 +22,7 @@ const {
   applyPromotion: applyPosPromotion,
   revertPromotion: revertPosPromotion,
 } = require('../controllers/posExpiryPromotion.controller');
+const { getExpiryBatchAlerts } = require('../controllers/product.controller');
 const { emitProductUpdate } = require('../utils/socket');
 
 const router = express.Router();
@@ -621,6 +622,7 @@ router.post('/promotions/:type', verifyTokenMiddleware, verifyAdmin, updatePromo
  * Protected: Admin only
  */
 router.get('/pos-expiry', verifyTokenMiddleware, verifyAdmin, getExpiryCandidates);
+router.get('/expiry-batches', verifyTokenMiddleware, verifyAdmin, getExpiryBatchAlerts);
 
 /**
  * GET /api/admin/pos-promotions/:productCode/preview

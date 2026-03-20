@@ -142,15 +142,19 @@ const AdminProducts = () => {
   };
 
   const mapPosExpiryToAlert = (row) => {
-    const daysRemaining = getDaysUntil(row?.ExpiryDate);
-    const qty = toNumberOrNull(row?.RemainingQty);
+    const expiryDateValue = row?.expiryDate || row?.ExpiryDate || null;
+    const daysRemaining = getDaysUntil(expiryDateValue);
+    const qty = toNumberOrNull(row?.remainingQty ?? row?.RemainingQty);
     const isExpired = daysRemaining != null && daysRemaining < 0;
     const isUrgent = daysRemaining != null && daysRemaining >= 0 && daysRemaining <= 14;
+    const productCode = row?.productCode || row?.ProductCode || '';
+    const productName = row?.productName || row?.ProductName || productCode || 'Unknown Product';
+    const batchNo = row?.batchNo || null;
 
     return {
-      key: `${row?.ProductCode || 'UNKNOWN'}-${row?.ExpiryDate || ''}`,
-      productCode: row?.ProductCode || '',
-      name: row?.ProductName || row?.ProductCode || 'Unknown Product',
+      key: `${productCode || 'UNKNOWN'}-${expiryDateValue || ''}-${batchNo || ''}`,
+      productCode,
+      name: productName,
       message: isExpired
         ? 'Already expired in POS stock'
         : daysRemaining == null
@@ -159,7 +163,8 @@ const AdminProducts = () => {
       isExpired,
       isUrgent,
       remainingQty: qty,
-      expiryDate: row?.ExpiryDate || null,
+      expiryDate: expiryDateValue,
+      batchNo,
     };
   };
 
@@ -178,10 +183,17 @@ const AdminProducts = () => {
     const status = product?.expiryStatus?.status;
     const label = product?.expiryStatus?.label;
     const daysToExpiry = product?.daysToExpiry ?? product?.expiryStatus?.daysRemaining ?? null;
+    const batchCount = Number(product?.expiryBatchCount ?? 0);
+    const withBatchCount = (baseLabel) => {
+      if (batchCount > 1) {
+        return `${baseLabel} (${batchCount} batches)`;
+      }
+      return baseLabel;
+    };
 
     if (status === 'expired') {
       return {
-        label: label || 'Expired',
+        label: withBatchCount(label || 'Expired'),
         backgroundColor: '#f8d7da',
         color: '#721c24',
         icon: 'fas fa-times-circle',
@@ -190,7 +202,7 @@ const AdminProducts = () => {
 
     if (status === 'expiring_soon' || status === '1_week_warning' || status === '2_weeks_warning') {
       return {
-        label: label || (daysToExpiry != null ? `Expiring Soon (${daysToExpiry}d)` : 'Expiring Soon'),
+        label: withBatchCount(label || (daysToExpiry != null ? `Expiring Soon (${daysToExpiry}d)` : 'Expiring Soon')),
         backgroundColor: '#fff3cd',
         color: '#856404',
         icon: 'fas fa-exclamation-triangle',
@@ -199,7 +211,7 @@ const AdminProducts = () => {
 
     if (status === 'near_expiry' || status === '1_month_warning' || status === '2_months_warning') {
       return {
-        label: label || 'Near Expiry',
+        label: withBatchCount(label || 'Near Expiry'),
         backgroundColor: '#e8f4fd',
         color: '#0c5460',
         icon: 'fas fa-clock',
@@ -210,13 +222,19 @@ const AdminProducts = () => {
   };
 
   const fetchPosExpiryAlerts = async () => {
-    // Expiry alerts are built from the already-synced product records.
-    // The POS agent embeds expiryDate directly in the product sync payload,
-    // so there is no need to call the /admin/pos-expiry endpoint (which
-    // requires a direct connection to the local POS agent).
-    // Just trigger a product refresh so alerts reflect the latest sync.
-    console.log('[UI EXPIRY] alerts derived from synced product expiryDate fields');
-    await fetchProducts();
+    try {
+      setPosExpiryLoading(true);
+      setPosExpiryError('');
+      const response = await api.get('/admin/expiry-batches');
+      const rows = Array.isArray(response?.data?.data) ? response.data.data : [];
+      setPosExpiryItems(rows.map(mapPosExpiryToAlert));
+    } catch (err) {
+      const message = err?.response?.data?.error || err?.message || 'Failed to load expiry batches';
+      setPosExpiryError(message);
+      setPosExpiryItems([]);
+    } finally {
+      setPosExpiryLoading(false);
+    }
   };
 
   // Fetch products on mount
@@ -555,7 +573,7 @@ const AdminProducts = () => {
       sourceProduct: product,
     }));
 
-  const expiryAlerts = fallbackExpiryAlerts;
+  const expiryAlerts = posExpiryError ? fallbackExpiryAlerts : posExpiryItems;
   const expiryAlertCount = expiryAlerts.length;
 
   // Handle search with debounce

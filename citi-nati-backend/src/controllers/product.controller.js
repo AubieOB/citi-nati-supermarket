@@ -623,6 +623,7 @@ const getProducts = async (req, res) => {
         originalPrice: true,
         discountPrice: true,
         expiryDate: true,
+        expiryBatchCount: true,
         hideFromProductsPage: true
       },
       skip,
@@ -679,6 +680,7 @@ const getProductById = async (req, res) => {
         originalPrice: true,
         discountPrice: true,
         expiryDate: true,
+        expiryBatchCount: true,
         hideFromProductsPage: true
       }
     });
@@ -1152,6 +1154,36 @@ const syncProductsFromPOSAgent = async (req, res) => {
           continue;
         }
 
+        const normalizedBatches = Array.isArray(product.expiryBatches)
+          ? product.expiryBatches
+              .map((batch) => {
+                const expiryDate = batch?.expiryDate ? new Date(batch.expiryDate) : null;
+                const remainingQty = Number(batch?.remainingQty ?? batch?.RemainingQty ?? 0);
+                if (!expiryDate || Number.isNaN(expiryDate.getTime())) return null;
+                if (expiryDate.toISOString().slice(0, 10) === '1900-01-01') return null;
+                if (expiryDate < MIN_VALID_EXPIRY_DATE) return null;
+                if (!Number.isFinite(remainingQty) || remainingQty <= 0) return null;
+
+                return {
+                  productCode: String(product.sourceCode).trim(),
+                  expiryDate,
+                  remainingQty,
+                  locationCode: batch?.locationCode || process.env.POS_LOCATION_CODE || 'SH',
+                  batchNo: batch?.batchNo ? String(batch.batchNo) : null,
+                  lastSyncedAt: new Date(),
+                };
+              })
+              .filter(Boolean)
+          : [];
+
+        const nearestBatch = normalizedBatches
+          .slice()
+          .sort((a, b) => a.expiryDate - b.expiryDate)[0] || null;
+
+        const nearestExpiryDate = product.nearestExpiryDate
+          ? new Date(product.nearestExpiryDate)
+          : (product.expiryDate ? new Date(product.expiryDate) : (nearestBatch ? nearestBatch.expiryDate : null));
+
         // Upsert product into Product table (single source of truth)
         const result = await prisma.product.upsert(
           {
@@ -1163,9 +1195,8 @@ const syncProductsFromPOSAgent = async (req, res) => {
               category: product.category || 'Uncategorized',
               description: product.description || '',
               barcode: product.barcode || '',
-              ...(product.expiryDate !== undefined
-                ? { expiryDate: product.expiryDate ? new Date(product.expiryDate) : null }
-                : {}),
+              expiryDate: nearestExpiryDate,
+              expiryBatchCount: normalizedBatches.length,
               updatedAt: new Date(),
             },
             create: {
@@ -1176,13 +1207,27 @@ const syncProductsFromPOSAgent = async (req, res) => {
               category: product.category || 'Uncategorized',
               description: product.description || '',
               barcode: product.barcode || '',
-              expiryDate: product.expiryDate ? new Date(product.expiryDate) : null,
+              expiryDate: nearestExpiryDate,
+              expiryBatchCount: normalizedBatches.length,
               isActive: true,
               createdAt: new Date(),
               updatedAt: new Date(),
             },
           }
         );
+
+        await prisma.productExpiryBatch.deleteMany({
+          where: {
+            productCode: String(product.sourceCode).trim(),
+          },
+        });
+
+        if (normalizedBatches.length > 0) {
+          await prisma.productExpiryBatch.createMany({
+            data: normalizedBatches,
+            skipDuplicates: true,
+          });
+        }
 
         synced++;
         
@@ -1372,6 +1417,78 @@ const toggleProductVisibility = async (req, res) => {
   }
 };
 
+const getExpiryBatchAlerts = async (req, res) => {
+  try {
+    const locationCode = String(req.query.locationCode || process.env.POS_LOCATION_CODE || 'SH').trim().toUpperCase();
+    const rawRows = await prisma.productExpiryBatch.findMany({
+      where: {
+        remainingQty: { gt: 0 },
+        OR: [
+          { locationCode: null },
+          { locationCode },
+        ],
+      },
+      orderBy: [
+        { expiryDate: 'asc' },
+        { productCode: 'asc' },
+      ],
+    });
+
+    const productCodes = Array.from(new Set(rawRows.map((row) => row.productCode).filter(Boolean)));
+    const products = productCodes.length > 0
+      ? await prisma.product.findMany({
+          where: { sourceCode: { in: productCodes } },
+          select: { sourceCode: true, name: true },
+        })
+      : [];
+    const nameByCode = new Map(products.map((product) => [String(product.sourceCode || '').trim(), product.name]));
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const alerts = rawRows.map((row) => {
+      const days = Math.ceil((row.expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      const status = days < 0
+        ? 'expired'
+        : (days <= 7 ? 'expiring_soon' : (days <= 30 ? 'near_expiry' : 'ok'));
+
+      return {
+        productCode: row.productCode,
+        productName: nameByCode.get(String(row.productCode || '').trim()) || row.productCode,
+        expiryDate: row.expiryDate.toISOString(),
+        remainingQty: row.remainingQty,
+        locationCode: row.locationCode,
+        batchNo: row.batchNo,
+        daysToExpiry: days,
+        status,
+      };
+    });
+
+    const expiredCount = alerts.filter((row) => row.status === 'expired').length;
+    const nearExpiryCount = alerts.filter((row) => row.status === 'expiring_soon' || row.status === 'near_expiry').length;
+    console.log('[EXPIRY ALERTS] products evaluated count', productCodes.length);
+    console.log('[EXPIRY ALERTS] expired count', expiredCount);
+    console.log('[EXPIRY ALERTS] near expiry count', nearExpiryCount);
+    console.log('[EXPIRY ALERTS] sample alert row', alerts[0] || null);
+
+    return res.status(200).json({
+      success: true,
+      data: alerts,
+      meta: {
+        productsEvaluated: productCodes.length,
+        expiredCount,
+        nearExpiryCount,
+      },
+    });
+  } catch (error) {
+    console.error('[EXPIRY ALERTS] failed:', error.message);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to fetch expiry batch alerts',
+      details: error.message,
+    });
+  }
+};
+
 module.exports = { 
   createProduct, 
   getProducts, 
@@ -1380,6 +1497,7 @@ module.exports = {
   deleteProduct, 
   syncFromPOS,
   syncProductsFromPOSAgent,
+  getExpiryBatchAlerts,
   deletePOSProducts,
   getCategories,
   toggleProductVisibility

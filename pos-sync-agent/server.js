@@ -107,6 +107,11 @@ async function sendProductsToLiveServer(products) {
               category: p.CategoryName || 'Uncategorized',
               expiryDate: p.ExpiryDate ? (p.ExpiryDate instanceof Date ? p.ExpiryDate.toISOString() : p.ExpiryDate) : null,
               expirySource: p.ExpirySource || null,
+              nearestExpiryDate: p.ExpiryDate ? (p.ExpiryDate instanceof Date ? p.ExpiryDate.toISOString() : p.ExpiryDate) : null,
+              expiryBatchCount: Number.isFinite(Number(p.ExpiryBatchCount)) ? Number(p.ExpiryBatchCount) : 0,
+              daysToExpiry: Number.isFinite(Number(p.DaysToExpiry)) ? Number(p.DaysToExpiry) : null,
+              expiryStatus: p.ExpiryStatus || null,
+              expiryBatches: Array.isArray(p.ExpiryBatches) ? p.ExpiryBatches : [],
             })),
           },
           {
@@ -201,28 +206,56 @@ async function fetchProductsFromPOS() {
       });
     }
 
-    // Enrich each product with expiry data from the same SQL Server
-    const expiryMap = await buildExpiryMapFromPOS();
+    // Enrich each product with active expiry batches from the same SQL Server
+    const expiryBatchesMap = await buildActiveExpiryBatchesFromPOS();
     let enrichedWithExpiry = 0;
     const enrichedRecords = result.recordset.map(product => {
       const code = String(product.ProductCode || '').trim();
-      const expiry = expiryMap.get(code);
-      if (expiry) enrichedWithExpiry++;
+      const batches = expiryBatchesMap.get(code) || [];
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const upcomingBatches = batches
+        .filter((batch) => {
+          const d = new Date(batch.expiryDate);
+          d.setHours(0, 0, 0, 0);
+          return d >= today;
+        })
+        .sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
+
+      const nearestBatch = upcomingBatches[0] || null;
+      if (nearestBatch) enrichedWithExpiry++;
+
+      const daysToExpiry = nearestBatch
+        ? Math.ceil((new Date(nearestBatch.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+        : null;
+
+      const expiryStatus = daysToExpiry == null
+        ? null
+        : (daysToExpiry < 0
+          ? 'Expired'
+          : (daysToExpiry <= 7 ? 'Expiring Soon' : (daysToExpiry <= 30 ? 'Near Expiry' : 'OK')));
+
       return {
         ...product,
-        ExpiryDate: expiry ? expiry.expiryDate : null,
-        ExpirySource: expiry ? expiry.source : null,
+        ExpiryDate: nearestBatch ? nearestBatch.expiryDate : null,
+        ExpirySource: nearestBatch ? nearestBatch.source : null,
+        ExpiryBatchCount: batches.length,
+        DaysToExpiry: daysToExpiry,
+        ExpiryStatus: expiryStatus,
+        ExpiryBatches: batches,
       };
     });
     console.log(`[POS FETCH][EXPIRY] products enriched with expiry=${enrichedWithExpiry}`);
-    const sampleEnriched = enrichedRecords.find(p => p.ExpiryDate);
+    const sampleEnriched = enrichedRecords.find(p => p.ExpiryDate || (Array.isArray(p.ExpiryBatches) && p.ExpiryBatches.length > 0));
     if (sampleEnriched) {
-      const daysToExpiry = Math.round((sampleEnriched.ExpiryDate - new Date()) / (1000 * 60 * 60 * 24));
       console.log(`[POS FETCH][EXPIRY] sample enriched product:`, {
         productCode: sampleEnriched.ProductCode,
-        expiryDate: sampleEnriched.ExpiryDate.toISOString().slice(0, 10),
-        daysToExpiry,
+        nearestExpiryDate: sampleEnriched.ExpiryDate ? sampleEnriched.ExpiryDate.toISOString().slice(0, 10) : null,
+        expiryBatchCount: sampleEnriched.ExpiryBatchCount || 0,
+        daysToExpiry: sampleEnriched.DaysToExpiry,
+        expiryStatus: sampleEnriched.ExpiryStatus,
         expirySource: sampleEnriched.ExpirySource,
+        sampleBatches: (sampleEnriched.ExpiryBatches || []).slice(0, 2),
       });
     }
 
@@ -234,14 +267,11 @@ async function fetchProductsFromPOS() {
 }
 
 /**
- * Builds a Map<ProductCode, { expiryDate: Date, source: string }> from SQL Server.
- * Primary: stockdetails (stock movement source of truth)
- * Fallback: vw_WillExpire_Products
- * Business rule: for each ProductCode, pick the LATEST expiry date among rows
- * that have positive remaining stock. "Latest" = newest batch currently on shelf.
- * Never fall back to stale historical expired rows if active stock exists.
+ * Builds a Map<ProductCode, Batch[]> from SQL Server.
+ * Batch granularity is ProductCode + ExpiryDate (active stock only).
+ * Product summary is computed separately from these batches.
  */
-async function buildExpiryMapFromPOS() {
+async function buildActiveExpiryBatchesFromPOS() {
   try {
     if (!pool) await initializePool();
     const locationCode = process.env.POS_LOCATION_CODE || 'SH';
@@ -272,50 +302,57 @@ async function buildExpiryMapFromPOS() {
     }
     console.log(`[POS FETCH][EXPIRY] grouped products: ${grouped.size}`);
 
-    const expiryMap = new Map();
+    const expiryBatchesMap = new Map();
     let totalSkipped = 0;
 
-    const toGrnRank = (value) => {
-      if (value == null) return Number.MIN_SAFE_INTEGER;
-      const parsed = Number(String(value).trim());
-      return Number.isFinite(parsed) ? parsed : Number.MIN_SAFE_INTEGER;
-    };
-
     for (const [code, entries] of grouped.entries()) {
-      // Keep only rows with positive remaining stock (active batches)
-      const activeRows = entries.filter(
-        e => e.RemainingQty != null && e.RemainingQty > 0
-      );
-
+      // Keep only active rows and aggregate by ProductCode + ExpiryDate
+      const activeRows = entries.filter((e) => e.RemainingQty != null && e.RemainingQty > 0);
       const skippedCount = entries.length - activeRows.length;
       totalSkipped += skippedCount;
 
       if (activeRows.length === 0) {
-        // No active stock at all — skip this product entirely
         continue;
       }
 
-      // Sort by latest stock add first (GRNNo DESC), expiry date DESC as tie-breaker.
-      activeRows.sort((a, b) => {
-        const grnDiff = toGrnRank(b.LatestGRNNo) - toGrnRank(a.LatestGRNNo);
-        if (grnDiff !== 0) return grnDiff;
-        return new Date(b.ExpiryDate) - new Date(a.ExpiryDate);
-      });
-      const chosen = activeRows[0];
-      const chosenDate = new Date(chosen.ExpiryDate);
+      const byExpiryDate = new Map();
+      for (const row of activeRows) {
+        const dateKey = new Date(row.ExpiryDate).toISOString().slice(0, 10);
+        if (!byExpiryDate.has(dateKey)) {
+          byExpiryDate.set(dateKey, {
+            productCode: code,
+            expiryDate: new Date(row.ExpiryDate).toISOString(),
+            remainingQty: 0,
+            locationCode,
+            batchNo: row.LatestGRNNo != null ? String(row.LatestGRNNo) : null,
+            source,
+          });
+        }
+        const current = byExpiryDate.get(dateKey);
+        current.remainingQty += Number(row.RemainingQty || 0);
+      }
 
-      expiryMap.set(code, { expiryDate: chosenDate, source });
+      const batches = Array.from(byExpiryDate.values())
+        .filter((b) => b.remainingQty > 0)
+        .sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
 
-      if (expiryMap.size <= 3) {
-        console.log(`[POS FETCH][EXPIRY] selected latest stock-add row: productCode=${code} grnNo=${chosen.LatestGRNNo || 'n/a'} expiryDate=${chosenDate.toISOString().slice(0,10)} activeRows=${activeRows.length} skipped=${skippedCount}`);
+      if (batches.length > 0) {
+        expiryBatchesMap.set(code, batches);
+      }
+
+      if (expiryBatchesMap.size <= 3) {
+        console.log(`[POS FETCH][EXPIRY] grouped rows for product ${code}: total=${entries.length} active=${activeRows.length} batches=${batches.length}`);
+        if (batches[0]) {
+          console.log(`[POS FETCH][EXPIRY] selected summary batch for ${code}: nearestExpiryDate=${new Date(batches[0].expiryDate).toISOString().slice(0,10)} remainingQty=${batches[0].remainingQty}`);
+        }
       }
     }
 
-    console.log(`[POS FETCH][EXPIRY] expiry map size=${expiryMap.size}`);
+    console.log(`[POS FETCH][EXPIRY] expiry batch map size=${expiryBatchesMap.size}`);
     console.log(`[POS FETCH][EXPIRY] skipped historical rows count=${totalSkipped}`);
-    return expiryMap;
+    return expiryBatchesMap;
   } catch (err) {
-    console.error('[POS FETCH][EXPIRY] buildExpiryMapFromPOS failed:', err.message);
+    console.error('[POS FETCH][EXPIRY] buildActiveExpiryBatchesFromPOS failed:', err.message);
     return new Map();
   }
 }
