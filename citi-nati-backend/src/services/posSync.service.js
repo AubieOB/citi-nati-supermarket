@@ -352,9 +352,14 @@ async function getExpiryProductsFromPOS({ days = 14, locationCode = 'SH', includ
     : POS_AGENT_TIMEOUT_MS;
 
   try {
+    if (!POS_SECRET) {
+      console.warn('[BACKEND -> AGENT][EXPIRY] POS_SECRET is empty. Agent will likely return 401 before route-level [EXPIRY] logs.');
+    }
+
     console.log('[BACKEND -> AGENT][EXPIRY] requesting expiry candidates', {
       endpoint,
       targetUrl,
+      hasSecret: Boolean(POS_SECRET),
       days,
       locationCode,
       includeExpired,

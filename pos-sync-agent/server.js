@@ -501,7 +501,7 @@ app.get('/pos-sync/products', validateApiKey, async (req, res) => {
 app.get('/pos-sync/expiry-products', validateApiKey, async (req, res) => {
   try {
     const validation = validateExpiryRequest(req.query);
-    console.log('[EXPIRY] request received');
+    console.log('[EXPIRY] /expiry-products request received');
     console.log('[EXPIRY] params', {
       days: validation.requested.days,
       locationCode: validation.requested.locationCode,
@@ -521,7 +521,7 @@ app.get('/pos-sync/expiry-products', validateApiKey, async (req, res) => {
 
     console.log('[EXPIRY] DB query start');
     const result = await fetchExpiryCandidates(validation.normalized);
-    console.log('[EXPIRY] DB query result count', result.products.length);
+    console.log('[EXPIRY] DB query success count', result.products.length);
 
     return res.json({
       success: true,

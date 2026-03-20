@@ -6,15 +6,12 @@ const posSyncService = require('../services/posSync.service');
 
 const prisma = new PrismaClient();
 const MIN_VALID_EXPIRY_DATE = new Date('2000-01-01T00:00:00.000Z');
-const ADMIN_EXPIRY_REQUEST_TIMEOUT_MS = 800;
+const ADMIN_EXPIRY_REQUEST_TIMEOUT_MS = 10000;
 const ADMIN_EXPIRY_CACHE_TTL_MS = 5 * 60 * 1000;
-const ADMIN_EXPIRY_FAILURE_COOLDOWN_MS = 60 * 1000;
 
 const adminExpiryFetchState = {
   rows: [],
   fetchedAt: 0,
-  lastFailureAt: 0,
-  lastFailureReason: null,
 };
 
 // ensure a trigram index for fast case-insensitive name searches (autocomplete)
@@ -114,7 +111,7 @@ const formatProduct = (product, req, includeDiscountSuggestion = false) => {
 };
 
 function normalizeProductCode(value) {
-  const normalized = String(value || '').trim().toUpperCase();
+  const normalized = String(value || '').trim();
   return normalized || null;
 }
 
@@ -224,7 +221,7 @@ function pickPreferredExpiryRow(rows) {
         remainingQty,
       };
     })
-    .filter((row) => row.normalizedDate && Number.isFinite(row.remainingQty) && row.remainingQty > 0);
+    .filter((row) => row.normalizedDate);
 
   if (normalizedRows.length === 0) {
     return null;
@@ -232,7 +229,7 @@ function pickPreferredExpiryRow(rows) {
 
   const today = getStartOfToday();
   const upcomingRows = normalizedRows
-    .filter((row) => row.normalizedDate >= today)
+    .filter((row) => row.normalizedDate >= today && Number.isFinite(row.remainingQty) && row.remainingQty > 0)
     .sort((left, right) => left.normalizedDate - right.normalizedDate);
 
   if (upcomingRows.length > 0) {
@@ -254,72 +251,62 @@ async function fetchPosExpiryMap(products) {
       .filter(Boolean)
   );
 
-  console.log('[ADMIN PRODUCTS] merge key used', 'product.sourceCode -> expiry.ProductCode (normalized trim+uppercase)');
+  console.log('[ADMIN PRODUCTS] merge key used', 'String(product.sourceCode).trim() === String(expiry.ProductCode).trim()');
 
   const now = Date.now();
   const hasFreshCache = adminExpiryFetchState.fetchedAt > 0 && (now - adminExpiryFetchState.fetchedAt) < ADMIN_EXPIRY_CACHE_TTL_MS;
-  const inFailureCooldown = adminExpiryFetchState.lastFailureAt > 0
-    && (now - adminExpiryFetchState.lastFailureAt) < ADMIN_EXPIRY_FAILURE_COOLDOWN_MS;
 
   let expiryRows = [];
+  const targetUrl = `${process.env.POS_AGENT_URL || 'http://localhost:3001'}/pos-sync/expiry-products`;
 
-  if (inFailureCooldown) {
-    console.warn('[ADMIN PRODUCTS] expiry fetch skipped (cooldown active)', {
-      cooldownMsRemaining: ADMIN_EXPIRY_FAILURE_COOLDOWN_MS - (now - adminExpiryFetchState.lastFailureAt),
-      lastFailureReason: adminExpiryFetchState.lastFailureReason,
+  console.log(`[ADMIN PRODUCTS] calling POS expiry endpoint: ${targetUrl}`);
+  console.log('[ADMIN PRODUCTS] POS expiry request params', {
+    source: 'view',
+    includeExpired: true,
+    requestTimeoutMs: ADMIN_EXPIRY_REQUEST_TIMEOUT_MS,
+  });
+
+  const expiryResult = await posSyncService.getExpiryProductsFromPOS({
+    days: 3650,
+    locationCode: process.env.POS_LOCATION_CODE || 'SH',
+    includeExpired: true,
+    source: 'view',
+    requestTimeoutMs: ADMIN_EXPIRY_REQUEST_TIMEOUT_MS,
+  });
+
+  if (!expiryResult.success) {
+    console.warn('[ADMIN PRODUCTS] expiry fetch failed', {
+      error: expiryResult.error,
+      status: expiryResult.meta?.status || null,
+      rawBody: expiryResult.meta?.rawBody || null,
+      targetUrl: expiryResult.meta?.targetUrl || null,
     });
     if (hasFreshCache || adminExpiryFetchState.rows.length > 0) {
       expiryRows = adminExpiryFetchState.rows;
       console.log('[ADMIN PRODUCTS] using cached expiry rows', expiryRows.length);
     }
-    console.log('[ADMIN PRODUCTS] expiry rows fetched count', expiryRows.length);
+  } else {
+    expiryRows = Array.isArray(expiryResult.data?.data) ? expiryResult.data.data : [];
+    console.log('[ADMIN PRODUCTS] POS expiry response status', expiryResult.meta?.status || 200);
+    console.log('[ADMIN PRODUCTS] POS expiry rows count', expiryRows.length);
     console.log('[ADMIN PRODUCTS] first expiry row', expiryRows[0] || null);
+    adminExpiryFetchState.rows = expiryRows;
+    adminExpiryFetchState.fetchedAt = Date.now();
   }
 
-  if (!inFailureCooldown) {
+  console.log('[ADMIN PRODUCTS] expiry rows fetched count', expiryRows.length);
+  console.log('[ADMIN PRODUCTS] first expiry row', expiryRows[0] || null);
 
-    console.log('[ADMIN PRODUCTS] calling POS expiry endpoint', {
-      endpoint: '/pos-sync/expiry-products',
-      targetUrl: `${process.env.POS_AGENT_URL || 'http://localhost:3001'}/pos-sync/expiry-products`,
-      source: 'view',
-      includeExpired: true,
-      requestTimeoutMs: ADMIN_EXPIRY_REQUEST_TIMEOUT_MS,
-    });
-
-    const expiryResult = await posSyncService.getExpiryProductsFromPOS({
-      days: 3650,
-      locationCode: process.env.POS_LOCATION_CODE || 'SH',
-      includeExpired: true,
-      source: 'view',
-      requestTimeoutMs: ADMIN_EXPIRY_REQUEST_TIMEOUT_MS,
-    });
-
-    if (!expiryResult.success) {
-      adminExpiryFetchState.lastFailureAt = Date.now();
-      adminExpiryFetchState.lastFailureReason = expiryResult.error;
-      console.warn('[ADMIN PRODUCTS] expiry fetch failed', {
-        error: expiryResult.error,
-        status: expiryResult.meta?.status || null,
-        rawBody: expiryResult.meta?.rawBody || null,
-        targetUrl: expiryResult.meta?.targetUrl || null,
-      });
-      if (hasFreshCache || adminExpiryFetchState.rows.length > 0) {
-        expiryRows = adminExpiryFetchState.rows;
-        console.log('[ADMIN PRODUCTS] using cached expiry rows', expiryRows.length);
-      }
-    } else {
-      expiryRows = Array.isArray(expiryResult.data?.data) ? expiryResult.data.data : [];
-      console.log('[ADMIN PRODUCTS] POS expiry response status', expiryResult.meta?.status || 200);
-      console.log('[ADMIN PRODUCTS] POS expiry rows count', expiryRows.length);
-      adminExpiryFetchState.rows = expiryRows;
-      adminExpiryFetchState.fetchedAt = Date.now();
-      adminExpiryFetchState.lastFailureAt = 0;
-      adminExpiryFetchState.lastFailureReason = null;
-    }
-
-    console.log('[ADMIN PRODUCTS] expiry rows fetched count', expiryRows.length);
-    console.log('[ADMIN PRODUCTS] first expiry row', expiryRows[0] || null);
-  }
+  const first5ProductSourceCodeValues = products
+    .map((product) => String(product.sourceCode || '').trim())
+    .filter(Boolean)
+    .slice(0, 5);
+  const first5ExpiryProductCodeValues = expiryRows
+    .map((row) => String(row.ProductCode || row.productCode || '').trim())
+    .filter(Boolean)
+    .slice(0, 5);
+  console.log('[ADMIN PRODUCTS] first 5 product sourceCode values', first5ProductSourceCodeValues);
+  console.log('[ADMIN PRODUCTS] first 5 expiry ProductCode values', first5ExpiryProductCodeValues);
 
   const groupedRows = new Map();
 
@@ -347,11 +334,7 @@ async function fetchPosExpiryMap(products) {
     }
   }
 
-  const firstExpiryMapKeys = Array.from(expiryMap.keys()).slice(0, 5);
-  const firstProductKeys = Array.from(productCodeSet.values()).slice(0, 5);
   console.log('[ADMIN PRODUCTS] expiry map size', expiryMap.size);
-  console.log('[ADMIN PRODUCTS] first 5 expiry map keys', firstExpiryMapKeys);
-  console.log('[ADMIN PRODUCTS] first 5 product sourceCode keys', firstProductKeys);
 
   return expiryMap;
 }
