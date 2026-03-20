@@ -210,39 +210,13 @@ const AdminProducts = () => {
   };
 
   const fetchPosExpiryAlerts = async () => {
-    try {
-      setPosExpiryLoading(true);
-      setPosExpiryError('');
-      console.log('[UI EXPIRY] fetch start', {
-        endpoint: '/admin/pos-expiry',
-        days: 14,
-        includeExpired: false,
-        source: 'view',
-      });
-
-      const response = await api.get('/admin/pos-expiry', {
-        params: {
-          days: 14,
-          includeExpired: false,
-          source: 'view',
-        },
-      });
-
-      const rows = Array.isArray(response?.data?.data) ? response.data.data : [];
-      console.log('[UI EXPIRY] fetch response', {
-        success: response?.data?.success === true,
-        count: rows.length,
-      });
-
-      setPosExpiryItems(rows.map(mapPosExpiryToAlert));
-    } catch (err) {
-      const message = err?.response?.data?.error || err?.message || 'Failed to load POS expiry alerts';
-      console.error('[UI EXPIRY] fetch error', message);
-      setPosExpiryError(message);
-      setPosExpiryItems([]);
-    } finally {
-      setPosExpiryLoading(false);
-    }
+    // Expiry alerts are built from the already-synced product records.
+    // The POS agent embeds expiryDate directly in the product sync payload,
+    // so there is no need to call the /admin/pos-expiry endpoint (which
+    // requires a direct connection to the local POS agent).
+    // Just trigger a product refresh so alerts reflect the latest sync.
+    console.log('[UI EXPIRY] alerts derived from synced product expiryDate fields');
+    await fetchProducts();
   };
 
   // Fetch products on mount
@@ -581,7 +555,7 @@ const AdminProducts = () => {
       sourceProduct: product,
     }));
 
-  const expiryAlerts = posExpiryError ? fallbackExpiryAlerts : posExpiryItems;
+  const expiryAlerts = fallbackExpiryAlerts;
   const expiryAlertCount = expiryAlerts.length;
 
   // Handle search with debounce

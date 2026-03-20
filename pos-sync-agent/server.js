@@ -236,7 +236,9 @@ async function fetchProductsFromPOS() {
 /**
  * Builds a Map<ProductCode, { expiryDate: Date, source: string }> from SQL Server.
  * Primary: vw_WillExpire_Products  Fallback: stockdetails
- * Picks the earliest upcoming valid expiry with positive stock per product.
+ * Business rule: for each ProductCode, pick the LATEST expiry date among rows
+ * that have positive remaining stock. "Latest" = newest batch currently on shelf.
+ * Never fall back to stale historical expired rows if active stock exists.
  */
 async function buildExpiryMapFromPOS() {
   try {
@@ -245,7 +247,7 @@ async function buildExpiryMapFromPOS() {
     const result = await fetchExpiryCandidates({
       days: 3650,
       locationCode,
-      includeExpired: true,
+      includeExpired: true,  // fetch all so we can apply our own selection rule
       source: 'view',
       productCodes: [],
     });
@@ -255,35 +257,51 @@ async function buildExpiryMapFromPOS() {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const MIN_DATE = new Date('2000-01-01T00:00:00.000Z');
 
-    // Group by ProductCode
+    // Group by ProductCode — only keep rows with valid dates
     const grouped = new Map();
     for (const row of rows) {
       const code = String(row.ProductCode || '').trim();
       if (!code || !row.ExpiryDate) continue;
+      const d = new Date(row.ExpiryDate);
+      if (isNaN(d.getTime()) || d < MIN_DATE) continue;
       if (!grouped.has(code)) grouped.set(code, []);
       grouped.get(code).push(row);
     }
+    console.log(`[POS FETCH][EXPIRY] grouped products: ${grouped.size}`);
 
     const expiryMap = new Map();
+    let totalSkipped = 0;
+
     for (const [code, entries] of grouped.entries()) {
-      // Prefer earliest upcoming date with positive (or unknown) stock
-      const upcoming = entries
-        .filter(e => new Date(e.ExpiryDate) >= today && (e.RemainingQty == null || e.RemainingQty > 0))
-        .sort((a, b) => new Date(a.ExpiryDate) - new Date(b.ExpiryDate));
-      if (upcoming.length > 0) {
-        expiryMap.set(code, { expiryDate: new Date(upcoming[0].ExpiryDate), source });
+      // Keep only rows with positive remaining stock (active batches)
+      const activeRows = entries.filter(
+        e => e.RemainingQty != null && e.RemainingQty > 0
+      );
+
+      const skippedCount = entries.length - activeRows.length;
+      totalSkipped += skippedCount;
+
+      if (activeRows.length === 0) {
+        // No active stock at all — skip this product entirely
         continue;
       }
-      // Fallback: most recent expired row
-      const expired = entries
-        .filter(e => new Date(e.ExpiryDate) < today)
-        .sort((a, b) => new Date(b.ExpiryDate) - new Date(a.ExpiryDate));
-      if (expired.length > 0) {
-        expiryMap.set(code, { expiryDate: new Date(expired[0].ExpiryDate), source });
+
+      // Sort DESC by ExpiryDate — pick the LATEST active stock batch
+      activeRows.sort((a, b) => new Date(b.ExpiryDate) - new Date(a.ExpiryDate));
+      const chosen = activeRows[0];
+      const chosenDate = new Date(chosen.ExpiryDate);
+
+      expiryMap.set(code, { expiryDate: chosenDate, source });
+
+      if (expiryMap.size <= 3) {
+        console.log(`[POS FETCH][EXPIRY] selected current expiry row: productCode=${code} expiryDate=${chosenDate.toISOString().slice(0,10)} activeRows=${activeRows.length} skipped=${skippedCount}`);
       }
     }
+
     console.log(`[POS FETCH][EXPIRY] expiry map size=${expiryMap.size}`);
+    console.log(`[POS FETCH][EXPIRY] skipped historical rows count=${totalSkipped}`);
     return expiryMap;
   } catch (err) {
     console.error('[POS FETCH][EXPIRY] buildExpiryMapFromPOS failed:', err.message);
