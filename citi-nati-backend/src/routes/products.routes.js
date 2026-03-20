@@ -1,5 +1,5 @@
 const express = require('express');
-const { createProduct, getProducts, getProductById, updateProduct, deleteProduct, syncFromPOS, syncProductsFromPOSAgent, deletePOSProducts, getCategories, toggleProductVisibility } = require('../controllers/product.controller');
+const { createProduct, getProducts, getProductById, updateProduct, deleteProduct, syncFromPOS, syncProductsFromPOSAgent, receivePosExpiryPush, deletePOSProducts, getCategories, toggleProductVisibility } = require('../controllers/product.controller');
 const { verifyTokenMiddleware } = require('../middleware/auth.middleware');
 const { verifyAdmin } = require('../middleware/admin.middleware');
 const uploadProductImage = require('../middlewares/uploadProductImageCloudinary');
@@ -61,6 +61,9 @@ router.post(
 // POST /api/pos-sync/push - Receive products from POS Agent (API Key auth)
 // This endpoint is called directly by the POS Sync Agent
 router.post('/pos-sync/push', syncProductsFromPOSAgent);
+
+// POST /api/pos-sync/expiry-push - Receive expiry rows pushed by POS Agent
+router.post('/pos-sync/expiry-push', receivePosExpiryPush);
 
 // DELETE /api/products/pos-sync/clear - Delete all POS synced products (ADMIN only)
 router.delete(

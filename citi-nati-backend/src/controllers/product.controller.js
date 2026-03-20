@@ -15,6 +15,12 @@ const adminExpiryFetchState = {
   fetchedAt: 0,
 };
 
+// Cache populated when POS agent pushes expiry data via POST /pos-sync/expiry-push
+const posExpiryPushCache = {
+  rows: [],
+  pushedAt: 0,
+};
+
 // ensure a trigram index for fast case-insensitive name searches (autocomplete)
 (async () => {
   try {
@@ -276,57 +282,65 @@ async function fetchPosExpiryMap(products) {
   const hasFreshCache = adminExpiryFetchState.fetchedAt > 0 && (now - adminExpiryFetchState.fetchedAt) < ADMIN_EXPIRY_CACHE_TTL_MS;
 
   let expiryRows = [];
-  const posConfig = posSyncService.getConfig();
-  const targetUrl = `${posConfig.agentUrl}/pos-sync/expiry-products`;
-  const productCodes = Array.from(productCodeSet.values());
 
-  console.log(`[ADMIN PRODUCTS] calling POS expiry endpoint: ${targetUrl}`);
-  console.log('[ADMIN PRODUCTS] POS expiry request params', {
-    source: 'view',
-    includeExpired: true,
-    productCodesCount: productCodes.length,
-    requestTimeoutMs: ADMIN_EXPIRY_REQUEST_TIMEOUT_MS,
-  });
+  // Prefer push cache — POS agent proactively pushes expiry data every 5 min
+  if (posExpiryPushCache.rows.length > 0) {
+    expiryRows = posExpiryPushCache.rows;
+    const ageSecs = Math.round((Date.now() - posExpiryPushCache.pushedAt) / 1000);
+    console.log('[ADMIN PRODUCTS] using POS-pushed expiry cache:', expiryRows.length, 'rows, age:', ageSecs + 's');
+  } else {
+    const posConfig = posSyncService.getConfig();
+    const targetUrl = `${posConfig.agentUrl}/pos-sync/expiry-products`;
+    const productCodes = Array.from(productCodeSet.values());
 
-  let expiryResult = await posSyncService.getExpiryProductsFromPOS({
-    days: 3650,
-    locationCode: process.env.POS_LOCATION_CODE || 'SH',
-    includeExpired: true,
-    source: 'view',
-    productCodes,
-    requestTimeoutMs: ADMIN_EXPIRY_REQUEST_TIMEOUT_MS,
-  });
+    console.log(`[ADMIN PRODUCTS] calling POS expiry endpoint: ${targetUrl}`);
+    console.log('[ADMIN PRODUCTS] POS expiry request params', {
+      source: 'view',
+      includeExpired: true,
+      productCodesCount: productCodes.length,
+      requestTimeoutMs: ADMIN_EXPIRY_REQUEST_TIMEOUT_MS,
+    });
 
-  if (!expiryResult.success) {
-    console.warn('[ADMIN PRODUCTS] retrying POS expiry fetch with stockdetails source');
-    expiryResult = await posSyncService.getExpiryProductsFromPOS({
+    let expiryResult = await posSyncService.getExpiryProductsFromPOS({
       days: 3650,
       locationCode: process.env.POS_LOCATION_CODE || 'SH',
       includeExpired: true,
-      source: 'stockdetails',
+      source: 'view',
       productCodes,
       requestTimeoutMs: ADMIN_EXPIRY_REQUEST_TIMEOUT_MS,
     });
-  }
 
-  if (!expiryResult.success) {
-    console.warn('[ADMIN PRODUCTS] expiry fetch failed', {
-      error: expiryResult.error,
-      status: expiryResult.meta?.status || null,
-      rawBody: expiryResult.meta?.rawBody || null,
-      targetUrl: expiryResult.meta?.targetUrl || null,
-    });
-    if (hasFreshCache || adminExpiryFetchState.rows.length > 0) {
-      expiryRows = adminExpiryFetchState.rows;
-      console.log('[ADMIN PRODUCTS] using cached expiry rows', expiryRows.length);
+    if (!expiryResult.success) {
+      console.warn('[ADMIN PRODUCTS] retrying POS expiry fetch with stockdetails source');
+      expiryResult = await posSyncService.getExpiryProductsFromPOS({
+        days: 3650,
+        locationCode: process.env.POS_LOCATION_CODE || 'SH',
+        includeExpired: true,
+        source: 'stockdetails',
+        productCodes,
+        requestTimeoutMs: ADMIN_EXPIRY_REQUEST_TIMEOUT_MS,
+      });
     }
-  } else {
-    expiryRows = Array.isArray(expiryResult.data?.data) ? expiryResult.data.data : [];
-    console.log('[ADMIN PRODUCTS] expiry response status', expiryResult.meta?.status || 200);
-    console.log('[ADMIN PRODUCTS] expiry rows count', expiryRows.length);
-    console.log('[ADMIN PRODUCTS] first expiry row', expiryRows[0] || null);
-    adminExpiryFetchState.rows = expiryRows;
-    adminExpiryFetchState.fetchedAt = Date.now();
+
+    if (!expiryResult.success) {
+      console.warn('[ADMIN PRODUCTS] expiry fetch failed', {
+        error: expiryResult.error,
+        status: expiryResult.meta?.status || null,
+        rawBody: expiryResult.meta?.rawBody || null,
+        targetUrl: expiryResult.meta?.targetUrl || null,
+      });
+      if (hasFreshCache || adminExpiryFetchState.rows.length > 0) {
+        expiryRows = adminExpiryFetchState.rows;
+        console.log('[ADMIN PRODUCTS] using pull-cached expiry rows', expiryRows.length);
+      }
+    } else {
+      expiryRows = Array.isArray(expiryResult.data?.data) ? expiryResult.data.data : [];
+      console.log('[ADMIN PRODUCTS] expiry response status', expiryResult.meta?.status || 200);
+      console.log('[ADMIN PRODUCTS] expiry rows count', expiryRows.length);
+      console.log('[ADMIN PRODUCTS] first expiry row', expiryRows[0] || null);
+      adminExpiryFetchState.rows = expiryRows;
+      adminExpiryFetchState.fetchedAt = Date.now();
+    }
   }
 
   console.log('[ADMIN PRODUCTS] expiry rows fetched count', expiryRows.length);
@@ -1378,6 +1392,35 @@ const toggleProductVisibility = async (req, res) => {
   }
 };
 
+/**
+ * POST /api/products/pos-sync/expiry-push
+ * Receives expiry rows pushed by the POS agent and stores them in memory.
+ */
+const receivePosExpiryPush = async (req, res) => {
+  try {
+    const secret = req.headers['x-pos-secret'];
+    const expectedSecret = process.env.POS_SECRET;
+    if (!secret || secret !== expectedSecret) {
+      console.error('[EXPIRY PUSH] Unauthorized attempt');
+      return res.status(403).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const { rows } = req.body;
+    if (!rows || !Array.isArray(rows)) {
+      return res.status(400).json({ success: false, error: 'Expected { rows: [] }' });
+    }
+
+    posExpiryPushCache.rows = rows;
+    posExpiryPushCache.pushedAt = Date.now();
+    console.log(`[EXPIRY PUSH] Stored ${rows.length} expiry rows from POS agent`);
+
+    return res.json({ success: true, received: rows.length });
+  } catch (err) {
+    console.error('[EXPIRY PUSH] Error:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+};
+
 module.exports = { 
   createProduct, 
   getProducts, 
@@ -1386,6 +1429,7 @@ module.exports = {
   deleteProduct, 
   syncFromPOS,
   syncProductsFromPOSAgent,
+  receivePosExpiryPush,
   deletePOSProducts,
   getCategories,
   toggleProductVisibility

@@ -1399,6 +1399,47 @@ async function autoSync() {
   }
 }
 
+/** Auto expiry push - sends expiry rows to live server every 5 minutes */
+let isExpiryPushRunning = false;
+const EXPIRY_PUSH_INTERVAL_MS = parseInt(process.env.EXPIRY_PUSH_INTERVAL_MS || String(5 * 60 * 1000), 10);
+
+async function autoExpiryPush() {
+  if (isExpiryPushRunning) {
+    console.log('[AUTO EXPIRY PUSH] Skipped tick - previous cycle still running');
+    return;
+  }
+  if (!process.env.LIVE_SERVER_URL || !process.env.POS_SECRET) {
+    return;
+  }
+
+  isExpiryPushRunning = true;
+  try {
+    const locationCode = process.env.POS_LOCATION_CODE || 'SH';
+    const expiryData = await fetchExpiryCandidates({
+      days: 3650,
+      locationCode,
+      includeExpired: true,
+      source: 'view',
+      productCodes: [],
+    });
+    const rows = expiryData.products || [];
+    console.log(`[AUTO EXPIRY PUSH] Fetched ${rows.length} expiry rows, pushing to live server...`);
+    const response = await axios.post(
+      `${process.env.LIVE_SERVER_URL}/api/products/pos-sync/expiry-push`,
+      { rows },
+      {
+        headers: { 'x-pos-secret': process.env.POS_SECRET },
+        timeout: 30000,
+      }
+    );
+    console.log('[AUTO EXPIRY PUSH] ✅ Push complete:', response.data);
+  } catch (err) {
+    console.error('[AUTO EXPIRY PUSH] ❌ Push failed:', err.message);
+  } finally {
+    isExpiryPushRunning = false;
+  }
+}
+
 async function pollAndProcessCommands() {
   if (isCommandPollRunning) {
     console.log('[POS COMMAND POLLER] Skipped tick - previous cycle still running');
@@ -1486,6 +1527,15 @@ async function startServer() {
         autoSyncInterval = setInterval(autoSync, SYNC_INTERVAL_MS);
         autoSyncStarted = true;
         console.log('[AUTO SYNC] ✅ Auto-sync enabled');
+      }
+
+      // Start expiry push (runs immediately then every EXPIRY_PUSH_INTERVAL_MS)
+      if (process.env.LIVE_SERVER_URL && process.env.POS_SECRET) {
+        autoExpiryPush();
+        setInterval(autoExpiryPush, EXPIRY_PUSH_INTERVAL_MS);
+        console.log(`[AUTO EXPIRY PUSH] ✅ Enabled (interval: ${EXPIRY_PUSH_INTERVAL_MS}ms)`);
+      } else {
+        console.log('[AUTO EXPIRY PUSH] ⚠️ Disabled (requires LIVE_SERVER_URL and POS_SECRET)');
       }
 
       if (ENABLE_POS_COMMAND_POLLING && process.env.LIVE_SERVER_URL && process.env.POS_SECRET) {
