@@ -271,150 +271,127 @@ async function fetchProductsFromPOS() {
 }
 
 function reconcileBatchesWithLiveStock(batches, liveStockQty) {
+  // No reconciliation needed. Each row from vw_WillExpire_Products already has
+  // accurate StockBalance. Return batches as-is without modification or reallocation.
   if (!Array.isArray(batches) || batches.length === 0) {
     return [];
   }
 
-  const normalizedLiveStock = Number.isFinite(Number(liveStockQty)) ? Math.max(0, Number(liveStockQty)) : 0;
-  if (normalizedLiveStock <= 0) {
-    return [];
+  return batches
+    .filter((batch) => Number.isFinite(batch.remainingQty) && batch.remainingQty > 0)
+    .sort((left, right) => {
+      const leftExp = left?.expiryDate ? new Date(left.expiryDate).getTime() : Number.POSITIVE_INFINITY;
+      const rightExp = right?.expiryDate ? new Date(right.expiryDate).getTime() : Number.POSITIVE_INFINITY;
+      return leftExp - rightExp;
+    });
+}
+
+function getExpiryBatchDebugProductCode() {
+  const raw = process.env.EXPIRY_BATCH_DEBUG_PRODUCT_CODE || process.env.EXPIRY_BATCH_DEBUG_PRODUCT || '';
+  const normalized = String(raw).trim();
+  return normalized || null;
+}
+
+function shouldDebugExpiryBatch(productCode) {
+  const target = getExpiryBatchDebugProductCode();
+  if (!target) {
+    return false;
   }
 
-  let remainingStockToAllocate = normalizedLiveStock;
-
-  const parseBatchRank = (batchNo) => {
-    if (batchNo == null) return Number.NEGATIVE_INFINITY;
-    const parsed = Number(batchNo);
-    return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
-  };
-
-  const normalizedBatches = batches
-    .map((batch) => ({
-      ...batch,
-      remainingQty: Number(batch?.remainingQty || 0),
-      expiryTimestamp: batch?.expiryDate ? new Date(batch.expiryDate).getTime() : Number.POSITIVE_INFINITY,
-      batchRank: parseBatchRank(batch?.batchNo),
-    }))
-    .filter((batch) => Number.isFinite(batch.remainingQty) && batch.remainingQty > 0);
-
-  const allocationOrder = [...normalizedBatches].sort((left, right) => {
-    if (left.batchRank !== right.batchRank) {
-      return right.batchRank - left.batchRank;
-    }
-
-    return right.expiryTimestamp - left.expiryTimestamp;
-  });
-
-  const reconciled = allocationOrder.map((batch) => {
-      if (remainingStockToAllocate <= 0) {
-        return {
-          ...batch,
-          remainingQty: 0,
-        };
-      }
-
-      const allocatedQty = Math.min(batch.remainingQty, remainingStockToAllocate);
-      remainingStockToAllocate -= allocatedQty;
-
-      return {
-        ...batch,
-        remainingQty: allocatedQty,
-      };
-    });
-
-  return reconciled
-    .filter((batch) => batch.remainingQty > 0)
-    .sort((left, right) => left.expiryTimestamp - right.expiryTimestamp)
-    .map(({ expiryTimestamp, ...batch }) => batch);
+  return String(productCode || '').trim().toUpperCase() === target.toUpperCase();
 }
 
 /**
- * Builds a Map<ProductCode, Batch[]> from SQL Server.
- * Batch granularity is ProductCode + ExpiryDate (active stock only).
- * Product summary is computed separately from these batches.
+ * Builds a Map<ProductCode, Batch[]> from SQL Server using vw_WillExpire_Products.
+ * Each StockDetailID is one complete batch. No grouping, no aggregation.
  */
 async function buildActiveExpiryBatchesFromPOS() {
   try {
     if (!pool) await initializePool();
     const locationCode = process.env.POS_LOCATION_CODE || 'SH';
+    
+    // Fetch all expiry rows from view - no pre-filtering by days here
     const result = await fetchExpiryCandidates({
       days: 3650,
       locationCode,
-      includeExpired: true,  // fetch all so we can apply our own selection rule
-      source: 'stockdetails',
+      includeExpired: true,  // fetch all rows, apply date logic in agent
+      source: 'view',  // prefer vw_WillExpire_Products
       productCodes: [],
     });
-    const source = result.source;
+    
     const rows = result.products || [];
-    console.log(`[POS FETCH][EXPIRY] expiry rows fetched: count=${rows.length}`);
+    console.log(`[POS FETCH][EXPIRY] rows fetched from view: count=${rows.length}`);
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
     const MIN_DATE = new Date('2000-01-01T00:00:00.000Z');
+    const expiryBatchesMap = new Map();
+    let processedCount = 0;
+    let skippedCount = 0;
 
-    // Group by ProductCode — only keep rows with valid dates
-    const grouped = new Map();
+    // Process each row as ONE standalone batch (identified by StockDetailID)
     for (const row of rows) {
       const code = String(row.ProductCode || '').trim();
-      if (!code || !row.ExpiryDate) continue;
+      if (!code || !row.ExpiryDate) {
+        skippedCount++;
+        continue;
+      }
+      
       const d = new Date(row.ExpiryDate);
-      if (isNaN(d.getTime()) || d < MIN_DATE) continue;
-      if (!grouped.has(code)) grouped.set(code, []);
-      grouped.get(code).push(row);
-    }
-    console.log(`[POS FETCH][EXPIRY] grouped products: ${grouped.size}`);
-
-    const expiryBatchesMap = new Map();
-    let totalSkipped = 0;
-
-    for (const [code, entries] of grouped.entries()) {
-      // Keep only active rows and aggregate by ProductCode + GRN + ExpiryDate
-      const activeRows = entries.filter((e) => e.RemainingQty != null && e.RemainingQty > 0);
-      const skippedCount = entries.length - activeRows.length;
-      totalSkipped += skippedCount;
-
-      if (activeRows.length === 0) {
+      if (isNaN(d.getTime()) || d < MIN_DATE) {
+        skippedCount++;
+        continue;
+      }
+      
+      const StockBalance = Number(row.StockBalance || 0);
+      if (StockBalance <= 0) {
+        skippedCount++;
         continue;
       }
 
-      const byBatch = new Map();
-      for (const row of activeRows) {
-        const dateKey = new Date(row.ExpiryDate).toISOString().slice(0, 10);
-        const batchNo = row.LatestGRNNo != null ? String(row.LatestGRNNo) : null;
-        const batchKey = `${batchNo || 'NO-GRN'}|${dateKey}`;
+      // Use StockDetailID as the unique batch identifier
+      const stockDetailId = row.StockDetailID != null ? String(row.StockDetailID).trim() : null;
+      const debugEnabled = shouldDebugExpiryBatch(code);
 
-        if (!byBatch.has(batchKey)) {
-          byBatch.set(batchKey, {
-            productCode: code,
-            expiryDate: new Date(row.ExpiryDate).toISOString(),
-            remainingQty: 0,
-            locationCode,
-            batchNo,
-            source,
-          });
-        }
-        const current = byBatch.get(batchKey);
-        current.remainingQty += Number(row.RemainingQty || 0);
+      const batch = {
+        productCode: code,
+        expiryDate: d.toISOString(),
+        remainingQty: StockBalance,
+        locationCode: locationCode,
+        batchNo: stockDetailId,  // StockDetailID is the unique batch key
+        source: result.source,
+      };
+
+      if (debugEnabled) {
+        console.log(`[EXPIRY BATCH] processing batch for ${code}:`, batch);
       }
 
-      const batches = Array.from(byBatch.values())
-        .filter((b) => b.remainingQty > 0)
-        .sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
-
-      if (batches.length > 0) {
-        expiryBatchesMap.set(code, batches);
+      if (!expiryBatchesMap.has(code)) {
+        expiryBatchesMap.set(code, []);
       }
+      expiryBatchesMap.get(code).push(batch);
+      processedCount++;
+    }
 
-      if (expiryBatchesMap.size <= 3) {
-        console.log(`[POS FETCH][EXPIRY] grouped rows for product ${code}: total=${entries.length} active=${activeRows.length} batches=${batches.length}`);
-        if (batches[0]) {
-          console.log(`[POS FETCH][EXPIRY] selected summary batch for ${code}: nearestExpiryDate=${new Date(batches[0].expiryDate).toISOString().slice(0,10)} remainingQty=${batches[0].remainingQty}`);
-        }
-      }
+    // Sort batches per product by expiry date
+    for (const batches of expiryBatchesMap.values()) {
+      batches.sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
     }
 
     console.log(`[POS FETCH][EXPIRY] expiry batch map size=${expiryBatchesMap.size}`);
-    console.log(`[POS FETCH][EXPIRY] skipped historical rows count=${totalSkipped}`);
+    console.log(`[POS FETCH][EXPIRY] rows processed=${processedCount}`);
+    console.log(`[POS FETCH][EXPIRY] rows skipped=${skippedCount}`);
+
+    // Log sample batches per product
+    let sampleLog = 0;
+    for (const [code, batches] of expiryBatchesMap.entries()) {
+      if (sampleLog < 3) {
+        console.log(`[POS FETCH][EXPIRY] product ${code}: ${batches.length} batches`);
+        batches.slice(0, 2).forEach((b, idx) => {
+          console.log(`  batch ${idx + 1}: StockDetailID=${b.batchNo} qty=${b.remainingQty} expiry=${new Date(b.expiryDate).toISOString().slice(0, 10)}`);
+        });
+        sampleLog++;
+      }
+    }
+
     return expiryBatchesMap;
   } catch (err) {
     console.error('[POS FETCH][EXPIRY] buildActiveExpiryBatchesFromPOS failed:', err.message);
@@ -628,80 +605,43 @@ async function fetchExpiryCandidates({ days, locationCode, includeExpired, sourc
        AND ExpiryDate >= CAST(GETDATE() AS date)
        AND ExpiryDate < DATEADD(DAY, @ExpiryDays, CAST(GETDATE() AS date))`;
 
-  const stockDetailsQuery = `
-      SELECT
-        sd.ProductCode,
-        sd.ExpiryDate,
-        s.GRNNo AS LatestGRNNo,
-        SUM(ISNULL(sd.StockQty, 0) - ISNULL(sd.StockOut, 0)) AS RemainingQty
-      FROM POS.dbo.stockdetails sd
-      INNER JOIN POS.dbo.stocks s
-        ON sd.GRNNo = s.GRNNo
-      WHERE ${rangeClause}
-        AND sd.ExpiryDate IS NOT NULL
-        AND s.LocationCode = @LocationCode
-        ${buildProductCodeFilter('sd')}
-      GROUP BY sd.ProductCode, sd.ExpiryDate, s.GRNNo
-      HAVING SUM(ISNULL(sd.StockQty, 0) - ISNULL(sd.StockOut, 0)) > 0
-      ORDER BY s.GRNNo DESC, sd.ExpiryDate DESC, sd.ProductCode ASC
-    `;
-
   const viewQuery = `
-      SELECT *
+      SELECT
+        ProductCode,
+        StockDetailID,
+        ExpiryDate,
+        StockBalance
       FROM POS.dbo.vw_WillExpire_Products vw
       WHERE ${rangeClause}
         AND vw.ExpiryDate IS NOT NULL
+        AND vw.StockBalance > 0
         ${buildProductCodeFilter('vw')}
-      ORDER BY vw.ExpiryDate ASC
+      ORDER BY vw.ProductCode ASC, vw.ExpiryDate ASC
     `;
 
-  const query = safeSource === 'stockdetails'
-    ? `
-      ${stockDetailsQuery}
-    `
-    : viewQuery;
+  // Always use the view for accurate batch-level data
+  const query = viewQuery;
 
   let result;
-  let resolvedSource = safeSource;
+  let resolvedSource = 'view';
 
   try {
     result = await request.query(query);
-    if (safeSource !== 'stockdetails' && (!result.recordset || result.recordset.length === 0)) {
-      console.warn('[EXPIRY] primary vw_WillExpire_Products returned 0 rows, falling back to stockdetails');
-      const fallbackRequest = pool.request();
-      fallbackRequest.input('MinValidDate', sql.Date, new Date('2000-01-01T00:00:00.000Z'));
-      fallbackRequest.input('ExpiryDays', sql.Int, safeDays);
-      fallbackRequest.input('LocationCode', sql.VarChar(10), safeLocationCode);
-      if (productCodesCsv) {
-        fallbackRequest.input('ProductCodesCsv', sql.NVarChar(sql.MAX), productCodesCsv);
-      }
-      result = await fallbackRequest.query(stockDetailsQuery);
-      resolvedSource = 'stockdetails';
-    }
   } catch (error) {
-    if (safeSource !== 'stockdetails') {
-      console.warn('[EXPIRY] primary vw_WillExpire_Products query failed, falling back to stockdetails:', error.message);
-      const fallbackRequest = pool.request();
-      fallbackRequest.input('MinValidDate', sql.Date, new Date('2000-01-01T00:00:00.000Z'));
-      fallbackRequest.input('ExpiryDays', sql.Int, safeDays);
-      fallbackRequest.input('LocationCode', sql.VarChar(10), safeLocationCode);
-      if (productCodesCsv) {
-        fallbackRequest.input('ProductCodesCsv', sql.NVarChar(sql.MAX), productCodesCsv);
-      }
-      result = await fallbackRequest.query(stockDetailsQuery);
-      resolvedSource = 'stockdetails';
-    } else {
-      throw error;
-    }
+    console.error('[EXPIRY] vw_WillExpire_Products query failed:', error.message);
+    throw error;
   }
 
   const products = (result.recordset || [])
-    .map((row) => mapExpiryRow(row, safeLocationCode))
-    .filter((row) => row.ProductCode && row.ExpiryDate)
-    .filter((row) => !row.ExpiryDate.startsWith('1900-01-01'))
-    .filter((row) => row.RemainingQty == null || row.RemainingQty > 0);
+    .map((row) => ({
+      ProductCode: row.ProductCode,
+      StockDetailID: row.StockDetailID,
+      ExpiryDate: row.ExpiryDate,
+      StockBalance: Number(row.StockBalance || 0),
+    }))
+    .filter((row) => row.ProductCode && row.ExpiryDate && row.StockBalance > 0);
 
-  console.log(`[EXPIRY] fetched ${products.length} expiry rows within ${safeDays} days from ${resolvedSource} (includeExpired=${safeIncludeExpired}, productCodes=${safeProductCodes.length})`);
+  console.log(`[EXPIRY] fetched ${products.length} expiry batch rows from vw_WillExpire_Products`);
 
   return {
     days: safeDays,
@@ -709,10 +649,6 @@ async function fetchExpiryCandidates({ days, locationCode, includeExpired, sourc
     includeExpired: safeIncludeExpired,
     source: resolvedSource,
     products,
-    sql: {
-      primary: safeSource === 'stockdetails' ? stockDetailsQuery.trim() : viewQuery.trim(),
-      fallback: stockDetailsQuery.trim(),
-    },
   };
 }
 
