@@ -7,7 +7,7 @@ const { verifyToken } = require('../utils/jwt');
 
 const prisma = new PrismaClient();
 const MIN_VALID_EXPIRY_DATE = new Date('2000-01-01T00:00:00.000Z');
-const ADMIN_EXPIRY_REQUEST_TIMEOUT_MS = 10000;
+const ADMIN_EXPIRY_REQUEST_TIMEOUT_MS = 30000;
 const ADMIN_EXPIRY_CACHE_TTL_MS = 5 * 60 * 1000;
 
 const adminExpiryFetchState = {
@@ -278,21 +278,36 @@ async function fetchPosExpiryMap(products) {
   let expiryRows = [];
   const posConfig = posSyncService.getConfig();
   const targetUrl = `${posConfig.agentUrl}/pos-sync/expiry-products`;
+  const productCodes = Array.from(productCodeSet.values());
 
   console.log(`[ADMIN PRODUCTS] calling POS expiry endpoint: ${targetUrl}`);
   console.log('[ADMIN PRODUCTS] POS expiry request params', {
     source: 'view',
     includeExpired: true,
+    productCodesCount: productCodes.length,
     requestTimeoutMs: ADMIN_EXPIRY_REQUEST_TIMEOUT_MS,
   });
 
-  const expiryResult = await posSyncService.getExpiryProductsFromPOS({
+  let expiryResult = await posSyncService.getExpiryProductsFromPOS({
     days: 3650,
     locationCode: process.env.POS_LOCATION_CODE || 'SH',
     includeExpired: true,
     source: 'view',
+    productCodes,
     requestTimeoutMs: ADMIN_EXPIRY_REQUEST_TIMEOUT_MS,
   });
+
+  if (!expiryResult.success) {
+    console.warn('[ADMIN PRODUCTS] retrying POS expiry fetch with stockdetails source');
+    expiryResult = await posSyncService.getExpiryProductsFromPOS({
+      days: 3650,
+      locationCode: process.env.POS_LOCATION_CODE || 'SH',
+      includeExpired: true,
+      source: 'stockdetails',
+      productCodes,
+      requestTimeoutMs: ADMIN_EXPIRY_REQUEST_TIMEOUT_MS,
+    });
+  }
 
   if (!expiryResult.success) {
     console.warn('[ADMIN PRODUCTS] expiry fetch failed', {

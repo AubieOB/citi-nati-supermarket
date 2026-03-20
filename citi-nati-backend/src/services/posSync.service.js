@@ -377,7 +377,7 @@ async function updatePrices(updates = []) {
   }
 }
 
-async function getExpiryProductsFromPOS({ days = 14, locationCode = 'SH', includeExpired = false, source = 'view', requestTimeoutMs } = {}) {
+async function getExpiryProductsFromPOS({ days = 14, locationCode = 'SH', includeExpired = false, source = 'view', productCodes = [], requestTimeoutMs } = {}) {
   if (!ENABLE_POS_SYNC) {
     return { success: false, error: 'POS Sync is disabled' };
   }
@@ -387,6 +387,12 @@ async function getExpiryProductsFromPOS({ days = 14, locationCode = 'SH', includ
   const effectiveTimeoutMs = Number.isFinite(Number(requestTimeoutMs)) && Number(requestTimeoutMs) > 0
     ? Number(requestTimeoutMs)
     : POS_AGENT_TIMEOUT_MS;
+  const normalizedProductCodes = Array.isArray(productCodes)
+    ? productCodes.map((value) => String(value || '').trim()).filter(Boolean)
+    : [];
+  const productCodesCsv = normalizedProductCodes.length > 0
+    ? normalizedProductCodes.join(',')
+    : undefined;
 
   try {
     if (!POS_SECRET) {
@@ -403,6 +409,7 @@ async function getExpiryProductsFromPOS({ days = 14, locationCode = 'SH', includ
       locationCode,
       includeExpired,
       source,
+      productCodesCount: normalizedProductCodes.length,
     });
 
     const response = await posAgent.get(endpoint, {
@@ -411,6 +418,7 @@ async function getExpiryProductsFromPOS({ days = 14, locationCode = 'SH', includ
         locationCode,
         includeExpired,
         source,
+        productCodesCsv,
       },
       timeout: effectiveTimeoutMs,
     });

@@ -253,13 +253,29 @@ function normalizeExpiryIncludeExpired(query) {
 }
 
 function summarizeExpiryRequest(query) {
+  const rawProductCodes = query.productCodesCsv || query.productCodes;
   return {
     days: query.days,
     locationCode: query.locationCode,
     includeExpired: query.includeExpired,
     source: query.source,
     filter: query.filter,
+    productCodes: rawProductCodes,
   };
+}
+
+function normalizeExpiryProductCodes(value) {
+  if (value == null || value === '') {
+    return [];
+  }
+
+  const values = Array.isArray(value)
+    ? value
+    : String(value).split(',');
+
+  return Array.from(new Set(values
+    .map((item) => String(item || '').trim())
+    .filter(Boolean)));
 }
 
 function validateExpiryRequest(query) {
@@ -269,6 +285,7 @@ function validateExpiryRequest(query) {
     locationCode: normalizeLocationCode(query.locationCode),
     includeExpired: normalizeExpiryIncludeExpired(query),
     source: normalizeExpirySource(query.source),
+    productCodes: normalizeExpiryProductCodes(query.productCodesCsv || query.productCodes),
   };
 
   const issues = [];
@@ -357,7 +374,7 @@ function mapExpiryRow(row, fallbackLocationCode) {
   };
 }
 
-async function fetchExpiryCandidates({ days, locationCode, includeExpired, source }) {
+async function fetchExpiryCandidates({ days, locationCode, includeExpired, source, productCodes }) {
   if (!pool) {
     await initializePool();
   }
@@ -366,10 +383,22 @@ async function fetchExpiryCandidates({ days, locationCode, includeExpired, sourc
   const safeDays = normalizeExpiryDays(days);
   const safeLocationCode = normalizeLocationCode(locationCode);
   const safeIncludeExpired = normalizeBooleanFlag(includeExpired, false);
+  const safeProductCodes = normalizeExpiryProductCodes(productCodes);
+  const productCodesCsv = safeProductCodes.length > 0 ? safeProductCodes.join(',') : null;
   const request = pool.request();
   request.input('MinValidDate', sql.Date, new Date('2000-01-01T00:00:00.000Z'));
   request.input('ExpiryDays', sql.Int, safeDays);
   request.input('LocationCode', sql.VarChar(10), safeLocationCode);
+  request.input('ProductCodesCsv', sql.NVarChar(sql.MAX), productCodesCsv);
+
+  const buildProductCodeFilter = (alias) => `
+       AND (
+         @ProductCodesCsv IS NULL OR
+         LTRIM(RTRIM(CAST(${alias}.ProductCode AS NVARCHAR(100)))) IN (
+           SELECT LTRIM(RTRIM(value))
+           FROM STRING_SPLIT(@ProductCodesCsv, ',')
+         )
+       )`;
 
   const rangeClause = safeIncludeExpired
     ? `ExpiryDate >= @MinValidDate`
@@ -385,6 +414,7 @@ async function fetchExpiryCandidates({ days, locationCode, includeExpired, sourc
       FROM POS.dbo.stockdetails sd
       WHERE ${rangeClause}
         AND sd.ExpiryDate IS NOT NULL
+        ${buildProductCodeFilter('sd')}
       GROUP BY sd.ProductCode, sd.ExpiryDate
       HAVING SUM(ISNULL(sd.StockQty, 0) - ISNULL(sd.StockOut, 0)) > 0
       ORDER BY sd.ExpiryDate ASC, sd.ProductCode ASC
@@ -392,10 +422,11 @@ async function fetchExpiryCandidates({ days, locationCode, includeExpired, sourc
 
   const viewQuery = `
       SELECT *
-      FROM POS.dbo.vw_WillExpire_Products
+      FROM POS.dbo.vw_WillExpire_Products vw
       WHERE ${rangeClause}
-        AND ExpiryDate IS NOT NULL
-      ORDER BY ExpiryDate ASC
+        AND vw.ExpiryDate IS NOT NULL
+        ${buildProductCodeFilter('vw')}
+      ORDER BY vw.ExpiryDate ASC
     `;
 
   const query = safeSource === 'stockdetails'
@@ -415,6 +446,7 @@ async function fetchExpiryCandidates({ days, locationCode, includeExpired, sourc
       fallbackRequest.input('MinValidDate', sql.Date, new Date('2000-01-01T00:00:00.000Z'));
       fallbackRequest.input('ExpiryDays', sql.Int, safeDays);
       fallbackRequest.input('LocationCode', sql.VarChar(10), safeLocationCode);
+      fallbackRequest.input('ProductCodesCsv', sql.NVarChar(sql.MAX), productCodesCsv);
       result = await fallbackRequest.query(stockDetailsQuery);
       resolvedSource = 'stockdetails';
     }
@@ -425,6 +457,7 @@ async function fetchExpiryCandidates({ days, locationCode, includeExpired, sourc
       fallbackRequest.input('MinValidDate', sql.Date, new Date('2000-01-01T00:00:00.000Z'));
       fallbackRequest.input('ExpiryDays', sql.Int, safeDays);
       fallbackRequest.input('LocationCode', sql.VarChar(10), safeLocationCode);
+      fallbackRequest.input('ProductCodesCsv', sql.NVarChar(sql.MAX), productCodesCsv);
       result = await fallbackRequest.query(stockDetailsQuery);
       resolvedSource = 'stockdetails';
     } else {
@@ -438,7 +471,7 @@ async function fetchExpiryCandidates({ days, locationCode, includeExpired, sourc
     .filter((row) => !row.ExpiryDate.startsWith('1900-01-01'))
     .filter((row) => row.RemainingQty == null || row.RemainingQty > 0);
 
-  console.log(`[EXPIRY] fetched ${products.length} expiry rows within ${safeDays} days from ${resolvedSource} (includeExpired=${safeIncludeExpired})`);
+  console.log(`[EXPIRY] fetched ${products.length} expiry rows within ${safeDays} days from ${resolvedSource} (includeExpired=${safeIncludeExpired}, productCodes=${safeProductCodes.length})`);
 
   return {
     days: safeDays,
@@ -530,6 +563,7 @@ app.get('/pos-sync/expiry-products', validateApiKey, async (req, res) => {
       includeExpired: result.includeExpired,
       source: result.source,
       count: result.products.length,
+      productCodesCount: validation.normalized.productCodes.length,
       data: result.products,
     });
   } catch (err) {
