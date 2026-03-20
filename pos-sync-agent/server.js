@@ -611,11 +611,14 @@ async function fetchExpiryCandidates({ days, locationCode, includeExpired, sourc
       SELECT
         sd.ProductCode,
         sd.ExpiryDate,
-        MAX(sd.GRNNo) AS LatestGRNNo,
+        MAX(s.GRNNo) AS LatestGRNNo,
         SUM(ISNULL(sd.StockQty, 0) - ISNULL(sd.StockOut, 0)) AS RemainingQty
       FROM POS.dbo.stockdetails sd
+      INNER JOIN POS.dbo.stocks s
+        ON sd.GRNNo = s.GRNNo
       WHERE ${rangeClause}
         AND sd.ExpiryDate IS NOT NULL
+        AND s.LocationCode = @LocationCode
         ${buildProductCodeFilter('sd')}
       GROUP BY sd.ProductCode, sd.ExpiryDate
       HAVING SUM(ISNULL(sd.StockQty, 0) - ISNULL(sd.StockOut, 0)) > 0
