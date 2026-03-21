@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import toast from 'react-hot-toast';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../../utils/api.js';
 import { formatMWK } from '../../utils/currency.js';
 import { getSocket } from '../../utils/socket.js';
@@ -27,6 +26,9 @@ const AdminPromotions = () => {
   const [activeTab, setActiveTab] = useState('global');
   const [previewProducts, setPreviewProducts] = useState([]);
   const [showPreview, setShowPreview] = useState(false);
+  const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
+  const [filterBarHeight, setFilterBarHeight] = useState(0);
+  const filterBarRef = useRef(null);
 
   const clearSearch = () => {
     setSearchTerm('');
@@ -60,6 +62,42 @@ const AdminPromotions = () => {
       if (typeof cleanupSocket === 'function') {
         cleanupSocket();
       }
+    };
+  }, []);
+
+  useEffect(() => {
+    let resizeObserver;
+
+    const updateFilterBarLayout = () => {
+      const contentArea = document.querySelector('.admin-content-area');
+      if (!contentArea) return;
+
+      const rect = contentArea.getBoundingClientRect();
+      const mobileTopOffset = 56;
+
+      setFilterBarLayout({
+        left: rect.left,
+        width: rect.width,
+        top: window.innerWidth <= 768 ? mobileTopOffset : 0,
+      });
+
+      if (filterBarRef.current) {
+        setFilterBarHeight(filterBarRef.current.offsetHeight);
+      }
+    };
+
+    updateFilterBarLayout();
+    window.addEventListener('resize', updateFilterBarLayout);
+
+    const contentArea = document.querySelector('.admin-content-area');
+    if (contentArea && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(updateFilterBarLayout);
+      resizeObserver.observe(contentArea);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateFilterBarLayout);
+      if (resizeObserver) resizeObserver.disconnect();
     };
   }, []);
 
@@ -539,64 +577,123 @@ const AdminPromotions = () => {
     return <div style={{ textAlign: 'center', padding: '2rem' }}>Loading promotions...</div>;
   }
 
+  const promotionTabs = [
+    { id: 'global', label: 'Global Promotion', icon: 'fa-globe' },
+    { id: 'category', label: 'Category Promotion', icon: 'fa-box' },
+    { id: 'selective', label: 'Selective Promotion', icon: 'fa-hand-pointer' },
+  ];
+
+  const promotionsFilterSpacerHeight = Math.max(Math.min(filterBarHeight, 128) - 8, 0);
+
   return (
-    <div style={{ padding: '1.5rem' }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        marginBottom: '2rem',
-        gap: '0.75rem',
-      }}>
-        <i className="fas fa-tags" style={{ fontSize: '1.5rem', color: '#5B4B8A' }}></i>
-        <h1 style={{ margin: 0, color: '#333' }}>Promotions Management</h1>
+    <div style={{ position: 'relative' }}>
+      <div
+        ref={filterBarRef}
+        style={{
+          position: 'fixed',
+          top: `${filterBarLayout.top}px`,
+          left: `${filterBarLayout.left}px`,
+          width: `${filterBarLayout.width}px`,
+          zIndex: 80,
+          backgroundColor: '#fff',
+          border: '1px solid #eee',
+          borderRadius: '8px',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+          boxSizing: 'border-box',
+          overflow: 'hidden',
+          padding: '0.75rem 1rem',
+        }}
+      >
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.75rem',
+          flexWrap: 'wrap',
+          marginBottom: '0.75rem',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <i className="fas fa-tags" style={{ fontSize: '1.2rem', color: '#5B4B8A' }}></i>
+            <h1 style={{ margin: 0, color: '#333', fontSize: '1.15rem' }}>Promotions Management</h1>
+          </div>
+          <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600' }}>
+            Catalog: {allProducts.length} products | {categories.length} categories
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+          {promotionTabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '0.6rem 1rem',
+                border: activeTab === tab.id ? 'none' : '1px solid #d1d5db',
+                borderRadius: '8px',
+                backgroundColor: activeTab === tab.id ? '#5B4B8A' : '#fff',
+                color: activeTab === tab.id ? '#fff' : '#4b5563',
+                fontWeight: activeTab === tab.id ? '700' : '600',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                transition: 'all 0.2s ease',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+              }}
+            >
+              <i className={`fas ${tab.icon}`}></i>
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Info Box */}
+      <div style={{ height: `${promotionsFilterSpacerHeight}px` }}></div>
+
       <div style={{
-        backgroundColor: '#e3f2fd',
-        borderLeft: '4px solid #2196F3',
+        backgroundColor: '#f8fafc',
+        border: '1px solid #e5e7eb',
+        borderRadius: '10px',
         padding: '1rem',
-        borderRadius: '4px',
-        marginBottom: '2rem',
-        color: '#1565c0',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.75rem',
       }}>
-        <i className="fas fa-lightbulb" style={{ fontSize: '1.2rem' }}></i>
-        <p style={{ margin: 0 }}>
-          <strong>Tip:</strong> Use promotions to boost sales. Preview products before activating to ensure correct targeting.
-        </p>
-      </div>
+        {/* Info Box */}
+        <div style={{
+          backgroundColor: '#e3f2fd',
+          borderLeft: '4px solid #2196F3',
+          padding: '1rem',
+          borderRadius: '4px',
+          marginBottom: '1rem',
+          color: '#1565c0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem',
+        }}>
+          <i className="fas fa-lightbulb" style={{ fontSize: '1.2rem' }}></i>
+          <p style={{ margin: 0 }}>
+            <strong>Tip:</strong> Use promotions to boost sales. Preview products before activating to ensure correct targeting.
+          </p>
+        </div>
 
-      <div style={{
-        marginBottom: '1rem',
-        color: '#666',
-        fontSize: '0.9rem',
-      }}>
-        Catalog loaded: {allProducts.length} products across {categories.length} categories
-      </div>
-
-      {/* Promotion Cards */}
-      <div style={{ maxWidth: '900px' }}>
-        {renderPromotionCard(
-          'global',
-          'Global Promotion',
-          'Apply discount to all products in store',
-          'fa-globe'
-        )}
-        {renderPromotionCard(
-          'category',
-          'Category Promotion',
-          'Apply discount to all products in a selected category',
-          'fa-box'
-        )}
-        {renderPromotionCard(
-          'selective',
-          'Selective Promotion',
-          'Apply discount to specific products you choose',
-          'fa-hand-pointer'
-        )}
+        <div style={{ maxWidth: '900px' }}>
+          {activeTab === 'global' && renderPromotionCard(
+            'global',
+            'Global Promotion',
+            'Apply discount to all products in store',
+            'fa-globe'
+          )}
+          {activeTab === 'category' && renderPromotionCard(
+            'category',
+            'Category Promotion',
+            'Apply discount to all products in a selected category',
+            'fa-box'
+          )}
+          {activeTab === 'selective' && renderPromotionCard(
+            'selective',
+            'Selective Promotion',
+            'Apply discount to specific products you choose',
+            'fa-hand-pointer'
+          )}
+        </div>
       </div>
 
       {/* Preview Modal */}
