@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import api from '../../utils/api.js';
 import { useModal } from '../../hooks/useModal.js';
 import Modal from '../common/Modal.jsx';
@@ -10,7 +10,10 @@ const AdminSystem = () => {
   const [saving, setSaving] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState(DEFAULT_MESSAGE);
+  const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
+  const [filterBarHeight, setFilterBarHeight] = useState(0);
   const { modal, showError, showSuccess, closeModal } = useModal();
+  const filterBarRef = useRef(null);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -28,6 +31,49 @@ const AdminSystem = () => {
 
     loadSettings();
   }, [showError]);
+
+  useEffect(() => {
+    let resizeObserver;
+
+    const updateFilterBarLayout = () => {
+      const contentArea = document.querySelector('.admin-content-area');
+      if (!contentArea) return;
+
+      const rect = contentArea.getBoundingClientRect();
+      const mobileTopOffset = 56;
+
+      setFilterBarLayout({
+        left: rect.left,
+        width: rect.width,
+        top: window.innerWidth <= 768 ? mobileTopOffset : 0,
+      });
+
+      if (filterBarRef.current) {
+        setFilterBarHeight(filterBarRef.current.offsetHeight);
+      }
+    };
+
+    updateFilterBarLayout();
+    window.addEventListener('resize', updateFilterBarLayout);
+
+    const contentArea = document.querySelector('.admin-content-area');
+    if (contentArea && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(updateFilterBarLayout);
+      resizeObserver.observe(contentArea);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateFilterBarLayout);
+      if (resizeObserver) resizeObserver.disconnect();
+    };
+  }, []);
+
+  // Re-measure bar height after each render to account for content wrapping
+  useEffect(() => {
+    if (filterBarRef.current) {
+      setFilterBarHeight(filterBarRef.current.offsetHeight);
+    }
+  });
 
   const handleSave = async () => {
     try {
@@ -48,10 +94,54 @@ const AdminSystem = () => {
     return <div style={{ padding: '1.5rem', color: '#666' }}>Loading system settings...</div>;
   }
 
+  const systemFilterSpacerHeight = filterBarHeight > 0 ? filterBarHeight + 8 : 0;
+
   return (
-    <div style={{ maxWidth: '820px', margin: '0 auto', display: 'grid', gap: '1.25rem' }}>
+    <div style={{ position: 'relative' }}>
+      <div
+        ref={filterBarRef}
+        style={{
+          position: 'fixed',
+          top: `${filterBarLayout.top}px`,
+          left: `${filterBarLayout.left}px`,
+          width: `${filterBarLayout.width}px`,
+          zIndex: 80,
+          backgroundColor: '#fff',
+          border: '1px solid #eee',
+          borderRadius: '8px',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+          boxSizing: 'border-box',
+          overflow: 'hidden',
+          padding: '0.75rem 1rem',
+        }}
+      >
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.6rem',
+        }}>
+          <i className="fas fa-sliders-h" style={{ fontSize: '1.2rem', color: '#5B4B8A' }}></i>
+          <h1 style={{ margin: 0, color: '#333', fontSize: '1.15rem' }}>System Settings</h1>
+        </div>
+        <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600', marginTop: '0.5rem' }}>
+          Maintenance: {maintenanceMode ? 'ENABLED' : 'DISABLED'}
+        </div>
+      </div>
+
+      <div style={{ height: `${systemFilterSpacerHeight}px` }}></div>
+
+      <div style={{
+        backgroundColor: '#f8fafc',
+        border: '1px solid #e5e7eb',
+        borderRadius: '10px',
+        padding: '1rem',
+        maxWidth: '820px',
+        margin: '0 auto',
+        display: 'grid',
+        gap: '1.25rem',
+      }}>
       <div style={{ backgroundColor: '#fff', borderRadius: '10px', padding: '1.5rem', boxShadow: '0 2px 10px rgba(0,0,0,0.08)' }}>
-        <h2 style={{ marginTop: 0, color: '#333' }}>System Settings</h2>
+        <h2 style={{ marginTop: 0, color: '#333', marginBottom: '1rem' }}>System Configuration</h2>
         <p style={{ color: '#666', marginBottom: '1.25rem' }}>
           Control website-wide behavior. Maintenance mode blocks public access and shows an apology screen while keeping admin access available.
         </p>
@@ -111,6 +201,7 @@ const AdminSystem = () => {
             {saving ? 'Saving...' : 'Save System Settings'}
           </button>
         </div>
+      </div>
       </div>
 
       <Modal
