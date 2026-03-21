@@ -137,6 +137,13 @@ const AdminSecurity = () => {
     };
   }, []);
 
+  // Re-measure bar height after each render to account for content wrapping
+  useEffect(() => {
+    if (filterBarRef.current) {
+      setFilterBarHeight(filterBarRef.current.offsetHeight);
+    }
+  });
+
   const handleInputChange = (event, scope) => {
     const { name, value } = event.target;
 

@@ -101,6 +101,13 @@ const AdminPromotions = () => {
     };
   }, []);
 
+  // Re-measure bar height after each render to account for content wrapping
+  useEffect(() => {
+    if (filterBarRef.current) {
+      setFilterBarHeight(filterBarRef.current.offsetHeight);
+    }
+  });
+
   /**
    * Real-time promotion updates via Socket.io
    */

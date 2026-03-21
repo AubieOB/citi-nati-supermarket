@@ -198,6 +198,13 @@ const AdminUsers = () => {
     };
   }, []);
 
+  // Re-measure bar height after each render to account for content wrapping
+  useEffect(() => {
+    if (filterBarRef.current) {
+      setFilterBarHeight(filterBarRef.current.offsetHeight);
+    }
+  });
+
   const filteredUsers = users.filter((u) => {
     const query = searchTerm.trim().toLowerCase();
     const matchesSearch = !query
