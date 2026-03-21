@@ -30,8 +30,11 @@ const AdminStocks = () => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [stockAction, setStockAction] = useState('');
   const [stockQuantity, setStockQuantity] = useState(0);
+  const [adjustmentReason, setAdjustmentReason] = useState('');
+  const [adjustmentNotes, setAdjustmentNotes] = useState('');
   const [showActionModal, setShowActionModal] = useState(false);
   const [actionType, setActionType] = useState('add'); // 'add' or 'subtract'
+  const [isSubmittingAdjustment, setIsSubmittingAdjustment] = useState(false);
   const [lowStockThreshold, setLowStockThreshold] = useState(5);
   const [currentPage, setCurrentPage] = useState(1);
   const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
@@ -178,14 +181,33 @@ const AdminStocks = () => {
       return;
     }
 
-    try {
-      const newStock = actionType === 'add'
-        ? selectedProduct.stock + stockQuantity
-        : Math.max(0, selectedProduct.stock - stockQuantity);
+    if (actionType === 'add') {
+      notifyInfo('Website stock-in is disabled. Use the trusted receiving flow outside the website.', 4000);
+      return;
+    }
 
-      const response = await api.put(`/products/${selectedProduct.id}`, {
-        stock: newStock
+    const productCode = String(selectedProduct.productCode || selectedProduct.sourceCode || selectedProduct.code || '').trim();
+    if (!productCode) {
+      notifyError('This product has no product code. Adjustment cannot be submitted safely.', 4000);
+      return;
+    }
+
+    if (!adjustmentReason.trim()) {
+      notifyError('Reason is required for stock corrections', 3000);
+      return;
+    }
+
+    try {
+      setIsSubmittingAdjustment(true);
+
+      const response = await api.post('/admin/inventory/adjustments', {
+        productCode,
+        adjustmentQty: -Math.abs(stockQuantity),
+        reason: adjustmentReason.trim(),
+        notes: adjustmentNotes.trim(),
       });
+
+      const newStock = Number(response.data?.adjustment?.newStock ?? Math.max(0, selectedProduct.stock - stockQuantity));
 
       // Update local state (allProducts list used for filtering/pagination)
       setAllProducts(prev => 
@@ -196,22 +218,32 @@ const AdminStocks = () => {
         )
       );
 
-      const action = actionType === 'add' ? 'added' : 'removed';
-      notifySuccess(`✅ ${stockQuantity} units ${action} to ${selectedProduct.name}!`, 3000);
+      notifySuccess(`✅ ${stockQuantity} units removed from ${selectedProduct.name}`, 3000);
 
       setShowActionModal(false);
       setStockQuantity(0);
+      setAdjustmentReason('');
+      setAdjustmentNotes('');
       setSelectedProduct(null);
     } catch (err) {
       console.error('Error updating stock:', err);
       notifyError(`Failed to update stock: ${err.response?.data?.error || 'Unknown error'}`, 4000);
+    } finally {
+      setIsSubmittingAdjustment(false);
     }
   };
 
   const openStockModal = (product, type) => {
+    if (type === 'add') {
+      notifyInfo('Add Stock is disabled. Website receiving / GRN stock-in is not enabled in this phase.', 4000);
+      return;
+    }
+
     setSelectedProduct(product);
     setActionType(type);
     setStockQuantity(0);
+    setAdjustmentReason('manual_correction');
+    setAdjustmentNotes('');
     setShowActionModal(true);
   };
 
@@ -219,6 +251,8 @@ const AdminStocks = () => {
     setShowActionModal(false);
     setSelectedProduct(null);
     setStockQuantity(0);
+    setAdjustmentReason('');
+    setAdjustmentNotes('');
   };
 
   const getStockStatus = (stock) => {
@@ -873,23 +907,23 @@ const AdminStocks = () => {
                       }}>
                         <button
                           onClick={() => openStockModal(product, 'add')}
-                          title="Add Stock"
+                          title="Add Stock disabled until dedicated website receiving module exists"
+                          disabled
                           style={{
                             padding: '0.5rem 0.75rem',
                             borderRadius: '4px',
                             border: 'none',
-                            backgroundColor: '#4CAF50',
+                            backgroundColor: '#b7c3b9',
                             color: '#fff',
-                            cursor: 'pointer',
+                            cursor: 'not-allowed',
                             fontWeight: '600',
                             fontSize: '0.85rem',
                             transition: 'all 0.2s ease',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '0.5rem',
+                            opacity: 0.7,
                           }}
-                          onMouseOver={(e) => e.target.style.opacity = '0.8'}
-                          onMouseOut={(e) => e.target.style.opacity = '1'}
                         >
                           <i className="fas fa-plus"></i>
                           Add
@@ -971,6 +1005,20 @@ const AdminStocks = () => {
               <i className={`fas ${actionType === 'add' ? 'fa-plus' : 'fa-minus'}`} style={{ color: actionType === 'add' ? '#4CAF50' : '#f44336' }}></i>
               {actionType === 'add' ? 'Add Stock' : 'Remove Stock'}
             </h2>
+
+            {actionType === 'subtract' && (
+              <div style={{
+                marginBottom: '1rem',
+                padding: '0.85rem 1rem',
+                borderRadius: '6px',
+                backgroundColor: '#fff3e0',
+                color: '#8a5a00',
+                fontSize: '0.9rem',
+                border: '1px solid #ffd59a',
+              }}>
+                Manual stock correction only. Website GRN / stock receiving is disabled in this phase.
+              </div>
+            )}
             
             <div style={{ marginBottom: '1.5rem' }}>
               <p style={{ margin: '0 0 0.5rem 0', color: '#666' }}>
@@ -1004,6 +1052,57 @@ const AdminStocks = () => {
                 placeholder="Enter quantity"
                 autoFocus
               />
+
+              {actionType === 'subtract' && (
+                <>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontWeight: '600',
+                    color: '#333',
+                  }}>
+                    Reason
+                  </label>
+                  <input
+                    type="text"
+                    value={adjustmentReason}
+                    onChange={(e) => setAdjustmentReason(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '4px',
+                      border: '1px solid #ddd',
+                      fontSize: '0.95rem',
+                      marginBottom: '1rem',
+                    }}
+                    placeholder="e.g. damaged_item, count_correction, shrinkage"
+                  />
+
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontWeight: '600',
+                    color: '#333',
+                  }}>
+                    Notes
+                  </label>
+                  <textarea
+                    value={adjustmentNotes}
+                    onChange={(e) => setAdjustmentNotes(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '4px',
+                      border: '1px solid #ddd',
+                      fontSize: '0.95rem',
+                      marginBottom: '1rem',
+                      minHeight: '90px',
+                      resize: 'vertical',
+                    }}
+                    placeholder="Optional correction notes for audit trail"
+                  />
+                </>
+              )}
 
               {actionType === 'subtract' && (
                 <p style={{
@@ -1055,6 +1154,7 @@ const AdminStocks = () => {
               </button>
               <button
                 onClick={handleStockAction}
+                disabled={isSubmittingAdjustment || stockQuantity <= 0 || (actionType === 'subtract' && !adjustmentReason.trim())}
                 style={{
                   padding: '0.75rem 1.5rem',
                   borderRadius: '4px',
@@ -1062,17 +1162,18 @@ const AdminStocks = () => {
                   backgroundColor: actionType === 'add' ? '#4CAF50' : '#f44336',
                   color: '#fff',
                   fontWeight: '600',
-                  cursor: 'pointer',
+                  cursor: isSubmittingAdjustment ? 'not-allowed' : 'pointer',
                   transition: 'all 0.2s ease',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem',
+                  opacity: isSubmittingAdjustment ? 0.7 : 1,
                 }}
                 onMouseOver={(e) => e.target.style.opacity = '0.9'}
                 onMouseOut={(e) => e.target.style.opacity = '1'}
               >
                 <i className={`fas ${actionType === 'add' ? 'fa-check' : 'fa-check'}`}></i>
-                {actionType === 'add' ? 'Add Stock' : 'Remove Stock'}
+                {isSubmittingAdjustment ? 'Submitting...' : (actionType === 'add' ? 'Add Stock' : 'Remove Stock')}
               </button>
             </div>
           </div>

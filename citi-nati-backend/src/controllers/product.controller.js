@@ -1229,13 +1229,13 @@ const updateProduct = async (req, res) => {
 const adjustInventoryStock = async (req, res) => {
   try {
     const productCode = String(req.body.productCode || '').trim();
-    const locationCode = String(req.body.locationCode || '').trim();
+    const expectedLocationCode = getDefaultLocationCode();
+    const locationCode = String(req.body.locationCode || expectedLocationCode).trim();
     const reason = String(req.body.reason || '').trim();
     const notes = req.body.notes == null ? '' : String(req.body.notes).trim();
     const performedBy = getAdjustmentActor(req);
     const timestamp = new Date();
     const parsedAdjustmentQty = Number.parseInt(req.body.adjustmentQty, 10);
-    const expectedLocationCode = getDefaultLocationCode();
 
     if (!productCode) {
       return res.status(400).json({ error: 'productCode is required' });
