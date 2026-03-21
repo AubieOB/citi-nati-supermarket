@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import api from '../../utils/api.js';
 import { useModal } from '../../hooks/useModal.js';
 import Modal from '../common/Modal.jsx';
@@ -45,7 +45,11 @@ const AdminSecurity = () => {
   const [driverStatusLoading, setDriverStatusLoading] = useState(false);
   const [adminFormData, setAdminFormData] = useState(emptyFormState);
   const [driverFormData, setDriverFormData] = useState(emptyFormState);
+  const [activeTab, setActiveTab] = useState('admin');
+  const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
+  const [filterBarHeight, setFilterBarHeight] = useState(0);
   const { modal, showError, showSuccess, closeModal } = useModal();
+  const filterBarRef = useRef(null);
 
   useEffect(() => {
     const fetchStatus = async () => {
@@ -96,6 +100,42 @@ const AdminSecurity = () => {
 
     fetchDriverStatus();
   }, [selectedDriverId, driverAccounts, showError]);
+
+  useEffect(() => {
+    let resizeObserver;
+
+    const updateFilterBarLayout = () => {
+      const contentArea = document.querySelector('.admin-content-area');
+      if (!contentArea) return;
+
+      const rect = contentArea.getBoundingClientRect();
+      const mobileTopOffset = 56;
+
+      setFilterBarLayout({
+        left: rect.left,
+        width: rect.width,
+        top: window.innerWidth <= 768 ? mobileTopOffset : 0,
+      });
+
+      if (filterBarRef.current) {
+        setFilterBarHeight(filterBarRef.current.offsetHeight);
+      }
+    };
+
+    updateFilterBarLayout();
+    window.addEventListener('resize', updateFilterBarLayout);
+
+    const contentArea = document.querySelector('.admin-content-area');
+    if (contentArea && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(updateFilterBarLayout);
+      resizeObserver.observe(contentArea);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateFilterBarLayout);
+      if (resizeObserver) resizeObserver.disconnect();
+    };
+  }, []);
 
   const handleInputChange = (event, scope) => {
     const { name, value } = event.target;
@@ -189,8 +229,87 @@ const AdminSecurity = () => {
     return <div style={{ padding: '1.5rem', color: '#666' }}>Loading security settings...</div>;
   }
 
+  const securityTabs = [
+    { id: 'admin', label: 'Admin Security', icon: 'fa-user-shield' },
+    { id: 'driver', label: 'Driver Security', icon: 'fa-id-card' },
+  ];
+
+  const securityFilterSpacerHeight = Math.max(Math.min(filterBarHeight, 128) - 8, 0);
+
   return (
-    <div style={{ maxWidth: '900px', margin: '0 auto', display: 'grid', gap: '1rem' }}>
+    <div style={{ position: 'relative' }}>
+      <div
+        ref={filterBarRef}
+        style={{
+          position: 'fixed',
+          top: `${filterBarLayout.top}px`,
+          left: `${filterBarLayout.left}px`,
+          width: `${filterBarLayout.width}px`,
+          zIndex: 80,
+          backgroundColor: '#fff',
+          border: '1px solid #eee',
+          borderRadius: '8px',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+          boxSizing: 'border-box',
+          overflow: 'hidden',
+          padding: '0.75rem 1rem',
+        }}
+      >
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.75rem',
+          flexWrap: 'wrap',
+          marginBottom: '0.75rem',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <i className="fas fa-lock" style={{ fontSize: '1.2rem', color: '#5B4B8A' }}></i>
+            <h1 style={{ margin: 0, color: '#333', fontSize: '1.15rem' }}>Security Management</h1>
+          </div>
+          <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600' }}>
+            Admin key: {hasAdminSecurityKey ? 'SET' : 'NOT SET'} | Driver key: {selectedDriverId ? (hasDriverSecurityKey ? 'SET' : 'NOT SET') : 'N/A'}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+          {securityTabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '0.6rem 1rem',
+                border: activeTab === tab.id ? 'none' : '1px solid #d1d5db',
+                borderRadius: '8px',
+                backgroundColor: activeTab === tab.id ? '#5B4B8A' : '#fff',
+                color: activeTab === tab.id ? '#fff' : '#4b5563',
+                fontWeight: activeTab === tab.id ? '700' : '600',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                transition: 'all 0.2s ease',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+              }}
+            >
+              <i className={`fas ${tab.icon}`}></i>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ height: `${securityFilterSpacerHeight}px` }}></div>
+
+      <div style={{
+        backgroundColor: '#f8fafc',
+        border: '1px solid #e5e7eb',
+        borderRadius: '10px',
+        padding: '1rem',
+        maxWidth: '900px',
+        margin: '0 auto',
+      }}>
+      {activeTab === 'admin' && (
       <div style={{ backgroundColor: '#fff', borderRadius: '10px', padding: '1.5rem', boxShadow: '0 2px 10px rgba(0,0,0,0.08)' }}>
         <h2 style={{ marginTop: 0, color: '#333' }}>Admin Security Key</h2>
         <p style={{ color: '#666', marginBottom: '1.25rem' }}>
@@ -255,7 +374,9 @@ const AdminSecurity = () => {
           </button>
         </form>
       </div>
+      )}
 
+      {activeTab === 'driver' && (
       <div style={{ backgroundColor: '#fff', borderRadius: '10px', padding: '1.5rem', boxShadow: '0 2px 10px rgba(0,0,0,0.08)' }}>
         <h2 style={{ marginTop: 0, color: '#333' }}>Driver Security Key</h2>
         <p style={{ color: '#666', marginBottom: '1.25rem' }}>
@@ -348,6 +469,9 @@ const AdminSecurity = () => {
             {savingDriver ? 'Saving...' : hasDriverSecurityKey ? 'Change Driver Security Key' : 'Set Driver Security Key'}
           </button>
         </form>
+      </div>
+      )}
+
       </div>
 
       <Modal
