@@ -131,10 +131,45 @@ const AdminRefunds = () => {
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '0.6rem',
+          justifyContent: 'space-between',
+          gap: '0.75rem',
+          flexWrap: 'wrap',
         }}>
-          <i className="fas fa-undo" style={{ fontSize: '1.2rem', color: '#5B4B8A' }}></i>
-          <h1 style={{ margin: 0, color: '#333', fontSize: '1.15rem' }}>Refunds Management</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <i className="fas fa-undo" style={{ fontSize: '1.2rem', color: '#5B4B8A' }}></i>
+            <h1 style={{ margin: 0, color: '#333', fontSize: '1.15rem' }}>Refunds Management</h1>
+          </div>
+          <button
+            onClick={() => window.open('https://dashboard.paychangu.com', '_blank')}
+            style={{
+              padding: '0.6rem 1rem',
+              backgroundColor: '#5B4B8A',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '0.9rem',
+              fontWeight: '600',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              transition: 'all 0.2s ease',
+              whiteSpace: 'nowrap'
+            }}
+            onMouseOver={(e) => {
+              e.target.style.backgroundColor = '#4a3a6e';
+              e.target.style.transform = 'translateY(-1px)';
+              e.target.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
+            }}
+            onMouseOut={(e) => {
+              e.target.style.backgroundColor = '#5B4B8A';
+              e.target.style.transform = 'translateY(0)';
+              e.target.style.boxShadow = 'none';
+            }}
+          >
+            <i className="fas fa-external-link-alt"></i>
+            Open PayChangu Dashboard
+          </button>
         </div>
         <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600', marginTop: '0.5rem' }}>
           Pending refunds: {refunds.length}
@@ -177,51 +212,13 @@ const AdminRefunds = () => {
           Manage customer refunds that require manual processing
         </p>
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr auto',
-          gap: '1rem',
-          alignItems: 'start'
+          backgroundColor: '#e8f4f8',
+          padding: '1rem',
+          borderRadius: '8px',
+          borderLeft: '4px solid #17a2b8'
         }}>
-          <div style={{
-            backgroundColor: '#e8f4f8',
-            padding: '1rem',
-            borderRadius: '8px',
-            borderLeft: '4px solid #17a2b8'
-          }}>
-            <i className="fas fa-info-circle" style={{ marginRight: '0.5rem' }}></i>
-            <strong>Total Pending:</strong> {refunds.length} refund{refunds.length !== 1 ? 's' : ''}
-          </div>
-          <button
-            onClick={() => window.open('https://dashboard.paychangu.com', '_blank')}
-            style={{
-              padding: '0.75rem 1.5rem',
-              backgroundColor: '#5B4B8A',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '0.95rem',
-              fontWeight: '600',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              transition: 'all 0.2s ease',
-              whiteSpace: 'nowrap'
-            }}
-            onMouseOver={(e) => {
-              e.target.style.backgroundColor = '#4a3a6e';
-              e.target.style.transform = 'translateY(-2px)';
-              e.target.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
-            }}
-            onMouseOut={(e) => {
-              e.target.style.backgroundColor = '#5B4B8A';
-              e.target.style.transform = 'translateY(0)';
-              e.target.style.boxShadow = 'none';
-            }}
-          >
-            <i className="fas fa-external-link-alt"></i>
-            Open PayChangu Dashboard
-          </button>
+          <i className="fas fa-info-circle" style={{ marginRight: '0.5rem' }}></i>
+          <strong>Total Pending:</strong> {refunds.length} refund{refunds.length !== 1 ? 's' : ''}
         </div>
       </div>
 
