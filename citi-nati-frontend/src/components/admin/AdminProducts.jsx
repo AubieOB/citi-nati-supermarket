@@ -59,9 +59,12 @@ const AdminProducts = () => {
   const [expiryAlertCategory, setExpiryAlertCategory] = useState('');
   const [expiryAlertStockFilter, setExpiryAlertStockFilter] = useState('all');
   const pageSize = 20;
+  const POS_ALERTS_CLIENT_CACHE_TTL_MS = 5 * 60 * 1000;
   const searchTimeoutRef = useRef(null);
   const recognitionRef = useRef(null);
   const voiceEnabledRef = useRef(false);
+  const posExpiryFetchedAtRef = useRef(0);
+  const posExpiryInFlightRef = useRef(false);
   const filterBarRef = useRef(null);
   const { modal, closeModal, showConfirm, showError, showSuccess } = useModal();
 
@@ -351,17 +354,24 @@ const AdminProducts = () => {
   };
 
   const fetchPosExpiryAlerts = async () => {
+    if (posExpiryInFlightRef.current) {
+      return;
+    }
+
+    posExpiryInFlightRef.current = true;
     try {
       setPosExpiryLoading(true);
       setPosExpiryError('');
       const response = await api.get('/admin/expiry-batches');
       const rows = Array.isArray(response?.data?.data) ? response.data.data : [];
       setPosExpiryItems(rows.map(mapPosExpiryToAlert));
+      posExpiryFetchedAtRef.current = Date.now();
     } catch (err) {
       const message = err?.response?.data?.error || err?.message || 'Failed to load expiry batches';
       setPosExpiryError(message);
       setPosExpiryItems([]);
     } finally {
+      posExpiryInFlightRef.current = false;
       setPosExpiryLoading(false);
     }
   };
@@ -373,9 +383,15 @@ const AdminProducts = () => {
 
   useEffect(() => {
     if (activeSubTab === 'expiry-alerts') {
-      fetchPosExpiryAlerts();
+      const isFresh = posExpiryFetchedAtRef.current > 0
+        && (Date.now() - posExpiryFetchedAtRef.current) < POS_ALERTS_CLIENT_CACHE_TTL_MS;
+      const hasLocalData = posExpiryItems.length > 0;
+
+      if (!hasLocalData || !isFresh) {
+        fetchPosExpiryAlerts();
+      }
     }
-  }, [activeSubTab]);
+  }, [activeSubTab, posExpiryItems.length]);
 
   useEffect(() => {
     voiceEnabledRef.current = isVoiceSearchEnabled;
