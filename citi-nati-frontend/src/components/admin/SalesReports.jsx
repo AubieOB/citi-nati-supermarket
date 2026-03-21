@@ -17,6 +17,8 @@ const SalesReports = ({ refreshTrigger }) => {
   const [activeReport, setActiveReport] = useState('byProduct');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [productSearchTerm, setProductSearchTerm] = useState('');
+  const [selectedProducts, setSelectedProducts] = useState([]);
 
   const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
   const [filterBarHeight, setFilterBarHeight] = useState(0);
@@ -147,15 +149,45 @@ const SalesReports = ({ refreshTrigger }) => {
     return Object.values(driverMap).sort((a, b) => b.totalEarnings - a.totalEarnings);
   }, [filteredSalesDays]);
 
+  const filteredProductOptions = useMemo(() => {
+    const query = productSearchTerm.trim().toLowerCase();
+    if (!query) {
+      return productSales;
+    }
+
+    return productSales.filter((product) =>
+      String(product.name || '').toLowerCase().includes(query)
+    );
+  }, [productSales, productSearchTerm]);
+
+  const visibleProductSales = useMemo(() => {
+    if (selectedProducts.length === 0) {
+      return productSales;
+    }
+
+    const selectedSet = new Set(selectedProducts);
+    return productSales.filter((product) => selectedSet.has(product.name));
+  }, [productSales, selectedProducts]);
+
+  useEffect(() => {
+    const availableNames = new Set(productSales.map((product) => product.name));
+    setSelectedProducts((previous) => previous.filter((name) => availableNames.has(name)));
+  }, [productSales]);
+
   const handleExportDetailedReport = () => {
     if (filteredSalesDays.length === 0) {
       toast.error('No sales data available for selected dates', { position: 'top-right' });
       return;
     }
 
+    if (visibleProductSales.length === 0) {
+      toast.error('No product sales match your selected product filters', { position: 'top-right' });
+      return;
+    }
+
     try {
       setExporting('product-report');
-      generateProductSalesReportPDF(productSales, filteredSalesDays, {
+      generateProductSalesReportPDF(visibleProductSales, filteredSalesDays, {
         fromDate: fromDate ? new Date(fromDate).toLocaleDateString() : 'All Time',
         toDate: toDate ? new Date(toDate).toLocaleDateString() : 'All Time',
       });
@@ -409,22 +441,22 @@ const SalesReports = ({ refreshTrigger }) => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <h3 style={{ margin: 0, color: '#333' }}>
                 Sales by Product
-                {productSales.length > 0 && (
+                {visibleProductSales.length > 0 && (
                   <span style={{ fontSize: '0.85rem', color: '#666', marginLeft: '1rem' }}>
-                    ({productSales.length} products)
+                    ({visibleProductSales.length} product{visibleProductSales.length === 1 ? '' : 's'})
                   </span>
                 )}
               </h3>
               <button
                 onClick={handleExportDetailedReport}
-                disabled={exporting === 'product-report' || productSales.length === 0}
+                disabled={exporting === 'product-report' || visibleProductSales.length === 0}
                 style={{
                   padding: '0.75rem 1.5rem',
                   backgroundColor: exporting === 'product-report' ? '#ccc' : '#2D8659',
                   color: '#fff',
                   border: 'none',
                   borderRadius: '4px',
-                  cursor: exporting === 'product-report' || productSales.length === 0 ? 'not-allowed' : 'pointer',
+                  cursor: exporting === 'product-report' || visibleProductSales.length === 0 ? 'not-allowed' : 'pointer',
                   fontWeight: '600',
                   fontSize: '0.9rem',
                 }}
@@ -434,7 +466,109 @@ const SalesReports = ({ refreshTrigger }) => {
               </button>
             </div>
 
-            {productSales.length > 0 ? (
+            <div style={{
+              marginBottom: '1.25rem',
+              padding: '1rem',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              backgroundColor: '#f9fafb',
+            }}>
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+                <div style={{ fontWeight: '700', color: '#374151', fontSize: '0.9rem' }}>
+                  Product Filter
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search product name..."
+                  value={productSearchTerm}
+                  onChange={(e) => setProductSearchTerm(e.target.value)}
+                  style={{
+                    flex: 1,
+                    minWidth: '220px',
+                    padding: '0.6rem 0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '0.88rem',
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setSelectedProducts([])}
+                  style={{
+                    padding: '0.6rem 0.85rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    backgroundColor: '#fff',
+                    color: '#374151',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    fontSize: '0.82rem',
+                  }}
+                >
+                  Clear Selected
+                </button>
+              </div>
+
+              <div style={{
+                maxHeight: '180px',
+                overflowY: 'auto',
+                backgroundColor: '#fff',
+                border: '1px solid #e5e7eb',
+                borderRadius: '6px',
+                padding: '0.35rem',
+              }}>
+                {filteredProductOptions.length === 0 ? (
+                  <div style={{ padding: '0.6rem', color: '#6b7280', fontSize: '0.85rem' }}>
+                    No products match your search.
+                  </div>
+                ) : (
+                  filteredProductOptions.map((product) => {
+                    const isChecked = selectedProducts.includes(product.name);
+
+                    return (
+                      <label
+                        key={product.name}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.6rem',
+                          padding: '0.45rem 0.55rem',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          backgroundColor: isChecked ? '#eef2ff' : 'transparent',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedProducts((previous) => [...previous, product.name]);
+                            } else {
+                              setSelectedProducts((previous) => previous.filter((name) => name !== product.name));
+                            }
+                          }}
+                        />
+                        <span style={{ fontSize: '0.86rem', color: '#111827', flex: 1 }}>
+                          {product.name}
+                        </span>
+                        <span style={{ fontSize: '0.8rem', color: '#6b7280', fontWeight: '600' }}>
+                          Qty {product.quantity}
+                        </span>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+
+              <div style={{ marginTop: '0.6rem', fontSize: '0.82rem', color: '#4b5563' }}>
+                {selectedProducts.length > 0
+                  ? `${selectedProducts.length} product${selectedProducts.length === 1 ? '' : 's'} selected`
+                  : 'No products selected (showing all products)'}
+              </div>
+            </div>
+
+            {visibleProductSales.length > 0 ? (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
@@ -445,7 +579,7 @@ const SalesReports = ({ refreshTrigger }) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {productSales.map((product, idx) => (
+                    {visibleProductSales.map((product, idx) => (
                       <tr key={`${product.name}-${idx}`} style={{ borderBottom: '1px solid #eee', backgroundColor: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
                         <td style={{ padding: '1rem', color: '#333', fontWeight: '500' }}>{product.name}</td>
                         <td style={{ padding: '1rem', textAlign: 'center', color: '#333', fontWeight: '600' }}>{product.quantity}</td>
@@ -457,10 +591,10 @@ const SalesReports = ({ refreshTrigger }) => {
                     <tr style={{ backgroundColor: '#f0f9f6', fontWeight: '700', borderTop: '2px solid #ddd' }}>
                       <td style={{ padding: '1rem', color: '#333' }}>TOTAL</td>
                       <td style={{ padding: '1rem', textAlign: 'center', color: '#333' }}>
-                        {productSales.reduce((sum, p) => sum + p.quantity, 0)}
+                        {visibleProductSales.reduce((sum, p) => sum + p.quantity, 0)}
                       </td>
                       <td style={{ padding: '1rem', textAlign: 'right', color: '#2D8659' }}>
-                        MWK {productSales.reduce((sum, p) => sum + p.totalRevenue, 0).toFixed(2)}
+                        MWK {visibleProductSales.reduce((sum, p) => sum + p.totalRevenue, 0).toFixed(2)}
                       </td>
                     </tr>
                   </tbody>
@@ -468,7 +602,7 @@ const SalesReports = ({ refreshTrigger }) => {
               </div>
             ) : (
               <div style={{ backgroundColor: '#f5f5f5', padding: '2rem', textAlign: 'center', borderRadius: '4px', color: '#666' }}>
-                No product sales data available for the selected period.
+                No product sales data available for the selected period and product filter.
               </div>
             )}
           </div>
