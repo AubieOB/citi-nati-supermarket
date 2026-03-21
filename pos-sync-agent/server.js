@@ -170,23 +170,42 @@ async function fetchProductsFromPOS() {
     const LOCATION_CODE = process.env.POS_LOCATION_CODE || 'SH';
 
     // REAL-TIME STOCK + PRICE
-    // Stock = SUM(QtyIn) - SUM(QtyOut) from ProductActivity
+    // Stock = ProductActivity net stock minus manual stock adjustments
     // Price = Most recent FPrice from productprices (by PriceID DESC = latest record)
     const query = `
+      WITH ActivityStock AS (
+        SELECT
+          pa.ProductCode,
+          pa.LocationCode,
+          ISNULL(SUM(pa.QtyIn), 0) - ISNULL(SUM(pa.QtyOut), 0) AS ActivityQty
+        FROM POS.dbo.ProductActivity pa
+        WHERE pa.LocationCode = @LocationCode
+        GROUP BY pa.ProductCode, pa.LocationCode
+      ),
+      ManualAdjustmentStock AS (
+        SELECT
+          sad.ProductCode,
+          sa.LocationCode,
+          ISNULL(SUM(sad.Quantity), 0) AS ManualDecreaseQty
+        FROM POS.dbo.stockadjustments sa
+        INNER JOIN POS.dbo.stockadjdetails sad ON sa.StockAdjID = sad.AdjustID
+        WHERE sa.LocationCode = @LocationCode
+        GROUP BY sad.ProductCode, sa.LocationCode
+      )
       SELECT 
           p.ProductCode,
           p.ProductName,
           ISNULL(p.Barcode,'') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
-          ISNULL(SUM(pa.QtyIn), 0) - ISNULL(SUM(pa.QtyOut), 0) AS QuantityAvailable,
+        ISNULL(ast.ActivityQty, 0) - ISNULL(mast.ManualDecreaseQty, 0) AS QuantityAvailable,
           ISNULL(
               (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC),
               (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode ORDER BY PriceID DESC)
           ) AS SellingPrice
       FROM POS.dbo.productsmaster p
       LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
-      LEFT JOIN POS.dbo.ProductActivity pa ON p.ProductCode = pa.ProductCode AND pa.LocationCode = @LocationCode
-      GROUP BY p.ProductCode, p.ProductName, p.Barcode, pt.ProductTypeName
+      LEFT JOIN ActivityStock ast ON p.ProductCode = ast.ProductCode AND ast.LocationCode = @LocationCode
+      LEFT JOIN ManualAdjustmentStock mast ON p.ProductCode = mast.ProductCode AND mast.LocationCode = @LocationCode
       ORDER BY p.ProductCode
     `;
 
@@ -195,7 +214,7 @@ async function fetchProductsFromPOS() {
     const result = await request.query(query);
     
     console.log(`[POS FETCH] ✅ Fetched ${result.recordset.length} products from location: ${LOCATION_CODE}`);
-    console.log(`[POS FETCH] Stock: SUM(QtyIn) - SUM(QtyOut)`);
+    console.log(`[POS FETCH] Stock: ProductActivity net minus manual stock adjustments`);
     console.log(`[POS FETCH] Price: Most recent FPrice (by PriceID DESC)`);
     
     // Debug log first 5 products

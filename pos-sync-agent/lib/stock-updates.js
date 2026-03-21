@@ -30,10 +30,20 @@ async function getCurrentStock(request, productCode, locationCode) {
     const stockRequest = createScopedRequest(request);
     const query = `
       SELECT TOP 1
-          ISNULL(SUM(pa.QtyIn), 0) - ISNULL(SUM(pa.QtyOut), 0) AS CurrentStock
-      FROM POS.dbo.ProductActivity pa
-      WHERE pa.ProductCode = @ProductCode
-      AND pa.LocationCode = @LocationCode
+          ISNULL((
+            SELECT SUM(pa.QtyIn) - SUM(pa.QtyOut)
+            FROM POS.dbo.ProductActivity pa
+            WHERE pa.ProductCode = @ProductCode
+              AND pa.LocationCode = @LocationCode
+          ), 0)
+          -
+          ISNULL((
+            SELECT SUM(sad.Quantity)
+            FROM POS.dbo.stockadjustments sa
+            INNER JOIN POS.dbo.stockadjdetails sad ON sa.StockAdjID = sad.AdjustID
+            WHERE sad.ProductCode = @ProductCode
+              AND sa.LocationCode = @LocationCode
+          ), 0) AS CurrentStock
     `;
 
     stockRequest.input('ProductCode', sql.VarChar(50), productCode);
