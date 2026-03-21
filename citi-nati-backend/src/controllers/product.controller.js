@@ -19,6 +19,13 @@ const adminExpiryFetchState = {
 // sorted-joined product codes so different sets don't share stale data.
 const _liveExpiryBatchCache = new Map(); // key -> { data: Map, ts: number }
 
+// Cache for all-products expiry alerts (used by alerts endpoint). Single cache,
+// TTL-based to prevent hammering SQL Server on rapid alert panel refreshes.
+const _allProductsExpiryCache = {
+  rows: null,
+  ts: 0,
+};
+
 function decodeExpiryBatchReference(value) {
   const raw = String(value || '').trim();
   if (!raw) {
@@ -1659,39 +1666,52 @@ const getExpiryBatchAlerts = async (req, res) => {
     const locationCode = String(req.query.locationCode || process.env.POS_LOCATION_CODE || 'SH').trim().toUpperCase();
     let rawRows = [];
 
-    try {
-      const expiryResult = await posSyncService.getExpiryProductsFromPOS({
-        days: 3650,
-        locationCode,
-        includeExpired: true,
-        source: 'view',
-        requestTimeoutMs: ADMIN_EXPIRY_REQUEST_TIMEOUT_MS,
-      });
+    // Check if cache is fresh
+    const now = Date.now();
+    const isCacheFresh = _allProductsExpiryCache.ts > 0 && (now - _allProductsExpiryCache.ts) < ADMIN_EXPIRY_CACHE_TTL_MS;
 
-      if (!expiryResult.success) {
-        throw new Error(expiryResult.error || 'Live POS expiry alert fetch failed');
-      }
+    if (isCacheFresh && _allProductsExpiryCache.rows) {
+      console.log('[EXPIRY ALERTS] using cached all-products expiry rows (age: %dms)', now - _allProductsExpiryCache.ts);
+      rawRows = _allProductsExpiryCache.rows;
+    } else {
+      try {
+        const expiryResult = await posSyncService.getExpiryProductsFromPOS({
+          days: 3650,
+          locationCode,
+          includeExpired: true,
+          source: 'view',
+          requestTimeoutMs: ADMIN_EXPIRY_REQUEST_TIMEOUT_MS,
+        });
 
-      rawRows = (Array.isArray(expiryResult.data?.data) ? expiryResult.data.data : [])
-        .map((row) => ({
-          productCode: normalizeProductCode(row?.ProductCode || row?.productCode),
-          ...normalizeLiveBatchForResponse(row),
-        }))
-        .filter((row) => row.productCode && row.expiryDate);
-    } catch (liveError) {
-      console.warn('[EXPIRY ALERTS] live POS fetch failed, falling back to stored batches', liveError.message);
-      rawRows = await prisma.productExpiryBatch.findMany({
-        where: {
-          OR: [
-            { locationCode: null },
-            { locationCode },
+        if (!expiryResult.success) {
+          throw new Error(expiryResult.error || 'Live POS expiry alert fetch failed');
+        }
+
+        rawRows = (Array.isArray(expiryResult.data?.data) ? expiryResult.data.data : [])
+          .map((row) => ({
+            productCode: normalizeProductCode(row?.ProductCode || row?.productCode),
+            ...normalizeLiveBatchForResponse(row),
+          }))
+          .filter((row) => row.productCode && row.expiryDate);
+
+        // Cache the fetched rows
+        _allProductsExpiryCache.rows = rawRows;
+        _allProductsExpiryCache.ts = Date.now();
+      } catch (liveError) {
+        console.warn('[EXPIRY ALERTS] live POS fetch failed, falling back to stored batches', liveError.message);
+        rawRows = await prisma.productExpiryBatch.findMany({
+          where: {
+            OR: [
+              { locationCode: null },
+              { locationCode },
+            ],
+          },
+          orderBy: [
+            { expiryDate: 'asc' },
+            { productCode: 'asc' },
           ],
-        },
-        orderBy: [
-          { expiryDate: 'asc' },
-          { productCode: 'asc' },
-        ],
-      });
+        });
+      }
     }
 
     const productCodes = Array.from(new Set(rawRows.map((row) => row.productCode).filter(Boolean)));
