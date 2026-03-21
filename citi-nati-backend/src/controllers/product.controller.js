@@ -29,6 +29,16 @@ const _allProductsExpiryCache = {
   refreshing: false,
 };
 
+const ADMIN_INVENTORY_ADJUSTMENT_AUDIT_SOURCE = 'admin_inventory_adjustment_audit';
+
+function getAdjustmentActor(req) {
+  return String(req.user?.email || req.user?.id || req.user?.userId || 'admin').trim();
+}
+
+function getDefaultLocationCode() {
+  return String(process.env.POS_LOCATION_CODE || 'SH').trim();
+}
+
 function decodeExpiryBatchReference(value) {
   const raw = String(value || '').trim();
   if (!raw) {
@@ -1018,12 +1028,15 @@ const updateProduct = async (req, res) => {
       if (isNaN(parsedStock) || parsedStock < 0) {
         return res.status(400).json({ error: 'Invalid stock value' });
       }
-      updateData.stock = parsedStock;
       incomingParsedStock = parsedStock;
       newStock = parsedStock;
       stockChanged = parsedStock !== Number(existingProduct.stock);
+
       if (stockChanged) {
-        changedFields.push('stock');
+        return res.status(400).json({
+          error: 'Direct stock edits via product update are disabled. Use the admin inventory adjustment endpoint instead.',
+          code: 'STOCK_UPDATE_REQUIRES_ADJUSTMENT_ENDPOINT',
+        });
       }
     }
     if (req.body.category !== undefined && req.body.category !== '') {
@@ -1171,74 +1184,6 @@ const updateProduct = async (req, res) => {
       posCommands.push({ ...posCommand });
     }
 
-    if (updatedProduct.sourceCode && incomingStockProvided && stockChanged) {
-      console.log('[BACKEND PRODUCT EDIT] stockChanged detected', {
-        productId: updatedProduct.id,
-        sourceCode: updatedProduct.sourceCode,
-        oldStock,
-        newStock,
-      });
-
-      if (newStock < oldStock) {
-        const qtyReduction = oldStock - newStock;
-        const stockPayload = {
-          productId: String(updatedProduct.id),
-          productCode: updatedProduct.sourceCode,
-          locationCode: process.env.POS_LOCATION_CODE || 'SH',
-          oldStock,
-          newStock,
-          qtyReduction,
-          adjustmentType: 'DECREASE',
-          reason: 'manual_admin_adjustment',
-        };
-
-        console.log('[POS COMMAND QUEUE] enqueue UPDATE_STOCK start', {
-          oldStock,
-          newStock,
-          qtyReduction,
-        });
-        console.log('[POS COMMAND QUEUE] enqueue payload:', stockPayload);
-
-        const stockPosCommand = {
-          attempted: true,
-          success: null,
-          error: null,
-          payload: stockPayload,
-          commandId: null,
-          commandType: 'UPDATE_STOCK',
-        };
-
-        try {
-          const queuedStock = await posCommandQueueService.enqueueCommand('UPDATE_STOCK', stockPayload, {
-            source: 'product.updateProduct',
-            relatedEntityType: 'Product',
-            relatedEntityId: updatedProduct.id,
-          });
-
-          stockPosCommand.success = true;
-          stockPosCommand.commandId = queuedStock.id;
-          console.log('[POS COMMAND QUEUE] enqueue UPDATE_STOCK success:', { commandId: queuedStock.id });
-        } catch (queueErr) {
-          stockPosCommand.success = false;
-          stockPosCommand.error = queueErr.message;
-          console.error('[POS COMMAND QUEUE ERROR] enqueue UPDATE_STOCK failed:', queueErr.message);
-        }
-
-        posCommands.push(stockPosCommand);
-      } else if (newStock > oldStock) {
-        console.log('[BACKEND POS WRITE SKIP] stock increase detected; UPDATE_STOCK is decrease-only for Phase 2', {
-          oldStock,
-          newStock,
-        });
-      }
-    } else if (incomingStockProvided && stockChanged && !updatedProduct.sourceCode) {
-      console.log('[BACKEND POS WRITE SKIP] non-POS product stock change skipped', {
-        productId: updatedProduct.id,
-        oldStock,
-        newStock,
-      });
-    }
-
     // Debug: Log what was actually saved to database
     console.log('[PRODUCT UPDATE] ✅ Product updated in database:', {
       id: updatedProduct.id,
@@ -1277,6 +1222,253 @@ const updateProduct = async (req, res) => {
     console.error('Error updating product:', err);
     return res.status(500).json({
       error: 'Server error while updating product',
+    });
+  }
+};
+
+const adjustInventoryStock = async (req, res) => {
+  try {
+    const productCode = String(req.body.productCode || '').trim();
+    const locationCode = String(req.body.locationCode || '').trim();
+    const reason = String(req.body.reason || '').trim();
+    const notes = req.body.notes == null ? '' : String(req.body.notes).trim();
+    const performedBy = getAdjustmentActor(req);
+    const timestamp = new Date();
+    const parsedAdjustmentQty = Number.parseInt(req.body.adjustmentQty, 10);
+    const expectedLocationCode = getDefaultLocationCode();
+
+    if (!productCode) {
+      return res.status(400).json({ error: 'productCode is required' });
+    }
+
+    if (!locationCode) {
+      return res.status(400).json({ error: 'locationCode is required' });
+    }
+
+    if (locationCode !== expectedLocationCode) {
+      return res.status(400).json({
+        error: `Unsupported locationCode. Expected ${expectedLocationCode}`,
+      });
+    }
+
+    if (!Number.isInteger(parsedAdjustmentQty) || parsedAdjustmentQty === 0) {
+      return res.status(400).json({ error: 'adjustmentQty must be a non-zero integer' });
+    }
+
+    if (!reason) {
+      return res.status(400).json({ error: 'reason is required' });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const product = await tx.product.findFirst({
+        where: { sourceCode: productCode },
+      });
+
+      if (!product) {
+        throw new Error('PRODUCT_NOT_FOUND');
+      }
+
+      const previousStock = Number(product.stock || 0);
+      const newStock = previousStock + parsedAdjustmentQty;
+
+      if (newStock < 0) {
+        throw new Error('NEGATIVE_STOCK_NOT_ALLOWED');
+      }
+
+      const updatedProduct = await tx.product.update({
+        where: { id: product.id },
+        data: { stock: newStock },
+      });
+
+      const auditPayload = {
+        productId: String(product.id),
+        productCode,
+        locationCode,
+        adjustmentQty: parsedAdjustmentQty,
+        previousStock,
+        newStock,
+        reason,
+        notes,
+        performedBy,
+        timestamp: timestamp.toISOString(),
+        adjustmentClass: 'MANUAL_CORRECTION',
+      };
+
+      const auditLog = await tx.posWriteCommand.create({
+        data: {
+          commandType: 'UPDATE_STOCK',
+          status: 'COMPLETED',
+          payload: auditPayload,
+          source: ADMIN_INVENTORY_ADJUSTMENT_AUDIT_SOURCE,
+          relatedEntityType: 'Product',
+          relatedEntityId: String(product.id),
+          createdBy: performedBy,
+          pickedAt: timestamp,
+          processedAt: timestamp,
+          resultSummary: {
+            auditOnly: true,
+            posWriteQueued: false,
+          },
+          maxRetries: 0,
+        },
+      });
+
+      return {
+        product: updatedProduct,
+        auditLog,
+        previousStock,
+        newStock,
+      };
+    });
+
+    let posCommand = null;
+
+    if (parsedAdjustmentQty < 0) {
+      const qtyReduction = Math.abs(parsedAdjustmentQty);
+      const stockPayload = {
+        productId: String(result.product.id),
+        productCode,
+        locationCode,
+        oldStock: result.previousStock,
+        newStock: result.newStock,
+        qtyReduction,
+        adjustmentType: 'DECREASE',
+        reason,
+        notes,
+        performedBy,
+        timestamp: timestamp.toISOString(),
+      };
+
+      try {
+        posCommand = await posCommandQueueService.enqueueCommand('UPDATE_STOCK', stockPayload, {
+          source: 'admin.inventory.adjustment',
+          relatedEntityType: 'Product',
+          relatedEntityId: result.product.id,
+          createdBy: performedBy,
+        });
+
+        await prisma.posWriteCommand.update({
+          where: { id: result.auditLog.id },
+          data: {
+            resultSummary: {
+              auditOnly: true,
+              posWriteQueued: true,
+              posCommandId: posCommand.id,
+            },
+          },
+        });
+      } catch (queueErr) {
+        await prisma.posWriteCommand.update({
+          where: { id: result.auditLog.id },
+          data: {
+            resultSummary: {
+              auditOnly: true,
+              posWriteQueued: false,
+              posWriteError: queueErr.message,
+            },
+          },
+        });
+      }
+    } else {
+      await prisma.posWriteCommand.update({
+        where: { id: result.auditLog.id },
+        data: {
+          resultSummary: {
+            auditOnly: true,
+            posWriteQueued: false,
+            note: 'Positive adjustments are recorded locally only. Website GRN/stock-in is intentionally not implemented in this phase.',
+          },
+        },
+      });
+    }
+
+    try {
+      const { emitProductUpdate } = require('../utils/socket');
+      emitProductUpdate(result.product);
+    } catch (socketErr) {
+      console.warn('[INVENTORY ADJUSTMENT] Could not emit socket event:', socketErr.message);
+    }
+
+    if (result.product.stock <= 10) {
+      await notifyLowStock(result.product);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Inventory adjustment applied successfully',
+      adjustment: {
+        productCode,
+        locationCode,
+        adjustmentQty: parsedAdjustmentQty,
+        reason,
+        notes,
+        performedBy,
+        timestamp: timestamp.toISOString(),
+        previousStock: result.previousStock,
+        newStock: result.newStock,
+        auditLogId: result.auditLog.id,
+        posWriteCommandId: posCommand?.id || null,
+      },
+    });
+  } catch (err) {
+    if (err.message === 'PRODUCT_NOT_FOUND') {
+      return res.status(404).json({ error: 'POS-linked product not found for productCode' });
+    }
+
+    if (err.message === 'NEGATIVE_STOCK_NOT_ALLOWED') {
+      return res.status(400).json({ error: 'Adjustment would make stock negative' });
+    }
+
+    console.error('[INVENTORY ADJUSTMENT] failed:', err.message);
+    return res.status(500).json({
+      error: 'Failed to apply inventory adjustment',
+      details: err.message,
+    });
+  }
+};
+
+const getInventoryAdjustmentAudit = async (req, res) => {
+  try {
+    const limit = Math.max(1, Math.min(200, Number.parseInt(req.query.limit, 10) || 50));
+
+    const rows = await prisma.posWriteCommand.findMany({
+      where: {
+        source: ADMIN_INVENTORY_ADJUSTMENT_AUDIT_SOURCE,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: limit,
+    });
+
+    const adjustments = rows.map((row) => ({
+      id: row.id,
+      productCode: row.payload?.productCode || null,
+      locationCode: row.payload?.locationCode || null,
+      adjustmentQty: row.payload?.adjustmentQty || 0,
+      previousStock: row.payload?.previousStock ?? null,
+      newStock: row.payload?.newStock ?? null,
+      reason: row.payload?.reason || null,
+      notes: row.payload?.notes || '',
+      performedBy: row.payload?.performedBy || row.createdBy || null,
+      timestamp: row.payload?.timestamp || row.createdAt,
+      audit: row.resultSummary || {},
+    }));
+
+    return res.status(200).json({
+      success: true,
+      adjustments,
+      meta: {
+        limit,
+        count: adjustments.length,
+        writeModel: 'sales decrement remains webhook-driven; website GRN receiving is disabled in this phase',
+      },
+    });
+  } catch (err) {
+    console.error('[INVENTORY ADJUSTMENT AUDIT] failed:', err.message);
+    return res.status(500).json({
+      error: 'Failed to fetch inventory adjustment audit log',
+      details: err.message,
     });
   }
 };
@@ -1810,6 +2002,8 @@ module.exports = {
   getProducts, 
   getProductById, 
   updateProduct, 
+  adjustInventoryStock,
+  getInventoryAdjustmentAudit,
   deleteProduct, 
   syncFromPOS,
   syncProductsFromPOSAgent,
