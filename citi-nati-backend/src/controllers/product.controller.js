@@ -15,6 +15,10 @@ const adminExpiryFetchState = {
   fetchedAt: 0,
 };
 
+// Cache for live POS expiry batch fetches (used by alerts endpoint). Keyed by
+// sorted-joined product codes so different sets don't share stale data.
+const _liveExpiryBatchCache = new Map(); // key -> { data: Map, ts: number }
+
 function decodeExpiryBatchReference(value) {
   const raw = String(value || '').trim();
   if (!raw) {
@@ -210,6 +214,12 @@ async function fetchLiveExpiryBatchesByCode(sourceCodes) {
     return new Map();
   }
 
+  const cacheKey = [...sourceCodes].sort().join('|');
+  const cached = _liveExpiryBatchCache.get(cacheKey);
+  if (cached && (Date.now() - cached.ts) < ADMIN_EXPIRY_CACHE_TTL_MS) {
+    return cached.data;
+  }
+
   const expiryResult = await posSyncService.getExpiryProductsFromPOS({
     days: 3650,
     locationCode: process.env.POS_LOCATION_CODE || 'SH',
@@ -249,6 +259,8 @@ async function fetchLiveExpiryBatchesByCode(sourceCodes) {
       sample: batches[0] || null,
     });
   });
+
+  _liveExpiryBatchCache.set(cacheKey, { data: batchesByCode, ts: Date.now() });
 
   return batchesByCode;
 }
@@ -852,9 +864,11 @@ const getProducts = async (req, res) => {
     // Debug logging
     console.log(`[PRODUCTS] Retrieved: ${products.length}, Total: ${total}, Category: ${category || 'all'}, Search: ${search || 'none'}`);
 
-    // expiryDate is stored on each product record via POS sync; formatProduct computes expiryStatus from it
+    // expiryDate is stored on each product record via POS sync; formatProduct computes expiryStatus from it.
+    // The product list always uses stored DB batches (fast). Live POS fetch is reserved for the
+    // dedicated alerts endpoint so paginated list loads don't hammer the SQL Server on every request.
     const enrichedProducts = await attachExpiryBatchesToProducts(products, {
-      preferLive: forceAdminPosExpiry,
+      preferLive: false,
     });
 
     // Map over products and format with computed fields

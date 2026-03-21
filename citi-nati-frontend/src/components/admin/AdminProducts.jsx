@@ -538,22 +538,9 @@ const AdminProducts = () => {
       let page = 1;
       const perPage = 100;
       let all = [];
-      let usePosExpiry = true;
 
       const fetchProductsPage = async (pageNumber) => {
-        const basePath = `/products?page=${pageNumber}&pageSize=${perPage}`;
-        const shouldUseExpiryEnrichment = usePosExpiry && pageNumber === 1;
-
-        if (shouldUseExpiryEnrichment) {
-          try {
-            return await api.get(`${basePath}&includePosExpiry=true`);
-          } catch (posExpiryErr) {
-            console.warn('[ADMIN PRODUCTS UI] includePosExpiry request failed, retrying without enrichment', posExpiryErr?.response?.data || posExpiryErr.message);
-            usePosExpiry = false;
-          }
-        }
-
-        return api.get(basePath);
+        return api.get(`/products?page=${pageNumber}&pageSize=${perPage}`);
       };
 
       const normalizeAdminPosProduct = (product) => ({
