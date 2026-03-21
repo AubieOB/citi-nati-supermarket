@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Button from '../ui/Button.jsx';
 import api from '../../utils/api.js';
 import Modal from '../common/Modal.jsx';
@@ -26,7 +26,10 @@ const AdminDrivers = () => {
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
+  const [filterBarHeight, setFilterBarHeight] = useState(0);
   const { modal, closeModal, showError, showConfirm } = useModal();
+  const filterBarRef = useRef(null);
 
   useEffect(() => {
     fetchDrivers();
@@ -42,6 +45,49 @@ const AdminDrivers = () => {
     window.addEventListener('driversUpdated', handleDriversUpdated);
     return () => window.removeEventListener('driversUpdated', handleDriversUpdated);
   }, []);
+
+  useEffect(() => {
+    let resizeObserver;
+
+    const updateFilterBarLayout = () => {
+      const contentArea = document.querySelector('.admin-content-area');
+      if (!contentArea) return;
+
+      const rect = contentArea.getBoundingClientRect();
+      const mobileTopOffset = 56;
+
+      setFilterBarLayout({
+        left: rect.left,
+        width: rect.width,
+        top: window.innerWidth <= 768 ? mobileTopOffset : 0,
+      });
+
+      if (filterBarRef.current) {
+        setFilterBarHeight(filterBarRef.current.offsetHeight);
+      }
+    };
+
+    updateFilterBarLayout();
+    window.addEventListener('resize', updateFilterBarLayout);
+
+    const contentArea = document.querySelector('.admin-content-area');
+    if (contentArea && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(updateFilterBarLayout);
+      resizeObserver.observe(contentArea);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateFilterBarLayout);
+      if (resizeObserver) resizeObserver.disconnect();
+    };
+  }, []);
+
+  // Re-measure bar height after each render to account for content wrapping
+  useEffect(() => {
+    if (filterBarRef.current) {
+      setFilterBarHeight(filterBarRef.current.offsetHeight);
+    }
+  });
 
   const fetchDrivers = async () => {
     try {
@@ -155,18 +201,71 @@ const AdminDrivers = () => {
     );
   }
 
+  const driversFilterSpacerHeight = filterBarHeight > 0 ? filterBarHeight + 8 : 0;
+
   return (
-    <div>
-      {/* Create Form */}
-      {showForm && (
-        <div style={{
-          backgroundColor: '#f8f9fa',
-          padding: '1.5rem',
+    <div style={{ position: 'relative' }}>
+      <div
+        ref={filterBarRef}
+        style={{
+          position: 'fixed',
+          top: `${filterBarLayout.top}px`,
+          left: `${filterBarLayout.left}px`,
+          width: `${filterBarLayout.width}px`,
+          zIndex: 80,
+          backgroundColor: '#fff',
+          border: '1px solid #eee',
           borderRadius: '8px',
-          marginBottom: '2rem',
-          borderLeft: '4px solid #5B4B8A',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+          boxSizing: 'border-box',
+          overflow: 'hidden',
+          padding: '0.75rem 1rem',
+        }}
+      >
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.75rem',
+          flexWrap: 'wrap',
         }}>
-          <h3 style={{ marginBottom: '1rem', color: '#5B4B8A' }}>Create New Driver Account</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <i className="fas fa-car" style={{ fontSize: '1.2rem', color: '#5B4B8A' }}></i>
+            <h1 style={{ margin: 0, color: '#333', fontSize: '1.15rem' }}>Drivers Management</h1>
+          </div>
+          <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600' }}>
+            Total drivers: {drivers.length}
+          </div>
+        </div>
+        <div style={{ marginTop: '0.75rem' }}>
+          <Button
+            variant="primary"
+            onClick={() => setShowForm(!showForm)}
+            style={{ fontSize: '0.9rem', padding: '0.6rem 1rem' }}
+          >
+            {showForm ? '✕ Cancel' : '+ Create New Driver'}
+          </Button>
+        </div>
+      </div>
+
+      <div style={{ height: `${driversFilterSpacerHeight}px` }}></div>
+
+      <div style={{
+        backgroundColor: '#f8fafc',
+        border: '1px solid #e5e7eb',
+        borderRadius: '10px',
+        padding: '1rem',
+      }}>
+        {/* Create Form */}
+        {showForm && (
+          <div style={{
+            backgroundColor: '#f8f9fa',
+            padding: '1.5rem',
+            borderRadius: '8px',
+            marginBottom: '2rem',
+            borderLeft: '4px solid #5B4B8A',
+          }}>
+            <h3 style={{ marginBottom: '1rem', marginTop: 0, color: '#5B4B8A' }}>Create New Driver Account</h3>
 
           {formError && (
             <div style={{
@@ -301,140 +400,131 @@ const AdminDrivers = () => {
         </div>
       )}
 
-      {!showForm && (
-        <Button
-          variant="primary"
-          onClick={() => setShowForm(true)}
-          style={{ marginBottom: '2rem' }}
-        >
-          + Create New Driver Account
-        </Button>
-      )}
-
-      {/* Error Message */}
-      {error && (
-        <div style={{
-          backgroundColor: '#f8d7da',
-          color: '#721c24',
-          padding: '1rem',
-          borderRadius: '4px',
-          marginBottom: '2rem',
-        }}>
-          {error}
-        </div>
-      )}
-
-      {/* Drivers Table */}
-      {drivers.length === 0 ? (
-        <div style={{
-          backgroundColor: '#f8f9fa',
-          padding: '2rem',
-          borderRadius: '8px',
-          textAlign: 'center',
-          color: '#666',
-        }}>
-          No drivers yet. Create your first driver!
-        </div>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{
-            width: '100%',
-            borderCollapse: 'collapse',
-            backgroundColor: '#fff',
-            borderRadius: '8px',
-            overflow: 'hidden',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+        {/* Error Message */}
+        {error && (
+          <div style={{
+            backgroundColor: '#f8d7da',
+            color: '#721c24',
+            padding: '1rem',
+            borderRadius: '4px',
+            marginBottom: '2rem',
           }}>
-            <thead style={{ backgroundColor: '#f8f9fa', borderBottom: '2px solid #ddd' }}>
-              <tr>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>Name</th>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>Phone</th>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>Email</th>
-                <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {drivers.map((driver) => (
-                <tr key={driver.id} style={{ borderBottom: '1px solid #eee' }}>
-                  <td style={{ padding: '1rem' }}>{driver.name}</td>
-                  <td style={{ padding: '1rem' }}>
-                    {editingPhoneId === driver.id ? (
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <input
-                          type="tel"
-                          value={editingPhoneValue}
-                          onChange={(e) => setEditingPhoneValue(e.target.value)}
-                          placeholder="Phone number"
-                          style={{
-                            flex: 1,
-                            padding: '0.5rem',
-                            border: 'none',
-                            borderRadius: '4px',
-                          }}
-                        />
-                        <button
-                          onClick={() => handleSavePhone(driver.id)}
-                          style={{
-                            padding: '0.5rem 1rem',
-                            backgroundColor: '#28a745',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '0.85rem',
-                          }}
-                        >
-                          Save
-                        </button>
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                        <span style={{
-                          flex: 1,
-                          color: driver.phone ? '#000' : '#999',
-                        }}>
-                          {driver.phone || '(No phone number)'}
-                        </span>
-                        <button
-                          onClick={() => handleEditPhoneClick(driver.id, driver.phone)}
-                          style={{
-                            padding: '0.25rem 0.75rem',
-                            backgroundColor: '#007bff',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '0.85rem',
-                          }}
-                        >
-                          Edit
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                  <td style={{ padding: '1rem' }}>{driver.email || 'N/A'}</td>
-                  <td style={{ padding: '1rem', textAlign: 'center' }}>
-                    <button
-                      onClick={() => handleDelete(driver.id)}
-                      style={{
-                        padding: '0.5rem 1rem',
-                        backgroundColor: '#dc3545',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '0.9rem',
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </td>
+            {error}
+          </div>
+        )}
+
+        {/* Drivers Table */}
+        {drivers.length === 0 ? (
+          <div style={{
+            backgroundColor: '#f8f9fa',
+            padding: '2rem',
+            borderRadius: '8px',
+            textAlign: 'center',
+            color: '#666',
+          }}>
+            No drivers yet. Create your first driver!
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              backgroundColor: '#fff',
+              borderRadius: '8px',
+              overflow: 'hidden',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+            }}>
+              <thead style={{ backgroundColor: '#f8f9fa', borderBottom: '2px solid #ddd' }}>
+                <tr>
+                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>Name</th>
+                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>Phone</th>
+                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>Email</th>
+                  <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600' }}>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {drivers.map((driver) => (
+                  <tr key={driver.id} style={{ borderBottom: '1px solid #eee' }}>
+                    <td style={{ padding: '1rem' }}>{driver.name}</td>
+                    <td style={{ padding: '1rem' }}>
+                      {editingPhoneId === driver.id ? (
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <input
+                            type="tel"
+                            value={editingPhoneValue}
+                            onChange={(e) => setEditingPhoneValue(e.target.value)}
+                            placeholder="Phone number"
+                            style={{
+                              flex: 1,
+                              padding: '0.5rem',
+                              border: 'none',
+                              borderRadius: '4px',
+                            }}
+                          />
+                          <button
+                            onClick={() => handleSavePhone(driver.id)}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              backgroundColor: '#28a745',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '0.85rem',
+                            }}
+                          >
+                            Save
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <span style={{
+                            flex: 1,
+                            color: driver.phone ? '#000' : '#999',
+                          }}>
+                            {driver.phone || '(No phone number)'}
+                          </span>
+                          <button
+                            onClick={() => handleEditPhoneClick(driver.id, driver.phone)}
+                            style={{
+                              padding: '0.25rem 0.75rem',
+                              backgroundColor: '#007bff',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '0.85rem',
+                            }}
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ padding: '1rem' }}>{driver.email || 'N/A'}</td>
+                    <td style={{ padding: '1rem', textAlign: 'center' }}>
+                      <button
+                        onClick={() => handleDelete(driver.id)}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          backgroundColor: '#dc3545',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '0.9rem',
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
       <Modal
         isOpen={modal.isOpen}
         title={modal.title}
