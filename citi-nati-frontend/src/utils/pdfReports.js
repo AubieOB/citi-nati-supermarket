@@ -231,6 +231,17 @@ export const generateProductSalesReportPDF = (productSales, salesDays, dateRange
   const periodTo = dateRange.toDate || 'All Time';
   const generatedText = `${new Date().toLocaleDateString('en-GB')} ${new Date().toLocaleTimeString()}`;
   const totalProducts = groups.length;
+  const sharedColumnStyles = {
+    0: { cellWidth: 22 },
+    1: { cellWidth: 18, halign: 'center' },
+    2: { cellWidth: 58 },
+    3: { cellWidth: 14, halign: 'center' },
+    4: { cellWidth: 24, halign: 'right' },
+    5: { cellWidth: 24, halign: 'right' },
+    6: { cellWidth: 24, halign: 'right' },
+    7: { cellWidth: 20, halign: 'right' },
+    8: { cellWidth: 24, halign: 'right' },
+  };
   let y = margin;
 
   const drawHeader = () => {
@@ -362,17 +373,7 @@ export const generateProductSalesReportPDF = (productSales, salesDays, dateRange
       alternateRowStyles: {
         fillColor: [250, 250, 250],
       },
-      columnStyles: {
-        0: { cellWidth: 22 },
-        1: { cellWidth: 18, halign: 'center' },
-        2: { cellWidth: 58 },
-        3: { cellWidth: 14, halign: 'center' },
-        4: { cellWidth: 24, halign: 'right' },
-        5: { cellWidth: 24, halign: 'right' },
-        6: { cellWidth: 24, halign: 'right' },
-        7: { cellWidth: 20, halign: 'right' },
-        8: { cellWidth: 24, halign: 'right' },
-      },
+      columnStyles: sharedColumnStyles,
       pageBreak: 'auto',
     });
 
@@ -384,7 +385,10 @@ export const generateProductSalesReportPDF = (productSales, salesDays, dateRange
       head: [],
       body: [[
         'Subtotal for ' + group.productName,
+        '',
+        '',
         String(group.totalQty),
+        '-',
         formatMoney(group.totalDiscount),
         formatMoney(group.totalNet),
         formatMoney(group.totalVat),
@@ -400,14 +404,7 @@ export const generateProductSalesReportPDF = (productSales, salesDays, dateRange
         lineColor: [200, 220, 210],
         lineWidth: 0.2,
       },
-      columnStyles: {
-        0: { cellWidth: 137 },
-        1: { cellWidth: 14, halign: 'center' },
-        2: { cellWidth: 24, halign: 'right' },
-        3: { cellWidth: 24, halign: 'right' },
-        4: { cellWidth: 20, halign: 'right' },
-        5: { cellWidth: 24, halign: 'right' },
-      },
+      columnStyles: sharedColumnStyles,
     });
 
     y = (doc.lastAutoTable?.finalY || y + 6) + 5;
@@ -428,10 +425,13 @@ export const generateProductSalesReportPDF = (productSales, salesDays, dateRange
   autoTable(doc, {
     startY: y,
     margin: { left: margin, right: margin },
-    head: [['Grand Totals', 'Qty', 'Discount', 'Net Amount', 'VAT', 'Gross Amount']],
+    head: [['Grand Totals', '', '', 'Qty', 'Unit Price', 'Discount', 'Net Amount', 'VAT', 'Gross Amount']],
     body: [[
       'ALL SELECTED PRODUCTS',
+      '',
+      '',
       String(grandTotals.qty),
+      '-',
       formatMoney(grandTotals.discount),
       formatMoney(grandTotals.net),
       formatMoney(grandTotals.vat),
@@ -454,14 +454,7 @@ export const generateProductSalesReportPDF = (productSales, salesDays, dateRange
       fillColor: [244, 240, 247],
       fontStyle: 'bold',
     },
-    columnStyles: {
-      0: { cellWidth: 137 },
-      1: { cellWidth: 14, halign: 'center' },
-      2: { cellWidth: 24, halign: 'right' },
-      3: { cellWidth: 24, halign: 'right' },
-      4: { cellWidth: 20, halign: 'right' },
-      5: { cellWidth: 24, halign: 'right' },
-    },
+    columnStyles: sharedColumnStyles,
   });
 
   const pageCount = doc.getNumberOfPages();
