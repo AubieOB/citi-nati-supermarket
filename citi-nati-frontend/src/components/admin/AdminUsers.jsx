@@ -4,6 +4,7 @@ import api from '../../utils/api.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
+import { generateAdminUsersTablePDF } from '../../utils/pdfReports.js';
 
 /**
  * 👥 ADMIN USERS MANAGEMENT
@@ -23,7 +24,8 @@ const AdminUsers = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [updatingUserId, setUpdatingUserId] = useState(null);
-  const { modal, closeModal, showConfirm, showError } = useModal();
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const { modal, closeModal, showConfirm, showError, showSuccess } = useModal();
   const filterBarRef = useRef(null);
 
   useEffect(() => {
@@ -118,6 +120,27 @@ const AdminUsers = () => {
 
   const clearSearch = () => {
     setSearchTerm('');
+  };
+
+  const handleDownloadUsersPdf = async () => {
+    if (filteredUsers.length === 0) {
+      showError('No users to export', 'There are no users matching the current filters.');
+      return;
+    }
+
+    try {
+      setIsExportingPdf(true);
+      await generateAdminUsersTablePDF(filteredUsers, {
+        roleFilter,
+        verificationFilter,
+      });
+      showSuccess('Success', `PDF downloaded with ${filteredUsers.length} user(s).`);
+    } catch (err) {
+      console.error('[ADMIN USERS] PDF export failed:', err);
+      showError('PDF export failed', 'Unable to generate users PDF. Please try again.');
+    } finally {
+      setIsExportingPdf(false);
+    }
   };
 
   useEffect(() => {
@@ -365,6 +388,28 @@ const AdminUsers = () => {
             Clear Filters
           </button>
         )}
+
+        <button
+          type="button"
+          onClick={handleDownloadUsersPdf}
+          disabled={isExportingPdf}
+          style={{
+            padding: '0.75rem 1rem',
+            border: 'none',
+            borderRadius: '6px',
+            backgroundColor: isExportingPdf ? '#6c757d' : '#5B4B8A',
+            color: '#fff',
+            cursor: isExportingPdf ? 'not-allowed' : 'pointer',
+            fontWeight: '600',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+          }}
+          title="Download filtered users PDF"
+        >
+          <i className={`fas ${isExportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`}></i>
+          {isExportingPdf ? 'Generating PDF...' : 'Download PDF'}
+        </button>
 
         <span style={{ color: '#666', fontSize: '0.9rem', marginLeft: 'auto' }}>
           {filteredUsers.length} / {users.length} users

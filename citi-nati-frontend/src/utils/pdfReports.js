@@ -886,6 +886,129 @@ export const generateAdminProductsTablePDF = (products, options = {}) => {
   return html2pdf().set(opt).from(element).save();
 };
 
+export const generateAdminUsersTablePDF = (users, options = {}) => {
+  const {
+    roleFilter = 'all',
+    verificationFilter = 'all',
+  } = options;
+
+  const today = new Date();
+  const dateText = today.toLocaleDateString();
+  const timeText = today.toLocaleTimeString();
+
+  const roleLabel = roleFilter === 'all' ? 'All Roles' : roleFilter;
+  const verificationLabel = verificationFilter === 'all'
+    ? 'All Verification'
+    : verificationFilter === 'verified'
+      ? 'Verified Email'
+      : 'Unverified Email';
+
+  const rowsHtml = users.map((user, idx) => {
+    const roleText = String(user.role || 'user');
+    const joinedText = user.createdAt
+      ? new Date(user.createdAt).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+        })
+      : 'N/A';
+
+    return `
+      <tr style="background-color: ${idx % 2 === 0 ? '#fff' : '#f9f9f9'};">
+        <td style="padding: 10px; border: 1px solid #ddd; word-break: break-word;">${escapeHtml(user.name || 'N/A')}</td>
+        <td style="padding: 10px; border: 1px solid #ddd; word-break: break-all;">${escapeHtml(user.email || 'N/A')}</td>
+        <td style="padding: 10px; border: 1px solid #ddd; text-align: center; text-transform: capitalize;">${escapeHtml(roleText)}</td>
+        <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">${user.emailVerified ? 'Verified' : 'Unverified'}</td>
+        <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">${escapeHtml(joinedText)}</td>
+      </tr>
+    `;
+  }).join('');
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; color: #222; padding: 16px; width: 1120px; box-sizing: border-box;">
+      <style>
+        .pdf-users-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 12px;
+          table-layout: fixed;
+          page-break-inside: auto;
+        }
+
+        .pdf-users-table thead {
+          display: table-header-group;
+        }
+
+        .pdf-users-table tr {
+          page-break-inside: avoid;
+          break-inside: avoid;
+          page-break-after: auto;
+        }
+
+        .pdf-users-table td,
+        .pdf-users-table th {
+          page-break-inside: avoid;
+          break-inside: avoid;
+        }
+      </style>
+
+      ${buildBrandedHeader({
+        reportTitle: 'Admin Users Report',
+        periodText: `Role: ${escapeHtml(roleLabel)} | Verification: ${escapeHtml(verificationLabel)} | Users: ${users.length}`,
+        generatedText: `Generated: ${escapeHtml(dateText)} ${escapeHtml(timeText)}`,
+        accentColor: BRAND_PURPLE,
+      })}
+
+      <table class="pdf-users-table">
+        <colgroup>
+          <col style="width: 23%;" />
+          <col style="width: 33%;" />
+          <col style="width: 14%;" />
+          <col style="width: 14%;" />
+          <col style="width: 16%;" />
+        </colgroup>
+        <thead>
+          <tr style="background-color: #5B4B8A; color: white;">
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Name</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Email</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: center;">Role</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: center;">Email Status</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: center;">Joined</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  const element = document.createElement('div');
+  element.innerHTML = html;
+
+  const safeRole = String(roleLabel || 'all-roles').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  const opt = {
+    margin: 6,
+    filename: `admin-users-${safeRole || 'all-roles'}-${today.toISOString().split('T')[0]}.pdf`,
+    image: { type: 'png', quality: 1.0 },
+    html2canvas: {
+      scale: 4,
+      logging: false,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      letterRendering: true,
+      windowWidth: 1200,
+    },
+    jsPDF: { orientation: 'landscape', unit: 'mm', format: 'a4', compress: false },
+    pagebreak: {
+      mode: ['avoid-all', 'css', 'legacy'],
+      avoid: ['tr', 'td', 'th', 'thead', 'tbody'],
+    },
+  };
+
+  return html2pdf().set(opt).from(element).save();
+};
+
 const formatExpiryPdfDate = (value) => {
   if (!value) return 'No expiry date';
   const parsed = new Date(value);
