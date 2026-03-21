@@ -231,7 +231,15 @@ const AdminProducts = () => {
 
   const getDefaultBatchForProduct = (product) => {
     const batches = normalizeProductExpiryBatches(product?.expiryBatches);
-    return batches.length > 0 ? batches[0] : null;
+    if (batches.length === 0) {
+      return null;
+    }
+
+    const batchIndex = batches.length - 1;
+    return {
+      batch: batches[batchIndex],
+      batchIndex,
+    };
   };
 
   const formatBatchIdentity = (batch, batchIndex) => {
@@ -1915,7 +1923,9 @@ const AdminProducts = () => {
                 const productCode = product.productCode || product.sourceCode || product.code;
                 const expiryBadge = getExpiryBadge(product);
                 const productBatches = normalizeProductExpiryBatches(product.expiryBatches);
-                const defaultBatch = getDefaultBatchForProduct(product);
+                const defaultBatchInfo = getDefaultBatchForProduct(product);
+                const defaultBatch = defaultBatchInfo?.batch || null;
+                const defaultBatchIndex = defaultBatchInfo?.batchIndex ?? 0;
                 const isBatchListExpanded = Boolean(expandedBatchRows[product.id]);
                 const stockQty = getProductBatchTotalQty(product);
                 
@@ -2007,7 +2017,7 @@ const AdminProducts = () => {
                               }}
                             >
                               <i className={`fas ${isBatchListExpanded ? 'fa-chevron-down' : 'fa-chevron-right'}`}></i>
-                              {defaultBatch ? `Earliest active batch: ${formatExpiryDate(defaultBatch.expiryDate)}` : 'Show batches'}
+                              {defaultBatch ? `Latest active batch: ${formatExpiryDate(defaultBatch.expiryDate)}` : 'Show batches'}
                             </button>
                             <span style={{
                               padding: '0.35rem 0.55rem',
@@ -2039,7 +2049,7 @@ const AdminProducts = () => {
                                     Expires: {formatExpiryDate(defaultBatch.expiryDate)}
                                   </div>
                                   <div style={{ fontSize: '0.8rem', color: '#4b5563' }}>
-                                    {formatBatchIdentity(defaultBatch, 0)}
+                                    {formatBatchIdentity(defaultBatch, defaultBatchIndex)}
                                   </div>
                                   {defaultBatch.receivedQty != null && (
                                     <div style={{ fontSize: '0.8rem', color: '#4b5563' }}>
