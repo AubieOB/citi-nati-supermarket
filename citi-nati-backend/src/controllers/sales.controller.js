@@ -157,6 +157,13 @@ const getSalesDayHistory = async (req, res) => {
         orders: {
           where: { paymentStatus: 'PAID' },
           include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              }
+            },
             items: {
               include: {
                 product: true
