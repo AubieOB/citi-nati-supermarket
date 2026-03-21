@@ -1619,6 +1619,8 @@ const syncProductsFromPOSAgent = async (req, res) => {
           .slice()
           .sort((a, b) => a.expiryDate - b.expiryDate)[0] || null;
 
+        const normalizedStock = Math.max(0, Number(product.stock || 0));
+
         const nearestExpiryDate = product.nearestExpiryDate
           ? new Date(product.nearestExpiryDate)
           : (product.expiryDate ? new Date(product.expiryDate) : (nearestBatch ? nearestBatch.expiryDate : null));
@@ -1630,7 +1632,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
             update: {
               name: product.name,
               price: product.price || 0,
-              stock: product.stock || 0,
+              stock: normalizedStock,
               category: product.category || 'Uncategorized',
               description: product.description || '',
               barcode: product.barcode || '',
@@ -1642,7 +1644,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
               sourceCode: product.sourceCode,
               name: product.name,
               price: product.price || 0,
-              stock: product.stock || 0,
+              stock: normalizedStock,
               category: product.category || 'Uncategorized',
               description: product.description || '',
               barcode: product.barcode || '',
