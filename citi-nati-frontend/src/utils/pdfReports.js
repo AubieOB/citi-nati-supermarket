@@ -1,4 +1,6 @@
 import html2pdf from 'html2pdf.js';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import logo from '../assets/citi-nati-logo.png.png';
 
 const BRAND_PURPLE = '#5B4B8A';
@@ -897,7 +899,7 @@ export const generateExpiryAlertsPDF = (alertCards, options = {}) => {
     selectedStockFilter = 'all',
   } = options;
   const today = new Date();
-  const dateText = today.toLocaleDateString();
+  const dateText = today.toLocaleDateString('en-GB');
   const timeText = today.toLocaleTimeString();
   const categoryLabel = selectedCategory || 'All Categories';
   const stockFilterLabel = selectedStockFilter === 'all'
@@ -907,79 +909,125 @@ export const generateExpiryAlertsPDF = (alertCards, options = {}) => {
       : selectedStockFilter === 'low-stock'
         ? 'Low Stock'
         : 'Out of Stock';
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 12;
+  let y = margin;
 
-  const cardsHtml = alertCards.map((card, index) => {
-    const batchesHtml = card.batches.map((batch, batchIndex) => `
-      <tr>
-        <td style="padding: 6px; border: 1px solid #ddd; font-size: 11px;">Batch ${batchIndex + 1}${batch.batchNo ? ` (${escapeHtml(batch.batchNo)})` : ''}</td>
-        <td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 11px;">${escapeHtml(batch.remainingQty)}</td>
-        <td style="padding: 6px; border: 1px solid #ddd; font-size: 11px;">${escapeHtml(formatExpiryPdfDate(batch.expiryDate))}</td>
-        <td style="padding: 6px; border: 1px solid #ddd; font-size: 11px;">${escapeHtml(batch.statusLabel)}</td>
-      </tr>
-    `).join('');
+  const drawPageHeader = () => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.setTextColor(45, 134, 89);
+    doc.text('Citi-Nati Supermarket', pageWidth / 2, y, { align: 'center' });
 
-    return `
-      <div style="page-break-inside: avoid; break-inside: avoid; border: 1px solid #ddd; border-left: 6px solid ${card.isExpired ? '#dc3545' : card.isUrgent ? '#ffc107' : '#2D8659'}; border-radius: 8px; padding: 12px; margin-bottom: 14px; background: ${index % 2 === 0 ? '#fff' : '#fafafa'};">
-        <div style="display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; align-items: flex-start; flex-wrap: wrap;">
-          <div style="flex: 1; min-width: 0;">
-            <h3 style="margin: 0 0 3px 0; color: #222; font-size: 15px; line-height: 1.2;">${escapeHtml(card.name)}</h3>
-            <p style="margin: 0; color: #666; font-size: 11px; line-height: 1.3;">Code: ${escapeHtml(card.productCode || 'N/A')} | Category: ${escapeHtml(card.category || 'Uncategorized')}</p>
-          </div>
-          <div style="text-align: right; white-space: nowrap;">
-            <p style="margin: 0; color: #111; font-size: 11px; font-weight: 700;">Total Qty: ${escapeHtml(card.totalQty)}</p>
-            <p style="margin: 2px 0 0 0; color: #666; font-size: 10px;">${escapeHtml(card.stockLabel)}</p>
-          </div>
-        </div>
-        <table style="width: 100%; border-collapse: collapse; font-size: 11px; table-layout: fixed;">
-          <thead>
-            <tr style="background: #2D8659; color: white;">
-              <th style="padding: 6px; border: 1px solid #ddd; text-align: left; font-weight: bold;">Batch</th>
-              <th style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold; width: 60px;">Qty</th>
-              <th style="padding: 6px; border: 1px solid #ddd; text-align: left; font-weight: bold;">Expiry Date</th>
-              <th style="padding: 6px; border: 1px solid #ddd; text-align: left; font-weight: bold;">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${batchesHtml}
-          </tbody>
-        </table>
-      </div>
-    `;
-  }).join('');
+    y += 7;
+    doc.setFontSize(12);
+    doc.setTextColor(40, 40, 40);
+    doc.text('Expiry Alert Cards Export', pageWidth / 2, y, { align: 'center' });
 
-  const html = `
-    <div style="font-family: Arial, sans-serif; color: #222; padding: 12px; max-width: 800px; box-sizing: border-box;">
-      ${buildBrandedHeader({
-        reportTitle: 'Expiry Alert Cards Export',
-        periodText: `Category: ${escapeHtml(categoryLabel)} | Stock Filter: ${escapeHtml(stockFilterLabel)} | Products: ${alertCards.length}`,
-        generatedText: `Generated: ${escapeHtml(dateText)} ${escapeHtml(timeText)}`,
-        accentColor: '#dc3545',
-        compact: true,
-      })}
-      ${cardsHtml || '<p style="color: #666; font-size: 12px;">No expiry cards matched the selected filters.</p>'}
-    </div>
-  `;
+    y += 6;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(90, 90, 90);
+    doc.text(`Category: ${categoryLabel} | Stock Filter: ${stockFilterLabel} | Products: ${alertCards.length}`, pageWidth / 2, y, { align: 'center' });
 
-  const element = document.createElement('div');
-  element.innerHTML = html;
+    y += 5;
+    doc.text(`Generated: ${dateText} ${timeText}`, pageWidth / 2, y, { align: 'center' });
 
-  const opt = {
-    margin: 8,
-    filename: `expiry-alerts-${today.toISOString().split('T')[0]}.pdf`,
-    image: { type: 'png', quality: 1.0 },
-    html2canvas: {
-      scale: 2,
-      logging: false,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      windowWidth: 850,
-    },
-    jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4', compress: true },
-    pagebreak: {
-      mode: ['css', 'legacy'],
-      avoid: ['tr'],
-    },
+    y += 4;
+    doc.setDrawColor(220, 53, 69);
+    doc.setLineWidth(0.6);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 6;
   };
 
-  return html2pdf().set(opt).from(element).save();
+  drawPageHeader();
+
+  if (!Array.isArray(alertCards) || alertCards.length === 0) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    doc.setTextColor(100, 100, 100);
+    doc.text('No expiry cards matched the selected filters.', margin, y + 10);
+    doc.save(`expiry-alerts-${today.toISOString().split('T')[0]}.pdf`);
+    return;
+  }
+
+  alertCards.forEach((card, cardIndex) => {
+    if (y > pageHeight - 45) {
+      doc.addPage();
+      y = margin;
+      drawPageHeader();
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(31, 41, 55);
+    doc.text(String(card.name || 'Unknown Product'), margin, y);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(100, 100, 100);
+    y += 5;
+    doc.text(`Code: ${card.productCode || 'N/A'} | Category: ${card.category || 'Uncategorized'}`, margin, y);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(55, 65, 81);
+    doc.text(`${Array.isArray(card.batches) ? card.batches.length : 0} batch${Array.isArray(card.batches) && card.batches.length === 1 ? '' : 'es'}`, pageWidth - margin, y, { align: 'right' });
+
+    const tableRows = (Array.isArray(card.batches) ? card.batches : []).map((batch, batchIndex) => {
+      const batchLabel = batch?.grnNo && batch?.stockDetailId
+        ? `GRN ${batch.grnNo} / SD ${batch.stockDetailId}`
+        : batch?.grnNo
+          ? `GRN ${batch.grnNo}`
+          : batch?.stockDetailId
+            ? `Stock Detail ${batch.stockDetailId}`
+            : `Batch ${batchIndex + 1}${batch?.batchNo ? ` (${batch.batchNo})` : ''}`;
+
+      return [
+        batchLabel,
+        batch?.receivedQty != null ? String(batch.receivedQty) : '-',
+        formatExpiryPdfDate(batch?.expiryDate),
+        batch?.statusLabel || '-',
+      ];
+    });
+
+    autoTable(doc, {
+      startY: y + 3,
+      margin: { left: margin, right: margin },
+      head: [['Batch', 'Received Qty', 'Expiry Date', 'Status']],
+      body: tableRows,
+      theme: 'grid',
+      styles: {
+        fontSize: 8,
+        textColor: [34, 34, 34],
+        cellPadding: 1.8,
+        lineColor: [225, 225, 225],
+        lineWidth: 0.2,
+      },
+      headStyles: {
+        fillColor: [45, 134, 89],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+      },
+      columnStyles: {
+        0: { cellWidth: 78 },
+        1: { cellWidth: 26, halign: 'center' },
+        2: { cellWidth: 36 },
+        3: { cellWidth: 'auto' },
+      },
+      pageBreak: 'auto',
+    });
+
+    y = (doc.lastAutoTable?.finalY || y + 10) + 4;
+
+    if (cardIndex < alertCards.length - 1) {
+      doc.setDrawColor(235, 235, 235);
+      doc.setLineWidth(0.2);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 4;
+    }
+  });
+
+  doc.save(`expiry-alerts-${today.toISOString().split('T')[0]}.pdf`);
 };
