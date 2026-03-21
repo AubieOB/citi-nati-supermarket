@@ -204,17 +204,17 @@ const AdminProducts = () => {
 
     return batches
       .map((batch) => {
-        const remainingQty = toNumberOrNull(batch?.remainingQty);
         const expiryDate = batch?.expiryDate || null;
         const parsed = expiryDate ? new Date(expiryDate) : null;
+        const receivedQty = toNumberOrNull(batch?.receivedQty);
 
-        if (!parsed || Number.isNaN(parsed.getTime()) || remainingQty == null || remainingQty <= 0) {
+        if (!parsed || Number.isNaN(parsed.getTime())) {
           return null;
         }
 
         return {
           expiryDate,
-          remainingQty,
+          receivedQty,
           stockDetailId: batch?.stockDetailId || null,
           grnNo: batch?.grnNo || null,
           batchNo: batch?.batchNo || null,
@@ -248,12 +248,7 @@ const AdminProducts = () => {
   };
 
   const getProductBatchTotalQty = (product) => {
-    const batches = normalizeProductExpiryBatches(product?.expiryBatches);
-    if (batches.length === 0) {
-      return toNumberOrNull(product?.stock) ?? 0;
-    }
-
-    return batches.reduce((sum, batch) => sum + (batch.remainingQty || 0), 0);
+    return toNumberOrNull(product?.stock) ?? 0;
   };
 
   const getStockBucket = (qty) => {
@@ -272,13 +267,13 @@ const AdminProducts = () => {
   const mapPosExpiryToAlert = (row) => {
     const expiryDateValue = row?.expiryDate || row?.ExpiryDate || null;
     const daysRemaining = getDaysUntil(expiryDateValue);
-    const qty = toNumberOrNull(row?.remainingQty ?? row?.RemainingQty ?? row?.stockBalance ?? row?.StockBalance);
     const isExpired = daysRemaining != null && daysRemaining < 0;
     const isUrgent = daysRemaining != null && daysRemaining >= 0 && daysRemaining <= 14;
     const productCode = row?.productCode || row?.ProductCode || '';
     const productName = row?.productName || row?.ProductName || productCode || 'Unknown Product';
     const stockDetailId = row?.stockDetailId || row?.StockDetailID || null;
     const grnNo = row?.grnNo || row?.GRNNo || null;
+    const receivedQty = toNumberOrNull(row?.receivedQty ?? row?.ReceivedQty ?? row?.stockQty ?? row?.StockQty);
     const batchNo = row?.batchNo || grnNo || stockDetailId || null;
 
     return {
@@ -293,10 +288,10 @@ const AdminProducts = () => {
           : `Expires in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'}`,
       isExpired,
       isUrgent,
-      remainingQty: qty,
       expiryDate: expiryDateValue,
       stockDetailId,
       grnNo,
+      receivedQty,
       batchNo,
       daysToExpiry: daysRemaining,
     };
@@ -731,8 +726,10 @@ const AdminProducts = () => {
       current.batches.push({
         key: alert.key,
         expiryDate: alert.expiryDate,
-        remainingQty: alert.remainingQty ?? 0,
         batchNo: alert.batchNo || null,
+        stockDetailId: alert.stockDetailId || null,
+        grnNo: alert.grnNo || null,
+        receivedQty: alert.receivedQty ?? null,
         daysToExpiry: alert.daysToExpiry,
         statusLabel: getExpiryBatchStatus(alert.expiryDate).label,
       });
@@ -752,15 +749,10 @@ const AdminProducts = () => {
           timestamp: batch.expiryDate ? new Date(batch.expiryDate).getTime() : Number.POSITIVE_INFINITY,
         }))
         .sort((left, right) => left.timestamp - right.timestamp);
-      const totalQty = batches.reduce((sum, batch) => sum + (Number(batch.remainingQty) || 0), 0);
-      const stockBucket = getStockBucket(totalQty);
 
       return {
         ...card,
         batches,
-        totalQty,
-        stockBucket,
-        stockLabel: getStockBucketLabel(stockBucket),
         isExpired: batches.some((batch) => (batch.daysToExpiry ?? getDaysUntil(batch.expiryDate)) < 0),
         isUrgent: batches.some((batch) => {
           const daysRemaining = batch.daysToExpiry ?? getDaysUntil(batch.expiryDate);
@@ -777,8 +769,7 @@ const AdminProducts = () => {
   const expiryAlertCategories = [...new Set(expiryAlertCards.map((card) => card.category || 'Uncategorized'))].sort();
   const filteredExpiryAlertCards = expiryAlertCards.filter((card) => {
     const matchesCategory = !expiryAlertCategory || card.category === expiryAlertCategory;
-    const matchesStock = expiryAlertStockFilter === 'all' || card.stockBucket === expiryAlertStockFilter;
-    return matchesCategory && matchesStock;
+    return matchesCategory;
   });
   const expiryAlertCount = filteredExpiryAlertCards.length;
   const expiryAlertsSourceCount = expiryAlertCards.length;
@@ -1437,10 +1428,7 @@ const AdminProducts = () => {
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: '0.82rem', color: '#374151', fontWeight: '700' }}>
-                        Total Qty: {card.totalQty}
-                      </div>
-                      <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>
-                        {card.stockLabel}
+                        {card.batches.length} batch{card.batches.length === 1 ? '' : 'es'}
                       </div>
                     </div>
                   </div>
@@ -1465,14 +1453,22 @@ const AdminProducts = () => {
                         >
                           <div>
                             <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#111827' }}>
-                              Batch {index + 1}{batch.batchNo ? ` (${batch.batchNo})` : ''}
-                            </div>
-                            <div style={{ fontSize: '0.82rem', color: '#4b5563' }}>
-                              Quantity {batch.remainingQty}
+                              {batch.grnNo && batch.stockDetailId
+                                ? `GRN ${batch.grnNo} / SD ${batch.stockDetailId}`
+                                : batch.grnNo
+                                  ? `GRN ${batch.grnNo}`
+                                  : batch.stockDetailId
+                                    ? `Stock Detail ${batch.stockDetailId}`
+                                    : `Batch ${index + 1}${batch.batchNo ? ` (${batch.batchNo})` : ''}`}
                             </div>
                             <div style={{ fontSize: '0.82rem', color: '#4b5563' }}>
                               Expiry {formatExpiryDate(batch.expiryDate)}
                             </div>
+                            {batch.receivedQty != null && (
+                              <div style={{ fontSize: '0.82rem', color: '#4b5563' }}>
+                                Received Qty {batch.receivedQty}
+                              </div>
+                            )}
                           </div>
                           <span style={{
                             padding: '0.35rem 0.6rem',
@@ -1804,22 +1800,11 @@ const AdminProducts = () => {
           </select>
 
           <select
+            disabled
             value={expiryAlertStockFilter}
             onChange={(e) => setExpiryAlertStockFilter(e.target.value)}
-            style={{
-              padding: '0.75rem',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '1rem',
-              minWidth: '180px',
-              backgroundColor: '#fff',
-            }}
-          >
-            <option value="all">All Stock Levels</option>
-            <option value="in-stock">In Stock</option>
-            <option value="low-stock">Low Stock</option>
-            <option value="out-of-stock">Out of Stock</option>
-          </select>
+            style={{ display: 'none' }}
+          />
 
           <button
             onClick={handleDownloadExpiryAlertsPdf}
@@ -1883,25 +1868,25 @@ const AdminProducts = () => {
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{
-            width: '100%',
-            borderCollapse: 'collapse',
-            backgroundColor: '#fff',
-            borderRadius: '8px',
-            overflow: 'hidden',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-          }}>
-            <thead style={{ backgroundColor: '#f8f9fa', borderBottom: '2px solid #ddd' }}>
-              <tr>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem' }}>ID</th>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem' }}>Name</th>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem' }}>Product Code</th>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem' }}>Category</th>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem' }}>Pricing</th>
-                <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', fontSize: '0.9rem' }}>Stock</th>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem' }}>Expiry Status</th>
-                <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', fontSize: '0.9rem' }}>Actions</th>
-              </tr>
-            </thead>
+              width: '100%',
+              borderCollapse: 'collapse',
+              backgroundColor: '#fff',
+              borderRadius: '8px',
+              overflow: 'hidden',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+            }}>
+              <thead style={{ backgroundColor: '#f8f9fa', borderBottom: '2px solid #ddd' }}>
+                <tr>
+                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem' }}>ID</th>
+                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem' }}>Name</th>
+                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem' }}>Product Code</th>
+                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem' }}>Category</th>
+                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem' }}>Pricing</th>
+                  <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', fontSize: '0.9rem' }}>Stock</th>
+                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem' }}>Expiry Status</th>
+                  <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', fontSize: '0.9rem' }}>Actions</th>
+                </tr>
+              </thead>
             <tbody>
               {paginatedProducts.map((product) => {
                 const finalPrice = product.isOnSale && product.discountPrice ? product.discountPrice : product.price;
@@ -1914,7 +1899,7 @@ const AdminProducts = () => {
                 const productBatches = normalizeProductExpiryBatches(product.expiryBatches);
                 const defaultBatch = getDefaultBatchForProduct(product);
                 const isBatchListExpanded = Boolean(expandedBatchRows[product.id]);
-                const totalBatchQty = getProductBatchTotalQty(product);
+                const stockQty = getProductBatchTotalQty(product);
                 
                 return (
                   <tr 
@@ -1979,10 +1964,10 @@ const AdminProducts = () => {
                     <td style={{
                       padding: '1rem',
                       textAlign: 'center',
-                      color: totalBatchQty > 20 ? '#4caf50' : totalBatchQty > 0 ? '#ff9800' : '#f44336',
+                      color: stockQty > 20 ? '#4caf50' : stockQty > 0 ? '#ff9800' : '#f44336',
                       fontWeight: '600',
                     }}>
-                      {totalBatchQty}
+                      {stockQty}
                     </td>
                     <td style={{ padding: '1rem', fontSize: '0.9rem' }}>
                       {productBatches.length > 0 ? (
@@ -2033,11 +2018,16 @@ const AdminProducts = () => {
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                                   <div style={{ color: '#111827', fontWeight: '700' }}>
-                                    Remaining Qty {defaultBatch.remainingQty}: {formatExpiryDate(defaultBatch.expiryDate)}
+                                    Expires: {formatExpiryDate(defaultBatch.expiryDate)}
                                   </div>
                                   <div style={{ fontSize: '0.8rem', color: '#4b5563' }}>
                                     {formatBatchIdentity(defaultBatch, 0)}
                                   </div>
+                                  {defaultBatch.receivedQty != null && (
+                                    <div style={{ fontSize: '0.8rem', color: '#4b5563' }}>
+                                      Received Qty {defaultBatch.receivedQty}
+                                    </div>
+                                  )}
                                   <span style={{
                                     padding: '0.35rem 0.55rem',
                                     borderRadius: '999px',
@@ -2077,8 +2067,13 @@ const AdminProducts = () => {
                                         {formatBatchIdentity(batch, batchIndex)}
                                       </div>
                                       <div style={{ fontSize: '0.8rem', color: '#4b5563' }}>
-                                        Remaining Qty {batch.remainingQty}: {formatExpiryDate(batch.expiryDate)}
+                                        Expiry Date {formatExpiryDate(batch.expiryDate)}
                                       </div>
+                                      {batch.receivedQty != null && (
+                                        <div style={{ fontSize: '0.8rem', color: '#4b5563' }}>
+                                          Received Qty {batch.receivedQty}
+                                        </div>
+                                      )}
                                     </div>
                                     <span style={{
                                       padding: '0.35rem 0.55rem',

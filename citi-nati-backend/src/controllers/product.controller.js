@@ -161,9 +161,7 @@ const formatProduct = (product, req, includeDiscountSuggestion = false) => {
 
 function normalizeBatchForResponse(batch) {
   const expiryDate = normalizeExpiryDate(batch?.expiryDate);
-  const remainingQty = Number(batch?.remainingQty ?? 0);
-
-  if (!expiryDate || !Number.isFinite(remainingQty) || remainingQty <= 0) {
+  if (!expiryDate) {
     return null;
   }
 
@@ -171,26 +169,18 @@ function normalizeBatchForResponse(batch) {
 
   return {
     expiryDate: expiryDate.toISOString(),
-    remainingQty,
     locationCode: batch?.locationCode || null,
     stockDetailId: decodedRef.stockDetailId,
     grnNo: decodedRef.grnNo,
     batchNo: decodedRef.grnNo || decodedRef.stockDetailId || batch?.batchNo || null,
+    receivedQty: null,
     lastSyncedAt: batch?.lastSyncedAt ? new Date(batch.lastSyncedAt).toISOString() : null,
   };
 }
 
 function normalizeLiveBatchForResponse(batch) {
   const expiryDate = normalizeExpiryDate(batch?.expiryDate ?? batch?.ExpiryDate);
-  const remainingQty = Number(
-    batch?.StockBalance
-    ?? batch?.stockBalance
-    ?? batch?.remainingQty
-    ?? batch?.RemainingQty
-    ?? 0
-  );
-
-  if (!expiryDate || !Number.isFinite(remainingQty) || remainingQty <= 0) {
+  if (!expiryDate) {
     return null;
   }
 
@@ -200,14 +190,17 @@ function normalizeLiveBatchForResponse(batch) {
   const grnNo = batch?.grnNo != null
     ? String(batch.grnNo).trim()
     : (batch?.GRNNo != null ? String(batch.GRNNo).trim() : null);
+  const receivedQty = batch?.StockQty != null
+    ? Number(batch.StockQty)
+    : (batch?.stockQty != null ? Number(batch.stockQty) : null);
 
   return {
     expiryDate: expiryDate.toISOString(),
-    remainingQty,
     locationCode: batch?.locationCode || batch?.LocationCode || null,
     stockDetailId,
     grnNo,
     batchNo: grnNo || stockDetailId || null,
+    receivedQty: Number.isFinite(receivedQty) ? receivedQty : null,
     lastSyncedAt: null,
   };
 }
@@ -1650,19 +1643,42 @@ const toggleProductVisibility = async (req, res) => {
 const getExpiryBatchAlerts = async (req, res) => {
   try {
     const locationCode = String(req.query.locationCode || process.env.POS_LOCATION_CODE || 'SH').trim().toUpperCase();
-    const rawRows = await prisma.productExpiryBatch.findMany({
-      where: {
-        remainingQty: { gt: 0 },
-        OR: [
-          { locationCode: null },
-          { locationCode },
+    let rawRows = [];
+
+    try {
+      const expiryResult = await posSyncService.getExpiryProductsFromPOS({
+        days: 3650,
+        locationCode,
+        includeExpired: true,
+        source: 'view',
+        requestTimeoutMs: ADMIN_EXPIRY_REQUEST_TIMEOUT_MS,
+      });
+
+      if (!expiryResult.success) {
+        throw new Error(expiryResult.error || 'Live POS expiry alert fetch failed');
+      }
+
+      rawRows = (Array.isArray(expiryResult.data?.data) ? expiryResult.data.data : [])
+        .map((row) => ({
+          productCode: normalizeProductCode(row?.ProductCode || row?.productCode),
+          ...normalizeLiveBatchForResponse(row),
+        }))
+        .filter((row) => row.productCode && row.expiryDate);
+    } catch (liveError) {
+      console.warn('[EXPIRY ALERTS] live POS fetch failed, falling back to stored batches', liveError.message);
+      rawRows = await prisma.productExpiryBatch.findMany({
+        where: {
+          OR: [
+            { locationCode: null },
+            { locationCode },
+          ],
+        },
+        orderBy: [
+          { expiryDate: 'asc' },
+          { productCode: 'asc' },
         ],
-      },
-      orderBy: [
-        { expiryDate: 'asc' },
-        { productCode: 'asc' },
-      ],
-    });
+      });
+    }
 
     const productCodes = Array.from(new Set(rawRows.map((row) => row.productCode).filter(Boolean)));
     const products = productCodes.length > 0
@@ -1677,7 +1693,8 @@ const getExpiryBatchAlerts = async (req, res) => {
     today.setHours(0, 0, 0, 0);
     const alerts = rawRows.map((row) => {
       const decodedRef = decodeExpiryBatchReference(row.batchNo);
-      const days = Math.ceil((row.expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      const expiryDate = row.expiryDate instanceof Date ? row.expiryDate : new Date(row.expiryDate);
+      const days = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       const status = days < 0
         ? 'expired'
         : (days <= 7 ? 'expiring_soon' : (days <= 30 ? 'near_expiry' : 'ok'));
@@ -1686,12 +1703,12 @@ const getExpiryBatchAlerts = async (req, res) => {
         productCode: row.productCode,
         productName: productsByCode.get(String(row.productCode || '').trim())?.name || row.productCode,
         category: productsByCode.get(String(row.productCode || '').trim())?.category || null,
-        expiryDate: row.expiryDate.toISOString(),
-        remainingQty: row.remainingQty,
+        expiryDate: expiryDate.toISOString(),
         locationCode: row.locationCode,
-        stockDetailId: decodedRef.stockDetailId,
-        grnNo: decodedRef.grnNo,
-        batchNo: decodedRef.grnNo || decodedRef.stockDetailId || row.batchNo,
+        stockDetailId: row.stockDetailId || decodedRef.stockDetailId,
+        grnNo: row.grnNo || decodedRef.grnNo,
+        batchNo: row.grnNo || decodedRef.grnNo || row.stockDetailId || decodedRef.stockDetailId || row.batchNo,
+        receivedQty: row.receivedQty ?? null,
         daysToExpiry: days,
         status,
       };
