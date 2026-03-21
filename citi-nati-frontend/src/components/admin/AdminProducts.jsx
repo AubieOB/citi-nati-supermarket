@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Button from '../ui/Button.jsx';
 import api from '../../utils/api.js';
 import { formatMWK } from '../../utils/currency.js';
@@ -677,87 +677,102 @@ const AdminProducts = () => {
   // Get unique categories for filter dropdown
   const categories = [...new Set(products.map(p => p.category))].sort();
 
-  const fallbackExpiryAlerts = products
-    .filter(p => p.expiryStatus && p.expiryStatus.status)
-    .sort((a, b) => {
-      return getExpirySeverity(a) - getExpirySeverity(b);
-    })
-    .map((product) => ({
-      key: String(product.id),
-      productCode: product.productCode || product.sourceCode || '',
-      name: product.name,
-      category: product.category || 'Uncategorized',
-      message: product.expiryStatus?.label || product.expiryStatus?.message || 'Expiry warning',
-      isExpired: product.expiryStatus?.status === 'expired',
-      isUrgent: ['expiring_soon', '1_week_warning', '2_weeks_warning'].includes(product.expiryStatus?.status),
-      remainingQty: toNumberOrNull(product.stock),
-      expiryDate: product.expiryDate || null,
-      batchNo: null,
-      daysToExpiry: product.daysToExpiry ?? null,
-      sourceProduct: product,
-    }));
+  // Memoize fallback alert construction (products-based)
+  const fallbackExpiryAlerts = useMemo(() => {
+    return products
+      .filter(p => p.expiryStatus && p.expiryStatus.status)
+      .sort((a, b) => {
+        return getExpirySeverity(a) - getExpirySeverity(b);
+      })
+      .map((product) => ({
+        key: String(product.id),
+        productCode: product.productCode || product.sourceCode || '',
+        name: product.name,
+        category: product.category || 'Uncategorized',
+        message: product.expiryStatus?.label || product.expiryStatus?.message || 'Expiry warning',
+        isExpired: product.expiryStatus?.status === 'expired',
+        isUrgent: ['expiring_soon', '1_week_warning', '2_weeks_warning'].includes(product.expiryStatus?.status),
+        remainingQty: toNumberOrNull(product.stock),
+        expiryDate: product.expiryDate || null,
+        batchNo: null,
+        daysToExpiry: product.daysToExpiry ?? null,
+        sourceProduct: product,
+      }));
+  }, [products]);
 
   const expiryAlerts = posExpiryError ? fallbackExpiryAlerts : posExpiryItems;
-  const expiryAlertCards = Array.from(
-    expiryAlerts.reduce((accumulator, alert) => {
-      const key = String(alert.productCode || alert.name || alert.key);
-      const current = accumulator.get(key) || {
-        key,
-        productCode: alert.productCode || '',
-        name: alert.name || alert.productCode || 'Unknown Product',
-        category: alert.category || 'Uncategorized',
-        sourceProduct: alert.sourceProduct || null,
-        batches: [],
-      };
 
-      current.batches.push({
-        key: alert.key,
-        expiryDate: alert.expiryDate,
-        batchNo: alert.batchNo || null,
-        stockDetailId: alert.stockDetailId || null,
-        grnNo: alert.grnNo || null,
-        receivedQty: alert.receivedQty ?? null,
-        daysToExpiry: alert.daysToExpiry,
-        statusLabel: getExpiryBatchStatus(alert.expiryDate).label,
+  // Memoize expensive alert card grouping/processing
+  const expiryAlertCards = useMemo(() => {
+    return Array.from(
+      expiryAlerts.reduce((accumulator, alert) => {
+        const key = String(alert.productCode || alert.name || alert.key);
+        const current = accumulator.get(key) || {
+          key,
+          productCode: alert.productCode || '',
+          name: alert.name || alert.productCode || 'Unknown Product',
+          category: alert.category || 'Uncategorized',
+          sourceProduct: alert.sourceProduct || null,
+          batches: [],
+        };
+
+        current.batches.push({
+          key: alert.key,
+          expiryDate: alert.expiryDate,
+          batchNo: alert.batchNo || null,
+          stockDetailId: alert.stockDetailId || null,
+          grnNo: alert.grnNo || null,
+          receivedQty: alert.receivedQty ?? null,
+          daysToExpiry: alert.daysToExpiry,
+          statusLabel: getExpiryBatchStatus(alert.expiryDate).label,
+        });
+
+        if (!current.sourceProduct && alert.sourceProduct) {
+          current.sourceProduct = alert.sourceProduct;
+        }
+
+        accumulator.set(key, current);
+        return accumulator;
+      }, new Map()).values()
+    )
+      .map((card) => {
+        const batches = card.batches
+          .map((batch) => ({
+            ...batch,
+            timestamp: batch.expiryDate ? new Date(batch.expiryDate).getTime() : Number.POSITIVE_INFINITY,
+          }))
+          .sort((left, right) => left.timestamp - right.timestamp);
+
+        return {
+          ...card,
+          batches,
+          isExpired: batches.some((batch) => (batch.daysToExpiry ?? getDaysUntil(batch.expiryDate)) < 0),
+          isUrgent: batches.some((batch) => {
+            const daysRemaining = batch.daysToExpiry ?? getDaysUntil(batch.expiryDate);
+            return daysRemaining != null && daysRemaining >= 0 && daysRemaining <= 14;
+          }),
+        };
+      })
+      .sort((left, right) => {
+        const leftSoonest = left.batches[0]?.timestamp ?? Number.POSITIVE_INFINITY;
+        const rightSoonest = right.batches[0]?.timestamp ?? Number.POSITIVE_INFINITY;
+        return leftSoonest - rightSoonest;
       });
+  }, [expiryAlerts]);
 
-      if (!current.sourceProduct && alert.sourceProduct) {
-        current.sourceProduct = alert.sourceProduct;
-      }
+  // Memoize category extraction
+  const expiryAlertCategories = useMemo(() => {
+    return [...new Set(expiryAlertCards.map((card) => card.category || 'Uncategorized'))].sort();
+  }, [expiryAlertCards]);
 
-      accumulator.set(key, current);
-      return accumulator;
-    }, new Map()).values()
-  )
-    .map((card) => {
-      const batches = card.batches
-        .map((batch) => ({
-          ...batch,
-          timestamp: batch.expiryDate ? new Date(batch.expiryDate).getTime() : Number.POSITIVE_INFINITY,
-        }))
-        .sort((left, right) => left.timestamp - right.timestamp);
-
-      return {
-        ...card,
-        batches,
-        isExpired: batches.some((batch) => (batch.daysToExpiry ?? getDaysUntil(batch.expiryDate)) < 0),
-        isUrgent: batches.some((batch) => {
-          const daysRemaining = batch.daysToExpiry ?? getDaysUntil(batch.expiryDate);
-          return daysRemaining != null && daysRemaining >= 0 && daysRemaining <= 14;
-        }),
-      };
-    })
-    .sort((left, right) => {
-      const leftSoonest = left.batches[0]?.timestamp ?? Number.POSITIVE_INFINITY;
-      const rightSoonest = right.batches[0]?.timestamp ?? Number.POSITIVE_INFINITY;
-      return leftSoonest - rightSoonest;
+  // Memoize filtering
+  const filteredExpiryAlertCards = useMemo(() => {
+    return expiryAlertCards.filter((card) => {
+      const matchesCategory = !expiryAlertCategory || card.category === expiryAlertCategory;
+      return matchesCategory;
     });
+  }, [expiryAlertCards, expiryAlertCategory]);
 
-  const expiryAlertCategories = [...new Set(expiryAlertCards.map((card) => card.category || 'Uncategorized'))].sort();
-  const filteredExpiryAlertCards = expiryAlertCards.filter((card) => {
-    const matchesCategory = !expiryAlertCategory || card.category === expiryAlertCategory;
-    return matchesCategory;
-  });
   const expiryAlertCount = filteredExpiryAlertCards.length;
   const expiryAlertsSourceCount = expiryAlertCards.length;
 
