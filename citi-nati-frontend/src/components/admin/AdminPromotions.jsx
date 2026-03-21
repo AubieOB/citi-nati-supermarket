@@ -583,7 +583,7 @@ const AdminPromotions = () => {
     { id: 'selective', label: 'Selective Promotion', icon: 'fa-hand-pointer' },
   ];
 
-  const promotionsFilterSpacerHeight = Math.max(Math.min(filterBarHeight, 128) - 8, 0);
+  const promotionsFilterSpacerHeight = filterBarHeight > 0 ? filterBarHeight + 8 : 0;
 
   return (
     <div style={{ position: 'relative' }}>

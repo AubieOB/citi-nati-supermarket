@@ -234,7 +234,7 @@ const AdminSecurity = () => {
     { id: 'driver', label: 'Driver Security', icon: 'fa-id-card' },
   ];
 
-  const securityFilterSpacerHeight = Math.max(Math.min(filterBarHeight, 128) - 8, 0);
+  const securityFilterSpacerHeight = filterBarHeight > 0 ? filterBarHeight + 8 : 0;
 
   return (
     <div style={{ position: 'relative' }}>
