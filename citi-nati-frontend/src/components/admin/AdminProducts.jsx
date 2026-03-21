@@ -49,6 +49,7 @@ const AdminProducts = () => {
   const [posExpiryLoading, setPosExpiryLoading] = useState(false);
   const [posExpiryError, setPosExpiryError] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [expiryAlertsPage, setExpiryAlertsPage] = useState(1);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingExpiryPdf, setIsExportingExpiryPdf] = useState(false);
   const [isVoiceSearchEnabled, setIsVoiceSearchEnabled] = useState(false);
@@ -59,6 +60,7 @@ const AdminProducts = () => {
   const [expiryAlertCategory, setExpiryAlertCategory] = useState('');
   const [expiryAlertStockFilter, setExpiryAlertStockFilter] = useState('all');
   const pageSize = 20;
+  const expiryAlertsPageSize = 12;
   const POS_ALERTS_CLIENT_CACHE_TTL_MS = 5 * 60 * 1000;
   const searchTimeoutRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -400,6 +402,18 @@ const AdminProducts = () => {
       }
     }
   }, [activeSubTab, posExpiryItems.length]);
+
+  useEffect(() => {
+    if (activeSubTab === 'expiry-alerts') {
+      setExpiryAlertsPage(1);
+    }
+  }, [activeSubTab, expiryAlertCategory]);
+
+  useEffect(() => {
+    if (expiryAlertsPage > expiryAlertsTotalPages) {
+      setExpiryAlertsPage(expiryAlertsTotalPages);
+    }
+  }, [expiryAlertsPage, expiryAlertsTotalPages]);
 
   useEffect(() => {
     voiceEnabledRef.current = isVoiceSearchEnabled;
@@ -796,6 +810,14 @@ const AdminProducts = () => {
       return matchesCategory;
     });
   }, [expiryAlertCards, expiryAlertCategory]);
+
+  const expiryAlertsTotalPages = Math.max(1, Math.ceil(filteredExpiryAlertCards.length / expiryAlertsPageSize));
+
+  const paginatedExpiryAlertCards = useMemo(() => {
+    const safePage = Math.min(Math.max(expiryAlertsPage, 1), expiryAlertsTotalPages);
+    const start = (safePage - 1) * expiryAlertsPageSize;
+    return filteredExpiryAlertCards.slice(start, start + expiryAlertsPageSize);
+  }, [filteredExpiryAlertCards, expiryAlertsPage, expiryAlertsTotalPages, expiryAlertsPageSize]);
 
   const expiryAlertCount = filteredExpiryAlertCards.length;
   const expiryAlertsSourceCount = expiryAlertCards.length;
@@ -1429,7 +1451,7 @@ const AdminProducts = () => {
               </div>
             )}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
-              {filteredExpiryAlertCards.map((card) => (
+              {paginatedExpiryAlertCards.map((card) => (
                 <div
                   key={card.key}
                   style={{
@@ -1539,6 +1561,16 @@ const AdminProducts = () => {
                 </div>
               ))}
             </div>
+
+            {expiryAlertsTotalPages > 1 && (
+              <div style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'center' }}>
+                <Pagination
+                  currentPage={expiryAlertsPage}
+                  totalPages={expiryAlertsTotalPages}
+                  onPageChange={setExpiryAlertsPage}
+                />
+              </div>
+            )}
           </div>
         ) : (
           <div style={{
