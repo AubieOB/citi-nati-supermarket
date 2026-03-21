@@ -180,10 +180,92 @@ function normalizeBatchForResponse(batch) {
   };
 }
 
-async function attachExpiryBatchesToProducts(products) {
+function normalizeLiveBatchForResponse(batch) {
+  const expiryDate = normalizeExpiryDate(batch?.expiryDate ?? batch?.ExpiryDate);
+  const remainingQty = Number(
+    batch?.StockBalance
+    ?? batch?.stockBalance
+    ?? batch?.remainingQty
+    ?? batch?.RemainingQty
+    ?? 0
+  );
+
+  if (!expiryDate || !Number.isFinite(remainingQty) || remainingQty <= 0) {
+    return null;
+  }
+
+  const stockDetailId = batch?.stockDetailId != null
+    ? String(batch.stockDetailId).trim()
+    : (batch?.StockDetailID != null ? String(batch.StockDetailID).trim() : null);
+  const grnNo = batch?.grnNo != null
+    ? String(batch.grnNo).trim()
+    : (batch?.GRNNo != null ? String(batch.GRNNo).trim() : null);
+
+  return {
+    expiryDate: expiryDate.toISOString(),
+    remainingQty,
+    locationCode: batch?.locationCode || batch?.LocationCode || null,
+    stockDetailId,
+    grnNo,
+    batchNo: grnNo || stockDetailId || null,
+    lastSyncedAt: null,
+  };
+}
+
+async function fetchLiveExpiryBatchesByCode(sourceCodes) {
+  if (!Array.isArray(sourceCodes) || sourceCodes.length === 0) {
+    return new Map();
+  }
+
+  const expiryResult = await posSyncService.getExpiryProductsFromPOS({
+    days: 3650,
+    locationCode: process.env.POS_LOCATION_CODE || 'SH',
+    includeExpired: true,
+    source: 'view',
+    productCodes: sourceCodes,
+    requestTimeoutMs: ADMIN_EXPIRY_REQUEST_TIMEOUT_MS,
+  });
+
+  if (!expiryResult.success) {
+    throw new Error(expiryResult.error || 'Live POS expiry fetch failed');
+  }
+
+  const rawRows = Array.isArray(expiryResult.data?.data) ? expiryResult.data.data : [];
+  const batchesByCode = new Map();
+
+  rawRows.forEach((row) => {
+    const code = normalizeProductCode(row?.ProductCode || row?.productCode);
+    const normalizedBatch = normalizeLiveBatchForResponse(row);
+
+    if (!code || !normalizedBatch) {
+      return;
+    }
+
+    if (!batchesByCode.has(code)) {
+      batchesByCode.set(code, []);
+    }
+
+    batchesByCode.get(code).push(normalizedBatch);
+  });
+
+  batchesByCode.forEach((batches, code) => {
+    batches.sort((left, right) => new Date(left.expiryDate) - new Date(right.expiryDate));
+    console.log('[ADMIN PRODUCTS] live expiry batches attached', {
+      productCode: code,
+      batchCount: batches.length,
+      sample: batches[0] || null,
+    });
+  });
+
+  return batchesByCode;
+}
+
+async function attachExpiryBatchesToProducts(products, options = {}) {
   if (!Array.isArray(products) || products.length === 0) {
     return products;
   }
+
+  const { preferLive = false } = options;
 
   const sourceCodes = Array.from(new Set(
     products
@@ -196,6 +278,18 @@ async function attachExpiryBatchesToProducts(products) {
       ...product,
       expiryBatches: [],
     }));
+  }
+
+  if (preferLive) {
+    try {
+      const liveBatchesByCode = await fetchLiveExpiryBatchesByCode(sourceCodes);
+      return products.map((product) => ({
+        ...product,
+        expiryBatches: liveBatchesByCode.get(normalizeProductCode(product.sourceCode)) || [],
+      }));
+    } catch (error) {
+      console.warn('[ADMIN PRODUCTS] live expiry batch fetch failed, falling back to stored batches', error.message);
+    }
   }
 
   const rawBatches = await prisma.productExpiryBatch.findMany({
@@ -766,7 +860,9 @@ const getProducts = async (req, res) => {
     console.log(`[PRODUCTS] Retrieved: ${products.length}, Total: ${total}, Category: ${category || 'all'}, Search: ${search || 'none'}`);
 
     // expiryDate is stored on each product record via POS sync; formatProduct computes expiryStatus from it
-    const enrichedProducts = await attachExpiryBatchesToProducts(products);
+    const enrichedProducts = await attachExpiryBatchesToProducts(products, {
+      preferLive: forceAdminPosExpiry,
+    });
 
     // Map over products and format with computed fields
     const productsWithFormatted = enrichedProducts.map((product) =>
@@ -822,7 +918,9 @@ const getProductById = async (req, res) => {
     }
 
     // Format product with computed fields
-    const productWithBatches = (await attachExpiryBatchesToProducts([product]))[0];
+    const productWithBatches = (await attachExpiryBatchesToProducts([product], {
+      preferLive: shouldForceAdminExpiryEnrichment(req),
+    }))[0];
     const formattedProduct = formatProduct(productWithBatches, req, true);
 
     return res.status(200).json(formattedProduct);
