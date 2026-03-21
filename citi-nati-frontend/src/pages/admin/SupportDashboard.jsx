@@ -45,7 +45,10 @@ const SupportDashboard = () => {
   const [attachedFiles, setAttachedFiles] = useState([]);
   const fileInputRef = useRef(null);
   const [unattendedCount, setUnattendedCount] = useState(0);
+  const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
+  const [filterBarHeight, setFilterBarHeight] = useState(0);
   const { modal, closeModal, showConfirm } = useModal();
+  const filterBarRef = useRef(null);
 
   // Fetch tickets on component mount or filter change
   useEffect(() => {
@@ -228,6 +231,51 @@ const SupportDashboard = () => {
     }
   };
 
+  useEffect(() => {
+    let resizeObserver;
+
+    const updateFilterBarLayout = () => {
+      const contentArea = document.querySelector('.admin-content-area');
+      if (!contentArea) return;
+
+      const rect = contentArea.getBoundingClientRect();
+      const mobileTopOffset = 56;
+
+      setFilterBarLayout({
+        left: rect.left,
+        width: rect.width,
+        top: window.innerWidth <= 768 ? mobileTopOffset : 0,
+      });
+
+      if (filterBarRef.current) {
+        setFilterBarHeight(filterBarRef.current.offsetHeight);
+      }
+    };
+
+    updateFilterBarLayout();
+    window.addEventListener('resize', updateFilterBarLayout);
+
+    const contentArea = document.querySelector('.admin-content-area');
+    if (contentArea && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(updateFilterBarLayout);
+      resizeObserver.observe(contentArea);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateFilterBarLayout);
+      if (resizeObserver) resizeObserver.disconnect();
+    };
+  }, []);
+
+  // Re-measure bar height after each render to account for content wrapping
+  useEffect(() => {
+    if (filterBarRef.current) {
+      setFilterBarHeight(filterBarRef.current.offsetHeight);
+    }
+  });
+
+  const supportFilterSpacerHeight = filterBarHeight > 0 ? filterBarHeight + 8 : 0;
+
   const handleReply = async (e) => {
     e.preventDefault();
 
@@ -408,48 +456,41 @@ const SupportDashboard = () => {
   }
 
   return (
-    <div className="page" style={{ minHeight: '100vh', paddingBottom: '3rem' }}>
-      <Container>
-        <div style={{ paddingTop: '2rem' }}>
-          {/* Header */}
-          <div style={{
-            marginBottom: '2rem',
-            paddingBottom: '1.5rem',
-            borderBottom: '1px solid #e0e0e0'
-          }}>
-            <h1 style={{
-              margin: '0 0 0.5rem 0',
-              fontSize: '2rem',
-              color: '#333',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}>
-              <i className="fas fa-life-ring"></i>
-              Support Tickets
-              {unattendedCount > 0 && (
-                <span style={{
-                  marginLeft: 'auto',
-                  padding: '0.5rem 1rem',
-                  backgroundColor: '#ff6b6b',
-                  color: 'white',
-                  borderRadius: '20px',
-                  fontSize: '0.9rem',
-                  fontWeight: 'bold',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}>
-                  <i className="fas fa-exclamation-circle"></i>
-                  {unattendedCount} Unattended
-                </span>
-              )}
-            </h1>
-            <p style={{ margin: '0', color: '#666' }}>
-              Total Tickets: {tickets.length} | Open: {tickets.filter(t => t.status === 'OPEN').length} | In Progress: {tickets.filter(t => t.status === 'IN_PROGRESS').length} | Closed: {tickets.filter(t => t.status === 'CLOSED').length}
-            </p>
-          </div>
+    <div className="page" style={{ minHeight: '100vh', paddingBottom: '3rem', position: 'relative' }}>
+      <div
+        ref={filterBarRef}
+        style={{
+          position: 'fixed',
+          top: `${filterBarLayout.top}px`,
+          left: `${filterBarLayout.left}px`,
+          width: `${filterBarLayout.width}px`,
+          zIndex: 80,
+          backgroundColor: '#fff',
+          border: '1px solid #eee',
+          borderRadius: '8px',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+          boxSizing: 'border-box',
+          overflow: 'hidden',
+          padding: '0.75rem 1rem',
+        }}
+      >
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.6rem',
+        }}>
+          <i className="fas fa-life-ring" style={{ fontSize: '1.2rem', color: '#5B4B8A' }}></i>
+          <h1 style={{ margin: 0, color: '#333', fontSize: '1.15rem' }}>Support Tickets</h1>
+        </div>
+        <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600', marginTop: '0.5rem' }}>
+          Total: {tickets.length} | Open: {tickets.filter(t => t.status === 'OPEN').length} {unattendedCount > 0 && ` | ⚠️ ${unattendedCount} Unattended`}
+        </div>
+      </div>
 
+      <div style={{ height: `${supportFilterSpacerHeight}px` }}></div>
+
+      <Container>
+        <div style={{ paddingTop: '0' }}>
           {/* Success Message */}
           {successMessage && (
             <div style={{

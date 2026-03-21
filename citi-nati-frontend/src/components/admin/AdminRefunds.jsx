@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Button from '../ui/Button.jsx';
 import api from '../../utils/api.js';
 import Modal from '../common/Modal.jsx';
@@ -17,11 +17,57 @@ const AdminRefunds = () => {
   const [error, setError] = useState(null);
   const [approvalNote, setApprovalNote] = useState('');
   const [selectedRefundId, setSelectedRefundId] = useState(null);
+  const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
+  const [filterBarHeight, setFilterBarHeight] = useState(0);
   const { modal, closeModal, showConfirm } = useModal();
+  const filterBarRef = useRef(null);
 
   useEffect(() => {
     fetchPendingRefunds();
   }, []);
+
+  useEffect(() => {
+    let resizeObserver;
+
+    const updateFilterBarLayout = () => {
+      const contentArea = document.querySelector('.admin-content-area');
+      if (!contentArea) return;
+
+      const rect = contentArea.getBoundingClientRect();
+      const mobileTopOffset = 56;
+
+      setFilterBarLayout({
+        left: rect.left,
+        width: rect.width,
+        top: window.innerWidth <= 768 ? mobileTopOffset : 0,
+      });
+
+      if (filterBarRef.current) {
+        setFilterBarHeight(filterBarRef.current.offsetHeight);
+      }
+    };
+
+    updateFilterBarLayout();
+    window.addEventListener('resize', updateFilterBarLayout);
+
+    const contentArea = document.querySelector('.admin-content-area');
+    if (contentArea && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(updateFilterBarLayout);
+      resizeObserver.observe(contentArea);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateFilterBarLayout);
+      if (resizeObserver) resizeObserver.disconnect();
+    };
+  }, []);
+
+  // Re-measure bar height after each render to account for content wrapping
+  useEffect(() => {
+    if (filterBarRef.current) {
+      setFilterBarHeight(filterBarRef.current.offsetHeight);
+    }
+  });
 
   const fetchPendingRefunds = async () => {
     try {
@@ -64,7 +110,45 @@ const AdminRefunds = () => {
   };
 
   return (
-    <div>
+    <div style={{ position: 'relative' }}>
+      <div
+        ref={filterBarRef}
+        style={{
+          position: 'fixed',
+          top: `${filterBarLayout.top}px`,
+          left: `${filterBarLayout.left}px`,
+          width: `${filterBarLayout.width}px`,
+          zIndex: 80,
+          backgroundColor: '#fff',
+          border: '1px solid #eee',
+          borderRadius: '8px',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+          boxSizing: 'border-box',
+          overflow: 'hidden',
+          padding: '0.75rem 1rem',
+        }}
+      >
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.6rem',
+        }}>
+          <i className="fas fa-undo" style={{ fontSize: '1.2rem', color: '#5B4B8A' }}></i>
+          <h1 style={{ margin: 0, color: '#333', fontSize: '1.15rem' }}>Refunds Management</h1>
+        </div>
+        <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600', marginTop: '0.5rem' }}>
+          Pending refunds: {refunds.length}
+        </div>
+      </div>
+
+      <div style={{ height: `${filterBarHeight > 0 ? filterBarHeight + 8 : 0}px` }}></div>
+
+      <div style={{
+        backgroundColor: '#f8fafc',
+        border: '1px solid #e5e7eb',
+        borderRadius: '10px',
+        padding: '1rem',
+      }}>
       {/* Loading Indicator */}
       {loading && (
         <div style={{
@@ -349,6 +433,7 @@ const AdminRefunds = () => {
         cancelText={modal.cancelText || 'Cancel'}
         showCancelButton={modal.showCancelButton !== false}
       />
+      </div>
     </div>
   );
 };
