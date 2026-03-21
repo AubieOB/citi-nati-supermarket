@@ -911,32 +911,32 @@ export const generateExpiryAlertsPDF = (alertCards, options = {}) => {
   const cardsHtml = alertCards.map((card, index) => {
     const batchesHtml = card.batches.map((batch, batchIndex) => `
       <tr>
-        <td style="padding: 8px; border: 1px solid #ddd;">Batch ${batchIndex + 1}${batch.batchNo ? ` (${escapeHtml(batch.batchNo)})` : ''}</td>
-        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${escapeHtml(batch.remainingQty)}</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(formatExpiryPdfDate(batch.expiryDate))}</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(batch.statusLabel)}</td>
+        <td style="padding: 6px; border: 1px solid #ddd; font-size: 11px;">Batch ${batchIndex + 1}${batch.batchNo ? ` (${escapeHtml(batch.batchNo)})` : ''}</td>
+        <td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 11px;">${escapeHtml(batch.remainingQty)}</td>
+        <td style="padding: 6px; border: 1px solid #ddd; font-size: 11px;">${escapeHtml(formatExpiryPdfDate(batch.expiryDate))}</td>
+        <td style="padding: 6px; border: 1px solid #ddd; font-size: 11px;">${escapeHtml(batch.statusLabel)}</td>
       </tr>
     `).join('');
 
     return `
-      <div style="page-break-inside: avoid; break-inside: avoid; border: 1px solid #ddd; border-left: 6px solid ${card.isExpired ? '#dc3545' : card.isUrgent ? '#ffc107' : '#2D8659'}; border-radius: 10px; padding: 16px; margin-bottom: 18px; background: ${index % 2 === 0 ? '#fff' : '#fafafa'};">
-        <div style="display: flex; justify-content: space-between; gap: 16px; margin-bottom: 12px; align-items: flex-start;">
-          <div>
-            <h3 style="margin: 0 0 4px 0; color: #222; font-size: 18px;">${escapeHtml(card.name)}</h3>
-            <p style="margin: 0; color: #666; font-size: 12px;">Code: ${escapeHtml(card.productCode || 'N/A')} | Category: ${escapeHtml(card.category || 'Uncategorized')}</p>
+      <div style="page-break-inside: avoid; break-inside: avoid; border: 1px solid #ddd; border-left: 6px solid ${card.isExpired ? '#dc3545' : card.isUrgent ? '#ffc107' : '#2D8659'}; border-radius: 8px; padding: 12px; margin-bottom: 14px; background: ${index % 2 === 0 ? '#fff' : '#fafafa'};">
+        <div style="display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; align-items: flex-start; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 0;">
+            <h3 style="margin: 0 0 3px 0; color: #222; font-size: 15px; line-height: 1.2;">${escapeHtml(card.name)}</h3>
+            <p style="margin: 0; color: #666; font-size: 11px; line-height: 1.3;">Code: ${escapeHtml(card.productCode || 'N/A')} | Category: ${escapeHtml(card.category || 'Uncategorized')}</p>
           </div>
-          <div style="text-align: right;">
-            <p style="margin: 0; color: #111; font-size: 12px; font-weight: 700;">Total Batch Qty: ${escapeHtml(card.totalQty)}</p>
-            <p style="margin: 4px 0 0 0; color: #666; font-size: 12px;">${escapeHtml(card.stockLabel)}</p>
+          <div style="text-align: right; white-space: nowrap;">
+            <p style="margin: 0; color: #111; font-size: 11px; font-weight: 700;">Total Qty: ${escapeHtml(card.totalQty)}</p>
+            <p style="margin: 2px 0 0 0; color: #666; font-size: 10px;">${escapeHtml(card.stockLabel)}</p>
           </div>
         </div>
-        <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 11px; table-layout: fixed;">
           <thead>
             <tr style="background: #2D8659; color: white;">
-              <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Batch</th>
-              <th style="padding: 8px; border: 1px solid #ddd; text-align: center;">Quantity</th>
-              <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Expiry Date</th>
-              <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Status</th>
+              <th style="padding: 6px; border: 1px solid #ddd; text-align: left; font-weight: bold;">Batch</th>
+              <th style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold; width: 60px;">Qty</th>
+              <th style="padding: 6px; border: 1px solid #ddd; text-align: left; font-weight: bold;">Expiry Date</th>
+              <th style="padding: 6px; border: 1px solid #ddd; text-align: left; font-weight: bold;">Status</th>
             </tr>
           </thead>
           <tbody>
@@ -948,14 +948,15 @@ export const generateExpiryAlertsPDF = (alertCards, options = {}) => {
   }).join('');
 
   const html = `
-    <div style="font-family: Arial, sans-serif; color: #222; padding: 16px; width: 1120px; box-sizing: border-box;">
+    <div style="font-family: Arial, sans-serif; color: #222; padding: 12px; max-width: 800px; box-sizing: border-box;">
       ${buildBrandedHeader({
         reportTitle: 'Expiry Alert Cards Export',
         periodText: `Category: ${escapeHtml(categoryLabel)} | Stock Filter: ${escapeHtml(stockFilterLabel)} | Products: ${alertCards.length}`,
         generatedText: `Generated: ${escapeHtml(dateText)} ${escapeHtml(timeText)}`,
         accentColor: '#dc3545',
+        compact: true,
       })}
-      ${cardsHtml || '<p style="color: #666;">No expiry cards matched the selected filters.</p>'}
+      ${cardsHtml || '<p style="color: #666; font-size: 12px;">No expiry cards matched the selected filters.</p>'}
     </div>
   `;
 
@@ -963,20 +964,20 @@ export const generateExpiryAlertsPDF = (alertCards, options = {}) => {
   element.innerHTML = html;
 
   const opt = {
-    margin: 6,
+    margin: 8,
     filename: `expiry-alerts-${today.toISOString().split('T')[0]}.pdf`,
     image: { type: 'png', quality: 1.0 },
     html2canvas: {
-      scale: 3,
+      scale: 2,
       logging: false,
       useCORS: true,
       backgroundColor: '#ffffff',
-      windowWidth: 1200,
+      windowWidth: 850,
     },
     jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4', compress: true },
     pagebreak: {
       mode: ['css', 'legacy'],
-      avoid: ['table', 'tr', 'td', 'th'],
+      avoid: ['tr'],
     },
   };
 
