@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { getSalesDayHistory } from '../../utils/salesService.js';
+import api from '../../utils/api.js';
 import {
   generateSummaryReportPDF,
   generateProductSalesReportPDF,
@@ -12,6 +13,7 @@ const SalesReports = ({ refreshTrigger }) => {
   const { token } = useAuth();
 
   const [salesDays, setSalesDays] = useState([]);
+  const [productCatalog, setProductCatalog] = useState([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(null);
   const [activeReport, setActiveReport] = useState('byProduct');
@@ -66,8 +68,12 @@ const SalesReports = ({ refreshTrigger }) => {
 
       try {
         setLoading(true);
-        const daysData = await getSalesDayHistory(token);
+        const [daysData, productsResponse] = await Promise.all([
+          getSalesDayHistory(token),
+          api.get('/products?page=1&pageSize=5000'),
+        ]);
         setSalesDays(daysData || []);
+        setProductCatalog(Array.isArray(productsResponse?.data?.products) ? productsResponse.data.products : []);
       } catch (error) {
         console.error('Error fetching reports data:', error);
         toast.error('Failed to load reports');
@@ -149,30 +155,55 @@ const SalesReports = ({ refreshTrigger }) => {
     return Object.values(driverMap).sort((a, b) => b.totalEarnings - a.totalEarnings);
   }, [filteredSalesDays]);
 
+  const catalogProductOptions = useMemo(() => {
+    const names = new Set();
+    productCatalog.forEach((product) => {
+      const name = String(product?.name || '').trim();
+      if (name) names.add(name);
+    });
+    return Array.from(names.values()).sort((a, b) => a.localeCompare(b));
+  }, [productCatalog]);
+
   const filteredProductOptions = useMemo(() => {
     const query = productSearchTerm.trim().toLowerCase();
     if (!query) {
-      return productSales;
+      return catalogProductOptions;
     }
 
-    return productSales.filter((product) =>
-      String(product.name || '').toLowerCase().includes(query)
+    return catalogProductOptions.filter((productName) =>
+      String(productName || '').toLowerCase().includes(query)
     );
-  }, [productSales, productSearchTerm]);
+  }, [catalogProductOptions, productSearchTerm]);
+
+  const salesByProductName = useMemo(() => {
+    const map = new Map();
+    productSales.forEach((product) => {
+      map.set(product.name, product);
+    });
+    return map;
+  }, [productSales]);
 
   const visibleProductSales = useMemo(() => {
     if (selectedProducts.length === 0) {
       return productSales;
     }
 
-    const selectedSet = new Set(selectedProducts);
-    return productSales.filter((product) => selectedSet.has(product.name));
-  }, [productSales, selectedProducts]);
+    return selectedProducts.map((productName) => {
+      const existing = salesByProductName.get(productName);
+      if (existing) return existing;
+
+      return {
+        name: productName,
+        quantity: 0,
+        totalRevenue: 0,
+      };
+    });
+  }, [productSales, selectedProducts, salesByProductName]);
 
   useEffect(() => {
-    const availableNames = new Set(productSales.map((product) => product.name));
+    const availableNames = new Set(catalogProductOptions);
     setSelectedProducts((previous) => previous.filter((name) => availableNames.has(name)));
-  }, [productSales]);
+  }, [catalogProductOptions]);
 
   const handleExportDetailedReport = () => {
     if (filteredSalesDays.length === 0) {
@@ -522,12 +553,13 @@ const SalesReports = ({ refreshTrigger }) => {
                     No products match your search.
                   </div>
                 ) : (
-                  filteredProductOptions.map((product) => {
-                    const isChecked = selectedProducts.includes(product.name);
+                  filteredProductOptions.map((productName) => {
+                    const isChecked = selectedProducts.includes(productName);
+                    const metrics = salesByProductName.get(productName);
 
                     return (
                       <label
-                        key={product.name}
+                        key={productName}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -543,17 +575,17 @@ const SalesReports = ({ refreshTrigger }) => {
                           checked={isChecked}
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setSelectedProducts((previous) => [...previous, product.name]);
+                              setSelectedProducts((previous) => [...previous, productName]);
                             } else {
-                              setSelectedProducts((previous) => previous.filter((name) => name !== product.name));
+                              setSelectedProducts((previous) => previous.filter((name) => name !== productName));
                             }
                           }}
                         />
                         <span style={{ fontSize: '0.86rem', color: '#111827', flex: 1 }}>
-                          {product.name}
+                          {productName}
                         </span>
                         <span style={{ fontSize: '0.8rem', color: '#6b7280', fontWeight: '600' }}>
-                          Qty {product.quantity}
+                          Qty {metrics?.quantity ?? 0}
                         </span>
                       </label>
                     );
