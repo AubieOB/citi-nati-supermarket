@@ -404,18 +404,6 @@ const AdminProducts = () => {
   }, [activeSubTab, posExpiryItems.length]);
 
   useEffect(() => {
-    if (activeSubTab === 'expiry-alerts') {
-      setExpiryAlertsPage(1);
-    }
-  }, [activeSubTab, expiryAlertCategory]);
-
-  useEffect(() => {
-    if (expiryAlertsPage > expiryAlertsTotalPages) {
-      setExpiryAlertsPage(expiryAlertsTotalPages);
-    }
-  }, [expiryAlertsPage, expiryAlertsTotalPages]);
-
-  useEffect(() => {
     voiceEnabledRef.current = isVoiceSearchEnabled;
   }, [isVoiceSearchEnabled]);
 
@@ -821,6 +809,18 @@ const AdminProducts = () => {
 
   const expiryAlertCount = filteredExpiryAlertCards.length;
   const expiryAlertsSourceCount = expiryAlertCards.length;
+
+  useEffect(() => {
+    if (activeSubTab === 'expiry-alerts') {
+      setExpiryAlertsPage(1);
+    }
+  }, [activeSubTab, expiryAlertCategory]);
+
+  useEffect(() => {
+    if (expiryAlertsPage > expiryAlertsTotalPages) {
+      setExpiryAlertsPage(expiryAlertsTotalPages);
+    }
+  }, [expiryAlertsPage, expiryAlertsTotalPages]);
 
   // Handle search with debounce
   const handleSearchChange = (e) => {
