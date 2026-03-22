@@ -1239,27 +1239,13 @@ const adjustInventoryStock = async (req, res) => {
     const timestamp = new Date();
     const parsedAdjustmentQty = Number.parseInt(req.body.adjustmentQty, 10);
 
-    const POS_PRODUCT_CODE_MAX_LENGTH = 6;
-
     if (!requestedProductCode || requestedProductCode.trim().length === 0) {
       return res.status(400).json({ error: 'productCode is required' });
-    }
-
-    if (requestedProductCode.length > POS_PRODUCT_CODE_MAX_LENGTH) {
-      console.warn('[ADMIN INVENTORY] ProductCode rejected — exceeds POS VARCHAR(6) limit:', {
-        productCode: requestedProductCode,
-        length: requestedProductCode.length,
-        maxAllowed: POS_PRODUCT_CODE_MAX_LENGTH,
-      });
-      return res.status(400).json({
-        error: `productCode exceeds POS maximum length of ${POS_PRODUCT_CODE_MAX_LENGTH}. Received "${requestedProductCode}" (${requestedProductCode.length} chars). ProductCode must match a valid POS ProductCode, not a product name.`,
-      });
     }
 
     console.log('[ADMIN INVENTORY] ProductCode validated:', {
       productCode: requestedProductCode,
       length: requestedProductCode.length,
-      maxAllowed: POS_PRODUCT_CODE_MAX_LENGTH,
     });
 
     if (!locationCode) {
