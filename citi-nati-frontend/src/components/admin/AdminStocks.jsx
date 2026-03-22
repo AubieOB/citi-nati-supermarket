@@ -186,8 +186,11 @@ const AdminStocks = () => {
       return;
     }
 
-    const productCode = String(selectedProduct.productCode || selectedProduct.sourceCode || selectedProduct.code || '').trim();
-    if (!productCode) {
+    const productCode = typeof (selectedProduct.productCode || selectedProduct.sourceCode || selectedProduct.code) === 'string'
+      ? (selectedProduct.productCode || selectedProduct.sourceCode || selectedProduct.code)
+      : String(selectedProduct.productCode || selectedProduct.sourceCode || selectedProduct.code || '');
+
+    if (!productCode || productCode.trim().length === 0) {
       notifyError('This product has no product code. Adjustment cannot be submitted safely.', 4000);
       return;
     }

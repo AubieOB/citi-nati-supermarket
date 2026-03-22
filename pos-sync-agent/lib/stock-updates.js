@@ -5,6 +5,7 @@
  */
 
 const sql = require('mssql');
+const _columnLengthCache = new Map();
 
 function createScopedRequest(request) {
   if (request && request.transaction) {
@@ -16,6 +17,30 @@ function createScopedRequest(request) {
   }
 
   return request;
+}
+
+async function getColumnMaxLength(request, tableName, columnName) {
+  const cacheKey = `${tableName}.${columnName}`;
+  if (_columnLengthCache.has(cacheKey)) {
+    return _columnLengthCache.get(cacheKey);
+  }
+
+  const schemaRequest = createScopedRequest(request);
+  schemaRequest.input('TableName', sql.VarChar(128), tableName);
+  schemaRequest.input('ColumnName', sql.VarChar(128), columnName);
+
+  const schemaResult = await schemaRequest.query(`
+    SELECT CHARACTER_MAXIMUM_LENGTH AS MaxLength
+    FROM POS.INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = 'dbo'
+      AND TABLE_NAME = @TableName
+      AND COLUMN_NAME = @ColumnName
+  `);
+
+  const maxLength = Number(schemaResult?.recordset?.[0]?.MaxLength || 0);
+  const normalizedMax = Number.isFinite(maxLength) ? maxLength : 0;
+  _columnLengthCache.set(cacheKey, normalizedMax);
+  return normalizedMax;
 }
 
 /**
@@ -333,6 +358,10 @@ async function applyManualStockDecrease(request, payload) {
     reason,
   } = payload;
 
+  const exactProductCode = typeof productCode === 'string'
+    ? productCode
+    : String(productCode == null ? '' : productCode);
+
   console.log('[STOCK] applyManualStockDecrease payload:', {
     productCode,
     locationCode,
@@ -343,15 +372,19 @@ async function applyManualStockDecrease(request, payload) {
     reason,
   });
 
-  if (!productCode || !locationCode) {
+  if (!exactProductCode || !locationCode) {
     throw new Error('NON_RETRYABLE: productCode and locationCode are required');
+  }
+
+  if (exactProductCode.trim().length === 0) {
+    throw new Error('NON_RETRYABLE: productCode is empty/blank and cannot be used for stock decrement');
   }
 
   if (!Number.isFinite(qtyReduction) || qtyReduction <= 0) {
     throw new Error('NON_RETRYABLE: qtyReduction must be a positive number');
   }
 
-  const currentStock = await getCurrentStock(request, productCode, locationCode);
+  const currentStock = await getCurrentStock(request, exactProductCode, locationCode);
   if (currentStock < qtyReduction) {
     throw new Error(`NON_RETRYABLE: insufficient stock for manual decrease. Available=${currentStock}, Requested=${qtyReduction}`);
   }
@@ -386,10 +419,25 @@ async function applyManualStockDecrease(request, payload) {
   console.log('[STOCK] schema fields used (detail): AdjustID, ProductCode, Quantity');
 
   const detailRequest = createScopedRequest(request);
+  const allowedProductCodeLength = await getColumnMaxLength(request, 'stockadjdetails', 'ProductCode');
+  const productCodeLength = exactProductCode.length;
+
+  console.log('[STOCK] stockadjdetails insert target:', 'POS.dbo.stockadjdetails');
+  console.log('[STOCK] stockadjdetails ProductCode validation:', {
+    ProductCode: exactProductCode,
+    ProductCodeLength: productCodeLength,
+    AllowedMaxLength: allowedProductCodeLength,
+    commandId: commandId || null,
+  });
+
+  if (allowedProductCodeLength > 0 && productCodeLength > allowedProductCodeLength) {
+    throw new Error(
+      `NON_RETRYABLE: ProductCode length ${productCodeLength} exceeds stockadjdetails.ProductCode max ${allowedProductCodeLength}`
+    );
+  }
+
   detailRequest.input('DetailAdjustID', sql.Int, stockAdjId);
-  // ProductCode column is varchar(6) in confirmed schema; use VarChar(50) param to pass value
-  // SQL Server will enforce its own column length at insert time
-  detailRequest.input('DetailProductCode', sql.VarChar(50), productCode);
+  detailRequest.input('DetailProductCode', sql.VarChar(Math.max(1, allowedProductCodeLength || 50)), exactProductCode);
   detailRequest.input('DetailQuantity', sql.Decimal(18, 2), qtyReduction);
 
   const detailResult = await detailRequest.query(`
@@ -402,7 +450,7 @@ async function applyManualStockDecrease(request, payload) {
 
   // ── Step 3: insert QtyOut into ProductActivity (source-of-truth for stock) ──
   const activityRequest = createScopedRequest(request);
-  activityRequest.input('ActivityProductCode', sql.VarChar(50), productCode);
+  activityRequest.input('ActivityProductCode', sql.VarChar(50), exactProductCode);
   activityRequest.input('ActivityLocationCode', sql.VarChar(10), locationCode);
   activityRequest.input('ActivityQtyOut', sql.Decimal(18, 2), qtyReduction);
   activityRequest.input('ActivityTrDate', sql.DateTime, adjDate);
@@ -410,7 +458,7 @@ async function applyManualStockDecrease(request, payload) {
   activityRequest.input('ActivityTxnType', sql.VarChar(50), 'STOCK_ADJUSTMENT');
 
   const adjustmentPayload = {
-    ProductCode: productCode,
+    ProductCode: exactProductCode,
     LocationCode: locationCode,
     QtyIn: 0,
     QtyOut: qtyReduction,
@@ -449,7 +497,7 @@ async function applyManualStockDecrease(request, payload) {
 
   return {
     stockAdjId,
-    productCode,
+    productCode: exactProductCode,
     locationCode,
     qtyReduction,
     refNo,
