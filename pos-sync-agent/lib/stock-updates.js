@@ -7,6 +7,7 @@
 const sql = require('mssql');
 const _columnLengthCache = new Map();
 const _locationNameCache = new Map();
+const _productNameCache = new Map();
 
 const LOCATION_NAME_FALLBACKS = Object.freeze({
   SH: 'SHOP',
@@ -91,6 +92,42 @@ async function resolveLocationName(request, locationCode) {
   );
 }
 
+async function resolveProductName(request, productCode) {
+  const normalizedProductCode = String(productCode == null ? '' : productCode);
+
+  if (!normalizedProductCode || normalizedProductCode.trim().length === 0) {
+    console.error('[STOCK] ProductName resolution failed: productCode missing/blank', { productCode });
+    throw new Error('NON_RETRYABLE: productCode is required to resolve ProductName for ProductActivity');
+  }
+
+  if (_productNameCache.has(normalizedProductCode)) {
+    return _productNameCache.get(normalizedProductCode);
+  }
+
+  const productRequest = createScopedRequest(request);
+  productRequest.input('ProductCode', sql.VarChar(50), normalizedProductCode);
+
+  const productResult = await productRequest.query(`
+    SELECT TOP 1 ProductName
+    FROM POS.dbo.Products
+    WHERE ProductCode = @ProductCode
+  `);
+
+  const dbProductName = productResult?.recordset?.[0]?.ProductName;
+  if (typeof dbProductName !== 'string' || dbProductName.trim().length === 0) {
+    console.error('[STOCK] ProductName resolution failed: no ProductName found in POS.dbo.Products', {
+      productCode: normalizedProductCode,
+    });
+    throw new Error(
+      `NON_RETRYABLE: could not resolve ProductName for ProductCode "${normalizedProductCode}". ProductActivity insert aborted.`
+    );
+  }
+
+  const resolvedName = dbProductName.trim();
+  _productNameCache.set(normalizedProductCode, resolvedName);
+  return resolvedName;
+}
+
 /**
  * Get current stock quantity for a product at a location
  * @param {sql.Request} request - SQL request object
@@ -150,9 +187,18 @@ async function reduceStockOnSale(request, productCode, locationCode, qtyReductio
 
     // Insert QtyOut record into ProductActivity using live schema columns
     const trDate = new Date();
+    const resolvedProductName = await resolveProductName(request, productCode);
     const resolvedLocationName = await resolveLocationName(request, locationCode);
+    const productNameMaxLength = await getColumnMaxLength(request, 'ProductActivity', 'ProductName');
     const locationNameMaxLength = await getColumnMaxLength(request, 'ProductActivity', 'LocationName');
+    const productNameLength = resolvedProductName.length;
     const locationNameLength = resolvedLocationName.length;
+
+    if (productNameMaxLength > 0 && productNameLength > productNameMaxLength) {
+      throw new Error(
+        `NON_RETRYABLE: ProductName length ${productNameLength} exceeds ProductActivity.ProductName max ${productNameMaxLength}`
+      );
+    }
 
     if (locationNameMaxLength > 0 && locationNameLength > locationNameMaxLength) {
       throw new Error(
@@ -163,6 +209,7 @@ async function reduceStockOnSale(request, productCode, locationCode, qtyReductio
     const query = `
       INSERT INTO POS.dbo.ProductActivity (
         ProductCode,
+        ProductName,
         LocationCode,
         LocationName,
         QtyIn,
@@ -173,6 +220,7 @@ async function reduceStockOnSale(request, productCode, locationCode, qtyReductio
       )
       VALUES (
         @ProductCode,
+        @ProductName,
         @LocationCode,
         @LocationName,
         0,
@@ -185,6 +233,7 @@ async function reduceStockOnSale(request, productCode, locationCode, qtyReductio
 
     const insertRequest = createScopedRequest(request);
     insertRequest.input('ProductCode', sql.VarChar(50), productCode);
+    insertRequest.input('ProductName', sql.VarChar(Math.max(1, productNameMaxLength || 255)), resolvedProductName);
     insertRequest.input('LocationCode', sql.VarChar(10), locationCode);
     insertRequest.input('LocationName', sql.VarChar(Math.max(1, locationNameMaxLength || 50)), resolvedLocationName);
     insertRequest.input('QtyOut', sql.Decimal(18, 2), qtyReduction);
@@ -194,6 +243,7 @@ async function reduceStockOnSale(request, productCode, locationCode, qtyReductio
 
     const salePayload = {
       ProductCode: productCode,
+      ProductName: resolvedProductName,
       LocationCode: locationCode,
       LocationName: resolvedLocationName,
       QtyIn: 0,
@@ -205,6 +255,7 @@ async function reduceStockOnSale(request, productCode, locationCode, qtyReductio
 
     console.log('[STOCK] ProductActivity pre-insert:', {
       ProductCode: productCode,
+      ProductName: resolvedProductName,
       LocationCode: locationCode,
       LocationName: resolvedLocationName,
       QtyOut: qtyReduction,
@@ -212,7 +263,7 @@ async function reduceStockOnSale(request, productCode, locationCode, qtyReductio
       TxnType: 'SALE',
     });
     console.log('[STOCK] ProductActivity insert target:', 'POS.dbo.ProductActivity');
-    console.log('[STOCK] ProductActivity insert columns:', ['ProductCode', 'LocationCode', 'LocationName', 'QtyIn', 'QtyOut', 'Tr_Date', 'TrType', 'TxnType']);
+    console.log('[STOCK] ProductActivity insert columns:', ['ProductCode', 'ProductName', 'LocationCode', 'LocationName', 'QtyIn', 'QtyOut', 'Tr_Date', 'TrType', 'TxnType']);
     console.log('[STOCK] ProductActivity insert payload keys:', Object.keys(salePayload));
     console.log('[STOCK] ProductActivity insert payload:', salePayload);
 
@@ -533,9 +584,18 @@ async function applyManualStockDecrease(request, payload) {
   console.log('[STOCK] detail rows affected:', detailRowsAffected);
 
   // ── Step 3: insert QtyOut into ProductActivity (source-of-truth for stock) ──
+  const resolvedProductName = await resolveProductName(request, exactProductCode);
   const resolvedLocationName = await resolveLocationName(request, locationCode);
+  const activityProductNameMaxLength = await getColumnMaxLength(request, 'ProductActivity', 'ProductName');
   const activityLocationNameMaxLength = await getColumnMaxLength(request, 'ProductActivity', 'LocationName');
+  const activityProductNameLength = resolvedProductName.length;
   const activityLocationNameLength = resolvedLocationName.length;
+
+  if (activityProductNameMaxLength > 0 && activityProductNameLength > activityProductNameMaxLength) {
+    throw new Error(
+      `NON_RETRYABLE: ProductName length ${activityProductNameLength} exceeds ProductActivity.ProductName max ${activityProductNameMaxLength}`
+    );
+  }
 
   if (activityLocationNameMaxLength > 0 && activityLocationNameLength > activityLocationNameMaxLength) {
     throw new Error(
@@ -545,6 +605,7 @@ async function applyManualStockDecrease(request, payload) {
 
   const activityRequest = createScopedRequest(request);
   activityRequest.input('ActivityProductCode', sql.VarChar(6), exactProductCode);
+  activityRequest.input('ActivityProductName', sql.VarChar(Math.max(1, activityProductNameMaxLength || 255)), resolvedProductName);
   activityRequest.input('ActivityLocationCode', sql.VarChar(10), locationCode);
   activityRequest.input('ActivityLocationName', sql.VarChar(Math.max(1, activityLocationNameMaxLength || 50)), resolvedLocationName);
   activityRequest.input('ActivityQtyOut', sql.Decimal(18, 2), qtyReduction);
@@ -554,6 +615,7 @@ async function applyManualStockDecrease(request, payload) {
 
   const adjustmentPayload = {
     ProductCode: exactProductCode,
+    ProductName: resolvedProductName,
     LocationCode: locationCode,
     LocationName: resolvedLocationName,
     QtyIn: 0,
@@ -565,6 +627,7 @@ async function applyManualStockDecrease(request, payload) {
 
   console.log('[STOCK] ProductActivity pre-insert:', {
     ProductCode: exactProductCode,
+    ProductName: resolvedProductName,
     LocationCode: locationCode,
     LocationName: resolvedLocationName,
     QtyOut: qtyReduction,
@@ -572,13 +635,14 @@ async function applyManualStockDecrease(request, payload) {
     TxnType: 'ADJ',
   });
   console.log('[STOCK] ProductActivity insert target:', 'POS.dbo.ProductActivity');
-  console.log('[STOCK] ProductActivity insert columns:', ['ProductCode', 'LocationCode', 'LocationName', 'QtyIn', 'QtyOut', 'Tr_Date', 'TrType', 'TxnType']);
+  console.log('[STOCK] ProductActivity insert columns:', ['ProductCode', 'ProductName', 'LocationCode', 'LocationName', 'QtyIn', 'QtyOut', 'Tr_Date', 'TrType', 'TxnType']);
   console.log('[STOCK] ProductActivity insert payload keys:', Object.keys(adjustmentPayload));
   console.log('[STOCK] ProductActivity insert payload:', adjustmentPayload);
 
   await activityRequest.query(`
     INSERT INTO POS.dbo.ProductActivity (
       ProductCode,
+      ProductName,
       LocationCode,
       LocationName,
       QtyIn,
@@ -589,6 +653,7 @@ async function applyManualStockDecrease(request, payload) {
     )
     VALUES (
       @ActivityProductCode,
+      @ActivityProductName,
       @ActivityLocationCode,
       @ActivityLocationName,
       0,
