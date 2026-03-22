@@ -128,6 +128,165 @@ async function resolveProductName(request, productCode) {
   return resolvedName;
 }
 
+async function readStockBalanceView(request, productCode, locationCode) {
+  const baseRequest = createScopedRequest(request);
+  baseRequest.input('ProductCode', sql.VarChar(50), productCode);
+  baseRequest.input('LocationCode', sql.VarChar(10), locationCode);
+
+  try {
+    const result = await baseRequest.query(`
+      SELECT TOP 1 BalanceQty
+      FROM POS.dbo.vw_Stock_Balance
+      WHERE ProductCode = @ProductCode
+        AND LocationCode = @LocationCode
+    `);
+
+    return Number(result?.recordset?.[0]?.BalanceQty || 0);
+  } catch (err) {
+    console.warn('[STOCK] vw_Stock_Balance query with LocationCode failed, retrying ProductCode-only lookup:', {
+      productCode,
+      locationCode,
+      error: err.message,
+    });
+  }
+
+  const fallbackRequest = createScopedRequest(request);
+  fallbackRequest.input('ProductCode', sql.VarChar(50), productCode);
+
+  const fallbackResult = await fallbackRequest.query(`
+    SELECT TOP 1 BalanceQty
+    FROM POS.dbo.vw_Stock_Balance
+    WHERE ProductCode = @ProductCode
+  `);
+
+  return Number(fallbackResult?.recordset?.[0]?.BalanceQty || 0);
+}
+
+async function applyFifoStockOutToStockDetails(request, productCode, locationCode, qtyOut) {
+  const normalizedQtyOut = Number(qtyOut || 0);
+  if (!Number.isFinite(normalizedQtyOut) || normalizedQtyOut <= 0) {
+    throw new Error('NON_RETRYABLE: qtyOut must be a positive number for stockdetails update');
+  }
+
+  const beforeBalanceQty = await readStockBalanceView(request, productCode, locationCode);
+  console.log('[STOCK][STOCKDETAILS] vw_Stock_Balance before:', {
+    productCode,
+    locationCode,
+    BalanceQty: beforeBalanceQty,
+  });
+
+  const batchRequest = createScopedRequest(request);
+  batchRequest.input('ProductCode', sql.VarChar(50), productCode);
+  batchRequest.input('LocationCode', sql.VarChar(10), locationCode);
+
+  const batchResult = await batchRequest.query(`
+    SELECT
+      sd.StockDetailID,
+      sd.GRNNo,
+      ISNULL(sd.StockQty, 0) AS StockQty,
+      ISNULL(sd.StockOut, 0) AS StockOut,
+      ISNULL(sd.StockQty, 0) - ISNULL(sd.StockOut, 0) AS AvailableQty
+    FROM POS.dbo.stockdetails sd
+    WHERE sd.ProductCode = @ProductCode
+      AND sd.LocationCode = @LocationCode
+      AND ISNULL(sd.StockQty, 0) - ISNULL(sd.StockOut, 0) > 0
+    ORDER BY
+      CASE WHEN sd.GRNNo IS NULL OR LTRIM(RTRIM(sd.GRNNo)) = '' THEN 1 ELSE 0 END,
+      sd.GRNNo ASC,
+      sd.StockDetailID ASC
+  `);
+
+  const batches = batchResult?.recordset || [];
+  const totalAvailable = batches.reduce((sum, row) => sum + Number(row.AvailableQty || 0), 0);
+
+  if (totalAvailable < normalizedQtyOut) {
+    throw new Error(
+      `NON_RETRYABLE: insufficient stockdetails balance for manual decrease. Available=${totalAvailable}, Requested=${normalizedQtyOut}`
+    );
+  }
+
+  let remaining = normalizedQtyOut;
+  let totalRowsAffected = 0;
+
+  for (const batch of batches) {
+    if (remaining <= 0) {
+      break;
+    }
+
+    const stockDetailId = Number(batch.StockDetailID);
+    const stockQty = Number(batch.StockQty || 0);
+    const stockOutBefore = Number(batch.StockOut || 0);
+    const availableQty = Number(batch.AvailableQty || 0);
+    const deductQty = Math.min(remaining, availableQty);
+    const stockOutAfter = stockOutBefore + deductQty;
+
+    if (stockOutAfter > stockQty) {
+      throw new Error(
+        `NON_RETRYABLE: stockdetails overflow prevented for StockDetailID=${stockDetailId}. StockOutAfter=${stockOutAfter}, StockQty=${stockQty}`
+      );
+    }
+
+    console.log('[STOCK][STOCKDETAILS] FIFO batch before update:', {
+      StockDetailID: stockDetailId,
+      GRNNo: batch.GRNNo || null,
+      ProductCode: productCode,
+      LocationCode: locationCode,
+      StockQty: stockQty,
+      StockOutBefore: stockOutBefore,
+      DeductQty: deductQty,
+      StockOutAfter: stockOutAfter,
+    });
+
+    const updateRequest = createScopedRequest(request);
+    updateRequest.input('StockDetailID', sql.Int, stockDetailId);
+    updateRequest.input('DeductQty', sql.Decimal(18, 2), deductQty);
+
+    const updateResult = await updateRequest.query(`
+      UPDATE POS.dbo.stockdetails
+      SET StockOut = ISNULL(StockOut, 0) + @DeductQty
+      WHERE StockDetailID = @StockDetailID
+        AND ISNULL(StockOut, 0) + @DeductQty <= ISNULL(StockQty, 0)
+    `);
+
+    const rowsAffected = Number(updateResult?.rowsAffected?.[0] || 0);
+    totalRowsAffected += rowsAffected;
+
+    if (rowsAffected !== 1) {
+      throw new Error(
+        `Failed to update stockdetails for StockDetailID=${stockDetailId}. rowsAffected=${rowsAffected}`
+      );
+    }
+
+    console.log('[STOCK][STOCKDETAILS] FIFO batch after update:', {
+      StockDetailID: stockDetailId,
+      ProductCode: productCode,
+      LocationCode: locationCode,
+      StockOutBefore: stockOutBefore,
+      StockOutAfter: stockOutAfter,
+      affectedRows: rowsAffected,
+    });
+
+    remaining -= deductQty;
+  }
+
+  if (remaining > 0) {
+    throw new Error(`Failed to apply full stockdetails deduction. Remaining=${remaining}`);
+  }
+
+  const afterBalanceQty = await readStockBalanceView(request, productCode, locationCode);
+  console.log('[STOCK][STOCKDETAILS] vw_Stock_Balance after:', {
+    productCode,
+    locationCode,
+    BalanceQty: afterBalanceQty,
+  });
+
+  return {
+    beforeBalanceQty,
+    afterBalanceQty,
+    rowsAffected: totalRowsAffected,
+  };
+}
+
 /**
  * Get current stock quantity for a product at a location
  * @param {sql.Request} request - SQL request object
@@ -664,7 +823,17 @@ async function applyManualStockDecrease(request, payload) {
     )
   `);
 
-  console.log('[STOCK] adjustment path: dbo.stockadjustments + dbo.stockadjdetails + dbo.ProductActivity');
+  // ── Step 4: update dbo.stockdetails so POS stock views reflect decrement ──
+  const stockDetailsUpdate = await applyFifoStockOutToStockDetails(
+    request,
+    exactProductCode,
+    locationCode,
+    qtyReduction
+  );
+
+  console.log('[STOCK][STOCKDETAILS] update summary:', stockDetailsUpdate);
+
+  console.log('[STOCK] adjustment path: dbo.stockadjustments + dbo.stockadjdetails + dbo.ProductActivity + dbo.stockdetails');
 
   return {
     stockAdjId,
@@ -675,7 +844,8 @@ async function applyManualStockDecrease(request, payload) {
     oldStock,
     newStock,
     reason,
-    tablesTouched: ['dbo.stockadjustments', 'dbo.stockadjdetails', 'dbo.ProductActivity'],
+    tablesTouched: ['dbo.stockadjustments', 'dbo.stockadjdetails', 'dbo.ProductActivity', 'dbo.stockdetails'],
+    stockDetailsUpdate,
   };
 }
 
