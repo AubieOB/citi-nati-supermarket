@@ -6,6 +6,12 @@
 
 const sql = require('mssql');
 const _columnLengthCache = new Map();
+const _locationNameCache = new Map();
+
+const LOCATION_NAME_FALLBACKS = Object.freeze({
+  SH: 'SHOP',
+  ST999: 'STOCK WRITE OFF',
+});
 
 function createScopedRequest(request) {
   if (request && request.transaction) {
@@ -41,6 +47,48 @@ async function getColumnMaxLength(request, tableName, columnName) {
   const normalizedMax = Number.isFinite(maxLength) ? maxLength : 0;
   _columnLengthCache.set(cacheKey, normalizedMax);
   return normalizedMax;
+}
+
+async function resolveLocationName(request, locationCode) {
+  const normalizedLocationCode = String(locationCode == null ? '' : locationCode).trim();
+
+  if (!normalizedLocationCode) {
+    throw new Error('NON_RETRYABLE: locationCode is required to resolve LocationName for ProductActivity');
+  }
+
+  if (_locationNameCache.has(normalizedLocationCode)) {
+    return _locationNameCache.get(normalizedLocationCode);
+  }
+
+  const locationRequest = createScopedRequest(request);
+  locationRequest.input('LocationCode', sql.VarChar(10), normalizedLocationCode);
+
+  const locationResult = await locationRequest.query(`
+    SELECT TOP 1 LocationName
+    FROM POS.dbo.Locations
+    WHERE LocationCode = @LocationCode
+  `);
+
+  const dbLocationName = locationResult?.recordset?.[0]?.LocationName;
+  if (typeof dbLocationName === 'string' && dbLocationName.trim().length > 0) {
+    const resolvedName = dbLocationName.trim();
+    _locationNameCache.set(normalizedLocationCode, resolvedName);
+    return resolvedName;
+  }
+
+  const fallbackLocationName = LOCATION_NAME_FALLBACKS[normalizedLocationCode] || '';
+  if (fallbackLocationName) {
+    console.warn('[STOCK] LocationName resolved via fallback map:', {
+      locationCode: normalizedLocationCode,
+      locationName: fallbackLocationName,
+    });
+    _locationNameCache.set(normalizedLocationCode, fallbackLocationName);
+    return fallbackLocationName;
+  }
+
+  throw new Error(
+    `NON_RETRYABLE: could not resolve LocationName for LocationCode "${normalizedLocationCode}". ProductActivity insert aborted.`
+  );
 }
 
 /**
@@ -102,10 +150,21 @@ async function reduceStockOnSale(request, productCode, locationCode, qtyReductio
 
     // Insert QtyOut record into ProductActivity using live schema columns
     const trDate = new Date();
+    const resolvedLocationName = await resolveLocationName(request, locationCode);
+    const locationNameMaxLength = await getColumnMaxLength(request, 'ProductActivity', 'LocationName');
+    const locationNameLength = resolvedLocationName.length;
+
+    if (locationNameMaxLength > 0 && locationNameLength > locationNameMaxLength) {
+      throw new Error(
+        `NON_RETRYABLE: LocationName length ${locationNameLength} exceeds ProductActivity.LocationName max ${locationNameMaxLength}`
+      );
+    }
+
     const query = `
       INSERT INTO POS.dbo.ProductActivity (
         ProductCode,
         LocationCode,
+        LocationName,
         QtyIn,
         QtyOut,
         Tr_Date,
@@ -115,6 +174,7 @@ async function reduceStockOnSale(request, productCode, locationCode, qtyReductio
       VALUES (
         @ProductCode,
         @LocationCode,
+        @LocationName,
         0,
         @QtyOut,
         @TrDate,
@@ -126,6 +186,7 @@ async function reduceStockOnSale(request, productCode, locationCode, qtyReductio
     const insertRequest = createScopedRequest(request);
     insertRequest.input('ProductCode', sql.VarChar(50), productCode);
     insertRequest.input('LocationCode', sql.VarChar(10), locationCode);
+    insertRequest.input('LocationName', sql.VarChar(Math.max(1, locationNameMaxLength || 50)), resolvedLocationName);
     insertRequest.input('QtyOut', sql.Decimal(18, 2), qtyReduction);
     insertRequest.input('TrDate', sql.DateTime, trDate);
     insertRequest.input('TrType', sql.VarChar(1), 'S');
@@ -134,6 +195,7 @@ async function reduceStockOnSale(request, productCode, locationCode, qtyReductio
     const salePayload = {
       ProductCode: productCode,
       LocationCode: locationCode,
+      LocationName: resolvedLocationName,
       QtyIn: 0,
       QtyOut: qtyReduction,
       Tr_Date: trDate.toISOString(),
@@ -141,8 +203,16 @@ async function reduceStockOnSale(request, productCode, locationCode, qtyReductio
       TxnType: 'SALE',
     };
 
+    console.log('[STOCK] ProductActivity pre-insert:', {
+      ProductCode: productCode,
+      LocationCode: locationCode,
+      LocationName: resolvedLocationName,
+      QtyOut: qtyReduction,
+      TrType: 'S',
+      TxnType: 'SALE',
+    });
     console.log('[STOCK] ProductActivity insert target:', 'POS.dbo.ProductActivity');
-    console.log('[STOCK] ProductActivity insert columns:', ['ProductCode', 'LocationCode', 'QtyIn', 'QtyOut', 'Tr_Date', 'TrType', 'TxnType']);
+    console.log('[STOCK] ProductActivity insert columns:', ['ProductCode', 'LocationCode', 'LocationName', 'QtyIn', 'QtyOut', 'Tr_Date', 'TrType', 'TxnType']);
     console.log('[STOCK] ProductActivity insert payload keys:', Object.keys(salePayload));
     console.log('[STOCK] ProductActivity insert payload:', salePayload);
 
@@ -463,9 +533,20 @@ async function applyManualStockDecrease(request, payload) {
   console.log('[STOCK] detail rows affected:', detailRowsAffected);
 
   // ── Step 3: insert QtyOut into ProductActivity (source-of-truth for stock) ──
+  const resolvedLocationName = await resolveLocationName(request, locationCode);
+  const activityLocationNameMaxLength = await getColumnMaxLength(request, 'ProductActivity', 'LocationName');
+  const activityLocationNameLength = resolvedLocationName.length;
+
+  if (activityLocationNameMaxLength > 0 && activityLocationNameLength > activityLocationNameMaxLength) {
+    throw new Error(
+      `NON_RETRYABLE: LocationName length ${activityLocationNameLength} exceeds ProductActivity.LocationName max ${activityLocationNameMaxLength}`
+    );
+  }
+
   const activityRequest = createScopedRequest(request);
   activityRequest.input('ActivityProductCode', sql.VarChar(6), exactProductCode);
   activityRequest.input('ActivityLocationCode', sql.VarChar(10), locationCode);
+  activityRequest.input('ActivityLocationName', sql.VarChar(Math.max(1, activityLocationNameMaxLength || 50)), resolvedLocationName);
   activityRequest.input('ActivityQtyOut', sql.Decimal(18, 2), qtyReduction);
   activityRequest.input('ActivityTrDate', sql.DateTime, adjDate);
   activityRequest.input('ActivityTrType', sql.VarChar(1), 'A');
@@ -474,6 +555,7 @@ async function applyManualStockDecrease(request, payload) {
   const adjustmentPayload = {
     ProductCode: exactProductCode,
     LocationCode: locationCode,
+    LocationName: resolvedLocationName,
     QtyIn: 0,
     QtyOut: qtyReduction,
     Tr_Date: adjDate.toISOString(),
@@ -481,8 +563,16 @@ async function applyManualStockDecrease(request, payload) {
     TxnType: 'ADJ',
   };
 
+  console.log('[STOCK] ProductActivity pre-insert:', {
+    ProductCode: exactProductCode,
+    LocationCode: locationCode,
+    LocationName: resolvedLocationName,
+    QtyOut: qtyReduction,
+    TrType: 'A',
+    TxnType: 'ADJ',
+  });
   console.log('[STOCK] ProductActivity insert target:', 'POS.dbo.ProductActivity');
-  console.log('[STOCK] ProductActivity insert columns:', ['ProductCode', 'LocationCode', 'QtyIn', 'QtyOut', 'Tr_Date', 'TrType', 'TxnType']);
+  console.log('[STOCK] ProductActivity insert columns:', ['ProductCode', 'LocationCode', 'LocationName', 'QtyIn', 'QtyOut', 'Tr_Date', 'TrType', 'TxnType']);
   console.log('[STOCK] ProductActivity insert payload keys:', Object.keys(adjustmentPayload));
   console.log('[STOCK] ProductActivity insert payload:', adjustmentPayload);
 
@@ -490,6 +580,7 @@ async function applyManualStockDecrease(request, payload) {
     INSERT INTO POS.dbo.ProductActivity (
       ProductCode,
       LocationCode,
+      LocationName,
       QtyIn,
       QtyOut,
       Tr_Date,
@@ -499,6 +590,7 @@ async function applyManualStockDecrease(request, payload) {
     VALUES (
       @ActivityProductCode,
       @ActivityLocationCode,
+      @ActivityLocationName,
       0,
       @ActivityQtyOut,
       @ActivityTrDate,
