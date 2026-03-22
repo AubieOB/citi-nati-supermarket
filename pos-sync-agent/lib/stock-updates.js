@@ -469,7 +469,7 @@ async function applyManualStockDecrease(request, payload) {
   activityRequest.input('ActivityQtyOut', sql.Decimal(18, 2), qtyReduction);
   activityRequest.input('ActivityTrDate', sql.DateTime, adjDate);
   activityRequest.input('ActivityTrType', sql.VarChar(1), 'A');
-  activityRequest.input('ActivityTxnType', sql.VarChar(50), 'STOCK_ADJUSTMENT');
+  activityRequest.input('ActivityTxnType', sql.VarChar(10), 'ADJ');
 
   const adjustmentPayload = {
     ProductCode: exactProductCode,
@@ -478,7 +478,7 @@ async function applyManualStockDecrease(request, payload) {
     QtyOut: qtyReduction,
     Tr_Date: adjDate.toISOString(),
     TrType: 'A',
-    TxnType: 'STOCK_ADJUSTMENT',
+    TxnType: 'ADJ',
   };
 
   console.log('[STOCK] ProductActivity insert target:', 'POS.dbo.ProductActivity');
