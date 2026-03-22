@@ -59,13 +59,39 @@ async function getColumnMaxLength(request, tableName, columnName) {
   return normalizedMax;
 }
 
-async function ensureProductCodeSchemaCapacity(request) {
+/**
+ * Return a pool-level (non-transaction) Request for DDL.
+ * DDL inside a transaction aborts it on permission failure;
+ * running DDL on the pool itself is safe and independent.
+ */
+function makePoolLevelRequest(requestOrPool) {
+  // Pool passed directly — has .request() method
+  if (requestOrPool && typeof requestOrPool.request === 'function') {
+    return requestOrPool.request();
+  }
+  // Transaction-scoped request — extract pool from mssql internals
+  if (requestOrPool && requestOrPool.transaction) {
+    const txn = requestOrPool.transaction;
+    const poolRef = txn._pool || txn.parent;
+    if (poolRef && typeof poolRef.request === 'function') {
+      return poolRef.request();
+    }
+  }
+  // Plain pool-scoped request
+  if (requestOrPool && requestOrPool.parent && typeof requestOrPool.parent.request === 'function') {
+    return requestOrPool.parent.request();
+  }
+  // Fallback: use as-is (DDL inside transaction — ALTER errors caught below)
+  return requestOrPool;
+}
+
+async function ensureProductCodeSchemaCapacity(requestOrPool) {
   if (_productCodeSchemaAligned) {
     return;
   }
 
   for (const target of PRODUCT_CODE_SCHEMA_TARGETS) {
-    const metaRequest = createScopedRequest(request);
+    const metaRequest = makePoolLevelRequest(requestOrPool);
     metaRequest.input('TableName', sql.VarChar(128), target.tableName);
     metaRequest.input('ColumnName', sql.VarChar(128), target.columnName);
 
@@ -106,23 +132,30 @@ async function ensureProductCodeSchemaCapacity(request) {
     }
 
     if (dataType === 'varchar' && currentLength > 0 && currentLength < PRODUCT_CODE_TARGET_LENGTH) {
-      const alterRequest = createScopedRequest(request);
       const nullClause = isNullable ? 'NULL' : 'NOT NULL';
-
-      await alterRequest.query(`
-        ALTER TABLE POS.dbo.${target.tableName}
-        ALTER COLUMN ${target.columnName} VARCHAR(${PRODUCT_CODE_TARGET_LENGTH}) ${nullClause}
-      `);
-
-      _columnLengthCache.delete(`${target.tableName}.${target.columnName}`);
-
-      console.log('[SCHEMA] ProductCode column expanded:', {
-        table: `dbo.${target.tableName}`,
-        column: target.columnName,
-        fromLength: currentLength,
-        toLength: PRODUCT_CODE_TARGET_LENGTH,
-      });
-
+      try {
+        const alterRequest = makePoolLevelRequest(requestOrPool);
+        await alterRequest.query(`
+          ALTER TABLE POS.dbo.${target.tableName}
+          ALTER COLUMN ${target.columnName} VARCHAR(${PRODUCT_CODE_TARGET_LENGTH}) ${nullClause}
+        `);
+        _columnLengthCache.delete(`${target.tableName}.${target.columnName}`);
+        console.log('[SCHEMA] ProductCode column expanded:', {
+          table: `dbo.${target.tableName}`,
+          column: target.columnName,
+          fromLength: currentLength,
+          toLength: PRODUCT_CODE_TARGET_LENGTH,
+        });
+      } catch (alterErr) {
+        // pos_sync_writer lacks ALTER TABLE permission — log DBA instruction and continue.
+        // The narrow column length is kept in cache so callers can skip inserts that would truncate.
+        console.warn('[SCHEMA] ALTER TABLE failed (insufficient permissions):', {
+          table: `dbo.${target.tableName}`,
+          error: alterErr.message,
+          hint: `DBA must run: ALTER TABLE POS.dbo.${target.tableName} ALTER COLUMN ${target.columnName} VARCHAR(50) NOT NULL;`,
+        });
+        _columnLengthCache.set(`${target.tableName}.${target.columnName}`, currentLength);
+      }
       continue;
     }
 
@@ -742,7 +775,11 @@ async function applyManualStockDecrease(request, payload) {
     reason,
   });
 
-  await ensureProductCodeSchemaCapacity(request);
+  // Schema alignment is expected to have been called before the surrounding transaction.
+  // Call here as a safety net — it is a no-op if the flag is already set.
+  if (!_productCodeSchemaAligned) {
+    await ensureProductCodeSchemaCapacity(request);
+  }
 
   if (!exactProductCode || !locationCode) {
     throw new Error('NON_RETRYABLE: productCode and locationCode are required');
@@ -795,27 +832,37 @@ async function applyManualStockDecrease(request, payload) {
   console.log('[STOCK] inserting detail into dbo.stockadjdetails:', { stockAdjId, productCode, qtyReduction });
   console.log('[STOCK] schema fields used (detail): AdjustID, ProductCode, Quantity');
 
-  const detailRequest = createScopedRequest(request);
+  const adjdetailsColCapacity = await getColumnMaxLength(request, 'stockadjdetails', 'ProductCode');
   const productCodeLength = exactProductCode.length;
 
   console.log('[STOCK] stockadjdetails insert target:', 'POS.dbo.stockadjdetails');
   console.log('[STOCK] stockadjdetails ProductCode check:', {
     ProductCode: exactProductCode,
     ProductCodeLength: productCodeLength,
+    columnCapacity: adjdetailsColCapacity,
     commandId: commandId || null,
   });
 
-  detailRequest.input('DetailAdjustID', sql.Int, stockAdjId);
-  detailRequest.input('DetailProductCode', sql.VarChar(PRODUCT_CODE_TARGET_LENGTH), exactProductCode);
-  detailRequest.input('DetailQuantity', sql.Decimal(18, 2), qtyReduction);
+  if (adjdetailsColCapacity > 0 && productCodeLength > adjdetailsColCapacity) {
+    console.warn('[STOCK] stockadjdetails.ProductCode column too narrow — skipping detail insert:', {
+      columnCapacity: adjdetailsColCapacity,
+      productCodeLength,
+      hint: 'DBA must run: ALTER TABLE POS.dbo.stockadjdetails ALTER COLUMN ProductCode VARCHAR(50) NOT NULL;',
+    });
+  } else {
+    const detailRequest = createScopedRequest(request);
+    detailRequest.input('DetailAdjustID', sql.Int, stockAdjId);
+    detailRequest.input('DetailProductCode', sql.VarChar(PRODUCT_CODE_TARGET_LENGTH), exactProductCode);
+    detailRequest.input('DetailQuantity', sql.Decimal(18, 2), qtyReduction);
 
-  const detailResult = await detailRequest.query(`
-    INSERT INTO POS.dbo.stockadjdetails (AdjustID, ProductCode, Quantity)
-    VALUES (@DetailAdjustID, @DetailProductCode, @DetailQuantity)
-  `);
+    const detailResult = await detailRequest.query(`
+      INSERT INTO POS.dbo.stockadjdetails (AdjustID, ProductCode, Quantity)
+      VALUES (@DetailAdjustID, @DetailProductCode, @DetailQuantity)
+    `);
 
-  const detailRowsAffected = detailResult.rowsAffected && detailResult.rowsAffected[0];
-  console.log('[STOCK] detail rows affected:', detailRowsAffected);
+    const detailRowsAffected = detailResult.rowsAffected && detailResult.rowsAffected[0];
+    console.log('[STOCK] detail rows affected:', detailRowsAffected);
+  }
 
   // ── Step 3: insert QtyOut into ProductActivity (source-of-truth for stock) ──
   const resolvedProductName = await resolveProductName(request, exactProductCode);
@@ -931,4 +978,5 @@ module.exports = {
   updateStockForInvoiceItems,
   validateStockAvailability,
   applyManualStockDecrease,
+  ensureProductCodeSchemaCapacity,
 };
