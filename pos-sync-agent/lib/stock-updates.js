@@ -75,7 +75,7 @@ async function reduceStockOnSale(request, productCode, locationCode, qtyReductio
       );
     }
 
-    // Insert QtyOut record into ProductActivity
+    // Insert QtyOut record into ProductActivity using live schema columns
     const query = `
       INSERT INTO POS.dbo.ProductActivity (
         ProductCode,
@@ -83,7 +83,8 @@ async function reduceStockOnSale(request, productCode, locationCode, qtyReductio
         QtyIn,
         QtyOut,
         ActivityDate,
-        ActivityType
+        TrType,
+        TxnType
       )
       VALUES (
         @ProductCode,
@@ -91,7 +92,8 @@ async function reduceStockOnSale(request, productCode, locationCode, qtyReductio
         0,
         @QtyOut,
         @ActivityDate,
-        'SALE'
+        @TrType,
+        @TxnType
       )
     `;
 
@@ -100,6 +102,20 @@ async function reduceStockOnSale(request, productCode, locationCode, qtyReductio
     insertRequest.input('LocationCode', sql.VarChar(10), locationCode);
     insertRequest.input('QtyOut', sql.Decimal(18, 2), qtyReduction);
     insertRequest.input('ActivityDate', sql.DateTime, new Date());
+    insertRequest.input('TrType', sql.VarChar(1), 'S');
+    insertRequest.input('TxnType', sql.VarChar(50), 'SALE');
+
+    console.log('[STOCK] ProductActivity insert target:', 'POS.dbo.ProductActivity');
+    console.log('[STOCK] ProductActivity insert columns:', ['ProductCode', 'LocationCode', 'QtyIn', 'QtyOut', 'ActivityDate', 'TrType', 'TxnType']);
+    console.log('[STOCK] ProductActivity insert payload:', {
+      ProductCode: productCode,
+      LocationCode: locationCode,
+      QtyIn: 0,
+      QtyOut: qtyReduction,
+      ActivityDate: new Date().toISOString(),
+      TrType: 'S',
+      TxnType: 'SALE',
+    });
 
     await insertRequest.query(query);
 
@@ -386,6 +402,20 @@ async function applyManualStockDecrease(request, payload) {
   activityRequest.input('ActivityLocationCode', sql.VarChar(10), locationCode);
   activityRequest.input('ActivityQtyOut', sql.Decimal(18, 2), qtyReduction);
   activityRequest.input('ActivityDate', sql.DateTime, adjDate);
+  activityRequest.input('ActivityTrType', sql.VarChar(1), 'A');
+  activityRequest.input('ActivityTxnType', sql.VarChar(50), 'STOCK_ADJUSTMENT');
+
+  console.log('[STOCK] ProductActivity insert target:', 'POS.dbo.ProductActivity');
+  console.log('[STOCK] ProductActivity insert columns:', ['ProductCode', 'LocationCode', 'QtyIn', 'QtyOut', 'ActivityDate', 'TrType', 'TxnType']);
+  console.log('[STOCK] ProductActivity insert payload:', {
+    ProductCode: productCode,
+    LocationCode: locationCode,
+    QtyIn: 0,
+    QtyOut: qtyReduction,
+    ActivityDate: adjDate.toISOString(),
+    TrType: 'A',
+    TxnType: 'STOCK_ADJUSTMENT',
+  });
 
   await activityRequest.query(`
     INSERT INTO POS.dbo.ProductActivity (
@@ -394,7 +424,8 @@ async function applyManualStockDecrease(request, payload) {
       QtyIn,
       QtyOut,
       ActivityDate,
-      ActivityType
+      TrType,
+      TxnType
     )
     VALUES (
       @ActivityProductCode,
@@ -402,7 +433,8 @@ async function applyManualStockDecrease(request, payload) {
       0,
       @ActivityQtyOut,
       @ActivityDate,
-      'SALE'
+      @ActivityTrType,
+      @ActivityTxnType
     )
   `);
 
