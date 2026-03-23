@@ -135,11 +135,11 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
 
   const fetchEmergencySales = useCallback(async () => {
     try {
-      const isCashierScope = String(apiBase || '').startsWith('cashier/');
+      const isAdminScope = String(apiBase || '').startsWith('admin/');
       const response = await api.get(`/${apiBase}`, {
         params: {
           page: 1,
-          pageSize: isCashierScope ? 200 : 8,
+          pageSize: isAdminScope ? 200 : 20,
           status: 'all',
         },
       });
@@ -1016,7 +1016,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
                       <td colSpan={4} style={{ padding: '0.5rem', textAlign: 'center', color: '#666' }}>No sales</td>
                     </tr>
                   )}
-                  {sales.map((sale) => (
+                  {(String(apiBase || '').startsWith('admin/') ? sales : sales.slice(0, 20)).map((sale) => (
                     <tr key={sale.id} style={{ borderBottom: '1px solid #eef' }}>
                       <td style={{ padding: '0.26rem', fontFamily: 'Consolas, monospace' }}>{sale.sale_ref}</td>
                       <td style={{ padding: '0.26rem', textAlign: 'right', fontWeight: 700 }}>{formatMoney(sale.total)}</td>
