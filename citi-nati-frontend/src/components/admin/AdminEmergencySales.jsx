@@ -664,7 +664,7 @@ const AdminEmergencySales = () => {
           <button onClick={() => printReceipt(lastReceipt)} style={{ ...headerButtonStyle, backgroundColor: '#ffc6ba' }}>PRINT<br />[F8]</button>
           <button onClick={removeSelectedRow} style={{ ...headerButtonStyle, backgroundColor: '#ff6248', color: '#fff' }}>DELETE<br />[F9]</button>
           <button onClick={clearInvoice} style={{ ...headerButtonStyle, backgroundColor: '#ecf0a8' }}>NEW<br />[F10]</button>
-          <button onClick={toggleFullscreen} style={{ ...headerButtonStyle, backgroundColor: '#ece3a8' }}>{isPanelFullscreen ? 'RESTORE' : 'DRAWER'}<br />[F11]</button>
+          <button onClick={toggleFullscreen} style={{ ...headerButtonStyle, backgroundColor: '#ece3a8' }}>{isPanelFullscreen ? 'FULLSCREEN' : 'FULL'}<br />[F11]</button>
         </div>
       </div>
 
