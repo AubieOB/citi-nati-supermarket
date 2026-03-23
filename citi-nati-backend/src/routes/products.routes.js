@@ -1,5 +1,5 @@
 const express = require('express');
-const { createProduct, getProducts, getProductById, updateProduct, deleteProduct, syncFromPOS, syncProductsFromPOSAgent, deletePOSProducts, getCategories, toggleProductVisibility } = require('../controllers/product.controller');
+const { createProduct, getProducts, getProductById, updateProduct, updateProductStockThreshold, deleteProduct, syncFromPOS, syncProductsFromPOSAgent, deletePOSProducts, getCategories, toggleProductVisibility } = require('../controllers/product.controller');
 const { verifyTokenMiddleware } = require('../middleware/auth.middleware');
 const { verifyAdmin } = require('../middleware/admin.middleware');
 const uploadProductImage = require('../middlewares/uploadProductImageCloudinary');
@@ -40,6 +40,14 @@ router.put(
   verifyTokenMiddleware,
   verifyAdmin,
   toggleProductVisibility
+);
+
+// PATCH /api/products/:id/stock-threshold - Update per-product low stock threshold (ADMIN only)
+router.patch(
+  '/:id/stock-threshold',
+  verifyTokenMiddleware,
+  verifyAdmin,
+  updateProductStockThreshold
 );
 
 // DELETE /api/products/:id - Delete product by id (ADMIN only)

@@ -7,6 +7,11 @@ import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
 import Pagination from '../ui/Pagination.jsx';
 import { generateAdminProductsTablePDF, generateExpiryAlertsPDF } from '../../utils/pdfReports.js';
+import {
+  enrichProductStock,
+  resolveEffectiveStock,
+  resolveStockStatus,
+} from '../../utils/stockResolver.js';
 
 /**
  * 📦 ADMIN PRODUCTS MANAGEMENT - ENHANCED
@@ -142,14 +147,7 @@ const AdminProducts = () => {
   };
 
   const getEffectiveStockQty = (product) => {
-    if (!product) return 0;
-    if (product.overrideActive === true && product.overrideStock != null) {
-      return toNumberOrNull(product.overrideStock) ?? 0;
-    }
-    if (product.effectiveStock != null) {
-      return toNumberOrNull(product.effectiveStock) ?? 0;
-    }
-    return toNumberOrNull(product.stock) ?? 0;
+    return toNumberOrNull(resolveEffectiveStock(product)) ?? 0;
   };
 
   const getDaysUntil = (dateValue) => {
@@ -586,6 +584,7 @@ const AdminProducts = () => {
       };
 
       const normalizeAdminPosProduct = (product) => ({
+        ...enrichProductStock(product),
         id: product.id,
         name: product.name,
         sourceCode: product.sourceCode || null,
@@ -593,11 +592,6 @@ const AdminProducts = () => {
         category: product.category || 'Uncategorized',
         price: Number(product.price || 0),
         stock: Number(product.stock || 0),
-        posStock: product.posStock != null ? Number(product.posStock) : Number(product.stock || 0),
-        effectiveStock: product.effectiveStock != null ? Number(product.effectiveStock) : Number(product.stock || 0),
-        overrideActive: Boolean(product.overrideActive),
-        overrideStock: product.overrideStock != null ? Number(product.overrideStock) : null,
-        overrideReason: product.overrideReason || null,
         image: product.image || null,
         originalPrice: Number(product.price || 0),
         discountPrice: null,
@@ -1981,6 +1975,7 @@ const AdminProducts = () => {
                 const defaultBatchIndex = defaultBatchInfo?.batchIndex ?? 0;
                 const isBatchListExpanded = Boolean(expandedBatchRows[product.id]);
                 const stockQty = getProductBatchTotalQty(product);
+                const stockStatus = resolveStockStatus(product);
                 
                 return (
                   <tr 
@@ -2045,7 +2040,7 @@ const AdminProducts = () => {
                     <td style={{
                       padding: '1rem',
                       textAlign: 'center',
-                      color: stockQty > 20 ? '#4caf50' : stockQty > 0 ? '#ff9800' : '#f44336',
+                      color: stockStatus === 'in_stock' ? '#4caf50' : stockStatus === 'low_stock' ? '#ff9800' : '#f44336',
                       fontWeight: '600',
                     }}>
                       {stockQty}

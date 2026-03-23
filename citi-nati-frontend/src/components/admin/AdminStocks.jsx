@@ -7,6 +7,12 @@ import Pagination from '../ui/Pagination.jsx';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import logo from '../../assets/citi-nati-logo.png.png';
+import {
+  enrichProductStock,
+  resolveEffectiveStock,
+  resolveLowStockThreshold,
+  resolveStockStatus,
+} from '../../utils/stockResolver.js';
 
 /**
  * 📊 ADMIN STOCKS MANAGEMENT
@@ -32,13 +38,13 @@ const AdminStocks = () => {
   const [stockQuantity, setStockQuantity] = useState(0);
   const [showActionModal, setShowActionModal] = useState(false);
   const [actionType, setActionType] = useState('add'); // 'add' or 'subtract'
-  const [lowStockThreshold, setLowStockThreshold] = useState(5);
   // Stock override state
   const [showOverrideModal, setShowOverrideModal] = useState(false);
   const [overrideProduct, setOverrideProduct] = useState(null);
   const [pendingOverrideActive, setPendingOverrideActive] = useState(false);
   const [pendingOverrideStock, setPendingOverrideStock] = useState('');
   const [pendingOverrideReason, setPendingOverrideReason] = useState('');
+  const [pendingLowStockThreshold, setPendingLowStockThreshold] = useState('');
   const [isSubmittingOverride, setIsSubmittingOverride] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
@@ -70,8 +76,10 @@ const AdminStocks = () => {
           prevProducts.map((product) => {
             if (product.id !== updatedProduct.id) return product;
 
-            const previousStock = Number(product.stock || 0);
-            const nextStock = Number(updatedProduct.stock || 0);
+            const previousStock = Number(resolveEffectiveStock(product) || 0);
+            const nextProduct = enrichProductStock({ ...product, ...updatedProduct });
+            const nextStock = Number(resolveEffectiveStock(nextProduct) || 0);
+            const nextThreshold = resolveLowStockThreshold(nextProduct);
 
             if (previousStock > 0 && nextStock === 0) {
               notifyError(
@@ -79,15 +87,15 @@ const AdminStocks = () => {
                 5000,
                 `Out of stock alert. ${updatedProduct.name} is now out of stock.`
               );
-            } else if (previousStock > lowStockThreshold && nextStock > 0 && nextStock <= lowStockThreshold) {
+            } else if (previousStock > nextThreshold && nextStock > 0 && nextStock <= nextThreshold) {
               notifyInfo(
                 `🟡 Low stock alert: ${updatedProduct.name} has ${nextStock} left`,
                 5000,
-                `Low stock alert. ${updatedProduct.name} has ${nextStock} items left.`
+                `Low stock alert. ${updatedProduct.name} has ${nextStock} items left (threshold ${nextThreshold}).`
               );
             }
 
-            return { ...product, stock: updatedProduct.stock };
+            return nextProduct;
           })
         );
       };
@@ -108,7 +116,7 @@ const AdminStocks = () => {
         setAllProducts(prevProducts =>
           prevProducts.map(p =>
             p.id === updatedProduct.id 
-              ? { ...p, ...updatedProduct }
+              ? enrichProductStock({ ...p, ...updatedProduct })
               : p
           )
         );
@@ -133,7 +141,7 @@ const AdminStocks = () => {
     try {
       // Load first page immediately
       const res1 = await api.get(`/products?page=1&pageSize=100`);
-      const firstBatch = res1.data.products || [];
+      const firstBatch = (res1.data.products || []).map((product) => enrichProductStock(product));
       setAllProducts(firstBatch);
 
       // Extract categories from first batch
@@ -154,7 +162,7 @@ const AdminStocks = () => {
             const res = await api.get(`/products?page=${page}&pageSize=${perPage}`);
             const items = res.data.products || [];
             if (items.length === 0) break;
-            collected = collected.concat(items);
+            collected = collected.concat(items.map((product) => enrichProductStock(product)));
             if (items.length < perPage) break;
             page += 1;
           }
@@ -198,7 +206,7 @@ const AdminStocks = () => {
       setAllProducts(prev => 
         prev.map(p => 
           p.id === selectedProduct.id 
-            ? { ...p, stock: newStock }
+            ? enrichProductStock({ ...p, stock: newStock })
             : p
         )
       );
@@ -233,6 +241,7 @@ const AdminStocks = () => {
     setPendingOverrideActive(product.overrideActive || false);
     setPendingOverrideStock(product.overrideStock != null ? String(product.overrideStock) : '');
     setPendingOverrideReason(product.overrideReason || '');
+    setPendingLowStockThreshold(String(resolveLowStockThreshold(product)));
     setShowOverrideModal(true);
   };
 
@@ -247,6 +256,10 @@ const AdminStocks = () => {
       notifyError('Please enter a valid non-negative override stock quantity', 3000);
       return;
     }
+    if (pendingLowStockThreshold === '' || parseInt(pendingLowStockThreshold, 10) < 0 || Number.isNaN(parseInt(pendingLowStockThreshold, 10))) {
+      notifyError('Please enter a valid non-negative low stock threshold', 3000);
+      return;
+    }
     try {
       setIsSubmittingOverride(true);
       const response = await api.put(`/admin/inventory/stock-override/${overrideProduct.id}`, {
@@ -254,9 +267,14 @@ const AdminStocks = () => {
         overrideStock: pendingOverrideActive ? parseInt(pendingOverrideStock, 10) : null,
         overrideReason: pendingOverrideReason.trim() || null,
       });
-      const updatedProduct = response.data.product;
+
+      const thresholdResponse = await api.patch(`/products/${overrideProduct.id}/stock-threshold`, {
+        low_stock_threshold: parseInt(pendingLowStockThreshold, 10),
+      });
+
+      const updatedProduct = thresholdResponse?.data?.product || response.data.product;
       setAllProducts(prev =>
-        prev.map(p => p.id === overrideProduct.id ? { ...p, ...updatedProduct } : p)
+        prev.map(p => p.id === overrideProduct.id ? enrichProductStock({ ...p, ...updatedProduct }) : p)
       );
       if (pendingOverrideActive) {
         notifySuccess(`✅ Website stock override enabled: ${overrideProduct.name} → ${pendingOverrideStock} units`, 3000);
@@ -271,16 +289,16 @@ const AdminStocks = () => {
     }
   };
 
-  const getStockStatus = (stock) => {
-    if (stock === 0) return { color: '#d32f2f', label: 'Out of Stock', icon: '🔴' };
-    if (stock <= lowStockThreshold) return { color: '#f57c00', label: 'Low Stock', icon: '🟡' };
+  const getStockStatus = (product) => {
+    const status = resolveStockStatus(product);
+    if (status === 'out_of_stock') return { color: '#d32f2f', label: 'Out of Stock', icon: '🔴' };
+    if (status === 'low_stock') return { color: '#f57c00', label: 'Low Stock', icon: '🟡' };
     return { color: '#388e3c', label: 'In Stock', icon: '🟢' };
   };
 
   // Effective stock for display/filtering: override wins when active
   const getEffectiveStock = (product) => {
-    if (product.overrideActive && product.overrideStock != null) return product.overrideStock;
-    return product.effectiveStock != null ? product.effectiveStock : product.stock;
+    return resolveEffectiveStock(product);
   };
 
   // Filter products with debounced search
@@ -295,9 +313,9 @@ const AdminStocks = () => {
       const matchesCategory = filterCategory === 'all' || product.category === filterCategory;
       const matchesStockStatus =
         stockStatusFilter === 'all' ||
-        (stockStatusFilter === 'instock' && getEffectiveStock(product) > lowStockThreshold) ||
-        (stockStatusFilter === 'lowstock' && getEffectiveStock(product) > 0 && getEffectiveStock(product) <= lowStockThreshold) ||
-        (stockStatusFilter === 'outofstock' && getEffectiveStock(product) === 0);
+        (stockStatusFilter === 'instock' && resolveStockStatus(product) === 'in_stock') ||
+        (stockStatusFilter === 'lowstock' && resolveStockStatus(product) === 'low_stock') ||
+        (stockStatusFilter === 'outofstock' && resolveStockStatus(product) === 'out_of_stock');
       return matchesSearch && matchesCategory && matchesStockStatus;
     });
 
@@ -394,13 +412,14 @@ const AdminStocks = () => {
 
         // Prepare table data - exclude Actions column
         const tableData = filteredProducts.map(product => {
-          const status = getStockStatus(product.stock);
+          const status = getStockStatus(product);
+          const effStock = getEffectiveStock(product);
           const productCode = product.productCode || product.sourceCode || product.code || '-';
           return [
             product.name,
             productCode,
             product.category,
-            product.stock,
+            effStock,
             status.label,
           ];
         });
@@ -690,21 +709,24 @@ const AdminStocks = () => {
               gap: '0.5rem',
             }}>
               <i className="fas fa-bell" style={{ color: '#5B4B8A' }}></i>
-              Low Stock Threshold
+              Low Stock Rule
             </label>
-            <input
-              type="number"
-              value={lowStockThreshold}
-              onChange={(e) => setLowStockThreshold(Math.max(1, parseInt(e.target.value) || 5))}
+            <div
               style={{
                 width: '100%',
+                minHeight: '44px',
                 padding: '0.75rem',
                 borderRadius: '4px',
                 border: '1px solid #ddd',
-                fontSize: '1rem',
+                fontSize: '0.9rem',
+                color: '#666',
+                boxSizing: 'border-box',
+                display: 'flex',
+                alignItems: 'center',
               }}
-              min="1"
-            />
+            >
+              Per-product threshold. Edit via each row's Override button.
+            </div>
           </div>
           <div>
             <label style={{
@@ -760,9 +782,9 @@ const AdminStocks = () => {
           const { outOfStock, lowStock, inStock } = (() => {
             const source = filteredProducts; // includes any search/category filters
             return {
-              outOfStock: source.filter(p => getEffectiveStock(p) === 0),
-              lowStock: source.filter(p => getEffectiveStock(p) > 0 && getEffectiveStock(p) <= lowStockThreshold),
-              inStock: source.filter(p => getEffectiveStock(p) > lowStockThreshold),
+              outOfStock: source.filter(p => resolveStockStatus(p) === 'out_of_stock'),
+              lowStock: source.filter(p => resolveStockStatus(p) === 'low_stock'),
+              inStock: source.filter(p => resolveStockStatus(p) === 'in_stock'),
             };
           })();
           return (
@@ -865,15 +887,16 @@ const AdminStocks = () => {
               paginatedProducts.map((product) => {
                 const effStock = getEffectiveStock(product);
                 const posStockVal = product.posStock != null ? product.posStock : product.stock;
-                const status = getStockStatus(effStock);
+                const status = getStockStatus(product);
                 const productCode = product.productCode || product.sourceCode || product.code;
                 const hasOverride = product.overrideActive && product.overrideStock != null;
+                const threshold = resolveLowStockThreshold(product);
                 return (
                   <tr
                     key={product.id}
                     style={{
                       borderBottom: '1px solid #eee',
-                      backgroundColor: effStock === 0 ? '#ffebee' : effStock <= lowStockThreshold ? '#fff3e0' : '#fff',
+                      backgroundColor: status.label === 'Out of Stock' ? '#ffebee' : status.label === 'Low Stock' ? '#fff3e0' : '#fff',
                     }}
                   >
                     <td style={{ padding: '1rem' }}>
@@ -935,12 +958,15 @@ const AdminStocks = () => {
                         justifyContent: 'center',
                       }}>
                         <i className={`fas ${
-                          effStock === 0 ? 'fa-ban' :
-                          effStock <= lowStockThreshold ? 'fa-exclamation-circle' :
+                          status.label === 'Out of Stock' ? 'fa-ban' :
+                          status.label === 'Low Stock' ? 'fa-exclamation-circle' :
                           'fa-check-circle'
                         }`}></i>
                         {status.label}
                       </span>
+                      <div style={{ fontSize: '0.72rem', color: '#666', marginTop: '0.35rem' }}>
+                        Threshold: {threshold}
+                      </div>
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'center' }}>
                       <div style={{
@@ -1283,6 +1309,30 @@ const AdminStocks = () => {
               </span>
             </div>
 
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ display: 'block', fontWeight: '600', color: '#333', fontSize: '0.9rem', marginBottom: '0.4rem' }}>
+                Low Stock Threshold
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={pendingLowStockThreshold}
+                onChange={(e) => setPendingLowStockThreshold(e.target.value)}
+                placeholder="Enter product threshold"
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  borderRadius: '4px',
+                  border: '1px solid #ddd',
+                  fontSize: '1rem',
+                  boxSizing: 'border-box',
+                }}
+              />
+              <p style={{ margin: '0.4rem 0 0 0', color: '#888', fontSize: '0.82rem' }}>
+                Low stock status triggers when Effective Website Stock is less than or equal to this threshold.
+              </p>
+            </div>
+
             {/* Buttons */}
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
               <button
@@ -1302,7 +1352,13 @@ const AdminStocks = () => {
               </button>
               <button
                 onClick={handleSaveOverride}
-                disabled={isSubmittingOverride || (pendingOverrideActive && (pendingOverrideStock === '' || parseInt(pendingOverrideStock) < 0))}
+                disabled={
+                  isSubmittingOverride
+                  || (pendingOverrideActive && (pendingOverrideStock === '' || parseInt(pendingOverrideStock, 10) < 0))
+                  || pendingLowStockThreshold === ''
+                  || Number.isNaN(parseInt(pendingLowStockThreshold, 10))
+                  || parseInt(pendingLowStockThreshold, 10) < 0
+                }
                 style={{
                   padding: '0.75rem 1.5rem',
                   borderRadius: '4px',

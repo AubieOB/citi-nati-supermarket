@@ -4,6 +4,10 @@ const { notifyLowStock } = require('../utils/messageService');
 const posCommandQueueService = require('../services/posCommandQueue.service');
 const posSyncService = require('../services/posSync.service');
 const { verifyToken } = require('../utils/jwt');
+const {
+  DEFAULT_LOW_STOCK_THRESHOLD,
+  enrichProductStock,
+} = require('../utils/stockResolver');
 
 const prisma = new PrismaClient();
 const MIN_VALID_EXPIRY_DATE = new Date('2000-01-01T00:00:00.000Z');
@@ -156,21 +160,15 @@ const formatProduct = (product, req, includeDiscountSuggestion = false) => {
     console.warn(`[PRODUCT FORMAT] ⚠️ Product ${product.id} (${product.name}) has no image`);
   }
 
-  // Compute effective stock: override wins when active, otherwise posStock (= product.stock)
-  const posStock = typeof product.stock === 'number' ? product.stock : Number(product.stock || 0);
-  const effectiveStock = (product.overrideActive === true && product.overrideStock != null)
-    ? product.overrideStock
-    : posStock;
+  const stockEnriched = enrichProductStock(product);
 
   const formatted = {
-    ...product,
+    ...stockEnriched,
     imageUrl,
     expiryStatus,
     daysToExpiry,
     expirySource: product.expirySource || null,
     finalPrice,
-    posStock,
-    effectiveStock,
   };
 
   // Include discount suggestion for admin endpoints
@@ -766,9 +764,7 @@ const createProduct = async (req, res) => {
 
     // Notify if stock is low (10 or below) or out of stock
     // ✅ This works for all products including POS products without images
-    if (product.stock <= 10) {
-      await notifyLowStock(product);
-    }
+    await notifyLowStock(product);
 
     // Format product with computed fields
     const formattedProduct = formatProduct(product, req, true);
@@ -877,6 +873,7 @@ const getProducts = async (req, res) => {
         hideFromProductsPage: true,
         overrideActive: true,
         overrideStock: true,
+        lowStockThreshold: true,
         overrideReason: true,
         overrideUpdatedAt: true,
         overrideUpdatedBy: true,
@@ -943,6 +940,7 @@ const getProductById = async (req, res) => {
         hideFromProductsPage: true,
         overrideActive: true,
         overrideStock: true,
+        lowStockThreshold: true,
         overrideReason: true,
         overrideUpdatedAt: true,
         overrideUpdatedBy: true,
@@ -1273,7 +1271,7 @@ const updateProduct = async (req, res) => {
 
     // Notify if stock was updated and is now low (10 or below) or out of stock
     // ✅ This works for all products including POS products without images
-    if (updateData.stock !== undefined && updatedProduct.stock <= 10) {
+    if (updateData.stock !== undefined) {
       await notifyLowStock(updatedProduct);
     }
 
@@ -1393,6 +1391,72 @@ const setStockOverride = async (req, res) => {
   } catch (err) {
     console.error('[STOCK OVERRIDE] Error:', err.message);
     return res.status(500).json({ error: 'Failed to update stock override' });
+  }
+};
+
+/**
+ * PATCH /api/products/:id/stock-threshold
+ * Update per-product low stock threshold.
+ */
+const updateProductStockThreshold = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ error: 'Invalid product id' });
+    }
+
+    const rawThreshold = req.body?.low_stock_threshold;
+    if (rawThreshold === undefined || rawThreshold === null || String(rawThreshold).trim() === '') {
+      return res.status(400).json({ error: 'low_stock_threshold is required' });
+    }
+
+    const parsedThreshold = parseInt(rawThreshold, 10);
+    if (!Number.isInteger(parsedThreshold)) {
+      return res.status(400).json({ error: 'low_stock_threshold must be an integer' });
+    }
+
+    if (parsedThreshold < 0) {
+      return res.status(400).json({ error: 'low_stock_threshold cannot be negative' });
+    }
+
+    const existing = await prisma.product.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const updated = await prisma.product.update({
+      where: { id },
+      data: {
+        lowStockThreshold: parsedThreshold,
+      },
+    });
+
+    const enriched = formatProduct(updated, req, true);
+
+    console.log('[STOCK THRESHOLD] Updated per-product low stock threshold:', {
+      productId: id,
+      productName: updated.name,
+      low_stock_threshold: enriched.low_stock_threshold,
+      effective_stock: enriched.effective_stock,
+      stock_status: enriched.stock_status,
+      fallback_default: DEFAULT_LOW_STOCK_THRESHOLD,
+    });
+
+    try {
+      const { emitProductUpdate } = require('../utils/socket');
+      emitProductUpdate(updated);
+    } catch (socketErr) {
+      console.warn('[STOCK THRESHOLD] Socket emit failed:', socketErr.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Low stock threshold updated successfully',
+      product: enriched,
+    });
+  } catch (error) {
+    console.error('[STOCK THRESHOLD] Failed to update threshold:', error.message);
+    return res.status(500).json({ error: 'Failed to update low stock threshold' });
   }
 };
 
@@ -1927,6 +1991,7 @@ module.exports = {
   createProduct, 
   getProducts, 
   getProductById, 
+  updateProductStockThreshold,
   updateProduct, 
   setStockOverride,
   deleteProduct, 

@@ -1,4 +1,5 @@
 const { createMessage } = require('../controllers/admin-messages.controller.js');
+const { enrichProductStock, DEFAULT_LOW_STOCK_THRESHOLD } = require('./stockResolver');
 
 /**
  * Admin Message Service
@@ -123,28 +124,29 @@ const createSystemAlert = async (title, message) => {
 /**
  * Create message for low stock or out of stock warning
  * ✅ Supports POS products even without images (sourceCode products)
- * This function ALWAYS triggers alerts for products <= 10 units, regardless of image availability
+ * Uses per-product threshold against effective stock.
  */
 const notifyLowStock = async (product) => {
   try {
+    const stock = enrichProductStock(product);
+
     // Build message with POS indicator if applicable
-    const isPOSProduct = !!product.sourceCode;
+    const isPOSProduct = !!stock.sourceCode;
     const posIndicator = isPOSProduct ? ' [POS]' : '';
     
-    if (product.stock === 0) {
+    if (stock.stock_status === 'out_of_stock') {
       // Out of stock notification - Works for all products including POS without images
       await createMessage(
         'system',
         `Out of Stock Alert${posIndicator}`,
-        `Product "${product.name}"${posIndicator} is now out of stock.${isPOSProduct ? ` (POS Code: ${product.sourceCode})` : ''}`
+        `Product "${stock.name}"${posIndicator} is now out of stock.${isPOSProduct ? ` (POS Code: ${stock.sourceCode})` : ''}`
       );
-    } else if (product.stock <= 10) {
+    } else if (stock.stock_status === 'low_stock') {
       // Low stock notification - Works for all products including POS without images
-      // NOTE: POS products with null image are still notified
       await createMessage(
         'system',
         `Low Stock Alert${posIndicator}`,
-        `Product "${product.name}"${posIndicator} stock is running low (${product.stock} units remaining).${isPOSProduct ? ` (POS Code: ${product.sourceCode})` : ''}`
+        `Product "${stock.name}"${posIndicator} stock is running low (${stock.effective_stock} units remaining, threshold ${stock.low_stock_threshold ?? DEFAULT_LOW_STOCK_THRESHOLD}).${isPOSProduct ? ` (POS Code: ${stock.sourceCode})` : ''}`
       );
     }
   } catch (error) {

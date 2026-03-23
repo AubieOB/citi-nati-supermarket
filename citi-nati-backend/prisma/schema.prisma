@@ -63,6 +63,7 @@ model Product {
   enabled                 Boolean    @default(true)
   overrideActive          Boolean    @default(false)
   overrideStock           Int?
+  lowStockThreshold       Int?       @map("low_stock_threshold")
   overrideReason          String?
   overrideUpdatedAt       DateTime?
   overrideUpdatedBy       String?

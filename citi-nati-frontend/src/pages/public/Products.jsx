@@ -9,6 +9,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { useCart } from '../../context/CartContext.jsx';
 import { formatMWK } from '../../utils/currency.js';
 import { productValidation, cartValidation } from '../../utils/backendAlignment.js';
+import { resolveEffectiveStock } from '../../utils/stockResolver.js';
 import Modal from '../../components/common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
 import '../../styles/global.css';
@@ -27,14 +28,7 @@ function calculateDiscount(originalPrice, finalPrice) {
 }
 
 function getEffectiveStock(product) {
-  if (!product) return 0;
-  if (product.overrideActive === true && product.overrideStock != null) {
-    return Number(product.overrideStock || 0);
-  }
-  if (product.effectiveStock != null) {
-    return Number(product.effectiveStock || 0);
-  }
-  return Number(product.stock || 0);
+  return resolveEffectiveStock(product);
 }
 
 /**
