@@ -35,6 +35,32 @@ function formatDateTime(value) {
   return date.toLocaleString();
 }
 
+function buildReceiptFromSale(sale) {
+  if (!sale) return null;
+
+  return {
+    sale_ref: sale.sale_ref || sale.saleRef,
+    created_at: sale.createdAt || sale.created_at,
+    cashier_name: sale.cashier_name || sale.cashierName || '-',
+    payment_method: sale.payment_method || sale.paymentMethod || 'CASH',
+    subtotal: Number(sale.subtotal || 0),
+    discount: Number(sale.discount || 0),
+    total: Number(sale.total || 0),
+    tendered_amount: Number(sale.tendered_amount ?? sale.tenderedAmount ?? sale.total ?? 0),
+    change_amount: Number(sale.change_amount ?? sale.changeAmount ?? 0),
+    balance_due: Number(sale.balance_due ?? sale.balanceDue ?? 0),
+    items: Array.isArray(sale.items)
+      ? sale.items.map((item) => ({
+          product_code: item.product_code || item.productCode || '-',
+          product_name: item.product_name || item.productName || '-',
+          qty: Number(item.qty || 0),
+          unit_price: Number(item.unit_price ?? item.unitPrice ?? 0),
+          line_total: Number(item.line_total ?? item.lineTotal ?? 0),
+        }))
+      : [],
+  };
+}
+
 function isPrintableKey(event) {
   if (event.ctrlKey || event.metaKey || event.altKey) return false;
   return typeof event.key === 'string' && event.key.length === 1;
@@ -386,6 +412,125 @@ const AdminEmergencySales = () => {
     popup.print();
   }, []);
 
+  const viewReceipt = useCallback((sale) => {
+    const receipt = buildReceiptFromSale(sale);
+    if (!receipt) {
+      notifyError('Receipt data not available', 2200);
+      return;
+    }
+
+    const itemsHtml = (receipt.items || [])
+      .map(
+        (item, index) => `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${item.product_code || '-'}</td>
+          <td>${item.product_name}</td>
+          <td style="text-align:right;">${item.qty}</td>
+          <td style="text-align:right;">${formatMoney(item.unit_price)}</td>
+          <td style="text-align:right;">${formatMoney(item.line_total)}</td>
+        </tr>`
+      )
+      .join('');
+
+    const html = `<!doctype html>
+    <html>
+    <head>
+      <title>Emergency Receipt ${receipt.sale_ref}</title>
+      <style>
+        body { font-family: Consolas, 'Courier New', monospace; padding: 12px; color: #111; }
+        h2, p { margin: 0; text-align: center; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px; }
+        th, td { border: 1px solid #bbb; padding: 5px; }
+        .meta { margin-top: 10px; font-size: 12px; }
+        .row { display: flex; justify-content: space-between; margin-top: 2px; }
+        .note { margin-top: 12px; color: #9a5d00; font-weight: 700; }
+      </style>
+    </head>
+    <body>
+      <h2>Citi-Nati Supermarket</h2>
+      <p>Emergency Sale Receipt</p>
+      <div class="meta">
+        <div><strong>Ref:</strong> ${receipt.sale_ref}</div>
+        <div><strong>Date:</strong> ${formatDateTime(receipt.created_at)}</div>
+        <div><strong>Cashier:</strong> ${receipt.cashier_name || '-'}</div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Code</th>
+            <th>Item</th>
+            <th>Qty</th>
+            <th>Price</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>${itemsHtml}</tbody>
+      </table>
+      <div class="row"><span>Subtotal</span><span>${formatMoney(receipt.subtotal)}</span></div>
+      <div class="row"><span>Discount</span><span>${formatMoney(receipt.discount)}</span></div>
+      <div class="row"><span>Total</span><span>${formatMoney(receipt.total)}</span></div>
+      <div class="row"><span>Tendered</span><span>${formatMoney(receipt.tendered_amount)}</span></div>
+      <div class="row"><span>Change</span><span>${formatMoney(receipt.change_amount)}</span></div>
+      <div class="note">${sale.sync_status === 'synced_to_pos' ? 'Synced to POS' : 'Pending POS Sync'}</div>
+    </body>
+    </html>`;
+
+    const popup = window.open('', '_blank', 'width=860,height=760');
+    if (!popup) {
+      notifyError('Popup blocked. Please allow popups to view receipt.', 3000);
+      return;
+    }
+
+    popup.document.open();
+    popup.document.write(html);
+    popup.document.close();
+    popup.focus();
+  }, []);
+
+  const downloadReceipt = useCallback((sale) => {
+    const receipt = buildReceiptFromSale(sale);
+    if (!receipt) {
+      notifyError('Receipt data not available', 2200);
+      return;
+    }
+
+    const itemsText = (receipt.items || [])
+      .map((item, index) => `${index + 1}. ${item.product_name} | ${item.product_code} | Qty ${item.qty} | ${formatMoney(item.unit_price)} | ${formatMoney(item.line_total)}`)
+      .join('\n');
+
+    const content = [
+      'Citi-Nati Supermarket',
+      'Emergency Sale Receipt',
+      '',
+      `Sale Ref: ${receipt.sale_ref}`,
+      `Date: ${formatDateTime(receipt.created_at)}`,
+      `Cashier: ${receipt.cashier_name || '-'}`,
+      `Payment Method: ${receipt.payment_method || '-'}`,
+      '',
+      'Items:',
+      itemsText,
+      '',
+      `Subtotal: ${formatMoney(receipt.subtotal)}`,
+      `Discount: ${formatMoney(receipt.discount)}`,
+      `Total: ${formatMoney(receipt.total)}`,
+      `Tendered: ${formatMoney(receipt.tendered_amount)}`,
+      `Change: ${formatMoney(receipt.change_amount)}`,
+      `Status: ${sale.sync_status === 'synced_to_pos' ? 'Synced to POS' : 'Pending POS Sync'}`,
+    ].join('\n');
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${receipt.sale_ref || 'emergency-sale-receipt'}.txt`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  }, []);
+
   const submitSale = useCallback(async () => {
     if (cart.length === 0) {
       notifyError('Invoice is empty', 2200);
@@ -733,7 +878,7 @@ const AdminEmergencySales = () => {
                 {cart.length === 0 && (
                   <tr>
                     <td colSpan={6} style={{ padding: '1rem', textAlign: 'center', color: '#666', fontWeight: 600 }}>
-                      Scan product code now. No need to focus a search box first.
+                      No product selected
                     </td>
                   </tr>
                 )}
@@ -850,12 +995,13 @@ const AdminEmergencySales = () => {
                   <th style={{ textAlign: 'left', padding: '0.25rem' }}>Ref</th>
                   <th style={{ textAlign: 'right', padding: '0.25rem' }}>Total</th>
                   <th style={{ textAlign: 'left', padding: '0.25rem' }}>Status</th>
+                  <th style={{ textAlign: 'center', padding: '0.25rem' }}>Receipt</th>
                 </tr>
               </thead>
               <tbody>
                 {sales.length === 0 && (
                   <tr>
-                    <td colSpan={3} style={{ padding: '0.5rem', textAlign: 'center', color: '#666' }}>No sales</td>
+                    <td colSpan={4} style={{ padding: '0.5rem', textAlign: 'center', color: '#666' }}>No sales</td>
                   </tr>
                 )}
                 {sales.slice(0, 8).map((sale) => (
@@ -864,6 +1010,24 @@ const AdminEmergencySales = () => {
                     <td style={{ padding: '0.26rem', textAlign: 'right', fontWeight: 700 }}>{formatMoney(sale.total)}</td>
                     <td style={{ padding: '0.26rem', color: STATUS_COLORS[sale.sync_status] || '#555', fontWeight: 700 }}>
                       {STATUS_LABELS[sale.sync_status] || sale.sync_status}
+                    </td>
+                    <td style={{ padding: '0.26rem', textAlign: 'center' }}>
+                      <div style={{ display: 'inline-flex', gap: '0.28rem' }}>
+                        <button
+                          onClick={() => viewReceipt(sale)}
+                          title="View receipt"
+                          style={{ border: '1px solid #7f83c4', backgroundColor: '#eef0ff', color: '#2b2f73', borderRadius: '4px', width: '28px', height: '24px', cursor: 'pointer' }}
+                        >
+                          <i className="fas fa-eye"></i>
+                        </button>
+                        <button
+                          onClick={() => downloadReceipt(sale)}
+                          title="Download receipt"
+                          style={{ border: '1px solid #5a8b5f', backgroundColor: '#edf9ef', color: '#1f6a2b', borderRadius: '4px', width: '28px', height: '24px', cursor: 'pointer' }}
+                        >
+                          <i className="fas fa-download"></i>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
