@@ -32,6 +32,38 @@ function normalizeTime(invoiceTime) {
   return new Date().toTimeString().slice(0, 8);
 }
 
+async function findExistingInvoiceByRefNo(request, refNo) {
+  if (!refNo) return null;
+
+  const lookupRequest = createScopedRequest(request);
+  lookupRequest.input('RefNo', sql.VarChar(255), refNo);
+
+  const result = await lookupRequest.query(`
+    SELECT TOP 1 InvoiceNo AS InvoiceCode
+    FROM POS.dbo.invoice
+    WHERE RefNo = @RefNo
+    ORDER BY InvoiceNo DESC
+  `);
+
+  const invoiceCode = Number(result.recordset?.[0]?.InvoiceCode);
+  if (!Number.isFinite(invoiceCode) || invoiceCode <= 0) {
+    return null;
+  }
+
+  return invoiceCode;
+}
+
+async function countInvoiceDetails(request, invoiceCode) {
+  const countRequest = createScopedRequest(request);
+  countRequest.input('InvoiceCode', sql.Int, invoiceCode);
+  const result = await countRequest.query(`
+    SELECT COUNT(1) AS DetailCount
+    FROM POS.dbo.invoicedetails
+    WHERE InvoiceCode = @InvoiceCode
+  `);
+  return Number(result.recordset?.[0]?.DetailCount || 0);
+}
+
 /**
  * Get next CashSaleNo from LastCashSaleNo table
  * @param {sql.Request} request - SQL request object within a transaction
@@ -497,6 +529,28 @@ async function writeBackInvoice(request, invoiceData) {
 
     const safeInvoiceDate = toSqlDate(invoiceDate, invoiceTime);
     const refNo = String(reference || `ORD${orderId}`).slice(0, 255);
+
+    const existingInvoiceCode = await findExistingInvoiceByRefNo(request, refNo);
+    if (existingInvoiceCode) {
+      const existingItemCount = await countInvoiceDetails(request, existingInvoiceCode);
+      console.log('[INVOICE] idempotent hit: existing invoice found for RefNo', {
+        orderId,
+        refNo,
+        invoiceCode: existingInvoiceCode,
+      });
+
+      return {
+        success: true,
+        orderId,
+        reference: refNo,
+        invoiceCode: existingInvoiceCode,
+        cashSaleNo: null,
+        itemCount: existingItemCount,
+        detailIds: [],
+        alreadySynced: true,
+        tablesTouched: ['dbo.invoice', 'dbo.invoicedetails'],
+      };
+    }
 
     const invoiceHeader = {
       invoiceSerialNo: Number(cashSaleNo),

@@ -1565,6 +1565,10 @@ async function gracefulShutdown() {
     clearInterval(commandPollInterval);
     console.log('Command poll interval cleared');
   }
+  if (emergencySalesPollInterval) {
+    clearInterval(emergencySalesPollInterval);
+    console.log('Emergency sales poll interval cleared');
+  }
   if (pool) {
     await pool.close();
     console.log('Database connection pool closed');
@@ -1584,6 +1588,12 @@ let commandPollInterval;
 const COMMAND_POLL_INTERVAL_MS = parseInt(process.env.COMMAND_POLL_INTERVAL_MS || '5000', 10);
 const ENABLE_POS_COMMAND_POLLING = process.env.ENABLE_POS_COMMAND_POLLING !== 'false';
 let isCommandPollRunning = false;
+
+/** Emergency sales polling interval */
+let emergencySalesPollInterval;
+const EMERGENCY_SALES_POLL_INTERVAL_MS = parseInt(process.env.EMERGENCY_SALES_POLL_INTERVAL_MS || '7000', 10);
+const ENABLE_EMERGENCY_SALES_SYNC = process.env.ENABLE_EMERGENCY_SALES_SYNC !== 'false';
+let isEmergencySalesPollRunning = false;
 
 /**
  * Automatic sync function - runs on interval
@@ -1664,6 +1674,83 @@ async function pollAndProcessCommands() {
   }
 }
 
+async function writeEmergencySaleToPos(sale) {
+  if (!sale || !sale.payload) {
+    throw new Error('NON_RETRYABLE: emergency sale payload missing');
+  }
+
+  const transaction = new sql.Transaction(pool);
+
+  try {
+    await transaction.begin();
+    const request = new sql.Request(transaction);
+    const resultSummary = await invoiceWriteback.writeBackInvoice(request, sale.payload);
+    await transaction.commit();
+    return resultSummary;
+  } catch (error) {
+    try {
+      await transaction.rollback();
+    } catch (rollbackErr) {
+      console.log('[EMERGENCY SALES] rollback note:', rollbackErr.message);
+    }
+    throw error;
+  }
+}
+
+async function pollAndProcessEmergencySales() {
+  if (isEmergencySalesPollRunning) {
+    console.log('[EMERGENCY SALES] Skipped tick - previous cycle still running');
+    return;
+  }
+
+  isEmergencySalesPollRunning = true;
+
+  try {
+    const sales = await commandQueueClient.pollPendingEmergencySales(10);
+
+    if (!Array.isArray(sales) || sales.length === 0) {
+      return;
+    }
+
+    console.log(`[EMERGENCY SALES] Claimed ${sales.length} pending sale(s)`);
+
+    for (const sale of sales) {
+      try {
+        const resultSummary = await writeEmergencySaleToPos(sale);
+
+        await commandQueueClient.ackEmergencySaleSynced({
+          sale_ref: sale.sale_ref,
+          emergency_sale_id: sale.emergency_sale_id,
+          pos_invoice_no: resultSummary?.invoiceCode || null,
+        });
+
+        console.log('[EMERGENCY SALES] sync success:', {
+          saleRef: sale.sale_ref,
+          emergencySaleId: sale.emergency_sale_id,
+          invoiceCode: resultSummary?.invoiceCode || null,
+          alreadySynced: resultSummary?.alreadySynced === true,
+        });
+      } catch (error) {
+        console.error('[EMERGENCY SALES] sync failed:', {
+          saleRef: sale.sale_ref,
+          emergencySaleId: sale.emergency_sale_id,
+          error: error.message,
+        });
+
+        await commandQueueClient.ackEmergencySaleFailed({
+          sale_ref: sale.sale_ref,
+          emergency_sale_id: sale.emergency_sale_id,
+          sync_error: error.message,
+        });
+      }
+    }
+  } catch (error) {
+    console.error('[EMERGENCY SALES] poller error:', error.message);
+  } finally {
+    isEmergencySalesPollRunning = false;
+  }
+}
+
 /** Start server */
 const PORT = process.env.PORT || 3001;
 let autoSyncStarted = false;
@@ -1702,6 +1789,13 @@ async function startServer() {
         console.log(`[POS COMMAND POLLER] ✅ Polling enabled (${COMMAND_POLL_INTERVAL_MS}ms)`);
       } else {
         console.log('[POS COMMAND POLLER] ⚠️ Polling disabled (requires ENABLE_POS_COMMAND_POLLING=true, LIVE_SERVER_URL, POS_SECRET)');
+      }
+
+      if (ENABLE_EMERGENCY_SALES_SYNC && process.env.LIVE_SERVER_URL && process.env.POS_SECRET) {
+        emergencySalesPollInterval = setInterval(pollAndProcessEmergencySales, EMERGENCY_SALES_POLL_INTERVAL_MS);
+        console.log(`[EMERGENCY SALES] ✅ Sync polling enabled (${EMERGENCY_SALES_POLL_INTERVAL_MS}ms)`);
+      } else {
+        console.log('[EMERGENCY SALES] ⚠️ Sync polling disabled (requires ENABLE_EMERGENCY_SALES_SYNC=true, LIVE_SERVER_URL, POS_SECRET)');
       }
     });
   } catch (err) {

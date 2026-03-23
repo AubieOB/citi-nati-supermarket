@@ -51,8 +51,31 @@ async function failCommand(id, errorMessage, retryable = true) {
   return response.data;
 }
 
+async function pollPendingEmergencySales(limit = 10) {
+  const client = createClient();
+  const response = await client.get('/api/pos-sync/pending-emergency-sales', {
+    params: { limit },
+  });
+  return response.data?.sales || [];
+}
+
+async function ackEmergencySaleSynced(payload = {}) {
+  const client = createClient();
+  const response = await client.post('/api/pos-sync/ack-emergency-sale-synced', payload);
+  return response.data;
+}
+
+async function ackEmergencySaleFailed(payload = {}) {
+  const client = createClient();
+  const response = await client.post('/api/pos-sync/ack-emergency-sale-failed', payload);
+  return response.data;
+}
+
 module.exports = {
   pollCommands,
   completeCommand,
   failCommand,
+  pollPendingEmergencySales,
+  ackEmergencySaleSynced,
+  ackEmergencySaleFailed,
 };

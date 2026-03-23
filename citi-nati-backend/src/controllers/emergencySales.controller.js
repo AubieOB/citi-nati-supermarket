@@ -1,0 +1,706 @@
+const crypto = require('crypto');
+const { PrismaClient } = require('@prisma/client');
+const { resolveEffectiveStock, enrichProductStock } = require('../utils/stockResolver');
+const { notifyLowStock } = require('../utils/messageService');
+
+const prisma = new PrismaClient();
+const EMERGENCY_SALE_MAX_RETRIES = Number.parseInt(process.env.EMERGENCY_SALE_MAX_RETRIES || '10', 10);
+
+const SYNC_STATUS = {
+  PENDING: 'pending_pos_sync',
+  SYNCED: 'synced_to_pos',
+  FAILED: 'sync_failed',
+};
+
+function toMoney(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Number(parsed.toFixed(2));
+}
+
+function toSafeInt(value, fallback = 0) {
+  const parsed = parseInt(value, 10);
+  return Number.isInteger(parsed) ? parsed : fallback;
+}
+
+function generateEmergencySaleRef() {
+  const now = new Date();
+  const yyyy = String(now.getFullYear());
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const hh = String(now.getHours()).padStart(2, '0');
+  const min = String(now.getMinutes()).padStart(2, '0');
+  const sec = String(now.getSeconds()).padStart(2, '0');
+  const suffix = crypto.randomBytes(3).toString('hex').toUpperCase();
+  return `EMR-${yyyy}${mm}${dd}-${hh}${min}${sec}-${suffix}`;
+}
+
+function getCashierIdentity(req) {
+  const cashierId = String(req.user?.userId || '').trim() || null;
+  const cashierName = String(req.user?.email || req.user?.userId || 'admin').trim();
+  return { cashierId, cashierName };
+}
+
+function computeUnitPrice(product) {
+  const isOnSale = product?.isOnSale === true;
+  const discountPrice = Number(product?.discountPrice);
+  if (isOnSale && Number.isFinite(discountPrice) && discountPrice >= 0) {
+    return discountPrice;
+  }
+  return Number(product?.price || 0);
+}
+
+function normalizePaymentMethod(rawMethod) {
+  const method = String(rawMethod || 'CASH').trim().toUpperCase();
+  if (!method) return 'CASH';
+  return method.slice(0, 20);
+}
+
+function buildPosWriteInvoicePayload(emergencySale) {
+  const locationCode = process.env.POS_LOCATION_CODE || 'SH';
+  const priceTypeCode = process.env.POS_PRICE_TYPE_CODE || 'RT';
+
+  const items = (emergencySale.items || []).map((item) => ({
+    productCode: String(item.productCode || '').trim(),
+    productName: String(item.productName || '').trim() || `PRODUCT-${item.productCode}`,
+    qty: Number(item.qty),
+    unitPrice: Number(item.unitPrice),
+    discount: 0,
+    amount: Number(item.lineTotal),
+    taxRate: 0,
+    taxAmount: 0,
+    fPrice: Number(item.unitPrice),
+    locationCode,
+    costPrice: 0,
+    priceTypeCode,
+  }));
+
+  return {
+    orderId: `EMERGENCY-${emergencySale.id}`,
+    reference: emergencySale.saleRef,
+    locationCode,
+    customerCode: 'CASH',
+    invoiceDate: new Date(emergencySale.createdAt || new Date()).toISOString().slice(0, 10),
+    invoiceTime: new Date(emergencySale.createdAt || new Date()).toTimeString().slice(0, 8),
+    grossSale: Number(emergencySale.total),
+    vat: 0,
+    discount: Number(emergencySale.discount || 0),
+    netSale: Number(emergencySale.total),
+    payMethod1: normalizePaymentMethod(emergencySale.paymentMethod),
+    tenAmt1: Number(emergencySale.tenderedAmount || emergencySale.total),
+    payMethod2: '',
+    tenAmt2: 0,
+    userName: String(emergencySale.cashierName || 'EMERGENCY').slice(0, 20),
+    priceTypeCode,
+    invoiceType: 'CS',
+    tillId: 'WEB',
+    items,
+    emergencySaleId: emergencySale.id,
+    saleRef: emergencySale.saleRef,
+  };
+}
+
+function formatEmergencySale(sale) {
+  const subtotal = Number(sale.subtotal || 0);
+  const discount = Number(sale.discount || 0);
+  const total = Number(sale.total || 0);
+  const tenderedAmount = Number(sale.tenderedAmount || 0);
+  const changeAmount = Number(sale.changeAmount || 0);
+  const balanceDue = Math.max(0, Number((total - tenderedAmount).toFixed(2)));
+
+  return {
+    ...sale,
+    subtotal,
+    discount,
+    total,
+    tenderedAmount,
+    tendered_amount: tenderedAmount,
+    changeAmount,
+    change_amount: changeAmount,
+    balanceDue,
+    balance_due: balanceDue,
+    paymentMethod: sale.paymentMethod,
+    payment_method: sale.paymentMethod,
+    saleRef: sale.saleRef,
+    sale_ref: sale.saleRef,
+    cashierId: sale.cashierId,
+    cashier_id: sale.cashierId,
+    cashierName: sale.cashierName,
+    cashier_name: sale.cashierName,
+    syncStatus: sale.syncStatus,
+    sync_status: sale.syncStatus,
+    posInvoiceNo: sale.posInvoiceNo,
+    pos_invoice_no: sale.posInvoiceNo,
+    syncedAt: sale.syncedAt,
+    synced_at: sale.syncedAt,
+    lastSyncAttemptAt: sale.lastSyncAttemptAt,
+    last_sync_attempt_at: sale.lastSyncAttemptAt,
+    retryCount: sale.retryCount,
+    retry_count: sale.retryCount,
+    syncError: sale.syncError,
+    sync_error: sale.syncError,
+  };
+}
+
+function validateAgentSecret(req) {
+  const provided = req.headers['x-pos-secret'];
+  const expected = process.env.POS_SECRET;
+  return !!provided && !!expected && provided === expected;
+}
+
+async function lookupEmergencyProducts(req, res) {
+  try {
+    const query = String(req.query.q || req.query.search || '').trim();
+    if (!query) {
+      return res.status(200).json({ success: true, products: [] });
+    }
+
+    const products = await prisma.product.findMany({
+      where: {
+        enabled: true,
+        hideFromProductsPage: false,
+        OR: [
+          { barcode: { equals: query, mode: 'insensitive' } },
+          { sourceCode: { equals: query, mode: 'insensitive' } },
+          { name: { contains: query, mode: 'insensitive' } },
+        ],
+      },
+      select: {
+        id: true,
+        name: true,
+        sourceCode: true,
+        barcode: true,
+        price: true,
+        discountPrice: true,
+        isOnSale: true,
+        stock: true,
+        overrideActive: true,
+        overrideStock: true,
+        lowStockThreshold: true,
+      },
+      take: 30,
+      orderBy: [
+        { name: 'asc' },
+      ],
+    });
+
+    const normalizedQuery = query.toLowerCase();
+    const mapped = products
+      .map((product) => {
+        const enriched = enrichProductStock(product);
+        const unitPrice = computeUnitPrice(product);
+        return {
+          ...enriched,
+          productCode: enriched.sourceCode,
+          product_code: enriched.sourceCode,
+          unitPrice,
+          unit_price: unitPrice,
+        };
+      })
+      .sort((a, b) => {
+        const aExact = String(a.barcode || '').toLowerCase() === normalizedQuery || String(a.sourceCode || '').toLowerCase() === normalizedQuery;
+        const bExact = String(b.barcode || '').toLowerCase() === normalizedQuery || String(b.sourceCode || '').toLowerCase() === normalizedQuery;
+        if (aExact === bExact) return String(a.name || '').localeCompare(String(b.name || ''));
+        return aExact ? -1 : 1;
+      });
+
+    return res.status(200).json({ success: true, products: mapped });
+  } catch (error) {
+    console.error('[EMERGENCY SALES] lookup failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to search products' });
+  }
+}
+
+async function createEmergencySale(req, res) {
+  try {
+    const rawItems = Array.isArray(req.body?.items) ? req.body.items : [];
+    if (rawItems.length === 0) {
+      return res.status(400).json({ success: false, error: 'At least one invoice item is required' });
+    }
+
+    const quantityByProductId = new Map();
+
+    for (const line of rawItems) {
+      const productId = toSafeInt(line.product_id ?? line.productId);
+      const qty = toSafeInt(line.qty ?? line.quantity);
+
+      if (!Number.isInteger(productId) || productId <= 0) {
+        return res.status(400).json({ success: false, error: 'Each item must include a valid productId' });
+      }
+
+      if (!Number.isInteger(qty) || qty <= 0) {
+        return res.status(400).json({ success: false, error: 'Each item qty must be a positive integer' });
+      }
+
+      quantityByProductId.set(productId, (quantityByProductId.get(productId) || 0) + qty);
+    }
+
+    const productIds = Array.from(quantityByProductId.keys());
+    const { cashierId, cashierName } = getCashierIdentity(req);
+    const requestedDiscount = toMoney(req.body?.discount ?? req.body?.discount_amount ?? 0);
+    const paymentMethod = normalizePaymentMethod(req.body?.payment_method ?? req.body?.paymentMethod ?? 'CASH');
+
+    const created = await prisma.$transaction(async (tx) => {
+      const products = await tx.product.findMany({
+        where: { id: { in: productIds } },
+        select: {
+          id: true,
+          name: true,
+          sourceCode: true,
+          barcode: true,
+          price: true,
+          discountPrice: true,
+          isOnSale: true,
+          stock: true,
+          overrideActive: true,
+          overrideStock: true,
+          lowStockThreshold: true,
+        },
+      });
+
+      if (products.length !== productIds.length) {
+        return Promise.reject(new Error('One or more products do not exist'));
+      }
+
+      const productsById = new Map(products.map((product) => [product.id, product]));
+      const itemRows = [];
+      let subtotal = 0;
+
+      for (const [productId, qty] of quantityByProductId.entries()) {
+        const product = productsById.get(productId);
+        if (!product) {
+          return Promise.reject(new Error(`Product ${productId} not found`));
+        }
+
+        if (!product.sourceCode) {
+          return Promise.reject(new Error(`Product ${product.name} has no POS product code and cannot be synced`));
+        }
+
+        const effectiveStock = resolveEffectiveStock(product);
+        if (effectiveStock < qty) {
+          return Promise.reject(
+            new Error(`Insufficient stock for ${product.name}. Available ${effectiveStock}, requested ${qty}`)
+          );
+        }
+
+        const unitPrice = toMoney(computeUnitPrice(product));
+        const lineTotal = toMoney(unitPrice * qty);
+        subtotal = toMoney(subtotal + lineTotal);
+
+        itemRows.push({
+          product,
+          productId,
+          qty,
+          unitPrice,
+          lineTotal,
+        });
+      }
+
+      const discount = Math.max(0, Math.min(requestedDiscount, subtotal));
+      const total = toMoney(subtotal - discount);
+      const tenderedAmountRaw = req.body?.tendered_amount ?? req.body?.tenderedAmount;
+      const tenderedAmount = tenderedAmountRaw == null || tenderedAmountRaw === '' ? total : Math.max(0, toMoney(tenderedAmountRaw));
+      const changeAmount = tenderedAmount > total ? toMoney(tenderedAmount - total) : 0;
+
+      let saleRef = generateEmergencySaleRef();
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const existing = await tx.emergencySale.findUnique({ where: { saleRef } });
+        if (!existing) break;
+        saleRef = generateEmergencySaleRef();
+      }
+
+      const sale = await tx.emergencySale.create({
+        data: {
+          saleRef,
+          cashierId,
+          cashierName,
+          subtotal,
+          discount,
+          total,
+          tenderedAmount,
+          changeAmount,
+          paymentMethod,
+          syncStatus: SYNC_STATUS.PENDING,
+          cartSnapshot: {
+            items: itemRows.map((line) => ({
+              product_id: line.productId,
+              product_code: line.product.sourceCode,
+              barcode: line.product.barcode || null,
+              product_name: line.product.name,
+              unit_price: line.unitPrice,
+              qty: line.qty,
+              line_total: line.lineTotal,
+            })),
+            subtotal,
+            discount,
+            total,
+            tendered_amount: tenderedAmount,
+            change_amount: changeAmount,
+            payment_method: paymentMethod,
+          },
+        },
+      });
+
+      await tx.emergencySaleItem.createMany({
+        data: itemRows.map((line) => ({
+          emergencySaleId: sale.id,
+          productId: line.productId,
+          productCode: line.product.sourceCode,
+          barcode: line.product.barcode || null,
+          productName: line.product.name,
+          unitPrice: line.unitPrice,
+          qty: line.qty,
+          lineTotal: line.lineTotal,
+        })),
+      });
+
+      const updatedProducts = [];
+      for (const line of itemRows) {
+        const product = line.product;
+        const nextPosStock = Math.max(0, Number(product.stock || 0) - line.qty);
+        const nextOverrideStock = product.overrideActive && product.overrideStock != null
+          ? Math.max(0, Number(product.overrideStock || 0) - line.qty)
+          : null;
+
+        const updatedProduct = await tx.product.update({
+          where: { id: line.productId },
+          data: {
+            stock: nextPosStock,
+            ...(nextOverrideStock != null ? { overrideStock: nextOverrideStock } : {}),
+          },
+        });
+
+        updatedProducts.push(updatedProduct);
+      }
+
+      const fullSale = await tx.emergencySale.findUnique({
+        where: { id: sale.id },
+        include: {
+          items: true,
+        },
+      });
+
+      return {
+        sale: fullSale,
+        updatedProducts,
+      };
+    });
+
+    for (const product of created.updatedProducts || []) {
+      try {
+        await notifyLowStock(product);
+      } catch (notifyErr) {
+        console.warn('[EMERGENCY SALES] low stock notification failed:', notifyErr.message);
+      }
+    }
+
+    const formattedSale = formatEmergencySale(created.sale);
+    const posWritePayload = buildPosWriteInvoicePayload(created.sale);
+
+    return res.status(201).json({
+      success: true,
+      message: 'Emergency sale recorded successfully',
+      sale: formattedSale,
+      receipt: {
+        sale_ref: formattedSale.sale_ref,
+        created_at: formattedSale.createdAt,
+        cashier_name: formattedSale.cashier_name,
+        sync_status: formattedSale.sync_status,
+        note: 'Pending POS Sync',
+        items: (formattedSale.items || []).map((item) => ({
+          product_name: item.productName,
+          product_code: item.productCode,
+          barcode: item.barcode,
+          qty: item.qty,
+          unit_price: item.unitPrice,
+          line_total: item.lineTotal,
+        })),
+        subtotal: formattedSale.subtotal,
+        discount: formattedSale.discount,
+        total: formattedSale.total,
+        tendered_amount: formattedSale.tendered_amount,
+        change_amount: formattedSale.change_amount,
+        balance_due: formattedSale.balance_due,
+        payment_method: formattedSale.payment_method,
+      },
+      pos_write_payload: posWritePayload,
+    });
+  } catch (error) {
+    console.error('[EMERGENCY SALES] create failed:', error.message);
+    return res.status(400).json({ success: false, error: error.message || 'Failed to create emergency sale' });
+  }
+}
+
+async function listEmergencySales(req, res) {
+  try {
+    const page = Math.max(1, toSafeInt(req.query.page, 1));
+    const pageSize = Math.min(100, Math.max(1, toSafeInt(req.query.pageSize, 20)));
+    const skip = (page - 1) * pageSize;
+    const status = String(req.query.status || '').trim();
+    const search = String(req.query.search || '').trim();
+
+    const where = {
+      ...(status && status !== 'all' ? { syncStatus: status } : {}),
+      ...(search ? {
+        OR: [
+          { saleRef: { contains: search, mode: 'insensitive' } },
+          { cashierName: { contains: search, mode: 'insensitive' } },
+        ],
+      } : {}),
+    };
+
+    const [total, sales] = await Promise.all([
+      prisma.emergencySale.count({ where }),
+      prisma.emergencySale.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: pageSize,
+        include: {
+          items: true,
+        },
+      }),
+    ]);
+
+    const summaryGroup = await prisma.emergencySale.groupBy({
+      by: ['syncStatus'],
+      _count: { _all: true },
+    });
+
+    const summary = {
+      pending_pos_sync: 0,
+      synced_to_pos: 0,
+      sync_failed: 0,
+    };
+    for (const row of summaryGroup) {
+      summary[row.syncStatus] = row._count._all;
+    }
+
+    return res.status(200).json({
+      success: true,
+      sales: sales.map((sale) => formatEmergencySale(sale)),
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+      summary,
+    });
+  } catch (error) {
+    console.error('[EMERGENCY SALES] list failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to fetch emergency sales' });
+  }
+}
+
+async function getEmergencySaleById(req, res) {
+  try {
+    const id = toSafeInt(req.params.id);
+    if (!id) {
+      return res.status(400).json({ success: false, error: 'Invalid emergency sale id' });
+    }
+
+    const sale = await prisma.emergencySale.findUnique({
+      where: { id },
+      include: { items: true },
+    });
+
+    if (!sale) {
+      return res.status(404).json({ success: false, error: 'Emergency sale not found' });
+    }
+
+    return res.status(200).json({ success: true, sale: formatEmergencySale(sale) });
+  } catch (error) {
+    console.error('[EMERGENCY SALES] get by id failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to fetch emergency sale' });
+  }
+}
+
+async function retryEmergencySaleSync(req, res) {
+  try {
+    const id = toSafeInt(req.params.id);
+    if (!id) {
+      return res.status(400).json({ success: false, error: 'Invalid emergency sale id' });
+    }
+
+    const sale = await prisma.emergencySale.findUnique({ where: { id } });
+    if (!sale) {
+      return res.status(404).json({ success: false, error: 'Emergency sale not found' });
+    }
+
+    if (sale.syncStatus === SYNC_STATUS.SYNCED) {
+      return res.status(400).json({ success: false, error: 'Sale is already synced to POS' });
+    }
+
+    const updated = await prisma.emergencySale.update({
+      where: { id },
+      data: {
+        syncStatus: SYNC_STATUS.PENDING,
+        syncError: null,
+      },
+      include: { items: true },
+    });
+
+    return res.status(200).json({ success: true, sale: formatEmergencySale(updated) });
+  } catch (error) {
+    console.error('[EMERGENCY SALES] retry failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to retry emergency sale sync' });
+  }
+}
+
+async function getPendingEmergencySalesForPosSync(req, res) {
+  try {
+    if (!validateAgentSecret(req)) {
+      return res.status(403).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const limit = Math.min(50, Math.max(1, toSafeInt(req.query.limit ?? req.body?.limit, 10)));
+    const sales = await prisma.emergencySale.findMany({
+      where: {
+        syncStatus: {
+          in: [SYNC_STATUS.PENDING, SYNC_STATUS.FAILED],
+        },
+        retryCount: {
+          lt: Number.isFinite(EMERGENCY_SALE_MAX_RETRIES) ? EMERGENCY_SALE_MAX_RETRIES : 10,
+        },
+      },
+      include: {
+        items: true,
+      },
+      orderBy: [
+        { retryCount: 'asc' },
+        { createdAt: 'asc' },
+      ],
+      take: limit,
+    });
+
+    const now = new Date();
+    if (sales.length > 0) {
+      await prisma.emergencySale.updateMany({
+        where: { id: { in: sales.map((sale) => sale.id) } },
+        data: { lastSyncAttemptAt: now },
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      sales: sales.map((sale) => ({
+        emergency_sale_id: sale.id,
+        sale_ref: sale.saleRef,
+        sync_status: sale.syncStatus,
+        retry_count: sale.retryCount,
+        created_at: sale.createdAt,
+        payload: buildPosWriteInvoicePayload(sale),
+      })),
+    });
+  } catch (error) {
+    console.error('[EMERGENCY SALES] pending sync fetch failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to fetch pending emergency sales' });
+  }
+}
+
+async function ackEmergencySaleSynced(req, res) {
+  try {
+    if (!validateAgentSecret(req)) {
+      return res.status(403).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const saleRef = String(req.body?.sale_ref || req.body?.saleRef || '').trim();
+    const emergencySaleId = toSafeInt(req.body?.emergency_sale_id ?? req.body?.emergencySaleId);
+    const posInvoiceNo = req.body?.pos_invoice_no ?? req.body?.posInvoiceNo;
+
+    if (!saleRef && !emergencySaleId) {
+      return res.status(400).json({ success: false, error: 'sale_ref or emergency_sale_id is required' });
+    }
+
+    const sale = await prisma.emergencySale.findFirst({
+      where: saleRef ? { saleRef } : { id: emergencySaleId },
+    });
+
+    if (!sale) {
+      return res.status(404).json({ success: false, error: 'Emergency sale not found' });
+    }
+
+    if (sale.syncStatus === SYNC_STATUS.SYNCED) {
+      return res.status(200).json({ success: true, sale_ref: sale.saleRef, already_synced: true });
+    }
+
+    const updated = await prisma.emergencySale.update({
+      where: { id: sale.id },
+      data: {
+        syncStatus: SYNC_STATUS.SYNCED,
+        posInvoiceNo: posInvoiceNo != null ? String(posInvoiceNo) : sale.posInvoiceNo,
+        syncedAt: new Date(),
+        syncError: null,
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      sale_ref: updated.saleRef,
+      sync_status: updated.syncStatus,
+      pos_invoice_no: updated.posInvoiceNo,
+    });
+  } catch (error) {
+    console.error('[EMERGENCY SALES] ack synced failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to acknowledge synced emergency sale' });
+  }
+}
+
+async function ackEmergencySaleSyncFailed(req, res) {
+  try {
+    if (!validateAgentSecret(req)) {
+      return res.status(403).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const saleRef = String(req.body?.sale_ref || req.body?.saleRef || '').trim();
+    const emergencySaleId = toSafeInt(req.body?.emergency_sale_id ?? req.body?.emergencySaleId);
+    const syncError = String(req.body?.sync_error || req.body?.error || req.body?.errorMessage || 'Unknown POS sync error').slice(0, 1000);
+
+    if (!saleRef && !emergencySaleId) {
+      return res.status(400).json({ success: false, error: 'sale_ref or emergency_sale_id is required' });
+    }
+
+    const sale = await prisma.emergencySale.findFirst({
+      where: saleRef ? { saleRef } : { id: emergencySaleId },
+    });
+
+    if (!sale) {
+      return res.status(404).json({ success: false, error: 'Emergency sale not found' });
+    }
+
+    if (sale.syncStatus === SYNC_STATUS.SYNCED) {
+      return res.status(200).json({ success: true, sale_ref: sale.saleRef, already_synced: true });
+    }
+
+    const updated = await prisma.emergencySale.update({
+      where: { id: sale.id },
+      data: {
+        syncStatus: SYNC_STATUS.FAILED,
+        retryCount: { increment: 1 },
+        syncError,
+        lastSyncAttemptAt: new Date(),
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      sale_ref: updated.saleRef,
+      sync_status: updated.syncStatus,
+      retry_count: updated.retryCount,
+    });
+  } catch (error) {
+    console.error('[EMERGENCY SALES] ack failed failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to acknowledge failed emergency sale sync' });
+  }
+}
+
+module.exports = {
+  lookupEmergencyProducts,
+  createEmergencySale,
+  listEmergencySales,
+  getEmergencySaleById,
+  retryEmergencySaleSync,
+  getPendingEmergencySalesForPosSync,
+  ackEmergencySaleSynced,
+  ackEmergencySaleSyncFailed,
+  SYNC_STATUS,
+};

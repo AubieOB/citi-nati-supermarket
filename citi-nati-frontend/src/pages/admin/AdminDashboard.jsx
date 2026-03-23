@@ -1,5 +1,5 @@
 import React, { useState, useCallback, Suspense } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 // Lazy load admin components to reduce bundle size
@@ -12,6 +12,7 @@ const AdminInbox = React.lazy(() => import('../../components/admin/AdminInbox.js
 const AdminRefunds = React.lazy(() => import('../../components/admin/AdminRefunds.jsx'));
 const AdminPromotions = React.lazy(() => import('../../components/admin/AdminPromotions.jsx'));
 const AdminStocks = React.lazy(() => import('../../components/admin/AdminStocks.jsx'));
+const AdminEmergencySales = React.lazy(() => import('../../components/admin/AdminEmergencySales.jsx'));
 const AdminSecurity = React.lazy(() => import('../../components/admin/AdminSecurity.jsx'));
 const AdminSystem = React.lazy(() => import('../../components/admin/AdminSystem.jsx'));
 const AdminPOSManagement = React.lazy(() => import('./AdminPOSManagement.jsx'));
@@ -35,7 +36,9 @@ import '../../styles/admin-dashboard.css';
  */
 
 const AdminDashboard = () => {
-  const [activeTab, setActiveTab] = useState('inbox');
+  const location = useLocation();
+  const initialTab = location.pathname === '/admin/emergency-sales' ? 'emergency-sales' : 'inbox';
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [speechAlertsEnabled, setSpeechAlertsPreference] = useState(() => getSpeechAlertsEnabled());
@@ -47,6 +50,7 @@ const AdminDashboard = () => {
     { id: 'support', label: 'Support', icon: 'fa-life-ring' },
     { id: 'products', label: 'Products', icon: 'fa-box' },
     { id: 'stocks', label: 'Stocks', icon: 'fa-warehouse' },
+    { id: 'emergency-sales', label: 'Emergency Sale', icon: 'fa-cash-register' },
     { id: 'system', label: 'System', icon: 'fa-cogs' },
     { id: 'promotions', label: 'Promotions', icon: 'fa-tags' },
     { id: 'pos-management', label: 'POS Management', icon: 'fa-database' },
@@ -253,6 +257,7 @@ const AdminDashboard = () => {
             {activeTab === 'inbox' && <AdminInbox />}
             {activeTab === 'products' && <AdminProducts />}
             {activeTab === 'stocks' && <AdminStocks />}
+            {activeTab === 'emergency-sales' && <AdminEmergencySales />}
             {activeTab === 'system' && <AdminSystem />}
             {activeTab === 'security' && <AdminSecurity />}
             {activeTab === 'promotions' && <AdminPromotions />}

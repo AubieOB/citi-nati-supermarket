@@ -69,6 +69,7 @@ model Product {
   overrideUpdatedBy       String?
   cartItems               CartItem[]
   orderItems              OrderItem[]
+  emergencySaleItems      EmergencySaleItem[]
   createdAt               DateTime   @default(now())
   updatedAt               DateTime   @updatedAt
 
@@ -288,4 +289,50 @@ model ProductExpiryBatch {
   @@index([productCode])
   @@index([expiryDate])
   @@unique([productCode, expiryDate, locationCode, batchNo])
+}
+
+model EmergencySale {
+  id                Int                 @id @default(autoincrement())
+  saleRef           String              @unique @map("sale_ref")
+  cashierId         String?             @map("cashier_id")
+  cashierName       String              @map("cashier_name")
+  subtotal          Float
+  discount          Float               @default(0)
+  total             Float
+  tenderedAmount    Float               @map("tendered_amount")
+  changeAmount      Float               @map("change_amount")
+  paymentMethod     String              @default("CASH") @map("payment_method")
+  syncStatus        String              @default("pending_pos_sync") @map("sync_status")
+  posInvoiceNo      String?             @map("pos_invoice_no")
+  syncedAt          DateTime?           @map("synced_at")
+  lastSyncAttemptAt DateTime?           @map("last_sync_attempt_at")
+  retryCount        Int                 @default(0) @map("retry_count")
+  syncError         String?             @map("sync_error")
+  cartSnapshot      Json?               @map("cart_snapshot")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+  items             EmergencySaleItem[]
+
+  @@index([syncStatus, createdAt])
+  @@index([retryCount, syncStatus])
+  @@map("emergency_sales")
+}
+
+model EmergencySaleItem {
+  id              Int           @id @default(autoincrement())
+  emergencySaleId Int           @map("emergency_sale_id")
+  emergencySale   EmergencySale @relation(fields: [emergencySaleId], references: [id], onDelete: Cascade)
+  productId       Int?          @map("product_id")
+  product         Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productCode     String        @map("product_code")
+  barcode         String?
+  productName     String        @map("product_name")
+  unitPrice       Float         @map("unit_price")
+  qty             Int
+  lineTotal       Float         @map("line_total")
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  @@index([emergencySaleId])
+  @@index([productId])
+  @@map("emergency_sale_items")
 }

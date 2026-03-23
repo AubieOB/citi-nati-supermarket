@@ -22,6 +22,8 @@ const driversOrdersRoutes = require('./routes/drivers.orders.routes');
 const salesRoutes = require('./routes/sales.routes');
 const supportRoutes = require('./routes/support.routes');
 const posCommandsRoutes = require('./routes/posCommands.routes');
+const adminEmergencySalesRoutes = require('./routes/admin.emergency-sales.routes');
+const posSyncRoutes = require('./routes/posSync.routes');
 
 const prisma = new PrismaClient();
 
@@ -431,6 +433,12 @@ async function start() {
 
     // POS command queue routes (polled by local POS Sync Agent)
     app.use('/api/pos-commands', posCommandsRoutes);
+
+    // Emergency sale cashier/monitoring routes (admin-only)
+    app.use('/api/admin/emergency-sales', adminEmergencySalesRoutes);
+
+    // Emergency sale sync fetch/ack routes (POS agent secret protected)
+    app.use('/api/pos-sync', posSyncRoutes);
 
     // Ensure unknown API routes never return HTML to API clients
     app.use('/api', (req, res) => {
