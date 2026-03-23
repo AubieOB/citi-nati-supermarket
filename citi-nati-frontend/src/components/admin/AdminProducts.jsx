@@ -141,6 +141,17 @@ const AdminProducts = () => {
     return Number.isFinite(parsed) ? parsed : null;
   };
 
+  const getEffectiveStockQty = (product) => {
+    if (!product) return 0;
+    if (product.overrideActive === true && product.overrideStock != null) {
+      return toNumberOrNull(product.overrideStock) ?? 0;
+    }
+    if (product.effectiveStock != null) {
+      return toNumberOrNull(product.effectiveStock) ?? 0;
+    }
+    return toNumberOrNull(product.stock) ?? 0;
+  };
+
   const getDaysUntil = (dateValue) => {
     if (!dateValue) return null;
     const target = new Date(dateValue);
@@ -261,7 +272,7 @@ const AdminProducts = () => {
   };
 
   const getProductBatchTotalQty = (product) => {
-    return toNumberOrNull(product?.stock) ?? 0;
+    return getEffectiveStockQty(product);
   };
 
   const getStockBucket = (qty) => {
@@ -528,6 +539,11 @@ const AdminProducts = () => {
                   finalPrice: updatedProduct.finalPrice,
                   isOnSale: updatedProduct.isOnSale,
                   stock: updatedProduct.stock,
+                  posStock: updatedProduct.posStock,
+                  effectiveStock: updatedProduct.effectiveStock,
+                  overrideActive: updatedProduct.overrideActive,
+                  overrideStock: updatedProduct.overrideStock,
+                  overrideReason: updatedProduct.overrideReason,
                   category: updatedProduct.category,
                   image: updatedProduct.image,
                   expiryDate: updatedProduct.expiryDate,
@@ -577,6 +593,11 @@ const AdminProducts = () => {
         category: product.category || 'Uncategorized',
         price: Number(product.price || 0),
         stock: Number(product.stock || 0),
+        posStock: product.posStock != null ? Number(product.posStock) : Number(product.stock || 0),
+        effectiveStock: product.effectiveStock != null ? Number(product.effectiveStock) : Number(product.stock || 0),
+        overrideActive: Boolean(product.overrideActive),
+        overrideStock: product.overrideStock != null ? Number(product.overrideStock) : null,
+        overrideReason: product.overrideReason || null,
         image: product.image || null,
         originalPrice: Number(product.price || 0),
         discountPrice: null,
@@ -718,7 +739,7 @@ const AdminProducts = () => {
         message: product.expiryStatus?.label || product.expiryStatus?.message || 'Expiry warning',
         isExpired: product.expiryStatus?.status === 'expired',
         isUrgent: ['expiring_soon', '1_week_warning', '2_weeks_warning'].includes(product.expiryStatus?.status),
-        remainingQty: toNumberOrNull(product.stock),
+        remainingQty: getProductBatchTotalQty(product),
         expiryDate: product.expiryDate || null,
         batchNo: null,
         daysToExpiry: product.daysToExpiry ?? null,

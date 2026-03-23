@@ -26,6 +26,17 @@ function calculateDiscount(originalPrice, finalPrice) {
   return Math.round(discount);
 }
 
+function getEffectiveStock(product) {
+  if (!product) return 0;
+  if (product.overrideActive === true && product.overrideStock != null) {
+    return Number(product.overrideStock || 0);
+  }
+  if (product.effectiveStock != null) {
+    return Number(product.effectiveStock || 0);
+  }
+  return Number(product.stock || 0);
+}
+
 /**
  * Products Page - Enhanced with Search, Filters, and Promotions
  * 
@@ -389,6 +400,9 @@ const Products = () => {
               ? {
                   ...product,
                   stock: newStock,
+                    effectiveStock: product.overrideActive && product.overrideStock != null
+                      ? product.overrideStock
+                      : newStock,
                   ...(newPrice !== null && { price: newPrice }),
                 }
               : product
@@ -402,6 +416,9 @@ const Products = () => {
               ? {
                   ...product,
                   stock: newStock,
+                    effectiveStock: product.overrideActive && product.overrideStock != null
+                      ? product.overrideStock
+                      : newStock,
                   ...(newPrice !== null && { price: newPrice }),
                 }
               : product
@@ -444,6 +461,10 @@ const Products = () => {
                   finalPrice: updatedProduct.finalPrice,
                   isOnSale: updatedProduct.isOnSale,
                   stock: updatedProduct.stock,
+                  posStock: updatedProduct.posStock,
+                  effectiveStock: updatedProduct.effectiveStock,
+                  overrideActive: updatedProduct.overrideActive,
+                  overrideStock: updatedProduct.overrideStock,
                   category: updatedProduct.category,
                   image: updatedProduct.image,
                   expiryDate: updatedProduct.expiryDate,
@@ -468,6 +489,10 @@ const Products = () => {
                   finalPrice: updatedProduct.finalPrice,
                   isOnSale: updatedProduct.isOnSale,
                   stock: updatedProduct.stock,
+                  posStock: updatedProduct.posStock,
+                  effectiveStock: updatedProduct.effectiveStock,
+                  overrideActive: updatedProduct.overrideActive,
+                  overrideStock: updatedProduct.overrideStock,
                   category: updatedProduct.category,
                   image: updatedProduct.image,
                   expiryDate: updatedProduct.expiryDate,
@@ -509,11 +534,15 @@ const Products = () => {
             // Update existing product - only update stock/price to avoid breaking pagination
             console.log('[PRODUCTS] ✅ UPDATED:', syncedProduct.name, 'ID:', syncedProduct.id);
             const updated = [...prevProducts];
-            updated[matched] = {
+            const mergedProduct = {
               ...updated[matched],
               stock: syncedProduct.stock,
               price: syncedProduct.price,
               finalPrice: syncedProduct.price,
+            };
+            updated[matched] = {
+              ...mergedProduct,
+              effectiveStock: getEffectiveStock(mergedProduct),
             };
             return updated;
           } else {
@@ -651,7 +680,9 @@ const Products = () => {
       return;
     }
 
-    if (product.stock <= 0) {
+    const availableStock = getEffectiveStock(product);
+
+    if (availableStock <= 0) {
       showError('Out of Stock', `${product.name} is out of stock`);
       return;
     }
@@ -1091,6 +1122,7 @@ const Products = () => {
           ) : (
             <div className="products-grid" style={{ padding: '1rem', marginTop: '2.5rem' }}>
               {filteredProducts.map((product) => {
+                const availableStock = getEffectiveStock(product);
                 const originalPrice = Number(product.originalPrice || 0);
                 const finalPrice = Number(product.finalPrice || product.price || 0);
                 const discountPercent = product.isOnSale && originalPrice > 0 && finalPrice > 0 && finalPrice < originalPrice
@@ -1186,23 +1218,23 @@ const Products = () => {
                       {/* Stock Status */}
                       <div style={{
                         fontSize: '0.85rem',
-                        color: product.stock > 0 ? '#28a745' : '#dc3545',
+                        color: availableStock > 0 ? '#28a745' : '#dc3545',
                         marginBottom: '1rem'
                       }}>
-                        {product.stock > 0 ? `In Stock (${product.stock})` : 'Out of Stock'}
+                        {availableStock > 0 ? `In Stock (${availableStock})` : 'Out of Stock'}
                       </div>
 
                       {/* Add to Cart Button */}
                       <button
                         className="product-card__button"
                         onClick={() => handleAddToCart(product)}
-                        disabled={product.stock <= 0}
+                        disabled={availableStock <= 0}
                         style={{
-                          opacity: product.stock <= 0 ? 0.6 : 1,
-                          cursor: product.stock <= 0 ? 'not-allowed' : 'pointer'
+                          opacity: availableStock <= 0 ? 0.6 : 1,
+                          cursor: availableStock <= 0 ? 'not-allowed' : 'pointer'
                         }}
                       >
-                        {product.stock > 0 ? 'Add to Cart' : 'Out of Stock'}
+                        {availableStock > 0 ? 'Add to Cart' : 'Out of Stock'}
                       </button>
                     </div>
                   </div>
