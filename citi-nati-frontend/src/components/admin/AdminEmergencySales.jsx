@@ -46,6 +46,7 @@ const AdminEmergencySales = () => {
   const rootRef = useRef(null);
   const hiddenBarcodeInputRef = useRef(null);
   const searchModalInputRef = useRef(null);
+  const qtyInputRefs = useRef(new Map());
 
   const scanBufferRef = useRef('');
   const scanLastKeyAtRef = useRef(0);
@@ -59,9 +60,12 @@ const AdminEmergencySales = () => {
   const [searchModalQuery, setSearchModalQuery] = useState('');
   const [searchModalLoading, setSearchModalLoading] = useState(false);
   const [searchModalResults, setSearchModalResults] = useState([]);
+  const [searchModalActiveIndex, setSearchModalActiveIndex] = useState(0);
 
   const [showQuickMenu, setShowQuickMenu] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [isPanelFullscreen, setIsPanelFullscreen] = useState(false);
+  const [pendingQtyFocusRowId, setPendingQtyFocusRowId] = useState(null);
 
   const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [tenderedAmount, setTenderedAmount] = useState('');
@@ -138,6 +142,16 @@ const AdminEmergencySales = () => {
     }
   }, [searchModalOpen]);
 
+  useEffect(() => {
+    if (!pendingQtyFocusRowId) return;
+    const input = qtyInputRefs.current.get(pendingQtyFocusRowId);
+    if (input) {
+      input.focus();
+      input.select();
+    }
+    setPendingQtyFocusRowId(null);
+  }, [cart, pendingQtyFocusRowId]);
+
   const addProductToCart = useCallback((product, qty = 1) => {
     const productId = Number(product.id);
     if (!Number.isFinite(productId)) return;
@@ -170,12 +184,15 @@ const AdminEmergencySales = () => {
         return prev;
       }
 
+      const nextRowId = `${productId}-${Date.now()}`;
+      setSelectedRowId(nextRowId);
+      setPendingQtyFocusRowId(nextRowId);
+
       return [
         ...prev,
         {
-          id: `${productId}-${Date.now()}`,
+          id: nextRowId,
           productId,
-          barcode: product.barcode || '-',
           productCode: product.sourceCode || product.productCode || '-',
           productName: product.name,
           unitPrice,
@@ -231,6 +248,7 @@ const AdminEmergencySales = () => {
 
       setSearchModalQuery(query);
       setSearchModalResults(products);
+      setSearchModalActiveIndex(0);
       setSearchModalOpen(true);
       notifyInfo('Multiple matches found. Select from search modal.', 2000);
     } catch (error) {
@@ -244,6 +262,7 @@ const AdminEmergencySales = () => {
     const query = searchModalQuery.trim();
     if (!query) {
       setSearchModalResults([]);
+      setSearchModalActiveIndex(0);
       setSearchModalLoading(false);
       return;
     }
@@ -255,10 +274,12 @@ const AdminEmergencySales = () => {
         const products = await lookupProducts(query);
         if (!disposed) {
           setSearchModalResults(products);
+          setSearchModalActiveIndex(0);
         }
       } catch (error) {
         if (!disposed) {
           setSearchModalResults([]);
+          setSearchModalActiveIndex(0);
           notifyError(`Search failed: ${error.response?.data?.error || error.message}`, 2600);
         }
       } finally {
@@ -278,7 +299,7 @@ const AdminEmergencySales = () => {
     setCart([]);
     setSelectedRowId(null);
     setDiscount('0');
-    setTenderedAmount('');
+    setTenderedAmount('0.00');
     notifyInfo('New invoice started', 1500);
   }, []);
 
@@ -428,28 +449,26 @@ const AdminEmergencySales = () => {
     );
   }, []);
 
-  const toggleFullscreen = useCallback(async () => {
-    try {
-      if (!document.fullscreenElement) {
-        await (rootRef.current || document.documentElement).requestFullscreen();
-      } else {
-        await document.exitFullscreen();
-      }
-    } catch (error) {
-      notifyError(`Fullscreen failed: ${error.message}`, 2500);
-    }
+  const toggleFullscreen = useCallback(() => {
+    setIsPanelFullscreen((prev) => !prev);
   }, []);
 
   const openSearchModal = useCallback(() => {
     setSearchModalOpen(true);
     setSearchModalQuery('');
     setSearchModalResults([]);
+    setSearchModalActiveIndex(0);
   }, []);
 
   const closeAllDialogs = useCallback(() => {
     setSearchModalOpen(false);
     setShowQuickMenu(false);
     setShowPaymentDialog(false);
+  }, []);
+
+  const openPaymentDialog = useCallback(() => {
+    setTenderedAmount('0.00');
+    setShowPaymentDialog(true);
   }, []);
 
   useEffect(() => {
@@ -487,8 +506,7 @@ const AdminEmergencySales = () => {
           notifyError('Invoice is empty', 1800);
           return;
         }
-        setTenderedAmount(String(total));
-        setShowPaymentDialog(true);
+        openPaymentDialog();
         return;
       }
 
@@ -578,6 +596,7 @@ const AdminEmergencySales = () => {
     isSubmittingSale,
     lastReceipt,
     lookupAndAddFromScan,
+    openPaymentDialog,
     openSearchModal,
     printReceipt,
     removeSelectedRow,
@@ -602,7 +621,11 @@ const AdminEmergencySales = () => {
     <div
       ref={rootRef}
       style={{
-        height: 'calc(100vh - 112px)',
+        position: isPanelFullscreen ? 'fixed' : 'relative',
+        inset: isPanelFullscreen ? '0' : 'auto',
+        zIndex: isPanelFullscreen ? 3000 : 'auto',
+        height: isPanelFullscreen ? '100vh' : 'calc(100vh - 112px)',
+        width: isPanelFullscreen ? '100vw' : '100%',
         overflow: 'hidden',
         backgroundColor: '#d7d9de',
         border: '2px solid #7a7d86',
@@ -637,11 +660,11 @@ const AdminEmergencySales = () => {
           <button onClick={openSearchModal} style={{ ...headerButtonStyle, backgroundColor: '#98f28f' }}>SEARCH<br />[F1]</button>
           <button onClick={focusCaptureInput} style={{ ...headerButtonStyle, backgroundColor: '#ffe568' }}>CS / INV<br />[F3]</button>
           <button onClick={() => setShowQuickMenu(true)} style={{ ...headerButtonStyle, backgroundColor: '#f8bd75' }}>Q. MENU<br />[F4]</button>
-          <button onClick={() => setShowPaymentDialog(true)} style={{ ...headerButtonStyle, backgroundColor: '#f4afd8' }}>SAVE<br />[F6]</button>
+          <button onClick={openPaymentDialog} style={{ ...headerButtonStyle, backgroundColor: '#f4afd8' }}>SAVE<br />[F6]</button>
           <button onClick={() => printReceipt(lastReceipt)} style={{ ...headerButtonStyle, backgroundColor: '#ffc6ba' }}>PRINT<br />[F8]</button>
           <button onClick={removeSelectedRow} style={{ ...headerButtonStyle, backgroundColor: '#ff6248', color: '#fff' }}>DELETE<br />[F9]</button>
           <button onClick={clearInvoice} style={{ ...headerButtonStyle, backgroundColor: '#ecf0a8' }}>NEW<br />[F10]</button>
-          <button onClick={toggleFullscreen} style={{ ...headerButtonStyle, backgroundColor: '#ece3a8' }}>FULL<br />[F11]</button>
+          <button onClick={toggleFullscreen} style={{ ...headerButtonStyle, backgroundColor: '#ece3a8' }}>{isPanelFullscreen ? 'RESTORE' : 'DRAWER'}<br />[F11]</button>
         </div>
       </div>
 
@@ -699,7 +722,6 @@ const AdminEmergencySales = () => {
               <thead>
                 <tr style={{ backgroundColor: '#b9bdf6', color: '#141414' }}>
                   <th style={{ padding: '0.38rem', width: '40px', borderBottom: '1px solid #8f93d2' }}>#</th>
-                  <th style={{ padding: '0.38rem', width: '120px', borderBottom: '1px solid #8f93d2' }}>Barcode</th>
                   <th style={{ padding: '0.38rem', width: '140px', borderBottom: '1px solid #8f93d2' }}>Product Code</th>
                   <th style={{ padding: '0.38rem', borderBottom: '1px solid #8f93d2' }}>Product</th>
                   <th style={{ padding: '0.38rem', width: '115px', borderBottom: '1px solid #8f93d2', textAlign: 'right' }}>Unit Price</th>
@@ -710,7 +732,7 @@ const AdminEmergencySales = () => {
               <tbody>
                 {cart.length === 0 && (
                   <tr>
-                    <td colSpan={7} style={{ padding: '1rem', textAlign: 'center', color: '#666', fontWeight: 600 }}>
+                    <td colSpan={6} style={{ padding: '1rem', textAlign: 'center', color: '#666', fontWeight: 600 }}>
                       Scan product code now. No need to focus a search box first.
                     </td>
                   </tr>
@@ -726,7 +748,6 @@ const AdminEmergencySales = () => {
                     }}
                   >
                     <td style={{ padding: '0.34rem', textAlign: 'center' }}>{index + 1}</td>
-                    <td style={{ padding: '0.34rem' }}>{line.barcode}</td>
                     <td style={{ padding: '0.34rem', fontFamily: 'Consolas, monospace' }}>{line.productCode}</td>
                     <td style={{ padding: '0.34rem' }}>{line.productName}</td>
                     <td style={{ padding: '0.34rem', textAlign: 'right', fontWeight: 700 }}>{formatMoney(line.unitPrice)}</td>
@@ -734,10 +755,18 @@ const AdminEmergencySales = () => {
                       <div style={{ display: 'inline-flex', gap: '0.18rem', alignItems: 'center' }}>
                         <button onClick={(e) => { e.stopPropagation(); updateLineQty(line.id, line.qty - 1); }} style={{ border: '1px solid #999', borderRadius: '4px', backgroundColor: '#fff', width: '22px', cursor: 'pointer' }}>-</button>
                         <input
+                          ref={(element) => {
+                            if (element) {
+                              qtyInputRefs.current.set(line.id, element);
+                            } else {
+                              qtyInputRefs.current.delete(line.id);
+                            }
+                          }}
                           type="number"
                           min="1"
                           value={line.qty}
                           onClick={(e) => e.stopPropagation()}
+                          onFocus={(e) => e.target.select()}
                           onChange={(e) => updateLineQty(line.id, e.target.value)}
                           style={{ width: '46px', textAlign: 'center', border: '1px solid #aaa', borderRadius: '4px', padding: '0.16rem' }}
                         />
@@ -888,6 +917,38 @@ const AdminEmergencySales = () => {
                 ref={searchModalInputRef}
                 value={searchModalQuery}
                 onChange={(e) => setSearchModalQuery(e.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    event.preventDefault();
+                    setSearchModalOpen(false);
+                    return;
+                  }
+
+                  if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    setSearchModalActiveIndex((prev) => Math.min(prev + 1, Math.max(searchModalResults.length - 1, 0)));
+                    return;
+                  }
+
+                  if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    setSearchModalActiveIndex((prev) => Math.max(prev - 1, 0));
+                    return;
+                  }
+
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    const selectedProduct = searchModalResults[searchModalActiveIndex];
+                    if (selectedProduct) {
+                      addProductToCart(selectedProduct, 1);
+                      setSearchModalOpen(false);
+                      setSearchModalQuery('');
+                      setSearchModalResults([]);
+                      setSearchModalActiveIndex(0);
+                      notifySuccess(`${selectedProduct.name} added`, 1400);
+                    }
+                  }
+                }}
                 placeholder="Type barcode, code, or product name..."
                 style={{ width: '100%', padding: '0.66rem', borderRadius: '4px', border: '1px solid #8f8f8f', fontWeight: 600 }}
               />
@@ -896,7 +957,7 @@ const AdminEmergencySales = () => {
                 {!searchModalLoading && searchModalResults.length === 0 && (
                   <div style={{ padding: '0.7rem', color: '#666' }}>No results</div>
                 )}
-                {!searchModalLoading && searchModalResults.map((product) => (
+                {!searchModalLoading && searchModalResults.map((product, index) => (
                   <button
                     key={product.id}
                     onClick={() => {
@@ -904,6 +965,7 @@ const AdminEmergencySales = () => {
                       setSearchModalOpen(false);
                       setSearchModalQuery('');
                       setSearchModalResults([]);
+                      setSearchModalActiveIndex(0);
                       notifySuccess(`${product.name} added`, 1400);
                     }}
                     style={{
@@ -911,7 +973,7 @@ const AdminEmergencySales = () => {
                       textAlign: 'left',
                       border: 'none',
                       borderBottom: '1px solid #eee',
-                      backgroundColor: '#fff',
+                      backgroundColor: index === searchModalActiveIndex ? '#e7ebff' : '#fff',
                       padding: '0.56rem 0.7rem',
                       cursor: 'pointer',
                     }}
@@ -942,7 +1004,7 @@ const AdminEmergencySales = () => {
             <div style={{ fontWeight: 800, marginBottom: '0.6rem' }}>Quick Menu [F4]</div>
             <div style={{ display: 'grid', gap: '0.45rem' }}>
               <button onClick={() => { setShowQuickMenu(false); clearInvoice(); }} style={{ border: '1px solid #999', backgroundColor: '#fff', borderRadius: '4px', padding: '0.4rem', cursor: 'pointer' }}>New Invoice [F10]</button>
-              <button onClick={() => { setShowQuickMenu(false); setShowPaymentDialog(true); }} style={{ border: '1px solid #999', backgroundColor: '#fff', borderRadius: '4px', padding: '0.4rem', cursor: 'pointer' }}>Save / Sale [F6]</button>
+              <button onClick={() => { setShowQuickMenu(false); openPaymentDialog(); }} style={{ border: '1px solid #999', backgroundColor: '#fff', borderRadius: '4px', padding: '0.4rem', cursor: 'pointer' }}>Save / Sale [F6]</button>
               <button onClick={() => { setShowQuickMenu(false); printReceipt(lastReceipt); }} style={{ border: '1px solid #999', backgroundColor: '#fff', borderRadius: '4px', padding: '0.4rem', cursor: 'pointer' }}>Print [F8]</button>
               <button onClick={() => setShowQuickMenu(false)} style={{ border: '1px solid #999', backgroundColor: '#f5f5f5', borderRadius: '4px', padding: '0.4rem', cursor: 'pointer' }}>Close [Esc]</button>
             </div>
@@ -963,7 +1025,7 @@ const AdminEmergencySales = () => {
         }}>
           <div style={{
             width: '100%',
-            maxWidth: '480px',
+            maxWidth: '720px',
             backgroundColor: '#fff',
             borderRadius: '8px',
             border: '2px solid #8f94c9',
@@ -972,41 +1034,47 @@ const AdminEmergencySales = () => {
             <div style={{ backgroundColor: '#bfc3ff', padding: '0.65rem 0.8rem', fontWeight: 800 }}>
               CASH SALE / PAYMENT [F6]
             </div>
-            <div style={{ padding: '0.8rem' }}>
-              <div style={{ display: 'grid', gap: '0.4rem', marginBottom: '0.7rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Total</span><strong>{formatMoney(total)}</strong></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>Payment Method</span>
-                  <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} style={{ border: '1px solid #999', borderRadius: '4px', padding: '0.3rem' }}>
+            <div style={{ padding: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1rem', marginBottom: '0.9rem' }}>
+                <div style={{ display: 'grid', gap: '0.6rem' }}>
+                  <div style={{ fontWeight: 700 }}>PAYMENT METHOD</div>
+                  <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} style={{ border: '1px solid #999', borderRadius: '4px', padding: '0.48rem', fontSize: '1rem' }}>
                     <option value="CASH">Cash</option>
                     <option value="CARD">Card</option>
                     <option value="MOBILE_MONEY">Mobile Money</option>
                   </select>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>Tendered</span>
+                  <div style={{ fontWeight: 700 }}>AMOUNT TENDERED</div>
                   <input
                     type="number"
                     min="0"
                     step="0.01"
                     value={tenderedAmount}
                     onChange={(e) => setTenderedAmount(e.target.value)}
+                    onFocus={(e) => e.target.select()}
                     autoFocus
-                    style={{ width: '170px', border: '1px solid #999', borderRadius: '4px', padding: '0.3rem', textAlign: 'right' }}
+                    style={{ width: '100%', border: '1px solid #999', borderRadius: '4px', padding: '0.58rem', textAlign: 'right', fontSize: '1.7rem', fontFamily: 'Consolas, monospace' }}
                   />
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#2e7d32' }}>
-                  <span>Change</span><strong>{formatMoney(change)}</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: balanceDue > 0 ? '#c62828' : '#444' }}>
-                  <span>Balance Due</span><strong>{formatMoney(balanceDue)}</strong>
+                <div style={{ display: 'grid', gap: '0.6rem' }}>
+                  <div style={{ backgroundColor: '#000', borderRadius: '4px', padding: '0.55rem 0.7rem' }}>
+                    <div style={{ color: '#fff', fontWeight: 700, marginBottom: '0.3rem' }}>TOTAL AMOUNT</div>
+                    <div style={{ color: '#00ff66', textAlign: 'right', fontSize: '2.2rem', fontWeight: 800, fontFamily: 'Consolas, monospace' }}>{formatMoney(total)}</div>
+                  </div>
+                  <div style={{ backgroundColor: '#f4f4f4', borderRadius: '4px', padding: '0.55rem 0.7rem', border: '1px solid #ddd' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#2e7d32', fontSize: '1.05rem' }}>
+                      <span>Change</span><strong>{formatMoney(change)}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: balanceDue > 0 ? '#c62828' : '#444', fontSize: '1.05rem', marginTop: '0.4rem' }}>
+                      <span>Balance Due</span><strong>{formatMoney(balanceDue)}</strong>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                <button onClick={() => setShowPaymentDialog(false)} disabled={isSubmittingSale} style={{ border: '1px solid #888', backgroundColor: '#fff', borderRadius: '4px', padding: '0.45rem 0.65rem', cursor: 'pointer' }}>Cancel [Esc]</button>
-                <button onClick={submitSale} disabled={isSubmittingSale || cart.length === 0} style={{ border: 'none', backgroundColor: '#2e7d32', color: '#fff', borderRadius: '4px', padding: '0.45rem 0.72rem', cursor: isSubmittingSale ? 'not-allowed' : 'pointer', opacity: isSubmittingSale ? 0.7 : 1, fontWeight: 700 }}>
-                  {isSubmittingSale ? 'Saving...' : 'Confirm [Enter]'}
+                <button onClick={() => setShowPaymentDialog(false)} disabled={isSubmittingSale} style={{ border: '1px solid #888', backgroundColor: '#fff', borderRadius: '4px', padding: '0.55rem 0.8rem', cursor: 'pointer', minWidth: '110px' }}>Close [Esc]</button>
+                <button onClick={submitSale} disabled={isSubmittingSale || cart.length === 0} style={{ border: 'none', backgroundColor: '#2e7d32', color: '#fff', borderRadius: '4px', padding: '0.55rem 0.9rem', cursor: isSubmittingSale ? 'not-allowed' : 'pointer', opacity: isSubmittingSale ? 0.7 : 1, fontWeight: 700, minWidth: '150px' }}>
+                  {isSubmittingSale ? 'Saving...' : 'Accept & Print'}
                 </button>
               </div>
             </div>
