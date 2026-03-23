@@ -10,7 +10,7 @@ const STATUS_LABELS = {
 };
 
 const STATUS_COLORS = {
-  pending_pos_sync: '#f57c00',
+  pending_pos_sync: '#b06c00',
   synced_to_pos: '#2e7d32',
   sync_failed: '#c62828',
 };
@@ -22,7 +22,10 @@ function toMoney(value) {
 }
 
 function formatMoney(value) {
-  return `MWK ${toMoney(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return toMoney(value).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 function formatDateTime(value) {
@@ -32,29 +35,39 @@ function formatDateTime(value) {
   return date.toLocaleString();
 }
 
+function isPrintableKey(event) {
+  if (event.ctrlKey || event.metaKey || event.altKey) return false;
+  return typeof event.key === 'string' && event.key.length === 1;
+}
+
 const AdminEmergencySales = () => {
   const { user } = useAuth();
-  const rootRef = useRef(null);
-  const barcodeInputRef = useRef(null);
 
-  const [barcodeQuery, setBarcodeQuery] = useState('');
-  const [manualSearch, setManualSearch] = useState('');
+  const rootRef = useRef(null);
+  const hiddenBarcodeInputRef = useRef(null);
+  const searchModalInputRef = useRef(null);
+
+  const scanBufferRef = useRef('');
+  const scanLastKeyAtRef = useRef(0);
+  const scanClearTimeoutRef = useRef(null);
+
   const [cart, setCart] = useState([]);
   const [selectedRowId, setSelectedRowId] = useState(null);
+  const [barcodeGhostValue, setBarcodeGhostValue] = useState('');
 
-  const [showProductPicker, setShowProductPicker] = useState(false);
-  const [productPickerResults, setProductPickerResults] = useState([]);
-  const [pickerTitle, setPickerTitle] = useState('Select Product');
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
+  const [searchModalQuery, setSearchModalQuery] = useState('');
+  const [searchModalLoading, setSearchModalLoading] = useState(false);
+  const [searchModalResults, setSearchModalResults] = useState([]);
 
+  const [showQuickMenu, setShowQuickMenu] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+
   const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [tenderedAmount, setTenderedAmount] = useState('');
   const [discount, setDiscount] = useState('0');
   const [isSubmittingSale, setIsSubmittingSale] = useState(false);
 
-  const [salesStatusFilter, setSalesStatusFilter] = useState('all');
-  const [salesSearch, setSalesSearch] = useState('');
-  const [salesLoading, setSalesLoading] = useState(false);
   const [sales, setSales] = useState([]);
   const [salesSummary, setSalesSummary] = useState({
     pending_pos_sync: 0,
@@ -64,144 +77,66 @@ const AdminEmergencySales = () => {
 
   const [lastReceipt, setLastReceipt] = useState(null);
 
-  const subtotal = useMemo(() => toMoney(cart.reduce((sum, line) => sum + toMoney(line.qty * line.unitPrice), 0)), [cart]);
+  const subtotal = useMemo(
+    () => toMoney(cart.reduce((sum, line) => sum + toMoney(line.qty * line.unitPrice), 0)),
+    [cart]
+  );
+
   const discountValue = useMemo(() => {
     const parsed = toMoney(discount);
     return Math.max(0, Math.min(parsed, subtotal));
   }, [discount, subtotal]);
+
   const total = useMemo(() => toMoney(Math.max(0, subtotal - discountValue)), [subtotal, discountValue]);
+
   const tendered = useMemo(() => {
     if (tenderedAmount === '') return total;
     return Math.max(0, toMoney(tenderedAmount));
   }, [tenderedAmount, total]);
+
   const change = useMemo(() => (tendered > total ? toMoney(tendered - total) : 0), [tendered, total]);
   const balanceDue = useMemo(() => (tendered < total ? toMoney(total - tendered) : 0), [tendered, total]);
 
-  const focusBarcodeInput = useCallback(() => {
-    if (barcodeInputRef.current) {
-      barcodeInputRef.current.focus();
-      barcodeInputRef.current.select();
+  const focusCaptureInput = useCallback(() => {
+    if (hiddenBarcodeInputRef.current) {
+      hiddenBarcodeInputRef.current.focus();
     }
   }, []);
 
   const fetchEmergencySales = useCallback(async () => {
     try {
-      setSalesLoading(true);
       const response = await api.get('/admin/emergency-sales', {
         params: {
           page: 1,
-          pageSize: 50,
-          status: salesStatusFilter,
-          search: salesSearch.trim() || undefined,
+          pageSize: 8,
+          status: 'all',
         },
       });
 
       setSales(response.data?.sales || []);
-      setSalesSummary(response.data?.summary || {
-        pending_pos_sync: 0,
-        synced_to_pos: 0,
-        sync_failed: 0,
-      });
+      setSalesSummary(
+        response.data?.summary || {
+          pending_pos_sync: 0,
+          synced_to_pos: 0,
+          sync_failed: 0,
+        }
+      );
     } catch (error) {
-      notifyError(`Failed to load emergency sales: ${error.response?.data?.error || error.message}`, 4000);
-    } finally {
-      setSalesLoading(false);
+      notifyError(`Failed to load emergency sales: ${error.response?.data?.error || error.message}`, 3000);
     }
-  }, [salesSearch, salesStatusFilter]);
+  }, []);
 
   useEffect(() => {
     fetchEmergencySales();
-  }, [fetchEmergencySales]);
+    focusCaptureInput();
+  }, [fetchEmergencySales, focusCaptureInput]);
 
   useEffect(() => {
-    focusBarcodeInput();
-  }, [focusBarcodeInput]);
-
-  const printReceipt = useCallback((receipt) => {
-    if (!receipt) return;
-
-    const itemsHtml = (receipt.items || []).map((item, index) => `
-      <tr>
-        <td>${index + 1}</td>
-        <td>${item.product_code || '-'}</td>
-        <td>${item.product_name}</td>
-        <td style="text-align:right;">${item.qty}</td>
-        <td style="text-align:right;">${formatMoney(item.unit_price)}</td>
-        <td style="text-align:right;">${formatMoney(item.line_total)}</td>
-      </tr>
-    `).join('');
-
-    const html = `
-      <!doctype html>
-      <html>
-      <head>
-        <title>Emergency Sale Receipt ${receipt.sale_ref}</title>
-        <style>
-          body { font-family: 'Courier New', monospace; padding: 16px; color: #111; }
-          .header { text-align: center; margin-bottom: 12px; }
-          .meta { margin-bottom: 10px; font-size: 12px; }
-          table { width: 100%; border-collapse: collapse; font-size: 12px; }
-          th, td { border: 1px solid #ddd; padding: 6px; }
-          th { background: #f2f2f2; }
-          .totals { margin-top: 12px; font-size: 13px; }
-          .totals div { display: flex; justify-content: space-between; margin: 3px 0; }
-          .sync-note { margin-top: 14px; font-weight: 700; color: #b26a00; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h2 style="margin:0;">Citi-Nati Supermarket</h2>
-          <p style="margin:4px 0 0 0;">Emergency Sale Receipt</p>
-        </div>
-        <div class="meta">
-          <div><strong>Sale Ref:</strong> ${receipt.sale_ref}</div>
-          <div><strong>Date:</strong> ${formatDateTime(receipt.created_at)}</div>
-          <div><strong>Cashier:</strong> ${receipt.cashier_name || '-'}</div>
-          <div><strong>Payment:</strong> ${receipt.payment_method || '-'}</div>
-        </div>
-
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Code</th>
-              <th>Item</th>
-              <th>Qty</th>
-              <th>Price</th>
-              <th>Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${itemsHtml}
-          </tbody>
-        </table>
-
-        <div class="totals">
-          <div><span>Subtotal</span><span>${formatMoney(receipt.subtotal)}</span></div>
-          <div><span>Discount</span><span>${formatMoney(receipt.discount)}</span></div>
-          <div><span>Total</span><span>${formatMoney(receipt.total)}</span></div>
-          <div><span>Tendered</span><span>${formatMoney(receipt.tendered_amount)}</span></div>
-          <div><span>Change</span><span>${formatMoney(receipt.change_amount)}</span></div>
-          <div><span>Balance Due</span><span>${formatMoney(receipt.balance_due)}</span></div>
-        </div>
-
-        <div class="sync-note">Pending POS Sync</div>
-      </body>
-      </html>
-    `;
-
-    const popup = window.open('', '_blank', 'width=900,height=700');
-    if (!popup) {
-      notifyError('Popup blocked. Please allow popups to print receipt.', 4000);
-      return;
+    if (!searchModalOpen) return;
+    if (searchModalInputRef.current) {
+      searchModalInputRef.current.focus();
     }
-
-    popup.document.open();
-    popup.document.write(html);
-    popup.document.close();
-    popup.focus();
-    popup.print();
-  }, []);
+  }, [searchModalOpen]);
 
   const addProductToCart = useCallback((product, qty = 1) => {
     const productId = Number(product.id);
@@ -211,25 +146,27 @@ const AdminEmergencySales = () => {
     const effectiveStock = Number(product.effectiveStock ?? product.effective_stock ?? product.stock ?? 0);
 
     setCart((prev) => {
-      const existingIndex = prev.findIndex((line) => Number(line.productId) === productId);
-      if (existingIndex >= 0) {
+      const index = prev.findIndex((line) => Number(line.productId) === productId);
+
+      if (index >= 0) {
         const next = [...prev];
-        const nextQty = next[existingIndex].qty + qty;
+        const nextQty = next[index].qty + qty;
+
         if (nextQty > effectiveStock) {
-          notifyError(`Cannot exceed available stock (${effectiveStock}) for ${product.name}`, 3000);
+          notifyError(`Cannot exceed stock (${effectiveStock}) for ${product.name}`, 2500);
           return prev;
         }
 
-        next[existingIndex] = {
-          ...next[existingIndex],
+        next[index] = {
+          ...next[index],
           qty: nextQty,
-          lineTotal: toMoney(nextQty * next[existingIndex].unitPrice),
+          lineTotal: toMoney(nextQty * next[index].unitPrice),
         };
         return next;
       }
 
       if (qty > effectiveStock) {
-        notifyError(`Insufficient stock for ${product.name}. Available ${effectiveStock}`, 3000);
+        notifyError(`Insufficient stock for ${product.name}. Available ${effectiveStock}`, 2500);
         return prev;
       }
 
@@ -250,71 +187,100 @@ const AdminEmergencySales = () => {
     });
   }, []);
 
-  const runProductLookup = useCallback(async (query, opts = {}) => {
+  const lookupProducts = useCallback(async (query) => {
     const trimmed = String(query || '').trim();
-    if (!trimmed) return;
+    if (!trimmed) return [];
 
-    try {
-      const response = await api.get('/admin/emergency-sales/lookup', {
-        params: { q: trimmed },
-      });
-      const products = response.data?.products || [];
+    const response = await api.get('/admin/emergency-sales/lookup', {
+      params: { q: trimmed },
+    });
 
-      if (products.length === 0) {
-        notifyError(`No product found for "${trimmed}"`, 2500);
-        return;
-      }
+    return response.data?.products || [];
+  }, []);
 
-      if (products.length === 1 || opts.forceSingle) {
-        addProductToCart(products[0], 1);
-        notifySuccess(`${products[0].name} added to invoice`, 1800);
-        return;
-      }
-
-      setPickerTitle(`Multiple matches for "${trimmed}"`);
-      setProductPickerResults(products);
-      setShowProductPicker(true);
-    } catch (error) {
-      notifyError(`Lookup failed: ${error.response?.data?.error || error.message}`, 3500);
-    }
-  }, [addProductToCart]);
-
-  const onBarcodeEnter = async (event) => {
-    if (event.key !== 'Enter') return;
-    event.preventDefault();
-
-    const query = barcodeQuery.trim();
+  const lookupAndAddFromScan = useCallback(async (scanValue) => {
+    const query = String(scanValue || '').trim();
     if (!query) return;
 
-    await runProductLookup(query);
-    setBarcodeQuery('');
-    focusBarcodeInput();
-  };
+    try {
+      const products = await lookupProducts(query);
 
-  const updateLineQty = (lineId, nextQtyRaw) => {
-    const nextQty = Math.max(0, parseInt(nextQtyRaw, 10) || 0);
+      if (products.length === 0) {
+        notifyError(`No product found for "${query}"`, 2200);
+        return;
+      }
 
-    setCart((prev) => prev
-      .map((line) => {
-        if (line.id !== lineId) return line;
+      const normalized = query.toLowerCase();
+      const exactMatches = products.filter((p) => {
+        const byBarcode = String(p.barcode || '').toLowerCase() === normalized;
+        const byCode = String(p.sourceCode || p.productCode || '').toLowerCase() === normalized;
+        return byBarcode || byCode;
+      });
 
-        if (nextQty === 0) {
-          return null;
+      if (exactMatches.length === 1) {
+        addProductToCart(exactMatches[0], 1);
+        notifySuccess(`${exactMatches[0].name} added`, 1400);
+        return;
+      }
+
+      if (products.length === 1) {
+        addProductToCart(products[0], 1);
+        notifySuccess(`${products[0].name} added`, 1400);
+        return;
+      }
+
+      setSearchModalQuery(query);
+      setSearchModalResults(products);
+      setSearchModalOpen(true);
+      notifyInfo('Multiple matches found. Select from search modal.', 2000);
+    } catch (error) {
+      notifyError(`Lookup failed: ${error.response?.data?.error || error.message}`, 3000);
+    }
+  }, [addProductToCart, lookupProducts]);
+
+  useEffect(() => {
+    if (!searchModalOpen) return;
+
+    const query = searchModalQuery.trim();
+    if (!query) {
+      setSearchModalResults([]);
+      setSearchModalLoading(false);
+      return;
+    }
+
+    let disposed = false;
+    const timer = setTimeout(async () => {
+      try {
+        setSearchModalLoading(true);
+        const products = await lookupProducts(query);
+        if (!disposed) {
+          setSearchModalResults(products);
         }
-
-        if (nextQty > line.availableStock) {
-          notifyError(`Cannot exceed stock (${line.availableStock}) for ${line.productName}`, 2500);
-          return line;
+      } catch (error) {
+        if (!disposed) {
+          setSearchModalResults([]);
+          notifyError(`Search failed: ${error.response?.data?.error || error.message}`, 2600);
         }
+      } finally {
+        if (!disposed) {
+          setSearchModalLoading(false);
+        }
+      }
+    }, 160);
 
-        return {
-          ...line,
-          qty: nextQty,
-          lineTotal: toMoney(nextQty * line.unitPrice),
-        };
-      })
-      .filter(Boolean));
-  };
+    return () => {
+      disposed = true;
+      clearTimeout(timer);
+    };
+  }, [lookupProducts, searchModalOpen, searchModalQuery]);
+
+  const clearInvoice = useCallback(() => {
+    setCart([]);
+    setSelectedRowId(null);
+    setDiscount('0');
+    setTenderedAmount('');
+    notifyInfo('New invoice started', 1500);
+  }, []);
 
   const removeSelectedRow = useCallback(() => {
     if (!selectedRowId) return;
@@ -322,18 +288,86 @@ const AdminEmergencySales = () => {
     setSelectedRowId(null);
   }, [selectedRowId]);
 
-  const clearInvoice = useCallback(() => {
-    setCart([]);
-    setSelectedRowId(null);
-    setDiscount('0');
-    setTenderedAmount('');
-    notifyInfo('Invoice cleared', 1500);
-    focusBarcodeInput();
-  }, [focusBarcodeInput]);
+  const printReceipt = useCallback((receipt) => {
+    if (!receipt) {
+      notifyInfo('No receipt available to print', 1800);
+      return;
+    }
 
-  const submitSale = async () => {
+    const itemsHtml = (receipt.items || [])
+      .map(
+        (item, index) => `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${item.product_code || '-'}</td>
+          <td>${item.product_name}</td>
+          <td style="text-align:right;">${item.qty}</td>
+          <td style="text-align:right;">${formatMoney(item.unit_price)}</td>
+          <td style="text-align:right;">${formatMoney(item.line_total)}</td>
+        </tr>`
+      )
+      .join('');
+
+    const html = `<!doctype html>
+    <html>
+    <head>
+      <title>Emergency Receipt ${receipt.sale_ref}</title>
+      <style>
+        body { font-family: Consolas, 'Courier New', monospace; padding: 12px; color: #111; }
+        h2, p { margin: 0; text-align: center; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px; }
+        th, td { border: 1px solid #bbb; padding: 5px; }
+        .meta { margin-top: 10px; font-size: 12px; }
+        .row { display: flex; justify-content: space-between; margin-top: 2px; }
+        .note { margin-top: 12px; color: #9a5d00; font-weight: 700; }
+      </style>
+    </head>
+    <body>
+      <h2>Citi-Nati Supermarket</h2>
+      <p>Emergency Sale Receipt</p>
+      <div class="meta">
+        <div><strong>Ref:</strong> ${receipt.sale_ref}</div>
+        <div><strong>Date:</strong> ${formatDateTime(receipt.created_at)}</div>
+        <div><strong>Cashier:</strong> ${receipt.cashier_name || '-'}</div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Code</th>
+            <th>Item</th>
+            <th>Qty</th>
+            <th>Price</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>${itemsHtml}</tbody>
+      </table>
+      <div class="row"><span>Subtotal</span><span>${formatMoney(receipt.subtotal)}</span></div>
+      <div class="row"><span>Discount</span><span>${formatMoney(receipt.discount)}</span></div>
+      <div class="row"><span>Total</span><span>${formatMoney(receipt.total)}</span></div>
+      <div class="row"><span>Tendered</span><span>${formatMoney(receipt.tendered_amount)}</span></div>
+      <div class="row"><span>Change</span><span>${formatMoney(receipt.change_amount)}</span></div>
+      <div class="note">Pending POS Sync</div>
+    </body>
+    </html>`;
+
+    const popup = window.open('', '_blank', 'width=780,height=680');
+    if (!popup) {
+      notifyError('Popup blocked. Please allow popups to print.', 3000);
+      return;
+    }
+
+    popup.document.open();
+    popup.document.write(html);
+    popup.document.close();
+    popup.focus();
+    popup.print();
+  }, []);
+
+  const submitSale = useCallback(async () => {
     if (cart.length === 0) {
-      notifyError('Add at least one product before completing sale', 2500);
+      notifyError('Invoice is empty', 2200);
       return;
     }
 
@@ -350,26 +384,51 @@ const AdminEmergencySales = () => {
       });
 
       const savedSale = response.data?.sale;
-      const receipt = response.data?.receipt;
-      setLastReceipt(receipt || null);
+      const receipt = response.data?.receipt || null;
+      setLastReceipt(receipt);
 
-      notifySuccess(`Emergency sale saved: ${savedSale?.sale_ref || ''}`, 3500);
+      notifySuccess(`Saved ${savedSale?.sale_ref || 'sale'}`, 2600);
 
       setShowPaymentDialog(false);
       clearInvoice();
-      await fetchEmergencySales();
+      fetchEmergencySales();
 
       if (receipt) {
         printReceipt(receipt);
       }
     } catch (error) {
-      notifyError(`Sale failed: ${error.response?.data?.error || error.message}`, 4000);
+      notifyError(`Sale failed: ${error.response?.data?.error || error.message}`, 3500);
     } finally {
       setIsSubmittingSale(false);
     }
-  };
+  }, [cart, clearInvoice, discountValue, fetchEmergencySales, paymentMethod, printReceipt, tendered]);
 
-  const toggleFullscreen = async () => {
+  const updateLineQty = useCallback((lineId, nextQtyRaw) => {
+    const nextQty = Math.max(0, parseInt(nextQtyRaw, 10) || 0);
+
+    setCart((prev) =>
+      prev
+        .map((line) => {
+          if (line.id !== lineId) return line;
+
+          if (nextQty === 0) return null;
+
+          if (nextQty > line.availableStock) {
+            notifyError(`Cannot exceed stock (${line.availableStock})`, 2200);
+            return line;
+          }
+
+          return {
+            ...line,
+            qty: nextQty,
+            lineTotal: toMoney(nextQty * line.unitPrice),
+          };
+        })
+        .filter(Boolean)
+    );
+  }, []);
+
+  const toggleFullscreen = useCallback(async () => {
     try {
       if (!document.fullscreenElement) {
         await (rootRef.current || document.documentElement).requestFullscreen();
@@ -377,41 +436,55 @@ const AdminEmergencySales = () => {
         await document.exitFullscreen();
       }
     } catch (error) {
-      notifyError(`Fullscreen failed: ${error.message}`, 3000);
+      notifyError(`Fullscreen failed: ${error.message}`, 2500);
     }
-  };
+  }, []);
 
-  const handleRetryFailedSale = async (saleId) => {
-    try {
-      await api.post(`/admin/emergency-sales/${saleId}/retry-sync`);
-      notifySuccess('Sale marked for retry', 2200);
-      await fetchEmergencySales();
-    } catch (error) {
-      notifyError(`Retry failed: ${error.response?.data?.error || error.message}`, 3500);
-    }
-  };
+  const openSearchModal = useCallback(() => {
+    setSearchModalOpen(true);
+    setSearchModalQuery('');
+    setSearchModalResults([]);
+  }, []);
+
+  const closeAllDialogs = useCallback(() => {
+    setSearchModalOpen(false);
+    setShowQuickMenu(false);
+    setShowPaymentDialog(false);
+  }, []);
 
   useEffect(() => {
+    const resetScanBuffer = () => {
+      scanBufferRef.current = '';
+      setBarcodeGhostValue('');
+    };
+
     const onKeyDown = (event) => {
       const targetTag = String(event.target?.tagName || '').toLowerCase();
-      const isTextInput = targetTag === 'input' || targetTag === 'textarea';
+      const isInputLike = targetTag === 'input' || targetTag === 'textarea' || targetTag === 'select';
 
-      if (event.key === 'F2') {
+      if (event.key === 'F1') {
         event.preventDefault();
-        focusBarcodeInput();
+        openSearchModal();
+        return;
+      }
+
+      if (event.key === 'F3') {
+        event.preventDefault();
+        focusCaptureInput();
+        notifyInfo('Invoice / scanner focus ready', 1200);
         return;
       }
 
       if (event.key === 'F4') {
         event.preventDefault();
-        clearInvoice();
+        setShowQuickMenu(true);
         return;
       }
 
       if (event.key === 'F6') {
         event.preventDefault();
         if (cart.length === 0) {
-          notifyError('Invoice is empty', 2000);
+          notifyError('Invoice is empty', 1800);
           return;
         }
         setTenderedAmount(String(total));
@@ -419,222 +492,280 @@ const AdminEmergencySales = () => {
         return;
       }
 
-      if (event.key === 'Delete' && !isTextInput) {
+      if (event.key === 'F8') {
+        event.preventDefault();
+        printReceipt(lastReceipt);
+        return;
+      }
+
+      if (event.key === 'F9') {
         event.preventDefault();
         removeSelectedRow();
         return;
       }
 
+      if (event.key === 'F10') {
+        event.preventDefault();
+        clearInvoice();
+        return;
+      }
+
+      if (event.key === 'F11') {
+        event.preventDefault();
+        toggleFullscreen();
+        return;
+      }
+
       if (event.key === 'Escape') {
-        if (showProductPicker) {
-          event.preventDefault();
-          setShowProductPicker(false);
-        } else if (showPaymentDialog) {
-          event.preventDefault();
-          setShowPaymentDialog(false);
-        }
+        event.preventDefault();
+        closeAllDialogs();
+        resetScanBuffer();
+        return;
       }
 
       if (event.key === 'Enter' && showPaymentDialog) {
-        const targetTag = String(event.target?.tagName || '').toLowerCase();
-        const allowConfirm = targetTag !== 'textarea';
-        if (allowConfirm) {
-          event.preventDefault();
-          if (!isSubmittingSale && cart.length > 0) {
-            submitSale();
-          }
+        event.preventDefault();
+        if (!isSubmittingSale) {
+          submitSale();
         }
+        return;
+      }
+
+      if (isPrintableKey(event) && !searchModalOpen && !showPaymentDialog) {
+        const now = Date.now();
+        if (now - scanLastKeyAtRef.current > 85) {
+          scanBufferRef.current = '';
+        }
+        scanLastKeyAtRef.current = now;
+        scanBufferRef.current += event.key;
+        setBarcodeGhostValue(scanBufferRef.current);
+
+        if (scanClearTimeoutRef.current) {
+          clearTimeout(scanClearTimeoutRef.current);
+        }
+        scanClearTimeoutRef.current = setTimeout(() => {
+          resetScanBuffer();
+        }, 180);
+        return;
+      }
+
+      if (event.key === 'Enter' && !searchModalOpen && !showPaymentDialog && scanBufferRef.current.length >= 4) {
+        event.preventDefault();
+        const scanned = scanBufferRef.current;
+        resetScanBuffer();
+        lookupAndAddFromScan(scanned);
+        return;
+      }
+
+      if (event.key === 'Delete' && !isInputLike) {
+        event.preventDefault();
+        removeSelectedRow();
       }
     };
 
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      if (scanClearTimeoutRef.current) {
+        clearTimeout(scanClearTimeoutRef.current);
+      }
+    };
   }, [
     cart.length,
     clearInvoice,
-    focusBarcodeInput,
-    removeSelectedRow,
-    showPaymentDialog,
-    showProductPicker,
+    closeAllDialogs,
+    focusCaptureInput,
     isSubmittingSale,
+    lastReceipt,
+    lookupAndAddFromScan,
+    openSearchModal,
+    printReceipt,
+    removeSelectedRow,
+    searchModalOpen,
+    showPaymentDialog,
     submitSale,
+    toggleFullscreen,
     total,
   ]);
 
+  const headerButtonStyle = {
+    border: '1px solid #5d5d5d',
+    borderRadius: '4px',
+    fontWeight: 700,
+    fontSize: '0.83rem',
+    minHeight: '52px',
+    minWidth: '88px',
+    cursor: 'pointer',
+  };
+
   return (
-    <div ref={rootRef} style={{ padding: '1.5rem' }}>
-      <div style={{
+    <div
+      ref={rootRef}
+      style={{
+        height: 'calc(100vh - 112px)',
+        overflow: 'hidden',
+        backgroundColor: '#d7d9de',
+        border: '2px solid #7a7d86',
+        borderRadius: '8px',
+        padding: '0.65rem',
+        boxSizing: 'border-box',
         display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '0.75rem',
-        marginBottom: '1rem',
+        flexDirection: 'column',
+        color: '#101010',
+      }}
+    >
+      <input
+        ref={hiddenBarcodeInputRef}
+        value={barcodeGhostValue}
+        onChange={(e) => setBarcodeGhostValue(e.target.value)}
+        style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 1, height: 1 }}
+        aria-hidden="true"
+      />
+
+      <div style={{
+        backgroundColor: '#bfc3ff',
+        border: '1px solid #8e92c3',
+        borderRadius: '6px',
+        padding: '0.55rem 0.75rem',
+        marginBottom: '0.55rem',
       }}>
-        <div>
-          <h2 style={{ margin: 0, color: '#2d2d2d' }}>Emergency Sale / Invoice Panel</h2>
-          <p style={{ margin: '0.35rem 0 0 0', color: '#666', fontSize: '0.9rem' }}>
-            Internal in-shop fallback cashier panel. Receipts print immediately while POS sync happens later.
-          </p>
+        <div style={{ textAlign: 'center', fontWeight: 800, fontSize: '1.7rem', letterSpacing: '0.4px', marginBottom: '0.45rem' }}>
+          EMERGENCY SALE - Citi Nati Supermarket
         </div>
-        <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <button onClick={toggleFullscreen} style={{
-            border: '1px solid #888',
-            backgroundColor: '#fff',
-            color: '#333',
-            borderRadius: '6px',
-            padding: '0.6rem 0.9rem',
-            cursor: 'pointer',
-            fontWeight: 600,
-          }}>
-            <i className="fas fa-expand" style={{ marginRight: '0.4rem' }}></i>
-            Fullscreen
-          </button>
-          <button onClick={() => setShowPaymentDialog(true)} disabled={cart.length === 0} style={{
-            border: 'none',
-            backgroundColor: '#2e7d32',
-            color: '#fff',
-            borderRadius: '6px',
-            padding: '0.6rem 1rem',
-            cursor: cart.length === 0 ? 'not-allowed' : 'pointer',
-            fontWeight: 700,
-            opacity: cart.length === 0 ? 0.6 : 1,
-          }}>
-            <i className="fas fa-cash-register" style={{ marginRight: '0.4rem' }}></i>
-            Sale (F6)
-          </button>
+
+        <div style={{ display: 'flex', gap: '0.42rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <button onClick={openSearchModal} style={{ ...headerButtonStyle, backgroundColor: '#98f28f' }}>SEARCH<br />[F1]</button>
+          <button onClick={focusCaptureInput} style={{ ...headerButtonStyle, backgroundColor: '#ffe568' }}>CS / INV<br />[F3]</button>
+          <button onClick={() => setShowQuickMenu(true)} style={{ ...headerButtonStyle, backgroundColor: '#f8bd75' }}>Q. MENU<br />[F4]</button>
+          <button onClick={() => setShowPaymentDialog(true)} style={{ ...headerButtonStyle, backgroundColor: '#f4afd8' }}>SAVE<br />[F6]</button>
+          <button onClick={() => printReceipt(lastReceipt)} style={{ ...headerButtonStyle, backgroundColor: '#ffc6ba' }}>PRINT<br />[F8]</button>
+          <button onClick={removeSelectedRow} style={{ ...headerButtonStyle, backgroundColor: '#ff6248', color: '#fff' }}>DELETE<br />[F9]</button>
+          <button onClick={clearInvoice} style={{ ...headerButtonStyle, backgroundColor: '#ecf0a8' }}>NEW<br />[F10]</button>
+          <button onClick={toggleFullscreen} style={{ ...headerButtonStyle, backgroundColor: '#ece3a8' }}>FULL<br />[F11]</button>
         </div>
       </div>
 
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '2.1fr 1fr',
-        gap: '1rem',
+        gridTemplateColumns: '2.2fr 1fr',
+        gap: '0.55rem',
+        flex: 1,
+        minHeight: 0,
       }}>
-        <div style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr auto auto', gap: '0.6rem', marginBottom: '0.8rem' }}>
-            <input
-              ref={barcodeInputRef}
-              placeholder="Scan barcode / code then press Enter"
-              value={barcodeQuery}
-              onChange={(e) => setBarcodeQuery(e.target.value)}
-              onKeyDown={onBarcodeEnter}
-              style={{ padding: '0.7rem', borderRadius: '6px', border: '1px solid #ccc', fontWeight: 600 }}
-            />
-            <input
-              placeholder="Manual search by barcode, code, or name"
-              value={manualSearch}
-              onChange={(e) => setManualSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  runProductLookup(manualSearch);
-                }
-              }}
-              style={{ padding: '0.7rem', borderRadius: '6px', border: '1px solid #ccc' }}
-            />
-            <button
-              onClick={() => runProductLookup(manualSearch)}
-              style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '6px', padding: '0.7rem 1rem', cursor: 'pointer', fontWeight: 700 }}
-            >
-              Search
-            </button>
-            <button
-              onClick={clearInvoice}
-              style={{ border: '1px solid #c62828', backgroundColor: '#fff', color: '#c62828', borderRadius: '6px', padding: '0.7rem 0.8rem', cursor: 'pointer', fontWeight: 700 }}
-            >
-              Clear (F4)
-            </button>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
+          backgroundColor: '#cfd2ff',
+          border: '1px solid #8f92c8',
+          borderRadius: '6px',
+          padding: '0.5rem',
+        }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 0.7fr 0.7fr',
+            gap: '0.5rem',
+            marginBottom: '0.4rem',
+          }}>
+            <div style={{ backgroundColor: '#000', borderRadius: '4px', padding: '0.45rem 0.55rem' }}>
+              <div style={{ color: '#ff4f4f', fontWeight: 700, fontSize: '0.78rem' }}>TOTAL DUE</div>
+              <div style={{ color: '#00ff66', fontFamily: 'Consolas, monospace', fontWeight: 800, fontSize: '2rem', textAlign: 'right', lineHeight: 1.1 }}>
+                {formatMoney(total)}
+              </div>
+            </div>
+            <div style={{ backgroundColor: '#000', borderRadius: '4px', padding: '0.45rem 0.55rem' }}>
+              <div style={{ color: '#ff4f4f', fontWeight: 700, fontSize: '0.78rem' }}>DISCOUNT</div>
+              <div style={{ color: '#00ff66', fontFamily: 'Consolas, monospace', fontWeight: 800, fontSize: '1.5rem', textAlign: 'right', lineHeight: 1.1 }}>
+                {formatMoney(discountValue)}
+              </div>
+            </div>
+            <div style={{ backgroundColor: '#000', borderRadius: '4px', padding: '0.45rem 0.55rem' }}>
+              <div style={{ color: '#ff4f4f', fontWeight: 700, fontSize: '0.78rem' }}>ITEMS</div>
+              <div style={{ color: '#00ff66', fontFamily: 'Consolas, monospace', fontWeight: 800, fontSize: '1.5rem', textAlign: 'right', lineHeight: 1.1 }}>
+                {cart.length}
+              </div>
+            </div>
           </div>
 
-          <div style={{ overflowX: 'auto', maxHeight: '54vh', overflowY: 'auto', border: '1px solid #ececec', borderRadius: '8px' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '880px' }}>
-              <thead style={{ position: 'sticky', top: 0, backgroundColor: '#f8f8f8', zIndex: 1 }}>
-                <tr>
-                  <th style={{ padding: '0.7rem', textAlign: 'center' }}>#</th>
-                  <th style={{ padding: '0.7rem', textAlign: 'left' }}>Barcode</th>
-                  <th style={{ padding: '0.7rem', textAlign: 'left' }}>Product Code</th>
-                  <th style={{ padding: '0.7rem', textAlign: 'left' }}>Product Name</th>
-                  <th style={{ padding: '0.7rem', textAlign: 'right' }}>Unit Price</th>
-                  <th style={{ padding: '0.7rem', textAlign: 'center' }}>Qty</th>
-                  <th style={{ padding: '0.7rem', textAlign: 'right' }}>Line Total</th>
-                  <th style={{ padding: '0.7rem', textAlign: 'center' }}>Action</th>
+          <div style={{
+            flex: 1,
+            minHeight: 0,
+            border: '1px solid #9195d5',
+            backgroundColor: '#fff',
+            borderRadius: '5px',
+            overflow: 'hidden',
+          }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#b9bdf6', color: '#141414' }}>
+                  <th style={{ padding: '0.38rem', width: '40px', borderBottom: '1px solid #8f93d2' }}>#</th>
+                  <th style={{ padding: '0.38rem', width: '120px', borderBottom: '1px solid #8f93d2' }}>Barcode</th>
+                  <th style={{ padding: '0.38rem', width: '140px', borderBottom: '1px solid #8f93d2' }}>Product Code</th>
+                  <th style={{ padding: '0.38rem', borderBottom: '1px solid #8f93d2' }}>Product</th>
+                  <th style={{ padding: '0.38rem', width: '115px', borderBottom: '1px solid #8f93d2', textAlign: 'right' }}>Unit Price</th>
+                  <th style={{ padding: '0.38rem', width: '132px', borderBottom: '1px solid #8f93d2', textAlign: 'center' }}>Qty</th>
+                  <th style={{ padding: '0.38rem', width: '120px', borderBottom: '1px solid #8f93d2', textAlign: 'right' }}>Amount</th>
                 </tr>
               </thead>
               <tbody>
                 {cart.length === 0 && (
                   <tr>
-                    <td colSpan={8} style={{ textAlign: 'center', padding: '1.4rem', color: '#777' }}>No items in invoice</td>
+                    <td colSpan={7} style={{ padding: '1rem', textAlign: 'center', color: '#666', fontWeight: 600 }}>
+                      Scan product code now. No need to focus a search box first.
+                    </td>
                   </tr>
                 )}
-                {cart.map((line, index) => (
+                {cart.slice(0, 13).map((line, index) => (
                   <tr
                     key={line.id}
                     onClick={() => setSelectedRowId(line.id)}
                     style={{
-                      backgroundColor: selectedRowId === line.id ? '#ede7f6' : '#fff',
-                      borderBottom: '1px solid #eee',
+                      backgroundColor: selectedRowId === line.id ? '#e8ecff' : '#fff',
+                      borderBottom: '1px solid #ececff',
                       cursor: 'pointer',
                     }}
                   >
-                    <td style={{ padding: '0.65rem', textAlign: 'center' }}>{index + 1}</td>
-                    <td style={{ padding: '0.65rem' }}>{line.barcode}</td>
-                    <td style={{ padding: '0.65rem', fontFamily: 'monospace' }}>{line.productCode}</td>
-                    <td style={{ padding: '0.65rem' }}>{line.productName}</td>
-                    <td style={{ padding: '0.65rem', textAlign: 'right', fontWeight: 600 }}>{formatMoney(line.unitPrice)}</td>
-                    <td style={{ padding: '0.65rem', textAlign: 'center' }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                        <button onClick={(e) => { e.stopPropagation(); updateLineQty(line.id, line.qty - 1); }} style={{ border: '1px solid #ccc', backgroundColor: '#fff', borderRadius: '4px', width: '28px', cursor: 'pointer' }}>-</button>
+                    <td style={{ padding: '0.34rem', textAlign: 'center' }}>{index + 1}</td>
+                    <td style={{ padding: '0.34rem' }}>{line.barcode}</td>
+                    <td style={{ padding: '0.34rem', fontFamily: 'Consolas, monospace' }}>{line.productCode}</td>
+                    <td style={{ padding: '0.34rem' }}>{line.productName}</td>
+                    <td style={{ padding: '0.34rem', textAlign: 'right', fontWeight: 700 }}>{formatMoney(line.unitPrice)}</td>
+                    <td style={{ padding: '0.34rem', textAlign: 'center' }}>
+                      <div style={{ display: 'inline-flex', gap: '0.18rem', alignItems: 'center' }}>
+                        <button onClick={(e) => { e.stopPropagation(); updateLineQty(line.id, line.qty - 1); }} style={{ border: '1px solid #999', borderRadius: '4px', backgroundColor: '#fff', width: '22px', cursor: 'pointer' }}>-</button>
                         <input
                           type="number"
                           min="1"
                           value={line.qty}
                           onClick={(e) => e.stopPropagation()}
                           onChange={(e) => updateLineQty(line.id, e.target.value)}
-                          style={{ width: '52px', textAlign: 'center', border: '1px solid #ccc', borderRadius: '4px', padding: '0.2rem' }}
+                          style={{ width: '46px', textAlign: 'center', border: '1px solid #aaa', borderRadius: '4px', padding: '0.16rem' }}
                         />
-                        <button onClick={(e) => { e.stopPropagation(); updateLineQty(line.id, line.qty + 1); }} style={{ border: '1px solid #ccc', backgroundColor: '#fff', borderRadius: '4px', width: '28px', cursor: 'pointer' }}>+</button>
+                        <button onClick={(e) => { e.stopPropagation(); updateLineQty(line.id, line.qty + 1); }} style={{ border: '1px solid #999', borderRadius: '4px', backgroundColor: '#fff', width: '22px', cursor: 'pointer' }}>+</button>
                       </div>
                     </td>
-                    <td style={{ padding: '0.65rem', textAlign: 'right', fontWeight: 700 }}>{formatMoney(line.lineTotal)}</td>
-                    <td style={{ padding: '0.65rem', textAlign: 'center' }}>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setCart((prev) => prev.filter((p) => p.id !== line.id));
-                          if (selectedRowId === line.id) setSelectedRowId(null);
-                        }}
-                        style={{ border: '1px solid #c62828', color: '#c62828', backgroundColor: '#fff', borderRadius: '4px', padding: '0.25rem 0.5rem', cursor: 'pointer' }}
-                      >
-                        Remove
-                      </button>
-                    </td>
+                    <td style={{ padding: '0.34rem', textAlign: 'right', fontWeight: 800 }}>{formatMoney(line.lineTotal)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.8rem' }}>
-            <div style={{ color: '#666', fontSize: '0.9rem' }}>
-              Shortcuts: F2 Focus Search | F4 Clear | F6 Sale | Delete Remove | Esc Close Dialog
-            </div>
-            <button
-              onClick={removeSelectedRow}
-              disabled={!selectedRowId}
-              style={{ border: '1px solid #c62828', color: '#c62828', backgroundColor: '#fff', borderRadius: '6px', padding: '0.45rem 0.8rem', cursor: selectedRowId ? 'pointer' : 'not-allowed', opacity: selectedRowId ? 1 : 0.6 }}
-            >
-              Remove Selected (Delete)
-            </button>
+          <div style={{ marginTop: '0.35rem', fontSize: '0.82rem', color: '#282828', fontWeight: 600 }}>
+            Scanner Buffer: {barcodeGhostValue || 'ready'}
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
-            <h3 style={{ marginTop: 0, marginBottom: '0.8rem' }}>Invoice Summary</h3>
-            <div style={{ display: 'grid', gap: '0.45rem', marginBottom: '0.8rem' }}>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.55rem',
+          minHeight: 0,
+        }}>
+          <div style={{ backgroundColor: '#fff', border: '1px solid #aab', borderRadius: '6px', padding: '0.6rem' }}>
+            <div style={{ fontWeight: 800, marginBottom: '0.45rem' }}>Invoice Summary</div>
+            <div style={{ display: 'grid', gap: '0.3rem', fontSize: '0.9rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Cashier</span><strong>{user?.name || user?.email || 'Admin'}</strong></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Items</span><strong>{cart.length}</strong></div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Subtotal</span><strong>{formatMoney(subtotal)}</strong></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>Discount</span>
@@ -644,152 +775,160 @@ const AdminEmergencySales = () => {
                   step="0.01"
                   value={discount}
                   onChange={(e) => setDiscount(e.target.value)}
-                  style={{ width: '110px', textAlign: 'right', borderRadius: '4px', border: '1px solid #ccc', padding: '0.3rem' }}
+                  style={{ width: '96px', border: '1px solid #9aa', borderRadius: '4px', textAlign: 'right', padding: '0.2rem' }}
                 />
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #eee', paddingTop: '0.55rem', fontSize: '1.05rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #ddd', paddingTop: '0.35rem', fontSize: '1rem' }}>
                 <span>Total</span>
-                <strong style={{ color: '#2e7d32' }}>{formatMoney(total)}</strong>
+                <strong style={{ color: '#1f6d2c' }}>{formatMoney(total)}</strong>
               </div>
             </div>
-            <button onClick={() => setShowPaymentDialog(true)} disabled={cart.length === 0} style={{
-              width: '100%',
-              border: 'none',
-              backgroundColor: '#2e7d32',
-              color: '#fff',
-              borderRadius: '6px',
-              padding: '0.75rem',
-              fontWeight: 700,
-              cursor: cart.length === 0 ? 'not-allowed' : 'pointer',
-              opacity: cart.length === 0 ? 0.6 : 1,
-            }}>
-              Complete Sale (F6)
-            </button>
           </div>
 
-          <div style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
-            <h3 style={{ marginTop: 0, marginBottom: '0.8rem' }}>Sync Status Snapshot</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
-              {Object.keys(salesSummary).map((key) => (
-                <div key={key} style={{ border: `1px solid ${STATUS_COLORS[key]}55`, borderRadius: '6px', padding: '0.55rem', textAlign: 'center', backgroundColor: `${STATUS_COLORS[key]}15` }}>
-                  <div style={{ fontSize: '0.75rem', color: '#555' }}>{STATUS_LABELS[key]}</div>
-                  <div style={{ fontSize: '1.2rem', fontWeight: 800, color: STATUS_COLORS[key] }}>{salesSummary[key] || 0}</div>
+          <div style={{ backgroundColor: '#fff', border: '1px solid #aab', borderRadius: '6px', padding: '0.6rem' }}>
+            <div style={{ fontWeight: 800, marginBottom: '0.45rem' }}>Sync Counters</div>
+            <div style={{ display: 'grid', gap: '0.32rem' }}>
+              {Object.keys(salesSummary).map((status) => (
+                <div key={status} style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  border: `1px solid ${STATUS_COLORS[status]}66`,
+                  borderRadius: '4px',
+                  backgroundColor: `${STATUS_COLORS[status]}17`,
+                  padding: '0.28rem 0.4rem',
+                  fontSize: '0.86rem',
+                }}>
+                  <span>{STATUS_LABELS[status]}</span>
+                  <strong>{salesSummary[status] || 0}</strong>
                 </div>
               ))}
             </div>
           </div>
 
-          {lastReceipt && (
-            <div style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
-              <h3 style={{ marginTop: 0, marginBottom: '0.6rem' }}>Last Receipt</h3>
-              <div style={{ fontSize: '0.9rem', color: '#444', marginBottom: '0.7rem' }}>
-                <div><strong>Sale Ref:</strong> {lastReceipt.sale_ref}</div>
-                <div><strong>Total:</strong> {formatMoney(lastReceipt.total)}</div>
-                <div><strong>Status:</strong> Pending POS Sync</div>
+          <div style={{
+            flex: 1,
+            minHeight: 0,
+            backgroundColor: '#fff',
+            border: '1px solid #aab',
+            borderRadius: '6px',
+            padding: '0.6rem',
+            overflow: 'hidden',
+          }}>
+            <div style={{ fontWeight: 800, marginBottom: '0.45rem' }}>Recent Emergency Sales</div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f1f2f8' }}>
+                  <th style={{ textAlign: 'left', padding: '0.25rem' }}>Ref</th>
+                  <th style={{ textAlign: 'right', padding: '0.25rem' }}>Total</th>
+                  <th style={{ textAlign: 'left', padding: '0.25rem' }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sales.length === 0 && (
+                  <tr>
+                    <td colSpan={3} style={{ padding: '0.5rem', textAlign: 'center', color: '#666' }}>No sales</td>
+                  </tr>
+                )}
+                {sales.slice(0, 8).map((sale) => (
+                  <tr key={sale.id} style={{ borderBottom: '1px solid #eef' }}>
+                    <td style={{ padding: '0.26rem', fontFamily: 'Consolas, monospace' }}>{sale.sale_ref}</td>
+                    <td style={{ padding: '0.26rem', textAlign: 'right', fontWeight: 700 }}>{formatMoney(sale.total)}</td>
+                    <td style={{ padding: '0.26rem', color: STATUS_COLORS[sale.sync_status] || '#555', fontWeight: 700 }}>
+                      {STATUS_LABELS[sale.sync_status] || sale.sync_status}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {lastReceipt && (
+              <div style={{ marginTop: '0.45rem' }}>
+                <button onClick={() => printReceipt(lastReceipt)} style={{
+                  width: '100%',
+                  border: '1px solid #5e61a8',
+                  backgroundColor: '#e8e9ff',
+                  color: '#252867',
+                  borderRadius: '4px',
+                  padding: '0.38rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}>
+                  Reprint Last Receipt (F8)
+                </button>
               </div>
-              <button onClick={() => printReceipt(lastReceipt)} style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '6px', padding: '0.55rem 0.85rem', cursor: 'pointer', fontWeight: 700 }}>
-                <i className="fas fa-print" style={{ marginRight: '0.4rem' }}></i>
-                Print Again
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '1rem', marginTop: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.7rem', flexWrap: 'wrap', gap: '0.6rem' }}>
-          <h3 style={{ margin: 0 }}>Emergency Sales Monitoring</h3>
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <input
-              placeholder="Search sale ref or cashier"
-              value={salesSearch}
-              onChange={(e) => setSalesSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') fetchEmergencySales();
-              }}
-              style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-            />
-            <select value={salesStatusFilter} onChange={(e) => setSalesStatusFilter(e.target.value)} style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}>
-              <option value="all">All</option>
-              <option value="pending_pos_sync">Pending</option>
-              <option value="synced_to_pos">Synced</option>
-              <option value="sync_failed">Failed</option>
-            </select>
-            <button onClick={fetchEmergencySales} style={{ border: 'none', backgroundColor: '#1f4f8f', color: '#fff', borderRadius: '4px', padding: '0.5rem 0.8rem', cursor: 'pointer' }}>
-              Refresh
-            </button>
+            )}
           </div>
         </div>
-
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '920px' }}>
-            <thead>
-              <tr style={{ backgroundColor: '#f7f7f7' }}>
-                <th style={{ padding: '0.6rem', textAlign: 'left' }}>Sale Ref</th>
-                <th style={{ padding: '0.6rem', textAlign: 'left' }}>Created</th>
-                <th style={{ padding: '0.6rem', textAlign: 'left' }}>Cashier</th>
-                <th style={{ padding: '0.6rem', textAlign: 'right' }}>Total</th>
-                <th style={{ padding: '0.6rem', textAlign: 'left' }}>Status</th>
-                <th style={{ padding: '0.6rem', textAlign: 'center' }}>Retry</th>
-                <th style={{ padding: '0.6rem', textAlign: 'left' }}>Sync Error</th>
-                <th style={{ padding: '0.6rem', textAlign: 'left' }}>POS Invoice</th>
-                <th style={{ padding: '0.6rem', textAlign: 'center' }}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {salesLoading && (
-                <tr>
-                  <td colSpan={9} style={{ padding: '1rem', textAlign: 'center', color: '#666' }}>Loading emergency sales...</td>
-                </tr>
-              )}
-              {!salesLoading && sales.length === 0 && (
-                <tr>
-                  <td colSpan={9} style={{ padding: '1rem', textAlign: 'center', color: '#666' }}>No emergency sales found</td>
-                </tr>
-              )}
-              {!salesLoading && sales.map((sale) => (
-                <tr key={sale.id} style={{ borderBottom: '1px solid #eee' }}>
-                  <td style={{ padding: '0.55rem', fontFamily: 'monospace' }}>{sale.sale_ref}</td>
-                  <td style={{ padding: '0.55rem' }}>{formatDateTime(sale.createdAt)}</td>
-                  <td style={{ padding: '0.55rem' }}>{sale.cashier_name || '-'}</td>
-                  <td style={{ padding: '0.55rem', textAlign: 'right', fontWeight: 700 }}>{formatMoney(sale.total)}</td>
-                  <td style={{ padding: '0.55rem' }}>
-                    <span style={{
-                      padding: '0.25rem 0.55rem',
-                      borderRadius: '999px',
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                      backgroundColor: `${STATUS_COLORS[sale.sync_status] || '#555'}20`,
-                      color: STATUS_COLORS[sale.sync_status] || '#555',
-                    }}>
-                      {STATUS_LABELS[sale.sync_status] || sale.sync_status}
-                    </span>
-                  </td>
-                  <td style={{ padding: '0.55rem', textAlign: 'center' }}>{sale.retry_count}</td>
-                  <td style={{ padding: '0.55rem', color: '#a33', maxWidth: '260px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={sale.sync_error || ''}>
-                    {sale.sync_error || '-'}
-                  </td>
-                  <td style={{ padding: '0.55rem' }}>{sale.pos_invoice_no || '-'}</td>
-                  <td style={{ padding: '0.55rem', textAlign: 'center' }}>
-                    {sale.sync_status === 'sync_failed' ? (
-                      <button
-                        onClick={() => handleRetryFailedSale(sale.id)}
-                        style={{ border: '1px solid #f57c00', backgroundColor: '#fff7e6', color: '#a86500', borderRadius: '4px', padding: '0.25rem 0.5rem', cursor: 'pointer', fontWeight: 700 }}
-                      >
-                        Retry
-                      </button>
-                    ) : (
-                      '-'
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </div>
 
-      {showProductPicker && (
+      {searchModalOpen && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0,0,0,0.54)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1200,
+          padding: '1rem',
+        }}>
+          <div style={{
+            width: '100%',
+            maxWidth: '760px',
+            backgroundColor: '#fff',
+            borderRadius: '8px',
+            border: '2px solid #8b8ec6',
+            overflow: 'hidden',
+          }}>
+            <div style={{ backgroundColor: '#bfc3ff', padding: '0.65rem 0.9rem', fontWeight: 800, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>SEARCH PRODUCT [F1]</span>
+              <button onClick={() => setSearchModalOpen(false)} style={{ border: '1px solid #777', backgroundColor: '#fff', borderRadius: '4px', cursor: 'pointer' }}>Esc</button>
+            </div>
+            <div style={{ padding: '0.8rem' }}>
+              <input
+                ref={searchModalInputRef}
+                value={searchModalQuery}
+                onChange={(e) => setSearchModalQuery(e.target.value)}
+                placeholder="Type barcode, code, or product name..."
+                style={{ width: '100%', padding: '0.66rem', borderRadius: '4px', border: '1px solid #8f8f8f', fontWeight: 600 }}
+              />
+              <div style={{ marginTop: '0.65rem', border: '1px solid #ddd', borderRadius: '4px', maxHeight: '48vh', overflowY: 'auto' }}>
+                {searchModalLoading && <div style={{ padding: '0.7rem', color: '#666' }}>Searching...</div>}
+                {!searchModalLoading && searchModalResults.length === 0 && (
+                  <div style={{ padding: '0.7rem', color: '#666' }}>No results</div>
+                )}
+                {!searchModalLoading && searchModalResults.map((product) => (
+                  <button
+                    key={product.id}
+                    onClick={() => {
+                      addProductToCart(product, 1);
+                      setSearchModalOpen(false);
+                      setSearchModalQuery('');
+                      setSearchModalResults([]);
+                      notifySuccess(`${product.name} added`, 1400);
+                    }}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      border: 'none',
+                      borderBottom: '1px solid #eee',
+                      backgroundColor: '#fff',
+                      padding: '0.56rem 0.7rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{ fontWeight: 700 }}>{product.name}</div>
+                    <div style={{ fontSize: '0.82rem', color: '#666' }}>
+                      Code: {product.sourceCode || '-'} | Barcode: {product.barcode || '-'} | Stock: {product.effective_stock ?? product.effectiveStock ?? product.stock ?? 0} | Price: {formatMoney(product.unitPrice ?? product.unit_price ?? product.price)}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showQuickMenu && (
         <div style={{
           position: 'fixed',
           inset: 0,
@@ -797,49 +936,15 @@ const AdminEmergencySales = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 1100,
-          padding: '1rem',
+          zIndex: 1250,
         }}>
-          <div style={{ backgroundColor: '#fff', borderRadius: '8px', width: '100%', maxWidth: '760px', maxHeight: '80vh', overflow: 'hidden' }}>
-            <div style={{ padding: '0.9rem 1rem', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <strong>{pickerTitle}</strong>
-              <button onClick={() => setShowProductPicker(false)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
-            </div>
-            <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#f8f8f8' }}>
-                    <th style={{ textAlign: 'left', padding: '0.65rem' }}>Code</th>
-                    <th style={{ textAlign: 'left', padding: '0.65rem' }}>Name</th>
-                    <th style={{ textAlign: 'right', padding: '0.65rem' }}>Price</th>
-                    <th style={{ textAlign: 'right', padding: '0.65rem' }}>Stock</th>
-                    <th style={{ textAlign: 'center', padding: '0.65rem' }}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {productPickerResults.map((product) => (
-                    <tr key={product.id} style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={{ padding: '0.65rem', fontFamily: 'monospace' }}>{product.sourceCode || '-'}</td>
-                      <td style={{ padding: '0.65rem' }}>{product.name}</td>
-                      <td style={{ padding: '0.65rem', textAlign: 'right' }}>{formatMoney(product.unitPrice ?? product.unit_price ?? product.price)}</td>
-                      <td style={{ padding: '0.65rem', textAlign: 'right' }}>{product.effective_stock ?? product.effectiveStock ?? product.stock ?? 0}</td>
-                      <td style={{ padding: '0.65rem', textAlign: 'center' }}>
-                        <button
-                          onClick={() => {
-                            addProductToCart(product, 1);
-                            setShowProductPicker(false);
-                            setProductPickerResults([]);
-                            focusBarcodeInput();
-                          }}
-                          style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '4px', padding: '0.35rem 0.6rem', cursor: 'pointer' }}
-                        >
-                          Add
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <div style={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #999', padding: '1rem', minWidth: '280px' }}>
+            <div style={{ fontWeight: 800, marginBottom: '0.6rem' }}>Quick Menu [F4]</div>
+            <div style={{ display: 'grid', gap: '0.45rem' }}>
+              <button onClick={() => { setShowQuickMenu(false); clearInvoice(); }} style={{ border: '1px solid #999', backgroundColor: '#fff', borderRadius: '4px', padding: '0.4rem', cursor: 'pointer' }}>New Invoice [F10]</button>
+              <button onClick={() => { setShowQuickMenu(false); setShowPaymentDialog(true); }} style={{ border: '1px solid #999', backgroundColor: '#fff', borderRadius: '4px', padding: '0.4rem', cursor: 'pointer' }}>Save / Sale [F6]</button>
+              <button onClick={() => { setShowQuickMenu(false); printReceipt(lastReceipt); }} style={{ border: '1px solid #999', backgroundColor: '#fff', borderRadius: '4px', padding: '0.4rem', cursor: 'pointer' }}>Print [F8]</button>
+              <button onClick={() => setShowQuickMenu(false)} style={{ border: '1px solid #999', backgroundColor: '#f5f5f5', borderRadius: '4px', padding: '0.4rem', cursor: 'pointer' }}>Close [Esc]</button>
             </div>
           </div>
         </div>
@@ -849,59 +954,61 @@ const AdminEmergencySales = () => {
         <div style={{
           position: 'fixed',
           inset: 0,
-          backgroundColor: 'rgba(0,0,0,0.55)',
+          backgroundColor: 'rgba(0,0,0,0.6)',
           display: 'flex',
-          justifyContent: 'center',
           alignItems: 'center',
-          zIndex: 1200,
+          justifyContent: 'center',
+          zIndex: 1300,
           padding: '1rem',
         }}>
-          <div style={{ backgroundColor: '#fff', borderRadius: '8px', width: '100%', maxWidth: '460px', padding: '1.2rem' }}>
-            <h3 style={{ marginTop: 0, marginBottom: '0.9rem' }}>Confirm Emergency Sale</h3>
-
-            <div style={{ display: 'grid', gap: '0.55rem', marginBottom: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Total Amount</span><strong>{formatMoney(total)}</strong></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Payment Method</span>
-                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} style={{ border: '1px solid #ccc', borderRadius: '4px', padding: '0.35rem' }}>
-                  <option value="CASH">Cash</option>
-                  <option value="CARD">Card</option>
-                  <option value="MOBILE_MONEY">Mobile Money</option>
-                </select>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Tendered Amount</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={tenderedAmount}
-                  onChange={(e) => setTenderedAmount(e.target.value)}
-                  style={{ width: '150px', textAlign: 'right', borderRadius: '4px', border: '1px solid #ccc', padding: '0.35rem' }}
-                  autoFocus
-                />
-              </div>
-              {change > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#2e7d32' }}>
-                  <span>Change</span>
-                  <strong>{formatMoney(change)}</strong>
-                </div>
-              )}
-              {balanceDue > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#c62828' }}>
-                  <span>Balance Due</span>
-                  <strong>{formatMoney(balanceDue)}</strong>
-                </div>
-              )}
+          <div style={{
+            width: '100%',
+            maxWidth: '480px',
+            backgroundColor: '#fff',
+            borderRadius: '8px',
+            border: '2px solid #8f94c9',
+            overflow: 'hidden',
+          }}>
+            <div style={{ backgroundColor: '#bfc3ff', padding: '0.65rem 0.8rem', fontWeight: 800 }}>
+              CASH SALE / PAYMENT [F6]
             </div>
+            <div style={{ padding: '0.8rem' }}>
+              <div style={{ display: 'grid', gap: '0.4rem', marginBottom: '0.7rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Total</span><strong>{formatMoney(total)}</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Payment Method</span>
+                  <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} style={{ border: '1px solid #999', borderRadius: '4px', padding: '0.3rem' }}>
+                    <option value="CASH">Cash</option>
+                    <option value="CARD">Card</option>
+                    <option value="MOBILE_MONEY">Mobile Money</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Tendered</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={tenderedAmount}
+                    onChange={(e) => setTenderedAmount(e.target.value)}
+                    autoFocus
+                    style={{ width: '170px', border: '1px solid #999', borderRadius: '4px', padding: '0.3rem', textAlign: 'right' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#2e7d32' }}>
+                  <span>Change</span><strong>{formatMoney(change)}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: balanceDue > 0 ? '#c62828' : '#444' }}>
+                  <span>Balance Due</span><strong>{formatMoney(balanceDue)}</strong>
+                </div>
+              </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.55rem' }}>
-              <button onClick={() => setShowPaymentDialog(false)} disabled={isSubmittingSale} style={{ border: '1px solid #ccc', backgroundColor: '#fff', color: '#333', borderRadius: '4px', padding: '0.55rem 0.8rem', cursor: 'pointer' }}>
-                Cancel (Esc)
-              </button>
-              <button onClick={submitSale} disabled={isSubmittingSale || cart.length === 0} style={{ border: 'none', backgroundColor: '#2e7d32', color: '#fff', borderRadius: '4px', padding: '0.55rem 0.85rem', cursor: isSubmittingSale ? 'not-allowed' : 'pointer', opacity: isSubmittingSale ? 0.7 : 1, fontWeight: 700 }}>
-                {isSubmittingSale ? 'Saving...' : 'Confirm Sale (Enter)'}
-              </button>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                <button onClick={() => setShowPaymentDialog(false)} disabled={isSubmittingSale} style={{ border: '1px solid #888', backgroundColor: '#fff', borderRadius: '4px', padding: '0.45rem 0.65rem', cursor: 'pointer' }}>Cancel [Esc]</button>
+                <button onClick={submitSale} disabled={isSubmittingSale || cart.length === 0} style={{ border: 'none', backgroundColor: '#2e7d32', color: '#fff', borderRadius: '4px', padding: '0.45rem 0.72rem', cursor: isSubmittingSale ? 'not-allowed' : 'pointer', opacity: isSubmittingSale ? 0.7 : 1, fontWeight: 700 }}>
+                  {isSubmittingSale ? 'Saving...' : 'Confirm [Enter]'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
