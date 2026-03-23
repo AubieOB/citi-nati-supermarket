@@ -112,10 +112,6 @@ async function executeUpdateStock(pool, payload, commandId) {
     throw new Error('NON_RETRYABLE: UPDATE_STOCK requires a stock decrease (newStock < oldStock)');
   }
 
-  // Run schema alignment outside the transaction so ALTER TABLE failures
-  // (e.g. pos_sync_writer lacks DDL permissions) cannot abort DML work.
-  await stockUpdates.ensureProductCodeSchemaCapacity(pool);
-
   const transaction = new sql.Transaction(pool);
 
   try {
