@@ -433,21 +433,77 @@ async function createEmergencySale(req, res) {
 
 async function listEmergencySales(req, res) {
   try {
-    const page = Math.max(1, toSafeInt(req.query.page, 1));
-    const pageSize = Math.min(100, Math.max(1, toSafeInt(req.query.pageSize, 20)));
-    const skip = (page - 1) * pageSize;
+    const reportMode = String(req.query.reportMode || '').trim().toLowerCase() === 'all';
+    const page = reportMode ? 1 : Math.max(1, toSafeInt(req.query.page, 1));
+    const pageSize = reportMode ? 5000 : Math.min(100, Math.max(1, toSafeInt(req.query.pageSize, 20)));
+    const skip = reportMode ? 0 : (page - 1) * pageSize;
     const status = String(req.query.status || '').trim();
     const search = String(req.query.search || '').trim();
+    const cashier = String(req.query.cashier || '').trim();
+    const product = String(req.query.product || '').trim();
+    const startDate = String(req.query.startDate || '').trim();
+    const endDate = String(req.query.endDate || '').trim();
 
-    const where = {
-      ...(status && status !== 'all' ? { syncStatus: status } : {}),
-      ...(search ? {
+    const andClauses = [];
+
+    if (status && status !== 'all') {
+      andClauses.push({ syncStatus: status });
+    }
+
+    if (search) {
+      andClauses.push({
         OR: [
           { saleRef: { contains: search, mode: 'insensitive' } },
           { cashierName: { contains: search, mode: 'insensitive' } },
         ],
-      } : {}),
-    };
+      });
+    }
+
+    if (cashier) {
+      andClauses.push({
+        OR: [
+          { cashierName: { contains: cashier, mode: 'insensitive' } },
+          { cashierId: { contains: cashier, mode: 'insensitive' } },
+        ],
+      });
+    }
+
+    const createdAt = {};
+    if (startDate) {
+      const parsedStartDate = new Date(startDate);
+      if (Number.isFinite(parsedStartDate.getTime())) {
+        parsedStartDate.setHours(0, 0, 0, 0);
+        createdAt.gte = parsedStartDate;
+      }
+    }
+    if (endDate) {
+      const parsedEndDate = new Date(endDate);
+      if (Number.isFinite(parsedEndDate.getTime())) {
+        parsedEndDate.setHours(23, 59, 59, 999);
+        createdAt.lte = parsedEndDate;
+      }
+    }
+    if (Object.keys(createdAt).length > 0) {
+      andClauses.push({ createdAt });
+    }
+
+    if (product) {
+      const productId = toSafeInt(product);
+      andClauses.push({
+        items: {
+          some: {
+            OR: [
+              { productName: { contains: product, mode: 'insensitive' } },
+              { productCode: { contains: product, mode: 'insensitive' } },
+              { barcode: { contains: product, mode: 'insensitive' } },
+              ...(productId ? [{ productId }] : []),
+            ],
+          },
+        },
+      });
+    }
+
+    const where = andClauses.length > 0 ? { AND: andClauses } : {};
 
     const [total, sales] = await Promise.all([
       prisma.emergencySale.count({ where }),
@@ -463,6 +519,7 @@ async function listEmergencySales(req, res) {
     ]);
 
     const summaryGroup = await prisma.emergencySale.groupBy({
+      where,
       by: ['syncStatus'],
       _count: { _all: true },
     });

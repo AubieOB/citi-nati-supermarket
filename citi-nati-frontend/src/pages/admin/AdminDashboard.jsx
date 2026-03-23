@@ -13,6 +13,7 @@ const AdminRefunds = React.lazy(() => import('../../components/admin/AdminRefund
 const AdminPromotions = React.lazy(() => import('../../components/admin/AdminPromotions.jsx'));
 const AdminStocks = React.lazy(() => import('../../components/admin/AdminStocks.jsx'));
 const AdminEmergencySales = React.lazy(() => import('../../components/admin/AdminEmergencySales.jsx'));
+const AdminEmergencySalesReports = React.lazy(() => import('../../components/admin/AdminEmergencySalesReports.jsx'));
 const AdminSecurity = React.lazy(() => import('../../components/admin/AdminSecurity.jsx'));
 const AdminSystem = React.lazy(() => import('../../components/admin/AdminSystem.jsx'));
 const AdminPOSManagement = React.lazy(() => import('./AdminPOSManagement.jsx'));
@@ -51,6 +52,7 @@ const AdminDashboard = () => {
     { id: 'products', label: 'Products', icon: 'fa-box' },
     { id: 'stocks', label: 'Stocks', icon: 'fa-warehouse' },
     { id: 'emergency-sales', label: 'Emergency Sale', icon: 'fa-cash-register' },
+    { id: 'emergency-sales-reports', label: 'Emergency Reports', icon: 'fa-file-alt' },
     { id: 'system', label: 'System', icon: 'fa-cogs' },
     { id: 'promotions', label: 'Promotions', icon: 'fa-tags' },
     { id: 'pos-management', label: 'POS Management', icon: 'fa-database' },
@@ -258,6 +260,7 @@ const AdminDashboard = () => {
             {activeTab === 'products' && <AdminProducts />}
             {activeTab === 'stocks' && <AdminStocks />}
             {activeTab === 'emergency-sales' && <AdminEmergencySales />}
+            {activeTab === 'emergency-sales-reports' && <AdminEmergencySalesReports />}
             {activeTab === 'system' && <AdminSystem />}
             {activeTab === 'security' && <AdminSecurity />}
             {activeTab === 'promotions' && <AdminPromotions />}

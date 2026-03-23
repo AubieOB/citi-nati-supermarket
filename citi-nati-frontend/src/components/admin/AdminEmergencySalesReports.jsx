@@ -1,0 +1,671 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import api from '../../utils/api.js';
+import { notifyError, notifySuccess } from '../../utils/notifications.js';
+
+const TAB_DEFS = [
+  { id: 'overview', label: 'Overview', icon: 'fa-chart-pie' },
+  { id: 'sales', label: 'Sales Log', icon: 'fa-receipt' },
+  { id: 'products', label: 'By Product', icon: 'fa-box-open' },
+  { id: 'cashiers', label: 'By Cashier', icon: 'fa-user-tie' },
+];
+
+const STATUS_LABELS = {
+  pending_pos_sync: 'Pending POS Sync',
+  synced_to_pos: 'Synced to POS',
+  sync_failed: 'Sync Failed',
+};
+
+function toMoney(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Number(parsed.toFixed(2));
+}
+
+function formatMoney(value) {
+  return toMoney(value).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function formatDateTime(value) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleString();
+}
+
+function toCsv(rows) {
+  return rows
+    .map((row) =>
+      row
+        .map((cell) => {
+          const text = String(cell ?? '');
+          if (text.includes(',') || text.includes('"') || text.includes('\n')) {
+            return `"${text.replace(/"/g, '""')}"`;
+          }
+          return text;
+        })
+        .join(',')
+    )
+    .join('\n');
+}
+
+function downloadCsv(filename, rows) {
+  const csvBody = toCsv(rows);
+  const blob = new Blob([`\uFEFF${csvBody}`], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function statusColor(status) {
+  if (status === 'synced_to_pos') return '#2e7d32';
+  if (status === 'sync_failed') return '#c62828';
+  return '#b06c00';
+}
+
+const AdminEmergencySalesReports = () => {
+  const [activeTab, setActiveTab] = useState('overview');
+  const [loading, setLoading] = useState(false);
+  const [sales, setSales] = useState([]);
+  const [summary, setSummary] = useState({
+    pending_pos_sync: 0,
+    synced_to_pos: 0,
+    sync_failed: 0,
+  });
+
+  const [filters, setFilters] = useState({
+    startDate: '',
+    endDate: '',
+    product: '',
+    cashier: '',
+    status: 'all',
+  });
+
+  const [pendingFilters, setPendingFilters] = useState(filters);
+
+  const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
+  const [filterBarHeight, setFilterBarHeight] = useState(0);
+  const filterBarRef = useRef(null);
+
+  const fetchReportSales = useCallback(async (nextFilters) => {
+    setLoading(true);
+    try {
+      const response = await api.get('/admin/emergency-sales', {
+        params: {
+          reportMode: 'all',
+          status: nextFilters.status || 'all',
+          startDate: nextFilters.startDate || undefined,
+          endDate: nextFilters.endDate || undefined,
+          product: nextFilters.product || undefined,
+          cashier: nextFilters.cashier || undefined,
+        },
+      });
+
+      setSales(Array.isArray(response.data?.sales) ? response.data.sales : []);
+      setSummary(
+        response.data?.summary || {
+          pending_pos_sync: 0,
+          synced_to_pos: 0,
+          sync_failed: 0,
+        }
+      );
+    } catch (error) {
+      notifyError(`Failed to load emergency sales reports: ${error.response?.data?.error || error.message}`, 3000);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchReportSales(filters);
+  }, [fetchReportSales, filters]);
+
+  useEffect(() => {
+    let resizeObserver;
+
+    const updateFilterBarLayout = () => {
+      const contentArea = document.querySelector('.admin-content-area');
+      if (!contentArea) return;
+
+      const rect = contentArea.getBoundingClientRect();
+      const mobileTopOffset = 56;
+
+      setFilterBarLayout({
+        left: rect.left,
+        width: rect.width,
+        top: window.innerWidth <= 768 ? mobileTopOffset : 0,
+      });
+
+      if (filterBarRef.current) {
+        setFilterBarHeight(filterBarRef.current.offsetHeight);
+      }
+    };
+
+    updateFilterBarLayout();
+    window.addEventListener('resize', updateFilterBarLayout);
+
+    const contentArea = document.querySelector('.admin-content-area');
+    if (contentArea && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(updateFilterBarLayout);
+      resizeObserver.observe(contentArea);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateFilterBarLayout);
+      if (resizeObserver) resizeObserver.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (filterBarRef.current) {
+      setFilterBarHeight(filterBarRef.current.offsetHeight);
+    }
+  });
+
+  const appliedFiltersText = useMemo(() => {
+    const parts = [];
+    if (filters.startDate || filters.endDate) {
+      parts.push(`Date: ${filters.startDate || 'Any'} to ${filters.endDate || 'Any'}`);
+    }
+    if (filters.product) parts.push(`Product: ${filters.product}`);
+    if (filters.cashier) parts.push(`Cashier: ${filters.cashier}`);
+    if (filters.status && filters.status !== 'all') parts.push(`Status: ${STATUS_LABELS[filters.status] || filters.status}`);
+    return parts.length > 0 ? parts.join(' | ') : 'No filter applied';
+  }, [filters]);
+
+  const totals = useMemo(() => {
+    const grossTotal = sales.reduce((sum, sale) => sum + toMoney(sale.total), 0);
+    const itemCount = sales.reduce((sum, sale) => {
+      const items = Array.isArray(sale.items) ? sale.items : [];
+      return sum + items.reduce((itemSum, item) => itemSum + Number(item.qty || 0), 0);
+    }, 0);
+
+    return {
+      salesCount: sales.length,
+      grossTotal,
+      avgSale: sales.length > 0 ? toMoney(grossTotal / sales.length) : 0,
+      itemCount,
+    };
+  }, [sales]);
+
+  const productStats = useMemo(() => {
+    const map = new Map();
+
+    for (const sale of sales) {
+      const saleItems = Array.isArray(sale.items) ? sale.items : [];
+      for (const item of saleItems) {
+        const name = String(item.productName || item.product_name || 'Unknown Product').trim() || 'Unknown Product';
+        const code = String(item.productCode || item.product_code || '-').trim() || '-';
+        const key = `${code}::${name}`;
+
+        if (!map.has(key)) {
+          map.set(key, {
+            productCode: code,
+            productName: name,
+            qty: 0,
+            revenue: 0,
+            salesCount: 0,
+          });
+        }
+
+        const row = map.get(key);
+        row.qty += Number(item.qty || 0);
+        row.revenue += toMoney(item.lineTotal ?? item.line_total ?? 0);
+        row.salesCount += 1;
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
+  }, [sales]);
+
+  const cashierStats = useMemo(() => {
+    const map = new Map();
+
+    for (const sale of sales) {
+      const key = String(sale.cashier_name || sale.cashierName || 'Unknown').trim() || 'Unknown';
+
+      if (!map.has(key)) {
+        map.set(key, {
+          cashier: key,
+          salesCount: 0,
+          total: 0,
+          pending: 0,
+          synced: 0,
+          failed: 0,
+        });
+      }
+
+      const row = map.get(key);
+      row.salesCount += 1;
+      row.total += toMoney(sale.total);
+      if (sale.sync_status === 'pending_pos_sync') row.pending += 1;
+      if (sale.sync_status === 'synced_to_pos') row.synced += 1;
+      if (sale.sync_status === 'sync_failed') row.failed += 1;
+    }
+
+    return Array.from(map.values()).sort((a, b) => b.total - a.total);
+  }, [sales]);
+
+  const reportFilterSpacerHeight = Math.max(Math.min(filterBarHeight, 150) - 8, 0);
+
+  const handleApplyFilters = () => {
+    setFilters(pendingFilters);
+  };
+
+  const handleResetFilters = () => {
+    const reset = {
+      startDate: '',
+      endDate: '',
+      product: '',
+      cashier: '',
+      status: 'all',
+    };
+    setPendingFilters(reset);
+    setFilters(reset);
+  };
+
+  const handleDownloadSalesCsv = () => {
+    const rows = [
+      ['Sale Ref', 'Date', 'Cashier', 'Items', 'Subtotal', 'Discount', 'Total', 'Payment', 'Sync Status'],
+      ...sales.map((sale) => [
+        sale.sale_ref || sale.saleRef || '-',
+        formatDateTime(sale.created_at || sale.createdAt),
+        sale.cashier_name || sale.cashierName || '-',
+        Array.isArray(sale.items) ? sale.items.length : 0,
+        toMoney(sale.subtotal),
+        toMoney(sale.discount),
+        toMoney(sale.total),
+        sale.payment_method || sale.paymentMethod || '-',
+        STATUS_LABELS[sale.sync_status] || sale.sync_status || '-',
+      ]),
+    ];
+
+    downloadCsv(`emergency-sales-log-${Date.now()}.csv`, rows);
+    notifySuccess('Sales log CSV downloaded', 2000);
+  };
+
+  const handleDownloadProductCsv = () => {
+    const rows = [
+      ['Product Code', 'Product Name', 'Qty Sold', 'Revenue', 'Sale Lines'],
+      ...productStats.map((item) => [item.productCode, item.productName, item.qty, toMoney(item.revenue), item.salesCount]),
+    ];
+
+    downloadCsv(`emergency-sales-by-product-${Date.now()}.csv`, rows);
+    notifySuccess('Product report CSV downloaded', 2000);
+  };
+
+  const handleDownloadCashierCsv = () => {
+    const rows = [
+      ['Cashier', 'Sales Count', 'Total Value', 'Pending', 'Synced', 'Failed'],
+      ...cashierStats.map((cashier) => [
+        cashier.cashier,
+        cashier.salesCount,
+        toMoney(cashier.total),
+        cashier.pending,
+        cashier.synced,
+        cashier.failed,
+      ]),
+    ];
+
+    downloadCsv(`emergency-sales-by-cashier-${Date.now()}.csv`, rows);
+    notifySuccess('Cashier report CSV downloaded', 2000);
+  };
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div
+        ref={filterBarRef}
+        style={{
+          position: 'fixed',
+          top: `${filterBarLayout.top}px`,
+          left: `${filterBarLayout.left}px`,
+          width: `${filterBarLayout.width}px`,
+          zIndex: 82,
+          backgroundColor: '#ffffff',
+          border: '1px solid #e5e7eb',
+          borderRadius: '8px',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+          boxSizing: 'border-box',
+          overflow: 'hidden',
+        }}
+      >
+        <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f1f5f9', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          {TAB_DEFS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '0.6rem 0.9rem',
+                border: activeTab === tab.id ? 'none' : '1px solid #d1d5db',
+                borderRadius: '8px',
+                backgroundColor: activeTab === tab.id ? '#1f3a8a' : '#fff',
+                color: activeTab === tab.id ? '#fff' : '#334155',
+                fontWeight: 700,
+                fontSize: '0.87rem',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+              }}
+            >
+              <i className={`fas ${tab.icon}`}></i>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ padding: '0.75rem 1rem', display: 'flex', gap: '0.65rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <input
+            type="date"
+            value={pendingFilters.startDate}
+            onChange={(event) => setPendingFilters((prev) => ({ ...prev, startDate: event.target.value }))}
+            style={{ padding: '0.6rem 0.7rem', border: '1px solid #d1d5db', borderRadius: '6px' }}
+            title="Start date"
+          />
+
+          <input
+            type="date"
+            value={pendingFilters.endDate}
+            onChange={(event) => setPendingFilters((prev) => ({ ...prev, endDate: event.target.value }))}
+            style={{ padding: '0.6rem 0.7rem', border: '1px solid #d1d5db', borderRadius: '6px' }}
+            title="End date"
+          />
+
+          <input
+            type="text"
+            value={pendingFilters.product}
+            onChange={(event) => setPendingFilters((prev) => ({ ...prev, product: event.target.value }))}
+            placeholder="Filter by product"
+            style={{ padding: '0.6rem 0.7rem', border: '1px solid #d1d5db', borderRadius: '6px', minWidth: '200px' }}
+          />
+
+          <input
+            type="text"
+            value={pendingFilters.cashier}
+            onChange={(event) => setPendingFilters((prev) => ({ ...prev, cashier: event.target.value }))}
+            placeholder="Filter by cashier/user"
+            style={{ padding: '0.6rem 0.7rem', border: '1px solid #d1d5db', borderRadius: '6px', minWidth: '200px' }}
+          />
+
+          <select
+            value={pendingFilters.status}
+            onChange={(event) => setPendingFilters((prev) => ({ ...prev, status: event.target.value }))}
+            style={{ padding: '0.6rem 0.7rem', border: '1px solid #d1d5db', borderRadius: '6px' }}
+          >
+            <option value="all">All Statuses</option>
+            <option value="pending_pos_sync">Pending POS Sync</option>
+            <option value="synced_to_pos">Synced to POS</option>
+            <option value="sync_failed">Sync Failed</option>
+          </select>
+
+          <button
+            onClick={handleApplyFilters}
+            style={{
+              padding: '0.6rem 0.9rem',
+              border: 'none',
+              borderRadius: '6px',
+              backgroundColor: '#0f766e',
+              color: '#fff',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Apply Filters
+          </button>
+
+          <button
+            onClick={handleResetFilters}
+            style={{
+              padding: '0.6rem 0.9rem',
+              border: '1px solid #d1d5db',
+              borderRadius: '6px',
+              backgroundColor: '#fff',
+              color: '#334155',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Reset
+          </button>
+        </div>
+      </div>
+
+      <div style={{ height: `${reportFilterSpacerHeight}px` }}></div>
+
+      <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '1rem' }}>
+        <div style={{ marginBottom: '0.8rem', fontSize: '0.85rem', color: '#475569', fontWeight: 600 }}>
+          {appliedFiltersText}
+        </div>
+
+        {loading ? (
+          <div style={{ padding: '2rem 0', textAlign: 'center', color: '#64748b' }}>Loading emergency sales reports...</div>
+        ) : (
+          <>
+            {activeTab === 'overview' && (
+              <div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
+                  <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem' }}>
+                    <div style={{ color: '#64748b', fontSize: '0.82rem' }}>Emergency Sales</div>
+                    <div style={{ color: '#0f172a', fontSize: '1.35rem', fontWeight: 800 }}>{totals.salesCount}</div>
+                  </div>
+
+                  <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem' }}>
+                    <div style={{ color: '#64748b', fontSize: '0.82rem' }}>Gross Total</div>
+                    <div style={{ color: '#0f172a', fontSize: '1.35rem', fontWeight: 800 }}>{formatMoney(totals.grossTotal)}</div>
+                  </div>
+
+                  <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem' }}>
+                    <div style={{ color: '#64748b', fontSize: '0.82rem' }}>Average Sale</div>
+                    <div style={{ color: '#0f172a', fontSize: '1.35rem', fontWeight: 800 }}>{formatMoney(totals.avgSale)}</div>
+                  </div>
+
+                  <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem' }}>
+                    <div style={{ color: '#64748b', fontSize: '0.82rem' }}>Items Sold</div>
+                    <div style={{ color: '#0f172a', fontSize: '1.35rem', fontWeight: 800 }}>{totals.itemCount}</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.75rem' }}>
+                  {Object.entries(summary).map(([status, count]) => (
+                    <div key={status} style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem' }}>
+                      <div style={{ color: '#64748b', fontSize: '0.82rem' }}>{STATUS_LABELS[status] || status}</div>
+                      <div style={{ color: statusColor(status), fontSize: '1.25rem', fontWeight: 800 }}>{count}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'sales' && (
+              <div>
+                <div style={{ marginBottom: '0.7rem' }}>
+                  <button
+                    onClick={handleDownloadSalesCsv}
+                    style={{
+                      padding: '0.55rem 0.9rem',
+                      border: 'none',
+                      borderRadius: '6px',
+                      backgroundColor: '#1d4ed8',
+                      color: '#fff',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <i className="fas fa-download" style={{ marginRight: '0.45rem' }}></i>
+                    Download Sales CSV
+                  </button>
+                </div>
+
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#eef2ff' }}>
+                        <th style={{ textAlign: 'left', padding: '0.6rem', borderBottom: '1px solid #dbeafe' }}>Sale Ref</th>
+                        <th style={{ textAlign: 'left', padding: '0.6rem', borderBottom: '1px solid #dbeafe' }}>Date</th>
+                        <th style={{ textAlign: 'left', padding: '0.6rem', borderBottom: '1px solid #dbeafe' }}>Cashier</th>
+                        <th style={{ textAlign: 'right', padding: '0.6rem', borderBottom: '1px solid #dbeafe' }}>Items</th>
+                        <th style={{ textAlign: 'right', padding: '0.6rem', borderBottom: '1px solid #dbeafe' }}>Total</th>
+                        <th style={{ textAlign: 'left', padding: '0.6rem', borderBottom: '1px solid #dbeafe' }}>Sync Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sales.length === 0 && (
+                        <tr>
+                          <td colSpan={6} style={{ textAlign: 'center', padding: '1rem', color: '#94a3b8' }}>
+                            No emergency sales found for these filters.
+                          </td>
+                        </tr>
+                      )}
+
+                      {sales.map((sale) => (
+                        <tr key={sale.id}>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #e2e8f0', fontWeight: 700 }}>
+                            {sale.sale_ref || sale.saleRef || '-'}
+                          </td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #e2e8f0' }}>{formatDateTime(sale.created_at || sale.createdAt)}</td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #e2e8f0' }}>{sale.cashier_name || sale.cashierName || '-'}</td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>
+                            {Array.isArray(sale.items) ? sale.items.length : 0}
+                          </td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right', fontWeight: 700 }}>
+                            {formatMoney(sale.total)}
+                          </td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #e2e8f0', color: statusColor(sale.sync_status), fontWeight: 700 }}>
+                            {STATUS_LABELS[sale.sync_status] || sale.sync_status || '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'products' && (
+              <div>
+                <div style={{ marginBottom: '0.7rem' }}>
+                  <button
+                    onClick={handleDownloadProductCsv}
+                    style={{
+                      padding: '0.55rem 0.9rem',
+                      border: 'none',
+                      borderRadius: '6px',
+                      backgroundColor: '#0f766e',
+                      color: '#fff',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <i className="fas fa-download" style={{ marginRight: '0.45rem' }}></i>
+                    Download Product CSV
+                  </button>
+                </div>
+
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#ecfeff' }}>
+                        <th style={{ textAlign: 'left', padding: '0.6rem', borderBottom: '1px solid #ccfbf1' }}>Product Code</th>
+                        <th style={{ textAlign: 'left', padding: '0.6rem', borderBottom: '1px solid #ccfbf1' }}>Product Name</th>
+                        <th style={{ textAlign: 'right', padding: '0.6rem', borderBottom: '1px solid #ccfbf1' }}>Qty</th>
+                        <th style={{ textAlign: 'right', padding: '0.6rem', borderBottom: '1px solid #ccfbf1' }}>Revenue</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productStats.length === 0 && (
+                        <tr>
+                          <td colSpan={4} style={{ textAlign: 'center', padding: '1rem', color: '#94a3b8' }}>
+                            No product data for these filters.
+                          </td>
+                        </tr>
+                      )}
+
+                      {productStats.map((item) => (
+                        <tr key={`${item.productCode}-${item.productName}`}>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #e2e8f0' }}>{item.productCode}</td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #e2e8f0' }}>{item.productName}</td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>{item.qty}</td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right', fontWeight: 700 }}>
+                            {formatMoney(item.revenue)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'cashiers' && (
+              <div>
+                <div style={{ marginBottom: '0.7rem' }}>
+                  <button
+                    onClick={handleDownloadCashierCsv}
+                    style={{
+                      padding: '0.55rem 0.9rem',
+                      border: 'none',
+                      borderRadius: '6px',
+                      backgroundColor: '#7c3aed',
+                      color: '#fff',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <i className="fas fa-download" style={{ marginRight: '0.45rem' }}></i>
+                    Download Cashier CSV
+                  </button>
+                </div>
+
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#f5f3ff' }}>
+                        <th style={{ textAlign: 'left', padding: '0.6rem', borderBottom: '1px solid #e9d5ff' }}>Cashier</th>
+                        <th style={{ textAlign: 'right', padding: '0.6rem', borderBottom: '1px solid #e9d5ff' }}>Sales</th>
+                        <th style={{ textAlign: 'right', padding: '0.6rem', borderBottom: '1px solid #e9d5ff' }}>Total</th>
+                        <th style={{ textAlign: 'right', padding: '0.6rem', borderBottom: '1px solid #e9d5ff' }}>Pending</th>
+                        <th style={{ textAlign: 'right', padding: '0.6rem', borderBottom: '1px solid #e9d5ff' }}>Synced</th>
+                        <th style={{ textAlign: 'right', padding: '0.6rem', borderBottom: '1px solid #e9d5ff' }}>Failed</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cashierStats.length === 0 && (
+                        <tr>
+                          <td colSpan={6} style={{ textAlign: 'center', padding: '1rem', color: '#94a3b8' }}>
+                            No cashier data for these filters.
+                          </td>
+                        </tr>
+                      )}
+
+                      {cashierStats.map((row) => (
+                        <tr key={row.cashier}>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #e2e8f0', fontWeight: 700 }}>{row.cashier}</td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>{row.salesCount}</td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right', fontWeight: 700 }}>
+                            {formatMoney(row.total)}
+                          </td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>{row.pending}</td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>{row.synced}</td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>{row.failed}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default AdminEmergencySalesReports;
