@@ -61,6 +61,11 @@ model Product {
   isActive                Boolean    @default(true)
   hideFromProductsPage    Boolean    @default(false)
   enabled                 Boolean    @default(true)
+  overrideActive          Boolean    @default(false)
+  overrideStock           Int?
+  overrideReason          String?
+  overrideUpdatedAt       DateTime?
+  overrideUpdatedBy       String?
   cartItems               CartItem[]
   orderItems              OrderItem[]
   createdAt               DateTime   @default(now())

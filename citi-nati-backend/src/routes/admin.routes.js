@@ -22,7 +22,7 @@ const {
   applyPromotion: applyPosPromotion,
   revertPromotion: revertPosPromotion,
 } = require('../controllers/posExpiryPromotion.controller');
-const { getExpiryBatchAlerts, adjustInventoryStock, getInventoryAdjustmentAudit } = require('../controllers/product.controller');
+const { getExpiryBatchAlerts, adjustInventoryStock, setStockOverride, getInventoryAdjustmentAudit } = require('../controllers/product.controller');
 const { emitProductUpdate } = require('../utils/socket');
 
 const router = express.Router();
@@ -588,6 +588,14 @@ router.get('/inventory/adjustments', verifyTokenMiddleware, verifyAdmin, getInve
  * Protected: Admin only
  */
 router.post('/inventory/adjustments', verifyTokenMiddleware, verifyAdmin, adjustInventoryStock);
+
+/**
+ * PUT /api/admin/inventory/stock-override/:id
+ * Set or clear a website stock override for a product.
+ * POS stock is never modified — only override fields are changed.
+ * Protected: Admin only
+ */
+router.put('/inventory/stock-override/:id', verifyTokenMiddleware, verifyAdmin, setStockOverride);
 
 /**
  * ============================================

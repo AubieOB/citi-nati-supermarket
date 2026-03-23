@@ -67,10 +67,13 @@ const createOrder = async (req, res) => {
           throw new Error(`Product with id ${cartItem.productId} not found`);
         }
 
-        // Check if sufficient stock
-        if (product.stock < cartItem.quantity) {
+        // Check if sufficient stock (use effectiveStock: override if active, else posStock)
+        const effectiveStock = (product.overrideActive && product.overrideStock != null)
+          ? product.overrideStock
+          : product.stock;
+        if (effectiveStock < cartItem.quantity) {
           throw new Error(
-            `Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${cartItem.quantity}`
+            `Insufficient stock for ${product.name}. Available: ${effectiveStock}, Requested: ${cartItem.quantity}`
           );
         }
 

@@ -162,13 +162,21 @@ const formatProduct = (product, req, includeDiscountSuggestion = false) => {
     console.warn(`[PRODUCT FORMAT] ⚠️ Product ${product.id} (${product.name}) has no image`);
   }
 
+  // Compute effective stock: override wins when active, otherwise posStock (= product.stock)
+  const posStock = typeof product.stock === 'number' ? product.stock : Number(product.stock || 0);
+  const effectiveStock = (product.overrideActive === true && product.overrideStock != null)
+    ? product.overrideStock
+    : posStock;
+
   const formatted = {
     ...product,
     imageUrl,
     expiryStatus,
     daysToExpiry,
     expirySource: product.expirySource || null,
-    finalPrice
+    finalPrice,
+    posStock,
+    effectiveStock,
   };
 
   // Include discount suggestion for admin endpoints
@@ -872,7 +880,12 @@ const getProducts = async (req, res) => {
         discountPrice: true,
         expiryDate: true,
         expiryBatchCount: true,
-        hideFromProductsPage: true
+        hideFromProductsPage: true,
+        overrideActive: true,
+        overrideStock: true,
+        overrideReason: true,
+        overrideUpdatedAt: true,
+        overrideUpdatedBy: true,
       },
       skip,
       take,
@@ -933,7 +946,12 @@ const getProductById = async (req, res) => {
         discountPrice: true,
         expiryDate: true,
         expiryBatchCount: true,
-        hideFromProductsPage: true
+        hideFromProductsPage: true,
+        overrideActive: true,
+        overrideStock: true,
+        overrideReason: true,
+        overrideUpdatedAt: true,
+        overrideUpdatedBy: true,
       }
     });
 
@@ -1434,6 +1452,99 @@ const adjustInventoryStock = async (req, res) => {
   }
 };
 
+/**
+ * PUT /api/admin/inventory/stock-override/:id
+ * Set or clear a website stock override for a product.
+ * POS stock (product.stock) is never changed — only the override fields are updated.
+ */
+const setStockOverride = async (req, res) => {
+  try {
+    const productId = parseInt(req.params.id, 10);
+    if (!Number.isInteger(productId) || productId <= 0) {
+      return res.status(400).json({ error: 'Invalid product id' });
+    }
+
+    const overrideActive = req.body.overrideActive === true || req.body.overrideActive === 'true';
+    const rawOverrideStock = req.body.overrideStock;
+    const overrideReason = req.body.overrideReason == null
+      ? null
+      : String(req.body.overrideReason).trim() || null;
+    const performedBy = getAdjustmentActor(req);
+
+    let overrideStockValue = null;
+    if (overrideActive) {
+      const parsed = parseInt(rawOverrideStock, 10);
+      if (!Number.isInteger(parsed) || parsed < 0) {
+        return res.status(400).json({
+          error: 'overrideStock must be a non-negative integer when Override Active is enabled',
+        });
+      }
+      overrideStockValue = parsed;
+    }
+
+    const product = await prisma.product.findUnique({ where: { id: productId } });
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const previousOverrideActive = product.overrideActive;
+    const previousOverrideStock = product.overrideStock;
+
+    const updatedProduct = await prisma.product.update({
+      where: { id: productId },
+      data: {
+        overrideActive,
+        overrideStock: overrideStockValue,
+        overrideReason,
+        overrideUpdatedAt: new Date(),
+        overrideUpdatedBy: String(performedBy),
+      },
+    });
+
+    // Logging
+    if (overrideActive && !previousOverrideActive) {
+      console.log('[STOCK OVERRIDE] Override ENABLED:', {
+        productId,
+        productName: product.name,
+        posStock: product.stock,
+        overrideStock: overrideStockValue,
+        overrideReason,
+        performedBy,
+      });
+    } else if (!overrideActive && previousOverrideActive) {
+      console.log('[STOCK OVERRIDE] Override DISABLED — storefront reverts to POS stock:', {
+        productId,
+        productName: product.name,
+        posStock: product.stock,
+        performedBy,
+      });
+    } else if (overrideActive && previousOverrideStock !== overrideStockValue) {
+      console.log('[STOCK OVERRIDE] Override QUANTITY CHANGED:', {
+        productId,
+        productName: product.name,
+        from: previousOverrideStock,
+        to: overrideStockValue,
+        performedBy,
+      });
+    }
+
+    try {
+      const { emitProductUpdate } = require('../utils/socket');
+      emitProductUpdate(updatedProduct);
+    } catch (socketErr) {
+      console.warn('[STOCK OVERRIDE] Socket emit failed:', socketErr.message);
+    }
+
+    return res.json({
+      success: true,
+      product: formatProduct(updatedProduct, req, true),
+    });
+  } catch (err) {
+    console.error('[STOCK OVERRIDE] Error:', err.message);
+    return res.status(500).json({ error: 'Failed to update stock override' });
+  }
+};
+
 const getInventoryAdjustmentAudit = async (req, res) => {
   try {
     const limit = Math.max(1, Math.min(200, Number.parseInt(req.query.limit, 10) || 50));
@@ -1633,6 +1744,9 @@ const syncProductsFromPOSAgent = async (req, res) => {
           : (product.expiryDate ? new Date(product.expiryDate) : (nearestBatch ? nearestBatch.expiryDate : null));
 
         // Upsert product into Product table (single source of truth)
+        // IMPORTANT: override fields (overrideActive, overrideStock, overrideReason,
+        // overrideUpdatedAt, overrideUpdatedBy) are intentionally NOT included in the
+        // update block — POS sync must never overwrite admin-set website stock overrides.
         const result = await prisma.product.upsert(
           {
             where: { sourceCode: product.sourceCode },
@@ -2012,6 +2126,7 @@ module.exports = {
   getProductById, 
   updateProduct, 
   adjustInventoryStock,
+  setStockOverride,
   getInventoryAdjustmentAudit,
   deleteProduct, 
   syncFromPOS,

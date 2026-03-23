@@ -657,32 +657,44 @@ const handleWebhook = async (req, res) => {
         throw new Error('One or more products not found');
       }
 
-      // 5️⃣ Validate ALL stock first
+      // 5️⃣ Validate ALL stock first (use effectiveStock: override if active, else posStock)
       for (const item of order.items) {
         const product = products.find(p => p.id === item.productId);
         if (!product) {
           throw new Error(`Product ${item.productId} not found`);
         }
-        if (product.stock < item.quantity) {
+        const effectiveStock = (product.overrideActive && product.overrideStock != null)
+          ? product.overrideStock
+          : product.stock;
+        if (effectiveStock < item.quantity) {
           throw new Error(
-            `Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}`
+            `Insufficient stock for ${product.name}. Available: ${effectiveStock}, Requested: ${item.quantity}`
           );
         }
-        console.log(`[Webhook] ✅ Stock validated for product ${item.productId}: ${product.stock} >= ${item.quantity}`);
+        const stockSource = (product.overrideActive && product.overrideStock != null) ? 'override' : 'posStock';
+        console.log(`[Webhook] ✅ Stock validated for product ${item.productId}: effectiveStock=${effectiveStock} (${stockSource}) >= ${item.quantity}`);
       }
 
       // 6️⃣ Decrement ALL stock atomically
+      // Always decrement posStock (product.stock) to keep physical inventory accurate.
+      // If a website override is active, also decrement overrideStock by the same amount
+      // so the relative override remains meaningful after the sale.
       const updatedProducts = [];
       for (const item of order.items) {
+        const product = products.find(p => p.id === item.productId);
+        const decrementData = { stock: { decrement: item.quantity } };
+        if (product && product.overrideActive && product.overrideStock != null) {
+          decrementData.overrideStock = { decrement: item.quantity };
+        }
         const updated = await tx.product.update({
           where: { id: item.productId },
-          data: {
-            stock: { decrement: item.quantity }
-          },
-          select: { id: true, stock: true, price: true }
+          data: decrementData,
+          select: { id: true, stock: true, overrideActive: true, overrideStock: true, price: true }
         });
         updatedProducts.push(updated);
-        console.log(`[Webhook] 📦 Stock decremented for product ${item.productId}: new stock = ${updated.stock}`);
+        console.log(`[Webhook] 📦 Stock decremented for product ${item.productId}: posStock=${updated.stock}${
+          updated.overrideActive ? `, overrideStock=${updated.overrideStock}` : ''
+        }`);
       }
 
       // 7️⃣ Mark order as PAID (atomically with stock decrement)

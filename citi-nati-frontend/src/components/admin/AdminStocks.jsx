@@ -36,6 +36,13 @@ const AdminStocks = () => {
   const [actionType, setActionType] = useState('add'); // 'add' or 'subtract'
   const [isSubmittingAdjustment, setIsSubmittingAdjustment] = useState(false);
   const [lowStockThreshold, setLowStockThreshold] = useState(5);
+  // Stock override state
+  const [showOverrideModal, setShowOverrideModal] = useState(false);
+  const [overrideProduct, setOverrideProduct] = useState(null);
+  const [pendingOverrideActive, setPendingOverrideActive] = useState(false);
+  const [pendingOverrideStock, setPendingOverrideStock] = useState('');
+  const [pendingOverrideReason, setPendingOverrideReason] = useState('');
+  const [isSubmittingOverride, setIsSubmittingOverride] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
   const [filterBarHeight, setFilterBarHeight] = useState(0);
@@ -258,10 +265,59 @@ const AdminStocks = () => {
     setAdjustmentNotes('');
   };
 
+  const openOverrideModal = (product) => {
+    setOverrideProduct(product);
+    setPendingOverrideActive(product.overrideActive || false);
+    setPendingOverrideStock(product.overrideStock != null ? String(product.overrideStock) : '');
+    setPendingOverrideReason(product.overrideReason || '');
+    setShowOverrideModal(true);
+  };
+
+  const closeOverrideModal = () => {
+    setShowOverrideModal(false);
+    setOverrideProduct(null);
+  };
+
+  const handleSaveOverride = async () => {
+    if (!overrideProduct) return;
+    if (pendingOverrideActive && (pendingOverrideStock === '' || parseInt(pendingOverrideStock) < 0)) {
+      notifyError('Please enter a valid non-negative override stock quantity', 3000);
+      return;
+    }
+    try {
+      setIsSubmittingOverride(true);
+      const response = await api.put(`/admin/inventory/stock-override/${overrideProduct.id}`, {
+        overrideActive: pendingOverrideActive,
+        overrideStock: pendingOverrideActive ? parseInt(pendingOverrideStock, 10) : null,
+        overrideReason: pendingOverrideReason.trim() || null,
+      });
+      const updatedProduct = response.data.product;
+      setAllProducts(prev =>
+        prev.map(p => p.id === overrideProduct.id ? { ...p, ...updatedProduct } : p)
+      );
+      if (pendingOverrideActive) {
+        notifySuccess(`✅ Website stock override enabled: ${overrideProduct.name} → ${pendingOverrideStock} units`, 3000);
+      } else {
+        notifySuccess(`✅ Override cleared for ${overrideProduct.name} — POS stock is now used`, 3000);
+      }
+      closeOverrideModal();
+    } catch (err) {
+      notifyError(`Failed to save override: ${err.response?.data?.error || 'Unknown error'}`, 4000);
+    } finally {
+      setIsSubmittingOverride(false);
+    }
+  };
+
   const getStockStatus = (stock) => {
     if (stock === 0) return { color: '#d32f2f', label: 'Out of Stock', icon: '🔴' };
     if (stock <= lowStockThreshold) return { color: '#f57c00', label: 'Low Stock', icon: '🟡' };
     return { color: '#388e3c', label: 'In Stock', icon: '🟢' };
+  };
+
+  // Effective stock for display/filtering: override wins when active
+  const getEffectiveStock = (product) => {
+    if (product.overrideActive && product.overrideStock != null) return product.overrideStock;
+    return product.effectiveStock != null ? product.effectiveStock : product.stock;
   };
 
   // Filter products with debounced search
@@ -276,9 +332,9 @@ const AdminStocks = () => {
       const matchesCategory = filterCategory === 'all' || product.category === filterCategory;
       const matchesStockStatus =
         stockStatusFilter === 'all' ||
-        (stockStatusFilter === 'instock' && product.stock > lowStockThreshold) ||
-        (stockStatusFilter === 'lowstock' && product.stock > 0 && product.stock <= lowStockThreshold) ||
-        (stockStatusFilter === 'outofstock' && product.stock === 0);
+        (stockStatusFilter === 'instock' && getEffectiveStock(product) > lowStockThreshold) ||
+        (stockStatusFilter === 'lowstock' && getEffectiveStock(product) > 0 && getEffectiveStock(product) <= lowStockThreshold) ||
+        (stockStatusFilter === 'outofstock' && getEffectiveStock(product) === 0);
       return matchesSearch && matchesCategory && matchesStockStatus;
     });
 
@@ -741,9 +797,9 @@ const AdminStocks = () => {
           const { outOfStock, lowStock, inStock } = (() => {
             const source = filteredProducts; // includes any search/category filters
             return {
-              outOfStock: source.filter(p => p.stock === 0),
-              lowStock: source.filter(p => p.stock > 0 && p.stock <= lowStockThreshold),
-              inStock: source.filter(p => p.stock > lowStockThreshold),
+              outOfStock: source.filter(p => getEffectiveStock(p) === 0),
+              lowStock: source.filter(p => getEffectiveStock(p) > 0 && getEffectiveStock(p) <= lowStockThreshold),
+              inStock: source.filter(p => getEffectiveStock(p) > lowStockThreshold),
             };
           })();
           return (
@@ -828,7 +884,10 @@ const AdminStocks = () => {
                 Category
               </th>
               <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', fontSize: '0.95rem' }}>
-                Current Stock
+                POS Stock
+              </th>
+              <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', fontSize: '0.95rem' }}>
+                Effective Stock
               </th>
               <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', fontSize: '0.95rem' }}>
                 Status
@@ -841,18 +900,24 @@ const AdminStocks = () => {
           <tbody>
             {paginatedProducts.length > 0 ? (
               paginatedProducts.map((product) => {
-                const status = getStockStatus(product.stock);
+                const effStock = getEffectiveStock(product);
+                const posStockVal = product.posStock != null ? product.posStock : product.stock;
+                const status = getStockStatus(effStock);
                 const productCode = product.productCode || product.sourceCode || product.code;
+                const hasOverride = product.overrideActive && product.overrideStock != null;
                 return (
                   <tr
                     key={product.id}
                     style={{
                       borderBottom: '1px solid #eee',
-                      backgroundColor: product.stock === 0 ? '#ffebee' : product.stock <= lowStockThreshold ? '#fff3e0' : '#fff',
+                      backgroundColor: effStock === 0 ? '#ffebee' : effStock <= lowStockThreshold ? '#fff3e0' : '#fff',
                     }}
                   >
                     <td style={{ padding: '1rem' }}>
                       <strong>{product.name}</strong>
+                      {hasOverride && (
+                        <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', padding: '0.15rem 0.4rem', borderRadius: '10px', backgroundColor: '#e8d5ff', color: '#5B4B8A', fontWeight: '700', verticalAlign: 'middle' }}>OVERRIDE</span>
+                      )}
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'center', color: '#666', fontSize: '0.9rem' }}>
                       {productCode ? (
@@ -876,10 +941,22 @@ const AdminStocks = () => {
                       padding: '1rem',
                       textAlign: 'center',
                       fontWeight: '600',
-                      fontSize: '1.1rem',
-                      color: '#333',
+                      fontSize: '1rem',
+                      color: '#888',
                     }}>
-                      {product.stock}
+                      {posStockVal}
+                    </td>
+                    <td style={{
+                      padding: '1rem',
+                      textAlign: 'center',
+                      fontWeight: '700',
+                      fontSize: '1.1rem',
+                      color: hasOverride ? '#5B4B8A' : '#333',
+                    }}>
+                      {effStock}
+                      {hasOverride && (
+                        <div style={{ fontSize: '0.72rem', color: '#5B4B8A', fontWeight: '500' }}>override</div>
+                      )}
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'center' }}>
                       <span style={{
@@ -895,8 +972,8 @@ const AdminStocks = () => {
                         justifyContent: 'center',
                       }}>
                         <i className={`fas ${
-                          product.stock === 0 ? 'fa-ban' :
-                          product.stock <= lowStockThreshold ? 'fa-exclamation-circle' :
+                          effStock === 0 ? 'fa-ban' :
+                          effStock <= lowStockThreshold ? 'fa-exclamation-circle' :
                           'fa-check-circle'
                         }`}></i>
                         {status.label}
@@ -907,6 +984,7 @@ const AdminStocks = () => {
                         display: 'flex',
                         gap: '0.5rem',
                         justifyContent: 'center',
+                        flexWrap: 'wrap',
                       }}>
                         <button
                           onClick={() => openStockModal(product, 'add')}
@@ -954,6 +1032,26 @@ const AdminStocks = () => {
                           <i className="fas fa-minus"></i>
                           Remove
                         </button>
+                        <button
+                          onClick={() => openOverrideModal(product)}
+                          title="Set Website Stock Override"
+                          style={{
+                            padding: '0.5rem 0.75rem',
+                            borderRadius: '4px',
+                            border: hasOverride ? '2px solid #5B4B8A' : '1px solid #5B4B8A',
+                            backgroundColor: hasOverride ? '#5B4B8A' : '#fff',
+                            color: hasOverride ? '#fff' : '#5B4B8A',
+                            cursor: 'pointer',
+                            fontWeight: '600',
+                            fontSize: '0.85rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                          }}
+                        >
+                          <i className="fas fa-sliders-h"></i>
+                          Override
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -961,7 +1059,7 @@ const AdminStocks = () => {
               })
             ) : (
               <tr>
-                <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>
+                <td colSpan="7" style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>
                   No products found matching your filters
                 </td>
               </tr>
@@ -1177,6 +1275,200 @@ const AdminStocks = () => {
               >
                 <i className={`fas ${actionType === 'add' ? 'fa-check' : 'fa-check'}`}></i>
                 {isSubmittingAdjustment ? 'Submitting...' : (actionType === 'add' ? 'Add Stock' : 'Remove Stock')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Website Stock Override Modal */}
+      {showOverrideModal && overrideProduct && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.55)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000,
+          padding: '1rem',
+        }}>
+          <div style={{
+            backgroundColor: '#fff',
+            borderRadius: '10px',
+            padding: '2rem',
+            maxWidth: '460px',
+            width: '100%',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+          }}>
+            <h2 style={{ margin: '0 0 0.25rem 0', color: '#5B4B8A', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <i className="fas fa-sliders-h"></i>
+              Website Stock Override
+            </h2>
+            <p style={{ margin: '0 0 1.25rem 0', color: '#888', fontSize: '0.88rem' }}>
+              POS stock is read-only and will continue syncing. This override only affects what customers see and can order online.
+            </p>
+
+            {/* Info row */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '0.75rem',
+              marginBottom: '1.25rem',
+            }}>
+              <div style={{ backgroundColor: '#f5f5f5', borderRadius: '6px', padding: '0.75rem' }}>
+                <div style={{ fontSize: '0.78rem', color: '#888', marginBottom: '0.2rem' }}>Product</div>
+                <div style={{ fontWeight: '700', color: '#333', fontSize: '0.9rem' }}>{overrideProduct.name}</div>
+              </div>
+              <div style={{ backgroundColor: '#e8f5e9', borderRadius: '6px', padding: '0.75rem' }}>
+                <div style={{ fontSize: '0.78rem', color: '#888', marginBottom: '0.2rem' }}>POS Stock (read-only)</div>
+                <div style={{ fontWeight: '700', color: '#2e7d32', fontSize: '1.1rem' }}>
+                  {overrideProduct.posStock != null ? overrideProduct.posStock : overrideProduct.stock}
+                </div>
+              </div>
+            </div>
+
+            {/* Override Active Toggle */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ fontWeight: '600', color: '#333', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={pendingOverrideActive}
+                  onChange={(e) => {
+                    setPendingOverrideActive(e.target.checked);
+                    if (!e.target.checked) setPendingOverrideStock('');
+                  }}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#5B4B8A' }}
+                />
+                Override Active
+                <span style={{
+                  padding: '0.15rem 0.6rem',
+                  borderRadius: '10px',
+                  fontSize: '0.78rem',
+                  fontWeight: '700',
+                  backgroundColor: pendingOverrideActive ? '#5B4B8A' : '#eee',
+                  color: pendingOverrideActive ? '#fff' : '#888',
+                }}>
+                  {pendingOverrideActive ? 'ON' : 'OFF'}
+                </span>
+              </label>
+              {!pendingOverrideActive && (
+                <p style={{ margin: '0.4rem 0 0 0', color: '#888', fontSize: '0.82rem' }}>
+                  When off, the storefront uses POS Stock ({overrideProduct.posStock != null ? overrideProduct.posStock : overrideProduct.stock} units) directly.
+                </p>
+              )}
+            </div>
+
+            {/* Override Stock Input (only shown when active) */}
+            {pendingOverrideActive && (
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontWeight: '600', color: '#333', fontSize: '0.9rem', marginBottom: '0.4rem' }}>
+                  Website Stock Override
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={pendingOverrideStock}
+                  onChange={(e) => setPendingOverrideStock(e.target.value)}
+                  placeholder="Enter override quantity"
+                  autoFocus
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '4px',
+                    border: '2px solid #5B4B8A',
+                    fontSize: '1.1rem',
+                    fontWeight: '700',
+                    color: '#5B4B8A',
+                    boxSizing: 'border-box',
+                  }}
+                />
+                <p style={{ margin: '0.4rem 0 0 0', color: '#888', fontSize: '0.82rem' }}>
+                  Customers will see this as the available quantity. Must be ≥ 0.
+                </p>
+              </div>
+            )}
+
+            {/* Override Reason */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ display: 'block', fontWeight: '600', color: '#333', fontSize: '0.9rem', marginBottom: '0.4rem' }}>
+                Override Reason <span style={{ color: '#aaa', fontWeight: '400' }}>(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={pendingOverrideReason}
+                onChange={(e) => setPendingOverrideReason(e.target.value)}
+                placeholder="e.g. reserved for pre-orders, damaged batch excluded"
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  borderRadius: '4px',
+                  border: '1px solid #ddd',
+                  fontSize: '0.95rem',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+
+            {/* Effective Stock Preview */}
+            <div style={{
+              backgroundColor: pendingOverrideActive ? '#ede7f6' : '#e8f5e9',
+              border: `1px solid ${pendingOverrideActive ? '#5B4B8A' : '#388e3c'}`,
+              borderRadius: '6px',
+              padding: '0.75rem 1rem',
+              marginBottom: '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}>
+              <span style={{ fontWeight: '600', color: '#333', fontSize: '0.9rem' }}>Effective Website Stock</span>
+              <span style={{ fontWeight: '800', fontSize: '1.4rem', color: pendingOverrideActive ? '#5B4B8A' : '#2e7d32' }}>
+                {pendingOverrideActive && pendingOverrideStock !== ''
+                  ? parseInt(pendingOverrideStock) >= 0 ? parseInt(pendingOverrideStock) : '—'
+                  : (overrideProduct.posStock != null ? overrideProduct.posStock : overrideProduct.stock)
+                }
+              </span>
+            </div>
+
+            {/* Buttons */}
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+              <button
+                onClick={closeOverrideModal}
+                disabled={isSubmittingOverride}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '4px',
+                  border: '1px solid #ddd',
+                  backgroundColor: '#f5f5f5',
+                  color: '#333',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveOverride}
+                disabled={isSubmittingOverride || (pendingOverrideActive && (pendingOverrideStock === '' || parseInt(pendingOverrideStock) < 0))}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '4px',
+                  border: 'none',
+                  backgroundColor: '#5B4B8A',
+                  color: '#fff',
+                  fontWeight: '700',
+                  cursor: isSubmittingOverride ? 'not-allowed' : 'pointer',
+                  opacity: isSubmittingOverride ? 0.7 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                }}
+              >
+                <i className="fas fa-save"></i>
+                {isSubmittingOverride ? 'Saving...' : 'Save Override'}
               </button>
             </div>
           </div>

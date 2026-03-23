@@ -101,7 +101,7 @@ const CheckoutContent = () => {
 
       setBackendProducts(productsMap);
 
-      // Validate stock for each cart item
+      // Validate stock for each cart item (use effectiveStock: override if active, else posStock)
       const unavailableItems = [];
       cartItems.forEach(item => {
         const product = productsMap[item.productId];
@@ -111,12 +111,15 @@ const CheckoutContent = () => {
             reason: 'Product not found in stock',
             availableStock: 0
           });
-        } else if (item.quantity > product.stock) {
-          unavailableItems.push({
-            ...item,
-            reason: 'Insufficient stock',
-            availableStock: product.stock
-          });
+        } else {
+          const availableStock = product.effectiveStock != null ? product.effectiveStock : product.stock;
+          if (item.quantity > availableStock) {
+            unavailableItems.push({
+              ...item,
+              reason: 'Insufficient stock',
+              availableStock
+            });
+          }
         }
       });
 
