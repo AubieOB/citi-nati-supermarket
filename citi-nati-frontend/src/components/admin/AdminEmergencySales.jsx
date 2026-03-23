@@ -594,6 +594,15 @@ const AdminEmergencySales = () => {
     );
   }, []);
 
+  const finalizeQtyEntry = useCallback((event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    event.stopPropagation();
+    setSelectedRowId(null);
+    event.currentTarget.blur();
+    focusCaptureInput();
+  }, [focusCaptureInput]);
+
   const toggleFullscreen = useCallback(() => {
     setIsPanelFullscreen((prev) => !prev);
   }, []);
@@ -912,6 +921,7 @@ const AdminEmergencySales = () => {
                           value={line.qty}
                           onClick={(e) => e.stopPropagation()}
                           onFocus={(e) => e.target.select()}
+                          onKeyDown={finalizeQtyEntry}
                           onChange={(e) => updateLineQty(line.id, e.target.value)}
                           style={{ width: '46px', textAlign: 'center', border: '1px solid #aaa', borderRadius: '4px', padding: '0.16rem' }}
                         />
