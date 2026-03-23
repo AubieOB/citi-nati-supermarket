@@ -1246,9 +1246,7 @@ const updateProduct = async (req, res) => {
 
 const adjustInventoryStock = async (req, res) => {
   try {
-    const requestedProductCode = typeof req.body.productCode === 'string'
-      ? req.body.productCode
-      : String(req.body.productCode == null ? '' : req.body.productCode);
+    const productCode = String(req.body.productCode || '').trim();
     const expectedLocationCode = getDefaultLocationCode();
     const locationCode = String(req.body.locationCode || expectedLocationCode).trim();
     const reason = String(req.body.reason || '').trim();
@@ -1257,7 +1255,7 @@ const adjustInventoryStock = async (req, res) => {
     const timestamp = new Date();
     const parsedAdjustmentQty = Number.parseInt(req.body.adjustmentQty, 10);
 
-    if (!requestedProductCode || requestedProductCode.trim().length === 0) {
+    if (!productCode) {
       return res.status(400).json({ error: 'productCode is required' });
     }
 
@@ -1281,7 +1279,7 @@ const adjustInventoryStock = async (req, res) => {
 
     const result = await prisma.$transaction(async (tx) => {
       const product = await tx.product.findFirst({
-        where: { sourceCode: requestedProductCode },
+        where: { sourceCode: productCode },
       });
 
       if (!product) {
@@ -1302,7 +1300,7 @@ const adjustInventoryStock = async (req, res) => {
 
       const auditPayload = {
         productId: String(product.id),
-        productCode: product.sourceCode,
+        productCode,
         locationCode,
         adjustmentQty: parsedAdjustmentQty,
         previousStock,
@@ -1347,7 +1345,7 @@ const adjustInventoryStock = async (req, res) => {
       const qtyReduction = Math.abs(parsedAdjustmentQty);
       const stockPayload = {
         productId: String(result.product.id),
-        productCode: result.product.sourceCode,
+        productCode,
         locationCode,
         oldStock: result.previousStock,
         newStock: result.newStock,
@@ -1417,7 +1415,7 @@ const adjustInventoryStock = async (req, res) => {
       success: true,
       message: 'Inventory adjustment applied successfully',
       adjustment: {
-        productCode: result.product.sourceCode,
+        productCode,
         locationCode,
         adjustmentQty: parsedAdjustmentQty,
         reason,
