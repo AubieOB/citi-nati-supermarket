@@ -22,7 +22,7 @@ const {
   applyPromotion: applyPosPromotion,
   revertPromotion: revertPosPromotion,
 } = require('../controllers/posExpiryPromotion.controller');
-const { getExpiryBatchAlerts, adjustInventoryStock, setStockOverride, getInventoryAdjustmentAudit } = require('../controllers/product.controller');
+const { getExpiryBatchAlerts, setStockOverride } = require('../controllers/product.controller');
 const { emitProductUpdate } = require('../utils/socket');
 
 const router = express.Router();
@@ -574,20 +574,6 @@ router.get('/refunds/pending', verifyTokenMiddleware, verifyAdmin, getRefundPend
  * Protected: Admin only
  */
 router.put('/refunds/:orderId/approve', verifyTokenMiddleware, verifyAdmin, markOrderAsRefunded);
-
-/**
- * GET /api/admin/inventory/adjustments
- * Get recent manual stock adjustment audit records.
- * Protected: Admin only
- */
-router.get('/inventory/adjustments', verifyTokenMiddleware, verifyAdmin, getInventoryAdjustmentAudit);
-
-/**
- * POST /api/admin/inventory/adjustments
- * Apply a manual stock correction. This is not GRN receiving.
- * Protected: Admin only
- */
-router.post('/inventory/adjustments', verifyTokenMiddleware, verifyAdmin, adjustInventoryStock);
 
 /**
  * PUT /api/admin/inventory/stock-override/:id
