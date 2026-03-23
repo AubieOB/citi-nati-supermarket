@@ -522,6 +522,8 @@ async function listEmergencySales(req, res) {
     const product = String(req.query.product || '').trim();
     const startDate = String(req.query.startDate || '').trim();
     const endDate = String(req.query.endDate || '').trim();
+    const requesterRole = String(req.user?.role || '').trim().toLowerCase();
+    const requesterUserId = String(req.user?.userId || '').trim();
 
     const andClauses = [];
 
@@ -545,6 +547,11 @@ async function listEmergencySales(req, res) {
           { cashierId: { contains: cashier, mode: 'insensitive' } },
         ],
       });
+    }
+
+    // Cashier role must only see their own emergency sales, regardless of query filters.
+    if (requesterRole === 'cashier' && requesterUserId) {
+      andClauses.push({ cashierId: requesterUserId });
     }
 
     const createdAt = {};

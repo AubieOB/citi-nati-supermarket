@@ -135,10 +135,11 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
 
   const fetchEmergencySales = useCallback(async () => {
     try {
+      const isCashierScope = String(apiBase || '').startsWith('cashier/');
       const response = await api.get(`/${apiBase}`, {
         params: {
           page: 1,
-          pageSize: 8,
+          pageSize: isCashierScope ? 200 : 8,
           status: 'all',
         },
       });
@@ -999,50 +1000,52 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
             overflow: 'hidden',
           }}>
             <div style={{ fontWeight: 800, marginBottom: '0.45rem' }}>Recent Emergency Sales</div>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f1f2f8' }}>
-                  <th style={{ textAlign: 'left', padding: '0.25rem' }}>Ref</th>
-                  <th style={{ textAlign: 'right', padding: '0.25rem' }}>Total</th>
-                  <th style={{ textAlign: 'left', padding: '0.25rem' }}>Status</th>
-                  <th style={{ textAlign: 'center', padding: '0.25rem' }}>Receipt</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sales.length === 0 && (
-                  <tr>
-                    <td colSpan={4} style={{ padding: '0.5rem', textAlign: 'center', color: '#666' }}>No sales</td>
+            <div style={{ maxHeight: '44vh', overflowY: 'auto', border: '1px solid #edf0f7', borderRadius: '4px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f1f2f8' }}>
+                    <th style={{ textAlign: 'left', padding: '0.25rem', position: 'sticky', top: 0, zIndex: 1 }}>Ref</th>
+                    <th style={{ textAlign: 'right', padding: '0.25rem', position: 'sticky', top: 0, zIndex: 1 }}>Total</th>
+                    <th style={{ textAlign: 'left', padding: '0.25rem', position: 'sticky', top: 0, zIndex: 1 }}>Status</th>
+                    <th style={{ textAlign: 'center', padding: '0.25rem', position: 'sticky', top: 0, zIndex: 1 }}>Receipt</th>
                   </tr>
-                )}
-                {sales.slice(0, 8).map((sale) => (
-                  <tr key={sale.id} style={{ borderBottom: '1px solid #eef' }}>
-                    <td style={{ padding: '0.26rem', fontFamily: 'Consolas, monospace' }}>{sale.sale_ref}</td>
-                    <td style={{ padding: '0.26rem', textAlign: 'right', fontWeight: 700 }}>{formatMoney(sale.total)}</td>
-                    <td style={{ padding: '0.26rem', color: STATUS_COLORS[sale.sync_status] || '#555', fontWeight: 700 }}>
-                      {STATUS_LABELS[sale.sync_status] || sale.sync_status}
-                    </td>
-                    <td style={{ padding: '0.26rem', textAlign: 'center' }}>
-                      <div style={{ display: 'inline-flex', gap: '0.28rem' }}>
-                        <button
-                          onClick={() => viewReceipt(sale)}
-                          title="View receipt"
-                          style={{ border: '1px solid #7f83c4', backgroundColor: '#eef0ff', color: '#2b2f73', borderRadius: '4px', width: '28px', height: '24px', cursor: 'pointer' }}
-                        >
-                          <i className="fas fa-eye"></i>
-                        </button>
-                        <button
-                          onClick={() => downloadReceipt(sale)}
-                          title="Download receipt"
-                          style={{ border: '1px solid #5a8b5f', backgroundColor: '#edf9ef', color: '#1f6a2b', borderRadius: '4px', width: '28px', height: '24px', cursor: 'pointer' }}
-                        >
-                          <i className="fas fa-download"></i>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {sales.length === 0 && (
+                    <tr>
+                      <td colSpan={4} style={{ padding: '0.5rem', textAlign: 'center', color: '#666' }}>No sales</td>
+                    </tr>
+                  )}
+                  {sales.map((sale) => (
+                    <tr key={sale.id} style={{ borderBottom: '1px solid #eef' }}>
+                      <td style={{ padding: '0.26rem', fontFamily: 'Consolas, monospace' }}>{sale.sale_ref}</td>
+                      <td style={{ padding: '0.26rem', textAlign: 'right', fontWeight: 700 }}>{formatMoney(sale.total)}</td>
+                      <td style={{ padding: '0.26rem', color: STATUS_COLORS[sale.sync_status] || '#555', fontWeight: 700 }}>
+                        {STATUS_LABELS[sale.sync_status] || sale.sync_status}
+                      </td>
+                      <td style={{ padding: '0.26rem', textAlign: 'center' }}>
+                        <div style={{ display: 'inline-flex', gap: '0.28rem' }}>
+                          <button
+                            onClick={() => viewReceipt(sale)}
+                            title="View receipt"
+                            style={{ border: '1px solid #7f83c4', backgroundColor: '#eef0ff', color: '#2b2f73', borderRadius: '4px', width: '28px', height: '24px', cursor: 'pointer' }}
+                          >
+                            <i className="fas fa-eye"></i>
+                          </button>
+                          <button
+                            onClick={() => downloadReceipt(sale)}
+                            title="Download receipt"
+                            style={{ border: '1px solid #5a8b5f', backgroundColor: '#edf9ef', color: '#1f6a2b', borderRadius: '4px', width: '28px', height: '24px', cursor: 'pointer' }}
+                          >
+                            <i className="fas fa-download"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             {lastReceipt && (
               <div style={{ marginTop: '0.45rem' }}>
                 <button onClick={() => printReceipt(lastReceipt)} style={{

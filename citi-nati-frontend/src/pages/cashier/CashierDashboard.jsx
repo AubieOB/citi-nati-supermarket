@@ -14,7 +14,7 @@ const CashierDashboard = () => {
   const { user, logout } = useAuth();
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100vh', backgroundColor: '#f5f5f5', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Top bar */}
       <div style={{
         backgroundColor: '#5B4B8A',
@@ -57,7 +57,7 @@ const CashierDashboard = () => {
       </div>
 
       {/* POS Panel */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '0.75rem' }}>
+      <div style={{ flex: 1, overflow: 'hidden', padding: '0.75rem' }}>
         <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>Loading POS...</div>}>
           <AdminEmergencySales apiBase="cashier/emergency-sales" />
         </Suspense>

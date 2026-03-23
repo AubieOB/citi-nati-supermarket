@@ -266,6 +266,31 @@ const AdminEmergencySalesReports = () => {
 
   const reportFilterSpacerHeight = Math.max(Math.min(filterBarHeight, 150) - 8, 0);
 
+  const salesTotalsRow = useMemo(() => {
+    return {
+      items: sales.reduce((sum, sale) => sum + (Array.isArray(sale.items) ? sale.items.length : 0), 0),
+      total: toMoney(sales.reduce((sum, sale) => sum + toMoney(sale.total), 0)),
+    };
+  }, [sales]);
+
+  const productTotalsRow = useMemo(() => {
+    return {
+      qty: productStats.reduce((sum, row) => sum + Number(row.qty || 0), 0),
+      revenue: toMoney(productStats.reduce((sum, row) => sum + toMoney(row.revenue), 0)),
+      saleLines: productStats.reduce((sum, row) => sum + Number(row.salesCount || 0), 0),
+    };
+  }, [productStats]);
+
+  const cashierTotalsRow = useMemo(() => {
+    return {
+      salesCount: cashierStats.reduce((sum, row) => sum + Number(row.salesCount || 0), 0),
+      total: toMoney(cashierStats.reduce((sum, row) => sum + toMoney(row.total), 0)),
+      pending: cashierStats.reduce((sum, row) => sum + Number(row.pending || 0), 0),
+      synced: cashierStats.reduce((sum, row) => sum + Number(row.synced || 0), 0),
+      failed: cashierStats.reduce((sum, row) => sum + Number(row.failed || 0), 0),
+    };
+  }, [cashierStats]);
+
   const handleApplyFilters = () => {
     setFilters(pendingFilters);
   };
@@ -337,6 +362,7 @@ const AdminEmergencySalesReports = () => {
         sale.payment_method || sale.paymentMethod || '-',
         STATUS_LABELS[sale.sync_status] || sale.sync_status || '-',
       ]),
+      ['TOTAL', '', '', salesTotalsRow.items, '', '', salesTotalsRow.total, '', ''],
     ];
 
     downloadCsv(`emergency-sales-log-${Date.now()}.csv`, rows);
@@ -347,6 +373,7 @@ const AdminEmergencySalesReports = () => {
     const rows = [
       ['Product Code', 'Product Name', 'Qty Sold', 'Revenue', 'Sale Lines'],
       ...productStats.map((item) => [item.productCode, item.productName, item.qty, toMoney(item.revenue), item.salesCount]),
+      ['TOTAL', '', productTotalsRow.qty, productTotalsRow.revenue, productTotalsRow.saleLines],
     ];
 
     downloadCsv(`emergency-sales-by-product-${Date.now()}.csv`, rows);
@@ -364,6 +391,7 @@ const AdminEmergencySalesReports = () => {
         cashier.synced,
         cashier.failed,
       ]),
+      ['TOTAL', cashierTotalsRow.salesCount, cashierTotalsRow.total, cashierTotalsRow.pending, cashierTotalsRow.synced, cashierTotalsRow.failed],
     ];
 
     downloadCsv(`emergency-sales-by-cashier-${Date.now()}.csv`, rows);
@@ -400,9 +428,12 @@ const AdminEmergencySalesReports = () => {
         sale.payment_method || sale.paymentMethod || '-',
         STATUS_LABELS[sale.sync_status] || sale.sync_status || '-',
       ]),
+      foot: [['TOTAL', '', '', salesTotalsRow.items, '', '', formatMoney(salesTotalsRow.total), '', '']],
+      showFoot: 'lastPage',
       theme: 'grid',
       styles: { fontSize: 8 },
       headStyles: { fillColor: [29, 78, 216] },
+      footStyles: { fillColor: [219, 234, 254], textColor: [15, 23, 42], fontStyle: 'bold' },
     });
 
     doc.save(`emergency-sales-log-${Date.now()}.pdf`);
@@ -423,9 +454,12 @@ const AdminEmergencySalesReports = () => {
         formatMoney(item.revenue),
         item.salesCount,
       ]),
+      foot: [['TOTAL', '', productTotalsRow.qty, formatMoney(productTotalsRow.revenue), productTotalsRow.saleLines]],
+      showFoot: 'lastPage',
       theme: 'grid',
       styles: { fontSize: 8 },
       headStyles: { fillColor: [15, 118, 110] },
+      footStyles: { fillColor: [204, 251, 241], textColor: [15, 23, 42], fontStyle: 'bold' },
     });
 
     doc.save(`emergency-sales-by-product-${Date.now()}.pdf`);
@@ -447,9 +481,12 @@ const AdminEmergencySalesReports = () => {
         cashier.synced,
         cashier.failed,
       ]),
+      foot: [['TOTAL', cashierTotalsRow.salesCount, formatMoney(cashierTotalsRow.total), cashierTotalsRow.pending, cashierTotalsRow.synced, cashierTotalsRow.failed]],
+      showFoot: 'lastPage',
       theme: 'grid',
       styles: { fontSize: 8 },
       headStyles: { fillColor: [124, 58, 237] },
+      footStyles: { fillColor: [233, 213, 255], textColor: [15, 23, 42], fontStyle: 'bold' },
     });
 
     doc.save(`emergency-sales-by-cashier-${Date.now()}.pdf`);
@@ -717,6 +754,17 @@ const AdminEmergencySalesReports = () => {
                           </td>
                         </tr>
                       ))}
+
+                      {sales.length > 0 && (
+                        <tr style={{ backgroundColor: '#eff6ff' }}>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #bfdbfe', fontWeight: 800 }}>TOTAL</td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #bfdbfe' }}></td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #bfdbfe' }}></td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #bfdbfe', textAlign: 'right', fontWeight: 800 }}>{salesTotalsRow.items}</td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #bfdbfe', textAlign: 'right', fontWeight: 800 }}>{formatMoney(salesTotalsRow.total)}</td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #bfdbfe' }}></td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -788,6 +836,15 @@ const AdminEmergencySalesReports = () => {
                           </td>
                         </tr>
                       ))}
+
+                      {productStats.length > 0 && (
+                        <tr style={{ backgroundColor: '#ecfeff' }}>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #99f6e4', fontWeight: 800 }}>TOTAL</td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #99f6e4' }}></td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #99f6e4', textAlign: 'right', fontWeight: 800 }}>{productTotalsRow.qty}</td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #99f6e4', textAlign: 'right', fontWeight: 800 }}>{formatMoney(productTotalsRow.revenue)}</td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -863,6 +920,17 @@ const AdminEmergencySalesReports = () => {
                           <td style={{ padding: '0.6rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>{row.failed}</td>
                         </tr>
                       ))}
+
+                      {cashierStats.length > 0 && (
+                        <tr style={{ backgroundColor: '#f5f3ff' }}>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #ddd6fe', fontWeight: 800 }}>TOTAL</td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #ddd6fe', textAlign: 'right', fontWeight: 800 }}>{cashierTotalsRow.salesCount}</td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #ddd6fe', textAlign: 'right', fontWeight: 800 }}>{formatMoney(cashierTotalsRow.total)}</td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #ddd6fe', textAlign: 'right', fontWeight: 800 }}>{cashierTotalsRow.pending}</td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #ddd6fe', textAlign: 'right', fontWeight: 800 }}>{cashierTotalsRow.synced}</td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #ddd6fe', textAlign: 'right', fontWeight: 800 }}>{cashierTotalsRow.failed}</td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
