@@ -35,10 +35,89 @@ function generateEmergencySaleRef() {
   return `EMR-${yyyy}${mm}${dd}-${hh}${min}${sec}-${suffix}`;
 }
 
-function getCashierIdentity(req) {
+async function getCashierIdentity(req) {
   const cashierId = String(req.user?.userId || '').trim() || null;
-  const cashierName = String(req.user?.email || req.user?.userId || 'admin').trim();
+  let cashierName = String(req.user?.name || '').trim();
+
+  if (!cashierName && cashierId) {
+    const user = await prisma.user.findUnique({
+      where: { id: cashierId },
+      select: { name: true, email: true },
+    });
+
+    if (user?.name) {
+      cashierName = String(user.name).trim();
+    } else if (user?.email) {
+      cashierName = String(user.email).split('@')[0].trim();
+    }
+  }
+
+  if (!cashierName && req.user?.email) {
+    cashierName = String(req.user.email).split('@')[0].trim();
+  }
+
+  if (!cashierName) {
+    cashierName = String(req.user?.userId || 'admin').trim();
+  }
+
   return { cashierId, cashierName };
+}
+
+async function resolveCashierNamesForSales(sales) {
+  const records = Array.isArray(sales) ? sales : [];
+  if (records.length === 0) return records;
+
+  const cashierIds = new Set();
+  const cashierEmails = new Set();
+
+  for (const sale of records) {
+    const cashierId = String(sale.cashierId || '').trim();
+    const cashierName = String(sale.cashierName || '').trim();
+
+    if (cashierId) cashierIds.add(cashierId);
+    if (cashierName.includes('@')) cashierEmails.add(cashierName.toLowerCase());
+  }
+
+  if (cashierIds.size === 0 && cashierEmails.size === 0) {
+    return records;
+  }
+
+  const users = await prisma.user.findMany({
+    where: {
+      OR: [
+        ...(cashierIds.size > 0 ? [{ id: { in: Array.from(cashierIds) } }] : []),
+        ...(cashierEmails.size > 0 ? [{ email: { in: Array.from(cashierEmails) } }] : []),
+      ],
+    },
+    select: { id: true, name: true, email: true },
+  });
+
+  const usersById = new Map();
+  const usersByEmail = new Map();
+
+  for (const user of users) {
+    if (user?.id) usersById.set(String(user.id), user);
+    if (user?.email) usersByEmail.set(String(user.email).toLowerCase(), user);
+  }
+
+  return records.map((sale) => {
+    const currentCashierName = String(sale.cashierName || '').trim();
+    const currentCashierId = String(sale.cashierId || '').trim();
+
+    const matchedById = currentCashierId ? usersById.get(currentCashierId) : null;
+    const matchedByEmail = currentCashierName.includes('@')
+      ? usersByEmail.get(currentCashierName.toLowerCase())
+      : null;
+    const preferredName = String(matchedById?.name || matchedByEmail?.name || '').trim();
+
+    if (!preferredName) return sale;
+    if (preferredName === currentCashierName) return sale;
+
+    return {
+      ...sale,
+      cashierName: preferredName,
+    };
+  });
 }
 
 function computeUnitPrice(product) {
@@ -236,7 +315,7 @@ async function createEmergencySale(req, res) {
     }
 
     const productIds = Array.from(quantityByProductId.keys());
-    const { cashierId, cashierName } = getCashierIdentity(req);
+    const { cashierId, cashierName } = await getCashierIdentity(req);
     const requestedDiscount = toMoney(req.body?.discount ?? req.body?.discount_amount ?? 0);
     const paymentMethod = normalizePaymentMethod(req.body?.payment_method ?? req.body?.paymentMethod ?? 'CASH');
 
@@ -518,6 +597,8 @@ async function listEmergencySales(req, res) {
       }),
     ]);
 
+    const salesWithResolvedCashierNames = await resolveCashierNamesForSales(sales);
+
     const summaryGroup = await prisma.emergencySale.groupBy({
       where,
       by: ['syncStatus'],
@@ -535,7 +616,7 @@ async function listEmergencySales(req, res) {
 
     return res.status(200).json({
       success: true,
-      sales: sales.map((sale) => formatEmergencySale(sale)),
+      sales: salesWithResolvedCashierNames.map((sale) => formatEmergencySale(sale)),
       total,
       page,
       pageSize,
@@ -564,7 +645,8 @@ async function getEmergencySaleById(req, res) {
       return res.status(404).json({ success: false, error: 'Emergency sale not found' });
     }
 
-    return res.status(200).json({ success: true, sale: formatEmergencySale(sale) });
+    const [resolvedSale] = await resolveCashierNamesForSales([sale]);
+    return res.status(200).json({ success: true, sale: formatEmergencySale(resolvedSale || sale) });
   } catch (error) {
     console.error('[EMERGENCY SALES] get by id failed:', error.message);
     return res.status(500).json({ success: false, error: 'Failed to fetch emergency sale' });
