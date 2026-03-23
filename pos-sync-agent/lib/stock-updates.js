@@ -177,21 +177,22 @@ async function applyFifoStockOutToStockDetails(request, productCode, locationCod
 
   const batchRequest = createScopedRequest(request);
   batchRequest.input('ProductCode', sql.VarChar(50), productCode);
+  batchRequest.input('LocationCode', sql.VarChar(10), locationCode);
 
   const batchResult = await batchRequest.query(`
     SELECT
       sd.StockDetailID,
       sd.GRNNo,
-      sd.ExpiryDate,
       ISNULL(sd.StockQty, 0) AS StockQty,
       ISNULL(sd.StockOut, 0) AS StockOut,
       ISNULL(sd.StockQty, 0) - ISNULL(sd.StockOut, 0) AS AvailableQty
     FROM POS.dbo.stockdetails sd
     WHERE sd.ProductCode = @ProductCode
+      AND sd.LocationCode = @LocationCode
       AND ISNULL(sd.StockQty, 0) - ISNULL(sd.StockOut, 0) > 0
     ORDER BY
-      CASE WHEN sd.ExpiryDate IS NULL THEN 1 ELSE 0 END,
-      sd.ExpiryDate ASC,
+      CASE WHEN sd.GRNNo IS NULL OR LTRIM(RTRIM(sd.GRNNo)) = '' THEN 1 ELSE 0 END,
+      sd.GRNNo ASC,
       sd.StockDetailID ASC
   `);
 
@@ -225,16 +226,15 @@ async function applyFifoStockOutToStockDetails(request, productCode, locationCod
       );
     }
 
-    const remainingQtyAfterDeduction = remaining - deductQty;
-
-    console.log('[STOCK][STOCKDETAILS] FIFO batch deduction:', {
+    console.log('[STOCK][STOCKDETAILS] FIFO batch before update:', {
       StockDetailID: stockDetailId,
       GRNNo: batch.GRNNo || null,
-      ExpiryDate: batch.ExpiryDate || null,
       ProductCode: productCode,
-      availableQty,
-      deductedQty: deductQty,
-      remainingQty: remainingQtyAfterDeduction,
+      LocationCode: locationCode,
+      StockQty: stockQty,
+      StockOutBefore: stockOutBefore,
+      DeductQty: deductQty,
+      StockOutAfter: stockOutAfter,
     });
 
     const updateRequest = createScopedRequest(request);
@@ -260,12 +260,13 @@ async function applyFifoStockOutToStockDetails(request, productCode, locationCod
     console.log('[STOCK][STOCKDETAILS] FIFO batch after update:', {
       StockDetailID: stockDetailId,
       ProductCode: productCode,
+      LocationCode: locationCode,
       StockOutBefore: stockOutBefore,
       StockOutAfter: stockOutAfter,
       affectedRows: rowsAffected,
     });
 
-    remaining = remainingQtyAfterDeduction;
+    remaining -= deductQty;
   }
 
   if (remaining > 0) {
