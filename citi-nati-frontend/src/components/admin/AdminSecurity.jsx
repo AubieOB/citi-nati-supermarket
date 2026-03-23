@@ -37,14 +37,21 @@ const AdminSecurity = () => {
   const [loading, setLoading] = useState(true);
   const [savingAdmin, setSavingAdmin] = useState(false);
   const [savingDriver, setSavingDriver] = useState(false);
+  const [savingCashier, setSavingCashier] = useState(false);
   const [hasAdminSecurityKey, setHasAdminSecurityKey] = useState(false);
   const [driverAccounts, setDriverAccounts] = useState([]);
   const [selectedDriverId, setSelectedDriverId] = useState('');
   const [selectedDriverName, setSelectedDriverName] = useState('');
   const [hasDriverSecurityKey, setHasDriverSecurityKey] = useState(false);
   const [driverStatusLoading, setDriverStatusLoading] = useState(false);
+  const [cashierAccounts, setCashierAccounts] = useState([]);
+  const [selectedCashierId, setSelectedCashierId] = useState('');
+  const [selectedCashierName, setSelectedCashierName] = useState('');
+  const [hasCashierSecurityKey, setHasCashierSecurityKey] = useState(false);
+  const [cashierStatusLoading, setCashierStatusLoading] = useState(false);
   const [adminFormData, setAdminFormData] = useState(emptyFormState);
   const [driverFormData, setDriverFormData] = useState(emptyFormState);
+  const [cashierFormData, setCashierFormData] = useState(emptyFormState);
   const [activeTab, setActiveTab] = useState('admin');
   const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
   const [filterBarHeight, setFilterBarHeight] = useState(0);
@@ -54,19 +61,27 @@ const AdminSecurity = () => {
   useEffect(() => {
     const fetchStatus = async () => {
       try {
-        const [adminStatus, usersResponse] = await Promise.all([
+        const [adminStatus, usersResponse, cashiersResponse] = await Promise.all([
           api.get('/admin/security-key/status'),
           api.get('/admin/users'),
+          api.get('/admin/cashiers'),
         ]);
 
         const drivers = (usersResponse.data?.users || []).filter((user) => user.role === 'driver');
+        const fetchedCashiers = cashiersResponse.data?.cashiers || [];
 
         setHasAdminSecurityKey(Boolean(adminStatus.data?.hasSecurityKey));
         setDriverAccounts(drivers);
+        setCashierAccounts(fetchedCashiers);
 
         if (drivers.length > 0) {
           setSelectedDriverId(drivers[0].id);
           setSelectedDriverName(drivers[0].name || drivers[0].email || 'Selected driver');
+        }
+
+        if (fetchedCashiers.length > 0) {
+          setSelectedCashierId(fetchedCashiers[0].id);
+          setSelectedCashierName(fetchedCashiers[0].name || fetchedCashiers[0].email || 'Selected cashier');
         }
       } catch (err) {
         showError('Security setup failed', err.response?.data?.error || 'Unable to load security key status');
@@ -100,6 +115,33 @@ const AdminSecurity = () => {
 
     fetchDriverStatus();
   }, [selectedDriverId, driverAccounts, showError]);
+
+  useEffect(() => {
+    const fetchCashierStatus = async () => {
+      if (!selectedCashierId) {
+        setHasCashierSecurityKey(false);
+        setSelectedCashierName('');
+        return;
+      }
+
+      try {
+        setCashierStatusLoading(true);
+        const response = await api.get(`/admin/security-key/cashier/${selectedCashierId}/status`);
+        setHasCashierSecurityKey(Boolean(response.data?.hasSecurityKey));
+        setSelectedCashierName(
+          response.data?.cashier?.name ||
+          cashierAccounts.find((c) => c.id === selectedCashierId)?.name ||
+          'Selected cashier'
+        );
+      } catch (err) {
+        showError('Cashier security setup failed', err.response?.data?.error || 'Unable to load selected cashier security key status');
+      } finally {
+        setCashierStatusLoading(false);
+      }
+    };
+
+    fetchCashierStatus();
+  }, [selectedCashierId, cashierAccounts, showError]);
 
   useEffect(() => {
     let resizeObserver;
@@ -149,6 +191,11 @@ const AdminSecurity = () => {
 
     if (scope === 'admin') {
       setAdminFormData((prev) => ({ ...prev, [name]: value }));
+      return;
+    }
+
+    if (scope === 'cashier') {
+      setCashierFormData((prev) => ({ ...prev, [name]: value }));
       return;
     }
 
@@ -236,9 +283,47 @@ const AdminSecurity = () => {
     return <div style={{ padding: '1.5rem', color: '#666' }}>Loading security settings...</div>;
   }
 
+  const handleCashierSubmit = async (event) => {
+    event.preventDefault();
+
+    if (!selectedCashierId) {
+      showError('Validation', 'Select a cashier account first');
+      return;
+    }
+
+    const isValid = validateSecurityForm({
+      hasExistingKey: false, // Admin can always override cashier PIN without the current key
+      formData: cashierFormData,
+      showError,
+      label: 'cashier',
+    });
+
+    if (!isValid) {
+      return;
+    }
+
+    try {
+      setSavingCashier(true);
+      const payload = {
+        securityKey: cashierFormData.securityKey,
+        confirmSecurityKey: cashierFormData.confirmSecurityKey,
+      };
+
+      const response = await api.put(`/admin/security-key/cashier/${selectedCashierId}`, payload);
+      showSuccess('Success', response.data?.message || 'Cashier security key saved successfully');
+      setHasCashierSecurityKey(true);
+      setCashierFormData(emptyFormState);
+    } catch (err) {
+      showError('Failed', err.response?.data?.error || 'Unable to save cashier security key');
+    } finally {
+      setSavingCashier(false);
+    }
+  };
+
   const securityTabs = [
     { id: 'admin', label: 'Admin Security', icon: 'fa-user-shield' },
     { id: 'driver', label: 'Driver Security', icon: 'fa-id-card' },
+    { id: 'cashier', label: 'Cashier Security', icon: 'fa-user-tag' },
   ];
 
   const securityFilterSpacerHeight = filterBarHeight > 0 ? filterBarHeight + 8 : 0;
@@ -275,7 +360,7 @@ const AdminSecurity = () => {
             <h1 style={{ margin: 0, color: '#333', fontSize: '1.15rem' }}>Security Management</h1>
           </div>
           <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600' }}>
-            Admin key: {hasAdminSecurityKey ? 'SET' : 'NOT SET'} | Driver key: {selectedDriverId ? (hasDriverSecurityKey ? 'SET' : 'NOT SET') : 'N/A'}
+            Admin key: {hasAdminSecurityKey ? 'SET' : 'NOT SET'} | Driver key: {selectedDriverId ? (hasDriverSecurityKey ? 'SET' : 'NOT SET') : 'N/A'} | Cashier key: {selectedCashierId ? (hasCashierSecurityKey ? 'SET' : 'NOT SET') : 'N/A'}
           </div>
         </div>
 
@@ -474,6 +559,92 @@ const AdminSecurity = () => {
             }}
           >
             {savingDriver ? 'Saving...' : hasDriverSecurityKey ? 'Change Driver Security Key' : 'Set Driver Security Key'}
+          </button>
+        </form>
+      </div>
+      )}
+
+      {activeTab === 'cashier' && (
+      <div style={{ backgroundColor: '#fff', borderRadius: '10px', padding: '1.5rem', boxShadow: '0 2px 10px rgba(0,0,0,0.08)' }}>
+        <h2 style={{ marginTop: 0, color: '#333' }}>Cashier Security PIN</h2>
+        <p style={{ color: '#666', marginBottom: '1.25rem' }}>
+          {selectedCashierId
+            ? hasCashierSecurityKey
+              ? `Set a new security PIN for ${selectedCashierName}. The cashier will be prompted to enter it before accessing the POS.`
+              : `Set the first security PIN for ${selectedCashierName}. Only that cashier will be prompted for it.`
+            : 'Choose a cashier account to create or update that cashier\'s security PIN.'}
+        </p>
+        <p style={{ color: '#888', fontSize: '0.85rem', marginTop: 0, marginBottom: '1.25rem' }}>
+          <i className="fas fa-info-circle" style={{ marginRight: '0.4rem' }}></i>
+          As admin you can always set or replace a cashier PIN without requiring the current PIN.
+        </p>
+
+        <form onSubmit={handleCashierSubmit} style={{ display: 'grid', gap: '1rem' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.45rem', fontWeight: 600 }}>Cashier Account</label>
+            <select
+              value={selectedCashierId}
+              onChange={(event) => {
+                const nextId = event.target.value;
+                const selectedCashier = cashierAccounts.find((c) => c.id === nextId);
+                setSelectedCashierId(nextId);
+                setSelectedCashierName(selectedCashier?.name || selectedCashier?.email || 'Selected cashier');
+                setCashierFormData(emptyFormState);
+              }}
+              style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #ddd' }}
+            >
+              {cashierAccounts.length === 0 ? (
+                <option value="">No cashier accounts found</option>
+              ) : (
+                cashierAccounts.map((cashier) => (
+                  <option key={cashier.id} value={cashier.id}>
+                    {cashier.name} ({cashier.email})
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+
+          {cashierStatusLoading && <div style={{ color: '#666' }}>Loading selected cashier security status...</div>}
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.45rem', fontWeight: 600 }}>Enter Cashier Security PIN</label>
+            <input
+              type="password"
+              name="securityKey"
+              value={cashierFormData.securityKey}
+              onChange={(event) => handleInputChange(event, 'cashier')}
+              placeholder="Enter new PIN"
+              style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #ddd' }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.45rem', fontWeight: 600 }}>Confirm Cashier Security PIN</label>
+            <input
+              type="password"
+              name="confirmSecurityKey"
+              value={cashierFormData.confirmSecurityKey}
+              onChange={(event) => handleInputChange(event, 'cashier')}
+              placeholder="Confirm new PIN"
+              style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #ddd' }}
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={savingCashier || !selectedCashierId || cashierStatusLoading}
+            style={{
+              border: 'none',
+              borderRadius: '6px',
+              padding: '0.8rem 1rem',
+              backgroundColor: savingCashier ? '#8898aa' : '#5B4B8A',
+              color: '#fff',
+              fontWeight: 600,
+              cursor: savingCashier ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {savingCashier ? 'Saving...' : hasCashierSecurityKey ? 'Change Cashier Security PIN' : 'Set Cashier Security PIN'}
           </button>
         </form>
       </div>

@@ -875,4 +875,224 @@ router.delete('/pos-products/delete-all', verifyTokenMiddleware, verifyAdmin, as
   }
 });
 
+// ─── CASHIER ACCOUNT MANAGEMENT ─────────────────────────────────────────────
+
+/**
+ * GET /api/admin/cashiers
+ * List all cashier user accounts.
+ */
+router.get('/cashiers', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const cashiers = await prisma.user.findMany({
+      where: { role: 'cashier', isActive: true },
+      select: { id: true, name: true, email: true, createdAt: true },
+      orderBy: { name: 'asc' },
+    });
+    return res.json({ success: true, cashiers });
+  } catch (err) {
+    console.error('[ADMIN CASHIERS] List failed:', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to list cashier accounts' });
+  }
+});
+
+/**
+ * POST /api/admin/cashiers
+ * Create a new cashier user account.
+ * Body: { name, email, password }
+ */
+router.post('/cashiers', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ success: false, error: 'Name, email, and password are required' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ success: false, error: 'Password must be at least 6 characters' });
+    }
+
+    const existing = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
+    if (existing) {
+      return res.status(409).json({ success: false, error: 'A user with that email already exists' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const cashier = await prisma.user.create({
+      data: {
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        passwordHash,
+        role: 'cashier',
+        emailVerified: true,
+        isActive: true,
+      },
+      select: { id: true, name: true, email: true, createdAt: true },
+    });
+
+    return res.status(201).json({ success: true, cashier });
+  } catch (err) {
+    console.error('[ADMIN CASHIERS] Create failed:', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to create cashier account' });
+  }
+});
+
+/**
+ * PUT /api/admin/cashiers/:userId
+ * Update a cashier's name, email, or password.
+ * Body: { name?, email?, password? }
+ */
+router.put('/cashiers/:userId', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const cashier = await prisma.user.findUnique({
+      where: { id: req.params.userId },
+      select: { id: true, role: true, email: true },
+    });
+
+    if (!cashier || cashier.role !== 'cashier') {
+      return res.status(404).json({ success: false, error: 'Cashier account not found' });
+    }
+
+    const { name, email, password } = req.body;
+    const updateData = {};
+
+    if (name) updateData.name = name.trim();
+
+    if (email) {
+      const emailTrimmed = email.trim().toLowerCase();
+      if (emailTrimmed !== cashier.email) {
+        const conflict = await prisma.user.findUnique({ where: { email: emailTrimmed } });
+        if (conflict) {
+          return res.status(409).json({ success: false, error: 'Email already in use by another account' });
+        }
+        updateData.email = emailTrimmed;
+      }
+    }
+
+    if (password) {
+      if (password.length < 6) {
+        return res.status(400).json({ success: false, error: 'Password must be at least 6 characters' });
+      }
+      updateData.passwordHash = await bcrypt.hash(password, 10);
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ success: false, error: 'No update fields provided' });
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: cashier.id },
+      data: updateData,
+      select: { id: true, name: true, email: true, createdAt: true },
+    });
+
+    return res.json({ success: true, cashier: updated });
+  } catch (err) {
+    console.error('[ADMIN CASHIERS] Update failed:', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to update cashier account' });
+  }
+});
+
+/**
+ * DELETE /api/admin/cashiers/:userId
+ * Permanently delete a cashier account.
+ */
+router.delete('/cashiers/:userId', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const cashier = await prisma.user.findUnique({
+      where: { id: req.params.userId },
+      select: { id: true, role: true, name: true },
+    });
+
+    if (!cashier || cashier.role !== 'cashier') {
+      return res.status(404).json({ success: false, error: 'Cashier account not found' });
+    }
+
+    await prisma.user.delete({ where: { id: cashier.id } });
+
+    return res.json({ success: true, message: `Cashier account "${cashier.name}" deleted successfully` });
+  } catch (err) {
+    console.error('[ADMIN CASHIERS] Delete failed:', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to delete cashier account' });
+  }
+});
+
+// ─── CASHIER SECURITY PIN (Admin Managed) ───────────────────────────────────
+
+/**
+ * GET /api/admin/security-key/cashier/:userId/status
+ * Returns whether the selected cashier has a PIN configured.
+ */
+router.get('/security-key/cashier/:userId/status', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const cashierUser = await prisma.user.findUnique({
+      where: { id: req.params.userId },
+      select: { id: true, role: true, cashierSecurityKeyHash: true, name: true },
+    });
+
+    if (!cashierUser || cashierUser.role !== 'cashier') {
+      return res.status(404).json({ success: false, error: 'Cashier account not found' });
+    }
+
+    return res.json({
+      success: true,
+      hasSecurityKey: Boolean(cashierUser.cashierSecurityKeyHash),
+      cashier: { id: cashierUser.id, name: cashierUser.name },
+    });
+  } catch (err) {
+    console.error('[CASHIER SECURITY] Admin status check failed:', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to check cashier security key status' });
+  }
+});
+
+/**
+ * PUT /api/admin/security-key/cashier/:userId
+ * Set or replace a cashier's security PIN (admin can override without current key).
+ * Body: { securityKey, confirmSecurityKey }
+ */
+router.put('/security-key/cashier/:userId', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const { securityKey, confirmSecurityKey } = req.body;
+
+    if (!securityKey || !confirmSecurityKey) {
+      return res.status(400).json({ success: false, error: 'Enter and confirm cashier security key are required' });
+    }
+
+    if (securityKey !== confirmSecurityKey) {
+      return res.status(400).json({ success: false, error: 'Cashier security key confirmation does not match' });
+    }
+
+    if (securityKey.trim().length < 4) {
+      return res.status(400).json({ success: false, error: 'Security key must be at least 4 characters' });
+    }
+
+    const cashierUser = await prisma.user.findUnique({
+      where: { id: req.params.userId },
+      select: { id: true, role: true, name: true, cashierSecurityKeyHash: true },
+    });
+
+    if (!cashierUser || cashierUser.role !== 'cashier') {
+      return res.status(404).json({ success: false, error: 'Cashier account not found' });
+    }
+
+    const newHash = await bcrypt.hash(securityKey, 10);
+
+    await prisma.user.update({
+      where: { id: cashierUser.id },
+      data: { cashierSecurityKeyHash: newHash },
+    });
+
+    return res.json({
+      success: true,
+      message: cashierUser.cashierSecurityKeyHash
+        ? 'Cashier security key changed successfully'
+        : 'Cashier security key set successfully',
+    });
+  } catch (err) {
+    console.error('[CASHIER SECURITY] Admin set/change key failed:', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to save cashier security key' });
+  }
+});
+
 module.exports = router;

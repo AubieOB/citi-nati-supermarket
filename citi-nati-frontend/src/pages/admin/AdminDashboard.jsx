@@ -16,6 +16,7 @@ const AdminEmergencySales = React.lazy(() => import('../../components/admin/Admi
 const AdminEmergencySalesReports = React.lazy(() => import('../../components/admin/AdminEmergencySalesReports.jsx'));
 const AdminSecurity = React.lazy(() => import('../../components/admin/AdminSecurity.jsx'));
 const AdminSystem = React.lazy(() => import('../../components/admin/AdminSystem.jsx'));
+const AdminCashiers = React.lazy(() => import('../../components/admin/AdminCashiers.jsx'));
 const AdminPOSManagement = React.lazy(() => import('./AdminPOSManagement.jsx'));
 const SupportDashboard = React.lazy(() => import('./SupportDashboard.jsx'));
 
@@ -58,6 +59,7 @@ const AdminDashboard = () => {
     { id: 'pos-management', label: 'POS Management', icon: 'fa-database' },
     { id: 'users', label: 'Users', icon: 'fa-users' },
     { id: 'drivers', label: 'Drivers', icon: 'fa-car' },
+    { id: 'cashiers', label: 'Cashiers', icon: 'fa-user-tag' },
     { id: 'sales', label: 'Sales', icon: 'fa-dollar-sign' },
     { id: 'security', label: 'Security', icon: 'fa-key' },
   ];
@@ -271,6 +273,7 @@ const AdminDashboard = () => {
             {activeTab === 'refunds' && <AdminRefunds />}
             {activeTab === 'support' && <SupportDashboard />}
             {activeTab === 'drivers' && <AdminDrivers />}
+            {activeTab === 'cashiers' && <AdminCashiers />}
           </Suspense>
         </div>
       </div>

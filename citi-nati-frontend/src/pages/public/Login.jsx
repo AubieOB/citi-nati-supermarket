@@ -51,6 +51,8 @@ const Login = () => {
         navigate('/admin');
       } else if (user.role === 'driver') {
         navigate('/driver');
+      } else if (user.role === 'cashier') {
+        navigate('/cashier');
       } else {
         navigate('/');
       }
@@ -90,6 +92,8 @@ const Login = () => {
           navigate('/admin');
         } else if (user.role === 'driver') {
           navigate('/driver');
+        } else if (user.role === 'cashier') {
+          navigate('/cashier');
         } else {
           navigate('/');
         }

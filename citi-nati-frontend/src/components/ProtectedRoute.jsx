@@ -36,6 +36,10 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     return Boolean(allowedRoles?.includes('driver') && user?.role === 'driver');
   }, [allowedRoles, user?.role]);
 
+  const requiresCashierSecurityGate = useMemo(() => {
+    return Boolean(allowedRoles?.includes('cashier') && user?.role === 'cashier');
+  }, [allowedRoles, user?.role]);
+
   const securityGateConfig = useMemo(() => {
     if (requiresAdminSecurityGate) {
       return {
@@ -53,8 +57,16 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
       };
     }
 
+    if (requiresCashierSecurityGate) {
+      return {
+        statusEndpoint: '/cashier/security-key/status',
+        verifyEndpoint: '/cashier/security-key/verify',
+        roleLabel: 'cashier',
+      };
+    }
+
     return null;
-  }, [requiresAdminSecurityGate, requiresDriverSecurityGate]);
+  }, [requiresAdminSecurityGate, requiresDriverSecurityGate, requiresCashierSecurityGate]);
 
   useEffect(() => {
     const loadSecurityStatus = async () => {
@@ -148,7 +160,9 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
           boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
           padding: '1.5rem',
         }}>
-          <h2 style={{ marginTop: 0, marginBottom: '0.6rem', color: '#333' }}>{securityGateConfig.roleLabel === 'admin' ? 'Admin Security Key' : 'Driver Security Key'}</h2>
+          <h2 style={{ marginTop: 0, marginBottom: '0.6rem', color: '#333' }}>
+            {securityGateConfig.roleLabel === 'admin' ? 'Admin Security Key' : securityGateConfig.roleLabel === 'cashier' ? 'Cashier Security PIN' : 'Driver Security Key'}
+          </h2>
           <p style={{ marginTop: 0, marginBottom: '1rem', color: '#666' }}>
             {`Enter your ${securityGateConfig.roleLabel} security key to continue.`}
           </p>

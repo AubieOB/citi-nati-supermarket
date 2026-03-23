@@ -29,6 +29,7 @@ model User {
   passwordHash            String
   adminSecurityKeyHash    String?
   driverSecurityKeyHash   String?
+  cashierSecurityKeyHash  String?
   role                    String   @default("user")
   isActive                Boolean  @default(true)
   emailVerified           Boolean  @default(false)

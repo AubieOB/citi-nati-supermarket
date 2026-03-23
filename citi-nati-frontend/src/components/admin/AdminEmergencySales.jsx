@@ -66,7 +66,7 @@ function isPrintableKey(event) {
   return typeof event.key === 'string' && event.key.length === 1;
 }
 
-const AdminEmergencySales = () => {
+const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
   const { user } = useAuth();
 
   const rootRef = useRef(null);
@@ -135,7 +135,7 @@ const AdminEmergencySales = () => {
 
   const fetchEmergencySales = useCallback(async () => {
     try {
-      const response = await api.get('/admin/emergency-sales', {
+      const response = await api.get(`/${apiBase}`, {
         params: {
           page: 1,
           pageSize: 8,
@@ -154,7 +154,7 @@ const AdminEmergencySales = () => {
     } catch (error) {
       notifyError(`Failed to load emergency sales: ${error.response?.data?.error || error.message}`, 3000);
     }
-  }, []);
+  }, [apiBase]);
 
   useEffect(() => {
     fetchEmergencySales();
@@ -234,12 +234,12 @@ const AdminEmergencySales = () => {
     const trimmed = String(query || '').trim();
     if (!trimmed) return [];
 
-    const response = await api.get('/admin/emergency-sales/lookup', {
+    const response = await api.get(`/${apiBase}/lookup`, {
       params: { q: trimmed },
     });
 
     return response.data?.products || [];
-  }, []);
+  }, [apiBase]);
 
   const lookupAndAddFromScan = useCallback(async (scanValue) => {
     const query = String(scanValue || '').trim();
@@ -539,7 +539,7 @@ const AdminEmergencySales = () => {
 
     try {
       setIsSubmittingSale(true);
-      const response = await api.post('/admin/emergency-sales', {
+      const response = await api.post(`/${apiBase}`, {
         items: cart.map((line) => ({
           product_id: line.productId,
           qty: line.qty,
@@ -567,7 +567,7 @@ const AdminEmergencySales = () => {
     } finally {
       setIsSubmittingSale(false);
     }
-  }, [cart, clearInvoice, discountValue, fetchEmergencySales, paymentMethod, printReceipt, tendered]);
+  }, [apiBase, cart, clearInvoice, discountValue, fetchEmergencySales, paymentMethod, printReceipt, tendered]);
 
   const updateLineQty = useCallback((lineId, nextQtyRaw) => {
     const nextQty = Math.max(0, parseInt(nextQtyRaw, 10) || 0);

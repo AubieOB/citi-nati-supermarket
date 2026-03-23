@@ -38,13 +38,16 @@ const AdminDashboard = React.lazy(() => import('./pages/admin/AdminDashboard.jsx
 // Driver Pages (lazy loaded)
 const DriverDashboard = React.lazy(() => import('./pages/driver/DriverDashboard.jsx'));
 
+// Cashier Pages (lazy loaded)
+const CashierDashboard = React.lazy(() => import('./pages/cashier/CashierDashboard.jsx'));
+
 // Not Found
 const NotFound = React.lazy(() => import('./pages/NotFound.jsx'));
 
 // Import global styles
 import './styles/global.css';
 
-const MAINTENANCE_EXEMPT_PATHS = ['/admin', '/admin-login', '/maintenance'];
+const MAINTENANCE_EXEMPT_PATHS = ['/admin', '/admin-login', '/maintenance', '/cashier'];
 const DEFAULT_MAINTENANCE_MESSAGE = 'We are currently carrying out scheduled maintenance. We apologize for the inconvenience and appreciate your patience.';
 
 function AppInner() {
@@ -226,6 +229,18 @@ function AppInner() {
               <ProtectedRoute allowedRoles={["driver"]}>
                 <Suspense fallback={loadingFallback}>
                   <DriverDashboard />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Cashier Routes */}
+          <Route
+            path="/cashier"
+            element={
+              <ProtectedRoute allowedRoles={["cashier"]}>
+                <Suspense fallback={loadingFallback}>
+                  <CashierDashboard />
                 </Suspense>
               </ProtectedRoute>
             }
