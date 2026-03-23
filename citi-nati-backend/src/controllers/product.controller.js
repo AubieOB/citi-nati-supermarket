@@ -29,6 +29,10 @@ const _allProductsExpiryCache = {
   refreshing: false,
 };
 
+function getAdjustmentActor(req) {
+  return String(req.user?.email || req.user?.id || req.user?.userId || 'admin').trim();
+}
+
 function decodeExpiryBatchReference(value) {
   const raw = String(value || '').trim();
   if (!raw) {
