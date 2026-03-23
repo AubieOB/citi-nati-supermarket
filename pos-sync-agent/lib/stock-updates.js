@@ -8,20 +8,11 @@ const sql = require('mssql');
 const _columnLengthCache = new Map();
 const _locationNameCache = new Map();
 const _productNameCache = new Map();
-let _productCodeSchemaAligned = false;
 
 const LOCATION_NAME_FALLBACKS = Object.freeze({
   SH: 'SHOP',
   ST999: 'STOCK WRITE OFF',
 });
-
-const PRODUCT_CODE_TARGET_LENGTH = 50;
-const PRODUCT_CODE_SCHEMA_TARGETS = Object.freeze([
-  { tableName: 'Products', columnName: 'ProductCode' },
-  { tableName: 'ProductActivity', columnName: 'ProductCode' },
-  { tableName: 'stockdetails', columnName: 'ProductCode' },
-  { tableName: 'stockadjdetails', columnName: 'ProductCode' },
-]);
 
 function createScopedRequest(request) {
   if (request && request.transaction) {
@@ -57,86 +48,6 @@ async function getColumnMaxLength(request, tableName, columnName) {
   const normalizedMax = Number.isFinite(maxLength) ? maxLength : 0;
   _columnLengthCache.set(cacheKey, normalizedMax);
   return normalizedMax;
-}
-
-async function ensureProductCodeSchemaCapacity(request) {
-  if (_productCodeSchemaAligned) {
-    return;
-  }
-
-  for (const target of PRODUCT_CODE_SCHEMA_TARGETS) {
-    const metaRequest = createScopedRequest(request);
-    metaRequest.input('TableName', sql.VarChar(128), target.tableName);
-    metaRequest.input('ColumnName', sql.VarChar(128), target.columnName);
-
-    const metaResult = await metaRequest.query(`
-      SELECT TOP 1
-        DATA_TYPE AS DataType,
-        IS_NULLABLE AS IsNullable,
-        CHARACTER_MAXIMUM_LENGTH AS MaxLength
-      FROM POS.INFORMATION_SCHEMA.COLUMNS
-      WHERE TABLE_SCHEMA = 'dbo'
-        AND TABLE_NAME = @TableName
-        AND COLUMN_NAME = @ColumnName
-    `);
-
-    const row = metaResult?.recordset?.[0];
-    if (!row) {
-      throw new Error(
-        `NON_RETRYABLE: schema check failed. Missing column ${target.tableName}.${target.columnName}`
-      );
-    }
-
-    const dataType = String(row.DataType || '').toLowerCase();
-    const isNullable = String(row.IsNullable || 'YES').toUpperCase() === 'YES';
-    const maxLength = Number(row.MaxLength || 0);
-    const currentLength = Number.isFinite(maxLength) ? maxLength : 0;
-
-    console.log('[SCHEMA] ProductCode column check:', {
-      table: `dbo.${target.tableName}`,
-      column: target.columnName,
-      dataType,
-      currentLength,
-      targetLength: PRODUCT_CODE_TARGET_LENGTH,
-      isNullable,
-    });
-
-    if (dataType === 'varchar' && currentLength >= PRODUCT_CODE_TARGET_LENGTH) {
-      continue;
-    }
-
-    if (dataType === 'varchar' && currentLength > 0 && currentLength < PRODUCT_CODE_TARGET_LENGTH) {
-      const alterRequest = createScopedRequest(request);
-      const nullClause = isNullable ? 'NULL' : 'NOT NULL';
-
-      await alterRequest.query(`
-        ALTER TABLE POS.dbo.${target.tableName}
-        ALTER COLUMN ${target.columnName} VARCHAR(${PRODUCT_CODE_TARGET_LENGTH}) ${nullClause}
-      `);
-
-      _columnLengthCache.delete(`${target.tableName}.${target.columnName}`);
-
-      console.log('[SCHEMA] ProductCode column expanded:', {
-        table: `dbo.${target.tableName}`,
-        column: target.columnName,
-        fromLength: currentLength,
-        toLength: PRODUCT_CODE_TARGET_LENGTH,
-      });
-
-      continue;
-    }
-
-    if (dataType !== 'varchar') {
-      console.log('[SCHEMA] ProductCode column left unchanged (non-varchar):', {
-        table: `dbo.${target.tableName}`,
-        column: target.columnName,
-        dataType,
-        currentLength,
-      });
-    }
-  }
-
-  _productCodeSchemaAligned = true;
 }
 
 async function resolveLocationName(request, locationCode) {
@@ -423,8 +334,6 @@ async function getCurrentStock(request, productCode, locationCode) {
  */
 async function reduceStockOnSale(request, productCode, locationCode, qtyReduction) {
   try {
-    await ensureProductCodeSchemaCapacity(request);
-
     // Validate sufficient stock
     const currentStock = await getCurrentStock(request, productCode, locationCode);
 
@@ -715,7 +624,7 @@ async function validateStockAvailability(request, items, locationCode) {
  * Also writes QtyOut into ProductActivity so POS stock truth updates immediately.
  * Confirmed schema:
  *   stockadjustments: StockAdjID (identity PK), LocationCode varchar(6), RefNo varchar(255), AdjDate datetime
- *   stockadjdetails:  DetailID (identity PK), AdjustID int, ProductCode varchar(50), Quantity decimal
+ *   stockadjdetails:  DetailID (identity PK), AdjustID int, ProductCode varchar(6), Quantity decimal
  */
 async function applyManualStockDecrease(request, payload) {
   const {
@@ -742,7 +651,7 @@ async function applyManualStockDecrease(request, payload) {
     reason,
   });
 
-  await ensureProductCodeSchemaCapacity(request);
+  const POS_PRODUCT_CODE_MAX_LENGTH = 6;
 
   if (!exactProductCode || !locationCode) {
     throw new Error('NON_RETRYABLE: productCode and locationCode are required');
@@ -752,9 +661,16 @@ async function applyManualStockDecrease(request, payload) {
     throw new Error('NON_RETRYABLE: productCode is empty/blank and cannot be used for stock decrement');
   }
 
+  if (exactProductCode.length > POS_PRODUCT_CODE_MAX_LENGTH) {
+    throw new Error(
+      `NON_RETRYABLE: ProductCode "${exactProductCode}" (${exactProductCode.length} chars) exceeds POS VARCHAR(${POS_PRODUCT_CODE_MAX_LENGTH}) limit. Do not use product names as ProductCode.`
+    );
+  }
+
   console.log('[STOCK] ProductCode pre-validation passed:', {
     productCode: exactProductCode,
     length: exactProductCode.length,
+    maxAllowed: POS_PRODUCT_CODE_MAX_LENGTH,
   });
 
   if (!Number.isFinite(qtyReduction) || qtyReduction <= 0) {
@@ -796,17 +712,25 @@ async function applyManualStockDecrease(request, payload) {
   console.log('[STOCK] schema fields used (detail): AdjustID, ProductCode, Quantity');
 
   const detailRequest = createScopedRequest(request);
+  const allowedProductCodeLength = await getColumnMaxLength(request, 'stockadjdetails', 'ProductCode');
   const productCodeLength = exactProductCode.length;
 
   console.log('[STOCK] stockadjdetails insert target:', 'POS.dbo.stockadjdetails');
-  console.log('[STOCK] stockadjdetails ProductCode check:', {
+  console.log('[STOCK] stockadjdetails ProductCode validation:', {
     ProductCode: exactProductCode,
     ProductCodeLength: productCodeLength,
+    AllowedMaxLength: allowedProductCodeLength,
     commandId: commandId || null,
   });
 
+  if (allowedProductCodeLength > 0 && productCodeLength > allowedProductCodeLength) {
+    throw new Error(
+      `NON_RETRYABLE: ProductCode length ${productCodeLength} exceeds stockadjdetails.ProductCode max ${allowedProductCodeLength}`
+    );
+  }
+
   detailRequest.input('DetailAdjustID', sql.Int, stockAdjId);
-  detailRequest.input('DetailProductCode', sql.VarChar(PRODUCT_CODE_TARGET_LENGTH), exactProductCode);
+  detailRequest.input('DetailProductCode', sql.VarChar(Math.max(1, allowedProductCodeLength || 50)), exactProductCode);
   detailRequest.input('DetailQuantity', sql.Decimal(18, 2), qtyReduction);
 
   const detailResult = await detailRequest.query(`
@@ -838,7 +762,7 @@ async function applyManualStockDecrease(request, payload) {
   }
 
   const activityRequest = createScopedRequest(request);
-  activityRequest.input('ActivityProductCode', sql.VarChar(PRODUCT_CODE_TARGET_LENGTH), exactProductCode);
+  activityRequest.input('ActivityProductCode', sql.VarChar(6), exactProductCode);
   activityRequest.input('ActivityProductName', sql.VarChar(Math.max(1, activityProductNameMaxLength || 255)), resolvedProductName);
   activityRequest.input('ActivityLocationCode', sql.VarChar(10), locationCode);
   activityRequest.input('ActivityLocationName', sql.VarChar(Math.max(1, activityLocationNameMaxLength || 50)), resolvedLocationName);
