@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import api from '../../utils/api.js';
 import { notifyError, notifySuccess } from '../../utils/notifications.js';
 
@@ -33,6 +35,15 @@ function formatDateTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '-';
   return date.toLocaleString();
+}
+
+function formatDateInput(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function toCsv(rows) {
@@ -271,6 +282,47 @@ const AdminEmergencySalesReports = () => {
     setFilters(reset);
   };
 
+  const applyPreset = (preset) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    let next = {
+      ...pendingFilters,
+      startDate: '',
+      endDate: '',
+    };
+
+    if (preset === 'today') {
+      const date = formatDateInput(today);
+      next = { ...next, startDate: date, endDate: date };
+    }
+
+    if (preset === 'last7') {
+      const start = new Date(today);
+      start.setDate(start.getDate() - 6);
+      next = { ...next, startDate: formatDateInput(start), endDate: formatDateInput(today) };
+    }
+
+    if (preset === 'last30') {
+      const start = new Date(today);
+      start.setDate(start.getDate() - 29);
+      next = { ...next, startDate: formatDateInput(start), endDate: formatDateInput(today) };
+    }
+
+    if (preset === 'thisMonth') {
+      const start = new Date(today.getFullYear(), today.getMonth(), 1);
+      next = { ...next, startDate: formatDateInput(start), endDate: formatDateInput(today) };
+    }
+
+    if (preset === 'lastMonth') {
+      const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const end = new Date(today.getFullYear(), today.getMonth(), 0);
+      next = { ...next, startDate: formatDateInput(start), endDate: formatDateInput(end) };
+    }
+
+    setPendingFilters(next);
+    setFilters(next);
+  };
+
   const handleDownloadSalesCsv = () => {
     const rows = [
       ['Sale Ref', 'Date', 'Cashier', 'Items', 'Subtotal', 'Discount', 'Total', 'Payment', 'Sync Status'],
@@ -318,6 +370,92 @@ const AdminEmergencySalesReports = () => {
     notifySuccess('Cashier report CSV downloaded', 2000);
   };
 
+  const addPdfHeader = (doc, title) => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(15);
+    doc.text('Citi-Nati Supermarket', 14, 14);
+    doc.setFontSize(12);
+    doc.text(title, 14, 21);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 27);
+    doc.text(appliedFiltersText, 14, 33);
+  };
+
+  const handleDownloadSalesPdf = () => {
+    const doc = new jsPDF({ orientation: 'landscape' });
+    addPdfHeader(doc, 'Emergency Sales Log Report');
+
+    autoTable(doc, {
+      startY: 38,
+      head: [['Sale Ref', 'Date', 'Cashier', 'Items', 'Subtotal', 'Discount', 'Total', 'Payment', 'Sync Status']],
+      body: sales.map((sale) => [
+        sale.sale_ref || sale.saleRef || '-',
+        formatDateTime(sale.created_at || sale.createdAt),
+        sale.cashier_name || sale.cashierName || '-',
+        Array.isArray(sale.items) ? sale.items.length : 0,
+        formatMoney(sale.subtotal),
+        formatMoney(sale.discount),
+        formatMoney(sale.total),
+        sale.payment_method || sale.paymentMethod || '-',
+        STATUS_LABELS[sale.sync_status] || sale.sync_status || '-',
+      ]),
+      theme: 'grid',
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [29, 78, 216] },
+    });
+
+    doc.save(`emergency-sales-log-${Date.now()}.pdf`);
+    notifySuccess('Sales log PDF downloaded', 2000);
+  };
+
+  const handleDownloadProductPdf = () => {
+    const doc = new jsPDF({ orientation: 'landscape' });
+    addPdfHeader(doc, 'Emergency Sales by Product Report');
+
+    autoTable(doc, {
+      startY: 38,
+      head: [['Product Code', 'Product Name', 'Qty Sold', 'Revenue', 'Sale Lines']],
+      body: productStats.map((item) => [
+        item.productCode,
+        item.productName,
+        item.qty,
+        formatMoney(item.revenue),
+        item.salesCount,
+      ]),
+      theme: 'grid',
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [15, 118, 110] },
+    });
+
+    doc.save(`emergency-sales-by-product-${Date.now()}.pdf`);
+    notifySuccess('Product report PDF downloaded', 2000);
+  };
+
+  const handleDownloadCashierPdf = () => {
+    const doc = new jsPDF({ orientation: 'landscape' });
+    addPdfHeader(doc, 'Emergency Sales by Cashier Report');
+
+    autoTable(doc, {
+      startY: 38,
+      head: [['Cashier', 'Sales Count', 'Total Value', 'Pending', 'Synced', 'Failed']],
+      body: cashierStats.map((cashier) => [
+        cashier.cashier,
+        cashier.salesCount,
+        formatMoney(cashier.total),
+        cashier.pending,
+        cashier.synced,
+        cashier.failed,
+      ]),
+      theme: 'grid',
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [124, 58, 237] },
+    });
+
+    doc.save(`emergency-sales-by-cashier-${Date.now()}.pdf`);
+    notifySuccess('Cashier report PDF downloaded', 2000);
+  };
+
   return (
     <div style={{ position: 'relative' }}>
       <div
@@ -362,6 +500,27 @@ const AdminEmergencySalesReports = () => {
         </div>
 
         <div style={{ padding: '0.75rem 1rem', display: 'flex', gap: '0.65rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            onClick={() => applyPreset('today')}
+            style={{ padding: '0.45rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '999px', backgroundColor: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem', color: '#1e293b' }}
+          >Today</button>
+          <button
+            onClick={() => applyPreset('last7')}
+            style={{ padding: '0.45rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '999px', backgroundColor: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem', color: '#1e293b' }}
+          >Last 7 Days</button>
+          <button
+            onClick={() => applyPreset('last30')}
+            style={{ padding: '0.45rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '999px', backgroundColor: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem', color: '#1e293b' }}
+          >Last 30 Days</button>
+          <button
+            onClick={() => applyPreset('thisMonth')}
+            style={{ padding: '0.45rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '999px', backgroundColor: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem', color: '#1e293b' }}
+          >This Month</button>
+          <button
+            onClick={() => applyPreset('lastMonth')}
+            style={{ padding: '0.45rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '999px', backgroundColor: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem', color: '#1e293b' }}
+          >Last Month</button>
+
           <input
             type="date"
             value={pendingFilters.startDate}
@@ -485,7 +644,7 @@ const AdminEmergencySalesReports = () => {
 
             {activeTab === 'sales' && (
               <div>
-                <div style={{ marginBottom: '0.7rem' }}>
+                <div style={{ marginBottom: '0.7rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <button
                     onClick={handleDownloadSalesCsv}
                     style={{
@@ -500,6 +659,22 @@ const AdminEmergencySalesReports = () => {
                   >
                     <i className="fas fa-download" style={{ marginRight: '0.45rem' }}></i>
                     Download Sales CSV
+                  </button>
+
+                  <button
+                    onClick={handleDownloadSalesPdf}
+                    style={{
+                      padding: '0.55rem 0.9rem',
+                      border: 'none',
+                      borderRadius: '6px',
+                      backgroundColor: '#0f172a',
+                      color: '#fff',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <i className="fas fa-file-pdf" style={{ marginRight: '0.45rem' }}></i>
+                    Download Sales PDF
                   </button>
                 </div>
 
@@ -550,7 +725,7 @@ const AdminEmergencySalesReports = () => {
 
             {activeTab === 'products' && (
               <div>
-                <div style={{ marginBottom: '0.7rem' }}>
+                <div style={{ marginBottom: '0.7rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <button
                     onClick={handleDownloadProductCsv}
                     style={{
@@ -565,6 +740,22 @@ const AdminEmergencySalesReports = () => {
                   >
                     <i className="fas fa-download" style={{ marginRight: '0.45rem' }}></i>
                     Download Product CSV
+                  </button>
+
+                  <button
+                    onClick={handleDownloadProductPdf}
+                    style={{
+                      padding: '0.55rem 0.9rem',
+                      border: 'none',
+                      borderRadius: '6px',
+                      backgroundColor: '#0f172a',
+                      color: '#fff',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <i className="fas fa-file-pdf" style={{ marginRight: '0.45rem' }}></i>
+                    Download Product PDF
                   </button>
                 </div>
 
@@ -605,7 +796,7 @@ const AdminEmergencySalesReports = () => {
 
             {activeTab === 'cashiers' && (
               <div>
-                <div style={{ marginBottom: '0.7rem' }}>
+                <div style={{ marginBottom: '0.7rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <button
                     onClick={handleDownloadCashierCsv}
                     style={{
@@ -620,6 +811,22 @@ const AdminEmergencySalesReports = () => {
                   >
                     <i className="fas fa-download" style={{ marginRight: '0.45rem' }}></i>
                     Download Cashier CSV
+                  </button>
+
+                  <button
+                    onClick={handleDownloadCashierPdf}
+                    style={{
+                      padding: '0.55rem 0.9rem',
+                      border: 'none',
+                      borderRadius: '6px',
+                      backgroundColor: '#0f172a',
+                      color: '#fff',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <i className="fas fa-file-pdf" style={{ marginRight: '0.45rem' }}></i>
+                    Download Cashier PDF
                   </button>
                 </div>
 
