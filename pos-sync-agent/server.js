@@ -173,31 +173,20 @@ async function fetchProductsFromPOS() {
     // Stock = SUM(QtyIn) - SUM(QtyOut) from ProductActivity
     // Price = Most recent FPrice from productprices (by PriceID DESC = latest record)
     const query = `
-      WITH ActivityNet AS (
-        SELECT
-          pa.ProductCode,
-          pa.LocationCode,
-          ISNULL(SUM(pa.QtyIn), 0) - ISNULL(SUM(pa.QtyOut), 0) AS NetQty
-        FROM POS.dbo.ProductActivity pa
-        WHERE pa.LocationCode = @LocationCode
-        GROUP BY pa.ProductCode, pa.LocationCode
-      )
       SELECT 
           p.ProductCode,
           p.ProductName,
           ISNULL(p.Barcode,'') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
-          CASE
-            WHEN ISNULL(an.NetQty, 0) < 0 THEN 0
-            ELSE ISNULL(an.NetQty, 0)
-          END AS QuantityAvailable,
+          ISNULL(SUM(pa.QtyIn), 0) - ISNULL(SUM(pa.QtyOut), 0) AS QuantityAvailable,
           ISNULL(
               (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC),
               (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode ORDER BY PriceID DESC)
           ) AS SellingPrice
       FROM POS.dbo.productsmaster p
       LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
-      LEFT JOIN ActivityNet an ON p.ProductCode = an.ProductCode AND an.LocationCode = @LocationCode
+      LEFT JOIN POS.dbo.ProductActivity pa ON p.ProductCode = pa.ProductCode AND pa.LocationCode = @LocationCode
+      GROUP BY p.ProductCode, p.ProductName, p.Barcode, pt.ProductTypeName
       ORDER BY p.ProductCode
     `;
 

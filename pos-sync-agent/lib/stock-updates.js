@@ -45,8 +45,7 @@ async function getCurrentStock(request, productCode, locationCode) {
       return 0;
     }
 
-    const rawCurrentStock = Number(result.recordset[0].CurrentStock || 0);
-    const currentStock = Math.max(0, rawCurrentStock);
+    const currentStock = result.recordset[0].CurrentStock || 0;
     console.log(`[STOCK] Current stock for ${productCode} at ${locationCode}: ${currentStock}`);
 
     return currentStock;
@@ -329,11 +328,6 @@ async function applyManualStockDecrease(request, payload) {
 
   if (!Number.isFinite(qtyReduction) || qtyReduction <= 0) {
     throw new Error('NON_RETRYABLE: qtyReduction must be a positive number');
-  }
-
-  const currentStock = await getCurrentStock(request, productCode, locationCode);
-  if (currentStock < qtyReduction) {
-    throw new Error(`NON_RETRYABLE: insufficient stock for manual decrease. Available=${currentStock}, Requested=${qtyReduction}`);
   }
 
   const refNo = `WEB-ADJ-${commandId || Date.now()}`;
