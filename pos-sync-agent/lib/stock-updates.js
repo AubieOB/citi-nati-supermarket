@@ -372,8 +372,6 @@ async function applyManualStockDecrease(request, payload) {
     reason,
   });
 
-  const POS_PRODUCT_CODE_MAX_LENGTH = 6;
-
   if (!exactProductCode || !locationCode) {
     throw new Error('NON_RETRYABLE: productCode and locationCode are required');
   }
@@ -381,18 +379,6 @@ async function applyManualStockDecrease(request, payload) {
   if (exactProductCode.trim().length === 0) {
     throw new Error('NON_RETRYABLE: productCode is empty/blank and cannot be used for stock decrement');
   }
-
-  if (exactProductCode.length > POS_PRODUCT_CODE_MAX_LENGTH) {
-    throw new Error(
-      `NON_RETRYABLE: ProductCode "${exactProductCode}" (${exactProductCode.length} chars) exceeds POS VARCHAR(${POS_PRODUCT_CODE_MAX_LENGTH}) limit. Do not use product names as ProductCode.`
-    );
-  }
-
-  console.log('[STOCK] ProductCode pre-validation passed:', {
-    productCode: exactProductCode,
-    length: exactProductCode.length,
-    maxAllowed: POS_PRODUCT_CODE_MAX_LENGTH,
-  });
 
   if (!Number.isFinite(qtyReduction) || qtyReduction <= 0) {
     throw new Error('NON_RETRYABLE: qtyReduction must be a positive number');
@@ -464,7 +450,7 @@ async function applyManualStockDecrease(request, payload) {
 
   // ── Step 3: insert QtyOut into ProductActivity (source-of-truth for stock) ──
   const activityRequest = createScopedRequest(request);
-  activityRequest.input('ActivityProductCode', sql.VarChar(6), exactProductCode);
+  activityRequest.input('ActivityProductCode', sql.VarChar(50), exactProductCode);
   activityRequest.input('ActivityLocationCode', sql.VarChar(10), locationCode);
   activityRequest.input('ActivityQtyOut', sql.Decimal(18, 2), qtyReduction);
   activityRequest.input('ActivityTrDate', sql.DateTime, adjDate);
