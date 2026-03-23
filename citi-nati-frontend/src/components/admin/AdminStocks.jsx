@@ -950,52 +950,6 @@ const AdminStocks = () => {
                         flexWrap: 'wrap',
                       }}>
                         <button
-                          onClick={() => openStockModal(product, 'add')}
-                          title="Add Stock"
-                          style={{
-                            padding: '0.5rem 0.75rem',
-                            borderRadius: '4px',
-                            border: 'none',
-                            backgroundColor: '#4CAF50',
-                            color: '#fff',
-                            cursor: 'pointer',
-                            fontWeight: '600',
-                            fontSize: '0.85rem',
-                            transition: 'all 0.2s ease',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem',
-                          }}
-                          onMouseOver={(e) => e.target.style.opacity = '0.8'}
-                          onMouseOut={(e) => e.target.style.opacity = '1'}
-                        >
-                          <i className="fas fa-plus"></i>
-                          Add
-                        </button>
-                        <button
-                          onClick={() => openStockModal(product, 'subtract')}
-                          title="Remove Stock"
-                          style={{
-                            padding: '0.5rem 0.75rem',
-                            borderRadius: '4px',
-                            border: 'none',
-                            backgroundColor: '#f44336',
-                            color: '#fff',
-                            cursor: 'pointer',
-                            fontWeight: '600',
-                            fontSize: '0.85rem',
-                            transition: 'all 0.2s ease',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem',
-                          }}
-                          onMouseOver={(e) => e.target.style.opacity = '0.8'}
-                          onMouseOut={(e) => e.target.style.opacity = '1'}
-                        >
-                          <i className="fas fa-minus"></i>
-                          Remove
-                        </button>
-                        <button
                           onClick={() => openOverrideModal(product)}
                           title="Set Website Stock Override"
                           style={{
