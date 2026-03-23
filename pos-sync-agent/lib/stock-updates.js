@@ -30,10 +30,20 @@ async function getCurrentStock(request, productCode, locationCode) {
     const stockRequest = createScopedRequest(request);
     const query = `
       SELECT TOP 1
-          ISNULL(SUM(pa.QtyIn), 0) - ISNULL(SUM(pa.QtyOut), 0) AS CurrentStock
-      FROM POS.dbo.ProductActivity pa
-      WHERE pa.ProductCode = @ProductCode
-      AND pa.LocationCode = @LocationCode
+          ISNULL((
+            SELECT SUM(pa.QtyIn) - SUM(pa.QtyOut)
+            FROM POS.dbo.ProductActivity pa
+            WHERE pa.ProductCode = @ProductCode
+              AND pa.LocationCode = @LocationCode
+          ), 0)
+          -
+          ISNULL((
+            SELECT SUM(sad.Quantity)
+            FROM POS.dbo.stockadjustments sa
+            INNER JOIN POS.dbo.stockadjdetails sad ON sa.StockAdjID = sad.AdjustID
+            WHERE sad.ProductCode = @ProductCode
+              AND sa.LocationCode = @LocationCode
+          ), 0) AS CurrentStock
     `;
 
     stockRequest.input('ProductCode', sql.VarChar(50), productCode);
@@ -296,7 +306,7 @@ async function validateStockAvailability(request, items, locationCode) {
 /**
  * Manual admin stock decrease (Phase 2)
  * Writes to dbo.stockadjustments (header) + dbo.stockadjdetails (detail).
- * Also writes QtyOut into ProductActivity so POS stock truth updates immediately.
+ * ProductActivity direct-write path is intentionally NOT used here.
  * Confirmed schema:
  *   stockadjustments: StockAdjID (identity PK), LocationCode varchar(6), RefNo varchar(255), AdjDate datetime
  *   stockadjdetails:  DetailID (identity PK), AdjustID int, ProductCode varchar(6), Quantity decimal
@@ -373,34 +383,7 @@ async function applyManualStockDecrease(request, payload) {
 
   const detailRowsAffected = detailResult.rowsAffected && detailResult.rowsAffected[0];
   console.log('[STOCK] detail rows affected:', detailRowsAffected);
-
-  // ── Step 3: insert QtyOut into ProductActivity (source-of-truth for stock) ──
-  const activityRequest = createScopedRequest(request);
-  activityRequest.input('ActivityProductCode', sql.VarChar(50), productCode);
-  activityRequest.input('ActivityLocationCode', sql.VarChar(10), locationCode);
-  activityRequest.input('ActivityQtyOut', sql.Decimal(18, 2), qtyReduction);
-  activityRequest.input('ActivityDate', sql.DateTime, adjDate);
-
-  await activityRequest.query(`
-    INSERT INTO POS.dbo.ProductActivity (
-      ProductCode,
-      LocationCode,
-      QtyIn,
-      QtyOut,
-      ActivityDate,
-      ActivityType
-    )
-    VALUES (
-      @ActivityProductCode,
-      @ActivityLocationCode,
-      0,
-      @ActivityQtyOut,
-      @ActivityDate,
-      'SALE'
-    )
-  `);
-
-  console.log('[STOCK] adjustment path: dbo.stockadjustments + dbo.stockadjdetails + dbo.ProductActivity');
+  console.log('[STOCK] adjustment path: dbo.stockadjustments + dbo.stockadjdetails (NOT ProductActivity)');
 
   return {
     stockAdjId,
@@ -411,7 +394,7 @@ async function applyManualStockDecrease(request, payload) {
     oldStock,
     newStock,
     reason,
-    tablesTouched: ['dbo.stockadjustments', 'dbo.stockadjdetails', 'dbo.ProductActivity'],
+    tablesTouched: ['dbo.stockadjustments', 'dbo.stockadjdetails'],
   };
 }
 
