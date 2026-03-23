@@ -1,6 +1,8 @@
 import React, { Suspense } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import AdminEmergencySales from '../../components/admin/AdminEmergencySales.jsx';
+import Modal from '../../components/common/Modal.jsx';
+import { useModal } from '../../hooks/useModal.js';
 import '../../styles/global.css';
 import '../../styles/admin-dashboard.css';
 
@@ -12,6 +14,17 @@ import '../../styles/admin-dashboard.css';
  */
 const CashierDashboard = () => {
   const { user, logout } = useAuth();
+  const { modal, showConfirm, closeModal } = useModal();
+
+  const handleLogoutClick = () => {
+    showConfirm(
+      'Confirm Logout',
+      'Are you sure you want to logout from the cashier POS?',
+      () => {
+        logout();
+      }
+    );
+  };
 
   return (
     <div style={{ height: '100vh', backgroundColor: '#f5f5f5', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -36,7 +49,7 @@ const CashierDashboard = () => {
             {user?.name || user?.email || 'Cashier'}
           </span>
           <button
-            onClick={logout}
+            onClick={handleLogoutClick}
             style={{
               background: 'rgba(255,255,255,0.15)',
               border: '1px solid rgba(255,255,255,0.3)',
@@ -62,6 +75,18 @@ const CashierDashboard = () => {
           <AdminEmergencySales apiBase="cashier/emergency-sales" />
         </Suspense>
       </div>
+
+      <Modal
+        isOpen={modal.isOpen}
+        title={modal.title}
+        message={modal.message}
+        type={modal.type}
+        onConfirm={modal.onConfirm}
+        onCancel={closeModal}
+        confirmText={modal.confirmText}
+        cancelText={modal.cancelText}
+        showCancelButton={modal.showCancelButton}
+      />
     </div>
   );
 };
