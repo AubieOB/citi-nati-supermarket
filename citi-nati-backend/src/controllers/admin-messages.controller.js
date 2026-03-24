@@ -30,18 +30,30 @@ const isMessageDuplicate = (type, title, message) => {
  */
 const getMessages = async (req, res) => {
   try {
-    const { type, limit = 50, offset = 0 } = req.query;
+    const { type, limit, offset = 0 } = req.query;
 
     let where = {};
     if (type) {
       where.type = type;
     }
 
-    const messages = await prisma.adminMessage.findMany({
+    const parsedLimit = limit != null && String(limit).trim() !== ''
+      ? parseInt(limit, 10)
+      : null;
+    const parsedOffset = parseInt(offset, 10);
+
+    const queryOptions = {
       where,
       orderBy: { createdAt: 'desc' },
-      take: parseInt(limit),
-      skip: parseInt(offset),
+      skip: Number.isInteger(parsedOffset) && parsedOffset > 0 ? parsedOffset : 0,
+    };
+
+    if (Number.isInteger(parsedLimit) && parsedLimit > 0) {
+      queryOptions.take = parsedLimit;
+    }
+
+    const messages = await prisma.adminMessage.findMany({
+      ...queryOptions,
     });
 
     const total = await prisma.adminMessage.count({ where });
@@ -49,8 +61,8 @@ const getMessages = async (req, res) => {
     return res.json({
       messages,
       total,
-      limit: parseInt(limit),
-      offset: parseInt(offset),
+      limit: Number.isInteger(parsedLimit) && parsedLimit > 0 ? parsedLimit : null,
+      offset: Number.isInteger(parsedOffset) && parsedOffset > 0 ? parsedOffset : 0,
     });
   } catch (error) {
     console.error('[ERROR] Get admin messages:', error);
