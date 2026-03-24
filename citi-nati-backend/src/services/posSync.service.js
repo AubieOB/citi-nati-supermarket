@@ -12,6 +12,9 @@
 
 const axios = require('axios');
 const { PrismaClient } = require('@prisma/client');
+const { notifyLowStock } = require('../utils/messageService');
+const { enrichProductStock } = require('../utils/stockResolver');
+const { emitProductUpdate } = require('../utils/socket');
 
 const prisma = new PrismaClient();
 
@@ -177,7 +180,7 @@ async function syncProductsFromPOS() {
 
         if (existingProduct) {
           // Update existing product
-          await prisma.product.update({
+          const updatedProduct = await prisma.product.update({
             where: { id: existingProduct.id },
             data: {
               ...productData,
@@ -187,12 +190,36 @@ async function syncProductsFromPOS() {
               category: existingProduct.category === 'POS Import' ? productData.category : existingProduct.category,
             },
           });
+
+          const previousStockStatus = enrichProductStock(existingProduct).stock_status;
+          const currentStockStatus = enrichProductStock(updatedProduct).stock_status;
+          const enteredAlertState = ['low_stock', 'out_of_stock'].includes(currentStockStatus)
+            && previousStockStatus !== currentStockStatus;
+
+          if (enteredAlertState) {
+            await notifyLowStock(updatedProduct);
+          }
+
+          if (global.io) {
+            emitProductUpdate(updatedProduct);
+          }
+
           console.log(`[POS Sync] Updated: ${productData.name} (${posProduct.ProductCode})`);
         } else {
           // Create new product
-          await prisma.product.create({
+          const createdProduct = await prisma.product.create({
             data: productData,
           });
+
+          const currentStockStatus = enrichProductStock(createdProduct).stock_status;
+          if (['low_stock', 'out_of_stock'].includes(currentStockStatus)) {
+            await notifyLowStock(createdProduct);
+          }
+
+          if (global.io) {
+            emitProductUpdate(createdProduct);
+          }
+
           console.log(`[POS Sync] Created: ${productData.name} (${posProduct.ProductCode})`);
         }
 

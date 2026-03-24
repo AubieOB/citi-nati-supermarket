@@ -1571,12 +1571,27 @@ const syncProductsFromPOSAgent = async (req, res) => {
 
     for (const product of products) {
       try {
+        const sourceCode = String(product.sourceCode || '').trim();
+
         // Validate required fields
-        if (!product.sourceCode || !product.name) {
+        if (!sourceCode || !product.name) {
           skipped++;
           errors.push(`Missing required fields for product: ${JSON.stringify(product)}`);
           continue;
         }
+
+        const existingProduct = await prisma.product.findUnique({
+          where: { sourceCode },
+          select: {
+            id: true,
+            name: true,
+            stock: true,
+            sourceCode: true,
+            lowStockThreshold: true,
+            overrideActive: true,
+            overrideStock: true,
+          },
+        });
 
         const normalizedBatches = Array.isArray(product.expiryBatches)
           ? product.expiryBatches
@@ -1591,7 +1606,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
                 if (!Number.isFinite(remainingQty) || remainingQty <= 0) return null;
 
                 return {
-                  productCode: String(product.sourceCode).trim(),
+                  productCode: sourceCode,
                   expiryDate,
                   remainingQty,
                   locationCode: batch?.locationCode || process.env.POS_LOCATION_CODE || 'SH',
@@ -1616,7 +1631,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
         // update block — POS sync must never overwrite admin-set website stock overrides.
         const result = await prisma.product.upsert(
           {
-            where: { sourceCode: product.sourceCode },
+            where: { sourceCode },
             update: {
               name: product.name,
               price: product.price || 0,
@@ -1629,7 +1644,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
               updatedAt: new Date(),
             },
             create: {
-              sourceCode: product.sourceCode,
+              sourceCode,
               name: product.name,
               price: product.price || 0,
               stock: product.stock || 0,
@@ -1647,7 +1662,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
 
         await prisma.productExpiryBatch.deleteMany({
           where: {
-            productCode: String(product.sourceCode).trim(),
+            productCode: sourceCode,
           },
         });
 
@@ -1664,10 +1679,28 @@ const syncProductsFromPOSAgent = async (req, res) => {
         const completeProduct = await prisma.product.findUnique({
           where: { id: result.id }
         });
+
+        if (completeProduct) {
+          const previousStockStatus = existingProduct
+            ? enrichProductStock(existingProduct).stock_status
+            : null;
+          const currentStockStatus = enrichProductStock(completeProduct).stock_status;
+          const enteredAlertState = ['low_stock', 'out_of_stock'].includes(currentStockStatus)
+            && previousStockStatus !== currentStockStatus;
+
+          if (enteredAlertState) {
+            await notifyLowStock(completeProduct);
+          }
+        }
         
         // Emit real-time update for this specific product (for instant frontend updates)
         if (global.io && completeProduct) {
           try {
+            const { emitProductUpdate } = require('../utils/socket');
+
+            // Keep the canonical product_updated event in sync with POS-pushed products.
+            emitProductUpdate(completeProduct);
+
             console.log(`[POS AGENT PUSH] 📡 Emitting real-time update for: ${completeProduct.name}`);
             global.io.emit('pos-product-updated', {
               id: completeProduct.id,
