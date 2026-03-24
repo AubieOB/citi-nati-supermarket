@@ -1,10 +1,15 @@
 const { createMessage } = require('../controllers/admin-messages.controller.js');
 const { enrichProductStock, DEFAULT_LOW_STOCK_THRESHOLD } = require('./stockResolver');
 
-const parsedLowStockAlertCooldownMs = Number(process.env.LOW_STOCK_ALERT_COOLDOWN_MS || 60 * 60 * 1000);
+const DEFAULT_LOW_STOCK_ALERT_COOLDOWN_MS = 60 * 60 * 1000;
+const parsedLowStockAlertCooldownMs = Number(
+  process.env.LOW_STOCK_ALERT_COOLDOWN_MS || DEFAULT_LOW_STOCK_ALERT_COOLDOWN_MS
+);
 const LOW_STOCK_ALERT_COOLDOWN_MS = Number.isFinite(parsedLowStockAlertCooldownMs) && parsedLowStockAlertCooldownMs >= 0
-  ? parsedLowStockAlertCooldownMs
-  : 60 * 60 * 1000;
+  ? (parsedLowStockAlertCooldownMs === 0
+      ? 0
+      : Math.max(parsedLowStockAlertCooldownMs, DEFAULT_LOW_STOCK_ALERT_COOLDOWN_MS))
+  : DEFAULT_LOW_STOCK_ALERT_COOLDOWN_MS;
 const lowStockAlertCooldownCache = new Map();
 
 function shouldSendStockAlert(stock) {
