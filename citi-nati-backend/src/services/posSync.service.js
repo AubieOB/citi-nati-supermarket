@@ -12,7 +12,7 @@
 
 const axios = require('axios');
 const { PrismaClient } = require('@prisma/client');
-const { notifyLowStock, createSystemAlert } = require('../utils/messageService');
+const { notifyLowStock } = require('../utils/messageService');
 const { enrichProductStock } = require('../utils/stockResolver');
 const { emitProductUpdate } = require('../utils/socket');
 
@@ -235,15 +235,6 @@ async function syncProductsFromPOS() {
     }
 
     console.log(`[POS Sync] ✅ Sync complete: ${synced} synced, ${skipped} skipped`);
-
-    try {
-      await createSystemAlert(
-        'POS Sync Completed',
-        `POS sync processed ${posProducts.length} product(s): ${synced} synced, ${skipped} skipped.`
-      );
-    } catch (msgErr) {
-      console.warn('[POS Sync] Could not create admin inbox sync summary:', msgErr.message);
-    }
 
     return {
       success: true,
