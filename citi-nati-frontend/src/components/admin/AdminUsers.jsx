@@ -9,7 +9,7 @@ import { generateAdminUsersTablePDF } from '../../utils/pdfReports.js';
 /**
  * 👥 ADMIN USERS MANAGEMENT
  * 
- * View all users, manage roles (user/admin), delete users
+ * View all users, manage roles (user/admin/driver/cashier), delete users
  * Strictly according to User Contract
  */
 
@@ -354,6 +354,7 @@ const AdminUsers = () => {
           <option value="user">Users</option>
           <option value="admin">Admins</option>
           <option value="driver">Drivers</option>
+          <option value="cashier">Cashiers</option>
         </select>
 
         <select
@@ -472,13 +473,14 @@ const AdminUsers = () => {
                       padding: '0.5rem',
                       borderRadius: '4px',
                       border: 'none',
-                      backgroundColor: u.role === 'admin' ? '#e8f4f8' : u.role === 'driver' ? '#f0f8ff' : '#fff',
-                      fontWeight: u.role === 'admin' || u.role === 'driver' ? '600' : '400',
+                      backgroundColor: u.role === 'admin' ? '#e8f4f8' : u.role === 'driver' ? '#f0f8ff' : u.role === 'cashier' ? '#fff7e8' : '#fff',
+                      fontWeight: u.role === 'admin' || u.role === 'driver' || u.role === 'cashier' ? '600' : '400',
                     }}
                   >
                     <option value="user">User</option>
                     <option value="admin">Admin</option>
                     <option value="driver">Driver</option>
+                    <option value="cashier">Cashier</option>
                   </select>
                 </td>
                 <td style={{ padding: '1rem', textAlign: 'center', fontSize: '0.9rem' }}>

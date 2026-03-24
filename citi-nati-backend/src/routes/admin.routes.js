@@ -369,7 +369,7 @@ router.get('/users', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
 
 /**
  * PUT /api/admin/users/:userId/role
- * Update user role (user, admin, driver)
+ * Update user role (user, admin, driver, cashier)
  * Protected: Admin only
  */
 router.put('/users/:userId/role', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
@@ -377,7 +377,7 @@ router.put('/users/:userId/role', verifyTokenMiddleware, verifyAdmin, async (req
     const { userId } = req.params;
     const { role } = req.body;
 
-    if (!['user', 'admin', 'driver'].includes(role)) {
+    if (!['user', 'admin', 'driver', 'cashier'].includes(role)) {
       return res.status(400).json({ error: 'Invalid role' });
     }
 
