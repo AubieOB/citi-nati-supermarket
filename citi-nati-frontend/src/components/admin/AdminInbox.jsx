@@ -20,6 +20,7 @@ import { useModal } from '../../hooks/useModal.js';
  */
 
 const AdminInbox = () => {
+  const INBOX_PERFORMANCE_WARNING_THRESHOLD = 500;
   const [messages, setMessages] = useState([]);
   const [filteredMessages, setFilteredMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -424,6 +425,7 @@ const AdminInbox = () => {
   };
 
   const unreadCount = messages.filter(m => !m.read).length;
+  const showPerformanceWarning = messages.length >= INBOX_PERFORMANCE_WARNING_THRESHOLD;
   const messagesListHeight = `calc(100vh - ${filterBarLayout.top + filterBarHeight + 16}px)`;
 
   return (
@@ -438,6 +440,23 @@ const AdminInbox = () => {
           marginBottom: '2rem',
         }}>
           {error}
+        </div>
+      )}
+
+      {/* Performance Hint */}
+      {!loading && !error && showPerformanceWarning && (
+        <div style={{
+          backgroundColor: '#fff3cd',
+          color: '#856404',
+          padding: '0.75rem 1rem',
+          borderRadius: '6px',
+          marginBottom: '1rem',
+          border: '1px solid #ffeeba',
+          fontSize: '0.9rem',
+          lineHeight: '1.4',
+        }}>
+          <i className="fas fa-exclamation-triangle" style={{ marginRight: '0.5rem' }}></i>
+          Large inbox loaded ({messages.length} messages). For faster performance, use search and filters, or clear old items.
         </div>
       )}
 
