@@ -429,7 +429,15 @@ const AdminInbox = () => {
   const messagesListHeight = `calc(100vh - ${filterBarLayout.top + filterBarHeight + 16}px)`;
 
   return (
-    <div style={{ padding: '1rem 0' }}>
+    <div style={{
+      padding: '1rem 0',
+      height: '100%',
+      minHeight: 0,
+      overflow: 'hidden',
+      display: 'flex',
+      flexDirection: 'column',
+      boxSizing: 'border-box',
+    }}>
       {/* Error Message */}
       {error && (
         <div style={{
@@ -753,6 +761,8 @@ const AdminInbox = () => {
       {/* Messages List */}
       {!loading && filteredMessages.length > 0 && (
         <div style={{
+          flex: '1 1 auto',
+          minHeight: 0,
           display: 'flex',
           flexDirection: 'column',
           gap: '1rem',
