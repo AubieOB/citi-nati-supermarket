@@ -431,9 +431,6 @@ const AdminInbox = () => {
   return (
     <div style={{
       padding: '1rem 0',
-      position: 'sticky',
-      top: 0,
-      alignSelf: 'stretch',
       height: '100%',
       minHeight: 0,
       overflow: 'hidden',
