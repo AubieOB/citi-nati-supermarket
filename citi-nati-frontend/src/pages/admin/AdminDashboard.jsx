@@ -256,7 +256,16 @@ const AdminDashboard = () => {
       {/* Main Content Area (with left margin for fixed sidebar) */}
       <div className={`admin-main-content ${sidebarCollapsed ? 'collapsed' : ''}`}>
         {/* Scrollable Content */}
-        <div className="admin-content-area">
+        <div
+          className="admin-content-area"
+          style={activeTab === 'inbox'
+            ? {
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+              }
+            : undefined}
+        >
           <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>Loading...</div>}>
             {activeTab === 'inbox' && <AdminInbox />}
             {activeTab === 'products' && <AdminProducts />}
