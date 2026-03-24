@@ -1,6 +1,40 @@
 const { createMessage } = require('../controllers/admin-messages.controller.js');
 const { enrichProductStock, DEFAULT_LOW_STOCK_THRESHOLD } = require('./stockResolver');
 
+const parsedLowStockAlertCooldownMs = Number(process.env.LOW_STOCK_ALERT_COOLDOWN_MS || 60 * 60 * 1000);
+const LOW_STOCK_ALERT_COOLDOWN_MS = Number.isFinite(parsedLowStockAlertCooldownMs) && parsedLowStockAlertCooldownMs >= 0
+  ? parsedLowStockAlertCooldownMs
+  : 60 * 60 * 1000;
+const lowStockAlertCooldownCache = new Map();
+
+function shouldSendStockAlert(stock) {
+  if (LOW_STOCK_ALERT_COOLDOWN_MS === 0) return true;
+
+  const productKey = stock.id || stock.sourceCode || stock.barcode || stock.name;
+  if (!productKey || !stock.stock_status) return true;
+
+  const key = `${productKey}:${stock.stock_status}`;
+  const now = Date.now();
+  const lastSentAt = lowStockAlertCooldownCache.get(key);
+
+  if (lastSentAt && (now - lastSentAt) < LOW_STOCK_ALERT_COOLDOWN_MS) {
+    return false;
+  }
+
+  lowStockAlertCooldownCache.set(key, now);
+
+  // Keep this tiny in-memory cache bounded for long-running processes.
+  if (lowStockAlertCooldownCache.size > 5000) {
+    for (const [cacheKey, timestamp] of lowStockAlertCooldownCache.entries()) {
+      if ((now - timestamp) >= LOW_STOCK_ALERT_COOLDOWN_MS) {
+        lowStockAlertCooldownCache.delete(cacheKey);
+      }
+    }
+  }
+
+  return true;
+}
+
 /**
  * Admin Message Service
  * Creates admin inbox messages for various system events
@@ -129,6 +163,10 @@ const createSystemAlert = async (title, message) => {
 const notifyLowStock = async (product) => {
   try {
     const stock = enrichProductStock(product);
+
+    if (!shouldSendStockAlert(stock)) {
+      return;
+    }
 
     // Build message with POS indicator if applicable
     const isPOSProduct = !!stock.sourceCode;
