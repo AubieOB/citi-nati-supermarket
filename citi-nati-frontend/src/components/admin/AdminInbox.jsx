@@ -390,6 +390,7 @@ const AdminInbox = () => {
 
   return (
     <div style={{
+      padding: '1rem 0',
       height: '100%',
       minHeight: 0,
       overflow: 'hidden',
@@ -436,8 +437,7 @@ const AdminInbox = () => {
           gap: '1rem',
           alignItems: 'center',
           marginBottom: '2rem',
-          position: 'sticky',
-          top: 0,
+          position: 'relative',
           zIndex: 80,
           padding: '1rem',
           backgroundColor: '#fff',
@@ -713,7 +713,7 @@ const AdminInbox = () => {
         </div>
       )}
 
-      {/* Messages List - Scrollable Container */}
+      {/* Messages List */}
       {!loading && filteredMessages.length > 0 && (
         <div style={{
           flex: '1 1 auto',
@@ -722,9 +722,7 @@ const AdminInbox = () => {
           flexDirection: 'column',
           gap: '1rem',
           overflowY: 'auto',
-          overflowX: 'hidden',
           paddingBottom: '0.5rem',
-          paddingRight: '0.5rem',
         }}>
           {filteredMessages.map((message) => {
             const typeInfo = getMessageTypeInfo(message.type);
