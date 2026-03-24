@@ -1681,14 +1681,10 @@ const syncProductsFromPOSAgent = async (req, res) => {
         });
 
         if (completeProduct) {
-          const previousStockStatus = existingProduct
-            ? enrichProductStock(existingProduct).stock_status
-            : null;
           const currentStockStatus = enrichProductStock(completeProduct).stock_status;
-          const enteredAlertState = ['low_stock', 'out_of_stock'].includes(currentStockStatus)
-            && previousStockStatus !== currentStockStatus;
+          const isAlertState = ['low_stock', 'out_of_stock'].includes(currentStockStatus);
 
-          if (enteredAlertState) {
+          if (isAlertState) {
             await notifyLowStock(completeProduct);
           }
         }

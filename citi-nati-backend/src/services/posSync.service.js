@@ -191,12 +191,10 @@ async function syncProductsFromPOS() {
             },
           });
 
-          const previousStockStatus = enrichProductStock(existingProduct).stock_status;
           const currentStockStatus = enrichProductStock(updatedProduct).stock_status;
-          const enteredAlertState = ['low_stock', 'out_of_stock'].includes(currentStockStatus)
-            && previousStockStatus !== currentStockStatus;
+          const isAlertState = ['low_stock', 'out_of_stock'].includes(currentStockStatus);
 
-          if (enteredAlertState) {
+          if (isAlertState) {
             await notifyLowStock(updatedProduct);
           }
 
