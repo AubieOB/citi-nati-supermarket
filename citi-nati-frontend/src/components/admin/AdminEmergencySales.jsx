@@ -73,6 +73,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
   const hiddenBarcodeInputRef = useRef(null);
   const searchModalInputRef = useRef(null);
   const qtyInputRefs = useRef(new Map());
+  const cartTableBodyRef = useRef(null);
 
   const scanBufferRef = useRef('');
   const scanLastKeyAtRef = useRef(0);
@@ -734,6 +735,34 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
         event.preventDefault();
         removeSelectedRow();
       }
+
+      if (event.key === 'ArrowDown' && !isInputLike && !searchModalOpen && !showPaymentDialog && cart.length > 0) {
+        event.preventDefault();
+        const cartIds = cart.map(item => item.id);
+        const currentIndex = selectedRowId ? cartIds.indexOf(selectedRowId) : -1;
+        const nextIndex = Math.min(currentIndex + 1, cartIds.length - 1);
+        setSelectedRowId(cartIds[nextIndex]);
+
+        const selectedRow = cartTableBodyRef.current?.querySelector(`tr[data-cart-id="${cartIds[nextIndex]}"]`);
+        if (selectedRow) {
+          selectedRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        return;
+      }
+
+      if (event.key === 'ArrowUp' && !isInputLike && !searchModalOpen && !showPaymentDialog && cart.length > 0) {
+        event.preventDefault();
+        const cartIds = cart.map(item => item.id);
+        const currentIndex = selectedRowId ? cartIds.indexOf(selectedRowId) : -1;
+        const nextIndex = Math.max(currentIndex - 1, 0);
+        setSelectedRowId(cartIds[nextIndex]);
+
+        const selectedRow = cartTableBodyRef.current?.querySelector(`tr[data-cart-id="${cartIds[nextIndex]}"]`);
+        if (selectedRow) {
+          selectedRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        return;
+      }
     };
 
     window.addEventListener('keydown', onKeyDown);
@@ -871,10 +900,12 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
             border: '1px solid #9195d5',
             backgroundColor: '#fff',
             borderRadius: '5px',
-            overflow: 'hidden',
+            overflow: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
           }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
-              <thead>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                 <tr style={{ backgroundColor: '#b9bdf6', color: '#141414' }}>
                   <th style={{ padding: '0.38rem', width: '40px', borderBottom: '1px solid #8f93d2' }}>#</th>
                   <th style={{ padding: '0.38rem', width: '140px', borderBottom: '1px solid #8f93d2' }}>Product Code</th>
@@ -884,7 +915,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
                   <th style={{ padding: '0.38rem', width: '120px', borderBottom: '1px solid #8f93d2', textAlign: 'right' }}>Amount</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody ref={cartTableBodyRef}>
                 {cart.length === 0 && (
                   <tr>
                     <td colSpan={6} style={{ padding: '1rem', textAlign: 'center', color: '#666', fontWeight: 600 }}>
@@ -892,9 +923,10 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
                     </td>
                   </tr>
                 )}
-                {cart.slice(0, 13).map((line, index) => (
+                {cart.map((line, index) => (
                   <tr
                     key={line.id}
+                    data-cart-id={line.id}
                     onClick={() => setSelectedRowId(line.id)}
                     style={{
                       backgroundColor: selectedRowId === line.id ? '#e8ecff' : '#fff',
