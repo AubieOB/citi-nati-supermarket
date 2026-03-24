@@ -1,6 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const { computeExpiryStatus, suggestDiscount } = require('../utils/expiryStatus');
-const { notifyLowStock } = require('../utils/messageService');
+const { notifyLowStock, createSystemAlert } = require('../utils/messageService');
 const posCommandQueueService = require('../services/posCommandQueue.service');
 const posSyncService = require('../services/posSync.service');
 const { verifyToken } = require('../utils/jwt');
@@ -1737,6 +1737,15 @@ const syncProductsFromPOSAgent = async (req, res) => {
       } catch (ioErr) {
         console.warn('[POS AGENT PUSH] Could not emit socket event:', ioErr.message);
       }
+    }
+
+    try {
+      await createSystemAlert(
+        'POS Sync Completed',
+        `POS sync processed ${products.length} product(s): ${synced} synced, ${skipped} skipped.`
+      );
+    } catch (msgErr) {
+      console.warn('[POS AGENT PUSH] Could not create admin inbox sync summary:', msgErr.message);
     }
 
     console.log(`[POS AGENT PUSH] Sync complete - Synced: ${synced}, Skipped: ${skipped}`);
