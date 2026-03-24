@@ -730,6 +730,15 @@ body.menu-open {
   transform: translateY(-3px);
 }
 
+.social-link.whatsapp {
+  background-color: #25D366;
+}
+
+.social-link.whatsapp:hover {
+  background-color: #1da851;
+  transform: translateY(-3px);
+}
+
 /* Mission and Vision Grid */
 .mission-vision-grid {
   display: grid;
