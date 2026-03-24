@@ -263,8 +263,8 @@ const AdminDashboard = () => {
                 overflow: 'hidden',
                 display: 'flex',
                 flexDirection: 'column',
-                height: '100%',
-                minHeight: 0,
+                height: '100vh',
+                minHeight: '100vh',
               }
             : undefined}
         >
