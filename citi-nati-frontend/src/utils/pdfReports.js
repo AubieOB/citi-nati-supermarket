@@ -1393,45 +1393,79 @@ export const generateExpiryAlertsPDF = (alertCards, options = {}) => {
   doc.save(`expiry-alerts-${today.toISOString().split('T')[0]}.pdf`);
 };
 
-export const generateQuotationPDF = (quotation) => {
+export const generateQuotationPDF = async (quotation) => {
+  // ── Measure logo to preserve aspect ratio ────────────────────────────────
+  let logoW = 18;
+  let logoH = 18;
+  try {
+    await new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const targetH = 18; // mm — consistent with other PDFs
+        logoH = targetH;
+        logoW = img.naturalWidth > 0 ? targetH * (img.naturalWidth / img.naturalHeight) : targetH;
+        resolve();
+      };
+      img.onerror = resolve;
+      img.src = logo;
+    });
+  } catch (_) { /* use defaults */ }
+
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 14;
   const contentWidth = pageWidth - margin * 2;
 
+  // ── Precise column widths (must match autoTable below) ────────────────────
+  const COL_NUM   = 10;
+  const COL_QTY   = 16;
+  const COL_PRICE = 36;
+  const COL_TOTAL = 36;
+  const COL_DESC  = contentWidth - COL_NUM - COL_QTY - COL_PRICE - COL_TOTAL;
+  const tableRightX  = pageWidth - margin;                              // right edge of table
+  const totalsStartX = margin + COL_NUM + COL_DESC + COL_QTY;          // aligns with "Unit Price" col
+  const totalsWidth  = tableRightX - totalsStartX;                      // spans Unit Price + Total cols
+
   // ── Logo ─────────────────────────────────────────────────────────────────
+  const logoTopY = 10;
   try {
-    doc.addImage(logo, 'PNG', margin, 10, 22, 22);
+    doc.addImage(logo, 'PNG', margin, logoTopY, logoW, logoH);
   } catch (_) { /* logo load failure is non-fatal */ }
 
-  // ── Company header (centre) ───────────────────────────────────────────────
+  const textLeft = margin + logoW + 4;
+
+  // ── Company name ──────────────────────────────────────────────────────────
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
-  doc.setTextColor(91, 75, 138); // BRAND_PURPLE
-  doc.text('Citi', margin + 27, 18);
-  doc.setTextColor(45, 134, 89); // BRAND_GREEN
-  doc.text('- Nati Supermarket', margin + 38, 18);
+  doc.setFontSize(16);
+  doc.setTextColor(91, 75, 138);
+  doc.text('Citi', textLeft, logoTopY + 7);
+  const citiW = doc.getTextWidth('Citi');
+  doc.setTextColor(45, 134, 89);
+  doc.text('- Nati Supermarket', textLeft + citiW, logoTopY + 7);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setTextColor(80, 80, 80);
-  doc.text('PO Box 32334, Chichiri, Blantyre 3', margin + 27, 23);
-  doc.text('Phone: (+265) 888857188  |  Email: smkulichi@gmail.com', margin + 27, 28);
+  doc.text('PO Box 32334, Chichiri, Blantyre 3', textLeft, logoTopY + 12);
+  doc.text('Phone: (+265) 888857188  |  Email: smkulichi@gmail.com', textLeft, logoTopY + 17);
 
   // ── "QUOTATION" badge (right side) ────────────────────────────────────────
+  const badgeW = 44;
+  const badgeX = pageWidth - margin - badgeW;
   doc.setFillColor(91, 75, 138);
-  doc.roundedRect(pageWidth - margin - 44, 9, 44, 14, 2, 2, 'F');
+  doc.roundedRect(badgeX, logoTopY, badgeW, 13, 2, 2, 'F');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
+  doc.setFontSize(12);
   doc.setTextColor(255, 255, 255);
-  doc.text('QUOTATION', pageWidth - margin - 22, 18, { align: 'center' });
+  doc.text('QUOTATION', badgeX + badgeW / 2, logoTopY + 8.5, { align: 'center' });
 
   // ── Divider ───────────────────────────────────────────────────────────────
+  const dividerY = logoTopY + logoH + 4;
   doc.setDrawColor(91, 75, 138);
   doc.setLineWidth(0.6);
-  doc.line(margin, 35, pageWidth - margin, 35);
+  doc.line(margin, dividerY, pageWidth - margin, dividerY);
 
-  let y = 42;
+  let y = dividerY + 8;
 
   // ── Quotation meta block (two columns) ────────────────────────────────────
   const col2 = margin + contentWidth / 2;
@@ -1453,8 +1487,12 @@ export const generateQuotationPDF = (quotation) => {
     quotation.clientEmail ? `Email: ${quotation.clientEmail}` : '',
   ].filter(Boolean);
 
-  const refDate = quotation.createdAt ? new Date(quotation.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
-  const validDate = quotation.validUntil ? new Date(quotation.validUntil).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A';
+  const refDate = quotation.createdAt
+    ? new Date(quotation.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    : '';
+  const validDate = quotation.validUntil
+    ? new Date(quotation.validUntil).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    : 'N/A';
 
   const detailLines = [
     `Ref: ${quotation.quotationRef}`,
@@ -1463,15 +1501,16 @@ export const generateQuotationPDF = (quotation) => {
     quotation.createdBy ? `Prepared By: ${quotation.createdBy}` : '',
   ].filter(Boolean);
 
-  const maxLines = Math.max(clientLines.length, detailLines.length);
-  for (let i = 0; i < maxLines; i++) {
+  const maxMetaLines = Math.max(clientLines.length, detailLines.length);
+  for (let i = 0; i < maxMetaLines; i++) {
     if (clientLines[i]) doc.text(clientLines[i], margin, y + i * 5);
     if (detailLines[i]) doc.text(detailLines[i], col2, y + i * 5);
   }
-  y += maxLines * 5 + 6;
+  y += maxMetaLines * 5 + 6;
 
   // ── Items table ───────────────────────────────────────────────────────────
-  const fmt = (v) => `MWK ${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const fmt = (v) =>
+    `MWK ${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const tableRows = (quotation.items || []).map((item, idx) => [
     String(idx + 1),
@@ -1486,35 +1525,37 @@ export const generateQuotationPDF = (quotation) => {
     head: [['#', 'Description', 'Qty', 'Unit Price', 'Total']],
     body: tableRows,
     margin: { left: margin, right: margin },
-    styles: { fontSize: 9, cellPadding: 3 },
+    tableWidth: contentWidth,
+    styles: { fontSize: 9, cellPadding: { top: 3, right: 4, bottom: 3, left: 4 } },
     headStyles: { fillColor: [91, 75, 138], textColor: 255, fontStyle: 'bold' },
     columnStyles: {
-      0: { cellWidth: 10, halign: 'center' },
-      2: { cellWidth: 14, halign: 'center' },
-      3: { cellWidth: 34, halign: 'right' },
-      4: { cellWidth: 34, halign: 'right' },
+      0: { cellWidth: COL_NUM,   halign: 'center' },
+      1: { cellWidth: COL_DESC,  halign: 'left'   },
+      2: { cellWidth: COL_QTY,   halign: 'center' },
+      3: { cellWidth: COL_PRICE, halign: 'right'  },
+      4: { cellWidth: COL_TOTAL, halign: 'right'  },
     },
     alternateRowStyles: { fillColor: [248, 246, 255] },
   });
 
   y = (doc.lastAutoTable?.finalY || y) + 6;
 
-  // ── Totals block ──────────────────────────────────────────────────────────
-  const totalsX = pageWidth - margin - 72;
-  const valX = pageWidth - margin;
-
+  // ── Totals block — aligned to Unit Price + Total columns ──────────────────
   const drawTotalRow = (label, value, bold = false, highlight = false) => {
     if (highlight) {
       doc.setFillColor(91, 75, 138);
-      doc.rect(totalsX - 2, y - 4, 72, 7, 'F');
+      // rect spans from totalsStartX edge to the table's right edge
+      doc.rect(totalsStartX, y - 4.5, totalsWidth, 7.5, 'F');
       doc.setTextColor(255, 255, 255);
     } else {
       doc.setTextColor(30, 30, 30);
     }
     doc.setFont('helvetica', bold ? 'bold' : 'normal');
     doc.setFontSize(9);
-    doc.text(label, totalsX, y);
-    doc.text(value, valX, y, { align: 'right' });
+    // label left-aligned at totalsStartX + small padding
+    doc.text(label, totalsStartX + 2, y);
+    // value right-aligned at table right edge with small padding
+    doc.text(value, tableRightX - 2, y, { align: 'right' });
     if (highlight) doc.setTextColor(30, 30, 30);
     y += 7;
   };
@@ -1561,7 +1602,12 @@ export const generateQuotationPDF = (quotation) => {
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'italic');
   doc.setTextColor(100, 100, 100);
-  doc.text('Thank you for your business! This quotation is subject to stock availability.', pageWidth / 2, footerY, { align: 'center' });
+  doc.text(
+    'Thank you for your business! This quotation is subject to stock availability.',
+    pageWidth / 2,
+    footerY,
+    { align: 'center' },
+  );
 
   doc.save(`quotation-${quotation.quotationRef || 'draft'}.pdf`);
 };
