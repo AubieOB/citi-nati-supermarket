@@ -337,3 +337,41 @@ model EmergencySaleItem {
   @@index([productId])
   @@map("emergency_sale_items")
 }
+
+model Quotation {
+  id            Int             @id @default(autoincrement())
+  quotationRef  String          @unique @map("quotation_ref")
+  clientName    String          @map("client_name")
+  clientEmail   String?         @map("client_email")
+  clientPhone   String?         @map("client_phone")
+  clientAddress String?         @map("client_address")
+  notes         String?
+  subtotal      Float
+  discount      Float           @default(0)
+  total         Float
+  validUntil    DateTime?       @map("valid_until")
+  createdBy     String?         @map("created_by")
+  items         QuotationItem[]
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  @@index([clientName])
+  @@index([createdAt])
+  @@map("quotations")
+}
+
+model QuotationItem {
+  id            Int        @id @default(autoincrement())
+  quotationId   Int        @map("quotation_id")
+  quotation     Quotation  @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  productId     Int?       @map("product_id")
+  productName   String     @map("product_name")
+  description   String?
+  qty           Int
+  unitPrice     Float      @map("unit_price")
+  lineTotal     Float      @map("line_total")
+  createdAt     DateTime   @default(now()) @map("created_at")
+
+  @@index([quotationId])
+  @@map("quotation_items")
+}

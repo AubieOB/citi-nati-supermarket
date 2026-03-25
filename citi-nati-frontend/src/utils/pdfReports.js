@@ -1392,3 +1392,176 @@ export const generateExpiryAlertsPDF = (alertCards, options = {}) => {
 
   doc.save(`expiry-alerts-${today.toISOString().split('T')[0]}.pdf`);
 };
+
+export const generateQuotationPDF = (quotation) => {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 14;
+  const contentWidth = pageWidth - margin * 2;
+
+  // ── Logo ─────────────────────────────────────────────────────────────────
+  try {
+    doc.addImage(logo, 'PNG', margin, 10, 22, 22);
+  } catch (_) { /* logo load failure is non-fatal */ }
+
+  // ── Company header (centre) ───────────────────────────────────────────────
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.setTextColor(91, 75, 138); // BRAND_PURPLE
+  doc.text('Citi', margin + 27, 18);
+  doc.setTextColor(45, 134, 89); // BRAND_GREEN
+  doc.text('- Nati Supermarket', margin + 38, 18);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(80, 80, 80);
+  doc.text('PO Box 32334, Chichiri, Blantyre 3', margin + 27, 23);
+  doc.text('Phone: (+265) 888857188  |  Email: smkulichi@gmail.com', margin + 27, 28);
+
+  // ── "QUOTATION" badge (right side) ────────────────────────────────────────
+  doc.setFillColor(91, 75, 138);
+  doc.roundedRect(pageWidth - margin - 44, 9, 44, 14, 2, 2, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.setTextColor(255, 255, 255);
+  doc.text('QUOTATION', pageWidth - margin - 22, 18, { align: 'center' });
+
+  // ── Divider ───────────────────────────────────────────────────────────────
+  doc.setDrawColor(91, 75, 138);
+  doc.setLineWidth(0.6);
+  doc.line(margin, 35, pageWidth - margin, 35);
+
+  let y = 42;
+
+  // ── Quotation meta block (two columns) ────────────────────────────────────
+  const col2 = margin + contentWidth / 2;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(91, 75, 138);
+  doc.text('PREPARED FOR', margin, y);
+  doc.text('QUOTATION DETAILS', col2, y);
+
+  y += 5;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(30, 30, 30);
+
+  const clientLines = [
+    quotation.clientName,
+    quotation.clientAddress || '',
+    quotation.clientPhone ? `Phone: ${quotation.clientPhone}` : '',
+    quotation.clientEmail ? `Email: ${quotation.clientEmail}` : '',
+  ].filter(Boolean);
+
+  const refDate = quotation.createdAt ? new Date(quotation.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+  const validDate = quotation.validUntil ? new Date(quotation.validUntil).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A';
+
+  const detailLines = [
+    `Ref: ${quotation.quotationRef}`,
+    `Date: ${refDate}`,
+    `Valid Until: ${validDate}`,
+    quotation.createdBy ? `Prepared By: ${quotation.createdBy}` : '',
+  ].filter(Boolean);
+
+  const maxLines = Math.max(clientLines.length, detailLines.length);
+  for (let i = 0; i < maxLines; i++) {
+    if (clientLines[i]) doc.text(clientLines[i], margin, y + i * 5);
+    if (detailLines[i]) doc.text(detailLines[i], col2, y + i * 5);
+  }
+  y += maxLines * 5 + 6;
+
+  // ── Items table ───────────────────────────────────────────────────────────
+  const fmt = (v) => `MWK ${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const tableRows = (quotation.items || []).map((item, idx) => [
+    String(idx + 1),
+    item.productName + (item.description ? `\n${item.description}` : ''),
+    String(item.qty),
+    fmt(item.unitPrice),
+    fmt(item.lineTotal),
+  ]);
+
+  autoTable(doc, {
+    startY: y,
+    head: [['#', 'Description', 'Qty', 'Unit Price', 'Total']],
+    body: tableRows,
+    margin: { left: margin, right: margin },
+    styles: { fontSize: 9, cellPadding: 3 },
+    headStyles: { fillColor: [91, 75, 138], textColor: 255, fontStyle: 'bold' },
+    columnStyles: {
+      0: { cellWidth: 10, halign: 'center' },
+      2: { cellWidth: 14, halign: 'center' },
+      3: { cellWidth: 34, halign: 'right' },
+      4: { cellWidth: 34, halign: 'right' },
+    },
+    alternateRowStyles: { fillColor: [248, 246, 255] },
+  });
+
+  y = (doc.lastAutoTable?.finalY || y) + 6;
+
+  // ── Totals block ──────────────────────────────────────────────────────────
+  const totalsX = pageWidth - margin - 72;
+  const valX = pageWidth - margin;
+
+  const drawTotalRow = (label, value, bold = false, highlight = false) => {
+    if (highlight) {
+      doc.setFillColor(91, 75, 138);
+      doc.rect(totalsX - 2, y - 4, 72, 7, 'F');
+      doc.setTextColor(255, 255, 255);
+    } else {
+      doc.setTextColor(30, 30, 30);
+    }
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    doc.setFontSize(9);
+    doc.text(label, totalsX, y);
+    doc.text(value, valX, y, { align: 'right' });
+    if (highlight) doc.setTextColor(30, 30, 30);
+    y += 7;
+  };
+
+  drawTotalRow('Subtotal:', fmt(quotation.subtotal));
+  if (Number(quotation.discount) > 0) {
+    drawTotalRow('Discount:', `-${fmt(quotation.discount)}`);
+  }
+  drawTotalRow('GRAND TOTAL:', fmt(quotation.total), true, true);
+
+  y += 4;
+
+  // ── Notes ─────────────────────────────────────────────────────────────────
+  if (quotation.notes) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(91, 75, 138);
+    doc.text('Notes:', margin, y);
+    y += 5;
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(50, 50, 50);
+    const noteLines = doc.splitTextToSize(quotation.notes, contentWidth);
+    doc.text(noteLines, margin, y);
+    y += noteLines.length * 5 + 4;
+  }
+
+  // ── Signature block ───────────────────────────────────────────────────────
+  const sigY = Math.max(y + 10, doc.internal.pageSize.getHeight() - 40);
+  doc.setDrawColor(180, 180, 180);
+  doc.setLineWidth(0.3);
+  doc.line(margin, sigY, margin + 60, sigY);
+  doc.line(pageWidth - margin - 60, sigY, pageWidth - margin, sigY);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(120, 120, 120);
+  doc.text('Authorised Signature', margin, sigY + 4);
+  doc.text("Customer's Signature", pageWidth - margin - 60, sigY + 4);
+
+  // ── Footer ────────────────────────────────────────────────────────────────
+  const footerY = doc.internal.pageSize.getHeight() - 8;
+  doc.setDrawColor(45, 134, 89);
+  doc.setLineWidth(0.4);
+  doc.line(margin, footerY - 4, pageWidth - margin, footerY - 4);
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'italic');
+  doc.setTextColor(100, 100, 100);
+  doc.text('Thank you for your business! This quotation is subject to stock availability.', pageWidth / 2, footerY, { align: 'center' });
+
+  doc.save(`quotation-${quotation.quotationRef || 'draft'}.pdf`);
+};

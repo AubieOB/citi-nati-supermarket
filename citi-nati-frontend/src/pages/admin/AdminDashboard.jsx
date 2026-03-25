@@ -19,6 +19,7 @@ const AdminSystem = React.lazy(() => import('../../components/admin/AdminSystem.
 const AdminCashiers = React.lazy(() => import('../../components/admin/AdminCashiers.jsx'));
 const AdminPOSManagement = React.lazy(() => import('./AdminPOSManagement.jsx'));
 const SupportDashboard = React.lazy(() => import('./SupportDashboard.jsx'));
+const AdminQuotations = React.lazy(() => import('../../components/admin/AdminQuotations.jsx'));
 
 import { useOrderUpdates } from '../../hooks/useOrderUpdates.js';
 import { getSpeechAlertsEnabled, setSpeechAlertsEnabled } from '../../utils/notifications.js';
@@ -52,6 +53,7 @@ const AdminDashboard = () => {
     { id: 'support', label: 'Support', icon: 'fa-life-ring' },
     { id: 'products', label: 'Products', icon: 'fa-box' },
     { id: 'stocks', label: 'Stocks', icon: 'fa-warehouse' },
+    { id: 'quotations', label: 'Quotations', icon: 'fa-file-invoice' },
     { id: 'emergency-sales', label: 'Emergency Sale', icon: 'fa-cash-register' },
     { id: 'emergency-sales-reports', label: 'Emergency Reports', icon: 'fa-file-alt' },
     { id: 'system', label: 'System', icon: 'fa-cogs' },
@@ -268,6 +270,7 @@ const AdminDashboard = () => {
         >
           <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>Loading...</div>}>
             {activeTab === 'inbox' && <AdminInbox />}
+            {activeTab === 'quotations' && <AdminQuotations />}
             {activeTab === 'products' && <AdminProducts />}
             {activeTab === 'stocks' && <AdminStocks />}
             {activeTab === 'emergency-sales' && <AdminEmergencySales />}

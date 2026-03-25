@@ -23,6 +23,7 @@ const salesRoutes = require('./routes/sales.routes');
 const supportRoutes = require('./routes/support.routes');
 const posCommandsRoutes = require('./routes/posCommands.routes');
 const adminEmergencySalesRoutes = require('./routes/admin.emergency-sales.routes');
+const adminQuotationsRoutes = require('./routes/admin.quotations.routes');
 const posSyncRoutes = require('./routes/posSync.routes');
 const cashierRoutes = require('./routes/cashier.routes');
 
@@ -437,6 +438,9 @@ async function start() {
 
     // Emergency sale cashier/monitoring routes (admin-only)
     app.use('/api/admin/emergency-sales', adminEmergencySalesRoutes);
+
+    // Quotations routes (admin-only)
+    app.use('/api/admin/quotations', adminQuotationsRoutes);
 
     // Emergency sale sync fetch/ack routes (POS agent secret protected)
     app.use('/api/pos-sync', posSyncRoutes);
