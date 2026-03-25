@@ -165,6 +165,7 @@ const AdminQuotations = () => {
   const [mode, setMode] = useState('system'); // 'system' | 'custom'
   const [products, setProducts] = useState([]);
   const [productSearch, setProductSearch] = useState('');
+  const [productSearching, setProductSearching] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // ── View quotations state ──────────────────────────────────────
@@ -173,15 +174,24 @@ const AdminQuotations = () => {
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState(null);
 
-  /* ── Load products (system mode) ─── */
+  /* ── Search products (system mode, search-on-type) ─── */
   useEffect(() => {
-    if (mode === 'system') {
-      api.get('/products').then((res) => {
-        const list = Array.isArray(res.data) ? res.data : res.data?.products ?? [];
-        setProducts(list);
-      }).catch(() => { /* non-critical */ });
-    }
-  }, [mode]);
+    if (mode !== 'system') return;
+    if (!productSearch.trim()) { setProducts([]); return; }
+    const term = productSearch.trim();
+    const timer = setTimeout(async () => {
+      setProductSearching(true);
+      try {
+        const res = await api.get(`/admin/pos-products?search=${encodeURIComponent(term)}&limit=15`);
+        setProducts(res.data?.products ?? []);
+      } catch {
+        setProducts([]);
+      } finally {
+        setProductSearching(false);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [productSearch, mode]);
 
   /* ── Load quotations ─── */
   const loadQuotations = useCallback(async () => {
@@ -309,11 +319,6 @@ const AdminQuotations = () => {
     window.open(`https://wa.me/?text=${encodeURIComponent(lines)}`, '_blank', 'noopener');
   };
 
-  /* ── Filtered products ─── */
-  const filteredProducts = products.filter((p) =>
-    p.name?.toLowerCase().includes(productSearch.toLowerCase()),
-  ).slice(0, 10);
-
   /* ── Filtered quotations ─── */
   const filteredQuotations = quotations.filter((q) => {
     const s = search.toLowerCase();
@@ -401,9 +406,12 @@ const AdminQuotations = () => {
                   value={productSearch}
                   onChange={(e) => setProductSearch(e.target.value)}
                 />
-                {productSearch && filteredProducts.length > 0 && (
+                {productSearch && productSearching && (
+                  <div style={{ marginTop: '0.4rem', color: '#999', fontSize: '0.82rem' }}><i className="fas fa-spinner fa-spin" style={{ marginRight: 4 }}></i>Searching…</div>
+                )}
+                {productSearch && !productSearching && products.length > 0 && (
                   <div style={{ position: 'absolute', top: '100%', left: 0, width: 360, background: '#fff', border: '1px solid #ddd', borderRadius: '5px', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.12)', maxHeight: 260, overflowY: 'auto' }}>
-                    {filteredProducts.map((p) => (
+                    {products.map((p) => (
                       <div
                         key={p.id}
                         style={{ padding: '0.55rem 1rem', cursor: 'pointer', borderBottom: '1px solid #f0f0f0', fontSize: '0.88rem' }}
@@ -415,7 +423,7 @@ const AdminQuotations = () => {
                     ))}
                   </div>
                 )}
-                {productSearch && filteredProducts.length === 0 && (
+                {productSearch && !productSearching && products.length === 0 && (
                   <div style={{ marginTop: '0.4rem', color: '#999', fontSize: '0.82rem' }}>No products found.</div>
                 )}
               </div>
