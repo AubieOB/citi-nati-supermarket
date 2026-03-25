@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../../utils/api.js';
 import { generateQuotationPDF } from '../../utils/pdfReports.js';
 import toast from 'react-hot-toast';
@@ -34,20 +34,13 @@ const emptyForm = () => ({
 /* ─────────────────────────── styles ──────────────────────────── */
 const S = {
   container: {
-    padding: '0 1.5rem 1.5rem',
+    padding: '1.5rem',
     maxWidth: '1100px',
     margin: '0 auto',
     fontFamily: 'system-ui, -apple-system, sans-serif',
   },
   header: {
-    position: 'sticky',
-    top: '-2rem',       // cancels the 2rem padding of .admin-content-area so it sticks flush to the top
-    zIndex: 50,
-    backgroundColor: '#f5f5f5',
-    marginLeft: '-2rem',  // bleed over the container's horizontal padding
-    marginRight: '-2rem',
-    padding: '1.5rem 2rem 0',
-    marginBottom: '1.5rem',
+    // dimensions set dynamically via fixedHeaderStyle
   },
   title: {
     fontSize: '1.6rem',
@@ -166,6 +159,55 @@ const S = {
 /* ═══════════════════════════ Component ═══════════════════════════ */
 const AdminQuotations = () => {
   const [tab, setTab] = useState('new');
+
+  // ── Fixed header layout (matches AdminPromotions / AdminOrders pattern) ──
+  const headerRef = useRef(null);
+  const [headerLayout, setHeaderLayout] = useState({ left: 0, width: 0, top: 0 });
+  const [headerHeight, setHeaderHeight] = useState(0);
+
+  useEffect(() => {
+    let resizeObserver;
+    const update = () => {
+      const contentArea = document.querySelector('.admin-content-area');
+      if (!contentArea) return;
+      const rect = contentArea.getBoundingClientRect();
+      setHeaderLayout({
+        left: rect.left,
+        width: rect.width,
+        top: window.innerWidth <= 768 ? 56 : 0,
+      });
+      if (headerRef.current) setHeaderHeight(headerRef.current.offsetHeight);
+    };
+    update();
+    window.addEventListener('resize', update);
+    const contentArea = document.querySelector('.admin-content-area');
+    if (contentArea && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(update);
+      resizeObserver.observe(contentArea);
+    }
+    return () => {
+      window.removeEventListener('resize', update);
+      if (resizeObserver) resizeObserver.disconnect();
+    };
+  }, []);
+
+  // Re-measure height after each render (content can wrap)
+  useEffect(() => {
+    if (headerRef.current) setHeaderHeight(headerRef.current.offsetHeight);
+  });
+
+  const fixedHeaderStyle = {
+    position: 'fixed',
+    top: `${headerLayout.top}px`,
+    left: `${headerLayout.left}px`,
+    width: `${headerLayout.width}px`,
+    zIndex: 80,
+    backgroundColor: '#fff',
+    borderBottom: '1px solid #e0e0e0',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+    boxSizing: 'border-box',
+    padding: '1rem 2rem 0',
+  };
 
   // ── New quotation state ────────────────────────────────────────
   const [form, setForm] = useState(emptyForm());
@@ -335,8 +377,8 @@ const AdminQuotations = () => {
   /* ══════════════════════════ RENDER ══════════════════════════ */
   return (
     <div style={S.container}>
-      {/* Header */}
-      <div style={S.header}>
+      {/* Fixed header */}
+      <div ref={headerRef} style={fixedHeaderStyle}>
         <h1 style={S.title}><i className="fas fa-file-invoice" style={{ marginRight: '0.5rem' }}></i>Quotations</h1>
         <div style={S.tabs}>
           <button style={S.tab(tab === 'new')} onClick={() => setTab('new')}>
@@ -347,6 +389,9 @@ const AdminQuotations = () => {
           </button>
         </div>
       </div>
+
+      {/* Spacer to prevent content from hiding under the fixed header */}
+      <div style={{ height: headerHeight + 8 }}></div>
 
       {/* ══ NEW QUOTATION TAB ══ */}
       {tab === 'new' && (
