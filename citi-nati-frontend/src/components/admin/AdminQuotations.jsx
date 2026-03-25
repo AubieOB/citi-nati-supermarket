@@ -34,12 +34,19 @@ const emptyForm = () => ({
 /* ─────────────────────────── styles ──────────────────────────── */
 const S = {
   container: {
-    padding: '1.5rem',
+    padding: '0 1.5rem 1.5rem',
     maxWidth: '1100px',
     margin: '0 auto',
     fontFamily: 'system-ui, -apple-system, sans-serif',
   },
   header: {
+    position: 'sticky',
+    top: '-2rem',       // cancels the 2rem padding of .admin-content-area so it sticks flush to the top
+    zIndex: 50,
+    backgroundColor: '#f5f5f5',
+    marginLeft: '-2rem',  // bleed over the container's horizontal padding
+    marginRight: '-2rem',
+    padding: '1.5rem 2rem 0',
     marginBottom: '1.5rem',
   },
   title: {
