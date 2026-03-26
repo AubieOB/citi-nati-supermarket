@@ -93,11 +93,12 @@ function AppInner() {
           return;
         }
 
-        setMaintenanceState({
+        // Keep the last known maintenance state on transient failures to avoid UI flicker.
+        setMaintenanceState((prev) => ({
           checked: true,
-          enabled: false,
-          message: DEFAULT_MAINTENANCE_MESSAGE
-        });
+          enabled: prev.enabled,
+          message: prev.message || DEFAULT_MAINTENANCE_MESSAGE
+        }));
       }
     };
 
