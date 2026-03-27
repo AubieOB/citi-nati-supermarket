@@ -3,6 +3,7 @@ import Button from '../ui/Button.jsx';
 import api from '../../utils/api.js';
 import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
+import { getSocket } from '../../utils/socket.js';
 
 /**
  * 💰 ADMIN REFUNDS MANAGEMENT
@@ -24,6 +25,24 @@ const AdminRefunds = () => {
 
   useEffect(() => {
     fetchPendingRefunds();
+  }, []);
+
+  // Real-time refund alerts via Socket.io
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleRefundAlert = () => {
+      console.log('[AdminRefunds] Refund alert received, refreshing...');
+      fetchPendingRefunds();
+    };
+
+    socket.on('refundAlertRequired', handleRefundAlert);
+    console.log('[AdminRefunds] 🔌 Socket listener attached for refundAlertRequired');
+
+    return () => {
+      socket.off('refundAlertRequired', handleRefundAlert);
+    };
   }, []);
 
   useEffect(() => {

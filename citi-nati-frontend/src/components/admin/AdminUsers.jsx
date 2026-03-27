@@ -43,6 +43,14 @@ const AdminUsers = () => {
     return () => window.removeEventListener('usersUpdated', handleUsersUpdated);
   }, []);
 
+  // 30-second polling for real-time user list updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchUsers();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   const fetchUsers = async () => {
     try {
       setError(null);

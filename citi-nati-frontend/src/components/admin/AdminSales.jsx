@@ -5,6 +5,7 @@ import SalesHistoryTable from './SalesHistoryTable.jsx';
 import SalesReports from './SalesReports.jsx';
 import { getCurrentSalesDay } from '../../utils/salesService.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { getSocket } from '../../utils/socket.js';
 
 const AdminSales = () => {
   const { user, token } = useAuth();
@@ -31,6 +32,24 @@ const AdminSales = () => {
 
     fetchCurrentDay();
   }, [token]);
+
+  // Trigger child component refresh when orders are updated in real-time
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleOrderUpdated = () => {
+      setRefreshTrigger(prev => prev + 1);
+    };
+
+    socket.on('orderUpdated', handleOrderUpdated);
+    socket.on('newOrder', handleOrderUpdated);
+
+    return () => {
+      socket.off('orderUpdated', handleOrderUpdated);
+      socket.off('newOrder', handleOrderUpdated);
+    };
+  }, []);
 
   useEffect(() => {
     let resizeObserver;

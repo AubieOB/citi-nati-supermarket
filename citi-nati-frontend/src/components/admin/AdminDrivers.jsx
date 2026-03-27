@@ -46,6 +46,14 @@ const AdminDrivers = () => {
     return () => window.removeEventListener('driversUpdated', handleDriversUpdated);
   }, []);
 
+  // 30-second polling for real-time driver list updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchDrivers();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     let resizeObserver;
 
