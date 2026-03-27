@@ -58,11 +58,15 @@ function resolvePosSecret() {
 const { value: POS_AGENT_URL, source: POS_AGENT_URL_SOURCE } = resolvePosAgentUrl();
 const { value: POS_SECRET, source: POS_SECRET_SOURCE } = resolvePosSecret();
 const ENABLE_POS_SYNC = process.env.ENABLE_POS_SYNC !== 'false'; // Enabled by default
+const POS_SYNC_ENABLED_KEY = 'pos_sync_enabled';
 const ENABLE_DIRECT_POS_WRITEBACK_DEBUG = process.env.ENABLE_DIRECT_POS_WRITEBACK_DEBUG === 'true';
 const parsedPosAgentTimeoutMs = parseInt(process.env.POS_AGENT_TIMEOUT_MS || '15000', 10);
 const POS_AGENT_TIMEOUT_MS = Number.isFinite(parsedPosAgentTimeoutMs) && parsedPosAgentTimeoutMs > 0
   ? parsedPosAgentTimeoutMs
   : 15000;
+const POS_SYNC_SETTINGS_CACHE_MS = 10000;
+let cachedPosSyncEnabled = ENABLE_POS_SYNC;
+let posSyncSettingsLoadedAt = 0;
 
 /**
  * Axios instance for POS Agent communication
@@ -94,13 +98,53 @@ function formatPosAgentError(error, endpoint, timeoutMs = POS_AGENT_TIMEOUT_MS) 
   return error.message;
 }
 
+async function recordMonitorEvent(payload) {
+  try {
+    const { recordPosSyncEvent } = require('./posSyncMonitor.service');
+    await recordPosSyncEvent(payload);
+  } catch (error) {
+    console.error('[POS Sync] Failed to record monitor event:', error.message);
+  }
+}
+
+async function getPosSyncEnabled(forceRefresh = false) {
+  if (!forceRefresh && Date.now() - posSyncSettingsLoadedAt < POS_SYNC_SETTINGS_CACHE_MS) {
+    return cachedPosSyncEnabled;
+  }
+
+  try {
+    const setting = await prisma.siteSetting.findUnique({
+      where: { key: POS_SYNC_ENABLED_KEY },
+    });
+    cachedPosSyncEnabled = setting ? setting.value === 'true' : ENABLE_POS_SYNC;
+    posSyncSettingsLoadedAt = Date.now();
+  } catch (error) {
+    console.warn('[POS Sync] Failed to load persisted POS sync setting:', error.message);
+  }
+
+  return cachedPosSyncEnabled;
+}
+
+async function setPosSyncEnabled(enabled) {
+  const nextValue = Boolean(enabled);
+  await prisma.siteSetting.upsert({
+    where: { key: POS_SYNC_ENABLED_KEY },
+    update: { value: nextValue ? 'true' : 'false' },
+    create: { key: POS_SYNC_ENABLED_KEY, value: nextValue ? 'true' : 'false' },
+  });
+
+  cachedPosSyncEnabled = nextValue;
+  posSyncSettingsLoadedAt = Date.now();
+  return cachedPosSyncEnabled;
+}
+
 /**
  * Check if POS Agent is reachable
  * 
  * @returns {Promise<boolean>} True if agent is healthy
  */
 async function checkPOSHealth() {
-  if (!ENABLE_POS_SYNC) {
+  if (!(await getPosSyncEnabled())) {
     console.log('[POS Sync] POS Sync is disabled');
     return false;
   }
@@ -127,9 +171,11 @@ async function checkPOSHealth() {
  * @returns {Promise<Object>} Sync result with count and status
  */
 async function syncProductsFromPOS() {
-  if (!ENABLE_POS_SYNC) {
+  if (!(await getPosSyncEnabled())) {
     return { success: false, error: 'POS Sync is disabled' };
   }
+
+  const startedAt = Date.now();
 
   try {
     console.log('[POS Sync] Starting product sync from POS Agent...');
@@ -234,6 +280,24 @@ async function syncProductsFromPOS() {
 
     console.log(`[POS Sync] ✅ Sync complete: ${synced} synced, ${skipped} skipped`);
 
+    await recordMonitorEvent({
+      eventType: 'manual-product-sync',
+      source: 'backend-sync-service',
+      status: skipped > 0 ? 'warning' : 'success',
+      level: skipped > 0 ? 'warning' : 'info',
+      title: skipped > 0 ? 'POS product sync completed with issues' : 'POS product sync completed',
+      message: `Product sync finished with ${synced} synced and ${skipped} skipped item(s).`,
+      reason: skipped > 0 ? `${skipped} product(s) failed individual sync processing.` : null,
+      suggestion: skipped > 0 ? 'Review skipped items in the monitor feed to fix malformed product payloads or mapping mismatches.' : 'No corrective action is required.',
+      durationMs: Date.now() - startedAt,
+      metadata: {
+        synced,
+        skipped,
+        total: posProducts.length,
+        errors,
+      },
+    });
+
     return {
       success: true,
       synced,
@@ -243,6 +307,20 @@ async function syncProductsFromPOS() {
     };
   } catch (error) {
     console.error('[POS Sync] ❌ Sync failed:', formatPosAgentError(error, '/pos-sync/products'));
+    await recordMonitorEvent({
+      eventType: 'manual-product-sync',
+      source: 'backend-sync-service',
+      status: 'failed',
+      level: 'error',
+      title: 'POS product sync failed',
+      message: 'Product sync from the POS agent failed before completion.',
+      reason: formatPosAgentError(error, '/pos-sync/products'),
+      suggestion: 'Check whether the agent is reachable, authentication is valid, and the POS agent endpoint is responding normally.',
+      durationMs: Date.now() - startedAt,
+      metadata: {
+        endpoint: '/pos-sync/products',
+      },
+    });
     return {
       success: false,
       error: formatPosAgentError(error, '/pos-sync/products'),
@@ -256,7 +334,7 @@ async function syncProductsFromPOS() {
  * @returns {Promise<Array>} Array of category objects
  */
 async function getCategoriesFromPOS() {
-  if (!ENABLE_POS_SYNC) {
+  if (!(await getPosSyncEnabled())) {
     return [];
   }
 
@@ -282,7 +360,7 @@ async function getCategoriesFromPOS() {
  * @returns {Promise<Array>} Array of stock objects with location info
  */
 async function getStockFromPOS() {
-  if (!ENABLE_POS_SYNC) {
+  if (!(await getPosSyncEnabled())) {
     return [];
   }
 
@@ -310,7 +388,7 @@ async function getStockFromPOS() {
  * @returns {Promise<number>} Current selling price
  */
 async function getPriceFromPOS(productCode) {
-  if (!ENABLE_POS_SYNC) {
+  if (!(await getPosSyncEnabled())) {
     return null;
   }
 
@@ -336,7 +414,7 @@ async function getPriceFromPOS(productCode) {
  * @returns {Promise<number|null>} Available stock or null if not found
  */
 async function getStockFromPOSByCode(productCode) {
-  if (!ENABLE_POS_SYNC) {
+  if (!(await getPosSyncEnabled())) {
     return null;
   }
 
@@ -369,7 +447,7 @@ async function updatePrices(updates = []) {
     };
   }
 
-  if (!ENABLE_POS_SYNC) {
+  if (!(await getPosSyncEnabled())) {
     return { success: false, error: 'POS Sync is disabled' };
   }
 
@@ -403,7 +481,7 @@ async function updatePrices(updates = []) {
 }
 
 async function getExpiryProductsFromPOS({ days = 14, locationCode = 'SH', includeExpired = false, source = 'view', productCodes = [], requestTimeoutMs } = {}) {
-  if (!ENABLE_POS_SYNC) {
+  if (!(await getPosSyncEnabled())) {
     return { success: false, error: 'POS Sync is disabled' };
   }
 
@@ -492,7 +570,7 @@ async function getExpiryProductsFromPOS({ days = 14, locationCode = 'SH', includ
 }
 
 async function previewPromotionPriceFromPOS(productCode, { locationCode = 'SH', priceTypeCode = 'RT' } = {}) {
-  if (!ENABLE_POS_SYNC) {
+  if (!(await getPosSyncEnabled())) {
     return { success: false, error: 'POS Sync is disabled' };
   }
 
@@ -525,13 +603,20 @@ async function previewPromotionPriceFromPOS(productCode, { locationCode = 'SH', 
  */
 function getConfig() {
   return {
-    enabled: ENABLE_POS_SYNC,
+    enabled: cachedPosSyncEnabled,
     agentUrl: POS_AGENT_URL,
     agentUrlSource: POS_AGENT_URL_SOURCE,
     timeoutMs: POS_AGENT_TIMEOUT_MS,
     hasSecret: !!POS_SECRET,
     secretSource: POS_SECRET_SOURCE,
     secretLength: POS_SECRET?.length || 0,
+  };
+}
+
+async function getRuntimeConfig() {
+  return {
+    ...getConfig(),
+    enabled: await getPosSyncEnabled(),
   };
 }
 
@@ -546,4 +631,7 @@ module.exports = {
   getExpiryProductsFromPOS,
   previewPromotionPriceFromPOS,
   getConfig,
+  getRuntimeConfig,
+  getPosSyncEnabled,
+  setPosSyncEnabled,
 };

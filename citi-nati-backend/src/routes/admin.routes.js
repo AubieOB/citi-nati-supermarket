@@ -22,6 +22,12 @@ const {
   applyPromotion: applyPosPromotion,
   revertPromotion: revertPosPromotion,
 } = require('../controllers/posExpiryPromotion.controller');
+const {
+  getPosSyncMonitor,
+  getPosSyncEvents,
+  togglePosSync,
+  runManualPosSync,
+} = require('../controllers/posSyncMonitor.controller');
 const { getExpiryBatchAlerts, setStockOverride } = require('../controllers/product.controller');
 const { emitProductUpdate } = require('../utils/socket');
 
@@ -128,6 +134,11 @@ router.put('/system/maintenance', verifyTokenMiddleware, verifyAdmin, async (req
     return res.status(500).json({ success: false, error: 'Failed to update maintenance mode' });
   }
 });
+
+router.get('/pos-sync/monitor', verifyTokenMiddleware, verifyAdmin, getPosSyncMonitor);
+router.get('/pos-sync/events', verifyTokenMiddleware, verifyAdmin, getPosSyncEvents);
+router.post('/pos-sync/toggle', verifyTokenMiddleware, verifyAdmin, togglePosSync);
+router.post('/pos-sync/manual-sync', verifyTokenMiddleware, verifyAdmin, runManualPosSync);
 
 /**
  * GET /api/admin/security-key/status

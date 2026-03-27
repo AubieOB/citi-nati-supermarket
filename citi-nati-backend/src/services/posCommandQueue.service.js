@@ -21,6 +21,15 @@ function getNextRetryAt(retryCount) {
   return new Date(Date.now() + delayMs);
 }
 
+async function recordMonitorEvent(payload) {
+  try {
+    const { recordPosSyncEvent } = require('./posSyncMonitor.service');
+    await recordPosSyncEvent(payload);
+  } catch (error) {
+    console.error('[POS COMMAND QUEUE] Failed to record monitor event:', error.message);
+  }
+}
+
 async function enqueueCommand(commandType, payload, meta = {}) {
   try {
     const command = await prisma.posWriteCommand.create({
@@ -49,6 +58,23 @@ async function enqueueCommand(commandType, payload, meta = {}) {
         promotionalPrice: payload?.promotionalPrice,
         restorePrice: payload?.restorePrice,
         orderId: payload?.orderId,
+      },
+    });
+
+    await recordMonitorEvent({
+      eventType: 'command-enqueued',
+      source: 'pos-command-queue',
+      status: 'success',
+      level: 'info',
+      title: `POS command queued: ${command.commandType}`,
+      message: `A ${command.commandType} command was queued for the POS agent.`,
+      suggestion: 'Monitor the queue feed to confirm the agent claims and processes this command.',
+      entityType: 'PosWriteCommand',
+      entityId: command.id,
+      metadata: {
+        commandType: command.commandType,
+        source: command.source,
+        relatedEntityId: command.relatedEntityId,
       },
     });
 
@@ -127,6 +153,23 @@ async function claimPendingCommands(limit = 10, agentId = 'unknown-agent') {
         ids: claimed.map((item) => item.id),
       });
 
+      if (claimed.length > 0) {
+        await recordMonitorEvent({
+          eventType: 'commands-claimed',
+          source: 'pos-command-queue',
+          status: 'success',
+          level: 'info',
+          title: 'POS agent claimed queued commands',
+          message: `The POS agent claimed ${claimed.length} queued command(s).`,
+          suggestion: 'Watch for matching completion or retry events next.',
+          agentId,
+          metadata: {
+            count: claimed.length,
+            ids: claimed.map((item) => item.id),
+          },
+        });
+      }
+
       return claimed;
     });
   } catch (error) {
@@ -158,6 +201,20 @@ async function markCommandCompleted(id, resultSummary = {}, agentId = null) {
     }
 
     console.log('[POS COMMAND QUEUE] command completed:', { id, agentId });
+
+    await recordMonitorEvent({
+      eventType: 'command-completed',
+      source: 'pos-command-queue',
+      status: 'success',
+      level: 'info',
+      title: 'POS command completed',
+      message: `Queued command ${id} completed successfully.`,
+      suggestion: 'No action required unless the downstream POS state still looks stale.',
+      entityType: 'PosWriteCommand',
+      entityId: id,
+      agentId,
+      metadata: resultSummary,
+    });
   } catch (error) {
     console.error('[POS COMMAND QUEUE ERROR] failed to complete command:', error.message);
     throw error;
@@ -213,6 +270,31 @@ async function markCommandFailed(id, errorMessage, retryable = true, agentId = n
       retryCount: nextRetryCount,
       maxRetries: command.maxRetries,
       nextRetryAt,
+    });
+
+    await recordMonitorEvent({
+      eventType: canRetry ? 'command-retry-scheduled' : 'command-failed',
+      source: 'pos-command-queue',
+      status: canRetry ? 'warning' : 'failed',
+      level: canRetry ? 'warning' : 'error',
+      title: canRetry ? 'POS command failed and will retry' : 'POS command failed permanently',
+      message: canRetry
+        ? `Queued command ${id} failed and was returned to the queue for retry ${nextRetryCount}/${command.maxRetries}.`
+        : `Queued command ${id} failed permanently after ${nextRetryCount} attempt(s).`,
+      reason: errorMessage,
+      suggestion: canRetry
+        ? 'If the same command keeps retrying, inspect the payload and the agent-side write endpoint.'
+        : 'Review the command payload and the agent/server logs before reissuing the command.',
+      entityType: 'PosWriteCommand',
+      entityId: id,
+      agentId: agentId || command.agentId,
+      metadata: {
+        retryable,
+        canRetry,
+        retryCount: nextRetryCount,
+        maxRetries: command.maxRetries,
+        nextRetryAt,
+      },
     });
   } catch (error) {
     console.error('[POS COMMAND QUEUE ERROR] failed to mark command failed:', error.message);

@@ -3,6 +3,7 @@ const { computeExpiryStatus, suggestDiscount } = require('../utils/expiryStatus'
 const { notifyLowStock } = require('../utils/messageService');
 const posCommandQueueService = require('../services/posCommandQueue.service');
 const posSyncService = require('../services/posSync.service');
+const { recordPosSyncEvent } = require('../services/posSyncMonitor.service');
 const { verifyToken } = require('../utils/jwt');
 const {
   DEFAULT_LOW_STOCK_THRESHOLD,
@@ -1737,6 +1738,23 @@ const syncProductsFromPOSAgent = async (req, res) => {
 
     console.log(`[POS AGENT PUSH] Sync complete - Synced: ${synced}, Skipped: ${skipped}`);
 
+    await recordPosSyncEvent({
+      eventType: 'agent-push-products',
+      source: 'pos-sync-agent',
+      status: skipped > 0 ? 'warning' : 'success',
+      level: skipped > 0 ? 'warning' : 'info',
+      title: skipped > 0 ? 'Agent push completed with sync errors' : 'Agent push completed',
+      message: `POS agent pushed ${products.length} product(s): ${synced} synced, ${skipped} skipped.`,
+      reason: skipped > 0 ? `${skipped} product record(s) could not be processed successfully.` : null,
+      suggestion: skipped > 0 ? 'Inspect malformed product records and verify the agent payload still matches backend expectations.' : 'No action required.',
+      metadata: {
+        total: products.length,
+        synced,
+        skipped,
+        errors: errors.slice(0, 20),
+      },
+    });
+
     return res.status(200).json({
       success: true,
       message: 'Products received and processed',
@@ -1747,6 +1765,18 @@ const syncProductsFromPOSAgent = async (req, res) => {
     });
   } catch (err) {
     console.error('[POS AGENT PUSH] Endpoint error:', err.message);
+
+    await recordPosSyncEvent({
+      eventType: 'agent-push-products',
+      source: 'pos-sync-agent',
+      status: 'failed',
+      level: 'error',
+      title: 'POS agent push failed',
+      message: 'The backend failed to process an inbound product push from the POS sync agent.',
+      reason: err.message,
+      suggestion: 'Check authentication, payload shape, and backend database constraints for the pushed product batch.',
+    });
+
     return res.status(500).json({
       success: false,
       error: 'Server error while processing POS products',

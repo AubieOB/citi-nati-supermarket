@@ -18,6 +18,7 @@ const AdminSecurity = React.lazy(() => import('../../components/admin/AdminSecur
 const AdminSystem = React.lazy(() => import('../../components/admin/AdminSystem.jsx'));
 const AdminCashiers = React.lazy(() => import('../../components/admin/AdminCashiers.jsx'));
 const AdminPOSManagement = React.lazy(() => import('./AdminPOSManagement.jsx'));
+const AdminPOSSyncMonitor = React.lazy(() => import('./AdminPOSSyncMonitor.jsx'));
 const SupportDashboard = React.lazy(() => import('./SupportDashboard.jsx'));
 const AdminQuotations = React.lazy(() => import('../../components/admin/AdminQuotations.jsx'));
 
@@ -59,6 +60,7 @@ const AdminDashboard = () => {
     { id: 'system', label: 'System', icon: 'fa-cogs' },
     { id: 'promotions', label: 'Promotions', icon: 'fa-tags' },
     { id: 'pos-management', label: 'POS Management', icon: 'fa-database' },
+    { id: 'pos-sync-monitor', label: 'POS Sync Monitor', icon: 'fa-chart-line' },
     { id: 'users', label: 'Users', icon: 'fa-users' },
     { id: 'drivers', label: 'Drivers', icon: 'fa-car' },
     { id: 'cashiers', label: 'Cashiers', icon: 'fa-user-tag' },
@@ -279,6 +281,7 @@ const AdminDashboard = () => {
             {activeTab === 'security' && <AdminSecurity />}
             {activeTab === 'promotions' && <AdminPromotions />}
             {activeTab === 'pos-management' && <AdminPOSManagement />}
+            {activeTab === 'pos-sync-monitor' && <AdminPOSSyncMonitor />}
             {activeTab === 'orders' && <AdminOrders />}
             {activeTab === 'users' && <AdminUsers />}
             {activeTab === 'sales' && <AdminSales />}

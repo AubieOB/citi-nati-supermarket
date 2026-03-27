@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { PrismaClient } = require('@prisma/client');
 const { resolveEffectiveStock, enrichProductStock } = require('../utils/stockResolver');
 const { notifyLowStock } = require('../utils/messageService');
+const { recordPosSyncEvent } = require('../services/posSyncMonitor.service');
 
 const prisma = new PrismaClient();
 const EMERGENCY_SALE_MAX_RETRIES = Number.parseInt(process.env.EMERGENCY_SALE_MAX_RETRIES || '10', 10);
@@ -779,6 +780,22 @@ async function ackEmergencySaleSynced(req, res) {
       },
     });
 
+    await recordPosSyncEvent({
+      eventType: 'emergency-sale-synced',
+      source: 'pos-sync-agent',
+      status: 'success',
+      level: 'info',
+      title: 'Emergency sale synced to POS',
+      message: `Emergency sale ${updated.saleRef} was acknowledged as synced to POS.`,
+      suggestion: 'No action required unless the POS invoice number is missing or inconsistent.',
+      entityType: 'EmergencySale',
+      entityId: String(updated.id),
+      metadata: {
+        saleRef: updated.saleRef,
+        posInvoiceNo: updated.posInvoiceNo,
+      },
+    });
+
     return res.status(200).json({
       success: true,
       sale_ref: updated.saleRef,
@@ -824,6 +841,23 @@ async function ackEmergencySaleSyncFailed(req, res) {
         retryCount: { increment: 1 },
         syncError,
         lastSyncAttemptAt: new Date(),
+      },
+    });
+
+    await recordPosSyncEvent({
+      eventType: 'emergency-sale-sync-failed',
+      source: 'pos-sync-agent',
+      status: 'failed',
+      level: 'error',
+      title: 'Emergency sale failed to sync to POS',
+      message: `Emergency sale ${updated.saleRef} failed to sync to POS.`,
+      reason: syncError,
+      suggestion: 'Inspect the invoice payload and the agent-side invoice write path, then retry after the root cause is fixed.',
+      entityType: 'EmergencySale',
+      entityId: String(updated.id),
+      metadata: {
+        saleRef: updated.saleRef,
+        retryCount: updated.retryCount,
       },
     });
 

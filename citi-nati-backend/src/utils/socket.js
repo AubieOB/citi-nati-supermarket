@@ -267,6 +267,24 @@ const emitMultipleStockUpdates = (products) => {
   }
 };
 
+/**
+ * Emit POS sync monitoring events to all admin clients
+ */
+const emitPosSyncEvent = (event) => {
+  try {
+    if (global.io && event) {
+      global.io.to('admin_room').emit('posSyncEvent', event);
+      console.log('[Socket.io] POS sync event emitted to admin_room:', {
+        eventType: event.eventType,
+        status: event.status,
+        source: event.source,
+      });
+    }
+  } catch (err) {
+    console.error('Error emitting posSyncEvent event:', err.message);
+  }
+};
+
 module.exports = {
   emitNewOrder,
   emitOrderAssigned,
@@ -276,4 +294,5 @@ module.exports = {
   emitProductUpdate,
   emitStockUpdate,
   emitMultipleStockUpdates,
+  emitPosSyncEvent,
 };

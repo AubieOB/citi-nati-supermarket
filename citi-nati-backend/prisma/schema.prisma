@@ -276,6 +276,30 @@ model SiteSetting {
   updatedAt DateTime @updatedAt
 }
 
+model PosSyncEvent {
+  id         String   @id @default(cuid())
+  eventType  String
+  source     String
+  status     String
+  level      String
+  title      String
+  message    String
+  reason     String?
+  suggestion String?
+  entityType String?
+  entityId   String?
+  agentId    String?
+  durationMs Int?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([status, createdAt])
+  @@index([level, createdAt])
+  @@index([source, createdAt])
+  @@index([eventType, createdAt])
+}
+
 model ProductExpiryBatch {
   id                      Int       @id @default(autoincrement())
   productCode             String
