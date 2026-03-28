@@ -10,19 +10,22 @@ const stockUpdates = require('./lib/stock-updates');
 const priceUpdates = require('./lib/price-updates');
 const commandQueueClient = require('./lib/command-queue-client');
 const commandExecutor = require('./lib/command-executor');
+const { buildConfig, getBranchTag, getSyncMetadata, validateStartupConfig } = require('./lib/config');
 
 const app = express();
 app.use(express.json());
 
-const ENABLE_DIRECT_WRITEBACK_DEBUG = process.env.ENABLE_DIRECT_POS_WRITEBACK_DEBUG === 'true';
-const SQL_SERVER = process.env.DB_SERVER || 'localhost';
-const SQL_DATABASE = process.env.DB_NAME || process.env.DB_DATABASE || 'POS';
-const SQL_USER = process.env.DB_USER || '';
+const appConfig = buildConfig();
+const BRANCH_TAG = getBranchTag(appConfig);
+const ENABLE_DIRECT_WRITEBACK_DEBUG = appConfig.server.enableDirectWritebackDebug;
+const SQL_SERVER = appConfig.posDb.server;
+const SQL_DATABASE = appConfig.posDb.database;
+const SQL_USER = appConfig.posDb.user;
 
 // SQL Server configuration
 const sqlConfig = {
   user: SQL_USER,
-  password: process.env.DB_PASSWORD,
+  password: appConfig.posDb.password,
   server: SQL_SERVER,
   database: SQL_DATABASE,
   options: {
@@ -43,15 +46,15 @@ let pool;
 async function initializePool() {
   if (!pool) {
     try {
-      console.log(`[DB CONFIG] SQL user: ${SQL_USER || '(not set)'}`);
-      console.log(`[DB CONFIG] SQL server: ${SQL_SERVER}`);
-      console.log(`[DB CONFIG] SQL database: ${SQL_DATABASE}`);
+      console.log(`${BRANCH_TAG} [DB CONFIG] SQL user: ${SQL_USER || '(not set)'}`);
+      console.log(`${BRANCH_TAG} [DB CONFIG] SQL server: ${SQL_SERVER}`);
+      console.log(`${BRANCH_TAG} [DB CONFIG] SQL database: ${SQL_DATABASE}`);
       pool = new sql.ConnectionPool(sqlConfig);
       await pool.connect();
-      console.log('Connected to SQL Server');
+      console.log(`${BRANCH_TAG} Connected to SQL Server`);
     } catch (err) {
-      console.error('[DB CONFIG ERROR] Failed to connect to SQL Server with configured credentials');
-      console.error('Failed to create connection pool:', err.message);
+      console.error(`${BRANCH_TAG} [DB CONFIG ERROR] Failed to connect to SQL Server with configured credentials`);
+      console.error(`${BRANCH_TAG} Failed to create connection pool:`, err.message);
       throw err;
     }
   }
@@ -61,21 +64,53 @@ async function initializePool() {
 /** Middleware: API Key Validation */
 function validateApiKey(req, res, next) {
   const apiKey = req.headers['x-pos-secret'];
-  if (!apiKey || apiKey !== process.env.POS_SECRET) {
+  if (!apiKey || apiKey !== appConfig.server.agentApiSecret) {
     return res.status(401).json({ success: false, error: 'Unauthorized: Invalid API key' });
   }
   next();
 }
 
+function requireFeature(flagName, moduleName) {
+  return (req, res, next) => {
+    if (appConfig.features[flagName]) {
+      return next();
+    }
+
+    return res.status(503).json({
+      success: false,
+      error: `${moduleName} is disabled for this branch deployment`,
+      branchCode: appConfig.branch.branchCode,
+      syncSourceCode: appConfig.branch.syncSourceCode,
+    });
+  };
+}
+
+function requireAllFeatures(flagNames, moduleName) {
+  return (req, res, next) => {
+    const disabled = flagNames.filter((flagName) => !appConfig.features[flagName]);
+    if (disabled.length === 0) {
+      return next();
+    }
+
+    return res.status(503).json({
+      success: false,
+      error: `${moduleName} is disabled for this branch deployment`,
+      disabledFlags: disabled,
+      branchCode: appConfig.branch.branchCode,
+      syncSourceCode: appConfig.branch.syncSourceCode,
+    });
+  };
+}
+
 /** Send products to live server API endpoint - with batching for large datasets */
 async function sendProductsToLiveServer(products) {
   try {
-    if (!process.env.LIVE_SERVER_URL) {
-      console.error('[POS SYNC] ERROR: LIVE_SERVER_URL not configured in .env');
-      return { success: false, error: 'LIVE_SERVER_URL not configured' };
+    if (!appConfig.backend.baseUrl) {
+      console.error(`${BRANCH_TAG} [POS SYNC] ERROR: BACKEND_BASE_URL not configured`);
+      return { success: false, error: 'BACKEND_BASE_URL not configured' };
     }
 
-    console.log(`[POS SYNC] Sending ${products.length} products to live server (batching)...`);
+    console.log(`${BRANCH_TAG} [POS SYNC] Sending ${products.length} products to live server (batching)...`);
 
     // Batch size to avoid payload too large errors - reduced for faster processing
     const BATCH_SIZE = 100;
@@ -85,18 +120,19 @@ async function sendProductsToLiveServer(products) {
       batches.push(products.slice(i, i + BATCH_SIZE));
     }
 
-    console.log(`[POS SYNC] Split into ${batches.length} batches of up to ${BATCH_SIZE} products`);
+    console.log(`${BRANCH_TAG} [POS SYNC] Split into ${batches.length} batches of up to ${BATCH_SIZE} products`);
 
     let totalSynced = 0;
     let totalErrors = 0;
 
     for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
       const batch = batches[batchIndex];
-      console.log(`[POS SYNC] Sending batch ${batchIndex + 1}/${batches.length} (${batch.length} products)...`);
+      const syncMetadata = getSyncMetadata(appConfig);
+      console.log(`${BRANCH_TAG} [POS SYNC] Sending batch ${batchIndex + 1}/${batches.length} (${batch.length} products)...`);
 
       try {
         const response = await axios.post(
-          `${process.env.LIVE_SERVER_URL}/api/products/pos-sync/push`,
+          `${appConfig.backend.baseUrl}/api/products/pos-sync/push`,
           {
             products: batch.map(p => ({
               sourceCode: p.ProductCode,
@@ -113,11 +149,14 @@ async function sendProductsToLiveServer(products) {
               expiryStatus: p.ExpiryStatus || null,
               expiryBatches: Array.isArray(p.ExpiryBatches) ? p.ExpiryBatches : [],
             })),
+            metadata: syncMetadata,
           },
           {
             headers: {
               'Content-Type': 'application/json',
-              'x-pos-secret': process.env.POS_SECRET,
+              'x-pos-secret': appConfig.backend.apiToken,
+              'x-branch-code': appConfig.branch.branchCode,
+              'x-sync-source-code': appConfig.branch.syncSourceCode,
             },
             timeout: 120000,
           }
@@ -125,11 +164,11 @@ async function sendProductsToLiveServer(products) {
 
         if (response.data.success) {
           totalSynced += response.data.synced || batch.length;
-          console.log(`[POS SYNC] ✅ Batch ${batchIndex + 1} sent successfully`);
+          console.log(`${BRANCH_TAG} [POS SYNC] ✅ Batch ${batchIndex + 1} sent successfully`);
         }
       } catch (batchError) {
         totalErrors++;
-        console.error(`[POS SYNC] ❌ Batch ${batchIndex + 1} failed:`, batchError.message);
+        console.error(`${BRANCH_TAG} [POS SYNC] ❌ Batch ${batchIndex + 1} failed:`, batchError.message);
       }
     }
 
@@ -139,13 +178,14 @@ async function sendProductsToLiveServer(products) {
       batchesSent: batches.length,
       batchesFailed: totalErrors,
       totalSynced,
+      metadata: getSyncMetadata(appConfig),
     };
 
-    console.log(`[POS SYNC] ✅ Sync complete:`, summary);
+    console.log(`${BRANCH_TAG} [POS SYNC] ✅ Sync complete:`, summary);
     return summary;
   } catch (error) {
-    console.error('[POS SYNC] ❌ Failed to send products to live server:');
-    console.error(error.message);
+    console.error(`${BRANCH_TAG} [POS SYNC] ❌ Failed to send products to live server:`);
+    console.error(`${BRANCH_TAG} ${error.message}`);
     return { success: false, error: error.message };
   }
 }
@@ -167,7 +207,7 @@ async function fetchProductsFromPOS() {
     if (!pool) await initializePool();
 
     // Get location code from environment or default to 'SH'
-    const LOCATION_CODE = process.env.POS_LOCATION_CODE || 'SH';
+    const LOCATION_CODE = appConfig.posDb.locationCode;
 
     // REAL-TIME STOCK + PRICE
     // Stock = SUM(QtyIn) - SUM(QtyOut) from ProductActivity
@@ -322,7 +362,7 @@ function shouldDebugExpiryBatch(productCode) {
 async function buildActiveExpiryBatchesFromPOS() {
   try {
     if (!pool) await initializePool();
-    const locationCode = process.env.POS_LOCATION_CODE || 'SH';
+    const locationCode = appConfig.posDb.locationCode;
     
     // Fetch all expiry rows from view - no pre-filtering by days here
     const result = await fetchExpiryCandidates({
@@ -447,7 +487,7 @@ function normalizeExpiryDays(value) {
 }
 
 function normalizeLocationCode(value) {
-  const normalized = String(value || process.env.POS_LOCATION_CODE || 'SH').trim().toUpperCase();
+  const normalized = String(value || appConfig.posDb.locationCode || 'SH').trim().toUpperCase();
   return normalized || 'SH';
 }
 
@@ -698,7 +738,7 @@ async function fetchExpiryCandidates({ days, locationCode, includeExpired, sourc
 /**
  * Manual endpoint: fetch and sync products
  */
-app.get('/pos-sync/products', validateApiKey, async (req, res) => {
+app.get('/pos-sync/products', validateApiKey, requireFeature('enableReportingSync', 'Reporting sync'), async (req, res) => {
   try {
     console.log('[POS SYNC] /pos-sync/products endpoint called');
     
@@ -859,7 +899,7 @@ app.get('/debug/find-location-stock', validateApiKey, async (req, res) => {
   try {
     if (!pool) await initializePool();
 
-    const LOCATION_CODE = process.env.POS_LOCATION_CODE || 'SH';
+    const LOCATION_CODE = appConfig.posDb.locationCode;
 
     // Check if stocks table (which had LocationCode) can be joined with stockdetails
     const query = `
@@ -937,7 +977,7 @@ app.get('/pos-sync/stock-by-location', validateApiKey, async (req, res) => {
   try {
     if (!pool) await initializePool();
 
-    const LOCATION_CODE = process.env.POS_LOCATION_CODE || 'SH';
+    const LOCATION_CODE = appConfig.posDb.locationCode;
 
     const query = `
       SELECT 
@@ -1020,7 +1060,7 @@ app.get('/pos-sync/stock-by-location', validateApiKey, async (req, res) => {
  *   "priceTypeCode": "1"
  * }
  */
-app.post('/pos-sync/write-invoice', validateApiKey, rejectDirectWritebackInProduction, async (req, res) => {
+app.post('/pos-sync/write-invoice', validateApiKey, requireAllFeatures(['enableOnlineOrderWriteback', 'enableInvoiceWriteback'], 'Invoice write-back'), rejectDirectWritebackInProduction, async (req, res) => {
   try {
     console.log('[WRITEBACK] POST /pos-sync/write-invoice called');
 
@@ -1098,7 +1138,7 @@ app.post('/pos-sync/write-invoice', validateApiKey, rejectDirectWritebackInProdu
  *   ]
  * }
  */
-app.post('/pos-sync/update-stock', validateApiKey, rejectDirectWritebackInProduction, async (req, res) => {
+app.post('/pos-sync/update-stock', validateApiKey, requireAllFeatures(['enableStockWriteback', 'enableManualStockSync'], 'Stock write-back'), rejectDirectWritebackInProduction, async (req, res) => {
   try {
     console.log('[WRITEBACK] POST /pos-sync/update-stock called');
 
@@ -1203,7 +1243,7 @@ app.post('/pos-sync/update-stock', validateApiKey, rejectDirectWritebackInProduc
  *   "locationCode": "SH"
  * }
  */
-app.post('/pos-sync/update-prices', validateApiKey, rejectDirectWritebackInProduction, async (req, res) => {
+app.post('/pos-sync/update-prices', validateApiKey, requireFeature('enablePriceSync', 'Price sync'), rejectDirectWritebackInProduction, async (req, res) => {
   try {
     console.log('[WRITEBACK] POST /pos-sync/update-prices called');
 
@@ -1275,7 +1315,7 @@ app.post('/pos-sync/update-prices', validateApiKey, rejectDirectWritebackInProdu
  *   "locationCode": "SH"
  * }
  */
-app.post('/pos-sync/apply-promotion', validateApiKey, async (req, res) => {
+app.post('/pos-sync/apply-promotion', validateApiKey, requireFeature('enablePromotionSync', 'Promotion sync'), async (req, res) => {
   try {
     console.log('[PROMO] /apply-promotion request received:', {
       endpoint: '/pos-sync/apply-promotion',
@@ -1369,7 +1409,7 @@ app.post('/pos-sync/apply-promotion', validateApiKey, async (req, res) => {
  *   "locationCode": "SH"
  * }
  */
-app.post('/pos-sync/revert-promotion', validateApiKey, async (req, res) => {
+app.post('/pos-sync/revert-promotion', validateApiKey, requireFeature('enablePromotionSync', 'Promotion sync'), async (req, res) => {
   try {
     console.log('[PROMO] /revert-promotion request received:', {
       endpoint: '/pos-sync/revert-promotion',
@@ -1469,14 +1509,14 @@ app.post('/pos-sync/revert-promotion', validateApiKey, async (req, res) => {
  * GET /pos-sync/promotion-preview/:productCode
  * Preview the latest price row that currently resolves in POS.
  */
-app.get('/pos-sync/promotion-preview/:productCode', validateApiKey, async (req, res) => {
+app.get('/pos-sync/promotion-preview/:productCode', validateApiKey, requireFeature('enablePromotionSync', 'Promotion sync'), async (req, res) => {
   try {
     console.log('[PROMO] GET /pos-sync/promotion-preview called');
 
     if (!pool) await initializePool();
 
     const { productCode } = req.params;
-    const locationCode = req.query.locationCode || process.env.POS_LOCATION_CODE || 'SH';
+    const locationCode = req.query.locationCode || appConfig.posDb.locationCode;
     const priceTypeCode = req.query.priceTypeCode || 'RT';
 
     const request = pool.request();
@@ -1510,12 +1550,12 @@ app.get('/pos-sync/promotion-preview/:productCode', validateApiKey, async (req, 
  * GET /pos-sync/get-resolved-price/:productCode
  * Backward-compatible alias for price preview.
  */
-app.get('/pos-sync/get-resolved-price/:productCode', validateApiKey, async (req, res) => {
+app.get('/pos-sync/get-resolved-price/:productCode', validateApiKey, requireFeature('enablePromotionSync', 'Promotion sync'), async (req, res) => {
   try {
     if (!pool) await initializePool();
 
     const { productCode } = req.params;
-    const locationCode = req.query.locationCode || process.env.POS_LOCATION_CODE || 'SH';
+    const locationCode = req.query.locationCode || appConfig.posDb.locationCode;
     const priceTypeCode = req.query.priceTypeCode || 'RT';
     const request = pool.request();
     const resolvedPrice = await priceUpdates.getResolvedPrice(request, productCode, locationCode, priceTypeCode);
@@ -1542,7 +1582,14 @@ app.get('/pos-sync/get-resolved-price/:productCode', validateApiKey, async (req,
 
 /** Health check endpoint */
 app.get('/health', (req, res) => {
-  res.json({ success: true, message: 'POS Sync Agent is running', timestamp: new Date().toISOString() });
+  res.json({
+    success: true,
+    message: 'POS Sync Agent is running',
+    timestamp: new Date().toISOString(),
+    branchCode: appConfig.branch.branchCode,
+    branchName: appConfig.branch.branchName,
+    syncSourceCode: appConfig.branch.syncSourceCode,
+  });
 });
 
 /** 404 handler */
@@ -1580,27 +1627,31 @@ process.on('SIGINT', gracefulShutdown);
 
 /** Auto-sync interval */
 let autoSyncInterval;
-const SYNC_INTERVAL_MS = process.env.SYNC_INTERVAL_MS || 60000; // 60 seconds default
+const SYNC_INTERVAL_MS = appConfig.polling.reportingSyncIntervalMs;
 let isAutoSyncRunning = false;
 
 /** Command polling interval */
 let commandPollInterval;
-const COMMAND_POLL_INTERVAL_MS = parseInt(process.env.COMMAND_POLL_INTERVAL_MS || '5000', 10);
-const ENABLE_POS_COMMAND_POLLING = process.env.ENABLE_POS_COMMAND_POLLING !== 'false';
+const COMMAND_POLL_INTERVAL_MS = appConfig.polling.commandPollIntervalMs;
+const ENABLE_POS_COMMAND_POLLING = appConfig.modules.commandPolling;
 let isCommandPollRunning = false;
 
 /** Emergency sales polling interval */
 let emergencySalesPollInterval;
-const EMERGENCY_SALES_POLL_INTERVAL_MS = parseInt(process.env.EMERGENCY_SALES_POLL_INTERVAL_MS || '7000', 10);
-const ENABLE_EMERGENCY_SALES_SYNC = process.env.ENABLE_EMERGENCY_SALES_SYNC !== 'false';
+const EMERGENCY_SALES_POLL_INTERVAL_MS = appConfig.polling.emergencySalesPollIntervalMs;
+const ENABLE_EMERGENCY_SALES_SYNC = appConfig.modules.emergencySalesSync;
 let isEmergencySalesPollRunning = false;
 
 /**
  * Automatic sync function - runs on interval
  */
 async function autoSync() {
+  if (!appConfig.features.enableReportingSync) {
+    return;
+  }
+
   if (isAutoSyncRunning) {
-    console.log('[AUTO SYNC] Skipped tick - previous cycle still running');
+    console.log(`${BRANCH_TAG} [AUTO SYNC] Skipped tick - previous cycle still running`);
     return;
   }
 
@@ -1608,19 +1659,41 @@ async function autoSync() {
   try {
     const products = await fetchProductsFromPOS();
     if (products.length > 0) {
-      console.log(`[AUTO SYNC] Triggered - fetched ${products.length} products`);
+      console.log(`${BRANCH_TAG} [AUTO SYNC] Triggered - fetched ${products.length} products`);
       await sendProductsToLiveServer(products);
     }
   } catch (err) {
-    console.error('[AUTO SYNC] Error:', err.message);
+    console.error(`${BRANCH_TAG} [AUTO SYNC] Error:`, err.message);
   } finally {
     isAutoSyncRunning = false;
   }
 }
 
+function isCommandTypeEnabled(commandType) {
+  const { features } = appConfig;
+
+  switch (commandType) {
+    case 'UPDATE_PRICE':
+      return features.enablePriceSync;
+    case 'UPDATE_STOCK':
+      return features.enableStockWriteback && features.enableManualStockSync;
+    case 'APPLY_PROMOTION':
+    case 'REVERT_PROMOTION':
+      return features.enablePromotionSync;
+    case 'WRITE_INVOICE':
+      return features.enableOnlineOrderWriteback && features.enableInvoiceWriteback;
+    default:
+      return false;
+  }
+}
+
 async function pollAndProcessCommands() {
+  if (!ENABLE_POS_COMMAND_POLLING) {
+    return;
+  }
+
   if (isCommandPollRunning) {
-    console.log('[POS COMMAND POLLER] Skipped tick - previous cycle still running');
+    console.log(`${BRANCH_TAG} [POS COMMAND POLLER] Skipped tick - previous cycle still running`);
     return;
   }
 
@@ -1633,11 +1706,21 @@ async function pollAndProcessCommands() {
       return;
     }
 
-    console.log(`[POS COMMAND POLLER] Claimed ${commands.length} command(s)`);
+    console.log(`${BRANCH_TAG} [POS COMMAND POLLER] Claimed ${commands.length} command(s)`);
 
     for (const command of commands) {
+      if (!isCommandTypeEnabled(command.commandType)) {
+        const disabledMessage = `Command ${command.commandType} disabled by feature flags for branch ${appConfig.branch.branchCode}`;
+        console.warn(`${BRANCH_TAG} [POS COMMAND EXECUTOR] skipping disabled command:`, {
+          id: command.id,
+          commandType: command.commandType,
+        });
+        await commandQueueClient.failCommand(command.id, disabledMessage, false);
+        continue;
+      }
+
       try {
-        console.log('[POS COMMAND EXECUTOR] start:', {
+        console.log(`${BRANCH_TAG} [POS COMMAND EXECUTOR] start:`, {
           id: command.id,
           commandType: command.commandType,
         });
@@ -1648,12 +1731,12 @@ async function pollAndProcessCommands() {
           message: 'Command executed successfully',
         });
 
-        console.log('[POS COMMAND EXECUTOR] success:', {
+        console.log(`${BRANCH_TAG} [POS COMMAND EXECUTOR] success:`, {
           id: command.id,
           commandType: command.commandType,
         });
       } catch (error) {
-        console.error('[POS COMMAND EXECUTOR ERROR] command failed:', {
+        console.error(`${BRANCH_TAG} [POS COMMAND EXECUTOR ERROR] command failed:`, {
           id: command.id,
           commandType: command.commandType,
           error: error.message,
@@ -1668,7 +1751,7 @@ async function pollAndProcessCommands() {
       }
     }
   } catch (err) {
-    console.error('[POS COMMAND POLLER ERROR]', err.message);
+    console.error(`${BRANCH_TAG} [POS COMMAND POLLER ERROR]`, err.message);
   } finally {
     isCommandPollRunning = false;
   }
@@ -1698,8 +1781,12 @@ async function writeEmergencySaleToPos(sale) {
 }
 
 async function pollAndProcessEmergencySales() {
+  if (!ENABLE_EMERGENCY_SALES_SYNC) {
+    return;
+  }
+
   if (isEmergencySalesPollRunning) {
-    console.log('[EMERGENCY SALES] Skipped tick - previous cycle still running');
+    console.log(`${BRANCH_TAG} [EMERGENCY SALES] Skipped tick - previous cycle still running`);
     return;
   }
 
@@ -1712,7 +1799,7 @@ async function pollAndProcessEmergencySales() {
       return;
     }
 
-    console.log(`[EMERGENCY SALES] Claimed ${sales.length} pending sale(s)`);
+    console.log(`${BRANCH_TAG} [EMERGENCY SALES] Claimed ${sales.length} pending sale(s)`);
 
     for (const sale of sales) {
       try {
@@ -1724,14 +1811,14 @@ async function pollAndProcessEmergencySales() {
           pos_invoice_no: resultSummary?.invoiceCode || null,
         });
 
-        console.log('[EMERGENCY SALES] sync success:', {
+        console.log(`${BRANCH_TAG} [EMERGENCY SALES] sync success:`, {
           saleRef: sale.sale_ref,
           emergencySaleId: sale.emergency_sale_id,
           invoiceCode: resultSummary?.invoiceCode || null,
           alreadySynced: resultSummary?.alreadySynced === true,
         });
       } catch (error) {
-        console.error('[EMERGENCY SALES] sync failed:', {
+        console.error(`${BRANCH_TAG} [EMERGENCY SALES] sync failed:`, {
           saleRef: sale.sale_ref,
           emergencySaleId: sale.emergency_sale_id,
           error: error.message,
@@ -1745,61 +1832,86 @@ async function pollAndProcessEmergencySales() {
       }
     }
   } catch (error) {
-    console.error('[EMERGENCY SALES] poller error:', error.message);
+    console.error(`${BRANCH_TAG} [EMERGENCY SALES] poller error:`, error.message);
   } finally {
     isEmergencySalesPollRunning = false;
   }
 }
 
 /** Start server */
-const PORT = process.env.PORT || 3001;
+const PORT = appConfig.server.port;
 let autoSyncStarted = false;
+
+function logStartupConfiguration() {
+  const validation = validateStartupConfig(appConfig);
+  console.log(`${BRANCH_TAG} [BOOT] Branch: ${appConfig.branch.branchName} (${appConfig.branch.branchCode})`);
+  console.log(`${BRANCH_TAG} [BOOT] Source: ${appConfig.branch.syncSourceCode} | LocationId: ${appConfig.branch.locationId}`);
+  console.log(`${BRANCH_TAG} [BOOT] Feature flags:`, appConfig.features);
+
+  if (validation.warnings.length > 0) {
+    validation.warnings.forEach((warning) => {
+      console.warn(`${BRANCH_TAG} [BOOT][WARN] ${warning}`);
+    });
+  }
+
+  if (!validation.valid) {
+    validation.errors.forEach((error) => {
+      console.error(`${BRANCH_TAG} [BOOT][ERROR] ${error}`);
+    });
+    throw new Error('Startup configuration validation failed');
+  }
+}
 
 startServer();
 async function startServer() {
   try {
+    logStartupConfiguration();
     await initializePool();
     app.listen(PORT, () => {
-      console.log(`POS Sync Agent listening on port ${PORT}`);
-      console.log(`API Key validation: ENABLED`);
-      console.log(`Database: ${SQL_SERVER}/${SQL_DATABASE}`);
-      console.log(`Live Server: ${process.env.LIVE_SERVER_URL || 'NOT CONFIGURED'}`);
-      console.log(`Auto-sync interval: ${SYNC_INTERVAL_MS}ms (${Math.round(SYNC_INTERVAL_MS / 1000)}s)`);
-      console.log('[PHASE 3 ROUTES] Registered:', [
+      console.log(`${BRANCH_TAG} POS Sync Agent listening on port ${PORT}`);
+      console.log(`${BRANCH_TAG} API Key validation: ENABLED`);
+      console.log(`${BRANCH_TAG} Database: ${SQL_SERVER}/${SQL_DATABASE}`);
+      console.log(`${BRANCH_TAG} Backend: ${appConfig.backend.baseUrl || 'NOT CONFIGURED'}`);
+      console.log(`${BRANCH_TAG} Polling interval: ${SYNC_INTERVAL_MS}ms (${Math.round(SYNC_INTERVAL_MS / 1000)}s)`);
+      console.log(`${BRANCH_TAG} [PHASE 3 ROUTES] Registered:`, [
         'GET /pos-sync/expiry-products',
         'POST /pos-sync/apply-promotion',
         'POST /pos-sync/revert-promotion',
         'GET /pos-sync/promotion-preview/:productCode',
         'GET /pos-sync/get-resolved-price/:productCode',
       ]);
-      console.log('[PHASE 3 COMMAND TYPES] Supported:', [
+      console.log(`${BRANCH_TAG} [PHASE 3 COMMAND TYPES] Supported:`, [
         'APPLY_PROMOTION',
         'REVERT_PROMOTION',
       ]);
 
-      // Start automatic sync if not already started
-      if (!autoSyncStarted) {
+      // reporting sync module
+      if (appConfig.modules.reportingSync && !autoSyncStarted) {
         autoSyncInterval = setInterval(autoSync, SYNC_INTERVAL_MS);
         autoSyncStarted = true;
-        console.log('[AUTO SYNC] ✅ Auto-sync enabled');
+        console.log(`${BRANCH_TAG} [AUTO SYNC] ✅ Reporting sync enabled`);
+      } else if (!appConfig.modules.reportingSync) {
+        console.log(`${BRANCH_TAG} [AUTO SYNC] ⏸ Reporting sync disabled by ENABLE_REPORTING_SYNC=false`);
       }
 
-      if (ENABLE_POS_COMMAND_POLLING && process.env.LIVE_SERVER_URL && process.env.POS_SECRET) {
+      // online commerce / write-back command module
+      if (ENABLE_POS_COMMAND_POLLING && appConfig.backend.baseUrl && appConfig.backend.apiToken) {
         commandPollInterval = setInterval(pollAndProcessCommands, COMMAND_POLL_INTERVAL_MS);
-        console.log(`[POS COMMAND POLLER] ✅ Polling enabled (${COMMAND_POLL_INTERVAL_MS}ms)`);
+        console.log(`${BRANCH_TAG} [POS COMMAND POLLER] ✅ Polling enabled (${COMMAND_POLL_INTERVAL_MS}ms)`);
       } else {
-        console.log('[POS COMMAND POLLER] ⚠️ Polling disabled (requires ENABLE_POS_COMMAND_POLLING=true, LIVE_SERVER_URL, POS_SECRET)');
+        console.log(`${BRANCH_TAG} [POS COMMAND POLLER] ⏸ Polling disabled by feature flags/config`);
       }
 
-      if (ENABLE_EMERGENCY_SALES_SYNC && process.env.LIVE_SERVER_URL && process.env.POS_SECRET) {
+      // emergency sales write-back module
+      if (ENABLE_EMERGENCY_SALES_SYNC && appConfig.backend.baseUrl && appConfig.backend.apiToken) {
         emergencySalesPollInterval = setInterval(pollAndProcessEmergencySales, EMERGENCY_SALES_POLL_INTERVAL_MS);
-        console.log(`[EMERGENCY SALES] ✅ Sync polling enabled (${EMERGENCY_SALES_POLL_INTERVAL_MS}ms)`);
+        console.log(`${BRANCH_TAG} [EMERGENCY SALES] ✅ Sync polling enabled (${EMERGENCY_SALES_POLL_INTERVAL_MS}ms)`);
       } else {
-        console.log('[EMERGENCY SALES] ⚠️ Sync polling disabled (requires ENABLE_EMERGENCY_SALES_SYNC=true, LIVE_SERVER_URL, POS_SECRET)');
+        console.log(`${BRANCH_TAG} [EMERGENCY SALES] ⏸ Sync polling disabled by feature flags/config`);
       }
     });
   } catch (err) {
-    console.error('Failed to start server:', err.message);
+    console.error(`${BRANCH_TAG} Failed to start server:`, err.message);
     process.exit(1);
   }
 }

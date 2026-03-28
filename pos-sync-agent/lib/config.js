@@ -1,0 +1,187 @@
+function parseBoolean(value, fallback = false) {
+  if (typeof value === 'boolean') return value;
+  if (value == null || value === '') return fallback;
+
+  const normalized = String(value).trim().toLowerCase();
+  if (['true', '1', 'yes', 'y', 'on'].includes(normalized)) return true;
+  if (['false', '0', 'no', 'n', 'off'].includes(normalized)) return false;
+
+  return fallback;
+}
+
+function parseInteger(value, fallback) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function normalizeString(value, fallback = '') {
+  const normalized = String(value || '').trim();
+  return normalized || fallback;
+}
+
+function buildBranchConfig() {
+  const branchCode = normalizeString(process.env.BRANCH_CODE, 'BLANTYRE');
+  const branchName = normalizeString(process.env.BRANCH_NAME, branchCode);
+  const locationId = normalizeString(process.env.LOCATION_ID, '1');
+  const syncSourceCode = normalizeString(process.env.SYNC_SOURCE_CODE, `${branchCode}_POS_01`);
+
+  return {
+    branchCode,
+    branchName,
+    locationId,
+    syncSourceCode,
+  };
+}
+
+function buildFeatureFlags() {
+  return {
+    enableReportingSync: parseBoolean(process.env.ENABLE_REPORTING_SYNC, true),
+    enableOnlineOrderWriteback: parseBoolean(process.env.ENABLE_ONLINE_ORDER_WRITEBACK, true),
+    enableStockWriteback: parseBoolean(process.env.ENABLE_STOCK_WRITEBACK, true),
+    enablePromotionSync: parseBoolean(process.env.ENABLE_PROMOTION_SYNC, true),
+    enablePriceSync: parseBoolean(process.env.ENABLE_PRICE_SYNC, true),
+    enableManualStockSync: parseBoolean(process.env.ENABLE_MANUAL_STOCK_SYNC, true),
+    enableInvoiceWriteback: parseBoolean(process.env.ENABLE_INVOICE_WRITEBACK, true),
+  };
+}
+
+function buildConfig() {
+  const branch = buildBranchConfig();
+  const features = buildFeatureFlags();
+
+  const backendBaseUrl = normalizeString(process.env.BACKEND_BASE_URL, normalizeString(process.env.LIVE_SERVER_URL));
+  const backendApiToken = normalizeString(process.env.BACKEND_API_TOKEN, normalizeString(process.env.POS_SECRET));
+
+  const sqlServer = normalizeString(process.env.POS_DB_SERVER, normalizeString(process.env.DB_SERVER, 'localhost'));
+  const sqlDatabase = normalizeString(process.env.POS_DB_NAME, normalizeString(process.env.DB_NAME || process.env.DB_DATABASE, 'POS'));
+  const sqlUser = normalizeString(process.env.POS_DB_USER, normalizeString(process.env.DB_USER));
+  const sqlPassword = normalizeString(process.env.POS_DB_PASSWORD, normalizeString(process.env.DB_PASSWORD));
+
+  const pollingIntervalMs = parseInteger(process.env.POLLING_INTERVAL_MS || process.env.SYNC_INTERVAL_MS, 60000);
+
+  const config = {
+    branch,
+    server: {
+      port: parseInteger(process.env.PORT, 3001),
+      enableDirectWritebackDebug: parseBoolean(process.env.ENABLE_DIRECT_POS_WRITEBACK_DEBUG, false),
+      agentApiSecret: normalizeString(process.env.POS_SECRET, backendApiToken),
+    },
+    backend: {
+      baseUrl: backendBaseUrl,
+      apiToken: backendApiToken,
+      commandPollTimeoutMs: parseInteger(process.env.COMMAND_POLL_TIMEOUT_MS, 15000),
+      agentId: normalizeString(process.env.POS_AGENT_ID, `${branch.branchCode.toLowerCase()}-${branch.syncSourceCode.toLowerCase()}`),
+    },
+    posDb: {
+      server: sqlServer,
+      database: sqlDatabase,
+      user: sqlUser,
+      password: sqlPassword,
+      locationCode: normalizeString(process.env.POS_LOCATION_CODE, 'SH').toUpperCase(),
+    },
+    polling: {
+      reportingSyncIntervalMs: pollingIntervalMs,
+      commandPollIntervalMs: parseInteger(process.env.COMMAND_POLL_INTERVAL_MS, 5000),
+      emergencySalesPollIntervalMs: parseInteger(process.env.EMERGENCY_SALES_POLL_INTERVAL_MS, 7000),
+    },
+    features,
+  };
+
+  config.modules = {
+    reportingSync: features.enableReportingSync,
+    commandPolling: features.enableOnlineOrderWriteback
+      || features.enableStockWriteback
+      || features.enablePromotionSync
+      || features.enablePriceSync
+      || features.enableInvoiceWriteback,
+    emergencySalesSync: features.enableOnlineOrderWriteback && features.enableInvoiceWriteback,
+    invoiceWriteback: features.enableInvoiceWriteback,
+    stockWriteback: features.enableStockWriteback,
+    priceSync: features.enablePriceSync,
+    promotionSync: features.enablePromotionSync,
+    manualStockSync: features.enableManualStockSync,
+  };
+
+  return config;
+}
+
+function getBranchTag(config) {
+  return `[BRANCH:${config.branch.branchCode}|SRC:${config.branch.syncSourceCode}]`;
+}
+
+function getSyncMetadata(config, extra = {}) {
+  return {
+    branchCode: config.branch.branchCode,
+    branchName: config.branch.branchName,
+    locationId: config.branch.locationId,
+    syncSourceCode: config.branch.syncSourceCode,
+    syncedAt: new Date().toISOString(),
+    ...extra,
+  };
+}
+
+function validateStartupConfig(config) {
+  const errors = [];
+  const warnings = [];
+
+  const requireValue = (value, message) => {
+    if (!value) {
+      errors.push(message);
+    }
+  };
+
+  requireValue(config.branch.branchCode, 'Missing branch code (BRANCH_CODE)');
+  requireValue(config.branch.branchName, 'Missing branch name (BRANCH_NAME)');
+  requireValue(config.branch.locationId, 'Missing location id (LOCATION_ID)');
+  requireValue(config.branch.syncSourceCode, 'Missing sync source code (SYNC_SOURCE_CODE)');
+
+  requireValue(config.posDb.server, 'Missing POS DB server (POS_DB_SERVER or DB_SERVER)');
+  requireValue(config.posDb.database, 'Missing POS DB name (POS_DB_NAME or DB_NAME/DB_DATABASE)');
+  requireValue(config.posDb.user, 'Missing POS DB user (POS_DB_USER or DB_USER)');
+  requireValue(config.posDb.password, 'Missing POS DB password (POS_DB_PASSWORD or DB_PASSWORD)');
+
+  requireValue(config.server.agentApiSecret, 'Missing agent API secret (POS_SECRET)');
+
+  if (config.modules.reportingSync || config.modules.commandPolling || config.modules.emergencySalesSync) {
+    requireValue(config.backend.baseUrl, 'Missing backend URL (BACKEND_BASE_URL or LIVE_SERVER_URL)');
+    requireValue(config.backend.apiToken, 'Missing backend API token (BACKEND_API_TOKEN or POS_SECRET)');
+  }
+
+  if (!process.env.BACKEND_BASE_URL && process.env.LIVE_SERVER_URL) {
+    warnings.push('Using legacy LIVE_SERVER_URL fallback. Prefer BACKEND_BASE_URL.');
+  }
+
+  if (!process.env.BACKEND_API_TOKEN && process.env.POS_SECRET) {
+    warnings.push('Using POS_SECRET as BACKEND_API_TOKEN fallback. Prefer dedicated BACKEND_API_TOKEN.');
+  }
+
+  if (!process.env.POS_DB_SERVER && process.env.DB_SERVER) {
+    warnings.push('Using legacy DB_SERVER fallback. Prefer POS_DB_SERVER.');
+  }
+
+  if (!process.env.POS_DB_NAME && (process.env.DB_NAME || process.env.DB_DATABASE)) {
+    warnings.push('Using legacy DB_NAME/DB_DATABASE fallback. Prefer POS_DB_NAME.');
+  }
+
+  if (!process.env.POS_DB_USER && process.env.DB_USER) {
+    warnings.push('Using legacy DB_USER fallback. Prefer POS_DB_USER.');
+  }
+
+  if (!process.env.POS_DB_PASSWORD && process.env.DB_PASSWORD) {
+    warnings.push('Using legacy DB_PASSWORD fallback. Prefer POS_DB_PASSWORD.');
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings,
+  };
+}
+
+module.exports = {
+  buildConfig,
+  getBranchTag,
+  getSyncMetadata,
+  validateStartupConfig,
+  parseBoolean,
+};
