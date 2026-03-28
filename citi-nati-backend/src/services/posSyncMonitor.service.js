@@ -185,7 +185,7 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40 } = {}) {
   const safeLimit = Math.max(10, Math.min(100, Number.parseInt(limit, 10) || 40));
   const since = new Date(Date.now() - safeHours * 60 * 60 * 1000);
 
-  const [config, agentHealthy, recentEvents, queueStats, recentCommands, emergencyGrouped, recentEmergencyFailures, recentWindowEvents] = await Promise.all([
+  const [config, agentHealthyDirect, recentEvents, queueStats, recentCommands, emergencyGrouped, recentEmergencyFailures, recentWindowEvents] = await Promise.all([
     getRuntimeConfig(),
     checkPOSHealth(),
     prisma.posSyncEvent.findMany({ orderBy: { createdAt: 'desc' }, take: safeLimit }),
@@ -200,6 +200,14 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40 } = {}) {
     }),
     prisma.posSyncEvent.findMany({ where: { createdAt: { gte: since } }, orderBy: { createdAt: 'asc' } }),
   ]);
+
+  // If the direct HTTP probe failed (e.g. backend can't reach the agent's LAN address),
+  // fall back to recent event evidence: a success event within the last 10 minutes means
+  // the agent is clearly alive and communicating.
+  const recentSuccessViaEvents = recentEvents.find(
+    (e) => e.status === 'success' && (Date.now() - new Date(e.createdAt).getTime()) < 10 * 60 * 1000,
+  );
+  const agentHealthy = agentHealthyDirect || recentSuccessViaEvents != null;
 
   const buckets = buildBuckets(safeHours);
   const bucketMap = new Map(buckets.map((bucket) => [bucket.key, bucket]));
