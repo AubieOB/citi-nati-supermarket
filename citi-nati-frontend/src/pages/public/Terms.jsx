@@ -96,8 +96,8 @@ const Terms = () => {
             </p>
             <p style={{ marginTop: '1rem' }}>
               Email: info@citinati.com<br />
-              Phone: (555) 123-4567<br />
-              Address: 123 Market Street, City, State 12345
+              Phone: (265) 888857188<br />
+              Address: Citi Nati Supermarket, PO Box 32334, Chichiri, Blantyre 3
             </p>
           </section>
         </div>
