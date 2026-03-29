@@ -55,7 +55,7 @@ function buildEntityResult(parsedCount, importResult = null) {
 
 async function mapEmployeeNosToIds(records, employeeNoKey = 'employeeNo') {
   const map = new Map();
-  const employeeNos = [...new Set(records.map((r) => (r[employeeNoKey] ? String(r[employeeNoKey]).trim() : null)).filter(Boolean))];
+  const employeeNos = [...new Set(records.map((r) => normalizeEmployeeNo(r[employeeNoKey])).filter(Boolean))];
 
   if (!employeeNos.length) return map;
 
@@ -64,37 +64,91 @@ async function mapEmployeeNosToIds(records, employeeNoKey = 'employeeNo') {
     select: { id: true, employeeNo: true },
   });
 
-  employees.forEach((e) => map.set(String(e.employeeNo).trim(), e.id));
+  employees.forEach((e) => map.set(normalizeEmployeeNo(e.employeeNo), e.id));
   return map;
 }
 
 function normalizePersonName(value) {
-  return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ');
+}
+
+function normalizeEmployeeNo(value) {
+  return String(value || '').trim().replace(/\s+/g, '');
+}
+
+function buildNameVariants(name) {
+  const normalized = normalizePersonName(name);
+  if (!normalized) return [];
+
+  const variants = new Set([normalized]);
+  const tokens = normalized.split(' ').filter(Boolean);
+
+  if (tokens.length >= 2) {
+    variants.add(`${tokens[0]} ${tokens[tokens.length - 1]}`);
+    variants.add(`${tokens[tokens.length - 1]} ${tokens[0]}`);
+  }
+
+  return [...variants];
+}
+
+function buildEmployeeLookupMaps(employees) {
+  const byNo = new Map();
+  const byName = new Map();
+
+  (employees || []).forEach((employee) => {
+    const employeeNo = normalizeEmployeeNo(employee.employeeNo);
+    if (employeeNo) {
+      byNo.set(employeeNo, employee.id);
+    }
+
+    const fullName = [employee.firstName, employee.middleName, employee.surname].filter(Boolean).join(' ');
+    buildNameVariants(fullName).forEach((variant) => {
+      if (!byName.has(variant)) byName.set(variant, employee.id);
+    });
+
+    const firstSurname = [employee.firstName, employee.surname].filter(Boolean).join(' ');
+    buildNameVariants(firstSurname).forEach((variant) => {
+      if (!byName.has(variant)) byName.set(variant, employee.id);
+    });
+  });
+
+  return { byNo, byName };
+}
+
+function resolveEmployeeId(record, lookup, employeeNoKey = 'employeeNo', employeeNameKey = 'employeeName') {
+  const employeeNo = normalizeEmployeeNo(record?.[employeeNoKey]);
+  if (employeeNo && lookup?.byNo?.has(employeeNo)) {
+    return lookup.byNo.get(employeeNo);
+  }
+
+  const nameCandidates = buildNameVariants(record?.[employeeNameKey]);
+  for (const nameCandidate of nameCandidates) {
+    if (lookup?.byName?.has(nameCandidate)) {
+      return lookup.byName.get(nameCandidate);
+    }
+  }
+
+  return null;
 }
 
 async function mapEmployeeNamesToIds(records, employeeNameKey = 'employeeName') {
   const map = new Map();
-  const names = [...new Set(records.map((r) => normalizePersonName(r[employeeNameKey])).filter(Boolean))];
+  const names = [...new Set(records.flatMap((r) => buildNameVariants(r[employeeNameKey])).filter(Boolean))];
   if (!names.length) return map;
 
   const employees = await prisma.employee.findMany({
-    where: {
-      OR: names.map((full) => {
-        const parts = full.split(' ').filter(Boolean);
-        const firstName = parts[0] || '';
-        const surname = parts.slice(1).join(' ') || '';
-        return {
-          firstName: { equals: firstName, mode: 'insensitive' },
-          surname: { equals: surname || 'Unknown', mode: 'insensitive' },
-        };
-      }),
-    },
-    select: { id: true, firstName: true, surname: true },
+    select: { id: true, firstName: true, middleName: true, surname: true },
   });
 
-  employees.forEach((e) => {
-    const key = normalizePersonName(`${e.firstName || ''} ${e.surname || ''}`);
-    if (key) map.set(key, e.id);
+  const lookup = buildEmployeeLookupMaps(employees);
+  names.forEach((name) => {
+    if (lookup.byName.has(name)) {
+      map.set(name, lookup.byName.get(name));
+    }
   });
 
   return map;
@@ -102,6 +156,7 @@ async function mapEmployeeNamesToIds(records, employeeNameKey = 'employeeName') 
 
 async function mapPeriodDescriptionsToIds(records) {
   const map = new Map();
+  const byDescription = new Map();
   const keys = [...new Set(records.map((r) => `${r.payrollMode || 'full_month'}||${r.description || ''}`))];
   if (!keys.length) return map;
 
@@ -117,8 +172,13 @@ async function mapPeriodDescriptionsToIds(records) {
 
   periods.forEach((p) => {
     map.set(`${p.payrollMode || 'full_month'}||${p.description || ''}`, p.id);
+    const normalizedDescription = normalizePersonName(p.description);
+    if (normalizedDescription && !byDescription.has(normalizedDescription)) {
+      byDescription.set(normalizedDescription, p.id);
+    }
   });
 
+  map.getByDescription = (description) => byDescription.get(normalizePersonName(description));
   return map;
 }
 
@@ -212,6 +272,11 @@ async function importPayrollParsedData(parsed, options = {}) {
 
   let entriesResult = null;
   if (includeSection(sectionSet, 'payrollEntries') && parsed.payrollEntries.length) {
+    const employees = await prisma.employee.findMany({
+      select: { id: true, employeeNo: true, firstName: true, middleName: true, surname: true },
+    });
+    const employeeLookup = buildEmployeeLookupMaps(employees);
+
     const employeeMap = await mapEmployeeNosToIds(parsed.payrollEntries, 'employeeNo');
     const employeeNameMap = await mapEmployeeNamesToIds(parsed.payrollEntries, 'employeeName');
 
@@ -225,15 +290,21 @@ async function importPayrollParsedData(parsed, options = {}) {
     const periodMap = await mapPeriodDescriptionsToIds(periodCandidates);
 
     const normalizedEntries = [];
+    let skippedEntries = 0;
 
     parsed.payrollEntries.forEach((entry) => {
-      const employeeIdByNo = employeeMap.get(String(entry.employeeNo || '').trim());
-      const employeeIdByName = employeeNameMap.get(normalizePersonName(entry.employeeName));
-      const employeeId = employeeIdByNo || employeeIdByName;
+      const employeeIdByNo = employeeMap.get(normalizeEmployeeNo(entry.employeeNo));
+      const employeeIdByName = buildNameVariants(entry.employeeName)
+        .map((candidate) => employeeNameMap.get(candidate))
+        .find(Boolean);
+      const employeeId = employeeIdByNo || employeeIdByName || resolveEmployeeId(entry, employeeLookup, 'employeeNo', 'employeeName');
       const periodKey = `${entry.payrollMode || 'full_month'}||${entry.periodDescription || entry.sourceSheet || ''}`;
-      const payrollPeriodId = periodMap.get(periodKey);
+      const payrollPeriodId = periodMap.get(periodKey)
+        || periodMap.getByDescription?.(entry.periodDescription)
+        || periodMap.getByDescription?.(entry.sourceSheet);
 
       if (!employeeId || !payrollPeriodId) {
+        skippedEntries += 1;
         return;
       }
 
@@ -259,8 +330,8 @@ async function importPayrollParsedData(parsed, options = {}) {
       });
     });
 
-    if (normalizedEntries.length < parsed.payrollEntries.length) {
-      warnings.push('Some payroll entries were skipped because employee or payroll period mapping was not found');
+    if (skippedEntries > 0) {
+      warnings.push(`Skipped ${skippedEntries} payroll entries because employee or payroll period mapping was not found`);
     }
 
     entriesResult = await importsService.importPayrollEntries(normalizedEntries);
@@ -334,12 +405,25 @@ async function importPayrollParsedData(parsed, options = {}) {
 
   let terminationsResult = null;
   if (includeSection(sectionSet, 'terminations') && parsed.terminations.length) {
+    const employees = await prisma.employee.findMany({
+      select: { id: true, employeeNo: true, firstName: true, middleName: true, surname: true },
+    });
+    const employeeLookup = buildEmployeeLookupMaps(employees);
+
     const employeeMap = await mapEmployeeNosToIds(parsed.terminations, 'employeeNo');
     const employeeNameMap = await mapEmployeeNamesToIds(parsed.terminations, 'employeeName');
+    let skippedTerminations = 0;
     const normalized = parsed.terminations
       .map((row) => {
-        const employeeId = employeeMap.get(String(row.employeeNo || '').trim()) || employeeNameMap.get(normalizePersonName(row.employeeName));
-        if (!employeeId) return null;
+        const employeeIdByNo = employeeMap.get(normalizeEmployeeNo(row.employeeNo));
+        const employeeIdByName = buildNameVariants(row.employeeName)
+          .map((candidate) => employeeNameMap.get(candidate))
+          .find(Boolean);
+        const employeeId = employeeIdByNo || employeeIdByName || resolveEmployeeId(row, employeeLookup, 'employeeNo', 'employeeName');
+        if (!employeeId) {
+          skippedTerminations += 1;
+          return null;
+        }
         return {
           employeeId,
           terminationDate: row.terminationDate,
@@ -352,8 +436,8 @@ async function importPayrollParsedData(parsed, options = {}) {
       })
       .filter(Boolean);
 
-    if (normalized.length < parsed.terminations.length) {
-      warnings.push('Some terminations were skipped because employee mapping failed');
+    if (skippedTerminations > 0) {
+      warnings.push(`Skipped ${skippedTerminations} terminations because employee mapping failed`);
     }
 
     terminationsResult = await importsService.importTerminations(normalized);
@@ -362,12 +446,25 @@ async function importPayrollParsedData(parsed, options = {}) {
 
   let reengagementResult = null;
   if (includeSection(sectionSet, 'reengagements') && parsed.reengagements.length) {
+    const employees = await prisma.employee.findMany({
+      select: { id: true, employeeNo: true, firstName: true, middleName: true, surname: true },
+    });
+    const employeeLookup = buildEmployeeLookupMaps(employees);
+
     const employeeMap = await mapEmployeeNosToIds(parsed.reengagements, 'employeeNo');
     const employeeNameMap = await mapEmployeeNamesToIds(parsed.reengagements, 'employeeName');
+    let skippedReengagements = 0;
     const normalized = parsed.reengagements
       .map((row) => {
-        const employeeId = employeeMap.get(String(row.employeeNo || '').trim()) || employeeNameMap.get(normalizePersonName(row.employeeName));
-        if (!employeeId) return null;
+        const employeeIdByNo = employeeMap.get(normalizeEmployeeNo(row.employeeNo));
+        const employeeIdByName = buildNameVariants(row.employeeName)
+          .map((candidate) => employeeNameMap.get(candidate))
+          .find(Boolean);
+        const employeeId = employeeIdByNo || employeeIdByName || resolveEmployeeId(row, employeeLookup, 'employeeNo', 'employeeName');
+        if (!employeeId) {
+          skippedReengagements += 1;
+          return null;
+        }
         return {
           employeeId,
           previousWage: row.previousWage,
@@ -380,8 +477,8 @@ async function importPayrollParsedData(parsed, options = {}) {
       })
       .filter(Boolean);
 
-    if (normalized.length < parsed.reengagements.length) {
-      warnings.push('Some reengagement records were skipped because employee mapping failed');
+    if (skippedReengagements > 0) {
+      warnings.push(`Skipped ${skippedReengagements} reengagement records because employee mapping failed`);
     }
 
     reengagementResult = await importsService.importReengagements(normalized);
