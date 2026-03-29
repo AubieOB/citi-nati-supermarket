@@ -36,6 +36,25 @@ function parseEmployeeNo(row, headerMap) {
   ]));
 }
 
+function parseEmployeeName(row, headerMap) {
+  return cleanString(findCellByAliases(row, headerMap, [
+    'Name of Employee',
+    'Employee Name',
+    'Full Name',
+    'Name',
+    'Names',
+  ]));
+}
+
+function parseAmountSafe(value) {
+  if (value === null || value === undefined) return null;
+  const text = String(value).trim();
+  if (!text || text === '-' || /^nil$/i.test(text) || /^none$/i.test(text) || /^not applicable$/i.test(text) || /^vacant$/i.test(text)) {
+    return null;
+  }
+  return parseNumber(text);
+}
+
 function splitFullName(value) {
   const text = cleanString(value);
   if (!text) return { firstName: null, surname: null };
@@ -69,6 +88,42 @@ function shouldSkipSummaryLikeRow(row, headerMap) {
   return !employeeNo;
 }
 
+function findLabelValueInWindow(rows, startIndex, endIndex, labelAliases = []) {
+  const start = Math.max(0, startIndex);
+  const end = Math.min(rows.length - 1, endIndex);
+
+  for (let i = start; i <= end; i += 1) {
+    const row = rows[i] || [];
+    for (let c = 0; c < row.length; c += 1) {
+      const cellValue = cleanString(row[c]);
+      if (!cellValue) continue;
+      const token = normalizeToken(cellValue);
+
+      const hit = labelAliases.some((alias) => {
+        const aliasToken = normalizeToken(alias);
+        return token === aliasToken || token.includes(aliasToken) || aliasToken.includes(token);
+      });
+
+      if (!hit) continue;
+
+      for (let next = c + 1; next < row.length; next += 1) {
+        const candidate = cleanString(row[next]);
+        if (candidate) return candidate;
+      }
+
+      if (i + 1 <= end) {
+        const downRow = rows[i + 1] || [];
+        for (let next = c; next < downRow.length; next += 1) {
+          const candidate = cleanString(downRow[next]);
+          if (candidate) return candidate;
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
 function parseBiodataSheet(workbook, sheetName, warnings) {
   const rows = getSheetRows(workbook, sheetName);
   const headerIndex = findHeaderRowIndex(rows, ['employee no', 'first name', 'surname']);
@@ -93,7 +148,12 @@ function parseBiodataSheet(workbook, sheetName, warnings) {
     const employeeNo = parseEmployeeNo(row, headerMap);
     const explicitFirstName = cleanString(findCellByAliases(row, headerMap, ['First Name', 'Firstname']));
     const explicitSurname = cleanString(findCellByAliases(row, headerMap, ['Surname', 'Last Name']));
-    const rawName = cleanString(findCellByAliases(row, headerMap, ['Employee Name', 'Full Name', 'Name', 'Names']));
+    const rawName = parseEmployeeName(row, headerMap);
+
+    if (rawName && /^vacant$/i.test(rawName)) {
+      skippedRows += 1;
+      continue;
+    }
 
     const nameParts = splitFullName(rawName);
     const firstName = explicitFirstName || nameParts.firstName;
@@ -208,35 +268,69 @@ function parseTerminationSheet(workbook, sheetName, warnings) {
   const rows = getSheetRows(workbook, sheetName);
   const headerIndex = findHeaderRowIndex(rows, ['employee', 'termination', 'reason']);
 
-  if (headerIndex < 0) {
-    warnings.push(`Sheet '${sheetName}' found but termination headers were not confidently detected`);
-    return { terminations: [] };
+  if (headerIndex >= 0) {
+    const { headerMap, dataRows } = buildRowObjectsFromSheet(workbook, sheetName, headerIndex);
+    const terminations = [];
+
+    for (const row of dataRows) {
+      if (shouldSkipSummaryLikeRow(row, headerMap)) continue;
+
+      const employeeNo = parseEmployeeNo(row, headerMap);
+      const employeeName = parseEmployeeName(row, headerMap);
+      const terminationDate = parseDate(findCellByAliases(row, headerMap, ['Termination Date', 'Date', 'Date Contract Terminated']));
+
+      if ((!employeeNo && !employeeName) || !terminationDate) continue;
+
+      terminations.push({
+        employeeNo,
+        employeeName,
+        terminationDate,
+        reason: cleanString(findCellByAliases(row, headerMap, ['Reason', 'Termination Reason', 'Resignation', 'Dismissal'])),
+        daysWorkedInFinalMonth: parseAmountSafe(findCellByAliases(row, headerMap, ['Days Worked in Final Month', 'Days Worked', 'Number of days worked during month of resignation/dismissal'])),
+        halfPayReceived: parseAmountSafe(findCellByAliases(row, headerMap, ['Half Pay Received', 'Half Pay', 'Payslip for end of Contract'])),
+        settlementAmount: parseAmountSafe(findCellByAliases(row, headerMap, ['Settlement Amount', 'Settlement', 'Total Gross Amount Due at End of Contract', 'Total Net Amount Due at End of Contract'])),
+        notes: cleanString(findCellByAliases(row, headerMap, ['Notes', 'Comment'])),
+      });
+    }
+
+    if (!terminations.length) {
+      warnings.push(`Terminations sheet detected but no valid rows were parsed from '${sheetName}'`);
+    }
+
+    return { terminations };
   }
 
-  const { headerMap, dataRows } = buildRowObjectsFromSheet(workbook, sheetName, headerIndex);
+  // Fallback for form-style layout where labels and values are vertically arranged.
   const terminations = [];
+  for (let i = 0; i < rows.length; i += 1) {
+    const rowText = normalizeToken((rows[i] || []).map((cell) => cleanString(cell) || '').join(' '));
+    if (!rowText.includes('employee resignation') && !rowText.includes('dismissal')) continue;
 
-  for (const row of dataRows) {
-    if (shouldSkipSummaryLikeRow(row, headerMap)) continue;
+    const employeeName = findLabelValueInWindow(rows, i, i + 12, ['Name of Employee', 'Employee Name']);
+    const terminationDateRaw = findLabelValueInWindow(rows, i, i + 20, ['Date Contract Terminated', 'Termination Date']);
+    const settlementRaw = findLabelValueInWindow(rows, i, i + 28, ['Total Gross Amount Due at End of Contract', 'Total Net Amount Due at End of Contract']);
+    const daysWorkedRaw = findLabelValueInWindow(rows, i, i + 24, ['Number of days worked during month of resignation/dismissal', 'Days Worked in Final Month']);
+    const halfPayRaw = findLabelValueInWindow(rows, i, i + 20, ['Payslip for end of Contract', 'Half Pay Received']);
 
-    const employeeNo = parseEmployeeNo(row, headerMap);
-    const terminationDate = parseDate(findCellByAliases(row, headerMap, ['Termination Date', 'Date']));
-
-    if (!employeeNo || !terminationDate) continue;
+    const normalizedName = cleanString(employeeName);
+    if (!normalizedName || /^employee does not exist$/i.test(normalizedName)) {
+      continue;
+    }
 
     terminations.push({
-      employeeNo,
-      terminationDate,
-      reason: cleanString(findCellByAliases(row, headerMap, ['Reason', 'Termination Reason'])),
-      daysWorkedInFinalMonth: parseNumber(findCellByAliases(row, headerMap, ['Days Worked in Final Month', 'Days Worked'])),
-      halfPayReceived: parseNumber(findCellByAliases(row, headerMap, ['Half Pay Received', 'Half Pay'])),
-      settlementAmount: parseNumber(findCellByAliases(row, headerMap, ['Settlement Amount', 'Settlement'])),
-      notes: cleanString(findCellByAliases(row, headerMap, ['Notes', 'Comment'])),
+      employeeNo: null,
+      employeeName: normalizedName,
+      terminationDate: parseDate(terminationDateRaw),
+      reason: 'resignation/dismissal',
+      daysWorkedInFinalMonth: parseAmountSafe(daysWorkedRaw),
+      halfPayReceived: parseAmountSafe(halfPayRaw),
+      settlementAmount: parseAmountSafe(settlementRaw),
+      notes: `Imported from form layout row ${i + 1}`,
     });
   }
 
   if (!terminations.length) {
-    warnings.push(`Terminations sheet detected but no valid rows were parsed from '${sheetName}'`);
+    warnings.push(`Sheet '${sheetName}' found but termination data rows were not detected in table or form layout`);
   }
 
   return { terminations };
@@ -244,7 +338,7 @@ function parseTerminationSheet(workbook, sheetName, warnings) {
 
 function parseReengagementSheet(workbook, sheetName, warnings) {
   const rows = getSheetRows(workbook, sheetName);
-  const headerIndex = findHeaderRowIndex(rows, ['employee', 'effective', 'wage']);
+  const headerIndex = findHeaderRowIndex(rows, ['employee', 'effective', 'wage', 'occupation', 'date employed']);
 
   if (headerIndex < 0) {
     warnings.push(`Sheet '${sheetName}' found but reengagement headers were not confidently detected`);
@@ -258,17 +352,21 @@ function parseReengagementSheet(workbook, sheetName, warnings) {
     if (shouldSkipSummaryLikeRow(row, headerMap)) continue;
 
     const employeeNo = parseEmployeeNo(row, headerMap);
-    const effectiveDate = parseDate(findCellByAliases(row, headerMap, ['Effective Date', 'Date']));
+    const employeeName = parseEmployeeName(row, headerMap);
+    const effectiveDate = parseDate(findCellByAliases(row, headerMap, ['Effective Date', 'Date', 'Date Employed']));
 
-    if (!employeeNo || !effectiveDate) continue;
+    if ((!employeeNo && !employeeName) || !effectiveDate) continue;
+
+    if (employeeName && /^vacant$/i.test(employeeName)) continue;
 
     reengagements.push({
       employeeNo,
-      previousWage: parseNumber(findCellByAliases(row, headerMap, ['Previous Wage', 'Old Wage'])),
-      reengagementWage: parseNumber(findCellByAliases(row, headerMap, ['Reengagement Wage', 'New Wage'])),
+      employeeName,
+      previousWage: parseAmountSafe(findCellByAliases(row, headerMap, ['Previous Wage', 'Old Wage', 'Wages as at 30/09/25'])),
+      reengagementWage: parseAmountSafe(findCellByAliases(row, headerMap, ['Reengagement Wage', 'New Wage', 'New Wage from 1/10/25', 'Wages on retrenchment'])),
       occupation: cleanString(findCellByAliases(row, headerMap, ['Occupation', 'Position'])),
       effectiveDate,
-      contractExpiryDate: parseDate(findCellByAliases(row, headerMap, ['Contract Expiry Date', 'Expiry Date'])),
+      contractExpiryDate: parseDate(findCellByAliases(row, headerMap, ['Contract Expiry Date', 'Expiry Date', 'Expiry of Contract'])),
       notes: cleanString(findCellByAliases(row, headerMap, ['Notes', 'Comment'])),
     });
   }
@@ -283,10 +381,84 @@ function parseReengagementSheet(workbook, sheetName, warnings) {
 function parsePayrollLikeSheets(workbook, sheetNames, warnings) {
   const payrollPeriods = [];
   const payrollEntries = [];
+  const discoveredEmployees = [];
+  const discoveredSalaryStructures = [];
+
+  const employeeIdentityMap = new Map();
+
+  function rememberEmployeeIdentity(entry) {
+    const key = entry.employeeNo || normalizeToken(entry.employeeName || '');
+    if (!key) return;
+    if (employeeIdentityMap.has(key)) return;
+
+    const employeeName = cleanString(entry.employeeName);
+    if (!employeeName || /^vacant$/i.test(employeeName)) return;
+
+    const split = splitFullName(employeeName);
+    const employee = {
+      employeeNo: entry.employeeNo || null,
+      firstName: split.firstName || 'Unknown',
+      surname: split.surname || 'Unknown',
+      employmentType: 'imported',
+      status: 'active',
+      notes: 'Derived from payroll sheets where biodata records were unavailable',
+    };
+
+    discoveredEmployees.push(employee);
+    employeeIdentityMap.set(key, true);
+
+    const monthlySalary = parseAmountSafe(entry.basicSalary) ?? parseAmountSafe(entry.grossPay) ?? parseAmountSafe(entry.netPay);
+    if (entry.employeeNo && monthlySalary !== null) {
+      discoveredSalaryStructures.push({
+        employeeNo: entry.employeeNo,
+        agreedSalaryPerMonth: monthlySalary,
+        annualIncrementAmount: 0,
+        salaryAfterIncrement: monthlySalary,
+        currency: 'MWK',
+        effectiveFrom: new Date(),
+        effectiveTo: null,
+        isCurrent: true,
+      });
+    }
+  }
+
+  function pushPayrollEntry(sheetName, payrollMode, periodDescription, entry) {
+    const employeeNo = cleanString(entry.employeeNo || null);
+    const employeeName = cleanString(entry.employeeName || null);
+    if (!employeeNo && !employeeName) return;
+    if (employeeName && /^vacant$/i.test(employeeName)) return;
+
+    const normalizedEntry = {
+      sourceSheet: sheetName,
+      periodDescription,
+      payrollMode,
+      employeeNo,
+      employeeName,
+      basicSalary: parseAmountSafe(entry.basicSalary) || 0,
+      incrementAmount: parseAmountSafe(entry.incrementAmount) || 0,
+      grossPay: parseAmountSafe(entry.grossPay) || 0,
+      totalDeductions: parseAmountSafe(entry.totalDeductions) || 0,
+      netPay: parseAmountSafe(entry.netPay) || 0,
+      daysWorked: parseAmountSafe(entry.daysWorked),
+      daysAbsent: parseAmountSafe(entry.daysAbsent),
+      overtimeHours: parseAmountSafe(entry.overtimeHours),
+      overtimeAmount: parseAmountSafe(entry.overtimeAmount),
+      loanDeductionAmount: parseAmountSafe(entry.loanDeductionAmount),
+      otherDeductionAmount: parseAmountSafe(entry.otherDeductionAmount),
+      bonusAmount: parseAmountSafe(entry.bonusAmount),
+      giftAmount: parseAmountSafe(entry.giftAmount),
+      leavePayAmount: parseAmountSafe(entry.leavePayAmount),
+      payeAmount: parseAmountSafe(entry.payeAmount),
+      notes: entry.notes || null,
+    };
+
+    payrollEntries.push(normalizedEntry);
+    rememberEmployeeIdentity(normalizedEntry);
+  }
 
   sheetNames.forEach((sheetName) => {
     const rows = getSheetRows(workbook, sheetName);
-    const headerIndex = findHeaderRowIndex(rows, ['employee', 'net', 'gross']);
+    const headerIndex = findHeaderRowIndex(rows, ['employee', 'name', 'gross', 'net', 'count', 'amount due']);
 
     if (headerIndex < 0) {
       warnings.push(`Sheet '${sheetName}' detected but skipped for payroll entries due to low-confidence mapping`);
@@ -310,31 +482,61 @@ function parsePayrollLikeSheets(workbook, sheetNames, warnings) {
       if (shouldSkipSummaryLikeRow(row, headerMap)) return;
 
       const employeeNo = parseEmployeeNo(row, headerMap);
-      if (!employeeNo) return;
+      const employeeName = parseEmployeeName(row, headerMap);
+      const grossCandidate = findCellByAliases(row, headerMap, ['Gross Salary', 'Gross Pay', 'Gross', 'Amount Due', 'Salary', 'Wages on retrenchment']);
+      const netCandidate = findCellByAliases(row, headerMap, ['Net Pay', 'Net', 'Net Pay for the Month', 'Net Pay mid and end of Month']);
 
-      payrollEntries.push({
-        sourceSheet: sheetName,
-        periodDescription,
-        payrollMode,
+      pushPayrollEntry(sheetName, payrollMode, periodDescription, {
         employeeNo,
-        basicSalary: parseNumber(findCellByAliases(row, headerMap, ['Basic Salary', 'Salary'])) || 0,
-        incrementAmount: parseNumber(findCellByAliases(row, headerMap, ['Increment Amount', 'Increment'])) || 0,
-        grossPay: parseNumber(findCellByAliases(row, headerMap, ['Gross Pay', 'Gross'])) || 0,
-        totalDeductions: parseNumber(findCellByAliases(row, headerMap, ['Total Deductions', 'Deductions'])) || 0,
-        netPay: parseNumber(findCellByAliases(row, headerMap, ['Net Pay', 'Net'])) || 0,
-        daysWorked: parseNumber(findCellByAliases(row, headerMap, ['Days Worked'])),
-        daysAbsent: parseNumber(findCellByAliases(row, headerMap, ['Days Absent'])),
-        overtimeHours: parseNumber(findCellByAliases(row, headerMap, ['Overtime Hours'])),
-        overtimeAmount: parseNumber(findCellByAliases(row, headerMap, ['Overtime Amount'])),
-        loanDeductionAmount: parseNumber(findCellByAliases(row, headerMap, ['Loan Deduction', 'Loan Deduction Amount'])),
-        otherDeductionAmount: parseNumber(findCellByAliases(row, headerMap, ['Other Deduction', 'Other Deductions'])),
-        bonusAmount: parseNumber(findCellByAliases(row, headerMap, ['Bonus', 'Bonus Amount'])),
-        giftAmount: parseNumber(findCellByAliases(row, headerMap, ['Gift', 'Gift Amount'])),
-        leavePayAmount: parseNumber(findCellByAliases(row, headerMap, ['Leave Pay', 'Leave Pay Amount'])),
-        payeAmount: parseNumber(findCellByAliases(row, headerMap, ['PAYE', 'PAYE Amount'])),
+        employeeName,
+        basicSalary: findCellByAliases(row, headerMap, ['Basic Salary', 'Salary', 'Gross Salary', 'Amount Due']),
+        incrementAmount: findCellByAliases(row, headerMap, ['Increment Amount', 'Increment']),
+        grossPay: grossCandidate,
+        totalDeductions: findCellByAliases(row, headerMap, ['Total Deductions', 'Deductions']),
+        netPay: netCandidate || grossCandidate,
+        daysWorked: findCellByAliases(row, headerMap, ['Days Worked']),
+        daysAbsent: findCellByAliases(row, headerMap, ['Days Absent']),
+        overtimeHours: findCellByAliases(row, headerMap, ['Overtime Hours']),
+        overtimeAmount: findCellByAliases(row, headerMap, ['Overtime Amount', 'Overtime Claim']),
+        loanDeductionAmount: findCellByAliases(row, headerMap, ['Loan Deduction', 'Loan Instalment', 'Loan Deduction Amount']),
+        otherDeductionAmount: findCellByAliases(row, headerMap, ['Other Deduction', 'Other Deductions', 'Absence Deduction']),
+        bonusAmount: findCellByAliases(row, headerMap, ['Bonus', 'Bonus Amount']),
+        giftAmount: findCellByAliases(row, headerMap, ['Gift', 'Gift Amount', 'Xmas Gift/Leave Pay']),
+        leavePayAmount: findCellByAliases(row, headerMap, ['Leave Pay', 'Leave Pay Amount']),
+        payeAmount: findCellByAliases(row, headerMap, ['PAYE', 'P.A.Y.E', 'PAYE Amount']),
         notes: cleanString(findCellByAliases(row, headerMap, ['Notes', 'Comment'])),
       });
     });
+
+    // Fallback for card-style sheets (Wages / Res-Workers style) where values are label-value blocks.
+    for (let i = 0; i < rows.length; i += 1) {
+      const rowText = normalizeToken((rows[i] || []).map((cell) => cleanString(cell) || '').join(' '));
+      if (!rowText.includes('name of employee')) continue;
+
+      const employeeName = findLabelValueInWindow(rows, i, i + 3, ['Name of Employee', 'Employee Name']);
+      if (!employeeName || /^vacant$/i.test(employeeName)) continue;
+
+      const employeeNo = findLabelValueInWindow(rows, i, i + 4, ['Employee Number', 'Employee No', 'Staff No', 'ID']);
+      const grossSalary = findLabelValueInWindow(rows, i, i + 18, ['Gross Salary', 'Amount Due', 'Wages on retrenchment']);
+      const netSalary = findLabelValueInWindow(rows, i, i + 18, ['Net Pay for the Month', 'Net Pay mid and end of Month']);
+      const loanInstalment = findLabelValueInWindow(rows, i, i + 18, ['Loan Instalment', 'Loan Deduction']);
+      const absenceDeduction = findLabelValueInWindow(rows, i, i + 18, ['Absence Deduction']);
+      const paye = findLabelValueInWindow(rows, i, i + 18, ['P.A.Y.E', 'PAYE']);
+
+      pushPayrollEntry(sheetName, payrollMode, periodDescription, {
+        employeeNo,
+        employeeName,
+        basicSalary: grossSalary,
+        grossPay: grossSalary,
+        netPay: netSalary || grossSalary,
+        loanDeductionAmount: loanInstalment,
+        otherDeductionAmount: absenceDeduction,
+        payeAmount: paye,
+        notes: `Imported from card layout block row ${i + 1}`,
+      });
+
+      i += 8;
+    }
 
     const entriesFromSheet = payrollEntries.filter((entry) => entry.sourceSheet === sheetName).length;
     if (!entriesFromSheet) {
@@ -342,7 +544,7 @@ function parsePayrollLikeSheets(workbook, sheetNames, warnings) {
     }
   });
 
-  return { payrollPeriods, payrollEntries };
+  return { payrollPeriods, payrollEntries, discoveredEmployees, discoveredSalaryStructures };
 }
 
 function parsePayrollWorkbook(workbook) {
@@ -440,6 +642,8 @@ function parsePayrollWorkbook(workbook) {
       const result = parsePayrollLikeSheets(workbook, payrollLikeSheets, warnings);
       parsed.payrollPeriods.push(...result.payrollPeriods);
       parsed.payrollEntries.push(...result.payrollEntries);
+      parsed.employees.push(...(result.discoveredEmployees || []));
+      parsed.salaryStructures.push(...(result.discoveredSalaryStructures || []));
     } catch (err) {
       err.stage = 'parsing';
       err.parser = 'parsePayrollLikeSheets';
@@ -447,6 +651,26 @@ function parsePayrollWorkbook(workbook) {
       err.detectedSheets = detectedSheets;
       throw err;
     }
+  }
+
+  if (parsed.employees.length) {
+    const seen = new Set();
+    parsed.employees = parsed.employees.filter((row) => {
+      const key = row.employeeNo || `${normalizeToken(row.firstName)}|${normalizeToken(row.surname)}`;
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  if (parsed.salaryStructures.length) {
+    const seen = new Set();
+    parsed.salaryStructures = parsed.salaryStructures.filter((row) => {
+      const key = `${row.employeeNo || ''}|${String(row.agreedSalaryPerMonth || '')}`;
+      if (!row.employeeNo || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
 
   if (!detectedSheets.length) {

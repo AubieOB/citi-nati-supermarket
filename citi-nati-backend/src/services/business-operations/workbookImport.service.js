@@ -68,6 +68,38 @@ async function mapEmployeeNosToIds(records, employeeNoKey = 'employeeNo') {
   return map;
 }
 
+function normalizePersonName(value) {
+  return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+async function mapEmployeeNamesToIds(records, employeeNameKey = 'employeeName') {
+  const map = new Map();
+  const names = [...new Set(records.map((r) => normalizePersonName(r[employeeNameKey])).filter(Boolean))];
+  if (!names.length) return map;
+
+  const employees = await prisma.employee.findMany({
+    where: {
+      OR: names.map((full) => {
+        const parts = full.split(' ').filter(Boolean);
+        const firstName = parts[0] || '';
+        const surname = parts.slice(1).join(' ') || '';
+        return {
+          firstName: { equals: firstName, mode: 'insensitive' },
+          surname: { equals: surname || 'Unknown', mode: 'insensitive' },
+        };
+      }),
+    },
+    select: { id: true, firstName: true, surname: true },
+  });
+
+  employees.forEach((e) => {
+    const key = normalizePersonName(`${e.firstName || ''} ${e.surname || ''}`);
+    if (key) map.set(key, e.id);
+  });
+
+  return map;
+}
+
 async function mapPeriodDescriptionsToIds(records) {
   const map = new Map();
   const keys = [...new Set(records.map((r) => `${r.payrollMode || 'full_month'}||${r.description || ''}`))];
@@ -181,6 +213,7 @@ async function importPayrollParsedData(parsed, options = {}) {
   let entriesResult = null;
   if (includeSection(sectionSet, 'payrollEntries') && parsed.payrollEntries.length) {
     const employeeMap = await mapEmployeeNosToIds(parsed.payrollEntries, 'employeeNo');
+    const employeeNameMap = await mapEmployeeNamesToIds(parsed.payrollEntries, 'employeeName');
 
     const periodCandidates = parsed.payrollPeriods.length
       ? parsed.payrollPeriods
@@ -194,7 +227,9 @@ async function importPayrollParsedData(parsed, options = {}) {
     const normalizedEntries = [];
 
     parsed.payrollEntries.forEach((entry) => {
-      const employeeId = employeeMap.get(String(entry.employeeNo || '').trim());
+      const employeeIdByNo = employeeMap.get(String(entry.employeeNo || '').trim());
+      const employeeIdByName = employeeNameMap.get(normalizePersonName(entry.employeeName));
+      const employeeId = employeeIdByNo || employeeIdByName;
       const periodKey = `${entry.payrollMode || 'full_month'}||${entry.periodDescription || entry.sourceSheet || ''}`;
       const payrollPeriodId = periodMap.get(periodKey);
 
@@ -300,9 +335,10 @@ async function importPayrollParsedData(parsed, options = {}) {
   let terminationsResult = null;
   if (includeSection(sectionSet, 'terminations') && parsed.terminations.length) {
     const employeeMap = await mapEmployeeNosToIds(parsed.terminations, 'employeeNo');
+    const employeeNameMap = await mapEmployeeNamesToIds(parsed.terminations, 'employeeName');
     const normalized = parsed.terminations
       .map((row) => {
-        const employeeId = employeeMap.get(String(row.employeeNo || '').trim());
+        const employeeId = employeeMap.get(String(row.employeeNo || '').trim()) || employeeNameMap.get(normalizePersonName(row.employeeName));
         if (!employeeId) return null;
         return {
           employeeId,
@@ -327,9 +363,10 @@ async function importPayrollParsedData(parsed, options = {}) {
   let reengagementResult = null;
   if (includeSection(sectionSet, 'reengagements') && parsed.reengagements.length) {
     const employeeMap = await mapEmployeeNosToIds(parsed.reengagements, 'employeeNo');
+    const employeeNameMap = await mapEmployeeNamesToIds(parsed.reengagements, 'employeeName');
     const normalized = parsed.reengagements
       .map((row) => {
-        const employeeId = employeeMap.get(String(row.employeeNo || '').trim());
+        const employeeId = employeeMap.get(String(row.employeeNo || '').trim()) || employeeNameMap.get(normalizePersonName(row.employeeName));
         if (!employeeId) return null;
         return {
           employeeId,
