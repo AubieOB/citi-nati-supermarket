@@ -2,6 +2,43 @@
 
 const XLSX = require('xlsx');
 
+const HEADER_ALIAS_MAP = new Map([
+  ['employee no', 'employee_no'],
+  ['employee number', 'employee_no'],
+  ['emp no', 'employee_no'],
+  ['emp number', 'employee_no'],
+  ['employee id', 'employee_no'],
+  ['id', 'employee_no'],
+  ['first name', 'first_name'],
+  ['firstname', 'first_name'],
+  ['name', 'first_name'],
+  ['surname', 'surname'],
+  ['last name', 'surname'],
+  ['salary', 'salary'],
+  ['basic salary', 'salary'],
+  ['basic pay', 'salary'],
+  ['agreed salary', 'salary'],
+  ['agreed salary per month', 'salary'],
+  ['monthly salary', 'salary'],
+  ['amount', 'amount'],
+  ['loan amount', 'amount'],
+  ['date', 'date'],
+  ['expense date', 'date'],
+  ['transaction date', 'date'],
+  ['loan', 'loan'],
+  ['loan reference', 'loan_reference'],
+]);
+
+const DEFAULT_HEADER_KEYWORDS = [
+  'employee',
+  'name',
+  'salary',
+  'id',
+  'amount',
+  'loan',
+  'date',
+];
+
 function normalizeToken(value) {
   return String(value || '')
     .trim()
@@ -12,7 +49,20 @@ function normalizeToken(value) {
 }
 
 function normalizeHeader(value) {
-  return normalizeToken(value);
+  const normalized = normalizeToken(value);
+  if (!normalized) return '';
+
+  if (HEADER_ALIAS_MAP.has(normalized)) {
+    return HEADER_ALIAS_MAP.get(normalized);
+  }
+
+  for (const [alias, canonical] of HEADER_ALIAS_MAP.entries()) {
+    if (normalized.includes(alias) || alias.includes(normalized)) {
+      return canonical;
+    }
+  }
+
+  return normalized.replace(/\s+/g, '_');
 }
 
 function readWorkbookFromBuffer(buffer) {
@@ -51,7 +101,8 @@ function getSheetRows(workbook, sheetName) {
 }
 
 function findHeaderRowIndex(rows, expectedHeaders, maxScanRows = 20) {
-  const expected = expectedHeaders.map(normalizeHeader);
+  const expected = expectedHeaders.map(normalizeHeader).filter(Boolean);
+  const keywordTokens = [...new Set([...DEFAULT_HEADER_KEYWORDS, ...expectedHeaders.map(normalizeToken).filter(Boolean)])];
   const scanLimit = Math.min(maxScanRows, rows.length);
 
   let bestIndex = -1;
@@ -59,7 +110,7 @@ function findHeaderRowIndex(rows, expectedHeaders, maxScanRows = 20) {
 
   for (let i = 0; i < scanLimit; i += 1) {
     const row = rows[i] || [];
-    const normalizedRow = row.map(normalizeHeader);
+    const normalizedRow = row.map(normalizeHeader).filter(Boolean);
 
     let score = 0;
     expected.forEach((h) => {
@@ -68,13 +119,23 @@ function findHeaderRowIndex(rows, expectedHeaders, maxScanRows = 20) {
       }
     });
 
+    keywordTokens.forEach((keyword) => {
+      if (normalizedRow.some((cell) => cell.includes(keyword.replace(/\s+/g, '_')) || cell.includes(keyword))) {
+        score += 0.35;
+      }
+    });
+
+    if (row.filter((cell) => cleanString(cell) !== null).length >= 3) {
+      score += 0.25;
+    }
+
     if (score > bestScore) {
       bestScore = score;
       bestIndex = i;
     }
   }
 
-  return bestScore >= 2 ? bestIndex : -1;
+  return bestScore >= 1.5 ? bestIndex : -1;
 }
 
 function toHeaderMap(headerRow) {
@@ -154,6 +215,35 @@ function buildRowObjects(rows, headerIndex) {
   return { headerMap, dataRows, headerRow };
 }
 
+function buildRowObjectsFromSheet(workbook, sheetName, headerIndex) {
+  const sheet = workbook.Sheets[sheetName];
+  if (!sheet) {
+    return { headerMap: new Map(), dataRows: [], headerRow: [] };
+  }
+
+  // Use range to start at the detected header row so real-world title/meta rows are ignored.
+  const rangedRows = XLSX.utils.sheet_to_json(sheet, {
+    header: 1,
+    raw: false,
+    defval: null,
+    blankrows: false,
+    range: headerIndex,
+  });
+
+  const headerRow = rangedRows[0] || [];
+  const headerMap = toHeaderMap(headerRow);
+  const dataRows = rangedRows.slice(1).filter((row) => !isEmptyRow(row));
+
+  console.info('[BO][IMPORTS][PARSER] sheet parsed', {
+    sheetName,
+    headerRowIndex: headerIndex,
+    normalizedHeaders: [...headerMap.keys()],
+    parsedRows: dataRows.length,
+  });
+
+  return { headerMap, dataRows, headerRow };
+}
+
 function summarizeParsedData(data) {
   const summary = {};
   Object.keys(data || {}).forEach((key) => {
@@ -177,5 +267,6 @@ module.exports = {
   cleanString,
   isEmptyRow,
   buildRowObjects,
+  buildRowObjectsFromSheet,
   summarizeParsedData,
 };

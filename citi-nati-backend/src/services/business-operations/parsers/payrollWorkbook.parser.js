@@ -5,7 +5,7 @@ const {
   detectSheetByAliases,
   getSheetRows,
   findHeaderRowIndex,
-  buildRowObjects,
+  buildRowObjectsFromSheet,
   findCellByAliases,
   cleanString,
   parseNumber,
@@ -30,7 +30,7 @@ function parseBiodataSheet(workbook, sheetName, warnings) {
     return { employees: [], salaryStructures: [] };
   }
 
-  const { headerMap, dataRows } = buildRowObjects(rows, headerIndex);
+  const { headerMap, dataRows } = buildRowObjectsFromSheet(workbook, sheetName, headerIndex);
 
   const employees = [];
   const salaryStructures = [];
@@ -82,6 +82,10 @@ function parseBiodataSheet(workbook, sheetName, warnings) {
     }
   }
 
+  if (!employees.length && !salaryStructures.length) {
+    warnings.push(`Biodata sheet detected but no valid rows were parsed from '${sheetName}'`);
+  }
+
   return { employees, salaryStructures };
 }
 
@@ -94,7 +98,7 @@ function parseLoanSheet(workbook, sheetName, warnings) {
     return { loans: [], loanTransactions: [] };
   }
 
-  const { headerMap, dataRows } = buildRowObjects(rows, headerIndex);
+  const { headerMap, dataRows } = buildRowObjectsFromSheet(workbook, sheetName, headerIndex);
   const loans = [];
   const loanTransactions = [];
 
@@ -129,6 +133,10 @@ function parseLoanSheet(workbook, sheetName, warnings) {
     }
   }
 
+  if (!loans.length && !loanTransactions.length) {
+    warnings.push(`Loan sheet detected but no valid rows were parsed from '${sheetName}'`);
+  }
+
   return { loans, loanTransactions };
 }
 
@@ -141,7 +149,7 @@ function parseTerminationSheet(workbook, sheetName, warnings) {
     return { terminations: [] };
   }
 
-  const { headerMap, dataRows } = buildRowObjects(rows, headerIndex);
+  const { headerMap, dataRows } = buildRowObjectsFromSheet(workbook, sheetName, headerIndex);
   const terminations = [];
 
   for (const row of dataRows) {
@@ -161,6 +169,10 @@ function parseTerminationSheet(workbook, sheetName, warnings) {
     });
   }
 
+  if (!terminations.length) {
+    warnings.push(`Terminations sheet detected but no valid rows were parsed from '${sheetName}'`);
+  }
+
   return { terminations };
 }
 
@@ -173,7 +185,7 @@ function parseReengagementSheet(workbook, sheetName, warnings) {
     return { reengagements: [] };
   }
 
-  const { headerMap, dataRows } = buildRowObjects(rows, headerIndex);
+  const { headerMap, dataRows } = buildRowObjectsFromSheet(workbook, sheetName, headerIndex);
   const reengagements = [];
 
   for (const row of dataRows) {
@@ -193,6 +205,10 @@ function parseReengagementSheet(workbook, sheetName, warnings) {
     });
   }
 
+  if (!reengagements.length) {
+    warnings.push(`Reengagement sheet detected but no valid rows were parsed from '${sheetName}'`);
+  }
+
   return { reengagements };
 }
 
@@ -209,7 +225,7 @@ function parsePayrollLikeSheets(workbook, sheetNames, warnings) {
       return;
     }
 
-    const { headerMap, dataRows } = buildRowObjects(rows, headerIndex);
+    const { headerMap, dataRows } = buildRowObjectsFromSheet(workbook, sheetName, headerIndex);
 
     const periodDescription = sheetName;
     const payrollMode = normalizeToken(sheetName).includes('mid') ? 'mid_month' : 'full_month';
@@ -249,6 +265,11 @@ function parsePayrollLikeSheets(workbook, sheetNames, warnings) {
         notes: cleanString(findCellByAliases(row, headerMap, ['Notes', 'Comment'])),
       });
     });
+
+    const entriesFromSheet = payrollEntries.filter((entry) => entry.sourceSheet === sheetName).length;
+    if (!entriesFromSheet) {
+      warnings.push(`Payroll sheet '${sheetName}' detected but no valid payroll rows were parsed`);
+    }
   });
 
   return { payrollPeriods, payrollEntries };

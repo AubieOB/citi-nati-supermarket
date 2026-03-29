@@ -5,7 +5,7 @@ const {
   detectSheetByAliases,
   getSheetRows,
   findHeaderRowIndex,
-  buildRowObjects,
+  buildRowObjectsFromSheet,
   findCellByAliases,
   cleanString,
   parseNumber,
@@ -30,7 +30,7 @@ function parseSuppliersSheet(workbook, sheetName, warnings) {
     return { suppliers: [], supplierTransactions: [] };
   }
 
-  const { headerMap, dataRows } = buildRowObjects(rows, headerIndex);
+  const { headerMap, dataRows } = buildRowObjectsFromSheet(workbook, sheetName, headerIndex);
   const suppliers = [];
   const supplierTransactions = [];
 
@@ -85,6 +85,10 @@ function parseSuppliersSheet(workbook, sheetName, warnings) {
     }
   }
 
+  if (!suppliers.length && !supplierTransactions.length) {
+    warnings.push(`Suppliers sheet detected but no valid rows were parsed from '${sheetName}'`);
+  }
+
   return { suppliers, supplierTransactions };
 }
 
@@ -97,7 +101,7 @@ function parseExpensesSheet(workbook, sheetName, warnings) {
     return { expenseCategories: [], expenses: [] };
   }
 
-  const { headerMap, dataRows } = buildRowObjects(rows, headerIndex);
+  const { headerMap, dataRows } = buildRowObjectsFromSheet(workbook, sheetName, headerIndex);
   const categoryMap = new Map();
   const expenses = [];
 
@@ -130,6 +134,10 @@ function parseExpensesSheet(workbook, sheetName, warnings) {
       referenceNo: cleanString(findCellByAliases(row, headerMap, ['Reference', 'Ref No', 'Voucher No'])),
       enteredBy: cleanString(findCellByAliases(row, headerMap, ['Entered By', 'User'])) || 'excel-import',
     });
+  }
+
+  if (![...categoryMap.values()].length && !expenses.length) {
+    warnings.push(`Expenses sheet detected but no valid rows were parsed from '${sheetName}'`);
   }
 
   return {
