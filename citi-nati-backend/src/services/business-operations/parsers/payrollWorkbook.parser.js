@@ -151,6 +151,36 @@ function findLabelValueInWindow(rows, startIndex, endIndex, labelAliases = []) {
   return null;
 }
 
+function hasActionableLoanLikeRows(dataRows, headerMap) {
+  return (dataRows || []).some((row) => {
+    const employeeNo = parseEmployeeNo(row, headerMap);
+    const employeeName = inferEmployeeNameFromRow(row, headerMap);
+    const principalAmount = parseAmountSafe(findCellByAliases(row, headerMap, ['Principal Amount', 'Loan Amount', 'Principal']));
+    const balanceAmount = parseAmountSafe(findCellByAliases(row, headerMap, ['Balance Amount', 'Balance']));
+    const repayment = parseAmountSafe(findCellByAliases(row, headerMap, ['Repayment Amount', 'Amount Paid', 'Paid']));
+
+    const hasIdentity = Boolean(employeeNo || employeeName);
+    const hasMoney = [principalAmount, balanceAmount, repayment].some((v) => v !== null && v > 0);
+    return hasIdentity && hasMoney;
+  });
+}
+
+function hasActionableTerminationBlocks(rows) {
+  const allRows = rows || [];
+  for (let i = 0; i < allRows.length; i += 1) {
+    const rowText = normalizeToken((allRows[i] || []).map((cell) => cleanString(cell) || '').join(' '));
+    if (!rowText.includes('employee resignation') && !rowText.includes('dismissal')) continue;
+
+    const employeeName = cleanString(findLabelValueInWindow(allRows, i, i + 12, ['Name of Employee', 'Employee Name']));
+    if (!employeeName) continue;
+    if (/^employee does not exist$/i.test(employeeName)) continue;
+    if (/^vacant$/i.test(employeeName)) continue;
+    return true;
+  }
+
+  return false;
+}
+
 function parseBiodataSheet(workbook, sheetName, warnings) {
   const rows = getSheetRows(workbook, sheetName);
   const headerIndex = findHeaderRowIndex(rows, ['employee no', 'first name', 'surname']);
@@ -297,7 +327,7 @@ function parseLoanSheet(workbook, sheetName, warnings) {
     }
   }
 
-  if (!loans.length && !loanTransactions.length) {
+  if (!loans.length && !loanTransactions.length && hasActionableLoanLikeRows(dataRows, headerMap)) {
     warnings.push(`Loan sheet detected but no valid rows were parsed from '${sheetName}'`);
   }
 
@@ -333,7 +363,7 @@ function parseTerminationSheet(workbook, sheetName, warnings) {
       });
     }
 
-    if (!terminations.length) {
+    if (!terminations.length && hasActionableTerminationBlocks(rows)) {
       warnings.push(`Terminations sheet detected but no valid rows were parsed from '${sheetName}'`);
     }
 
@@ -369,7 +399,7 @@ function parseTerminationSheet(workbook, sheetName, warnings) {
     });
   }
 
-  if (!terminations.length) {
+  if (!terminations.length && hasActionableTerminationBlocks(rows)) {
     warnings.push(`Sheet '${sheetName}' found but termination data rows were not detected in table or form layout`);
   }
 
