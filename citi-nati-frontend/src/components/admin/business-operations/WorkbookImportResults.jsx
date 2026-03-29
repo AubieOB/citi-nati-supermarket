@@ -1,7 +1,7 @@
 import React from 'react';
 import { ImportWarningsList, ImportErrorsList } from './ImportWarningsList.jsx';
 
-const WorkbookImportResults = ({ importResult, workbookType, onClose }) => {
+const WorkbookImportResults = ({ importResult, workbookType, onClose, onViewData }) => {
   if (!importResult) return null;
 
   const { success, data, errors, warnings, message } = importResult;
@@ -136,9 +136,7 @@ const WorkbookImportResults = ({ importResult, workbookType, onClose }) => {
         </button>
         <button
           type="button"
-          onClick={() => {
-            /* Could navigate to relevant tabs like /admin/business-operations?tab=suppliers */
-          }}
+          onClick={onViewData}
           style={{
             border: '1px solid #cbd5e1',
             backgroundColor: '#fff',

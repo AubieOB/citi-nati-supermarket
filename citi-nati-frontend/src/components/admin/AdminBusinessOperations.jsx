@@ -2,6 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import BusinessOperationsTabs from './business-operations/BusinessOperationsTabs.jsx';
 import SalesReportsTab from './business-operations/SalesReportsTab.jsx';
 import ComingSoonTabPanel from './business-operations/ComingSoonTabPanel.jsx';
+import EmployeesTab from './business-operations/EmployeesTab.jsx';
+import ExpensesTab from './business-operations/ExpensesTab.jsx';
+import MonthlySummaryTab from './business-operations/MonthlySummaryTab.jsx';
+import PayrollTab from './business-operations/PayrollTab.jsx';
 import BusinessOperationsImportButton from './business-operations/BusinessOperationsImportButton.jsx';
 import BusinessOperationsImportModal from './business-operations/BusinessOperationsImportModal.jsx';
 
@@ -24,22 +28,36 @@ const PLACEHOLDER_TEXT = {
   'report-history': 'Saved exports, print artifacts, and historical report runs will be accessible from this section.',
 };
 
-const CONTENT_BY_TAB = {
-  'sales-reports': <SalesReportsTab />,
-  suppliers: <ComingSoonTabPanel title="Suppliers" description={PLACEHOLDER_TEXT.suppliers} />,
-  expenses: <ComingSoonTabPanel title="Expenses" description={PLACEHOLDER_TEXT.expenses} />,
-  'monthly-summary': <ComingSoonTabPanel title="Monthly Summary" description={PLACEHOLDER_TEXT['monthly-summary']} />,
-  employees: <ComingSoonTabPanel title="Employees" description={PLACEHOLDER_TEXT.employees} />,
-  payroll: <ComingSoonTabPanel title="Payroll" description={PLACEHOLDER_TEXT.payroll} />,
-  'report-history': <ComingSoonTabPanel title="Report History" description={PLACEHOLDER_TEXT['report-history']} />,
-};
-
 const AdminBusinessOperations = () => {
   const [activeTab, setActiveTab] = useState('sales-reports');
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [dataRefreshKey, setDataRefreshKey] = useState(0);
   const headerRef = useRef(null);
   const [headerLayout, setHeaderLayout] = useState({ left: 0, width: 0, top: 0 });
   const [headerHeight, setHeaderHeight] = useState(0);
+
+  const handleImportSuccess = () => {
+    setDataRefreshKey((current) => current + 1);
+  };
+
+  const handleViewImportedData = ({ importResult }) => {
+    const importedSections = Object.keys(importResult?.data || {});
+    const shouldOpenEmployees = importedSections.some((section) => section === 'employees' || section === 'salaryStructures');
+
+    setDataRefreshKey((current) => current + 1);
+    setActiveTab(shouldOpenEmployees ? 'employees' : 'payroll');
+    setIsImportModalOpen(false);
+  };
+
+  const contentByTab = {
+    'sales-reports': <SalesReportsTab />,
+    suppliers: <ComingSoonTabPanel title="Suppliers" description={PLACEHOLDER_TEXT.suppliers} />,
+    expenses: <ExpensesTab refreshKey={dataRefreshKey} />,
+    'monthly-summary': <MonthlySummaryTab refreshKey={dataRefreshKey} />,
+    employees: <EmployeesTab refreshKey={dataRefreshKey} />,
+    payroll: <PayrollTab refreshKey={dataRefreshKey} />,
+    'report-history': <ComingSoonTabPanel title="Report History" description={PLACEHOLDER_TEXT['report-history']} />,
+  };
 
   useEffect(() => {
     let resizeObserver;
@@ -129,10 +147,15 @@ const AdminBusinessOperations = () => {
       <div style={{ height: spacerHeight }}></div>
 
       <div style={{ display: 'grid', gap: '1rem' }}>
-        {CONTENT_BY_TAB[activeTab]}
+        {contentByTab[activeTab]}
       </div>
 
-      <BusinessOperationsImportModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} />
+      <BusinessOperationsImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImportSuccess={handleImportSuccess}
+        onViewImportedData={handleViewImportedData}
+      />
     </div>
   );
 };

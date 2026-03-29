@@ -134,7 +134,7 @@ const ParseDiagnosticPanel = ({ diagnostic }) => {
   );
 };
 
-const BusinessOperationsImportModal = ({ isOpen, onClose }) => {
+const BusinessOperationsImportModal = ({ isOpen, onClose, onImportSuccess, onViewImportedData }) => {
   const [currentStep, setCurrentStep] = useState(STEPS.SELECT_TYPE);
 
   // Step 1: Type Selection
@@ -269,6 +269,7 @@ const BusinessOperationsImportModal = ({ isOpen, onClose }) => {
 
       if (response.data) {
         setImportResult(response.data);
+        onImportSuccess?.(response.data, workbookType);
         setCurrentStep(STEPS.RESULTS);
       } else {
         setImportError('Import failed. Please try again.');
@@ -283,6 +284,13 @@ const BusinessOperationsImportModal = ({ isOpen, onClose }) => {
   // Step 6: Completion
   const handleImportAnother = () => {
     resetWorkflow();
+  };
+
+  const handleViewData = () => {
+    if (!importResult) return;
+    onViewImportedData?.({ importResult, workbookType });
+    resetWorkflow();
+    onClose();
   };
 
   // Close modal
@@ -420,7 +428,12 @@ const BusinessOperationsImportModal = ({ isOpen, onClose }) => {
           )}
 
           {currentStep === STEPS.RESULTS && (
-            <WorkbookImportResults importResult={importResult} workbookType={workbookType} onClose={handleImportAnother} />
+            <WorkbookImportResults
+              importResult={importResult}
+              workbookType={workbookType}
+              onClose={handleImportAnother}
+              onViewData={handleViewData}
+            />
           )}
         </div>
 

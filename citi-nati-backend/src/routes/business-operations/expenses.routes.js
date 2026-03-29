@@ -9,6 +9,7 @@ const {
   updateExpense,
   getExpenseById,
   listExpenses,
+  getExpenseSummary,
   seedDefaultCategories,
   importExpenseCategories,
   importExpenses,
@@ -26,6 +27,7 @@ router.get('/categories', listExpenseCategories);
 
 router.post('/', createExpense);
 router.put('/:id', updateExpense);
+router.get('/summary/overview', getExpenseSummary);
 router.get('/:id', getExpenseById);
 router.get('/', listExpenses);
 

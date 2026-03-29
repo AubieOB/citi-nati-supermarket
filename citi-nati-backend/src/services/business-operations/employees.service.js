@@ -93,7 +93,18 @@ async function listEmployees({ search, status, department, locationId, skip, tak
   }
 
   const [data, total] = await Promise.all([
-    prisma.employee.findMany({ where, skip, take, orderBy: { [sortBy]: sortOrder } }),
+    prisma.employee.findMany({
+      where,
+      include: {
+        salaryStructures: {
+          orderBy: { effectiveFrom: 'desc' },
+          take: 1,
+        },
+      },
+      skip,
+      take,
+      orderBy: { [sortBy]: sortOrder },
+    }),
     prisma.employee.count({ where }),
   ]);
 

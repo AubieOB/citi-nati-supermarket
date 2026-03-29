@@ -196,6 +196,34 @@ async function listExpenses(req, res) {
   }
 }
 
+async function getExpenseSummary(req, res) {
+  try {
+    const filters = {
+      search: req.query.search ? String(req.query.search).trim() : null,
+      expenseCategoryId: toInt(req.query.expenseCategoryId),
+      locationId: toInt(req.query.locationId),
+      reportingPeriodId: toInt(req.query.reportingPeriodId),
+      startDate: req.query.startDate ? toDate(req.query.startDate) : null,
+      endDate: req.query.endDate ? toDate(req.query.endDate) : null,
+    };
+
+    const data = await expensesService.getExpenseSummary(filters);
+
+    return res.json({
+      success: true,
+      filters: {
+        ...filters,
+        startDate: req.query.startDate || null,
+        endDate: req.query.endDate || null,
+      },
+      data,
+    });
+  } catch (err) {
+    console.error('[BO][EXPENSES] getExpenseSummary error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to load expense summary' });
+  }
+}
+
 async function seedDefaultCategories(req, res) {
   try {
     const result = await expensesService.seedDefaultExpenseCategories();
@@ -240,6 +268,7 @@ module.exports = {
   updateExpense,
   getExpenseById,
   listExpenses,
+  getExpenseSummary,
   seedDefaultCategories,
   importExpenseCategories,
   importExpenses,

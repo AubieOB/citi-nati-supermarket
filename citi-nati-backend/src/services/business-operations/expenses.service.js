@@ -140,6 +140,83 @@ async function listExpenses({
   return { data, total, where };
 }
 
+async function getExpenseSummary({
+  search,
+  expenseCategoryId,
+  locationId,
+  reportingPeriodId,
+  startDate,
+  endDate,
+}) {
+  const where = {};
+
+  if (expenseCategoryId) where.expenseCategoryId = expenseCategoryId;
+  if (locationId) where.locationId = locationId;
+  if (reportingPeriodId) where.reportingPeriodId = reportingPeriodId;
+
+  if (startDate || endDate) {
+    where.expenseDate = {};
+    if (startDate) where.expenseDate.gte = startDate;
+    if (endDate) where.expenseDate.lte = endDate;
+  }
+
+  if (search) {
+    where.OR = [
+      { description: { contains: search, mode: 'insensitive' } },
+      { referenceNo: { contains: search, mode: 'insensitive' } },
+      { paymentMethod: { contains: search, mode: 'insensitive' } },
+      { expenseCategory: { name: { contains: search, mode: 'insensitive' } } },
+    ];
+  }
+
+  const [aggregate, grouped, recentExpenses] = await Promise.all([
+    prisma.expense.aggregate({
+      where,
+      _count: { id: true },
+      _sum: { amount: true },
+      _avg: { amount: true },
+    }),
+    prisma.expense.groupBy({
+      by: ['expenseCategoryId'],
+      where,
+      _count: { id: true },
+      _sum: { amount: true },
+      orderBy: { _sum: { amount: 'desc' } },
+      take: 6,
+    }),
+    prisma.expense.findMany({
+      where,
+      include: { expenseCategory: true },
+      orderBy: { expenseDate: 'desc' },
+      take: 5,
+    }),
+  ]);
+
+  const categoryIds = grouped.map((item) => item.expenseCategoryId).filter(Boolean);
+  const categories = categoryIds.length
+    ? await prisma.expenseCategory.findMany({
+        where: { id: { in: categoryIds } },
+        select: { id: true, code: true, name: true },
+      })
+    : [];
+  const categoryMap = new Map(categories.map((category) => [category.id, category]));
+
+  return {
+    totals: {
+      totalExpenses: aggregate._count.id || 0,
+      totalAmount: Number(aggregate._sum.amount || 0),
+      averageAmount: Number(aggregate._avg.amount || 0),
+    },
+    topCategories: grouped.map((item) => ({
+      expenseCategoryId: item.expenseCategoryId,
+      expenseCount: item._count.id || 0,
+      totalAmount: Number(item._sum.amount || 0),
+      category: categoryMap.get(item.expenseCategoryId) || null,
+    })),
+    recentExpenses,
+  };
+}
+
 async function seedDefaultExpenseCategories() {
   const result = { inserted: 0, updated: 0 };
 
@@ -250,6 +327,7 @@ module.exports = {
   updateExpense,
   getExpenseById,
   listExpenses,
+  getExpenseSummary,
   seedDefaultExpenseCategories,
   bulkUpsertExpenseCategories,
   bulkImportExpenses,
