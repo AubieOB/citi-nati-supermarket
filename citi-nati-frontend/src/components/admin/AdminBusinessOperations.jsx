@@ -6,6 +6,8 @@ import EmployeesTab from './business-operations/EmployeesTab.jsx';
 import ExpensesTab from './business-operations/ExpensesTab.jsx';
 import MonthlySummaryTab from './business-operations/MonthlySummaryTab.jsx';
 import PayrollTab from './business-operations/PayrollTab.jsx';
+import SuppliersTab from './business-operations/SuppliersTab.jsx';
+import ReportHistoryTab from './business-operations/ReportHistoryTab.jsx';
 import BusinessOperationsImportButton from './business-operations/BusinessOperationsImportButton.jsx';
 import BusinessOperationsImportModal from './business-operations/BusinessOperationsImportModal.jsx';
 
@@ -42,21 +44,27 @@ const AdminBusinessOperations = () => {
 
   const handleViewImportedData = ({ importResult }) => {
     const importedSections = Object.keys(importResult?.data || {});
-    const shouldOpenEmployees = importedSections.some((section) => section === 'employees' || section === 'salaryStructures');
+    const nextTab = importedSections.includes('suppliers')
+      ? 'suppliers'
+      : importedSections.some((section) => section === 'expenses' || section === 'expenseCategories')
+        ? 'expenses'
+        : importedSections.some((section) => section === 'employees' || section === 'salaryStructures')
+          ? 'employees'
+          : 'payroll';
 
     setDataRefreshKey((current) => current + 1);
-    setActiveTab(shouldOpenEmployees ? 'employees' : 'payroll');
+    setActiveTab(nextTab);
     setIsImportModalOpen(false);
   };
 
   const contentByTab = {
     'sales-reports': <SalesReportsTab />,
-    suppliers: <ComingSoonTabPanel title="Suppliers" description={PLACEHOLDER_TEXT.suppliers} />,
+    suppliers: <SuppliersTab refreshKey={dataRefreshKey} />,
     expenses: <ExpensesTab refreshKey={dataRefreshKey} />,
     'monthly-summary': <MonthlySummaryTab refreshKey={dataRefreshKey} />,
     employees: <EmployeesTab refreshKey={dataRefreshKey} />,
     payroll: <PayrollTab refreshKey={dataRefreshKey} />,
-    'report-history': <ComingSoonTabPanel title="Report History" description={PLACEHOLDER_TEXT['report-history']} />,
+    'report-history': <ReportHistoryTab refreshKey={dataRefreshKey} />,
   };
 
   useEffect(() => {
