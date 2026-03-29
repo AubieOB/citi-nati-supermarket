@@ -30,7 +30,13 @@ const WorkbookParsePreview = ({ parseResult, loading = false, error = '' }) => {
 
   if (!parseResult) return null;
 
-  const { summary, detectedSheets, lowConfidenceSheets, warnings, errors } = parseResult;
+  const { summary, detectedSheets, lowConfidenceSheets, warnings, errors, confidence } = parseResult;
+
+  const confidenceTone = confidence?.level === 'high'
+    ? { bg: '#ecfdf5', border: '#a7f3d0', text: '#065f46' }
+    : confidence?.level === 'medium'
+      ? { bg: '#fffbeb', border: '#fcd34d', text: '#92400e' }
+      : { bg: '#fef2f2', border: '#fecaca', text: '#991b1b' };
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
@@ -40,6 +46,34 @@ const WorkbookParsePreview = ({ parseResult, loading = false, error = '' }) => {
           Review what will be imported from the workbook.
         </p>
       </div>
+
+      {confidence && (
+        <div
+          style={{
+            backgroundColor: confidenceTone.bg,
+            border: `1px solid ${confidenceTone.border}`,
+            borderRadius: '12px',
+            padding: '0.9rem 1rem',
+            display: 'flex',
+            justifyContent: 'space-between',
+            gap: '1rem',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+          }}
+        >
+          <div style={{ color: confidenceTone.text }}>
+            <div style={{ fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Parse Confidence
+            </div>
+            <div style={{ marginTop: '0.2rem', fontWeight: 700, fontSize: '0.92rem' }}>
+              {confidence.summary}
+            </div>
+          </div>
+          <div style={{ color: confidenceTone.text, fontWeight: 800, fontSize: '1.05rem' }}>
+            Score: {confidence.score}/100 ({confidence.level})
+          </div>
+        </div>
+      )}
 
       {/* Summary */}
       {summary && Object.keys(summary).length > 0 && (

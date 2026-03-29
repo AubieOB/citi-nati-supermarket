@@ -797,19 +797,62 @@ function parsePayrollWorkbook(workbook) {
     });
   }
 
+  let duplicatePayrollEntriesRemoved = 0;
+  if (parsed.payrollEntries.length) {
+    const seen = new Set();
+    parsed.payrollEntries = parsed.payrollEntries.filter((row) => {
+      const key = [
+        row.sourceSheet || '',
+        row.periodDescription || '',
+        row.employeeNo || normalizeToken(row.employeeName || ''),
+        String(row.grossPay || 0),
+        String(row.netPay || 0),
+      ].join('|');
+
+      if (seen.has(key)) {
+        duplicatePayrollEntriesRemoved += 1;
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    });
+
+    if (duplicatePayrollEntriesRemoved > 0) {
+      warnings.push(`Deduplicated ${duplicatePayrollEntriesRemoved} duplicate payroll entries from repeated sheet rows`);
+    }
+  }
+
   if (parsed.employees.length) {
     warnings = warnings.filter((w) => !w.includes('Biodata sheet detected but no valid rows were parsed'));
+  }
+
+  if (parsed.terminations.length) {
+    warnings = warnings.filter((w) => !w.includes('Terminations sheet detected but no valid rows were parsed'));
+    warnings = warnings.filter((w) => !w.includes('termination data rows were not detected'));
   }
 
   if (!detectedSheets.length) {
     warnings.push('No recognized payroll workbook sheets were found. Confirm workbook type and sheet names.');
   }
 
+  const summary = summarizeParsedData(parsed);
+  const parsedTotal = Object.values(summary).reduce((sum, value) => sum + Number(value || 0), 0);
+  const penalty = (warnings.length * 4) + (errors.length * 15);
+  const score = Math.max(0, Math.min(100, 100 - penalty));
+  const confidence = {
+    score,
+    level: score >= 80 ? 'high' : score >= 55 ? 'medium' : 'low',
+    summary: `Detected ${parsedTotal} total parsed records across ${detectedSheets.length} sheets`,
+    duplicatePayrollEntriesRemoved,
+  };
+
   return {
     workbookType: 'payroll',
     detectedSheets,
     parsed,
-    summary: summarizeParsedData(parsed),
+    summary,
+    confidence,
     warnings,
     errors,
   };
