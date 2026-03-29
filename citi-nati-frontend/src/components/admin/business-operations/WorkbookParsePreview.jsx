@@ -1,5 +1,5 @@
 import React from 'react';
-import { ImportWarningsList, ImportErrorsList } from './ImportWarningsList.jsx';
+import { ImportWarningsList, ImportErrorsList, ImportInfoList } from './ImportWarningsList.jsx';
 
 const WorkbookParsePreview = ({ parseResult, loading = false, error = '' }) => {
   if (loading) {
@@ -31,6 +31,16 @@ const WorkbookParsePreview = ({ parseResult, loading = false, error = '' }) => {
   if (!parseResult) return null;
 
   const { summary, detectedSheets, lowConfidenceSheets, warnings, errors, confidence } = parseResult;
+
+  const allWarnings = Array.isArray(warnings) ? warnings : [];
+  const infoNotes = allWarnings.filter((item) => {
+    const text = typeof item === 'string' ? item.toLowerCase() : String(item?.message || '').toLowerCase();
+    return text.includes('deduplicated') || text.includes('duplicate payroll entries');
+  });
+  const actualWarnings = allWarnings.filter((item) => {
+    const text = typeof item === 'string' ? item.toLowerCase() : String(item?.message || '').toLowerCase();
+    return !(text.includes('deduplicated') || text.includes('duplicate payroll entries'));
+  });
 
   const confidenceTone = confidence?.level === 'high'
     ? { bg: '#ecfdf5', border: '#a7f3d0', text: '#065f46' }
@@ -184,8 +194,11 @@ const WorkbookParsePreview = ({ parseResult, loading = false, error = '' }) => {
         </div>
       )}
 
+      {/* Informational Notes */}
+      <ImportInfoList items={infoNotes} title="Import Notes" />
+
       {/* Warnings */}
-      <ImportWarningsList warnings={warnings} title="Import Warnings" />
+      <ImportWarningsList warnings={actualWarnings} title="Import Warnings" />
 
       {/* Errors */}
       <ImportErrorsList errors={errors} title="Parse Errors" />

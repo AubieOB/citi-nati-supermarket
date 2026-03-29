@@ -1,5 +1,32 @@
 import React from 'react';
 
+const ImportInfoList = ({ items, title = 'Information' }) => {
+  if (!items || !items.length) return null;
+
+  return (
+    <div
+      style={{
+        backgroundColor: '#eff6ff',
+        border: '1px solid #bfdbfe',
+        borderRadius: '12px',
+        padding: '1rem',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', color: '#1d4ed8' }}>
+        <i className="fas fa-circle-info"></i>
+        <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>{title}</h4>
+      </div>
+      <ul style={{ margin: 0, paddingLeft: '1.5rem', color: '#1e3a8a' }}>
+        {items.map((item, idx) => (
+          <li key={idx} style={{ fontSize: '0.88rem', lineHeight: 1.5, marginBottom: idx < items.length - 1 ? '0.4rem' : 0 }}>
+            {typeof item === 'string' ? item : item.message || JSON.stringify(item)}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
+
 const ImportWarningsList = ({ warnings, title = 'Warnings' }) => {
   if (!warnings || !warnings.length) return null;
 
@@ -54,4 +81,4 @@ const ImportErrorsList = ({ errors, title = 'Errors' }) => {
   );
 };
 
-export { ImportWarningsList, ImportErrorsList };
+export { ImportWarningsList, ImportErrorsList, ImportInfoList };
