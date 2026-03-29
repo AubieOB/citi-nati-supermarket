@@ -223,6 +223,17 @@ function AppInner() {
             }
           />
 
+          <Route
+            path="/admin/business-operations"
+            element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <Suspense fallback={loadingFallback}>
+                  <AdminDashboard />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+
           {/* Driver Routes */}
           <Route
             path="/driver"

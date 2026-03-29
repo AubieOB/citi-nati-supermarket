@@ -490,7 +490,6 @@ const AdminInbox = () => {
           flexWrap: 'wrap',
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
           boxSizing: 'border-box',
-          marginBottom: 0,
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '1rem', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>

@@ -21,6 +21,7 @@ const AdminPOSManagement = React.lazy(() => import('./AdminPOSManagement.jsx'));
 const AdminPOSSyncMonitor = React.lazy(() => import('./AdminPOSSyncMonitor.jsx'));
 const SupportDashboard = React.lazy(() => import('./SupportDashboard.jsx'));
 const AdminQuotations = React.lazy(() => import('../../components/admin/AdminQuotations.jsx'));
+const AdminBusinessOperations = React.lazy(() => import('../../components/admin/AdminBusinessOperations.jsx'));
 
 import { useOrderUpdates } from '../../hooks/useOrderUpdates.js';
 import { getSpeechAlertsEnabled, setSpeechAlertsEnabled } from '../../utils/notifications.js';
@@ -41,7 +42,11 @@ import '../../styles/admin-dashboard.css';
 
 const AdminDashboard = () => {
   const location = useLocation();
-  const initialTab = location.pathname === '/admin/emergency-sales' ? 'emergency-sales' : 'inbox';
+  const initialTab = location.pathname === '/admin/emergency-sales'
+    ? 'emergency-sales'
+    : location.pathname === '/admin/business-operations'
+      ? 'business-operations'
+      : 'inbox';
   const [activeTab, setActiveTab] = useState(initialTab);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -65,6 +70,7 @@ const AdminDashboard = () => {
     { id: 'drivers', label: 'Drivers', icon: 'fa-car' },
     { id: 'cashiers', label: 'Cashiers', icon: 'fa-user-tag' },
     { id: 'sales', label: 'Sales', icon: 'fa-dollar-sign' },
+    { id: 'business-operations', label: 'Business Operations', icon: 'fa-briefcase' },
     { id: 'security', label: 'Security', icon: 'fa-key' },
   ];
 
@@ -84,6 +90,22 @@ const AdminDashboard = () => {
   }, [speechAlertsEnabled]);
 
   useOrderUpdates(handleOrderUpdated, { listenAll: true, role: 'admin' });
+
+  React.useEffect(() => {
+    if (location.pathname === '/admin/emergency-sales' && activeTab !== 'emergency-sales') {
+      setActiveTab('emergency-sales');
+      return;
+    }
+
+    if (location.pathname === '/admin/business-operations' && activeTab !== 'business-operations') {
+      setActiveTab('business-operations');
+      return;
+    }
+
+    if (location.pathname === '/admin' && (activeTab === 'emergency-sales' || activeTab === 'business-operations')) {
+      setActiveTab('inbox');
+    }
+  }, [location.pathname, activeTab]);
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'row', backgroundColor: '#f5f5f5' }}>
@@ -155,6 +177,13 @@ const AdminDashboard = () => {
               key={tab.id}
               onClick={() => {
                 setActiveTab(tab.id);
+                if (tab.id === 'emergency-sales') {
+                  navigate('/admin/emergency-sales');
+                } else if (tab.id === 'business-operations') {
+                  navigate('/admin/business-operations');
+                } else if (location.pathname !== '/admin') {
+                  navigate('/admin');
+                }
                 setSidebarOpen(false); // Close sidebar on mobile after selection
               }}
               style={{
@@ -285,6 +314,7 @@ const AdminDashboard = () => {
             {activeTab === 'orders' && <AdminOrders />}
             {activeTab === 'users' && <AdminUsers />}
             {activeTab === 'sales' && <AdminSales />}
+            {activeTab === 'business-operations' && <AdminBusinessOperations />}
             {activeTab === 'refunds' && <AdminRefunds />}
             {activeTab === 'support' && <SupportDashboard />}
             {activeTab === 'drivers' && <AdminDrivers />}
