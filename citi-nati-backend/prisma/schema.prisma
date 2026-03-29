@@ -522,3 +522,275 @@ model SalesInvoiceItem {
   @@index([salesInvoiceId])
   @@map("sales_invoice_items")
 }
+
+model Supplier {
+  id                Int                   @id @default(autoincrement())
+  supplierCode      String?               @unique @map("supplier_code")
+  name              String
+  contactPerson     String?               @map("contact_person")
+  phone             String?
+  email             String?
+  address           String?
+  openingBalance    Float                 @default(0) @map("opening_balance")
+  status            String                @default("active")
+  notes             String?
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+  transactions      SupplierTransaction[]
+  balances          SupplierBalance[]
+
+  @@index([name])
+  @@index([status])
+  @@map("suppliers")
+}
+
+model SupplierTransaction {
+  id                Int       @id @default(autoincrement())
+  supplierId        Int       @map("supplier_id")
+  supplier          Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  reportingPeriodId Int?      @map("reporting_period_id")
+  transactionDate   DateTime  @map("transaction_date")
+  transactionType   String    @map("transaction_type")
+  paymentMethod     String?   @map("payment_method")
+  amount            Float
+  description       String?
+  referenceNo       String?   @map("reference_no")
+  enteredBy         String?   @map("entered_by")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@index([supplierId, transactionDate])
+  @@index([reportingPeriodId])
+  @@index([transactionType])
+  @@map("supplier_transactions")
+}
+
+model SupplierBalance {
+  id                 Int      @id @default(autoincrement())
+  supplierId         Int      @map("supplier_id")
+  supplier           Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  reportingPeriodId  Int      @map("reporting_period_id")
+  totalDebt          Float    @default(0) @map("total_debt")
+  totalPaid          Float    @default(0) @map("total_paid")
+  outstandingBalance Float    @default(0) @map("outstanding_balance")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@unique([supplierId, reportingPeriodId])
+  @@index([reportingPeriodId])
+  @@map("supplier_balances")
+}
+
+model ExpenseCategory {
+  id          Int       @id @default(autoincrement())
+  code        String    @unique
+  name        String
+  description String?
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  expenses    Expense[]
+
+  @@index([name])
+  @@index([isActive])
+  @@map("expense_categories")
+}
+
+model Expense {
+  id                Int             @id @default(autoincrement())
+  reportingPeriodId Int?            @map("reporting_period_id")
+  expenseCategoryId Int             @map("expense_category_id")
+  expenseCategory   ExpenseCategory @relation(fields: [expenseCategoryId], references: [id], onDelete: Restrict)
+  locationId        Int?            @map("location_id")
+  expenseDate       DateTime        @map("expense_date")
+  amount            Float
+  description       String?
+  paymentMethod     String?         @map("payment_method")
+  referenceNo       String?         @map("reference_no")
+  enteredBy         String?         @map("entered_by")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  @@index([expenseDate])
+  @@index([expenseCategoryId])
+  @@index([locationId])
+  @@index([reportingPeriodId])
+  @@map("expenses")
+}
+
+model Employee {
+  id                   Int                       @id @default(autoincrement())
+  employeeNo           String?                   @unique @map("employee_no")
+  firstName            String                    @map("first_name")
+  surname              String
+  middleName           String?                   @map("middle_name")
+  gender               String?
+  dateOfBirth          DateTime?                 @map("date_of_birth")
+  districtOfOrigin     String?                   @map("district_of_origin")
+  village              String?
+  traditionalAuthority String?                   @map("traditional_authority")
+  nationalId           String?                   @map("national_id")
+  nationalIdExpiryDate DateTime?                 @map("national_id_expiry_date")
+  contactNumber        String?                   @map("contact_number")
+  dateOfEmployment     DateTime?                 @map("date_of_employment")
+  position             String?
+  department           String?
+  locationId           Int?                      @map("location_id")
+  employmentType       String?                   @map("employment_type")
+  status               String                    @default("active")
+  notes                String?
+  createdAt            DateTime                  @default(now()) @map("created_at")
+  updatedAt            DateTime                  @updatedAt @map("updated_at")
+  salaryStructures     EmployeeSalaryStructure[]
+  payrollEntries       PayrollEntry[]
+  loans                EmployeeLoan[]
+  terminations         EmployeeTermination[]
+  reengagements        EmployeeReengagement[]
+
+  @@index([surname, firstName])
+  @@index([status])
+  @@index([department])
+  @@index([locationId])
+  @@map("employees")
+}
+
+model EmployeeSalaryStructure {
+  id                     Int       @id @default(autoincrement())
+  employeeId             Int       @map("employee_id")
+  employee               Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  agreedSalaryPerMonth   Float     @map("agreed_salary_per_month")
+  annualIncrementAmount  Float?    @default(0) @map("annual_increment_amount")
+  salaryAfterIncrement   Float?    @map("salary_after_increment")
+  currency               String    @default("MWK")
+  effectiveFrom          DateTime  @map("effective_from")
+  effectiveTo            DateTime? @map("effective_to")
+  isCurrent              Boolean   @default(true) @map("is_current")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  @@index([employeeId, isCurrent])
+  @@index([effectiveFrom, effectiveTo])
+  @@map("employee_salary_structures")
+}
+
+model PayrollPeriod {
+  id                Int                      @id @default(autoincrement())
+  reportingPeriodId Int?                     @map("reporting_period_id")
+  payrollMode       String                   @map("payroll_mode")
+  description       String?
+  status            String                   @default("draft")
+  createdBy         String?                  @map("created_by")
+  createdAt         DateTime                 @default(now()) @map("created_at")
+  updatedAt         DateTime                 @updatedAt @map("updated_at")
+  entries           PayrollEntry[]
+  loanTransactions  EmployeeLoanTransaction[]
+
+  @@index([status])
+  @@index([payrollMode])
+  @@index([reportingPeriodId])
+  @@map("payroll_periods")
+}
+
+model PayrollEntry {
+  id                   Int           @id @default(autoincrement())
+  payrollPeriodId      Int           @map("payroll_period_id")
+  payrollPeriod        PayrollPeriod @relation(fields: [payrollPeriodId], references: [id], onDelete: Cascade)
+  employeeId           Int           @map("employee_id")
+  employee             Employee      @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  basicSalary          Float         @default(0) @map("basic_salary")
+  incrementAmount      Float         @default(0) @map("increment_amount")
+  grossPay             Float         @default(0) @map("gross_pay")
+  totalDeductions      Float         @default(0) @map("total_deductions")
+  netPay               Float         @default(0) @map("net_pay")
+  daysWorked           Float?        @map("days_worked")
+  daysAbsent           Float?        @map("days_absent")
+  overtimeHours        Float?        @map("overtime_hours")
+  overtimeAmount       Float?        @default(0) @map("overtime_amount")
+  loanDeductionAmount  Float?        @default(0) @map("loan_deduction_amount")
+  otherDeductionAmount Float?        @default(0) @map("other_deduction_amount")
+  bonusAmount          Float?        @default(0) @map("bonus_amount")
+  giftAmount           Float?        @default(0) @map("gift_amount")
+  leavePayAmount       Float?        @default(0) @map("leave_pay_amount")
+  payeAmount           Float?        @default(0) @map("paye_amount")
+  notes                String?
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+
+  @@unique([payrollPeriodId, employeeId])
+  @@index([employeeId])
+  @@index([payrollPeriodId])
+  @@map("payroll_entries")
+}
+
+model EmployeeLoan {
+  id                     Int                       @id @default(autoincrement())
+  employeeId             Int                       @map("employee_id")
+  employee               Employee                  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  loanReference          String?                   @unique @map("loan_reference")
+  principalAmount        Float                     @map("principal_amount")
+  balanceAmount          Float                     @map("balance_amount")
+  monthlyDeductionAmount Float?                    @map("monthly_deduction_amount")
+  startDate              DateTime?                 @map("start_date")
+  endDate                DateTime?                 @map("end_date")
+  status                 String                    @default("active")
+  notes                  String?
+  createdAt              DateTime                  @default(now()) @map("created_at")
+  updatedAt              DateTime                  @updatedAt @map("updated_at")
+  transactions           EmployeeLoanTransaction[]
+
+  @@index([employeeId])
+  @@index([status])
+  @@map("employee_loans")
+}
+
+model EmployeeLoanTransaction {
+  id             Int          @id @default(autoincrement())
+  employeeLoanId Int          @map("employee_loan_id")
+  employeeLoan   EmployeeLoan @relation(fields: [employeeLoanId], references: [id], onDelete: Cascade)
+  payrollPeriodId Int?        @map("payroll_period_id")
+  payrollPeriod  PayrollPeriod? @relation(fields: [payrollPeriodId], references: [id], onDelete: SetNull)
+  transactionType String      @map("transaction_type")
+  amount         Float
+  notes          String?
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@index([employeeLoanId])
+  @@index([payrollPeriodId])
+  @@index([transactionType])
+  @@map("employee_loan_transactions")
+}
+
+model EmployeeTermination {
+  id                    Int       @id @default(autoincrement())
+  employeeId            Int       @map("employee_id")
+  employee              Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  terminationDate       DateTime  @map("termination_date")
+  reason                String?
+  daysWorkedInFinalMonth Float?   @map("days_worked_in_final_month")
+  halfPayReceived       Float?    @map("half_pay_received")
+  settlementAmount      Float?    @map("settlement_amount")
+  notes                 String?
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  @@index([employeeId])
+  @@index([terminationDate])
+  @@map("employee_terminations")
+}
+
+model EmployeeReengagement {
+  id                 Int       @id @default(autoincrement())
+  employeeId         Int       @map("employee_id")
+  employee           Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  previousWage       Float?    @map("previous_wage")
+  reengagementWage   Float?    @map("reengagement_wage")
+  occupation         String?
+  effectiveDate      DateTime  @map("effective_date")
+  contractExpiryDate DateTime? @map("contract_expiry_date")
+  notes              String?
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  @@index([employeeId])
+  @@index([effectiveDate])
+  @@map("employee_reengagements")
+}

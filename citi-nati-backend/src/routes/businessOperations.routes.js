@@ -41,6 +41,10 @@ const {
   getSalesUsers,
   getSalesPayments,
 } = require('../controllers/salesReporting.controller');
+const suppliersRoutes = require('./business-operations/suppliers.routes');
+const expensesRoutes = require('./business-operations/expenses.routes');
+const employeesRoutes = require('./business-operations/employees.routes');
+const payrollRoutes = require('./business-operations/payroll.routes');
 
 const router = express.Router();
 
@@ -53,5 +57,11 @@ router.get('/reports/sales/invoices', getSalesInvoices);
 router.get('/reports/sales/products', getSalesProducts);
 router.get('/reports/sales/users', getSalesUsers);
 router.get('/reports/sales/payments', getSalesPayments);
+
+// Import-first foundation endpoints
+router.use('/suppliers', suppliersRoutes);
+router.use('/expenses', expensesRoutes);
+router.use('/employees', employeesRoutes);
+router.use('/payroll', payrollRoutes);
 
 module.exports = router;
