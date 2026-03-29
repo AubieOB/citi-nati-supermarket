@@ -21,6 +21,54 @@ const SHEET_ALIASES = {
   payrollLike: ['Pay Sheet', 'Final', 'Wages', 'Combined Pay', 'Res-Workers', 'Shop-Workers'],
 };
 
+function parseEmployeeNo(row, headerMap) {
+  return cleanString(findCellByAliases(row, headerMap, [
+    'Employee No',
+    'Employee Number',
+    'Emp No',
+    'Employee ID',
+    'Staff No',
+    'Staff Number',
+    'Payroll No',
+    'Worker No',
+    'Man No',
+    'ID',
+  ]));
+}
+
+function splitFullName(value) {
+  const text = cleanString(value);
+  if (!text) return { firstName: null, surname: null };
+  const parts = text.split(/\s+/).filter(Boolean);
+  if (!parts.length) return { firstName: null, surname: null };
+  if (parts.length === 1) return { firstName: parts[0], surname: 'Unknown' };
+  return {
+    firstName: parts[0],
+    surname: parts.slice(1).join(' '),
+  };
+}
+
+function shouldSkipSummaryLikeRow(row, headerMap) {
+  const token = normalizeToken((row || []).map((cell) => cleanString(cell) || '').join(' '));
+  if (!token) return true;
+
+  const looksLikeSummary = [
+    'total',
+    'subtotal',
+    'grand total',
+    'brought forward',
+    'balance b f',
+    'balance bf',
+    'opening balance',
+    'closing balance',
+  ].some((needle) => token.includes(needle));
+
+  if (!looksLikeSummary) return false;
+
+  const employeeNo = parseEmployeeNo(row, headerMap);
+  return !employeeNo;
+}
+
 function parseBiodataSheet(workbook, sheetName, warnings) {
   const rows = getSheetRows(workbook, sheetName);
   const headerIndex = findHeaderRowIndex(rows, ['employee no', 'first name', 'surname']);
@@ -34,20 +82,32 @@ function parseBiodataSheet(workbook, sheetName, warnings) {
 
   const employees = [];
   const salaryStructures = [];
+  let skippedRows = 0;
 
   for (const row of dataRows) {
-    const employeeNo = cleanString(findCellByAliases(row, headerMap, ['Employee No', 'Employee Number', 'Emp No']));
-    const firstName = cleanString(findCellByAliases(row, headerMap, ['First Name', 'Firstname', 'Name']));
-    const surname = cleanString(findCellByAliases(row, headerMap, ['Surname', 'Last Name']));
+    if (shouldSkipSummaryLikeRow(row, headerMap)) {
+      skippedRows += 1;
+      continue;
+    }
 
-    if (!firstName || !surname) {
+    const employeeNo = parseEmployeeNo(row, headerMap);
+    const explicitFirstName = cleanString(findCellByAliases(row, headerMap, ['First Name', 'Firstname']));
+    const explicitSurname = cleanString(findCellByAliases(row, headerMap, ['Surname', 'Last Name']));
+    const rawName = cleanString(findCellByAliases(row, headerMap, ['Employee Name', 'Full Name', 'Name', 'Names']));
+
+    const nameParts = splitFullName(rawName);
+    const firstName = explicitFirstName || nameParts.firstName;
+    const surname = explicitSurname || nameParts.surname;
+
+    if ((!firstName || !surname) && !employeeNo) {
+      skippedRows += 1;
       continue;
     }
 
     employees.push({
       employeeNo,
-      firstName,
-      surname,
+      firstName: firstName || 'Unknown',
+      surname: surname || 'Unknown',
       middleName: cleanString(findCellByAliases(row, headerMap, ['Middle Name', 'Other Name'])),
       gender: cleanString(findCellByAliases(row, headerMap, ['Gender', 'Sex'])),
       dateOfBirth: parseDate(findCellByAliases(row, headerMap, ['Date of Birth', 'DOB'])),
@@ -64,11 +124,11 @@ function parseBiodataSheet(workbook, sheetName, warnings) {
       notes: cleanString(findCellByAliases(row, headerMap, ['Notes', 'Comment'])),
     });
 
-    const agreedSalaryPerMonth = parseNumber(findCellByAliases(row, headerMap, ['Agreed Salary per Month', 'Monthly Salary', 'Salary']));
+    const agreedSalaryPerMonth = parseNumber(findCellByAliases(row, headerMap, ['Agreed Salary per Month', 'Monthly Salary', 'Salary', 'Basic Pay', 'Basic Salary']));
     const annualIncrementAmount = parseNumber(findCellByAliases(row, headerMap, ['Annual Increment', 'Increment']));
     const salaryAfterIncrement = parseNumber(findCellByAliases(row, headerMap, ['Salary after Increment', 'Salary After Increment']));
 
-    if (agreedSalaryPerMonth !== null) {
+    if (agreedSalaryPerMonth !== null && employeeNo) {
       salaryStructures.push({
         employeeNo,
         agreedSalaryPerMonth,
@@ -84,6 +144,8 @@ function parseBiodataSheet(workbook, sheetName, warnings) {
 
   if (!employees.length && !salaryStructures.length) {
     warnings.push(`Biodata sheet detected but no valid rows were parsed from '${sheetName}'`);
+  } else if (skippedRows > 0) {
+    warnings.push(`Biodata sheet '${sheetName}' skipped ${skippedRows} non-data or incomplete rows during parsing`);
   }
 
   return { employees, salaryStructures };
@@ -103,7 +165,9 @@ function parseLoanSheet(workbook, sheetName, warnings) {
   const loanTransactions = [];
 
   for (const row of dataRows) {
-    const employeeNo = cleanString(findCellByAliases(row, headerMap, ['Employee No', 'Employee Number', 'Emp No']));
+    if (shouldSkipSummaryLikeRow(row, headerMap)) continue;
+
+    const employeeNo = parseEmployeeNo(row, headerMap);
     const principalAmount = parseNumber(findCellByAliases(row, headerMap, ['Principal Amount', 'Loan Amount', 'Principal']));
     const balanceAmount = parseNumber(findCellByAliases(row, headerMap, ['Balance Amount', 'Balance']));
 
@@ -153,7 +217,9 @@ function parseTerminationSheet(workbook, sheetName, warnings) {
   const terminations = [];
 
   for (const row of dataRows) {
-    const employeeNo = cleanString(findCellByAliases(row, headerMap, ['Employee No', 'Employee Number', 'Emp No']));
+    if (shouldSkipSummaryLikeRow(row, headerMap)) continue;
+
+    const employeeNo = parseEmployeeNo(row, headerMap);
     const terminationDate = parseDate(findCellByAliases(row, headerMap, ['Termination Date', 'Date']));
 
     if (!employeeNo || !terminationDate) continue;
@@ -189,7 +255,9 @@ function parseReengagementSheet(workbook, sheetName, warnings) {
   const reengagements = [];
 
   for (const row of dataRows) {
-    const employeeNo = cleanString(findCellByAliases(row, headerMap, ['Employee No', 'Employee Number', 'Emp No']));
+    if (shouldSkipSummaryLikeRow(row, headerMap)) continue;
+
+    const employeeNo = parseEmployeeNo(row, headerMap);
     const effectiveDate = parseDate(findCellByAliases(row, headerMap, ['Effective Date', 'Date']));
 
     if (!employeeNo || !effectiveDate) continue;
@@ -239,7 +307,9 @@ function parsePayrollLikeSheets(workbook, sheetNames, warnings) {
     });
 
     dataRows.forEach((row) => {
-      const employeeNo = cleanString(findCellByAliases(row, headerMap, ['Employee No', 'Employee Number', 'Emp No']));
+      if (shouldSkipSummaryLikeRow(row, headerMap)) return;
+
+      const employeeNo = parseEmployeeNo(row, headerMap);
       if (!employeeNo) return;
 
       payrollEntries.push({
