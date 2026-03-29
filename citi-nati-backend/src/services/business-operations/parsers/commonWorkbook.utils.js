@@ -3,6 +3,22 @@
 const XLSX = require('xlsx');
 
 const HEADER_ALIAS_MAP = new Map([
+  // Supplier-related columns (priority: before generic 'name')
+  ['supplier name', 'supplier_name'],
+  ['supplier code', 'supplier_code'],
+  ['debt amount', 'debt_amount'],
+  ['amount paid', 'amount_paid'],
+  ['amount due to suppliers', 'debt_amount'],
+  ['outstanding amount', 'outstanding_amount'],
+  ['contact person', 'contact_person'],
+  ['contact', 'contact_person'],
+  
+  // Expense-related columns (priority: before generic 'amount')
+  ['expense distribution', 'expense_category'],
+  ['utility expenses', 'utility_expenses'],
+  ['wages for the month', 'wages'],
+  
+  // Employee-related columns
   ['employee no', 'employee_no'],
   ['employee number', 'employee_no'],
   ['emp no', 'employee_no'],

@@ -47,10 +47,10 @@ function parseSuppliersSheet(workbook, sheetName, warnings) {
   const supplierTransactions = [];
 
   for (const row of dataRows) {
-    const name = cleanString(findCellByAliases(row, headerMap, ['Supplier Name', 'Name', 'Supplier']));
+    const name = cleanString(findCellByAliases(row, headerMap, ['Supplier Name', 'Supplier', 'Name']));
     if (!name) continue;
 
-    const supplierCode = cleanString(findCellByAliases(row, headerMap, ['Supplier Code', 'Code', 'Supplier Code']));
+    const supplierCode = cleanString(findCellByAliases(row, headerMap, ['Supplier Code', 'Code'])) || name.slice(0, 20);
     const openingBalance = parseNumber(findCellByAliases(row, headerMap, ['Opening Balance', 'Opening', 'Balance'])) || 0;
 
     suppliers.push({
@@ -65,9 +65,15 @@ function parseSuppliersSheet(workbook, sheetName, warnings) {
       notes: cleanString(findCellByAliases(row, headerMap, ['Notes', 'Comment'])),
     });
 
-    // Look for debt and paid amounts (handle both "Total Debt" and "Debt Amount" variants)
-    const debtAmount = parseNumber(findCellByAliases(row, headerMap, ['Total Debt', 'Debt Amount', 'Debt']));
-    const paidAmount = parseNumber(findCellByAliases(row, headerMap, ['Total Paid', 'Amount Paid', 'Paid', 'Payments']));
+    // Look for debt and paid amounts across all amount columns
+    const debtAmount = parseNumber(
+      findCellByAliases(row, headerMap, ['Debt Amount', 'Amount Due to Suppliers', 'Total Debt']) ||
+      findCellByAliases(row, headerMap, ['Amount'])
+    );
+    const paidAmount = parseNumber(
+      findCellByAliases(row, headerMap, ['Amount Paid', 'Total Paid', 'Paid']) ||
+      findCellByAliases(row, headerMap, ['Amount'])
+    );
 
     if (debtAmount !== null && debtAmount > 0) {
       supplierTransactions.push({
@@ -132,15 +138,25 @@ function parseExpensesSheet(workbook, sheetName, warnings) {
 
   for (const row of dataRows) {
     // Handle both "Expense Distribution" and direct category naming
-    const categoryName = cleanString(findCellByAliases(row, headerMap, ['Expense Distribution', 'Category', 'Expense Category', 'Type', 'Description'])) || 'Other Operating Expenses';
+    const categoryName = cleanString(
+      findCellByAliases(row, headerMap, ['Expense Distribution', 'Category', 'Expense Category', 'Type']) ||
+      row[0]  // Fall back to first column if it contains the expense name
+    ) || 'Other Operating Expenses';
     
+    // Skip section headers like "Total Expenses Incurred"
+    if (!categoryName || categoryName.toLowerCase().includes('total') || categoryName.toLowerCase() === 'expense distribution') {
+      continue;
+    }
+
     // Look for amount in debt or total columns
-    const amount = parseNumber(findCellByAliases(row, headerMap, ['Debt Amount', 'Amount', 'Expense Amount', 'Total']));
+    const amount = parseNumber(
+      findCellByAliases(row, headerMap, ['Debt Amount', 'Amount', 'Total'])
+    );
     
     // Try to extract date, default to today if not found
-    const expenseDate = parseDate(findCellByAliases(row, headerMap, ['Date', 'Expense Date', 'Transaction Date'])) || new Date();
+    const expenseDate = parseDate(findCellByAliases(row, headerMap, ['Date', 'Transaction Date'])) || new Date();
 
-    if (amount === null || !categoryName) continue;
+    if (amount === null || amount === 0) continue;
 
     const normalizedCode = normalizeToken(categoryName).replace(/\s+/g, '_').toUpperCase().slice(0, 32) || 'OTHER_OPERATING';
 
