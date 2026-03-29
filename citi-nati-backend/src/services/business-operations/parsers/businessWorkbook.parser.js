@@ -5,6 +5,7 @@ const {
   detectSheetByAliases,
   getSheetRows,
   findHeaderRowIndex,
+  buildRowObjects,
   buildRowObjectsFromSheet,
   findCellByAliases,
   cleanString,
@@ -42,7 +43,15 @@ function parseSuppliersSheet(workbook, sheetName, warnings) {
     return { suppliers: [], supplierTransactions: [] };
   }
 
-  const { headerMap, dataRows } = buildRowObjectsFromSheet(workbook, sheetName, headerIndex);
+  // Use buildRowObjects directly on filtered rows (not buildRowObjectsFromSheet which has row index issues)
+  const { headerMap, dataRows } = buildRowObjects(rows, headerIndex);
+
+  console.info('[BO][IMPORTS][PARSER] suppliers sheet parsed', {
+    sheetName,
+    headerRowIndex: headerIndex,
+    normalizedHeaders: [...headerMap.keys()],
+    parsedRows: dataRows.length,
+  });
   const suppliers = [];
   const supplierTransactions = [];
 
@@ -132,7 +141,15 @@ function parseExpensesSheet(workbook, sheetName, warnings) {
     return { expenseCategories: [], expenses: [] };
   }
 
-  const { headerMap, dataRows } = buildRowObjectsFromSheet(workbook, sheetName, headerIndex);
+  // Use buildRowObjects directly on filtered rows (not buildRowObjectsFromSheet which has row index issues)
+  const { headerMap, dataRows } = buildRowObjects(rows, headerIndex);
+
+  console.info('[BO][IMPORTS][PARSER] expenses sheet parsed', {
+    sheetName,
+    headerRowIndex: headerIndex,
+    normalizedHeaders: [...headerMap.keys()],
+    parsedRows: dataRows.length,
+  });
   const categoryMap = new Map();
   const expenses = [];
 
