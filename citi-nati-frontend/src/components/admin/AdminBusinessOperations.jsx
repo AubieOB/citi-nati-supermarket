@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import BusinessOperationsTabs from './business-operations/BusinessOperationsTabs.jsx';
 import SalesReportsTab from './business-operations/SalesReportsTab.jsx';
 import ComingSoonTabPanel from './business-operations/ComingSoonTabPanel.jsx';
+import BusinessOperationsImportButton from './business-operations/BusinessOperationsImportButton.jsx';
+import BusinessOperationsImportModal from './business-operations/BusinessOperationsImportModal.jsx';
 
 const TABS = [
   { id: 'sales-reports', label: 'Sales Reports', icon: 'fa-chart-column' },
@@ -34,6 +36,7 @@ const CONTENT_BY_TAB = {
 
 const AdminBusinessOperations = () => {
   const [activeTab, setActiveTab] = useState('sales-reports');
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const headerRef = useRef(null);
   const [headerLayout, setHeaderLayout] = useState({ left: 0, width: 0, top: 0 });
   const [headerHeight, setHeaderHeight] = useState(0);
@@ -114,6 +117,7 @@ const AdminBusinessOperations = () => {
                 Review branch-aware sales performance now, then extend the same workspace to suppliers, expenses, employees, payroll, and import-driven operational workflows.
               </p>
             </div>
+            <BusinessOperationsImportButton onClick={() => setIsImportModalOpen(true)} />
           </div>
 
           <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #edf2f7' }}>
@@ -127,6 +131,8 @@ const AdminBusinessOperations = () => {
       <div style={{ display: 'grid', gap: '1rem' }}>
         {CONTENT_BY_TAB[activeTab]}
       </div>
+
+      <BusinessOperationsImportModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} />
     </div>
   );
 };
