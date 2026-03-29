@@ -11,6 +11,8 @@ const priceUpdates = require('./lib/price-updates');
 const commandQueueClient = require('./lib/command-queue-client');
 const commandExecutor = require('./lib/command-executor');
 const { buildConfig, getBranchTag, getSyncMetadata, validateStartupConfig } = require('./lib/config');
+const ReportingSyncService = require('./lib/reporting-sync');
+const ReportingSyncState = require('./lib/reporting-sync-state');
 
 const app = express();
 app.use(express.json());
@@ -41,6 +43,10 @@ const sqlConfig = {
 
 // Connection pool
 let pool;
+
+/** Reporting sync service and state */
+let reportingSyncState;
+let reportingSyncService;
 
 /** Initialize SQL connection pool */
 async function initializePool() {
@@ -1608,6 +1614,10 @@ async function gracefulShutdown() {
     clearInterval(autoSyncInterval);
     console.log('Auto-sync interval cleared');
   }
+  if (reportingSyncInterval) {
+    clearInterval(reportingSyncInterval);
+    console.log('Reporting sync interval cleared');
+  }
   if (commandPollInterval) {
     clearInterval(commandPollInterval);
     console.log('Command poll interval cleared');
@@ -1641,6 +1651,11 @@ let emergencySalesPollInterval;
 const EMERGENCY_SALES_POLL_INTERVAL_MS = appConfig.polling.emergencySalesPollIntervalMs;
 const ENABLE_EMERGENCY_SALES_SYNC = appConfig.modules.emergencySalesSync;
 let isEmergencySalesPollRunning = false;
+
+/** Reporting sync interval */
+let reportingSyncInterval;
+const REPORTING_SYNC_INTERVAL_MS = appConfig.reporting.pollingIntervalMs;
+let isReportingSyncRunning = false;
 
 /**
  * Automatic sync function - runs on interval
@@ -1838,6 +1853,38 @@ async function pollAndProcessEmergencySales() {
   }
 }
 
+async function pollAndProcessReportingSync() {
+  if (!appConfig.features.enableReportingSync) {
+    return;
+  }
+
+  if (!reportingSyncService) {
+    console.warn(`${BRANCH_TAG} [REPORTING SYNC] Service not initialized`);
+    return;
+  }
+
+  if (isReportingSyncRunning) {
+    console.log(`${BRANCH_TAG} [REPORTING SYNC] Skipped tick - previous cycle still running`);
+    return;
+  }
+
+  isReportingSyncRunning = true;
+
+  try {
+    console.log(`${BRANCH_TAG} [REPORTING SYNC] Polling started`);
+
+    const result = await reportingSyncService.syncBatch(pool, appConfig.reporting.batchSize);
+
+    if (result.success) {
+      console.log(`${BRANCH_TAG} [REPORTING SYNC] ✅ Sync complete: ${result.invoiceCount} invoices, ${result.detailCount} details, checkpoint=${result.checkpoint}`);
+    }
+  } catch (error) {
+    console.error(`${BRANCH_TAG} [REPORTING SYNC] ❌ Polling error:`, error.message);
+  } finally {
+    isReportingSyncRunning = false;
+  }
+}
+
 /** Start server */
 const PORT = appConfig.server.port;
 let autoSyncStarted = false;
@@ -1867,6 +1914,18 @@ async function startServer() {
   try {
     logStartupConfiguration();
     await initializePool();
+
+    // Initialize reporting sync if enabled
+    if (appConfig.features.enableReportingSync) {
+      try {
+        reportingSyncState = new ReportingSyncState(appConfig.branch.branchCode);
+        reportingSyncService = new ReportingSyncService(appConfig, reportingSyncState);
+        console.log(`${BRANCH_TAG} [REPORTING SYNC] Service initialized, checkpoint: ${reportingSyncState.getLastSyncedInvoiceNo()}`);
+      } catch (err) {
+        console.error(`${BRANCH_TAG} [REPORTING SYNC] Failed to initialize:`, err.message);
+      }
+    }
+
     app.listen(PORT, () => {
       console.log(`${BRANCH_TAG} POS Sync Agent listening on port ${PORT}`);
       console.log(`${BRANCH_TAG} API Key validation: ENABLED`);
@@ -1908,6 +1967,16 @@ async function startServer() {
         console.log(`${BRANCH_TAG} [EMERGENCY SALES] ✅ Sync polling enabled (${EMERGENCY_SALES_POLL_INTERVAL_MS}ms)`);
       } else {
         console.log(`${BRANCH_TAG} [EMERGENCY SALES] ⏸ Sync polling disabled by feature flags/config`);
+      }
+
+      // reporting sync module
+      if (appConfig.features.enableReportingSync && reportingSyncService) {
+        reportingSyncInterval = setInterval(pollAndProcessReportingSync, REPORTING_SYNC_INTERVAL_MS);
+        console.log(`${BRANCH_TAG} [REPORTING SYNC] ✅ Polling enabled (${REPORTING_SYNC_INTERVAL_MS}ms, batch: ${appConfig.reporting.batchSize})`);
+        // Run one initial sync immediately
+        pollAndProcessReportingSync();
+      } else if (!appConfig.features.enableReportingSync) {
+        console.log(`${BRANCH_TAG} [REPORTING SYNC] ⏸ Polling disabled by ENABLE_REPORTING_SYNC=false`);
       }
     });
   } catch (err) {

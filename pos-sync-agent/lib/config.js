@@ -102,6 +102,12 @@ function buildConfig() {
     manualStockSync: features.enableManualStockSync,
   };
 
+  config.reporting = {
+    backendReportingEndpoint: normalizeString(process.env.REPORTING_BACKEND_ENDPOINT, '/api/pos-sync/reporting/invoices'),
+    batchSize: parseInteger(process.env.REPORTING_BATCH_SIZE, 100),
+    pollingIntervalMs: parseInteger(process.env.REPORTING_POLLING_INTERVAL_MS, parseInteger(process.env.POLLING_INTERVAL_MS || process.env.SYNC_INTERVAL_MS, 60000)),
+  };
+
   return config;
 }
 
