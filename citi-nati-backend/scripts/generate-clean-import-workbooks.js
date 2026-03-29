@@ -120,7 +120,6 @@ function generatePayrollCleanWorkbook() {
   }
 
   const biodataRows = (parsed.employees || [])
-    .filter((employee) => !shouldSkipSyntheticEmployee(employee))
     .map((employee) => {
       const salary = salaryByEmployeeNo.get(employee.employeeNo);
       return {
@@ -132,16 +131,18 @@ function generatePayrollCleanWorkbook() {
         'Employment Type': cleanText(employee.employmentType) || 'imported',
         'Agreed Salary per Month': salary ? Number(salary.agreedSalaryPerMonth || 0) : null,
       };
-    })
-    .filter((row) => row['First Name'] && row.Surname);
+    });
 
-  const seenPayrollRows = new Set();
-  const payrollRows = (parsed.payrollEntries || [])
-    .filter((entry) => !shouldSkipSyntheticEmployee(entry))
-    .filter((entry) => Number(entry.grossPay || 0) > 0 || Number(entry.netPay || 0) > 0)
-    .map((entry) => ({
+  const payrollSheetRowsMap = new Map();
+  for (const entry of parsed.payrollEntries || []) {
+    const sheetName = cleanText(entry.sourceSheet) || 'Pay Sheet';
+    if (!payrollSheetRowsMap.has(sheetName)) {
+      payrollSheetRowsMap.set(sheetName, []);
+    }
+
+    payrollSheetRowsMap.get(sheetName).push({
       'Employee No': cleanText(entry.employeeNo) || null,
-      'Name of Employee': cleanText(entry.employeeName) || null,
+      'Full Name': cleanText(entry.employeeName) || null,
       'Basic Salary': Number(entry.basicSalary || 0),
       'Gross Pay': Number(entry.grossPay || 0),
       'Total Deductions': Number(entry.totalDeductions || 0),
@@ -150,24 +151,17 @@ function generatePayrollCleanWorkbook() {
       'Loan Deduction': Number(entry.loanDeductionAmount || 0),
       'Other Deductions': Number(entry.otherDeductionAmount || 0),
       'Days Worked': entry.daysWorked === null || entry.daysWorked === undefined ? null : Number(entry.daysWorked),
+      'Days Absent': entry.daysAbsent === null || entry.daysAbsent === undefined ? null : Number(entry.daysAbsent),
       'Overtime Hours': entry.overtimeHours === null || entry.overtimeHours === undefined ? null : Number(entry.overtimeHours),
+      'Overtime Amount': entry.overtimeAmount === null || entry.overtimeAmount === undefined ? null : Number(entry.overtimeAmount),
+      'Bonus Amount': entry.bonusAmount === null || entry.bonusAmount === undefined ? null : Number(entry.bonusAmount),
+      'Gift Amount': entry.giftAmount === null || entry.giftAmount === undefined ? null : Number(entry.giftAmount),
+      'Leave Pay Amount': entry.leavePayAmount === null || entry.leavePayAmount === undefined ? null : Number(entry.leavePayAmount),
       Notes: cleanText(entry.notes) || null,
-    }))
-    .filter((row) => {
-      const key = [
-        row['Employee No'] || '',
-        row['Name of Employee'] || '',
-        String(row['Gross Pay'] || 0),
-        String(row['Net Pay'] || 0),
-      ].join('|');
-
-      if (seenPayrollRows.has(key)) return false;
-      seenPayrollRows.add(key);
-      return true;
     });
+  }
 
   const terminationRows = (parsed.terminations || [])
-    .filter((row) => !shouldSkipSyntheticEmployee(row))
     .map((row) => ({
       'Employee No': cleanText(row.employeeNo) || null,
       'Employee Name': cleanText(row.employeeName) || null,
@@ -186,7 +180,6 @@ function generatePayrollCleanWorkbook() {
     }));
 
   const reengagementRows = (parsed.reengagements || [])
-    .filter((row) => !shouldSkipSyntheticEmployee(row))
     .map((row) => ({
       'Employee No': cleanText(row.employeeNo) || null,
       'Employee Name': cleanText(row.employeeName) || null,
@@ -198,18 +191,35 @@ function generatePayrollCleanWorkbook() {
       Notes: cleanText(row.notes) || null,
     }));
 
+  const payrollSheetOrder = ['Pay Sheet', 'Final', 'Wages', 'Combined Pay', 'Res-Workers', 'Shop-Workers'];
+  const payrollSheets = [];
+
+  for (const preferredSheet of payrollSheetOrder) {
+    if (payrollSheetRowsMap.has(preferredSheet)) {
+      payrollSheets.push([preferredSheet, payrollSheetRowsMap.get(preferredSheet)]);
+      payrollSheetRowsMap.delete(preferredSheet);
+    }
+  }
+
+  for (const [sheetName, rows] of payrollSheetRowsMap.entries()) {
+    payrollSheets.push([sheetName, rows]);
+  }
+
   const outputPath = path.join(OUTPUT_DIR, 'Payroll_Workbook_Clean_2026.xlsx');
   writeWorkbook(outputPath, [
     ['Biodata', biodataRows],
-    ['Pay Sheet', payrollRows],
+    ...payrollSheets,
     ['Terminations', terminationRows],
     ['Reengagement Wages', reengagementRows],
   ]);
 
+  const totalPayrollRows = payrollSheets.reduce((sum, [, rows]) => sum + rows.length, 0);
+
   return {
     outputPath,
     biodata: biodataRows.length,
-    payrollEntries: payrollRows.length,
+    payrollSheets: payrollSheets.length,
+    payrollEntries: totalPayrollRows,
     terminations: terminationRows.length,
     reengagements: reengagementRows.length,
   };
