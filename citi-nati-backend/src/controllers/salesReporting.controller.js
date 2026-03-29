@@ -1,0 +1,263 @@
+'use strict';
+
+const { resolvePeriod, formatDateRange } = require('../utils/reportingPeriod');
+const {
+  extractFilters,
+  buildInvoiceWhere,
+  buildItemWhere,
+  parsePagination,
+  parseSort,
+  buildResponseFilters,
+  ALLOWED_INVOICE_SORT_FIELDS,
+  ALLOWED_PRODUCT_SORT_FIELDS,
+  ALLOWED_USER_SORT_FIELDS,
+} = require('../utils/reportingFilters');
+const {
+  querySalesSummary,
+  queryInvoiceList,
+  queryProductReport,
+  queryUserReport,
+  queryPaymentReport,
+} = require('../services/salesReporting.service');
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve the period parameters from req.query and return
+ * { startDate, endDate } or send a 400 response.
+ * Returns null when a response has already been sent.
+ */
+function resolvePeriodOrRespond(req, res) {
+  const { periodType, date, month, year, quarter, startDate, endDate } = req.query;
+  const result = resolvePeriod({ periodType, date, month, year, quarter, startDate, endDate });
+
+  if (result.error) {
+    res.status(400).json({ success: false, error: result.error });
+    return null;
+  }
+
+  return result; // { startDate: Date, endDate: Date, label: string }
+}
+
+// ---------------------------------------------------------------------------
+// 1. GET /reports/sales/summary
+// ---------------------------------------------------------------------------
+
+/**
+ * Return high-level aggregated sales metrics for the selected period + filters.
+ *
+ * Query params:
+ *   Period:  periodType, date, month, year, quarter, startDate, endDate
+ *   Filters: branchCode, syncSourceCode, locationCode, locationId,
+ *            userName, invoiceType, payMethod
+ */
+async function getSalesSummary(req, res) {
+  try {
+    const period = resolvePeriodOrRespond(req, res);
+    if (!period) return;
+
+    const filters = extractFilters(req.query);
+    const dateRange = formatDateRange(period.startDate, period.endDate);
+    const invoiceWhere = buildInvoiceWhere(period, filters);
+
+    const data = await querySalesSummary(invoiceWhere);
+
+    return res.json({
+      success: true,
+      filters: buildResponseFilters(req.query, period),
+      dateRange,
+      data,
+    });
+  } catch (err) {
+    console.error('[REPORTING] getSalesSummary error:', err);
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 2. GET /reports/sales/invoices
+// ---------------------------------------------------------------------------
+
+/**
+ * Return paginated invoice rows for the selected period + filters.
+ *
+ * Additional query params: page, pageSize, sortBy, sortOrder
+ */
+async function getSalesInvoices(req, res) {
+  try {
+    const period = resolvePeriodOrRespond(req, res);
+    if (!period) return;
+
+    const filters = extractFilters(req.query);
+    const dateRange = formatDateRange(period.startDate, period.endDate);
+    const pagination = parsePagination(req.query);
+    const sort = parseSort(req.query, ALLOWED_INVOICE_SORT_FIELDS, 'invoiceDate', 'desc');
+
+    if (sort.error) {
+      return res.status(400).json({ success: false, error: sort.error });
+    }
+
+    const invoiceWhere = buildInvoiceWhere(period, filters);
+    const { invoices, total } = await queryInvoiceList(invoiceWhere, pagination, sort);
+
+    return res.json({
+      success: true,
+      filters: buildResponseFilters(req.query, period),
+      dateRange,
+      data: invoices,
+      pagination: {
+        page: pagination.page,
+        pageSize: pagination.pageSize,
+        total,
+        totalPages: Math.ceil(total / pagination.pageSize),
+      },
+    });
+  } catch (err) {
+    console.error('[REPORTING] getSalesInvoices error:', err);
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 3. GET /reports/sales/products
+// ---------------------------------------------------------------------------
+
+/**
+ * Return paginated product-level aggregated rows for the selected period + filters.
+ *
+ * Additional query params: productCode, productName, page, pageSize, sortBy, sortOrder
+ */
+async function getSalesProducts(req, res) {
+  try {
+    const period = resolvePeriodOrRespond(req, res);
+    if (!period) return;
+
+    const filters = extractFilters(req.query);
+    const dateRange = formatDateRange(period.startDate, period.endDate);
+    const pagination = parsePagination(req.query);
+    const sort = parseSort(req.query, ALLOWED_PRODUCT_SORT_FIELDS, 'totalQuantitySold', 'desc');
+
+    if (sort.error) {
+      return res.status(400).json({ success: false, error: sort.error });
+    }
+
+    const itemWhere = buildItemWhere(period, filters);
+    const { products, total } = await queryProductReport(itemWhere, pagination, sort);
+
+    return res.json({
+      success: true,
+      filters: buildResponseFilters(req.query, period),
+      dateRange,
+      data: products,
+      pagination: {
+        page: pagination.page,
+        pageSize: pagination.pageSize,
+        total,
+        totalPages: Math.ceil(total / pagination.pageSize),
+      },
+    });
+  } catch (err) {
+    console.error('[REPORTING] getSalesProducts error:', err);
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4. GET /reports/sales/users
+// ---------------------------------------------------------------------------
+
+/**
+ * Return paginated cashier/user-level aggregated rows for the selected period + filters.
+ */
+async function getSalesUsers(req, res) {
+  try {
+    const period = resolvePeriodOrRespond(req, res);
+    if (!period) return;
+
+    const filters = extractFilters(req.query);
+    const dateRange = formatDateRange(period.startDate, period.endDate);
+    const pagination = parsePagination(req.query);
+    const sort = parseSort(req.query, ALLOWED_USER_SORT_FIELDS, 'totalInvoices', 'desc');
+
+    if (sort.error) {
+      return res.status(400).json({ success: false, error: sort.error });
+    }
+
+    const invoiceWhere = buildInvoiceWhere(period, filters);
+    const { users, total } = await queryUserReport(invoiceWhere, pagination, sort);
+
+    return res.json({
+      success: true,
+      filters: buildResponseFilters(req.query, period),
+      dateRange,
+      data: users,
+      pagination: {
+        page: pagination.page,
+        pageSize: pagination.pageSize,
+        total,
+        totalPages: Math.ceil(total / pagination.pageSize),
+      },
+    });
+  } catch (err) {
+    console.error('[REPORTING] getSalesUsers error:', err);
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 5. GET /reports/sales/payments
+// ---------------------------------------------------------------------------
+
+/**
+ * Return payment-method totals for the selected period + filters.
+ * Normalises the two payMethod columns into a single ranked list.
+ */
+async function getSalesPayments(req, res) {
+  try {
+    const period = resolvePeriodOrRespond(req, res);
+    if (!period) return;
+
+    const filters = extractFilters(req.query);
+    const dateRange = formatDateRange(period.startDate, period.endDate);
+    const invoiceWhere = buildInvoiceWhere(period, filters);
+
+    const payments = await queryPaymentReport(invoiceWhere);
+
+    const totals = payments.reduce(
+      (acc, p) => {
+        acc.totalAmount += p.totalAmount;
+        acc.invoiceCount += p.invoiceCount;
+        return acc;
+      },
+      { totalAmount: 0, invoiceCount: 0 },
+    );
+
+    return res.json({
+      success: true,
+      filters: buildResponseFilters(req.query, period),
+      dateRange,
+      data: payments,
+      totals: {
+        totalAmount: parseFloat(totals.totalAmount.toFixed(2)),
+        invoiceCount: totals.invoiceCount,
+      },
+    });
+  } catch (err) {
+    console.error('[REPORTING] getSalesPayments error:', err);
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Exports
+// ---------------------------------------------------------------------------
+
+module.exports = {
+  getSalesSummary,
+  getSalesInvoices,
+  getSalesProducts,
+  getSalesUsers,
+  getSalesPayments,
+};

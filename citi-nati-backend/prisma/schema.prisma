@@ -470,7 +470,12 @@ model SalesInvoice {
   @@index([invoiceDate])
   @@index([userName])
   @@index([locationCode])
+  @@index([branchCode])
   @@index([branchCode, invoiceDate])
+  @@index([syncSourceCode, invoiceDate])
+  @@index([payMethod1])
+  @@index([payMethod2])
+  @@index([invoiceType])
   @@map("sales_invoices")
 }
 
@@ -512,6 +517,7 @@ model SalesInvoiceItem {
   @@index([syncSourceCode])
   @@index([sourceInvDetailId])
   @@index([productCode])
+  @@index([productCode, productName])
   @@index([locationCode])
   @@index([salesInvoiceId])
   @@map("sales_invoice_items")

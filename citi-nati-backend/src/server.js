@@ -26,6 +26,7 @@ const adminEmergencySalesRoutes = require('./routes/admin.emergency-sales.routes
 const adminQuotationsRoutes = require('./routes/admin.quotations.routes');
 const posSyncRoutes = require('./routes/posSync.routes');
 const cashierRoutes = require('./routes/cashier.routes');
+const businessOperationsRoutes = require('./routes/businessOperations.routes');
 
 const prisma = new PrismaClient();
 
@@ -447,6 +448,9 @@ async function start() {
 
     // Cashier role routes (PIN + emergency sales for cashier)
     app.use('/api/cashier', cashierRoutes);
+
+    // Business Operations reporting endpoints (admin-protected)
+    app.use('/api/business-operations', businessOperationsRoutes);
 
     // Ensure unknown API routes never return HTML to API clients
     app.use('/api', (req, res) => {
