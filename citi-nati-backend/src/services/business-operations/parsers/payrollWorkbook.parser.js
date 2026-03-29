@@ -338,6 +338,38 @@ function parseTerminationSheet(workbook, sheetName, warnings) {
   const rows = getSheetRows(workbook, sheetName);
   const headerIndex = findHeaderRowIndex(rows, ['employee', 'termination', 'reason']);
 
+  function parseTerminationFormBlocks() {
+    const terminations = [];
+    for (let i = 0; i < rows.length; i += 1) {
+      const rowText = normalizeToken((rows[i] || []).map((cell) => cleanString(cell) || '').join(' '));
+      if (!rowText.includes('employee resignation') && !rowText.includes('dismissal')) continue;
+
+      const employeeName = findLabelValueInWindow(rows, i, i + 12, ['Name of Employee', 'Employee Name']);
+      const terminationDateRaw = findLabelValueInWindow(rows, i, i + 20, ['Date Contract Terminated', 'Termination Date']);
+      const settlementRaw = findLabelValueInWindow(rows, i, i + 28, ['Total Gross Amount Due at End of Contract', 'Total Net Amount Due at End of Contract']);
+      const daysWorkedRaw = findLabelValueInWindow(rows, i, i + 24, ['Number of days worked during month of resignation/dismissal', 'Days Worked in Final Month']);
+      const halfPayRaw = findLabelValueInWindow(rows, i, i + 20, ['Payslip for end of Contract', 'Half Pay Received']);
+
+      const normalizedName = cleanString(employeeName);
+      if (!normalizedName || /^employee does not exist$/i.test(normalizedName)) {
+        continue;
+      }
+
+      terminations.push({
+        employeeNo: null,
+        employeeName: normalizedName,
+        terminationDate: parseDate(terminationDateRaw),
+        reason: 'resignation/dismissal',
+        daysWorkedInFinalMonth: parseAmountSafe(daysWorkedRaw),
+        halfPayReceived: parseAmountSafe(halfPayRaw),
+        settlementAmount: parseAmountSafe(settlementRaw),
+        notes: `Imported from form layout row ${i + 1}`,
+      });
+    }
+
+    return terminations;
+  }
+
   if (headerIndex >= 0) {
     const { headerMap, dataRows } = buildRowObjectsFromSheet(workbook, sheetName, headerIndex);
     const terminations = [];
@@ -363,6 +395,10 @@ function parseTerminationSheet(workbook, sheetName, warnings) {
       });
     }
 
+    if (!terminations.length) {
+      terminations.push(...parseTerminationFormBlocks());
+    }
+
     if (!terminations.length && hasActionableTerminationBlocks(rows)) {
       warnings.push(`Terminations sheet detected but no valid rows were parsed from '${sheetName}'`);
     }
@@ -371,33 +407,7 @@ function parseTerminationSheet(workbook, sheetName, warnings) {
   }
 
   // Fallback for form-style layout where labels and values are vertically arranged.
-  const terminations = [];
-  for (let i = 0; i < rows.length; i += 1) {
-    const rowText = normalizeToken((rows[i] || []).map((cell) => cleanString(cell) || '').join(' '));
-    if (!rowText.includes('employee resignation') && !rowText.includes('dismissal')) continue;
-
-    const employeeName = findLabelValueInWindow(rows, i, i + 12, ['Name of Employee', 'Employee Name']);
-    const terminationDateRaw = findLabelValueInWindow(rows, i, i + 20, ['Date Contract Terminated', 'Termination Date']);
-    const settlementRaw = findLabelValueInWindow(rows, i, i + 28, ['Total Gross Amount Due at End of Contract', 'Total Net Amount Due at End of Contract']);
-    const daysWorkedRaw = findLabelValueInWindow(rows, i, i + 24, ['Number of days worked during month of resignation/dismissal', 'Days Worked in Final Month']);
-    const halfPayRaw = findLabelValueInWindow(rows, i, i + 20, ['Payslip for end of Contract', 'Half Pay Received']);
-
-    const normalizedName = cleanString(employeeName);
-    if (!normalizedName || /^employee does not exist$/i.test(normalizedName)) {
-      continue;
-    }
-
-    terminations.push({
-      employeeNo: null,
-      employeeName: normalizedName,
-      terminationDate: parseDate(terminationDateRaw),
-      reason: 'resignation/dismissal',
-      daysWorkedInFinalMonth: parseAmountSafe(daysWorkedRaw),
-      halfPayReceived: parseAmountSafe(halfPayRaw),
-      settlementAmount: parseAmountSafe(settlementRaw),
-      notes: `Imported from form layout row ${i + 1}`,
-    });
-  }
+  const terminations = parseTerminationFormBlocks();
 
   if (!terminations.length && hasActionableTerminationBlocks(rows)) {
     warnings.push(`Sheet '${sheetName}' found but termination data rows were not detected in table or form layout`);
