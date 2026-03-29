@@ -23,7 +23,19 @@ const SHEET_ALIASES = {
 
 function parseSuppliersSheet(workbook, sheetName, warnings) {
   const rows = getSheetRows(workbook, sheetName);
-  const headerIndex = findHeaderRowIndex(rows, ['supplier', 'name', 'balance']);
+  let headerIndex = findHeaderRowIndex(rows, ['supplier', 'name', 'balance']);
+
+  // Fallback: look for rows with "Supplier Name" in first column or nearby
+  if (headerIndex < 0) {
+    for (let i = 0; i < Math.min(15, rows.length); i += 1) {
+      const row = rows[i] || [];
+      const firstCells = (row.slice(0, 5) || []).map((c) => cleanString(c) || '').join(' ').toLowerCase();
+      if (firstCells.includes('supplier') && firstCells.includes('name')) {
+        headerIndex = i;
+        break;
+      }
+    }
+  }
 
   if (headerIndex < 0) {
     warnings.push(`Sheet '${sheetName}' found but supplier headers were not confidently detected`);
@@ -38,7 +50,7 @@ function parseSuppliersSheet(workbook, sheetName, warnings) {
     const name = cleanString(findCellByAliases(row, headerMap, ['Supplier Name', 'Name', 'Supplier']));
     if (!name) continue;
 
-    const supplierCode = cleanString(findCellByAliases(row, headerMap, ['Supplier Code', 'Code']));
+    const supplierCode = cleanString(findCellByAliases(row, headerMap, ['Supplier Code', 'Code', 'Supplier Code']));
     const openingBalance = parseNumber(findCellByAliases(row, headerMap, ['Opening Balance', 'Opening', 'Balance'])) || 0;
 
     suppliers.push({
@@ -53,8 +65,9 @@ function parseSuppliersSheet(workbook, sheetName, warnings) {
       notes: cleanString(findCellByAliases(row, headerMap, ['Notes', 'Comment'])),
     });
 
-    const debtAmount = parseNumber(findCellByAliases(row, headerMap, ['Total Debt', 'Debt']));
-    const paidAmount = parseNumber(findCellByAliases(row, headerMap, ['Total Paid', 'Paid', 'Payments']));
+    // Look for debt and paid amounts (handle both "Total Debt" and "Debt Amount" variants)
+    const debtAmount = parseNumber(findCellByAliases(row, headerMap, ['Total Debt', 'Debt Amount', 'Debt']));
+    const paidAmount = parseNumber(findCellByAliases(row, headerMap, ['Total Paid', 'Amount Paid', 'Paid', 'Payments']));
 
     if (debtAmount !== null && debtAmount > 0) {
       supplierTransactions.push({
@@ -94,7 +107,19 @@ function parseSuppliersSheet(workbook, sheetName, warnings) {
 
 function parseExpensesSheet(workbook, sheetName, warnings) {
   const rows = getSheetRows(workbook, sheetName);
-  const headerIndex = findHeaderRowIndex(rows, ['expense', 'amount', 'date']);
+  let headerIndex = findHeaderRowIndex(rows, ['expense', 'amount', 'date']);
+
+  // Fallback: look for rows with "Expense Distribution" or similar in first column
+  if (headerIndex < 0) {
+    for (let i = 0; i < Math.min(15, rows.length); i += 1) {
+      const row = rows[i] || [];
+      const firstCells = (row.slice(0, 5) || []).map((c) => cleanString(c) || '').join(' ').toLowerCase();
+      if ((firstCells.includes('expense') || firstCells.includes('distribution')) && firstCells.includes('amount')) {
+        headerIndex = i;
+        break;
+      }
+    }
+  }
 
   if (headerIndex < 0) {
     warnings.push(`Sheet '${sheetName}' found but expense headers were not confidently detected`);
@@ -106,11 +131,16 @@ function parseExpensesSheet(workbook, sheetName, warnings) {
   const expenses = [];
 
   for (const row of dataRows) {
-    const categoryName = cleanString(findCellByAliases(row, headerMap, ['Category', 'Expense Category', 'Type'])) || 'Other Operating Expenses';
-    const amount = parseNumber(findCellByAliases(row, headerMap, ['Amount', 'Expense Amount']));
-    const expenseDate = parseDate(findCellByAliases(row, headerMap, ['Date', 'Expense Date']));
+    // Handle both "Expense Distribution" and direct category naming
+    const categoryName = cleanString(findCellByAliases(row, headerMap, ['Expense Distribution', 'Category', 'Expense Category', 'Type', 'Description'])) || 'Other Operating Expenses';
+    
+    // Look for amount in debt or total columns
+    const amount = parseNumber(findCellByAliases(row, headerMap, ['Debt Amount', 'Amount', 'Expense Amount', 'Total']));
+    
+    // Try to extract date, default to today if not found
+    const expenseDate = parseDate(findCellByAliases(row, headerMap, ['Date', 'Expense Date', 'Transaction Date'])) || new Date();
 
-    if (amount === null || !expenseDate) continue;
+    if (amount === null || !categoryName) continue;
 
     const normalizedCode = normalizeToken(categoryName).replace(/\s+/g, '_').toUpperCase().slice(0, 32) || 'OTHER_OPERATING';
 
@@ -129,7 +159,7 @@ function parseExpensesSheet(workbook, sheetName, warnings) {
       locationId: null,
       expenseDate,
       amount,
-      description: cleanString(findCellByAliases(row, headerMap, ['Description', 'Details', 'Narration'])),
+      description: cleanString(findCellByAliases(row, headerMap, ['Details', 'Narration', 'Notes'])),
       paymentMethod: cleanString(findCellByAliases(row, headerMap, ['Payment Method', 'Method'])) || 'other',
       referenceNo: cleanString(findCellByAliases(row, headerMap, ['Reference', 'Ref No', 'Voucher No'])),
       enteredBy: cleanString(findCellByAliases(row, headerMap, ['Entered By', 'User'])) || 'excel-import',
