@@ -280,6 +280,71 @@ async function bulkUpsertSuppliers(records = []) {
   return result;
 }
 
+async function bulkImportSupplierTransactions(records = []) {
+  const result = { inserted: 0, updated: 0, skipped: 0 };
+
+  for (const row of records) {
+    const supplierCode = row.supplierCode ? String(row.supplierCode).trim() : null;
+    const supplierName = row.supplierName ? String(row.supplierName).trim() : null;
+    const amount = Number(row.amount);
+    const transactionDate = row.transactionDate ? new Date(row.transactionDate) : null;
+    const transactionType = row.transactionType ? String(row.transactionType).toLowerCase().trim() : null;
+
+    if (!Number.isFinite(amount) || !transactionDate || isNaN(transactionDate.getTime()) || !transactionType) {
+      result.skipped += 1;
+      continue;
+    }
+
+    let supplier = null;
+
+    if (supplierCode) {
+      supplier = await prisma.supplier.findUnique({ where: { supplierCode } });
+    }
+
+    if (!supplier && supplierName) {
+      supplier = await prisma.supplier.findFirst({
+        where: { name: { equals: supplierName, mode: 'insensitive' } },
+      });
+    }
+
+    if (!supplier) {
+      result.skipped += 1;
+      continue;
+    }
+
+    const existing = await prisma.supplierTransaction.findFirst({
+      where: {
+        supplierId: supplier.id,
+        transactionType,
+        amount,
+        referenceNo: row.referenceNo || null,
+      },
+    });
+
+    const payload = {
+      supplierId: supplier.id,
+      reportingPeriodId: row.reportingPeriodId || null,
+      transactionDate,
+      transactionType,
+      paymentMethod: row.paymentMethod || null,
+      amount,
+      description: row.description || null,
+      referenceNo: row.referenceNo || null,
+      enteredBy: row.enteredBy || 'excel-import',
+    };
+
+    if (existing) {
+      await prisma.supplierTransaction.update({ where: { id: existing.id }, data: payload });
+      result.updated += 1;
+    } else {
+      await prisma.supplierTransaction.create({ data: payload });
+      result.inserted += 1;
+    }
+  }
+
+  return result;
+}
+
 module.exports = {
   createSupplier,
   updateSupplier,
@@ -290,4 +355,5 @@ module.exports = {
   listSupplierTransactions,
   getSupplierBalanceSummary,
   bulkUpsertSuppliers,
+  bulkImportSupplierTransactions,
 };

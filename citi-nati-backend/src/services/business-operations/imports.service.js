@@ -9,6 +9,10 @@ async function importSuppliers(records) {
   return suppliersService.bulkUpsertSuppliers(records);
 }
 
+async function importSupplierTransactions(records) {
+  return suppliersService.bulkImportSupplierTransactions(records);
+}
+
 async function importExpenseCategories(records) {
   return expensesService.bulkUpsertExpenseCategories(records);
 }
@@ -37,6 +41,10 @@ async function importLoans(records) {
   return payrollService.bulkImportLoans(records);
 }
 
+async function importLoanTransactions(records) {
+  return payrollService.bulkImportLoanTransactions(records);
+}
+
 async function importTerminations(records) {
   return payrollService.bulkImportTerminations(records);
 }
@@ -47,6 +55,7 @@ async function importReengagements(records) {
 
 module.exports = {
   importSuppliers,
+  importSupplierTransactions,
   importExpenseCategories,
   importExpenses,
   importEmployees,
@@ -54,6 +63,7 @@ module.exports = {
   importPayrollPeriods,
   importPayrollEntries,
   importLoans,
+  importLoanTransactions,
   importTerminations,
   importReengagements,
 };

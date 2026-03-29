@@ -392,6 +392,51 @@ async function bulkImportLoans(records = []) {
   return result;
 }
 
+async function bulkImportLoanTransactions(records = []) {
+  const result = { inserted: 0, updated: 0, skipped: 0 };
+
+  for (const row of records) {
+    const employeeLoanId = Number(row.employeeLoanId);
+    const amount = Number(row.amount);
+    const transactionType = row.transactionType ? String(row.transactionType).trim().toLowerCase() : null;
+
+    if (!Number.isInteger(employeeLoanId) || !Number.isFinite(amount) || !transactionType) {
+      result.skipped += 1;
+      continue;
+    }
+
+    const payrollPeriodId = row.payrollPeriodId ? Number(row.payrollPeriodId) : null;
+
+    const existing = await prisma.employeeLoanTransaction.findFirst({
+      where: {
+        employeeLoanId,
+        payrollPeriodId: Number.isInteger(payrollPeriodId) ? payrollPeriodId : null,
+        transactionType,
+        amount,
+        notes: row.notes || null,
+      },
+    });
+
+    const payload = {
+      employeeLoanId,
+      payrollPeriodId: Number.isInteger(payrollPeriodId) ? payrollPeriodId : null,
+      transactionType,
+      amount,
+      notes: row.notes || null,
+    };
+
+    if (existing) {
+      await prisma.employeeLoanTransaction.update({ where: { id: existing.id }, data: payload });
+      result.updated += 1;
+    } else {
+      await prisma.employeeLoanTransaction.create({ data: payload });
+      result.inserted += 1;
+    }
+  }
+
+  return result;
+}
+
 async function bulkImportTerminations(records = []) {
   const result = { inserted: 0, updated: 0, skipped: 0 };
 
@@ -493,6 +538,7 @@ module.exports = {
   bulkImportPayrollPeriods,
   bulkImportPayrollEntries,
   bulkImportLoans,
+  bulkImportLoanTransactions,
   bulkImportTerminations,
   bulkImportReengagements,
 };
