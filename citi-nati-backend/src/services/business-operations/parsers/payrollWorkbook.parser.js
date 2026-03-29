@@ -46,6 +46,33 @@ function parseEmployeeName(row, headerMap) {
   ]));
 }
 
+function cleanEmployeeNameCandidate(value) {
+  const raw = cleanString(value);
+  if (!raw) return null;
+  const stripped = raw.replace(/^\d+\s*/g, '').replace(/^[-:\.\)\(\s]+|[-:\.\)\(\s]+$/g, '').trim();
+  if (!stripped) return null;
+  if (/^(vacant|subtotal|sub-total|total|nil|none)$/i.test(stripped)) return null;
+  if (/^(nyambadwe and domasi residence|citi-nati supermarkets.*|wages for residences.*)$/i.test(stripped)) return null;
+  if (!/[a-z]/i.test(stripped)) return null;
+  return stripped;
+}
+
+function inferEmployeeNameFromRow(row, headerMap) {
+  const explicit = cleanEmployeeNameCandidate(parseEmployeeName(row, headerMap));
+  if (explicit) return explicit;
+
+  for (const cell of row || []) {
+    const candidate = cleanEmployeeNameCandidate(cell);
+    if (!candidate) continue;
+
+    const asNumber = parseAmountSafe(candidate);
+    if (asNumber !== null) continue;
+    return candidate;
+  }
+
+  return null;
+}
+
 function parseAmountSafe(value) {
   if (value === null || value === undefined) return null;
   const text = String(value).trim();
@@ -352,7 +379,7 @@ function parseReengagementSheet(workbook, sheetName, warnings) {
     if (shouldSkipSummaryLikeRow(row, headerMap)) continue;
 
     const employeeNo = parseEmployeeNo(row, headerMap);
-    const employeeName = parseEmployeeName(row, headerMap);
+    const employeeName = inferEmployeeNameFromRow(row, headerMap);
     const effectiveDate = parseDate(findCellByAliases(row, headerMap, ['Effective Date', 'Date', 'Date Employed']));
 
     if ((!employeeNo && !employeeName) || !effectiveDate) continue;
@@ -482,7 +509,7 @@ function parsePayrollLikeSheets(workbook, sheetNames, warnings) {
       if (shouldSkipSummaryLikeRow(row, headerMap)) return;
 
       const employeeNo = parseEmployeeNo(row, headerMap);
-      const employeeName = parseEmployeeName(row, headerMap);
+      const employeeName = inferEmployeeNameFromRow(row, headerMap);
       const grossCandidate = findCellByAliases(row, headerMap, ['Gross Salary', 'Gross Pay', 'Gross', 'Amount Due', 'Salary', 'Wages on retrenchment']);
       const netCandidate = findCellByAliases(row, headerMap, ['Net Pay', 'Net', 'Net Pay for the Month', 'Net Pay mid and end of Month']);
 
@@ -513,7 +540,7 @@ function parsePayrollLikeSheets(workbook, sheetNames, warnings) {
       const rowText = normalizeToken((rows[i] || []).map((cell) => cleanString(cell) || '').join(' '));
       if (!rowText.includes('name of employee')) continue;
 
-      const employeeName = findLabelValueInWindow(rows, i, i + 3, ['Name of Employee', 'Employee Name']);
+      const employeeName = cleanEmployeeNameCandidate(findLabelValueInWindow(rows, i, i + 3, ['Name of Employee', 'Employee Name']));
       if (!employeeName || /^vacant$/i.test(employeeName)) continue;
 
       const employeeNo = findLabelValueInWindow(rows, i, i + 4, ['Employee Number', 'Employee No', 'Staff No', 'ID']);
