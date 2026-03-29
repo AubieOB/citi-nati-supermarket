@@ -159,17 +159,33 @@ function parseBusinessWorkbook(workbook) {
   };
 
   if (suppliersSheet) {
-    detectedSheets.push(suppliersSheet);
-    const result = parseSuppliersSheet(workbook, suppliersSheet, warnings);
-    parsed.suppliers.push(...result.suppliers);
-    parsed.supplierTransactions.push(...result.supplierTransactions);
+    try {
+      detectedSheets.push(suppliersSheet);
+      const result = parseSuppliersSheet(workbook, suppliersSheet, warnings);
+      parsed.suppliers.push(...result.suppliers);
+      parsed.supplierTransactions.push(...result.supplierTransactions);
+    } catch (err) {
+      err.stage = 'parsing';
+      err.parser = 'parseSuppliersSheet';
+      err.sheet = suppliersSheet;
+      err.detectedSheets = detectedSheets;
+      throw err;
+    }
   }
 
   if (expensesSheet) {
-    detectedSheets.push(expensesSheet);
-    const result = parseExpensesSheet(workbook, expensesSheet, warnings);
-    parsed.expenseCategories.push(...result.expenseCategories);
-    parsed.expenses.push(...result.expenses);
+    try {
+      detectedSheets.push(expensesSheet);
+      const result = parseExpensesSheet(workbook, expensesSheet, warnings);
+      parsed.expenseCategories.push(...result.expenseCategories);
+      parsed.expenses.push(...result.expenses);
+    } catch (err) {
+      err.stage = 'parsing';
+      err.parser = 'parseExpensesSheet';
+      err.sheet = expensesSheet;
+      err.detectedSheets = detectedSheets;
+      throw err;
+    }
   }
 
   if (salesInputSheet) {
@@ -188,7 +204,7 @@ function parseBusinessWorkbook(workbook) {
   }
 
   if (!detectedSheets.length) {
-    errors.push('No recognized business workbook sheets were found');
+    warnings.push('No recognized business workbook sheets were found. Confirm workbook type and sheet names.');
   }
 
   return {

@@ -15,6 +15,125 @@ const STEPS = {
   RESULTS: 'results',
 };
 
+const STAGE_SUGGESTIONS = {
+  upload: [
+    'Use multipart/form-data and ensure the file field is named workbook.',
+    'Re-upload the file and confirm the selected file is an Excel workbook (.xlsx or .xls).',
+  ],
+  'workbook-type-validation': [
+    'Confirm workbook type matches the file content (Payroll Workbook vs Business Workbook).',
+    'Choose a workbook type again, then retry preview.',
+  ],
+  'workbook-read': [
+    'Confirm the file is a valid Excel workbook and not a renamed CSV or text file.',
+    'Open and resave the workbook in Excel, then upload again.',
+  ],
+  'sheet-detection': [
+    'Check workbook sheet names and headers against the supported import format.',
+    'Try selecting the other workbook type and preview again.',
+  ],
+  parsing: [
+    'Check that required headers exist and are not heavily renamed.',
+    'Re-upload the workbook after removing malformed rows in detected sheets.',
+  ],
+  'import-orchestration': [
+    'Retry import for selected sections only to isolate the failing section.',
+    'Preview parse again to confirm mapped entities before re-importing.',
+  ],
+};
+
+function getStageSuggestions(stage) {
+  return STAGE_SUGGESTIONS[stage] || [
+    'Re-upload the file and retry parse preview.',
+    'Confirm file is a real Excel workbook and workbook type is correct.',
+  ];
+}
+
+function getParsePayload(responseData) {
+  if (!responseData) return null;
+  if (responseData.data && typeof responseData.data === 'object') return responseData.data;
+  return responseData;
+}
+
+function toParseDiagnostic(responseLike, fallbackMessage) {
+  const data = responseLike || {};
+  const stage = data.stage || null;
+  const message = data.message || data.error || fallbackMessage;
+  return {
+    stage,
+    message,
+    details: data.details || {},
+    detectedSheets: Array.isArray(data.detectedSheets) ? data.detectedSheets : [],
+    workbookTypeReceived: data.workbookTypeReceived || null,
+    fileMeta: data.fileMeta || null,
+    suggestions: getStageSuggestions(stage),
+  };
+}
+
+const ParseDiagnosticPanel = ({ diagnostic }) => {
+  if (!diagnostic) return null;
+
+  return (
+    <div
+      style={{
+        marginTop: '1rem',
+        backgroundColor: '#fef2f2',
+        border: '1px solid #fecaca',
+        borderRadius: '12px',
+        padding: '1rem',
+        display: 'grid',
+        gap: '0.75rem',
+      }}
+    >
+      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', color: '#b91c1c' }}>
+        <i className="fas fa-circle-exclamation"></i>
+        <strong>Parse Preview Failed</strong>
+      </div>
+
+      <div style={{ color: '#7f1d1d', fontSize: '0.9rem' }}>{diagnostic.message}</div>
+
+      {diagnostic.stage && (
+        <div style={{ fontSize: '0.84rem', color: '#991b1b' }}>
+          <strong>Failure stage:</strong> {diagnostic.stage}
+        </div>
+      )}
+
+      {diagnostic.detectedSheets.length > 0 && (
+        <div style={{ display: 'grid', gap: '0.4rem' }}>
+          <div style={{ fontSize: '0.84rem', color: '#991b1b', fontWeight: 700 }}>Detected sheets</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem' }}>
+            {diagnostic.detectedSheets.map((sheet) => (
+              <span
+                key={sheet}
+                style={{
+                  backgroundColor: '#fee2e2',
+                  color: '#7f1d1d',
+                  border: '1px solid #fecaca',
+                  borderRadius: '999px',
+                  padding: '0.28rem 0.65rem',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                }}
+              >
+                {sheet}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gap: '0.35rem' }}>
+        <div style={{ fontSize: '0.84rem', color: '#991b1b', fontWeight: 700 }}>What to try next</div>
+        <ul style={{ margin: 0, paddingLeft: '1.2rem', color: '#7f1d1d', fontSize: '0.85rem' }}>
+          {diagnostic.suggestions.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+};
+
 const BusinessOperationsImportModal = ({ isOpen, onClose }) => {
   const [currentStep, setCurrentStep] = useState(STEPS.SELECT_TYPE);
 
@@ -28,6 +147,7 @@ const BusinessOperationsImportModal = ({ isOpen, onClose }) => {
   const [parseResult, setParseResult] = useState(null);
   const [parseLoading, setParseLoading] = useState(false);
   const [parseError, setParseError] = useState('');
+  const [parseDiagnostic, setParseDiagnostic] = useState(null);
 
   // Step 4: Section Selection
   const [selectedSections, setSelectedSections] = useState([]);
@@ -47,6 +167,7 @@ const BusinessOperationsImportModal = ({ isOpen, onClose }) => {
     setParseResult(null);
     setParseLoading(false);
     setParseError('');
+    setParseDiagnostic(null);
     setSelectedSections([]);
     setImportLoading(false);
     setImportError('');
@@ -56,12 +177,23 @@ const BusinessOperationsImportModal = ({ isOpen, onClose }) => {
   // Step 1: Select Type
   const handleTypeSelect = (type) => {
     setWorkbookType(type);
+    setSelectedFile(null);
+    setParseResult(null);
+    setParseError('');
+    setParseDiagnostic(null);
+    setSelectedSections([]);
+    setImportResult(null);
     setCurrentStep(STEPS.UPLOAD_FILE);
   };
 
   // Step 2: Upload File
   const handleFileSelect = (file) => {
     setSelectedFile(file);
+    setParseResult(null);
+    setParseError('');
+    setParseDiagnostic(null);
+    setSelectedSections([]);
+    setImportResult(null);
   };
 
   const handleParseClick = async () => {
@@ -69,6 +201,7 @@ const BusinessOperationsImportModal = ({ isOpen, onClose }) => {
 
     setParseLoading(true);
     setParseError('');
+    setParseDiagnostic(null);
 
     try {
       const formData = new FormData();
@@ -79,10 +212,19 @@ const BusinessOperationsImportModal = ({ isOpen, onClose }) => {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      if (response.data?.data) {
-        setParseResult(response.data.data);
+      const payload = getParsePayload(response.data);
+
+      if (payload?.success === false) {
+        const diagnostic = toParseDiagnostic(payload, 'Workbook parse failed');
+        setParseError(diagnostic.message);
+        setParseDiagnostic(diagnostic);
+        return;
+      }
+
+      if (payload && payload.summary) {
+        setParseResult(payload);
         // Pre-select all available sections
-        const summary = response.data.data.summary || {};
+        const summary = payload.summary || {};
         const allSections = Object.keys(summary).map((key) => {
           // Convert camelCase to camelCase id
           return key.charAt(0).toLowerCase() + key.slice(1);
@@ -90,10 +232,17 @@ const BusinessOperationsImportModal = ({ isOpen, onClose }) => {
         setSelectedSections(allSections);
         setCurrentStep(STEPS.SELECT_SECTIONS);
       } else {
-        setParseError(response.data?.error || 'Failed to parse workbook');
+        const diagnostic = toParseDiagnostic(payload, 'Workbook parse did not return a valid summary');
+        setParseError(diagnostic.message);
+        setParseDiagnostic(diagnostic);
       }
     } catch (error) {
-      setParseError(error.response?.data?.error || 'Failed to parse workbook. Please check the file format.');
+      const diagnostic = toParseDiagnostic(
+        error.response?.data,
+        'Workbook parse failed. Please check workbook type and file format.'
+      );
+      setParseError(diagnostic.message);
+      setParseDiagnostic(diagnostic);
     } finally {
       setParseLoading(false);
     }
@@ -150,11 +299,13 @@ const BusinessOperationsImportModal = ({ isOpen, onClose }) => {
         setSelectedFile(null);
         setParseResult(null);
         setParseError('');
+        setParseDiagnostic(null);
         break;
       case STEPS.SELECT_SECTIONS:
         setCurrentStep(STEPS.UPLOAD_FILE);
         setParseResult(null);
         setParseError('');
+        setParseDiagnostic(null);
         setSelectedSections([]);
         break;
       case STEPS.RESULTS:
@@ -248,20 +399,7 @@ const BusinessOperationsImportModal = ({ isOpen, onClose }) => {
                 isLoading={parseLoading}
               />
               {parseError && (
-                <div
-                  style={{
-                    marginTop: '1rem',
-                    backgroundColor: '#fef2f2',
-                    border: '1px solid #fecaca',
-                    borderRadius: '10px',
-                    padding: '0.85rem 1rem',
-                    color: '#b91c1c',
-                    fontSize: '0.9rem',
-                  }}
-                >
-                  <i className="fas fa-circle-exclamation" style={{ marginRight: '0.5rem' }}></i>
-                  {parseError}
-                </div>
+                <ParseDiagnosticPanel diagnostic={parseDiagnostic || { message: parseError, suggestions: getStageSuggestions(null), detectedSheets: [] }} />
               )}
             </>
           )}

@@ -12,19 +12,64 @@ const {
 
 const router = express.Router();
 
+function buildUploadErrorResponse({ message, details = {}, fileMeta = null }) {
+  return {
+    success: false,
+    stage: 'upload',
+    message,
+    details,
+    detectedSheets: [],
+    workbookTypeReceived: null,
+    fileMeta,
+  };
+}
+
 function uploadSingleWorkbook(req, res, next) {
   const middleware = uploadWorkbook.single('workbook');
   middleware(req, res, (err) => {
     if (!err) return next();
 
+    const fileMeta = req.file
+      ? {
+          originalname: req.file.originalname,
+          mimetype: req.file.mimetype,
+          size: req.file.size,
+        }
+      : null;
+
     if (err instanceof multer.MulterError) {
       if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({ success: false, error: 'Workbook file too large. Max size is 20MB' });
+        return res.status(400).json(buildUploadErrorResponse({
+          message: 'Workbook file too large. Max size is 20MB',
+          details: { multerCode: err.code },
+          fileMeta,
+        }));
       }
-      return res.status(400).json({ success: false, error: err.message });
+
+      if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+        return res.status(400).json(buildUploadErrorResponse({
+          message: 'Unexpected upload field name. Use form-data field "workbook"',
+          details: {
+            multerCode: err.code,
+            expectedFieldName: 'workbook',
+            receivedFieldName: err.field || null,
+          },
+          fileMeta,
+        }));
+      }
+
+      return res.status(400).json(buildUploadErrorResponse({
+        message: err.message,
+        details: { multerCode: err.code },
+        fileMeta,
+      }));
     }
 
-    return res.status(400).json({ success: false, error: err.message || 'Invalid upload request' });
+    return res.status(400).json(buildUploadErrorResponse({
+      message: err.message || 'Invalid upload request',
+      details: { expectedFieldName: 'workbook' },
+      fileMeta,
+    }));
   });
 }
 

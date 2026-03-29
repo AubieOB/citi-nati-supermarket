@@ -286,40 +286,80 @@ function parsePayrollWorkbook(workbook) {
   };
 
   if (biodataSheet) {
-    detectedSheets.push(biodataSheet);
-    const result = parseBiodataSheet(workbook, biodataSheet, warnings);
-    parsed.employees.push(...result.employees);
-    parsed.salaryStructures.push(...result.salaryStructures);
+    try {
+      detectedSheets.push(biodataSheet);
+      const result = parseBiodataSheet(workbook, biodataSheet, warnings);
+      parsed.employees.push(...result.employees);
+      parsed.salaryStructures.push(...result.salaryStructures);
+    } catch (err) {
+      err.stage = 'parsing';
+      err.parser = 'parseBiodataSheet';
+      err.sheet = biodataSheet;
+      err.detectedSheets = detectedSheets;
+      throw err;
+    }
   }
 
   if (loanSheet) {
-    detectedSheets.push(loanSheet);
-    const result = parseLoanSheet(workbook, loanSheet, warnings);
-    parsed.loans.push(...result.loans);
-    parsed.loanTransactions.push(...result.loanTransactions);
+    try {
+      detectedSheets.push(loanSheet);
+      const result = parseLoanSheet(workbook, loanSheet, warnings);
+      parsed.loans.push(...result.loans);
+      parsed.loanTransactions.push(...result.loanTransactions);
+    } catch (err) {
+      err.stage = 'parsing';
+      err.parser = 'parseLoanSheet';
+      err.sheet = loanSheet;
+      err.detectedSheets = detectedSheets;
+      throw err;
+    }
   }
 
   if (terminationsSheet) {
-    detectedSheets.push(terminationsSheet);
-    const result = parseTerminationSheet(workbook, terminationsSheet, warnings);
-    parsed.terminations.push(...result.terminations);
+    try {
+      detectedSheets.push(terminationsSheet);
+      const result = parseTerminationSheet(workbook, terminationsSheet, warnings);
+      parsed.terminations.push(...result.terminations);
+    } catch (err) {
+      err.stage = 'parsing';
+      err.parser = 'parseTerminationSheet';
+      err.sheet = terminationsSheet;
+      err.detectedSheets = detectedSheets;
+      throw err;
+    }
   }
 
   if (reengagementSheet) {
-    detectedSheets.push(reengagementSheet);
-    const result = parseReengagementSheet(workbook, reengagementSheet, warnings);
-    parsed.reengagements.push(...result.reengagements);
+    try {
+      detectedSheets.push(reengagementSheet);
+      const result = parseReengagementSheet(workbook, reengagementSheet, warnings);
+      parsed.reengagements.push(...result.reengagements);
+    } catch (err) {
+      err.stage = 'parsing';
+      err.parser = 'parseReengagementSheet';
+      err.sheet = reengagementSheet;
+      err.detectedSheets = detectedSheets;
+      throw err;
+    }
   }
 
   if (payrollLikeSheets.length) {
-    detectedSheets.push(...payrollLikeSheets);
-    const result = parsePayrollLikeSheets(workbook, payrollLikeSheets, warnings);
-    parsed.payrollPeriods.push(...result.payrollPeriods);
-    parsed.payrollEntries.push(...result.payrollEntries);
+    try {
+      detectedSheets.push(...payrollLikeSheets);
+      const result = parsePayrollLikeSheets(workbook, payrollLikeSheets, warnings);
+      parsed.payrollPeriods.push(...result.payrollPeriods);
+      parsed.payrollEntries.push(...result.payrollEntries);
+    } catch (err) {
+      err.stage = 'parsing';
+      err.parser = 'parsePayrollLikeSheets';
+      err.sheet = payrollLikeSheets.join(', ');
+      err.detectedSheets = detectedSheets;
+      throw err;
+    }
   }
 
   if (!detectedSheets.length) {
-    errors.push('No recognized payroll workbook sheets were found');
+    warnings.push('No recognized payroll workbook sheets were found. Confirm workbook type and sheet names.');
   }
 
   return {

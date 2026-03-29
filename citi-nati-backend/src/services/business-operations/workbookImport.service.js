@@ -8,6 +8,15 @@ const { parseBusinessWorkbook } = require('./parsers/businessWorkbook.parser');
 
 const prisma = new PrismaClient();
 
+function createDiagnosticError(stage, message, details = {}, extras = {}) {
+  const err = new Error(message);
+  err.stage = stage;
+  err.details = details;
+  err.clientMessage = message;
+  if (extras.detectedSheets) err.detectedSheets = extras.detectedSheets;
+  return err;
+}
+
 function normalizeSectionSet(sections) {
   if (!sections) return null;
   if (Array.isArray(sections)) {
@@ -82,17 +91,67 @@ async function mapPeriodDescriptionsToIds(records) {
 }
 
 async function parseWorkbook(buffer, workbookType) {
-  const workbook = readWorkbookFromBuffer(buffer);
+  if (!workbookType || !['payroll', 'business'].includes(String(workbookType))) {
+    throw createDiagnosticError(
+      'workbook-type-validation',
+      "workbookType is required and must be 'payroll' or 'business'",
+      { allowedWorkbookTypes: ['payroll', 'business'] }
+    );
+  }
+
+  let workbook;
+  try {
+    workbook = readWorkbookFromBuffer(buffer);
+  } catch (err) {
+    throw createDiagnosticError(
+      'workbook-read',
+      'Unable to read Excel workbook file',
+      {
+        parserLibrary: 'xlsx',
+        reason: err.message,
+      }
+    );
+  }
 
   if (workbookType === 'payroll') {
-    return parsePayrollWorkbook(workbook);
+    try {
+      return parsePayrollWorkbook(workbook);
+    } catch (err) {
+      throw createDiagnosticError(
+        err.stage || 'parsing',
+        'Failed while parsing payroll workbook',
+        {
+          parser: err.parser || 'parsePayrollWorkbook',
+          sheet: err.sheet || null,
+          reason: err.message,
+        },
+        { detectedSheets: err.detectedSheets || [] }
+      );
+    }
   }
 
   if (workbookType === 'business') {
-    return parseBusinessWorkbook(workbook);
+    try {
+      return parseBusinessWorkbook(workbook);
+    } catch (err) {
+      throw createDiagnosticError(
+        err.stage || 'parsing',
+        'Failed while parsing business workbook',
+        {
+          parser: err.parser || 'parseBusinessWorkbook',
+          sheet: err.sheet || null,
+          reason: err.message,
+        },
+        { detectedSheets: err.detectedSheets || [] }
+      );
+    }
   }
 
-  throw new Error(`Unsupported workbookType '${workbookType}'`);
+  throw createDiagnosticError(
+    'workbook-type-validation',
+    "workbookType is required and must be 'payroll' or 'business'",
+    { receivedWorkbookType: workbookType }
+  );
 }
 
 async function importPayrollParsedData(parsed, options = {}) {
@@ -330,6 +389,14 @@ async function importBusinessParsedData(parsed, options = {}) {
 
 async function processWorkbookUpload({ fileBuffer, workbookType, parseOnly = false, sections = null }) {
   const parsedOutput = await parseWorkbook(fileBuffer, workbookType);
+  const weakSheetDetection = !parsedOutput.detectedSheets || !parsedOutput.detectedSheets.length;
+
+  if (weakSheetDetection) {
+    parsedOutput.warnings = [
+      ...(parsedOutput.warnings || []),
+      'Workbook was read successfully, but no recognizable sheets were detected for this workbook type',
+    ];
+  }
 
   if (parseOnly) {
     return {
@@ -339,18 +406,35 @@ async function processWorkbookUpload({ fileBuffer, workbookType, parseOnly = fal
       summary: parsedOutput.summary,
       warnings: parsedOutput.warnings,
       errors: parsedOutput.errors,
+      stage: weakSheetDetection ? 'sheet-detection' : null,
       parseOnly: true,
     };
   }
 
   let importOutput;
 
-  if (workbookType === 'payroll') {
-    importOutput = await importPayrollParsedData(parsedOutput.parsed, { sections });
-  } else if (workbookType === 'business') {
-    importOutput = await importBusinessParsedData(parsedOutput.parsed, { sections });
-  } else {
-    throw new Error(`Unsupported workbookType '${workbookType}'`);
+  try {
+    if (workbookType === 'payroll') {
+      importOutput = await importPayrollParsedData(parsedOutput.parsed, { sections });
+    } else if (workbookType === 'business') {
+      importOutput = await importBusinessParsedData(parsedOutput.parsed, { sections });
+    } else {
+      throw createDiagnosticError(
+        'workbook-type-validation',
+        "workbookType is required and must be 'payroll' or 'business'",
+        { receivedWorkbookType: workbookType }
+      );
+    }
+  } catch (err) {
+    if (err.stage) throw err;
+    throw createDiagnosticError(
+      'import-orchestration',
+      'Workbook parsed, but import orchestration failed',
+      {
+        reason: err.message,
+      },
+      { detectedSheets: parsedOutput.detectedSheets || [] }
+    );
   }
 
   return {
@@ -361,6 +445,7 @@ async function processWorkbookUpload({ fileBuffer, workbookType, parseOnly = fal
     results: importOutput.results,
     warnings: [...parsedOutput.warnings, ...importOutput.warnings],
     errors: [...parsedOutput.errors, ...importOutput.errors],
+    stage: weakSheetDetection ? 'sheet-detection' : null,
     parseOnly: false,
   };
 }
