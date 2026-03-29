@@ -156,7 +156,13 @@ function parseBiodataSheet(workbook, sheetName, warnings) {
   const headerIndex = findHeaderRowIndex(rows, ['employee no', 'first name', 'surname']);
 
   if (headerIndex < 0) {
-    warnings.push(`Sheet '${sheetName}' found but biodata headers were not confidently detected`);
+    const topTokens = rows
+      .slice(0, 30)
+      .map((r) => normalizeToken((r || []).join(' ')))
+      .join(' ');
+    if (topTokens.includes('biodata') || topTokens.includes('employee no') || topTokens.includes('first name')) {
+      warnings.push(`Sheet '${sheetName}' found but biodata headers were not confidently detected`);
+    }
     return { employees: [], salaryStructures: [] };
   }
 
@@ -243,7 +249,14 @@ function parseLoanSheet(workbook, sheetName, warnings) {
   const headerIndex = findHeaderRowIndex(rows, ['employee', 'loan', 'amount']);
 
   if (headerIndex < 0) {
-    warnings.push(`Sheet '${sheetName}' found but loan headers were not confidently detected`);
+    const topTokens = rows
+      .slice(0, 50)
+      .map((r) => normalizeToken((r || []).join(' ')))
+      .join(' ');
+    const looksLikeLoanData = topTokens.includes('loan') && (topTokens.includes('employee') || topTokens.includes('amount') || topTokens.includes('balance'));
+    if (looksLikeLoanData) {
+      warnings.push(`Sheet '${sheetName}' found but loan headers were not confidently detected`);
+    }
     return { loans: [], loanTransactions: [] };
   }
 
@@ -367,39 +380,76 @@ function parseReengagementSheet(workbook, sheetName, warnings) {
   const rows = getSheetRows(workbook, sheetName);
   const headerIndex = findHeaderRowIndex(rows, ['employee', 'effective', 'wage', 'occupation', 'date employed']);
 
-  if (headerIndex < 0) {
-    warnings.push(`Sheet '${sheetName}' found but reengagement headers were not confidently detected`);
-    return { reengagements: [] };
-  }
-
-  const { headerMap, dataRows } = buildRowObjectsFromSheet(workbook, sheetName, headerIndex);
   const reengagements = [];
 
-  for (const row of dataRows) {
-    if (shouldSkipSummaryLikeRow(row, headerMap)) continue;
+  if (headerIndex >= 0) {
+    const { headerMap, dataRows } = buildRowObjectsFromSheet(workbook, sheetName, headerIndex);
 
-    const employeeNo = parseEmployeeNo(row, headerMap);
-    const employeeName = inferEmployeeNameFromRow(row, headerMap);
-    const effectiveDate = parseDate(findCellByAliases(row, headerMap, ['Effective Date', 'Date', 'Date Employed']));
+    for (const row of dataRows) {
+      if (shouldSkipSummaryLikeRow(row, headerMap)) continue;
 
-    if ((!employeeNo && !employeeName) || !effectiveDate) continue;
+      const employeeNo = parseEmployeeNo(row, headerMap);
+      const employeeName = inferEmployeeNameFromRow(row, headerMap);
+      const effectiveDate = parseDate(findCellByAliases(row, headerMap, ['Effective Date', 'Date', 'Date Employed']));
 
-    if (employeeName && /^vacant$/i.test(employeeName)) continue;
+      if ((!employeeNo && !employeeName) || !effectiveDate) continue;
+      if (employeeName && /^vacant$/i.test(employeeName)) continue;
 
-    reengagements.push({
-      employeeNo,
-      employeeName,
-      previousWage: parseAmountSafe(findCellByAliases(row, headerMap, ['Previous Wage', 'Old Wage', 'Wages as at 30/09/25'])),
-      reengagementWage: parseAmountSafe(findCellByAliases(row, headerMap, ['Reengagement Wage', 'New Wage', 'New Wage from 1/10/25', 'Wages on retrenchment'])),
-      occupation: cleanString(findCellByAliases(row, headerMap, ['Occupation', 'Position'])),
-      effectiveDate,
-      contractExpiryDate: parseDate(findCellByAliases(row, headerMap, ['Contract Expiry Date', 'Expiry Date', 'Expiry of Contract'])),
-      notes: cleanString(findCellByAliases(row, headerMap, ['Notes', 'Comment'])),
-    });
+      reengagements.push({
+        employeeNo,
+        employeeName,
+        previousWage: parseAmountSafe(findCellByAliases(row, headerMap, ['Previous Wage', 'Old Wage', 'Wages as at 30/09/25'])),
+        reengagementWage: parseAmountSafe(findCellByAliases(row, headerMap, ['Reengagement Wage', 'New Wage', 'New Wage from 1/10/25', 'Wages on retrenchment'])),
+        occupation: cleanString(findCellByAliases(row, headerMap, ['Occupation', 'Position'])),
+        effectiveDate,
+        contractExpiryDate: parseDate(findCellByAliases(row, headerMap, ['Contract Expiry Date', 'Expiry Date', 'Expiry of Contract'])),
+        notes: cleanString(findCellByAliases(row, headerMap, ['Notes', 'Comment'])),
+      });
+    }
   }
 
   if (!reengagements.length) {
-    warnings.push(`Reengagement sheet detected but no valid rows were parsed from '${sheetName}'`);
+    // Fallback for form/key-value layout blocks.
+    for (let i = 0; i < rows.length; i += 1) {
+      const rowText = normalizeToken((rows[i] || []).map((cell) => cleanString(cell) || '').join(' '));
+      if (!rowText.includes('name of employee') && !rowText.includes('employee name')) continue;
+
+      const employeeName = cleanEmployeeNameCandidate(findLabelValueInWindow(rows, i, i + 4, ['Name of Employee', 'Employee Name']));
+      if (!employeeName) continue;
+
+      const employeeNo = findLabelValueInWindow(rows, i, i + 5, ['Employee Number', 'Employee No', 'Staff No', 'ID']);
+      const previousWage = findLabelValueInWindow(rows, i, i + 18, ['Previous Wage', 'Old Wage', 'Wages as at']);
+      const newWage = findLabelValueInWindow(rows, i, i + 18, ['Reengagement Wage', 'New Wage', 'New Wage from', 'Wages on retrenchment']);
+      const occupation = findLabelValueInWindow(rows, i, i + 10, ['Occupation', 'Position']);
+      const dateEmployed = findLabelValueInWindow(rows, i, i + 10, ['Date Employed', 'Effective Date', 'Date']);
+      const expiryDate = findLabelValueInWindow(rows, i, i + 14, ['Expiry of Contract', 'Contract Expiry Date', 'Expiry Date']);
+
+      const effectiveDate = parseDate(dateEmployed);
+      if (!effectiveDate) continue;
+
+      reengagements.push({
+        employeeNo: cleanString(employeeNo),
+        employeeName,
+        previousWage: parseAmountSafe(previousWage),
+        reengagementWage: parseAmountSafe(newWage),
+        occupation: cleanString(occupation),
+        effectiveDate,
+        contractExpiryDate: parseDate(expiryDate),
+        notes: `Imported from reengagement form layout row ${i + 1}`,
+      });
+
+      i += 4;
+    }
+  }
+
+  if (!reengagements.length) {
+    const topTokens = rows
+      .slice(0, 40)
+      .map((r) => normalizeToken((r || []).join(' ')))
+      .join(' ');
+    if (topTokens.includes('reengagement') || topTokens.includes('new wage') || topTokens.includes('wages on retrenchment')) {
+      warnings.push(`Reengagement sheet detected but no valid rows were parsed from '${sheetName}'`);
+    }
   }
 
   return { reengagements };
@@ -575,7 +625,7 @@ function parsePayrollLikeSheets(workbook, sheetNames, warnings) {
 }
 
 function parsePayrollWorkbook(workbook) {
-  const warnings = [];
+  let warnings = [];
   const errors = [];
   const detectedSheets = [];
 
@@ -585,9 +635,14 @@ function parsePayrollWorkbook(workbook) {
   const loanSheet = detectSheetByAliases(sheetNames, SHEET_ALIASES.loanSchedule);
   const terminationsSheet = detectSheetByAliases(sheetNames, SHEET_ALIASES.terminations);
   const reengagementSheet = detectSheetByAliases(sheetNames, SHEET_ALIASES.reengagements);
+  const reengagementSheets = [...new Set([
+    reengagementSheet,
+    ...sheetNames.filter((name) => normalizeToken(name).includes('reengagement')),
+  ].filter(Boolean))];
 
   const payrollLikeSheets = sheetNames.filter((sheetName) => {
     const normalized = normalizeToken(sheetName);
+    if (normalized.includes('reengagement')) return false;
     return SHEET_ALIASES.payrollLike.some((alias) => {
       const token = normalizeToken(alias);
       return normalized === token || normalized.includes(token) || token.includes(normalized);
@@ -649,15 +704,17 @@ function parsePayrollWorkbook(workbook) {
     }
   }
 
-  if (reengagementSheet) {
+  if (reengagementSheets.length) {
     try {
-      detectedSheets.push(reengagementSheet);
-      const result = parseReengagementSheet(workbook, reengagementSheet, warnings);
-      parsed.reengagements.push(...result.reengagements);
+      detectedSheets.push(...reengagementSheets);
+      reengagementSheets.forEach((sheet) => {
+        const result = parseReengagementSheet(workbook, sheet, warnings);
+        parsed.reengagements.push(...result.reengagements);
+      });
     } catch (err) {
       err.stage = 'parsing';
       err.parser = 'parseReengagementSheet';
-      err.sheet = reengagementSheet;
+      err.sheet = reengagementSheets.join(', ');
       err.detectedSheets = detectedSheets;
       throw err;
     }
@@ -698,6 +755,10 @@ function parsePayrollWorkbook(workbook) {
       seen.add(key);
       return true;
     });
+  }
+
+  if (parsed.employees.length) {
+    warnings = warnings.filter((w) => !w.includes('Biodata sheet detected but no valid rows were parsed'));
   }
 
   if (!detectedSheets.length) {
