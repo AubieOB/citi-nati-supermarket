@@ -20,7 +20,7 @@ const payrollService = require('./payroll.service');
 const employeesService = require('./employees.service');
 
 const COMPANY_NAME = 'Citi-Nati Supermarket';
-const COMPANY_CONTACT = process.env.EXPORT_COMPANY_CONTACT || 'Lilongwe, Malawi';
+const COMPANY_CONTACT = process.env.EXPORT_COMPANY_CONTACT || 'Blantyre, Malawi';
 const MWK_FORMAT = '"MWK" #,##0.00';
 const PDF_BRAND_PURPLE = '#5B4B8A';
 const PDF_BRAND_GREEN = '#2D8659';
