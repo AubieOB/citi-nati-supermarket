@@ -1,7 +1,7 @@
 import React from 'react';
 
-const NetSummaryCard = ({ sales, expenses, payroll, supplierPayments, netValue, isComplete }) => {
-  const positive = netValue >= 0;
+const NetSummaryCard = ({ sales, expenses, payroll, supplierPayments, netValue, rawNetValue, isComplete }) => {
+  const positive = (rawNetValue ?? 0) >= 0;
 
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: '16px', backgroundColor: '#fff', padding: '1rem 1.05rem', display: 'grid', gap: '0.55rem' }}>

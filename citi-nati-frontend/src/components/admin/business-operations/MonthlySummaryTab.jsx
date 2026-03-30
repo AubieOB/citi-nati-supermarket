@@ -379,6 +379,7 @@ const MonthlySummaryTab = ({ refreshKey = 0, onNavigateTab }) => {
         payroll={money(payrollTotal)}
         supplierPayments={money(supplierPaymentsTotal)}
         netValue={money(netPosition)}
+        rawNetValue={netPosition}
         isComplete={sectionComplete}
       />
     </div>
