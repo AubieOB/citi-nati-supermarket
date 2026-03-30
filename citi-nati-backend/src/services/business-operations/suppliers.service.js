@@ -70,7 +70,48 @@ async function listSuppliers({ search, status, skip, take, sortBy, sortOrder }) 
     prisma.supplier.count({ where }),
   ]);
 
-  return { data, total, where };
+  if (!data.length) {
+    return { data, total, where };
+  }
+
+  const supplierIds = data.map((supplier) => supplier.id);
+  const transactionAggregates = await prisma.supplierTransaction.groupBy({
+    by: ['supplierId', 'transactionType'],
+    where: { supplierId: { in: supplierIds } },
+    _sum: { amount: true },
+  });
+
+  const totalsBySupplierId = new Map();
+
+  transactionAggregates.forEach((row) => {
+    const current = totalsBySupplierId.get(row.supplierId) || {
+      totalDebt: 0,
+      totalPaid: 0,
+      totalAdjustment: 0,
+    };
+    const amount = Number(row._sum.amount || 0);
+
+    if (row.transactionType === 'debt') current.totalDebt += amount;
+    if (row.transactionType === 'payment') current.totalPaid += amount;
+    if (row.transactionType === 'adjustment') current.totalAdjustment += amount;
+
+    totalsBySupplierId.set(row.supplierId, current);
+  });
+
+  const enrichedData = data.map((supplier) => {
+    const totals = totalsBySupplierId.get(supplier.id) || {
+      totalDebt: 0,
+      totalPaid: 0,
+      totalAdjustment: 0,
+    };
+
+    return {
+      ...supplier,
+      currentBalance: Number(supplier.openingBalance || 0) + totals.totalDebt - totals.totalPaid + totals.totalAdjustment,
+    };
+  });
+
+  return { data: enrichedData, total, where };
 }
 
 async function createSupplierTransaction(payload) {

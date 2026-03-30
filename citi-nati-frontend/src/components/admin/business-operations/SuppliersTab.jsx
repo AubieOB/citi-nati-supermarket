@@ -1,5 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../../../utils/api.js';
+import SuppliersList from './SuppliersList.jsx';
+import SupplierDetailPanel from './SupplierDetailPanel.jsx';
+import SupplierFormModal from './SupplierFormModal.jsx';
+import SupplierTransactionFormModal from './SupplierTransactionFormModal.jsx';
+import SupplierEmptyState from './SupplierEmptyState.jsx';
 
 const cardStyle = {
   backgroundColor: '#fff',
@@ -8,87 +13,72 @@ const cardStyle = {
   boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)',
 };
 
-const tableStyle = {
-  width: '100%',
-  borderCollapse: 'collapse',
-  fontSize: '0.9rem',
-};
-
-const thStyle = {
-  textAlign: 'left',
-  padding: '0.85rem 0.9rem',
-  color: '#475569',
-  fontSize: '0.78rem',
-  textTransform: 'uppercase',
-  letterSpacing: '0.04em',
-  borderBottom: '1px solid #e2e8f0',
-  backgroundColor: '#f8fafc',
-  position: 'sticky',
-  top: 0,
-  zIndex: 1,
-};
-
-const tdStyle = {
-  padding: '0.9rem',
-  borderBottom: '1px solid #eef2f7',
-  color: '#0f172a',
-  verticalAlign: 'top',
-};
-
 const money = (value) => `MWK ${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const formatDate = (value) => {
-  if (!value) return 'Not set';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Not set';
-  return date.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
+const INITIAL_DETAIL_STATE = {
+  supplier: null,
+  summary: null,
+  transactions: [],
+  transactionPagination: null,
 };
-
-const EmptyState = ({ message }) => (
-  <div style={{ padding: '2rem', color: '#64748b', textAlign: 'center' }}>{message}</div>
-);
-
-const ErrorState = ({ message }) => (
-  <div style={{ padding: '1rem 1.25rem', borderRadius: '14px', backgroundColor: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca' }}>
-    {message}
-  </div>
-);
-
-const statusBadgeStyle = (status) => ({
-  display: 'inline-flex',
-  alignItems: 'center',
-  borderRadius: '999px',
-  padding: '0.32rem 0.7rem',
-  fontSize: '0.77rem',
-  fontWeight: 800,
-  textTransform: 'capitalize',
-  backgroundColor: status === 'active' ? '#dcfce7' : '#f1f5f9',
-  color: status === 'active' ? '#166534' : '#475569',
-});
 
 const SuppliersTab = ({ refreshKey = 0 }) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
+  const [transactionPage, setTransactionPage] = useState(1);
+
   const [suppliers, setSuppliers] = useState([]);
   const [pagination, setPagination] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [listLoading, setListLoading] = useState(true);
+  const [listError, setListError] = useState('');
+
   const [selectedSupplierId, setSelectedSupplierId] = useState(null);
-  const [detailState, setDetailState] = useState({ loading: false, error: '', balance: null, transactions: [] });
+  const [detailState, setDetailState] = useState(INITIAL_DETAIL_STATE);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
+  const [transactionsLoading, setTransactionsLoading] = useState(false);
+  const [transactionsError, setTransactionsError] = useState('');
+
+  const [supplierModalState, setSupplierModalState] = useState({ open: false, supplier: null });
+  const [supplierFormSaving, setSupplierFormSaving] = useState(false);
+  const [supplierFormError, setSupplierFormError] = useState('');
+
+  const [transactionModalState, setTransactionModalState] = useState({ open: false, transaction: null });
+  const [transactionFormSaving, setTransactionFormSaving] = useState(false);
+  const [transactionFormError, setTransactionFormError] = useState('');
+
+  const [pendingSelectedSupplierId, setPendingSelectedSupplierId] = useState(null);
+
+  const supplierOptions = useMemo(() => {
+    const currentOptions = suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name }));
+    const selectedSupplier = detailState.supplier;
+    if (selectedSupplier && !currentOptions.some((item) => item.id === selectedSupplier.id)) {
+      return [{ id: selectedSupplier.id, name: selectedSupplier.name }, ...currentOptions];
+    }
+    return currentOptions;
+  }, [detailState.supplier, suppliers]);
+
+  const totals = useMemo(() => {
+    const activeSuppliers = suppliers.filter((supplier) => String(supplier.status || '').toLowerCase() === 'active').length;
+    const pageBalance = suppliers.reduce((sum, supplier) => sum + Number(supplier.currentBalance || 0), 0);
+
+    return {
+      totalSuppliers: pagination?.total || 0,
+      activeSuppliers,
+      pageBalance,
+    };
+  }, [pagination?.total, suppliers]);
 
   const fetchSuppliers = useCallback(async () => {
-    setLoading(true);
-    setError('');
+    setListLoading(true);
+    setListError('');
+
     try {
       const response = await api.get('/business-operations/suppliers', {
         params: {
           page,
-          pageSize: 25,
+          pageSize: 20,
           sortBy: 'createdAt',
           sortOrder: 'desc',
           search: search || undefined,
@@ -98,45 +88,66 @@ const SuppliersTab = ({ refreshKey = 0 }) => {
 
       setSuppliers(response.data?.data || []);
       setPagination(response.data?.pagination || null);
-    } catch (requestError) {
+    } catch (error) {
       setSuppliers([]);
       setPagination(null);
-      setError(requestError.response?.data?.error || 'Failed to load suppliers');
+      setListError(error.response?.data?.error || 'Failed to load suppliers');
     } finally {
-      setLoading(false);
+      setListLoading(false);
     }
   }, [page, search, statusFilter]);
 
-  const fetchSupplierDetail = useCallback(async (supplierId) => {
+  const fetchSupplierDetail = useCallback(async (supplierId, nextTransactionPage = 1) => {
     if (!supplierId) {
-      setDetailState({ loading: false, error: '', balance: null, transactions: [] });
+      setDetailState(INITIAL_DETAIL_STATE);
+      setDetailError('');
+      setTransactionsError('');
       return;
     }
 
-    setDetailState((current) => ({ ...current, loading: true, error: '' }));
+    setDetailLoading(true);
+    setTransactionsLoading(true);
+    setDetailError('');
+    setTransactionsError('');
+
     try {
-      const [balanceResponse, transactionsResponse] = await Promise.all([
+      const [supplierResponse, balanceResponse, transactionsResponse] = await Promise.all([
+        api.get(`/business-operations/suppliers/${supplierId}`),
         api.get(`/business-operations/suppliers/${supplierId}/balance`),
         api.get('/business-operations/suppliers/transactions/list', {
-          params: { supplierId, page: 1, pageSize: 12, sortBy: 'transactionDate', sortOrder: 'desc' },
+          params: {
+            supplierId,
+            page: nextTransactionPage,
+            pageSize: 12,
+            sortBy: 'transactionDate',
+            sortOrder: 'desc',
+          },
         }),
       ]);
 
       setDetailState({
-        loading: false,
-        error: '',
-        balance: balanceResponse.data?.data || null,
+        supplier: supplierResponse.data?.data || balanceResponse.data?.data?.supplier || null,
+        summary: balanceResponse.data?.data?.summary || null,
         transactions: transactionsResponse.data?.data || [],
+        transactionPagination: transactionsResponse.data?.pagination || null,
       });
-    } catch (requestError) {
-      setDetailState({
-        loading: false,
-        error: requestError.response?.data?.error || 'Failed to load supplier balance and transactions',
-        balance: null,
-        transactions: [],
-      });
+    } catch (error) {
+      setDetailState(INITIAL_DETAIL_STATE);
+      const message = error.response?.data?.error || 'Failed to load supplier details';
+      setDetailError(message);
+      setTransactionsError(message);
+    } finally {
+      setDetailLoading(false);
+      setTransactionsLoading(false);
     }
   }, []);
+
+  const refreshData = useCallback(async ({ selectedId = selectedSupplierId, nextTransactionPage = transactionPage } = {}) => {
+    await fetchSuppliers();
+    if (selectedId) {
+      await fetchSupplierDetail(selectedId, nextTransactionPage);
+    }
+  }, [fetchSupplierDetail, fetchSuppliers, selectedSupplierId, transactionPage]);
 
   useEffect(() => {
     fetchSuppliers();
@@ -147,75 +158,171 @@ const SuppliersTab = ({ refreshKey = 0 }) => {
   }, [search, statusFilter]);
 
   useEffect(() => {
+    setTransactionPage(1);
+  }, [selectedSupplierId]);
+
+  useEffect(() => {
     if (!suppliers.length) {
       setSelectedSupplierId(null);
-      setDetailState({ loading: false, error: '', balance: null, transactions: [] });
       return;
     }
 
-    const stillVisible = suppliers.some((supplier) => supplier.id === selectedSupplierId);
-    if (!selectedSupplierId || !stillVisible) {
+    if (pendingSelectedSupplierId && suppliers.some((supplier) => supplier.id === pendingSelectedSupplierId)) {
+      setSelectedSupplierId(pendingSelectedSupplierId);
+      setPendingSelectedSupplierId(null);
+      return;
+    }
+
+    const isStillVisible = suppliers.some((supplier) => supplier.id === selectedSupplierId);
+    if (!selectedSupplierId || !isStillVisible) {
       setSelectedSupplierId(suppliers[0].id);
     }
-  }, [selectedSupplierId, suppliers]);
+  }, [pendingSelectedSupplierId, selectedSupplierId, suppliers]);
 
   useEffect(() => {
-    fetchSupplierDetail(selectedSupplierId);
-  }, [fetchSupplierDetail, refreshKey, selectedSupplierId]);
+    if (!selectedSupplierId) {
+      setDetailState(INITIAL_DETAIL_STATE);
+      return;
+    }
 
-  const totalSuppliers = pagination?.total || 0;
-  const activeSuppliers = useMemo(
-    () => suppliers.filter((supplier) => String(supplier.status || '').toLowerCase() === 'active').length,
-    [suppliers]
-  );
+    fetchSupplierDetail(selectedSupplierId, transactionPage);
+  }, [fetchSupplierDetail, refreshKey, selectedSupplierId, transactionPage]);
 
-  const selectedSupplier = detailState.balance?.supplier || null;
-  const balanceSummary = detailState.balance?.summary || null;
+  const handleSupplierSubmit = async (payload) => {
+    setSupplierFormSaving(true);
+    setSupplierFormError('');
+
+    try {
+      const response = supplierModalState.supplier
+        ? await api.put(`/business-operations/suppliers/${supplierModalState.supplier.id}`, payload)
+        : await api.post('/business-operations/suppliers', payload);
+
+      const savedSupplier = response.data?.data || null;
+      setSupplierModalState({ open: false, supplier: null });
+
+      if (savedSupplier?.id) {
+        setPendingSelectedSupplierId(savedSupplier.id);
+        setSelectedSupplierId(savedSupplier.id);
+      }
+
+      await refreshData({ selectedId: savedSupplier?.id || selectedSupplierId, nextTransactionPage: 1 });
+    } catch (error) {
+      setSupplierFormError(error.response?.data?.error || 'Failed to save supplier');
+    } finally {
+      setSupplierFormSaving(false);
+    }
+  };
+
+  const handleTransactionSubmit = async (payload) => {
+    setTransactionFormSaving(true);
+    setTransactionFormError('');
+
+    try {
+      await (transactionModalState.transaction
+        ? api.put(`/business-operations/suppliers/transactions/${transactionModalState.transaction.id}`, payload)
+        : api.post('/business-operations/suppliers/transactions', payload));
+
+      setTransactionModalState({ open: false, transaction: null });
+      setTransactionPage(1);
+      await refreshData({ selectedId: payload.supplierId || selectedSupplierId, nextTransactionPage: 1 });
+    } catch (error) {
+      setTransactionFormError(error.response?.data?.error || 'Failed to save supplier transaction');
+    } finally {
+      setTransactionFormSaving(false);
+    }
+  };
+
+  const openCreateSupplier = () => {
+    setSupplierFormError('');
+    setSupplierModalState({ open: true, supplier: null });
+  };
+
+  const openEditSupplier = (supplier) => {
+    setSupplierFormError('');
+    setSupplierModalState({ open: true, supplier });
+  };
+
+  const openCreateTransaction = () => {
+    setTransactionFormError('');
+    setTransactionModalState({ open: true, transaction: null });
+  };
+
+  const openEditTransaction = (transaction) => {
+    setTransactionFormError('');
+    setTransactionModalState({ open: true, transaction });
+  };
+
+  const selectedSupplier = detailState.supplier;
+  const selectedSummary = detailState.summary;
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
       <div style={{ ...cardStyle, padding: '1.2rem 1.3rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
           <div>
-            <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.15rem' }}>Suppliers</h3>
-            <p style={{ margin: '0.45rem 0 0', color: '#64748b', lineHeight: 1.6, maxWidth: '780px' }}>
-              Supplier imports now land in a live register with balance visibility and recent transaction history.
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', color: '#5B4B8A', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.76rem', letterSpacing: '0.05em' }}>
+              <i className="fas fa-truck-field"></i>
+              Suppliers Workspace
+            </div>
+            <h3 style={{ margin: '0.4rem 0 0', color: '#0f172a', fontSize: '1.2rem' }}>Supplier Management</h3>
+            <p style={{ margin: '0.45rem 0 0', color: '#64748b', lineHeight: 1.6, maxWidth: '920px' }}>
+              Set up suppliers manually, maintain clean verified records, record debts and payments, and monitor balances without depending on workbook imports.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={fetchSuppliers}
-            disabled={loading}
-            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.7rem 1rem', fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer' }}
-          >
-            <i className={`fas ${loading ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`} style={{ marginRight: '0.45rem' }}></i>
-            Refresh
-          </button>
+
+          <div style={{ display: 'flex', gap: '0.7rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={openCreateSupplier}
+              style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.72rem 1rem', fontWeight: 700, cursor: 'pointer' }}
+            >
+              <i className="fas fa-plus" style={{ marginRight: '0.45rem' }}></i>
+              Add New Supplier
+            </button>
+            <button
+              type="button"
+              onClick={() => refreshData({ selectedId: selectedSupplierId, nextTransactionPage: transactionPage })}
+              disabled={listLoading || detailLoading || transactionsLoading}
+              style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.72rem 1rem', fontWeight: 700, cursor: 'pointer' }}
+            >
+              <i className={`fas ${(listLoading || detailLoading || transactionsLoading) ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`} style={{ marginRight: '0.45rem' }}></i>
+              Refresh
+            </button>
+            <button
+              type="button"
+              disabled
+              title="Export will be added when the verified-data workflow is fully settled"
+              style={{ border: '1px dashed #cbd5e1', backgroundColor: '#fff', color: '#94a3b8', borderRadius: '10px', padding: '0.72rem 1rem', fontWeight: 700, cursor: 'not-allowed' }}
+            >
+              <i className="fas fa-file-export" style={{ marginRight: '0.45rem' }}></i>
+              Export
+            </button>
+          </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.9rem', marginTop: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.9rem', marginTop: '1rem' }}>
           <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
-            <div style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Total Suppliers</div>
-            <div style={{ marginTop: '0.35rem', fontSize: '1.65rem', fontWeight: 800, color: '#0f172a' }}>{totalSuppliers.toLocaleString('en-US')}</div>
+            <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Total Suppliers</div>
+            <div style={{ marginTop: '0.35rem', fontSize: '1.6rem', fontWeight: 800, color: '#0f172a' }}>{totals.totalSuppliers.toLocaleString('en-US')}</div>
           </div>
           <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
-            <div style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Active On Page</div>
-            <div style={{ marginTop: '0.35rem', fontSize: '1.65rem', fontWeight: 800, color: '#0f172a' }}>{activeSuppliers.toLocaleString('en-US')}</div>
+            <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Active On Page</div>
+            <div style={{ marginTop: '0.35rem', fontSize: '1.6rem', fontWeight: 800, color: '#0f172a' }}>{totals.activeSuppliers.toLocaleString('en-US')}</div>
           </div>
           <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
-            <div style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Outstanding Balance</div>
-            <div style={{ marginTop: '0.35rem', fontSize: '1.65rem', fontWeight: 800, color: '#0f172a' }}>{money(balanceSummary?.outstandingBalance)}</div>
+            <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Page Exposure</div>
+            <div style={{ marginTop: '0.35rem', fontSize: '1.6rem', fontWeight: 800, color: '#0f172a' }}>{money(totals.pageBalance)}</div>
           </div>
           <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
-            <div style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Selected Supplier Paid</div>
-            <div style={{ marginTop: '0.35rem', fontSize: '1.65rem', fontWeight: 800, color: '#0f172a' }}>{money(balanceSummary?.totalPaid)}</div>
+            <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Selected Outstanding</div>
+            <div style={{ marginTop: '0.35rem', fontSize: '1.6rem', fontWeight: 800, color: '#0f172a' }}>{money(selectedSummary?.outstandingBalance)}</div>
           </div>
         </div>
       </div>
 
       <div style={{ ...cardStyle, padding: '1rem' }}>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <div style={{ flex: '1 1 320px', position: 'relative' }}>
+          <div style={{ flex: '1 1 280px', position: 'relative' }}>
             <i className="fas fa-search" style={{ position: 'absolute', top: '50%', left: '0.95rem', transform: 'translateY(-50%)', color: '#94a3b8' }}></i>
             <input
               type="text"
@@ -237,138 +344,73 @@ const SuppliersTab = ({ refreshKey = 0 }) => {
         </div>
       </div>
 
-      <div style={{ ...cardStyle, overflow: 'hidden' }}>
-        {error ? (
-          <div style={{ padding: '1rem' }}><ErrorState message={error} /></div>
-        ) : loading ? (
-          <EmptyState message="Loading suppliers..." />
-        ) : !suppliers.length ? (
-          <EmptyState message="No suppliers matched the current search and status filters." />
-        ) : (
-          <>
-            <div style={{ overflowX: 'auto', maxHeight: '500px' }}>
-              <table style={tableStyle}>
-                <thead>
-                  <tr>
-                    <th style={thStyle}>Supplier</th>
-                    <th style={thStyle}>Contact</th>
-                    <th style={thStyle}>Status</th>
-                    <th style={thStyle}>Opening Balance</th>
-                    <th style={thStyle}>Notes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {suppliers.map((supplier) => {
-                    const selected = supplier.id === selectedSupplierId;
-                    return (
-                      <tr key={supplier.id} onClick={() => setSelectedSupplierId(supplier.id)} style={{ backgroundColor: selected ? '#f8fafc' : '#fff', cursor: 'pointer' }}>
-                        <td style={tdStyle}>
-                          <div style={{ display: 'grid', gap: '0.25rem' }}>
-                            <strong style={{ color: '#0f172a' }}>{supplier.name}</strong>
-                            <span style={{ color: '#64748b', fontSize: '0.84rem' }}>{supplier.supplierCode || 'No supplier code'}</span>
-                          </div>
-                        </td>
-                        <td style={tdStyle}>
-                          <div style={{ display: 'grid', gap: '0.25rem' }}>
-                            <span>{supplier.contactPerson || 'No contact person'}</span>
-                            <span style={{ color: '#64748b', fontSize: '0.84rem' }}>{supplier.phone || supplier.email || 'No phone or email'}</span>
-                          </div>
-                        </td>
-                        <td style={tdStyle}><span style={statusBadgeStyle(String(supplier.status || '').toLowerCase())}>{supplier.status || 'Unknown'}</span></td>
-                        <td style={tdStyle}>{money(supplier.openingBalance)}</td>
-                        <td style={tdStyle}>{supplier.notes || 'No notes'}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', padding: '1rem', borderTop: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
-              <span style={{ color: '#64748b', fontSize: '0.88rem' }}>Page {pagination?.page || 1} of {pagination?.totalPages || 1} with {(pagination?.total || 0).toLocaleString('en-US')} suppliers.</span>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={(pagination?.page || 1) <= 1} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.9rem', fontWeight: 700, cursor: 'pointer' }}>Previous</button>
-                <button type="button" onClick={() => setPage((current) => current + 1)} disabled={(pagination?.page || 1) >= (pagination?.totalPages || 1)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.9rem', fontWeight: 700, cursor: 'pointer' }}>Next</button>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-
-      <div style={{ ...cardStyle, padding: '1.2rem 1.3rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-          <div>
-            <h4 style={{ margin: 0, color: '#0f172a', fontSize: '1rem' }}>Selected Supplier Ledger</h4>
-            <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.9rem' }}>
-              Balance summary and latest supplier transactions for the selected record.
-            </p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(360px, 0.95fr)', gap: '1rem', alignItems: 'start' }}>
+        <div style={{ ...cardStyle, overflow: 'hidden' }}>
+          <div style={{ padding: '1rem 1.05rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+            <strong style={{ color: '#0f172a' }}>Supplier Register</strong>
+            <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>Select a supplier to inspect balance history, edit details, or record new transactions.</p>
           </div>
-          {selectedSupplier && <div style={statusBadgeStyle(String(selectedSupplier.status || '').toLowerCase())}>{selectedSupplier.status || 'Unknown'}</div>}
+          <SuppliersList
+            suppliers={suppliers}
+            loading={listLoading}
+            error={listError}
+            pagination={pagination}
+            page={page}
+            onPageChange={setPage}
+            selectedSupplierId={selectedSupplierId}
+            onSelectSupplier={(supplier) => setSelectedSupplierId(supplier.id)}
+            onEditSupplier={openEditSupplier}
+          />
         </div>
 
-        {detailState.error ? (
-          <div style={{ marginTop: '1rem' }}><ErrorState message={detailState.error} /></div>
-        ) : detailState.loading ? (
-          <EmptyState message="Loading supplier ledger..." />
-        ) : !selectedSupplier ? (
-          <EmptyState message="Select a supplier above to inspect balance and transactions." />
-        ) : (
-          <div style={{ display: 'grid', gap: '1rem', marginTop: '1rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.9rem' }}>
-              <div style={{ backgroundColor: '#f8fafc', borderRadius: '14px', padding: '1rem' }}>
-                <div style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Opening Balance</div>
-                <div style={{ marginTop: '0.45rem', fontWeight: 800, color: '#0f172a' }}>{money(balanceSummary?.openingBalance)}</div>
-              </div>
-              <div style={{ backgroundColor: '#f8fafc', borderRadius: '14px', padding: '1rem' }}>
-                <div style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Total Debt</div>
-                <div style={{ marginTop: '0.45rem', fontWeight: 800, color: '#0f172a' }}>{money(balanceSummary?.totalDebt)}</div>
-              </div>
-              <div style={{ backgroundColor: '#f8fafc', borderRadius: '14px', padding: '1rem' }}>
-                <div style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Total Paid</div>
-                <div style={{ marginTop: '0.45rem', fontWeight: 800, color: '#0f172a' }}>{money(balanceSummary?.totalPaid)}</div>
-              </div>
-              <div style={{ backgroundColor: '#f8fafc', borderRadius: '14px', padding: '1rem' }}>
-                <div style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Outstanding</div>
-                <div style={{ marginTop: '0.45rem', fontWeight: 800, color: '#0f172a' }}>{money(balanceSummary?.outstandingBalance)}</div>
-              </div>
-            </div>
-
-            <div style={{ border: '1px solid #e2e8f0', borderRadius: '16px', overflow: 'hidden' }}>
-              <div style={{ padding: '1rem 1.1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-                <strong style={{ color: '#0f172a' }}>Recent Transactions</strong>
-              </div>
-              {!detailState.transactions.length ? (
-                <EmptyState message="No supplier transactions are attached to this supplier yet." />
-              ) : (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={tableStyle}>
-                    <thead>
-                      <tr>
-                        <th style={thStyle}>Date</th>
-                        <th style={thStyle}>Type</th>
-                        <th style={thStyle}>Payment Method</th>
-                        <th style={thStyle}>Reference</th>
-                        <th style={thStyle}>Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {detailState.transactions.map((transaction) => (
-                        <tr key={transaction.id}>
-                          <td style={tdStyle}>{formatDate(transaction.transactionDate)}</td>
-                          <td style={tdStyle}>{transaction.transactionType || 'Unknown'}</td>
-                          <td style={tdStyle}>{transaction.paymentMethod || 'Not set'}</td>
-                          <td style={tdStyle}>{transaction.referenceNo || 'Not set'}</td>
-                          <td style={tdStyle}>{money(transaction.amount)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        <div style={{ ...cardStyle, padding: '1rem' }}>
+          {selectedSupplierId || detailLoading ? (
+            <SupplierDetailPanel
+              supplier={selectedSupplier}
+              balanceSummary={selectedSummary}
+              detailLoading={detailLoading}
+              detailError={detailError}
+              transactions={detailState.transactions}
+              transactionsLoading={transactionsLoading}
+              transactionsError={transactionsError}
+              transactionPagination={detailState.transactionPagination}
+              transactionPage={transactionPage}
+              onTransactionPageChange={setTransactionPage}
+              onEditSupplier={() => openEditSupplier(selectedSupplier)}
+              onAddTransaction={openCreateTransaction}
+              onEditTransaction={openEditTransaction}
+            />
+          ) : (
+            <SupplierEmptyState
+              title="No supplier selected"
+              message="Add your first supplier or choose one from the list to begin manual supplier management."
+              actionLabel="Add New Supplier"
+              onAction={openCreateSupplier}
+              icon="fa-truck-field"
+            />
+          )}
+        </div>
       </div>
+
+      <SupplierFormModal
+        isOpen={supplierModalState.open}
+        supplier={supplierModalState.supplier}
+        saving={supplierFormSaving}
+        error={supplierFormError}
+        onClose={() => setSupplierModalState({ open: false, supplier: null })}
+        onSubmit={handleSupplierSubmit}
+      />
+
+      <SupplierTransactionFormModal
+        isOpen={transactionModalState.open}
+        transaction={transactionModalState.transaction}
+        supplier={selectedSupplier}
+        supplierOptions={supplierOptions}
+        saving={transactionFormSaving}
+        error={transactionFormError}
+        onClose={() => setTransactionModalState({ open: false, transaction: null })}
+        onSubmit={handleTransactionSubmit}
+      />
     </div>
   );
 };
