@@ -19,6 +19,16 @@ const LOAN_TX_SORT_FIELDS = new Set(['id', 'amount', 'createdAt']);
 const TERMINATION_SORT_FIELDS = new Set(['id', 'terminationDate', 'settlementAmount', 'createdAt']);
 const REENGAGEMENT_SORT_FIELDS = new Set(['id', 'effectiveDate', 'createdAt']);
 
+function isPayrollEntryUniqueError(err) {
+  return (
+    err &&
+    err.code === 'P2002' &&
+    Array.isArray(err.meta?.target) &&
+    err.meta.target.includes('payroll_period_id') &&
+    err.meta.target.includes('employee_id')
+  );
+}
+
 function parsePayrollEntryPayload(body) {
   return {
     payrollPeriodId: toInt(body.payrollPeriodId),
@@ -96,6 +106,7 @@ async function listPayrollPeriods(req, res) {
     if (sort.error) return res.status(400).json({ success: false, error: sort.error });
 
     const filters = {
+      search: req.query.search ? String(req.query.search).trim() : null,
       status: req.query.status ? String(req.query.status).trim() : null,
       payrollMode: req.query.payrollMode ? String(req.query.payrollMode).toLowerCase() : null,
       reportingPeriodId: toInt(req.query.reportingPeriodId),
@@ -141,6 +152,12 @@ async function createPayrollEntry(req, res) {
     const data = await payrollService.createPayrollEntry(payload);
     return res.status(201).json({ success: true, data });
   } catch (err) {
+    if (isPayrollEntryUniqueError(err)) {
+      return res.status(409).json({
+        success: false,
+        error: 'A payroll entry already exists for this employee in the selected payroll period.',
+      });
+    }
     console.error('[BO][PAYROLL] createPayrollEntry error:', err);
     return res.status(500).json({ success: false, error: 'Failed to create payroll entry' });
   }
@@ -155,6 +172,12 @@ async function updatePayrollEntry(req, res) {
     const data = await payrollService.updatePayrollEntry(id, payload);
     return res.json({ success: true, data });
   } catch (err) {
+    if (isPayrollEntryUniqueError(err)) {
+      return res.status(409).json({
+        success: false,
+        error: 'A payroll entry already exists for this employee in the selected payroll period.',
+      });
+    }
     console.error('[BO][PAYROLL] updatePayrollEntry error:', err);
     return res.status(500).json({ success: false, error: 'Failed to update payroll entry' });
   }

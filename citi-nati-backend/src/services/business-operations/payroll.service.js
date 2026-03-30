@@ -35,16 +35,56 @@ async function updatePayrollPeriod(id, payload) {
   });
 }
 
-async function listPayrollPeriods({ status, payrollMode, reportingPeriodId, skip, take, sortBy, sortOrder }) {
+async function listPayrollPeriods({ search, status, payrollMode, reportingPeriodId, skip, take, sortBy, sortOrder }) {
   const where = {};
   if (status) where.status = status;
   if (payrollMode) where.payrollMode = payrollMode;
   if (reportingPeriodId) where.reportingPeriodId = reportingPeriodId;
+  if (search) {
+    where.OR = [
+      { description: { contains: search, mode: 'insensitive' } },
+      { createdBy: { contains: search, mode: 'insensitive' } },
+      { payrollMode: { contains: search, mode: 'insensitive' } },
+      { status: { contains: search, mode: 'insensitive' } },
+    ];
+  }
 
-  const [data, total] = await Promise.all([
+  const [periods, total] = await Promise.all([
     prisma.payrollPeriod.findMany({ where, skip, take, orderBy: { [sortBy]: sortOrder } }),
     prisma.payrollPeriod.count({ where }),
   ]);
+
+  const ids = periods.map((p) => p.id);
+  if (!ids.length) {
+    return { data: periods, total, where };
+  }
+
+  const grouped = await prisma.payrollEntry.groupBy({
+    by: ['payrollPeriodId'],
+    where: { payrollPeriodId: { in: ids } },
+    _count: { id: true },
+    _sum: {
+      grossPay: true,
+      totalDeductions: true,
+      netPay: true,
+      overtimeAmount: true,
+      loanDeductionAmount: true,
+    },
+  });
+
+  const groupedMap = new Map(grouped.map((g) => [g.payrollPeriodId, g]));
+  const data = periods.map((period) => {
+    const g = groupedMap.get(period.id);
+    return {
+      ...period,
+      entryCount: g?._count?.id || 0,
+      totalGrossPay: g?._sum?.grossPay || 0,
+      totalDeductions: g?._sum?.totalDeductions || 0,
+      totalNetPay: g?._sum?.netPay || 0,
+      totalOvertimeAmount: g?._sum?.overtimeAmount || 0,
+      totalLoanDeductionAmount: g?._sum?.loanDeductionAmount || 0,
+    };
+  });
 
   return { data, total, where };
 }
