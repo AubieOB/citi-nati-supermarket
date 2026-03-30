@@ -49,7 +49,7 @@ const AdminBusinessOperations = () => {
     'sales-reports': <SalesReportsTab />,
     suppliers: <SuppliersTab refreshKey={dataRefreshKey} />,
     expenses: <ExpensesTab refreshKey={dataRefreshKey} />,
-    'monthly-summary': <MonthlySummaryTab refreshKey={dataRefreshKey} />,
+    'monthly-summary': <MonthlySummaryTab refreshKey={dataRefreshKey} onNavigateTab={setActiveTab} />,
     employees: <EmployeesTab refreshKey={dataRefreshKey} />,
     payroll: <PayrollTab refreshKey={dataRefreshKey} />,
     'report-history': <ReportHistoryTab refreshKey={dataRefreshKey} />,

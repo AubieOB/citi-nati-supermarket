@@ -1,5 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../../../utils/api.js';
+import SummaryFiltersBar from './monthly-summary/SummaryFiltersBar.jsx';
+import SummaryCards from './monthly-summary/SummaryCards.jsx';
+import SalesSummarySection from './monthly-summary/SalesSummarySection.jsx';
+import ExpensesSummarySection from './monthly-summary/ExpensesSummarySection.jsx';
+import PayrollSummarySection from './monthly-summary/PayrollSummarySection.jsx';
+import SupplierSummarySection from './monthly-summary/SupplierSummarySection.jsx';
+import NetSummaryCard from './monthly-summary/NetSummaryCard.jsx';
 
 const cardStyle = {
   backgroundColor: '#fff',
@@ -10,222 +17,361 @@ const cardStyle = {
 
 const money = (value) => `MWK ${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const EmptyState = ({ message }) => (
-  <div style={{ padding: '2rem', color: '#64748b', textAlign: 'center' }}>{message}</div>
-);
-
-const ErrorState = ({ message }) => (
-  <div style={{ padding: '1rem 1.25rem', borderRadius: '14px', backgroundColor: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca' }}>
-    {message}
-  </div>
-);
-
-function buildMonthRange(year, month) {
+const monthRange = (year, month) => {
   const start = new Date(year, month - 1, 1);
   const end = new Date(year, month, 0);
   return {
     startDate: start.toISOString().slice(0, 10),
     endDate: end.toISOString().slice(0, 10),
+    label: `${start.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`,
   };
-}
+};
 
-const monthOptions = [
-  { value: 1, label: 'January' },
-  { value: 2, label: 'February' },
-  { value: 3, label: 'March' },
-  { value: 4, label: 'April' },
-  { value: 5, label: 'May' },
-  { value: 6, label: 'June' },
-  { value: 7, label: 'July' },
-  { value: 8, label: 'August' },
-  { value: 9, label: 'September' },
-  { value: 10, label: 'October' },
-  { value: 11, label: 'November' },
-  { value: 12, label: 'December' },
-];
+const inDateRange = (value, startDate, endDate) => {
+  if (!value) return false;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T23:59:59`);
+  return date >= start && date <= end;
+};
 
-const MonthlySummaryTab = ({ refreshKey = 0 }) => {
-  const today = new Date();
-  const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
-  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
-  const [state, setState] = useState({
-    loading: true,
-    error: '',
-    salesSummary: null,
-    salesMeta: null,
-    expenseSummary: null,
-    totalEmployees: 0,
-    activeEmployees: 0,
-    totalSuppliers: 0,
-    totalPayrollEntries: 0,
-    monthTerminations: 0,
-    monthReengagements: 0,
+const fetchAllPages = async (path, params = {}, maxPages = 20) => {
+  const rows = [];
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    const response = await api.get(path, { params: { ...params, page, pageSize: params.pageSize || 100 } });
+    const pageRows = Array.isArray(response?.data?.data) ? response.data.data : [];
+    const pagination = response?.data?.pagination || null;
+    rows.push(...pageRows);
+
+    const totalPages = Number(pagination?.totalPages || 1);
+    if (page >= totalPages || pageRows.length === 0) break;
+  }
+
+  return rows;
+};
+
+const parseError = (error, fallback) => error?.response?.data?.error || error?.response?.data?.message || fallback;
+
+const defaultSectionState = { loading: true, error: '' };
+
+const MonthlySummaryTab = ({ refreshKey = 0, onNavigateTab }) => {
+  const now = new Date();
+  const initialMonthRange = monthRange(now.getFullYear(), now.getMonth() + 1);
+
+  const [filters, setFilters] = useState({
+    periodType: 'month',
+    month: now.getMonth() + 1,
+    year: now.getFullYear(),
+    startDate: initialMonthRange.startDate,
+    endDate: initialMonthRange.endDate,
+    locationCode: '',
   });
+  const [refreshTick, setRefreshTick] = useState(0);
 
-  const fetchSummary = useCallback(async () => {
-    setState((prev) => ({ ...prev, loading: true, error: '' }));
-    const monthRange = buildMonthRange(selectedYear, selectedMonth);
+  const [salesState, setSalesState] = useState({ ...defaultSectionState, summary: null, payments: [] });
+  const [expensesState, setExpensesState] = useState({ ...defaultSectionState, summary: null });
+  const [payrollState, setPayrollState] = useState({ ...defaultSectionState, data: null });
+  const [supplierState, setSupplierState] = useState({ ...defaultSectionState, data: null });
+
+  const activeRange = useMemo(() => {
+    if (filters.periodType === 'month') return monthRange(filters.year, filters.month);
+    const label = `${filters.startDate || 'No start'} to ${filters.endDate || 'No end'}`;
+    return { startDate: filters.startDate, endDate: filters.endDate, label };
+  }, [filters.endDate, filters.month, filters.periodType, filters.startDate, filters.year]);
+
+  const validationError = useMemo(() => {
+    if (filters.periodType !== 'custom') return '';
+    if (!filters.startDate || !filters.endDate) return 'Start and end dates are required for custom range.';
+    if (new Date(filters.startDate) > new Date(filters.endDate)) return 'Custom range start date cannot be after end date.';
+    return '';
+  }, [filters.endDate, filters.periodType, filters.startDate]);
+
+  const handleFilterChange = useCallback((key, value) => {
+    setFilters((prev) => {
+      const next = { ...prev, [key]: value };
+      if (key === 'periodType' && value === 'month') {
+        const nextMonth = monthRange(prev.year, prev.month);
+        next.startDate = nextMonth.startDate;
+        next.endDate = nextMonth.endDate;
+      }
+      if ((key === 'month' || key === 'year') && next.periodType === 'month') {
+        const nextMonth = monthRange(key === 'year' ? value : next.year, key === 'month' ? value : next.month);
+        next.startDate = nextMonth.startDate;
+        next.endDate = nextMonth.endDate;
+      }
+      return next;
+    });
+  }, []);
+
+  const resetFilters = useCallback(() => {
+    const resetRange = monthRange(now.getFullYear(), now.getMonth() + 1);
+    setFilters({
+      periodType: 'month',
+      month: now.getMonth() + 1,
+      year: now.getFullYear(),
+      startDate: resetRange.startDate,
+      endDate: resetRange.endDate,
+      locationCode: '',
+    });
+  }, [now]);
+
+  const fetchSales = useCallback(async () => {
+    setSalesState((prev) => ({ ...prev, loading: true, error: '' }));
+
+    const params = filters.periodType === 'month'
+      ? { periodType: 'month', month: String(filters.month), year: String(filters.year) }
+      : { periodType: 'custom', startDate: activeRange.startDate, endDate: activeRange.endDate };
+
+    if (filters.locationCode.trim()) params.locationCode = filters.locationCode.trim().toUpperCase();
 
     try {
-      const [salesResponse, expenseSummaryResponse, totalEmployeesResponse, activeEmployeesResponse, suppliersResponse, payrollEntriesResponse, terminationsResponse, reengagementsResponse] = await Promise.all([
-        api.get('/business-operations/reports/sales/summary', { params: { periodType: 'month', month: String(selectedMonth), year: String(selectedYear) } }),
-        api.get('/business-operations/expenses/summary/overview', { params: monthRange }),
-        api.get('/business-operations/employees', { params: { page: 1, pageSize: 1, sortBy: 'createdAt', sortOrder: 'desc' } }),
-        api.get('/business-operations/employees', { params: { page: 1, pageSize: 1, status: 'active', sortBy: 'createdAt', sortOrder: 'desc' } }),
-        api.get('/business-operations/suppliers', { params: { page: 1, pageSize: 1, sortBy: 'createdAt', sortOrder: 'desc' } }),
-        api.get('/business-operations/payroll/entries', { params: { page: 1, pageSize: 1, sortBy: 'createdAt', sortOrder: 'desc' } }),
-        api.get('/business-operations/payroll/terminations', { params: { page: 1, pageSize: 1, sortBy: 'terminationDate', sortOrder: 'desc', startDate: monthRange.startDate, endDate: monthRange.endDate } }),
-        api.get('/business-operations/payroll/reengagements', { params: { page: 1, pageSize: 1, sortBy: 'effectiveDate', sortOrder: 'desc', startDate: monthRange.startDate, endDate: monthRange.endDate } }),
+      const [summaryResponse, paymentsResponse] = await Promise.all([
+        api.get('/business-operations/reports/sales/summary', { params }),
+        api.get('/business-operations/reports/sales/payments', { params }),
       ]);
 
-      setState({
+      setSalesState({
         loading: false,
         error: '',
-        salesSummary: salesResponse.data?.data || null,
-        salesMeta: { dateRange: salesResponse.data?.dateRange || null, filters: salesResponse.data?.filters || null },
-        expenseSummary: expenseSummaryResponse.data?.data || null,
-        totalEmployees: totalEmployeesResponse.data?.pagination?.total || 0,
-        activeEmployees: activeEmployeesResponse.data?.pagination?.total || 0,
-        totalSuppliers: suppliersResponse.data?.pagination?.total || 0,
-        totalPayrollEntries: payrollEntriesResponse.data?.pagination?.total || 0,
-        monthTerminations: terminationsResponse.data?.pagination?.total || 0,
-        monthReengagements: reengagementsResponse.data?.pagination?.total || 0,
+        summary: summaryResponse?.data?.data || null,
+        payments: Array.isArray(paymentsResponse?.data?.data) ? paymentsResponse.data.data : [],
       });
-    } catch (requestError) {
-      setState({
-        loading: false,
-        error: requestError.response?.data?.error || 'Failed to load monthly summary',
-        salesSummary: null,
-        salesMeta: null,
-        expenseSummary: null,
-        totalEmployees: 0,
-        activeEmployees: 0,
-        totalSuppliers: 0,
-        totalPayrollEntries: 0,
-        monthTerminations: 0,
-        monthReengagements: 0,
-      });
+    } catch (error) {
+      setSalesState({ loading: false, error: parseError(error, 'Failed to load sales summary.'), summary: null, payments: [] });
     }
-  }, [selectedMonth, selectedYear]);
+  }, [activeRange.endDate, activeRange.startDate, filters.locationCode, filters.month, filters.periodType, filters.year]);
+
+  const fetchExpenses = useCallback(async () => {
+    setExpensesState((prev) => ({ ...prev, loading: true, error: '' }));
+
+    const params = {
+      startDate: activeRange.startDate,
+      endDate: activeRange.endDate,
+    };
+
+    const asNumber = Number(filters.locationCode);
+    if (Number.isInteger(asNumber) && asNumber > 0) params.locationId = asNumber;
+
+    try {
+      const response = await api.get('/business-operations/expenses/summary/overview', { params });
+      setExpensesState({ loading: false, error: '', summary: response?.data?.data || null });
+    } catch (error) {
+      setExpensesState({ loading: false, error: parseError(error, 'Failed to load expense summary.'), summary: null });
+    }
+  }, [activeRange.endDate, activeRange.startDate, filters.locationCode]);
+
+  const fetchPayroll = useCallback(async () => {
+    setPayrollState((prev) => ({ ...prev, loading: true, error: '' }));
+
+    try {
+      const periods = await fetchAllPages('/business-operations/payroll/periods', {
+        sortBy: 'createdAt',
+        sortOrder: 'desc',
+        pageSize: 100,
+      });
+
+      const relevantPeriods = periods.filter((period) => inDateRange(period.createdAt, activeRange.startDate, activeRange.endDate));
+
+      if (!relevantPeriods.length) {
+        setPayrollState({
+          loading: false,
+          error: '',
+          data: {
+            totalBasicSalary: 0,
+            totalDeductions: 0,
+            totalNetPay: 0,
+            employeeCount: 0,
+            averageNetPay: 0,
+            periodCount: 0,
+          },
+        });
+        return;
+      }
+
+      const entryGroups = await Promise.all(
+        relevantPeriods.map((period) => fetchAllPages('/business-operations/payroll/entries', {
+          payrollPeriodId: period.id,
+          sortBy: 'createdAt',
+          sortOrder: 'desc',
+          pageSize: 150,
+        })),
+      );
+
+      const allEntries = entryGroups.flat();
+      const employeeIds = new Set(allEntries.map((entry) => entry.employeeId).filter(Boolean));
+      const totals = allEntries.reduce((acc, entry) => {
+        acc.totalBasicSalary += Number(entry.basicSalary || 0);
+        acc.totalDeductions += Number(entry.totalDeductions || 0);
+        acc.totalNetPay += Number(entry.netPay || 0);
+        return acc;
+      }, { totalBasicSalary: 0, totalDeductions: 0, totalNetPay: 0 });
+
+      setPayrollState({
+        loading: false,
+        error: '',
+        data: {
+          ...totals,
+          employeeCount: employeeIds.size,
+          averageNetPay: employeeIds.size ? totals.totalNetPay / employeeIds.size : 0,
+          periodCount: relevantPeriods.length,
+        },
+      });
+    } catch (error) {
+      setPayrollState({ loading: false, error: parseError(error, 'Failed to load payroll summary.'), data: null });
+    }
+  }, [activeRange.endDate, activeRange.startDate]);
+
+  const fetchSuppliers = useCallback(async () => {
+    setSupplierState((prev) => ({ ...prev, loading: true, error: '' }));
+
+    try {
+      const [suppliers, payments] = await Promise.all([
+        fetchAllPages('/business-operations/suppliers', {
+          sortBy: 'createdAt',
+          sortOrder: 'desc',
+          pageSize: 100,
+        }),
+        fetchAllPages('/business-operations/suppliers/transactions/list', {
+          sortBy: 'transactionDate',
+          sortOrder: 'desc',
+          transactionType: 'payment',
+          startDate: activeRange.startDate,
+          endDate: activeRange.endDate,
+          pageSize: 100,
+        }),
+      ]);
+
+      const activeSuppliers = suppliers.filter((supplier) => String(supplier.status || '').toLowerCase() === 'active').length;
+      const outstandingDebt = suppliers.reduce((sum, supplier) => {
+        const balance = Number(supplier.currentBalance || 0);
+        return sum + (balance > 0 ? balance : 0);
+      }, 0);
+
+      const paymentMethodsMap = payments.reduce((acc, payment) => {
+        const method = String(payment.paymentMethod || 'other').toLowerCase();
+        const current = acc.get(method) || 0;
+        acc.set(method, current + Number(payment.amount || 0));
+        return acc;
+      }, new Map());
+
+      const paymentMethods = Array.from(paymentMethodsMap.entries())
+        .map(([method, amount]) => ({ method, amount }))
+        .sort((a, b) => b.amount - a.amount);
+
+      const totalPayments = payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+
+      setSupplierState({
+        loading: false,
+        error: '',
+        data: {
+          activeSuppliers,
+          outstandingDebt,
+          totalPayments,
+          paymentMethods,
+        },
+      });
+    } catch (error) {
+      setSupplierState({ loading: false, error: parseError(error, 'Failed to load supplier summary.'), data: null });
+    }
+  }, [activeRange.endDate, activeRange.startDate]);
 
   useEffect(() => {
-    fetchSummary();
-  }, [fetchSummary, refreshKey]);
+    if (validationError) return;
+    fetchSales();
+    fetchExpenses();
+    fetchPayroll();
+    fetchSuppliers();
+  }, [fetchExpenses, fetchPayroll, fetchSales, fetchSuppliers, refreshKey, refreshTick, validationError]);
+
+  const salesTotal = Number(salesState.summary?.netSales || 0);
+  const expensesTotal = Number(expensesState.summary?.totals?.totalAmount || 0);
+  const payrollTotal = Number(payrollState.data?.totalNetPay || 0);
+  const supplierPaymentsTotal = Number(supplierState.data?.totalPayments || 0);
+  const supplierDebtTotal = Number(supplierState.data?.outstandingDebt || 0);
+  const netPosition = salesTotal - expensesTotal - payrollTotal - supplierPaymentsTotal;
+
+  const sectionComplete = !salesState.error && !expensesState.error && !payrollState.error && !supplierState.error;
+  const anyLoading = salesState.loading || expensesState.loading || payrollState.loading || supplierState.loading;
 
   const summaryCards = useMemo(() => ([
-    { label: 'Net Sales', value: money(state.salesSummary?.netSales), note: 'Sales performance for the selected month.' },
-    { label: 'Monthly Expenses', value: money(state.expenseSummary?.totals?.totalAmount), note: 'Expense total in the same month window.' },
-    { label: 'Invoices', value: (state.salesSummary?.totalInvoices || 0).toLocaleString('en-US'), note: 'Invoices counted in the selected sales period.' },
-    { label: 'Active Employees', value: state.activeEmployees.toLocaleString('en-US'), note: 'Current employee roster marked active.' },
-    { label: 'Suppliers', value: state.totalSuppliers.toLocaleString('en-US'), note: 'Suppliers available in the operations module.' },
-    { label: 'Payroll Entries', value: state.totalPayrollEntries.toLocaleString('en-US'), note: 'Imported payroll entries currently stored.' },
-  ]), [state.activeEmployees, state.expenseSummary?.totals?.totalAmount, state.salesSummary?.netSales, state.salesSummary?.totalInvoices, state.totalPayrollEntries, state.totalSuppliers]);
+    { label: 'Total Sales', value: money(salesTotal), note: 'Net sales for selected period.', tone: '#0369a1' },
+    { label: 'Total Expenses', value: money(expensesTotal), note: 'Expense outflow in selected period.', tone: '#b45309' },
+    { label: 'Total Payroll', value: money(payrollTotal), note: 'Net payroll paid in selected period.', tone: '#7c3aed' },
+    { label: 'Supplier Payments', value: money(supplierPaymentsTotal), note: 'Supplier payment outflow in selected period.', tone: '#15803d' },
+    { label: 'Supplier Debt', value: money(supplierDebtTotal), note: 'Current outstanding supplier balances.', tone: '#be123c' },
+    { label: 'Net Position', value: money(netPosition), note: netPosition >= 0 ? 'Profit (approx.)' : 'Loss (approx.)', tone: netPosition >= 0 ? '#166534' : '#b91c1c' },
+  ]), [expensesTotal, netPosition, payrollTotal, salesTotal, supplierDebtTotal, supplierPaymentsTotal]);
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
-      <div style={{ ...cardStyle, padding: '1.2rem 1.3rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+      <div style={{ ...cardStyle, padding: '1.08rem 1.15rem' }}>
+        <div style={{ display: 'grid', gap: '0.9rem' }}>
           <div>
-            <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.15rem' }}>Monthly Summary</h3>
-            <p style={{ margin: '0.45rem 0 0', color: '#64748b', lineHeight: 1.6, maxWidth: '820px' }}>
-              This view combines monthly sales and expenses with live workforce and operational counts so you can see the current business position without leaving the workspace.
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.42rem', color: '#5B4B8A', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.74rem', letterSpacing: '0.05em' }}>
+              <i className="fas fa-chart-line"></i>
+              Management Dashboard
+            </div>
+            <h3 style={{ margin: '0.38rem 0 0', color: '#0f172a', fontSize: '1.16rem' }}>Monthly Summary</h3>
+            <p style={{ margin: '0.4rem 0 0', color: '#64748b', lineHeight: 1.55, fontSize: '0.9rem' }}>
+              Executive overview combining Sales, Expenses, Payroll, and Suppliers to estimate business performance at a glance.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={fetchSummary}
-            disabled={state.loading}
-            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.7rem 1rem', fontWeight: 700, cursor: state.loading ? 'not-allowed' : 'pointer' }}
-          >
-            <i className={`fas ${state.loading ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`} style={{ marginRight: '0.45rem' }}></i>
-            Refresh
-          </button>
-        </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1rem' }}>
-          <select value={selectedMonth} onChange={(event) => setSelectedMonth(Number(event.target.value))} style={{ minWidth: '200px', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem', backgroundColor: '#fff' }}>
-            {monthOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-          <input type="number" min="2020" max="2100" value={selectedYear} onChange={(event) => setSelectedYear(Number(event.target.value || today.getFullYear()))} style={{ width: '140px', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem' }} />
+          <SummaryFiltersBar
+            filters={filters}
+            rangeLabel={activeRange.label}
+            loading={anyLoading}
+            validationError={validationError}
+            onChange={handleFilterChange}
+            onRefresh={() => setRefreshTick((current) => current + 1)}
+            onClear={resetFilters}
+          />
         </div>
-
-        {state.salesMeta?.dateRange && (
-          <div style={{ marginTop: '0.9rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', borderRadius: '999px', backgroundColor: '#f1f5f9', color: '#334155', padding: '0.45rem 0.8rem', fontSize: '0.86rem', fontWeight: 700 }}>
-            <i className="fas fa-calendar-days"></i>
-            {state.salesMeta.dateRange.startDate} to {state.salesMeta.dateRange.endDate}
-          </div>
-        )}
       </div>
 
-      {state.error ? (
-        <ErrorState message={state.error} />
-      ) : state.loading ? (
-        <div style={cardStyle}><EmptyState message="Loading monthly summary..." /></div>
-      ) : (
-        <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.9rem' }}>
-            {summaryCards.map((item) => (
-              <div key={item.label} style={{ ...cardStyle, padding: '1rem 1.1rem', display: 'grid', gap: '0.35rem' }}>
-                <span style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>{item.label}</span>
-                <strong style={{ fontSize: '1.65rem', color: '#0f172a' }}>{item.value}</strong>
-                <span style={{ color: '#64748b', fontSize: '0.84rem' }}>{item.note}</span>
-              </div>
-            ))}
-          </div>
+      <SummaryCards cards={summaryCards} />
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
-            <div style={{ ...cardStyle, padding: '1rem 1.1rem', display: 'grid', gap: '0.8rem' }}>
-              <div>
-                <strong style={{ color: '#0f172a' }}>Commercial Snapshot</strong>
-                <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>Core sales indicators for the selected month.</p>
-              </div>
-              <div style={{ display: 'grid', gap: '0.45rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}><span style={{ color: '#64748b' }}>Gross Sales</span><strong style={{ color: '#0f172a' }}>{money(state.salesSummary?.grossSales)}</strong></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}><span style={{ color: '#64748b' }}>VAT</span><strong style={{ color: '#0f172a' }}>{money(state.salesSummary?.vatTotal)}</strong></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}><span style={{ color: '#64748b' }}>Discounts</span><strong style={{ color: '#0f172a' }}>{money(state.salesSummary?.discountTotal)}</strong></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}><span style={{ color: '#64748b' }}>Average Invoice</span><strong style={{ color: '#0f172a' }}>{money(state.salesSummary?.averageInvoiceValue)}</strong></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}><span style={{ color: '#64748b' }}>Items Sold</span><strong style={{ color: '#0f172a' }}>{Number(state.salesSummary?.totalItemsSold || 0).toLocaleString('en-US')}</strong></div>
-              </div>
-            </div>
+      <div style={{ display: 'grid', gap: '0.9rem' }}>
+        <SalesSummarySection
+          loading={salesState.loading}
+          error={salesState.error}
+          summary={salesState.summary}
+          payments={salesState.payments}
+          onOpen={() => onNavigateTab?.('sales-reports')}
+        />
 
-            <div style={{ ...cardStyle, padding: '1rem 1.1rem', display: 'grid', gap: '0.8rem' }}>
-              <div>
-                <strong style={{ color: '#0f172a' }}>Operational Snapshot</strong>
-                <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>Expense mix and HR movement for the selected month window.</p>
-              </div>
-              <div style={{ display: 'grid', gap: '0.45rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}><span style={{ color: '#64748b' }}>Expense Count</span><strong style={{ color: '#0f172a' }}>{(state.expenseSummary?.totals?.totalExpenses || 0).toLocaleString('en-US')}</strong></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}><span style={{ color: '#64748b' }}>Average Expense</span><strong style={{ color: '#0f172a' }}>{money(state.expenseSummary?.totals?.averageAmount)}</strong></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}><span style={{ color: '#64748b' }}>Terminations This Month</span><strong style={{ color: '#0f172a' }}>{state.monthTerminations.toLocaleString('en-US')}</strong></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}><span style={{ color: '#64748b' }}>Reengagements This Month</span><strong style={{ color: '#0f172a' }}>{state.monthReengagements.toLocaleString('en-US')}</strong></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}><span style={{ color: '#64748b' }}>Total Employees</span><strong style={{ color: '#0f172a' }}>{state.totalEmployees.toLocaleString('en-US')}</strong></div>
-              </div>
-            </div>
-          </div>
+        <ExpensesSummarySection
+          loading={expensesState.loading}
+          error={expensesState.error}
+          summary={expensesState.summary}
+          onOpen={() => onNavigateTab?.('expenses')}
+        />
 
-          <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
-            <div>
-              <strong style={{ color: '#0f172a' }}>Top Expense Categories</strong>
-              <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>Largest contributors to monthly operating spend.</p>
-            </div>
-            {!state.expenseSummary?.topCategories?.length ? (
-              <EmptyState message="No expense categories matched the selected month." />
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.8rem', marginTop: '1rem' }}>
-                {state.expenseSummary.topCategories.map((item) => (
-                  <div key={item.expenseCategoryId} style={{ border: '1px solid #e2e8f0', borderRadius: '14px', padding: '0.9rem' }}>
-                    <strong style={{ color: '#0f172a' }}>{item.category?.name || 'Unknown category'}</strong>
-                    <div style={{ marginTop: '0.35rem', color: '#64748b', fontSize: '0.84rem' }}>{item.expenseCount} expenses</div>
-                    <div style={{ marginTop: '0.45rem', color: '#0f172a', fontWeight: 800 }}>{money(item.totalAmount)}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </>
-      )}
+        <PayrollSummarySection
+          loading={payrollState.loading}
+          error={payrollState.error}
+          data={payrollState.data}
+          onOpen={() => onNavigateTab?.('payroll')}
+        />
+
+        <SupplierSummarySection
+          loading={supplierState.loading}
+          error={supplierState.error}
+          data={supplierState.data}
+          onOpen={() => onNavigateTab?.('suppliers')}
+        />
+      </div>
+
+      <NetSummaryCard
+        sales={money(salesTotal)}
+        expenses={money(expensesTotal)}
+        payroll={money(payrollTotal)}
+        supplierPayments={money(supplierPaymentsTotal)}
+        netValue={money(netPosition)}
+        isComplete={sectionComplete}
+      />
     </div>
   );
 };
