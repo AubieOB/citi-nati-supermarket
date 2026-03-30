@@ -304,6 +304,15 @@ const MonthlySummaryTab = ({ refreshKey = 0, onNavigateTab }) => {
     { label: 'Net Position', value: money(netPosition), note: netPosition >= 0 ? 'Profit (approx.)' : 'Loss (approx.)', tone: netPosition >= 0 ? '#166534' : '#b91c1c' },
   ]), [expensesTotal, netPosition, payrollTotal, salesTotal, supplierDebtTotal, supplierPaymentsTotal]);
 
+  const drilldownPayload = useMemo(() => ({
+    periodType: filters.periodType,
+    month: filters.month,
+    year: filters.year,
+    startDate: activeRange.startDate,
+    endDate: activeRange.endDate,
+    locationCode: filters.locationCode?.trim() || '',
+  }), [activeRange.endDate, activeRange.startDate, filters.locationCode, filters.month, filters.periodType, filters.year]);
+
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
       <div style={{ ...cardStyle, padding: '1.08rem 1.15rem' }}>
@@ -339,28 +348,28 @@ const MonthlySummaryTab = ({ refreshKey = 0, onNavigateTab }) => {
           error={salesState.error}
           summary={salesState.summary}
           payments={salesState.payments}
-          onOpen={() => onNavigateTab?.('sales-reports')}
+          onOpen={() => onNavigateTab?.('sales-reports', drilldownPayload)}
         />
 
         <ExpensesSummarySection
           loading={expensesState.loading}
           error={expensesState.error}
           summary={expensesState.summary}
-          onOpen={() => onNavigateTab?.('expenses')}
+          onOpen={() => onNavigateTab?.('expenses', drilldownPayload)}
         />
 
         <PayrollSummarySection
           loading={payrollState.loading}
           error={payrollState.error}
           data={payrollState.data}
-          onOpen={() => onNavigateTab?.('payroll')}
+          onOpen={() => onNavigateTab?.('payroll', drilldownPayload)}
         />
 
         <SupplierSummarySection
           loading={supplierState.loading}
           error={supplierState.error}
           data={supplierState.data}
-          onOpen={() => onNavigateTab?.('suppliers')}
+          onOpen={() => onNavigateTab?.('suppliers', drilldownPayload)}
         />
       </div>
 

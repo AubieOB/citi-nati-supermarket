@@ -129,7 +129,7 @@ const ErrorState = ({ message }) => (
   </div>
 );
 
-const SalesReportsTab = () => {
+const SalesReportsTab = ({ drilldownRequest = null }) => {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [activeView, setActiveView] = useState('summary');
   const [viewState, setViewState] = useState(DEFAULT_VIEW_STATE);
@@ -145,6 +145,27 @@ const SalesReportsTab = () => {
   const [paymentsState, setPaymentsState] = useState({ data: [], totals: null, loading: false, error: '' });
 
   const queryKey = useMemo(() => JSON.stringify(filters), [filters]);
+
+  useEffect(() => {
+    if (!drilldownRequest?.token) return;
+
+    setFilters((prev) => {
+      const periodType = drilldownRequest.periodType === 'custom' ? 'custom' : 'month';
+      return {
+        ...prev,
+        periodType,
+        month: periodType === 'month' ? String(drilldownRequest.month || prev.month) : prev.month,
+        year: periodType === 'month' ? String(drilldownRequest.year || prev.year) : prev.year,
+        startDate: periodType === 'custom' ? String(drilldownRequest.startDate || '') : '',
+        endDate: periodType === 'custom' ? String(drilldownRequest.endDate || '') : '',
+        locationCode: String(drilldownRequest.locationCode || ''),
+        locationId: '',
+      };
+    });
+
+    setViewState(DEFAULT_VIEW_STATE);
+    setActiveView('summary');
+  }, [drilldownRequest]);
 
   const updateFilter = useCallback((key, value) => {
     setFilters((prev) => {

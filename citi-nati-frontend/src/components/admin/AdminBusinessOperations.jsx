@@ -25,6 +25,7 @@ const AdminBusinessOperations = () => {
   const [activeTab, setActiveTab] = useState('sales-reports');
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [dataRefreshKey, setDataRefreshKey] = useState(0);
+  const [drilldownRequests, setDrilldownRequests] = useState({});
 
   const handleImportSuccess = () => {
     setDataRefreshKey((current) => current + 1);
@@ -45,11 +46,24 @@ const AdminBusinessOperations = () => {
     setIsImportModalOpen(false);
   };
 
+  const handleNavigateTab = (tabId, drilldownPayload = null) => {
+    if (drilldownPayload) {
+      setDrilldownRequests((prev) => ({
+        ...prev,
+        [tabId]: {
+          ...drilldownPayload,
+          token: Date.now(),
+        },
+      }));
+    }
+    setActiveTab(tabId);
+  };
+
   const contentByTab = {
-    'sales-reports': <SalesReportsTab />,
+    'sales-reports': <SalesReportsTab drilldownRequest={drilldownRequests['sales-reports']} />,
     suppliers: <SuppliersTab refreshKey={dataRefreshKey} />,
-    expenses: <ExpensesTab refreshKey={dataRefreshKey} />,
-    'monthly-summary': <MonthlySummaryTab refreshKey={dataRefreshKey} onNavigateTab={setActiveTab} />,
+    expenses: <ExpensesTab refreshKey={dataRefreshKey} drilldownRequest={drilldownRequests.expenses} />,
+    'monthly-summary': <MonthlySummaryTab refreshKey={dataRefreshKey} onNavigateTab={handleNavigateTab} />,
     employees: <EmployeesTab refreshKey={dataRefreshKey} />,
     payroll: <PayrollTab refreshKey={dataRefreshKey} />,
     'report-history': <ReportHistoryTab refreshKey={dataRefreshKey} />,
@@ -85,7 +99,7 @@ const AdminBusinessOperations = () => {
           </div>
 
           <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #edf2f7' }}>
-            <BusinessOperationsTabs tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
+            <BusinessOperationsTabs tabs={TABS} activeTab={activeTab} onChange={handleNavigateTab} />
           </div>
         </div>
       </div>

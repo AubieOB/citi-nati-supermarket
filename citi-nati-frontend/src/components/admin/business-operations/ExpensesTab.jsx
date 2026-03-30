@@ -27,7 +27,7 @@ function getCurrentMonthRange() {
 const TAB_EXPENSES = 'expenses';
 const TAB_CATEGORIES = 'categories';
 
-const ExpensesTab = ({ refreshKey = 0 }) => {
+const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null }) => {
   const initialRange = getCurrentMonthRange();
 
   // Sub-tab
@@ -129,6 +129,20 @@ const ExpensesTab = ({ refreshKey = 0 }) => {
   useEffect(() => {
     fetchExpenses();
   }, [fetchExpenses, refreshKey]);
+
+  useEffect(() => {
+    if (!drilldownRequest?.token) return;
+
+    setActiveTab(TAB_EXPENSES);
+    setFilters((prev) => ({
+      ...prev,
+      search: '',
+      expenseCategoryId: '',
+      startDate: drilldownRequest.startDate || prev.startDate,
+      endDate: drilldownRequest.endDate || prev.endDate,
+    }));
+    setExpensePage(1);
+  }, [drilldownRequest]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
