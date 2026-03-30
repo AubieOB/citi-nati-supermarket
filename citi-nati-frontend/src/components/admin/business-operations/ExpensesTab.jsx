@@ -1,5 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../../../utils/api.js';
+import ExpensesList from './ExpensesList.jsx';
+import ExpenseDetailPanel from './ExpenseDetailPanel.jsx';
+import ExpenseFormModal from './ExpenseFormModal.jsx';
+import ExpenseCategoriesPanel from './ExpenseCategoriesPanel.jsx';
+import ExpenseCategoryFormModal from './ExpenseCategoryFormModal.jsx';
+import ExpenseSummaryCards from './ExpenseSummaryCards.jsx';
 
 const cardStyle = {
   backgroundColor: '#fff',
@@ -7,53 +13,6 @@ const cardStyle = {
   borderRadius: '18px',
   boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)',
 };
-
-const tableStyle = {
-  width: '100%',
-  borderCollapse: 'collapse',
-  fontSize: '0.9rem',
-};
-
-const thStyle = {
-  textAlign: 'left',
-  padding: '0.85rem 0.9rem',
-  color: '#475569',
-  fontSize: '0.78rem',
-  textTransform: 'uppercase',
-  letterSpacing: '0.04em',
-  borderBottom: '1px solid #e2e8f0',
-  backgroundColor: '#f8fafc',
-};
-
-const tdStyle = {
-  padding: '0.9rem',
-  borderBottom: '1px solid #eef2f7',
-  color: '#0f172a',
-  verticalAlign: 'top',
-};
-
-const money = (value) => `MWK ${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-const formatDate = (value) => {
-  if (!value) return 'Not set';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Not set';
-  return date.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-};
-
-const EmptyState = ({ message }) => (
-  <div style={{ padding: '2rem', color: '#64748b', textAlign: 'center' }}>{message}</div>
-);
-
-const ErrorState = ({ message }) => (
-  <div style={{ padding: '1rem 1.25rem', borderRadius: '14px', backgroundColor: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca' }}>
-    {message}
-  </div>
-);
 
 function getCurrentMonthRange() {
   const now = new Date();
@@ -65,245 +24,411 @@ function getCurrentMonthRange() {
   };
 }
 
+const TAB_EXPENSES = 'expenses';
+const TAB_CATEGORIES = 'categories';
+
 const ExpensesTab = ({ refreshKey = 0 }) => {
   const initialRange = getCurrentMonthRange();
+
+  // Sub-tab
+  const [activeTab, setActiveTab] = useState(TAB_EXPENSES);
+
+  // Expense list state
   const [filters, setFilters] = useState({
     search: '',
     expenseCategoryId: '',
     startDate: initialRange.startDate,
     endDate: initialRange.endDate,
   });
-  const [page, setPage] = useState(1);
-  const [categories, setCategories] = useState([]);
-  const [summary, setSummary] = useState(null);
+  const [expensePage, setExpensePage] = useState(1);
   const [expenses, setExpenses] = useState([]);
-  const [pagination, setPagination] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [expensePagination, setExpensePagination] = useState(null);
+  const [listLoading, setListLoading] = useState(true);
+  const [listError, setListError] = useState('');
 
-  const queryParams = useMemo(() => ({
-    page,
-    pageSize: 25,
+  // Summary
+  const [summary, setSummary] = useState(null);
+
+  // Categories
+  const [categories, setCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [categoriesError, setCategoriesError] = useState('');
+
+  // Selected expense detail
+  const [selectedExpense, setSelectedExpense] = useState(null);
+  const [pendingSelectId, setPendingSelectId] = useState(null);
+
+  // Expense modal
+  const [expenseModal, setExpenseModal] = useState({ open: false, expense: null });
+  const [expenseSaving, setExpenseSaving] = useState(false);
+  const [expenseError, setExpenseError] = useState('');
+
+  // Category modal
+  const [categoryModal, setCategoryModal] = useState({ open: false, category: null });
+  const [categorySaving, setCategorySaving] = useState(false);
+  const [categoryError, setCategoryError] = useState('');
+
+  // ---- fetch helpers ----
+
+  const expenseQueryParams = useMemo(() => ({
+    page: expensePage,
+    pageSize: 20,
     sortBy: 'expenseDate',
     sortOrder: 'desc',
     search: filters.search || undefined,
     expenseCategoryId: filters.expenseCategoryId || undefined,
     startDate: filters.startDate || undefined,
     endDate: filters.endDate || undefined,
-  }), [filters.endDate, filters.expenseCategoryId, filters.search, filters.startDate, page]);
+  }), [expensePage, filters.endDate, filters.expenseCategoryId, filters.search, filters.startDate]);
 
-  const fetchExpensesData = useCallback(async () => {
-    setLoading(true);
-    setError('');
+  const fetchCategories = useCallback(async () => {
+    setCategoriesLoading(true);
+    setCategoriesError('');
     try {
-      const [categoriesResponse, summaryResponse, expensesResponse] = await Promise.all([
-        api.get('/business-operations/expenses/categories', { params: { page: 1, pageSize: 200, sortBy: 'name', sortOrder: 'asc', isActive: true } }),
-        api.get('/business-operations/expenses/summary/overview', { params: queryParams }),
-        api.get('/business-operations/expenses', { params: queryParams }),
-      ]);
-
-      setCategories(categoriesResponse.data?.data || []);
-      setSummary(summaryResponse.data?.data || null);
-      setExpenses(expensesResponse.data?.data || []);
-      setPagination(expensesResponse.data?.pagination || null);
-    } catch (requestError) {
-      setCategories([]);
-      setSummary(null);
-      setExpenses([]);
-      setPagination(null);
-      setError(requestError.response?.data?.error || 'Failed to load expenses');
+      const res = await api.get('/business-operations/expenses/categories', {
+        params: { page: 1, pageSize: 500, sortBy: 'name', sortOrder: 'asc' },
+      });
+      setCategories(res.data?.data || []);
+    } catch (err) {
+      setCategoriesError(err.response?.data?.error || 'Failed to load categories');
     } finally {
-      setLoading(false);
+      setCategoriesLoading(false);
     }
-  }, [queryParams]);
+  }, []);
+
+  const fetchExpenses = useCallback(async () => {
+    setListLoading(true);
+    setListError('');
+    try {
+      const [summaryRes, listRes] = await Promise.all([
+        api.get('/business-operations/expenses/summary/overview', { params: expenseQueryParams }),
+        api.get('/business-operations/expenses', { params: expenseQueryParams }),
+      ]);
+      setSummary(summaryRes.data?.data || null);
+      setExpenses(listRes.data?.data || []);
+      setExpensePagination(listRes.data?.pagination || null);
+    } catch (err) {
+      setListError(err.response?.data?.error || 'Failed to load expenses');
+      setExpenses([]);
+      setExpensePagination(null);
+      setSummary(null);
+    } finally {
+      setListLoading(false);
+    }
+  }, [expenseQueryParams]);
+
+  const refreshAll = useCallback(async () => {
+    await Promise.all([fetchExpenses(), fetchCategories()]);
+  }, [fetchCategories, fetchExpenses]);
+
+  // Initial + refresh-key triggered load
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
 
   useEffect(() => {
-    fetchExpensesData();
-  }, [fetchExpensesData, refreshKey]);
+    fetchExpenses();
+  }, [fetchExpenses, refreshKey]);
 
+  // Reset to page 1 when filters change
   useEffect(() => {
-    setPage(1);
+    setExpensePage(1);
   }, [filters.expenseCategoryId, filters.search, filters.startDate, filters.endDate]);
+
+  // Auto-select first expense or pending new one
+  useEffect(() => {
+    if (!expenses.length) {
+      setSelectedExpense(null);
+      return;
+    }
+    if (pendingSelectId) {
+      const found = expenses.find((e) => e.id === pendingSelectId);
+      if (found) {
+        setSelectedExpense(found);
+        setPendingSelectId(null);
+        return;
+      }
+    }
+    if (!selectedExpense || !expenses.some((e) => e.id === selectedExpense.id)) {
+      setSelectedExpense(expenses[0]);
+    }
+  }, [expenses, pendingSelectId, selectedExpense]);
+
+  // ---- handlers ----
+
+  const handleExpenseSubmit = async (payload) => {
+    setExpenseSaving(true);
+    setExpenseError('');
+    try {
+      const res = expenseModal.expense
+        ? await api.put(`/business-operations/expenses/${expenseModal.expense.id}`, payload)
+        : await api.post('/business-operations/expenses', payload);
+
+      const saved = res.data?.data || null;
+      setExpenseModal({ open: false, expense: null });
+      if (saved?.id) setPendingSelectId(saved.id);
+      await refreshAll();
+    } catch (err) {
+      setExpenseError(err.response?.data?.error || 'Failed to save expense');
+    } finally {
+      setExpenseSaving(false);
+    }
+  };
+
+  const handleCategorySubmit = async (payload) => {
+    setCategorySaving(true);
+    setCategoryError('');
+    try {
+      await (categoryModal.category
+        ? api.put(`/business-operations/expenses/categories/${categoryModal.category.id}`, payload)
+        : api.post('/business-operations/expenses/categories', payload));
+      setCategoryModal({ open: false, category: null });
+      await fetchCategories();
+    } catch (err) {
+      setCategoryError(err.response?.data?.error || 'Failed to save category');
+    } finally {
+      setCategorySaving(false);
+    }
+  };
+
+  const openAddExpense = () => { setExpenseError(''); setExpenseModal({ open: true, expense: null }); };
+  const openEditExpense = (expense) => { setExpenseError(''); setExpenseModal({ open: true, expense }); };
+  const openAddCategory = () => { setCategoryError(''); setCategoryModal({ open: true, category: null }); };
+  const openEditCategory = (cat) => { setCategoryError(''); setCategoryModal({ open: true, category: cat }); };
+
+  const activeCategories = useMemo(() => categories.filter((c) => c.isActive), [categories]);
+  const isLoading = listLoading || categoriesLoading;
+
+  const tabBtnStyle = (active) => ({
+    border: 'none',
+    borderBottom: `2px solid ${active ? '#5B4B8A' : 'transparent'}`,
+    backgroundColor: 'transparent',
+    color: active ? '#5B4B8A' : '#64748b',
+    fontWeight: active ? 800 : 600,
+    fontSize: '0.92rem',
+    padding: '0.65rem 1rem',
+    cursor: 'pointer',
+    transition: 'color 0.15s, border-color 0.15s',
+  });
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
+
+      {/* ── Header ── */}
       <div style={{ ...cardStyle, padding: '1.2rem 1.3rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
           <div>
-            <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.15rem' }}>Expenses</h3>
-            <p style={{ margin: '0.45rem 0 0', color: '#64748b', lineHeight: 1.6, maxWidth: '780px' }}>
-              Imported expenses and categories are live here, with totals, top categories, and a searchable expense register.
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', color: '#5B4B8A', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.76rem', letterSpacing: '0.05em' }}>
+              <i className="fas fa-receipt" />
+              Expenses Workspace
+            </div>
+            <h3 style={{ margin: '0.4rem 0 0', color: '#0f172a', fontSize: '1.2rem' }}>Expense Management</h3>
+            <p style={{ margin: '0.45rem 0 0', color: '#64748b', lineHeight: 1.6, maxWidth: '900px' }}>
+              Enter and manage business expenses manually with full category control, date filtering, and clean records — no workbook import required.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={fetchExpensesData}
-            disabled={loading}
-            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.7rem 1rem', fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer' }}
-          >
-            <i className={`fas ${loading ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`} style={{ marginRight: '0.45rem' }}></i>
-            Refresh
-          </button>
+          <div style={{ display: 'flex', gap: '0.7rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={openAddExpense}
+              style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.72rem 1rem', fontWeight: 700, cursor: 'pointer' }}
+            >
+              <i className="fas fa-plus" style={{ marginRight: '0.45rem' }} />
+              Add Expense
+            </button>
+            <button
+              type="button"
+              onClick={openAddCategory}
+              style={{ border: '1px solid #5B4B8A', backgroundColor: '#fff', color: '#5B4B8A', borderRadius: '10px', padding: '0.72rem 1rem', fontWeight: 700, cursor: 'pointer' }}
+            >
+              <i className="fas fa-tags" style={{ marginRight: '0.45rem' }} />
+              Add Category
+            </button>
+            <button
+              type="button"
+              onClick={refreshAll}
+              disabled={isLoading}
+              style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.72rem 1rem', fontWeight: 700, cursor: isLoading ? 'not-allowed' : 'pointer' }}
+            >
+              <i className={`fas ${isLoading ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`} style={{ marginRight: '0.45rem' }} />
+              Refresh
+            </button>
+            <button
+              type="button"
+              disabled
+              title="Export coming soon"
+              style={{ border: '1px dashed #cbd5e1', backgroundColor: '#fff', color: '#94a3b8', borderRadius: '10px', padding: '0.72rem 1rem', fontWeight: 700, cursor: 'not-allowed' }}
+            >
+              <i className="fas fa-file-export" style={{ marginRight: '0.45rem' }} />
+              Export
+            </button>
+          </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.9rem', marginTop: '1rem' }}>
-          <div style={{ ...cardStyle, padding: '1rem 1.1rem', display: 'grid', gap: '0.35rem' }}>
-            <span style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Expense Count</span>
-            <strong style={{ fontSize: '1.65rem', color: '#0f172a' }}>{(summary?.totals?.totalExpenses || 0).toLocaleString('en-US')}</strong>
-            <span style={{ color: '#64748b', fontSize: '0.84rem' }}>Rows matching the active filters.</span>
-          </div>
-          <div style={{ ...cardStyle, padding: '1rem 1.1rem', display: 'grid', gap: '0.35rem' }}>
-            <span style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Total Amount</span>
-            <strong style={{ fontSize: '1.65rem', color: '#0f172a' }}>{money(summary?.totals?.totalAmount)}</strong>
-            <span style={{ color: '#64748b', fontSize: '0.84rem' }}>Aggregate spending for the selected range.</span>
-          </div>
-          <div style={{ ...cardStyle, padding: '1rem 1.1rem', display: 'grid', gap: '0.35rem' }}>
-            <span style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Average Expense</span>
-            <strong style={{ fontSize: '1.65rem', color: '#0f172a' }}>{money(summary?.totals?.averageAmount)}</strong>
-            <span style={{ color: '#64748b', fontSize: '0.84rem' }}>Average row amount in the current result set.</span>
-          </div>
-          <div style={{ ...cardStyle, padding: '1rem 1.1rem', display: 'grid', gap: '0.35rem' }}>
-            <span style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Active Categories</span>
-            <strong style={{ fontSize: '1.65rem', color: '#0f172a' }}>{categories.length.toLocaleString('en-US')}</strong>
-            <span style={{ color: '#64748b', fontSize: '0.84rem' }}>Expense categories available for imported entries.</span>
-          </div>
-        </div>
-      </div>
-
-      <div style={{ ...cardStyle, padding: '1rem' }}>
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <div style={{ flex: '1 1 280px', position: 'relative' }}>
-            <i className="fas fa-search" style={{ position: 'absolute', top: '50%', left: '0.95rem', transform: 'translateY(-50%)', color: '#94a3b8' }}></i>
-            <input
-              type="text"
-              value={filters.search}
-              onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
-              placeholder="Search by description, reference, payment method, or category"
-              style={{ width: '100%', boxSizing: 'border-box', padding: '0.85rem 1rem 0.85rem 2.7rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem' }}
-            />
-          </div>
-          <select
-            value={filters.expenseCategoryId}
-            onChange={(event) => setFilters((current) => ({ ...current, expenseCategoryId: event.target.value }))}
-            style={{ minWidth: '220px', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem', backgroundColor: '#fff' }}
-          >
-            <option value="">All categories</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>{category.name}</option>
-            ))}
-          </select>
-          <input
-            type="date"
-            value={filters.startDate}
-            onChange={(event) => setFilters((current) => ({ ...current, startDate: event.target.value }))}
-            style={{ padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem' }}
-          />
-          <input
-            type="date"
-            value={filters.endDate}
-            onChange={(event) => setFilters((current) => ({ ...current, endDate: event.target.value }))}
-            style={{ padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem' }}
-          />
+        {/* Summary cards */}
+        <div style={{ marginTop: '1.1rem' }}>
+          <ExpenseSummaryCards summary={summary} categoryCount={activeCategories.length} />
         </div>
       </div>
 
-      {error ? (
-        <ErrorState message={error} />
-      ) : loading ? (
-        <div style={cardStyle}><EmptyState message="Loading expenses..." /></div>
-      ) : (
+      {/* ── Sub-tabs ── */}
+      <div style={{ ...cardStyle, padding: '0 1.1rem', display: 'flex', gap: 0, borderBottom: 'none', overflow: 'hidden' }}>
+        <button type="button" style={tabBtnStyle(activeTab === TAB_EXPENSES)} onClick={() => setActiveTab(TAB_EXPENSES)}>
+          <i className="fas fa-list-ul" style={{ marginRight: '0.45rem' }} />
+          Expenses
+        </button>
+        <button type="button" style={tabBtnStyle(activeTab === TAB_CATEGORIES)} onClick={() => setActiveTab(TAB_CATEGORIES)}>
+          <i className="fas fa-tags" style={{ marginRight: '0.45rem' }} />
+          Categories
+          {categories.length > 0 && (
+            <span style={{ marginLeft: '0.5rem', backgroundColor: '#e0e7ff', color: '#4338ca', borderRadius: '999px', padding: '0.15rem 0.55rem', fontSize: '0.75rem', fontWeight: 800 }}>
+              {categories.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ── Expenses tab ── */}
+      {activeTab === TAB_EXPENSES && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
-            <div style={{ ...cardStyle, overflow: 'hidden' }}>
-              <div style={{ padding: '1rem 1.1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-                <strong style={{ color: '#0f172a' }}>Top Expense Categories</strong>
-                <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>Largest categories in the current filter window.</p>
+          {/* Filter bar */}
+          <div style={{ ...cardStyle, padding: '1rem' }}>
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <div style={{ flex: '1 1 280px', position: 'relative' }}>
+                <i className="fas fa-search" style={{ position: 'absolute', top: '50%', left: '0.95rem', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <input
+                  type="text"
+                  value={filters.search}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+                  placeholder="Search by description, reference, payment method, or category"
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '0.85rem 1rem 0.85rem 2.7rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem' }}
+                />
               </div>
-              {!summary?.topCategories?.length ? (
-                <EmptyState message="No category totals are available for the current filters." />
-              ) : (
-                <div style={{ display: 'grid', gap: '0.75rem', padding: '1rem' }}>
-                  {summary.topCategories.map((item) => (
-                    <div key={item.expenseCategoryId} style={{ border: '1px solid #e2e8f0', borderRadius: '14px', padding: '0.85rem 0.95rem', display: 'grid', gap: '0.2rem' }}>
-                      <strong style={{ color: '#0f172a' }}>{item.category?.name || 'Unknown category'}</strong>
-                      <span style={{ color: '#64748b', fontSize: '0.84rem' }}>{item.category?.code || 'No code'} • {item.expenseCount} expenses</span>
-                      <span style={{ color: '#0f172a', fontWeight: 800 }}>{money(item.totalAmount)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div style={{ ...cardStyle, overflow: 'hidden' }}>
-              <div style={{ padding: '1rem 1.1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-                <strong style={{ color: '#0f172a' }}>Recent Expense Activity</strong>
-                <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>Newest expense rows matching the active filters.</p>
+              <select
+                value={filters.expenseCategoryId}
+                onChange={(e) => setFilters((prev) => ({ ...prev, expenseCategoryId: e.target.value }))}
+                style={{ minWidth: '200px', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem', backgroundColor: '#fff' }}
+              >
+                <option value="">All categories</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <span style={{ color: '#64748b', fontSize: '0.87rem', whiteSpace: 'nowrap' }}>From</span>
+                <input
+                  type="date"
+                  value={filters.startDate}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, startDate: e.target.value }))}
+                  style={{ padding: '0.85rem 0.9rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem' }}
+                />
               </div>
-              {!summary?.recentExpenses?.length ? (
-                <EmptyState message="No recent expense activity matched the active filters." />
-              ) : (
-                <div style={{ display: 'grid', gap: '0.75rem', padding: '1rem' }}>
-                  {summary.recentExpenses.map((expense) => (
-                    <div key={expense.id} style={{ border: '1px solid #e2e8f0', borderRadius: '14px', padding: '0.85rem 0.95rem', display: 'grid', gap: '0.2rem' }}>
-                      <strong style={{ color: '#0f172a' }}>{expense.description || expense.expenseCategory?.name || 'Expense entry'}</strong>
-                      <span style={{ color: '#64748b', fontSize: '0.84rem' }}>{formatDate(expense.expenseDate)} • {expense.expenseCategory?.name || 'No category'}</span>
-                      <span style={{ color: '#0f172a', fontWeight: 800 }}>{money(expense.amount)}</span>
-                    </div>
-                  ))}
-                </div>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <span style={{ color: '#64748b', fontSize: '0.87rem', whiteSpace: 'nowrap' }}>To</span>
+                <input
+                  type="date"
+                  value={filters.endDate}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, endDate: e.target.value }))}
+                  style={{ padding: '0.85rem 0.9rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem' }}
+                />
+              </div>
+              {(filters.search || filters.expenseCategoryId || filters.startDate !== initialRange.startDate || filters.endDate !== initialRange.endDate) && (
+                <button
+                  type="button"
+                  onClick={() => setFilters({ search: '', expenseCategoryId: '', startDate: initialRange.startDate, endDate: initialRange.endDate })}
+                  style={{ border: '1px solid #fecaca', backgroundColor: '#fef2f2', color: '#b91c1c', borderRadius: '10px', padding: '0.72rem 0.9rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.87rem' }}
+                >
+                  <i className="fas fa-xmark" style={{ marginRight: '0.4rem' }} />
+                  Clear filters
+                </button>
               )}
             </div>
           </div>
 
-          <div style={{ ...cardStyle, overflow: 'hidden' }}>
-            <div style={{ padding: '1rem 1.1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-              <strong style={{ color: '#0f172a' }}>Expense Register</strong>
-              <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>Detailed imported expense rows for the active range and filters.</p>
+          {/* Two-panel layout */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.3fr) minmax(300px, 0.85fr)', gap: '1rem', alignItems: 'start' }}>
+
+            {/* Left — expense register */}
+            <div style={{ ...cardStyle, overflow: 'hidden' }}>
+              <div style={{ padding: '1rem 1.05rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <div>
+                  <strong style={{ color: '#0f172a' }}>Expense Register</strong>
+                  <p style={{ margin: '0.3rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>
+                    Select a row to view full details or click Edit inline.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={openAddExpense}
+                  style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.6rem 0.95rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.88rem' }}
+                >
+                  <i className="fas fa-plus" style={{ marginRight: '0.4rem' }} />
+                  Add Expense
+                </button>
+              </div>
+              {listError ? (
+                <div style={{ padding: '1rem', color: '#b91c1c', fontSize: '0.9rem' }}>{listError}</div>
+              ) : (
+                <ExpensesList
+                  expenses={expenses}
+                  loading={listLoading}
+                  error={listError}
+                  pagination={expensePagination}
+                  page={expensePage}
+                  onPageChange={setExpensePage}
+                  selectedExpenseId={selectedExpense?.id ?? null}
+                  onSelectExpense={(expense) => setSelectedExpense(expense)}
+                  onEditExpense={openEditExpense}
+                />
+              )}
             </div>
 
-            {!expenses.length ? (
-              <EmptyState message="No expenses matched the current filters." />
-            ) : (
-              <>
-                <div style={{ overflowX: 'auto', maxHeight: '520px' }}>
-                  <table style={tableStyle}>
-                    <thead>
-                      <tr>
-                        <th style={thStyle}>Date</th>
-                        <th style={thStyle}>Category</th>
-                        <th style={thStyle}>Description</th>
-                        <th style={thStyle}>Payment Method</th>
-                        <th style={thStyle}>Reference</th>
-                        <th style={thStyle}>Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {expenses.map((expense) => (
-                        <tr key={expense.id}>
-                          <td style={tdStyle}>{formatDate(expense.expenseDate)}</td>
-                          <td style={tdStyle}>{expense.expenseCategory?.name || 'Uncategorized'}</td>
-                          <td style={tdStyle}>{expense.description || 'No description'}</td>
-                          <td style={tdStyle}>{expense.paymentMethod || 'Not set'}</td>
-                          <td style={tdStyle}>{expense.referenceNo || 'Not set'}</td>
-                          <td style={tdStyle}>{money(expense.amount)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', padding: '1rem', borderTop: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
-                  <span style={{ color: '#64748b', fontSize: '0.88rem' }}>Page {pagination?.page || 1} of {pagination?.totalPages || 1} with {(pagination?.total || 0).toLocaleString('en-US')} expenses.</span>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={(pagination?.page || 1) <= 1} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.9rem', fontWeight: 700, cursor: 'pointer' }}>Previous</button>
-                    <button type="button" onClick={() => setPage((current) => current + 1)} disabled={(pagination?.page || 1) >= (pagination?.totalPages || 1)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.9rem', fontWeight: 700, cursor: 'pointer' }}>Next</button>
-                  </div>
-                </div>
-              </>
-            )}
+            {/* Right — detail panel */}
+            <div style={{ ...cardStyle, overflow: 'hidden' }}>
+              <ExpenseDetailPanel
+                expense={selectedExpense}
+                loading={listLoading}
+                error={listError}
+                onEdit={openEditExpense}
+                onAddExpense={openAddExpense}
+              />
+            </div>
           </div>
         </>
       )}
+
+      {/* ── Categories tab ── */}
+      {activeTab === TAB_CATEGORIES && (
+        <div style={{ ...cardStyle, overflow: 'hidden' }}>
+          <ExpenseCategoriesPanel
+            categories={categories}
+            loading={categoriesLoading}
+            error={categoriesError}
+            onAddCategory={openAddCategory}
+            onEditCategory={openEditCategory}
+          />
+        </div>
+      )}
+
+      {/* ── Modals ── */}
+      <ExpenseFormModal
+        isOpen={expenseModal.open}
+        expense={expenseModal.expense}
+        categories={activeCategories}
+        saving={expenseSaving}
+        error={expenseError}
+        onClose={() => setExpenseModal({ open: false, expense: null })}
+        onSubmit={handleExpenseSubmit}
+      />
+
+      <ExpenseCategoryFormModal
+        isOpen={categoryModal.open}
+        category={categoryModal.category}
+        saving={categorySaving}
+        error={categoryError}
+        onClose={() => setCategoryModal({ open: false, category: null })}
+        onSubmit={handleCategorySubmit}
+      />
     </div>
   );
 };
