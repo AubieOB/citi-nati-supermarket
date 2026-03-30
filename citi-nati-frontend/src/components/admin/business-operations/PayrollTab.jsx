@@ -477,7 +477,7 @@ const PayrollTab = ({ refreshKey = 0 }) => {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '1rem', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '1rem', alignItems: 'start' }}>
         <PayrollPeriodsList
           periods={periods}
           loading={periodsLoading}

@@ -288,7 +288,7 @@ const EmployeesTab = () => {
       </div>
 
       {/* ── Main two-panel layout ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.9fr', gap: '1rem', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1rem', alignItems: 'start' }}>
 
         {/* Left: list */}
         <EmployeesList

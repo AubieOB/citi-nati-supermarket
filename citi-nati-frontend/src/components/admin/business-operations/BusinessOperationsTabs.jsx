@@ -25,6 +25,8 @@ const BusinessOperationsTabs = ({ tabs, activeTab, onChange }) => {
         gap: '0.45rem',
         overflowX: 'auto',
         paddingBottom: '0.1rem',
+        flexWrap: 'nowrap',
+        maxWidth: '100%',
       }}
     >
       {tabs.map((tab) => (
