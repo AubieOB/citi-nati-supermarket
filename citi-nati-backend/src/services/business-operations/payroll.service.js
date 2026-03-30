@@ -4,6 +4,17 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
+function modelHasField(modelName, fieldName) {
+  try {
+    const model = prisma?._runtimeDataModel?.models?.[modelName];
+    return Array.isArray(model?.fields) && model.fields.some((field) => field.name === fieldName);
+  } catch (_error) {
+    return false;
+  }
+}
+
+const payrollPeriodHasLocation = modelHasField('PayrollPeriod', 'locationId');
+
 function parseDate(value) {
   if (!value) return null;
   const d = new Date(value);
@@ -11,35 +22,58 @@ function parseDate(value) {
 }
 
 async function createPayrollPeriod(payload) {
+  const createData = {
+    reportingPeriodId: payload.reportingPeriodId || null,
+    payrollMode: payload.payrollMode,
+    description: payload.description || null,
+    status: payload.status || 'draft',
+    createdBy: payload.createdBy || null,
+  };
+
+  if (payrollPeriodHasLocation && payload.locationId !== undefined) {
+    createData.locationId = payload.locationId || null;
+  }
+
   return prisma.payrollPeriod.create({
-    data: {
-      reportingPeriodId: payload.reportingPeriodId || null,
-      payrollMode: payload.payrollMode,
-      description: payload.description || null,
-      status: payload.status || 'draft',
-      createdBy: payload.createdBy || null,
-    },
+    data: createData,
   });
 }
 
 async function updatePayrollPeriod(id, payload) {
+  const updateData = {
+    reportingPeriodId: payload.reportingPeriodId,
+    payrollMode: payload.payrollMode,
+    description: payload.description,
+    status: payload.status,
+    createdBy: payload.createdBy,
+  };
+
+  if (payrollPeriodHasLocation && payload.locationId !== undefined) {
+    updateData.locationId = payload.locationId;
+  }
+
   return prisma.payrollPeriod.update({
     where: { id },
-    data: {
-      reportingPeriodId: payload.reportingPeriodId,
-      payrollMode: payload.payrollMode,
-      description: payload.description,
-      status: payload.status,
-      createdBy: payload.createdBy,
-    },
+    data: updateData,
   });
 }
 
-async function listPayrollPeriods({ search, status, payrollMode, reportingPeriodId, skip, take, sortBy, sortOrder }) {
+async function listPayrollPeriods({ search, status, payrollMode, reportingPeriodId, locationId, skip, take, sortBy, sortOrder }) {
   const where = {};
   if (status) where.status = status;
   if (payrollMode) where.payrollMode = payrollMode;
   if (reportingPeriodId) where.reportingPeriodId = reportingPeriodId;
+  if (locationId) {
+    if (payrollPeriodHasLocation) {
+      where.locationId = locationId;
+    } else {
+      where.entries = {
+        some: {
+          employee: { locationId },
+        },
+      };
+    }
+  }
   if (search) {
     where.OR = [
       { description: { contains: search, mode: 'insensitive' } },
@@ -124,10 +158,13 @@ async function getPayrollEntryById(id) {
   });
 }
 
-async function listPayrollEntries({ payrollPeriodId, employeeId, skip, take, sortBy, sortOrder }) {
+async function listPayrollEntries({ payrollPeriodId, employeeId, locationId, skip, take, sortBy, sortOrder }) {
   const where = {};
   if (payrollPeriodId) where.payrollPeriodId = payrollPeriodId;
   if (employeeId) where.employeeId = employeeId;
+  if (locationId) {
+    where.employee = { locationId };
+  }
 
   const [data, total] = await Promise.all([
     prisma.payrollEntry.findMany({

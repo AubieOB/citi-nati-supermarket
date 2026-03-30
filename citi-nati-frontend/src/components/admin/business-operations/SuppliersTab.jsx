@@ -49,7 +49,7 @@ const INITIAL_DETAIL_STATE = {
   transactionPagination: null,
 };
 
-const SuppliersTab = ({ refreshKey = 0 }) => {
+const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null }) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
@@ -112,6 +112,7 @@ const SuppliersTab = ({ refreshKey = 0 }) => {
           sortOrder: 'desc',
           search: search || undefined,
           status: statusFilter || undefined,
+          locationId: selectedLocationId || undefined,
         },
       });
 
@@ -124,7 +125,7 @@ const SuppliersTab = ({ refreshKey = 0 }) => {
     } finally {
       setListLoading(false);
     }
-  }, [page, search, statusFilter]);
+  }, [page, search, selectedLocationId, statusFilter]);
 
   const fetchSupplierDetail = useCallback(async (supplierId, nextTransactionPage = 1) => {
     if (!supplierId) {
@@ -150,6 +151,7 @@ const SuppliersTab = ({ refreshKey = 0 }) => {
             pageSize: 12,
             sortBy: 'transactionDate',
             sortOrder: 'desc',
+            locationId: selectedLocationId || undefined,
           },
         }),
       ]);
@@ -169,7 +171,7 @@ const SuppliersTab = ({ refreshKey = 0 }) => {
       setDetailLoading(false);
       setTransactionsLoading(false);
     }
-  }, []);
+  }, [selectedLocationId]);
 
   const refreshData = useCallback(async ({ selectedId = selectedSupplierId, nextTransactionPage = transactionPage } = {}) => {
     await fetchSuppliers();
@@ -184,7 +186,7 @@ const SuppliersTab = ({ refreshKey = 0 }) => {
 
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter]);
+  }, [search, selectedLocationId, statusFilter]);
 
   useEffect(() => {
     setTransactionPage(1);
@@ -223,8 +225,8 @@ const SuppliersTab = ({ refreshKey = 0 }) => {
 
     try {
       const response = supplierModalState.supplier
-        ? await api.put(`/business-operations/suppliers/${supplierModalState.supplier.id}`, payload)
-        : await api.post('/business-operations/suppliers', payload);
+        ? await api.put(`/business-operations/suppliers/${supplierModalState.supplier.id}`, { ...payload, locationId: selectedLocationId || undefined })
+        : await api.post('/business-operations/suppliers', { ...payload, locationId: selectedLocationId || undefined });
 
       const savedSupplier = response.data?.data || null;
       setSupplierModalState({ open: false, supplier: null });
@@ -248,8 +250,8 @@ const SuppliersTab = ({ refreshKey = 0 }) => {
 
     try {
       await (transactionModalState.transaction
-        ? api.put(`/business-operations/suppliers/transactions/${transactionModalState.transaction.id}`, payload)
-        : api.post('/business-operations/suppliers/transactions', payload));
+        ? api.put(`/business-operations/suppliers/transactions/${transactionModalState.transaction.id}`, { ...payload, locationId: selectedLocationId || undefined })
+        : api.post('/business-operations/suppliers/transactions', { ...payload, locationId: selectedLocationId || undefined }));
 
       setTransactionModalState({ open: false, transaction: null });
       setTransactionPage(1);
@@ -299,6 +301,7 @@ const SuppliersTab = ({ refreshKey = 0 }) => {
           search,
           status: statusFilter,
           supplierId: selectedSupplierId,
+          locationId: selectedLocationId,
         },
       });
     } catch (error) {

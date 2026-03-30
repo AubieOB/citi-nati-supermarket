@@ -4,41 +4,65 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
+function modelHasField(modelName, fieldName) {
+  try {
+    const model = prisma?._runtimeDataModel?.models?.[modelName];
+    return Array.isArray(model?.fields) && model.fields.some((field) => field.name === fieldName);
+  } catch (_error) {
+    return false;
+  }
+}
+
+const supplierHasLocation = modelHasField('Supplier', 'locationId');
+const supplierTransactionHasLocation = modelHasField('SupplierTransaction', 'locationId');
+
 function normalizeSupplierStatus(status) {
   if (!status) return 'active';
   return String(status).toLowerCase();
 }
 
 async function createSupplier(payload) {
+  const createData = {
+    supplierCode: payload.supplierCode || null,
+    name: payload.name,
+    contactPerson: payload.contactPerson || null,
+    phone: payload.phone || null,
+    email: payload.email || null,
+    address: payload.address || null,
+    openingBalance: payload.openingBalance || 0,
+    status: normalizeSupplierStatus(payload.status),
+    notes: payload.notes || null,
+  };
+
+  if (supplierHasLocation && payload.locationId !== undefined) {
+    createData.locationId = payload.locationId || null;
+  }
+
   return prisma.supplier.create({
-    data: {
-      supplierCode: payload.supplierCode || null,
-      name: payload.name,
-      contactPerson: payload.contactPerson || null,
-      phone: payload.phone || null,
-      email: payload.email || null,
-      address: payload.address || null,
-      openingBalance: payload.openingBalance || 0,
-      status: normalizeSupplierStatus(payload.status),
-      notes: payload.notes || null,
-    },
+    data: createData,
   });
 }
 
 async function updateSupplier(id, payload) {
+  const updateData = {
+    supplierCode: payload.supplierCode,
+    name: payload.name,
+    contactPerson: payload.contactPerson,
+    phone: payload.phone,
+    email: payload.email,
+    address: payload.address,
+    openingBalance: payload.openingBalance,
+    status: payload.status ? normalizeSupplierStatus(payload.status) : undefined,
+    notes: payload.notes,
+  };
+
+  if (supplierHasLocation && payload.locationId !== undefined) {
+    updateData.locationId = payload.locationId;
+  }
+
   return prisma.supplier.update({
     where: { id },
-    data: {
-      supplierCode: payload.supplierCode,
-      name: payload.name,
-      contactPerson: payload.contactPerson,
-      phone: payload.phone,
-      email: payload.email,
-      address: payload.address,
-      openingBalance: payload.openingBalance,
-      status: payload.status ? normalizeSupplierStatus(payload.status) : undefined,
-      notes: payload.notes,
-    },
+    data: updateData,
   });
 }
 
@@ -48,7 +72,7 @@ async function getSupplierById(id) {
   });
 }
 
-async function listSuppliers({ search, status, skip, take, sortBy, sortOrder }) {
+async function listSuppliers({ search, status, locationId, skip, take, sortBy, sortOrder }) {
   const where = {};
 
   if (status) {
@@ -63,6 +87,10 @@ async function listSuppliers({ search, status, skip, take, sortBy, sortOrder }) 
       { phone: { contains: search, mode: 'insensitive' } },
       { email: { contains: search, mode: 'insensitive' } },
     ];
+  }
+
+  if (locationId && supplierHasLocation) {
+    where.locationId = locationId;
   }
 
   const [data, total] = await Promise.all([
@@ -115,34 +143,46 @@ async function listSuppliers({ search, status, skip, take, sortBy, sortOrder }) 
 }
 
 async function createSupplierTransaction(payload) {
+  const createData = {
+    supplierId: payload.supplierId,
+    reportingPeriodId: payload.reportingPeriodId || null,
+    transactionDate: payload.transactionDate,
+    transactionType: payload.transactionType,
+    paymentMethod: payload.paymentMethod || null,
+    amount: payload.amount,
+    description: payload.description || null,
+    referenceNo: payload.referenceNo || null,
+    enteredBy: payload.enteredBy || null,
+  };
+
+  if (supplierTransactionHasLocation && payload.locationId !== undefined) {
+    createData.locationId = payload.locationId || null;
+  }
+
   return prisma.supplierTransaction.create({
-    data: {
-      supplierId: payload.supplierId,
-      reportingPeriodId: payload.reportingPeriodId || null,
-      transactionDate: payload.transactionDate,
-      transactionType: payload.transactionType,
-      paymentMethod: payload.paymentMethod || null,
-      amount: payload.amount,
-      description: payload.description || null,
-      referenceNo: payload.referenceNo || null,
-      enteredBy: payload.enteredBy || null,
-    },
+    data: createData,
   });
 }
 
 async function updateSupplierTransaction(id, payload) {
+  const updateData = {
+    reportingPeriodId: payload.reportingPeriodId,
+    transactionDate: payload.transactionDate,
+    transactionType: payload.transactionType,
+    paymentMethod: payload.paymentMethod,
+    amount: payload.amount,
+    description: payload.description,
+    referenceNo: payload.referenceNo,
+    enteredBy: payload.enteredBy,
+  };
+
+  if (supplierTransactionHasLocation && payload.locationId !== undefined) {
+    updateData.locationId = payload.locationId;
+  }
+
   return prisma.supplierTransaction.update({
     where: { id },
-    data: {
-      reportingPeriodId: payload.reportingPeriodId,
-      transactionDate: payload.transactionDate,
-      transactionType: payload.transactionType,
-      paymentMethod: payload.paymentMethod,
-      amount: payload.amount,
-      description: payload.description,
-      referenceNo: payload.referenceNo,
-      enteredBy: payload.enteredBy,
-    },
+    data: updateData,
   });
 }
 
@@ -151,6 +191,7 @@ async function listSupplierTransactions({
   reportingPeriodId,
   transactionType,
   paymentMethod,
+  locationId,
   startDate,
   endDate,
   search,
@@ -165,6 +206,13 @@ async function listSupplierTransactions({
   if (reportingPeriodId) where.reportingPeriodId = reportingPeriodId;
   if (transactionType) where.transactionType = transactionType;
   if (paymentMethod) where.paymentMethod = paymentMethod;
+  if (locationId) {
+    if (supplierTransactionHasLocation) {
+      where.locationId = locationId;
+    } else if (supplierHasLocation) {
+      where.supplier = { locationId };
+    }
+  }
   if (startDate || endDate) {
     where.transactionDate = {};
     if (startDate) where.transactionDate.gte = startDate;

@@ -31,6 +31,7 @@ async function createSupplier(req, res) {
       phone: req.body.phone,
       email: req.body.email,
       address: req.body.address,
+      locationId: toInt(req.body.locationId),
       openingBalance: toNumber(req.body.openingBalance, 0),
       status: req.body.status,
       notes: req.body.notes,
@@ -55,6 +56,7 @@ async function updateSupplier(req, res) {
       phone: req.body.phone,
       email: req.body.email,
       address: req.body.address,
+      locationId: req.body.locationId !== undefined ? toInt(req.body.locationId) : undefined,
       openingBalance: req.body.openingBalance !== undefined ? toNumber(req.body.openingBalance, 0) : undefined,
       status: req.body.status,
       notes: req.body.notes,
@@ -92,10 +94,12 @@ async function listSuppliers(req, res) {
 
     const search = req.query.search ? String(req.query.search).trim() : null;
     const status = req.query.status ? String(req.query.status).trim().toLowerCase() : null;
+    const locationId = toInt(req.query.locationId);
 
     const { data, total } = await suppliersService.listSuppliers({
       search,
       status,
+      locationId,
       skip: pagination.skip,
       take: pagination.take,
       sortBy: sort.sortBy,
@@ -107,7 +111,7 @@ async function listSuppliers(req, res) {
       total,
       page: pagination.page,
       pageSize: pagination.pageSize,
-      filters: { search, status },
+      filters: { search, status, locationId },
     }));
   } catch (err) {
     console.error('[BO][SUPPLIERS] listSuppliers error:', err);
@@ -139,6 +143,7 @@ async function createSupplierTransaction(req, res) {
       transactionDate,
       transactionType,
       paymentMethod,
+      locationId: toInt(req.body.locationId),
       amount,
       description: req.body.description,
       referenceNo: req.body.referenceNo,
@@ -162,6 +167,7 @@ async function updateSupplierTransaction(req, res) {
       transactionDate: req.body.transactionDate ? toDate(req.body.transactionDate) : undefined,
       transactionType: req.body.transactionType ? String(req.body.transactionType).toLowerCase() : undefined,
       paymentMethod: req.body.paymentMethod ? String(req.body.paymentMethod).toLowerCase() : undefined,
+      locationId: req.body.locationId !== undefined ? toInt(req.body.locationId) : undefined,
       amount: req.body.amount !== undefined ? toNumber(req.body.amount) : undefined,
       description: req.body.description,
       referenceNo: req.body.referenceNo,
@@ -194,6 +200,7 @@ async function listSupplierTransactions(req, res) {
     const reportingPeriodId = toInt(req.query.reportingPeriodId);
     const transactionType = req.query.transactionType ? String(req.query.transactionType).toLowerCase() : null;
     const paymentMethod = req.query.paymentMethod ? String(req.query.paymentMethod).toLowerCase() : null;
+    const locationId = toInt(req.query.locationId);
     const startDate = req.query.startDate ? toDate(req.query.startDate) : null;
     const endDate = req.query.endDate ? toDate(req.query.endDate) : null;
     const search = req.query.search ? String(req.query.search).trim() : null;
@@ -203,6 +210,7 @@ async function listSupplierTransactions(req, res) {
       reportingPeriodId,
       transactionType,
       paymentMethod,
+      locationId,
       startDate,
       endDate,
       search,
@@ -217,7 +225,7 @@ async function listSupplierTransactions(req, res) {
       total,
       page: pagination.page,
       pageSize: pagination.pageSize,
-      filters: { supplierId, reportingPeriodId, transactionType, paymentMethod, startDate: req.query.startDate, endDate: req.query.endDate, search },
+      filters: { supplierId, reportingPeriodId, transactionType, paymentMethod, locationId, startDate: req.query.startDate, endDate: req.query.endDate, search },
     }));
   } catch (err) {
     console.error('[BO][SUPPLIERS] listSupplierTransactions error:', err);

@@ -21,7 +21,7 @@ const buildFullName = (emp) =>
 const getApiError = (err, fallback) =>
   err?.response?.data?.error || err?.response?.data?.message || err?.message || fallback;
 
-const EmployeesTab = () => {
+const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null }) => {
   // ── List state ──
   const [employees, setEmployees] = useState([]);
   const [pagination, setPagination] = useState({ total: 0, skip: 0, take: 20 });
@@ -69,6 +69,7 @@ const EmployeesTab = () => {
       const params = { skip, take: 20 };
       if (search.trim()) params.search = search.trim();
       if (statusFilter) params.status = statusFilter;
+      if (selectedLocationId) params.locationId = selectedLocationId;
       const res = await api.get('/business-operations/employees', { params });
       const payload = res.data;
       const list = Array.isArray(payload?.data) ? payload.data : Array.isArray(payload?.employees) ? payload.employees : [];
@@ -81,7 +82,7 @@ const EmployeesTab = () => {
     } finally {
       setListLoading(false);
     }
-  }, [page, search, statusFilter]);
+  }, [page, search, selectedLocationId, statusFilter]);
 
   // ── Fetch employee detail + salary history ──
   const fetchDetail = useCallback(async (id) => {
@@ -115,7 +116,7 @@ const EmployeesTab = () => {
     fetchEmployees(1);
     setPage(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, statusFilter]);
+  }, [search, statusFilter, selectedLocationId, refreshKey]);
 
   useEffect(() => {
     if (page === 1) return; // already loaded by filter change
@@ -172,7 +173,7 @@ const EmployeesTab = () => {
         const res = await api.put(`/business-operations/employees/${employeeModal.employee.id}`, payload);
         saved = res.data;
       } else {
-        const res = await api.post('/business-operations/employees', payload);
+        const res = await api.post('/business-operations/employees', { ...payload, locationId: selectedLocationId || undefined });
         saved = res.data;
       }
       setEmployeeModal({ open: false, employee: null });
@@ -240,6 +241,7 @@ const EmployeesTab = () => {
         filters: {
           search,
           status: statusFilter,
+          locationId: selectedLocationId,
         },
       });
     } catch (error) {

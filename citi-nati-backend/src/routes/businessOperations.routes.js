@@ -41,6 +41,7 @@ const {
   getSalesUsers,
   getSalesPayments,
 } = require('../controllers/salesReporting.controller');
+const { listBusinessLocations } = require('../controllers/business-operations/locations.controller');
 const { resetImportedData } = require('../controllers/business-operations/adminReset.controller');
 const suppliersRoutes = require('./business-operations/suppliers.routes');
 const expensesRoutes = require('./business-operations/expenses.routes');
@@ -55,6 +56,7 @@ const router = express.Router();
 router.use(verifyTokenMiddleware, verifyAdmin);
 
 // Reporting endpoints
+router.get('/locations', listBusinessLocations);
 router.get('/reports/sales/summary', getSalesSummary);
 router.get('/reports/sales/invoices', getSalesInvoices);
 router.get('/reports/sales/products', getSalesProducts);

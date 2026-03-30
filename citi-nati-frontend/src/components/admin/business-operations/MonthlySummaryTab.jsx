@@ -57,7 +57,13 @@ const parseError = (error, fallback) => error?.response?.data?.error || error?.r
 
 const defaultSectionState = { loading: true, error: '' };
 
-const MonthlySummaryTab = ({ refreshKey = 0, onNavigateTab }) => {
+const MonthlySummaryTab = ({
+  refreshKey = 0,
+  onNavigateTab,
+  selectedLocationId = null,
+  selectedLocationCode = '',
+  selectedLocationName = '',
+}) => {
   const now = new Date();
   const initialMonthRange = monthRange(now.getFullYear(), now.getMonth() + 1);
 
@@ -67,7 +73,6 @@ const MonthlySummaryTab = ({ refreshKey = 0, onNavigateTab }) => {
     year: now.getFullYear(),
     startDate: initialMonthRange.startDate,
     endDate: initialMonthRange.endDate,
-    locationCode: '',
   });
   const [refreshTick, setRefreshTick] = useState(0);
 
@@ -116,7 +121,6 @@ const MonthlySummaryTab = ({ refreshKey = 0, onNavigateTab }) => {
       year: now.getFullYear(),
       startDate: resetRange.startDate,
       endDate: resetRange.endDate,
-      locationCode: '',
     });
   }, [now]);
 
@@ -127,7 +131,11 @@ const MonthlySummaryTab = ({ refreshKey = 0, onNavigateTab }) => {
       ? { periodType: 'month', month: String(filters.month), year: String(filters.year) }
       : { periodType: 'custom', startDate: activeRange.startDate, endDate: activeRange.endDate };
 
-    if (filters.locationCode.trim()) params.locationCode = filters.locationCode.trim().toUpperCase();
+    if (selectedLocationId) {
+      params.locationId = selectedLocationId;
+    } else if (selectedLocationCode.trim()) {
+      params.locationCode = selectedLocationCode.trim().toUpperCase();
+    }
 
     try {
       const [summaryResponse, paymentsResponse] = await Promise.all([
@@ -144,7 +152,7 @@ const MonthlySummaryTab = ({ refreshKey = 0, onNavigateTab }) => {
     } catch (error) {
       setSalesState({ loading: false, error: parseError(error, 'Failed to load sales summary.'), summary: null, payments: [] });
     }
-  }, [activeRange.endDate, activeRange.startDate, filters.locationCode, filters.month, filters.periodType, filters.year]);
+  }, [activeRange.endDate, activeRange.startDate, filters.month, filters.periodType, filters.year, selectedLocationCode, selectedLocationId]);
 
   const fetchExpenses = useCallback(async () => {
     setExpensesState((prev) => ({ ...prev, loading: true, error: '' }));
@@ -154,8 +162,7 @@ const MonthlySummaryTab = ({ refreshKey = 0, onNavigateTab }) => {
       endDate: activeRange.endDate,
     };
 
-    const asNumber = Number(filters.locationCode);
-    if (Number.isInteger(asNumber) && asNumber > 0) params.locationId = asNumber;
+    if (selectedLocationId) params.locationId = selectedLocationId;
 
     try {
       const response = await api.get('/business-operations/expenses/summary/overview', { params });
@@ -163,7 +170,7 @@ const MonthlySummaryTab = ({ refreshKey = 0, onNavigateTab }) => {
     } catch (error) {
       setExpensesState({ loading: false, error: parseError(error, 'Failed to load expense summary.'), summary: null });
     }
-  }, [activeRange.endDate, activeRange.startDate, filters.locationCode]);
+  }, [activeRange.endDate, activeRange.startDate, selectedLocationId]);
 
   const fetchPayroll = useCallback(async () => {
     setPayrollState((prev) => ({ ...prev, loading: true, error: '' }));
@@ -173,6 +180,7 @@ const MonthlySummaryTab = ({ refreshKey = 0, onNavigateTab }) => {
         sortBy: 'createdAt',
         sortOrder: 'desc',
         pageSize: 100,
+        locationId: selectedLocationId || undefined,
       });
 
       const relevantPeriods = periods.filter((period) => inDateRange(period.createdAt, activeRange.startDate, activeRange.endDate));
@@ -199,6 +207,7 @@ const MonthlySummaryTab = ({ refreshKey = 0, onNavigateTab }) => {
           sortBy: 'createdAt',
           sortOrder: 'desc',
           pageSize: 150,
+          locationId: selectedLocationId || undefined,
         })),
       );
 
@@ -224,7 +233,7 @@ const MonthlySummaryTab = ({ refreshKey = 0, onNavigateTab }) => {
     } catch (error) {
       setPayrollState({ loading: false, error: parseError(error, 'Failed to load payroll summary.'), data: null });
     }
-  }, [activeRange.endDate, activeRange.startDate]);
+  }, [activeRange.endDate, activeRange.startDate, selectedLocationId]);
 
   const fetchSuppliers = useCallback(async () => {
     setSupplierState((prev) => ({ ...prev, loading: true, error: '' }));
@@ -235,6 +244,7 @@ const MonthlySummaryTab = ({ refreshKey = 0, onNavigateTab }) => {
           sortBy: 'createdAt',
           sortOrder: 'desc',
           pageSize: 100,
+          locationId: selectedLocationId || undefined,
         }),
         fetchAllPages('/business-operations/suppliers/transactions/list', {
           sortBy: 'transactionDate',
@@ -243,6 +253,7 @@ const MonthlySummaryTab = ({ refreshKey = 0, onNavigateTab }) => {
           startDate: activeRange.startDate,
           endDate: activeRange.endDate,
           pageSize: 100,
+          locationId: selectedLocationId || undefined,
         }),
       ]);
 
@@ -278,7 +289,7 @@ const MonthlySummaryTab = ({ refreshKey = 0, onNavigateTab }) => {
     } catch (error) {
       setSupplierState({ loading: false, error: parseError(error, 'Failed to load supplier summary.'), data: null });
     }
-  }, [activeRange.endDate, activeRange.startDate]);
+  }, [activeRange.endDate, activeRange.startDate, selectedLocationId]);
 
   useEffect(() => {
     if (validationError) return;
@@ -313,8 +324,9 @@ const MonthlySummaryTab = ({ refreshKey = 0, onNavigateTab }) => {
     year: filters.year,
     startDate: activeRange.startDate,
     endDate: activeRange.endDate,
-    locationCode: filters.locationCode?.trim() || '',
-  }), [activeRange.endDate, activeRange.startDate, filters.locationCode, filters.month, filters.periodType, filters.year]);
+    locationCode: selectedLocationCode?.trim() || '',
+    locationId: selectedLocationId || '',
+  }), [activeRange.endDate, activeRange.startDate, filters.month, filters.periodType, filters.year, selectedLocationCode, selectedLocationId]);
 
   const handleExport = async (format) => {
     if (format === 'excel') setExportingExcel(true);
@@ -331,7 +343,8 @@ const MonthlySummaryTab = ({ refreshKey = 0, onNavigateTab }) => {
           year: filters.year,
           startDate: activeRange.startDate,
           endDate: activeRange.endDate,
-          locationCode: filters.locationCode,
+          locationId: selectedLocationId,
+          locationCode: selectedLocationCode,
         },
       });
     } catch (error) {
@@ -361,6 +374,8 @@ const MonthlySummaryTab = ({ refreshKey = 0, onNavigateTab }) => {
           <SummaryFiltersBar
             filters={filters}
             rangeLabel={activeRange.label}
+            locationLabel={selectedLocationName || selectedLocationCode || ''}
+            locationCode={selectedLocationCode || ''}
             loading={anyLoading}
             validationError={validationError}
             onChange={handleFilterChange}

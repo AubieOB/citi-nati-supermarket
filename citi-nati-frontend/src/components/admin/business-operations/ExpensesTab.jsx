@@ -28,7 +28,7 @@ function getCurrentMonthRange() {
 const TAB_EXPENSES = 'expenses';
 const TAB_CATEGORIES = 'categories';
 
-const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null }) => {
+const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocationId = null }) => {
   const initialRange = getCurrentMonthRange();
 
   // Sub-tab
@@ -82,7 +82,8 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null }) => {
     expenseCategoryId: filters.expenseCategoryId || undefined,
     startDate: filters.startDate || undefined,
     endDate: filters.endDate || undefined,
-  }), [expensePage, filters.endDate, filters.expenseCategoryId, filters.search, filters.startDate]);
+    locationId: selectedLocationId || undefined,
+  }), [expensePage, filters.endDate, filters.expenseCategoryId, filters.search, filters.startDate, selectedLocationId]);
 
   const fetchCategories = useCallback(async () => {
     setCategoriesLoading(true);
@@ -178,8 +179,8 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null }) => {
     setExpenseError('');
     try {
       const res = expenseModal.expense
-        ? await api.put(`/business-operations/expenses/${expenseModal.expense.id}`, payload)
-        : await api.post('/business-operations/expenses', payload);
+        ? await api.put(`/business-operations/expenses/${expenseModal.expense.id}`, { ...payload, locationId: selectedLocationId || undefined })
+        : await api.post('/business-operations/expenses', { ...payload, locationId: selectedLocationId || undefined });
 
       const saved = res.data?.data || null;
       setExpenseModal({ open: false, expense: null });
@@ -230,6 +231,7 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null }) => {
           expenseCategoryId: filters.expenseCategoryId,
           startDate: filters.startDate,
           endDate: filters.endDate,
+          locationId: selectedLocationId,
         },
       });
     } catch (error) {
@@ -239,7 +241,7 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null }) => {
       if (format === 'excel') setExportingExcel(false);
       if (format === 'pdf') setExportingPdf(false);
     }
-  }, [activeTab, filters.endDate, filters.expenseCategoryId, filters.search, filters.startDate]);
+  }, [activeTab, filters.endDate, filters.expenseCategoryId, filters.search, filters.startDate, selectedLocationId]);
 
   const tabBtnStyle = (active) => ({
     border: 'none',

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import BusinessOperationsTabs from './business-operations/BusinessOperationsTabs.jsx';
 import SalesReportsTab from './business-operations/SalesReportsTab.jsx';
 import ComingSoonTabPanel from './business-operations/ComingSoonTabPanel.jsx';
@@ -10,6 +10,7 @@ import SuppliersTab from './business-operations/SuppliersTab.jsx';
 import ReportHistoryTab from './business-operations/ReportHistoryTab.jsx';
 import BusinessOperationsImportButton from './business-operations/BusinessOperationsImportButton.jsx';
 import BusinessOperationsImportModal from './business-operations/BusinessOperationsImportModal.jsx';
+import api from '../../utils/api.js';
 
 const TABS = [
   { id: 'sales-reports', label: 'Sales Reports', icon: 'fa-chart-column' },
@@ -26,6 +27,42 @@ const AdminBusinessOperations = () => {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [dataRefreshKey, setDataRefreshKey] = useState(0);
   const [drilldownRequests, setDrilldownRequests] = useState({});
+  const [locations, setLocations] = useState([]);
+  const [selectedLocationId, setSelectedLocationId] = useState('all');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadLocations = async () => {
+      try {
+        const response = await api.get('/business-operations/locations');
+        const locationRows = Array.isArray(response?.data?.data) ? response.data.data : [];
+        if (cancelled) return;
+        setLocations(locationRows);
+      } catch (_error) {
+        if (cancelled) return;
+        setLocations([
+          { id: 1, code: 'BLT', name: 'Blantyre' },
+          { id: 2, code: 'ZMB', name: 'Zomba' },
+        ]);
+      }
+    };
+
+    loadLocations();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const selectedLocation = useMemo(() => {
+    if (selectedLocationId === 'all') return null;
+    const asNumber = Number(selectedLocationId);
+    return locations.find((location) => Number(location.id) === asNumber) || null;
+  }, [locations, selectedLocationId]);
+
+  const selectedLocationCode = selectedLocation?.code || '';
+  const selectedLocationIdNumber = selectedLocation ? Number(selectedLocation.id) : null;
 
   const handleImportSuccess = () => {
     setDataRefreshKey((current) => current + 1);
@@ -60,12 +97,12 @@ const AdminBusinessOperations = () => {
   };
 
   const contentByTab = {
-    'sales-reports': <SalesReportsTab drilldownRequest={drilldownRequests['sales-reports']} />,
-    suppliers: <SuppliersTab refreshKey={dataRefreshKey} />,
-    expenses: <ExpensesTab refreshKey={dataRefreshKey} drilldownRequest={drilldownRequests.expenses} />,
-    'monthly-summary': <MonthlySummaryTab refreshKey={dataRefreshKey} onNavigateTab={handleNavigateTab} />,
-    employees: <EmployeesTab refreshKey={dataRefreshKey} />,
-    payroll: <PayrollTab refreshKey={dataRefreshKey} />,
+    'sales-reports': <SalesReportsTab drilldownRequest={drilldownRequests['sales-reports']} selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} />,
+    suppliers: <SuppliersTab refreshKey={dataRefreshKey} selectedLocationId={selectedLocationIdNumber} />,
+    expenses: <ExpensesTab refreshKey={dataRefreshKey} drilldownRequest={drilldownRequests.expenses} selectedLocationId={selectedLocationIdNumber} />,
+    'monthly-summary': <MonthlySummaryTab refreshKey={dataRefreshKey} onNavigateTab={handleNavigateTab} selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} selectedLocationName={selectedLocation?.name || ''} />,
+    employees: <EmployeesTab refreshKey={dataRefreshKey} selectedLocationId={selectedLocationIdNumber} />,
+    payroll: <PayrollTab refreshKey={dataRefreshKey} selectedLocationId={selectedLocationIdNumber} />,
     'report-history': <ReportHistoryTab refreshKey={dataRefreshKey} />,
   };
 
@@ -95,7 +132,34 @@ const AdminBusinessOperations = () => {
                 Review branch-aware sales performance now, then extend the same workspace to suppliers, expenses, employees, payroll, and import-driven operational workflows.
               </p>
             </div>
-            <BusinessOperationsImportButton onClick={() => setIsImportModalOpen(true)} />
+            <div style={{ display: 'grid', gap: '0.6rem', justifyItems: 'end', minWidth: '240px' }}>
+              <label style={{ display: 'grid', gap: '0.25rem', minWidth: '220px' }}>
+                <span style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Location Scope
+                </span>
+                <select
+                  value={selectedLocationId}
+                  onChange={(event) => setSelectedLocationId(event.target.value)}
+                  style={{
+                    padding: '0.62rem 0.72rem',
+                    borderRadius: '10px',
+                    border: '1px solid #cbd5e1',
+                    backgroundColor: '#fff',
+                    color: '#0f172a',
+                    fontSize: '0.9rem',
+                    minWidth: '220px',
+                  }}
+                >
+                  <option value="all">All Locations</option>
+                  {locations.map((location) => (
+                    <option key={location.id} value={String(location.id)}>
+                      {location.name}{location.code ? ` (${location.code})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <BusinessOperationsImportButton onClick={() => setIsImportModalOpen(true)} />
+            </div>
           </div>
 
           <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #edf2f7' }}>

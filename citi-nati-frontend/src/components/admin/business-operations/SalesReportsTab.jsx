@@ -130,7 +130,7 @@ const ErrorState = ({ message }) => (
   </div>
 );
 
-const SalesReportsTab = ({ drilldownRequest = null }) => {
+const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, selectedLocationCode = '' }) => {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [activeView, setActiveView] = useState('summary');
   const [viewState, setViewState] = useState(DEFAULT_VIEW_STATE);
@@ -170,6 +170,20 @@ const SalesReportsTab = ({ drilldownRequest = null }) => {
     setActiveView('summary');
   }, [drilldownRequest]);
 
+  useEffect(() => {
+    setFilters((prev) => {
+      const nextLocationId = selectedLocationId ? String(selectedLocationId) : '';
+      const nextLocationCode = selectedLocationId ? String(selectedLocationCode || '').trim().toUpperCase() : '';
+      if (prev.locationId === nextLocationId && prev.locationCode === nextLocationCode) return prev;
+      return {
+        ...prev,
+        locationId: nextLocationId,
+        locationCode: nextLocationCode,
+      };
+    });
+    setViewState(DEFAULT_VIEW_STATE);
+  }, [selectedLocationCode, selectedLocationId]);
+
   const updateFilter = useCallback((key, value) => {
     setFilters((prev) => {
       const next = { ...prev, [key]: value };
@@ -185,9 +199,13 @@ const SalesReportsTab = ({ drilldownRequest = null }) => {
   }, []);
 
   const resetFilters = useCallback(() => {
-    setFilters(DEFAULT_FILTERS);
+    setFilters({
+      ...DEFAULT_FILTERS,
+      locationId: selectedLocationId ? String(selectedLocationId) : '',
+      locationCode: selectedLocationId ? String(selectedLocationCode || '').trim().toUpperCase() : '',
+    });
     setViewState(DEFAULT_VIEW_STATE);
-  }, []);
+  }, [selectedLocationCode, selectedLocationId]);
 
   const updateViewSort = useCallback((view, sortBy) => {
     setViewState((prev) => {

@@ -34,7 +34,7 @@ const reduceSummary = (entries = []) => entries.reduce((acc, entry) => {
   totalLoanDeductionAmount: 0,
 });
 
-const PayrollTab = ({ refreshKey = 0 }) => {
+const PayrollTab = ({ refreshKey = 0, selectedLocationId = null }) => {
   const [employees, setEmployees] = useState([]);
 
   const [periodFilters, setPeriodFilters] = useState({
@@ -85,13 +85,13 @@ const PayrollTab = ({ refreshKey = 0 }) => {
   const fetchEmployees = useCallback(async () => {
     try {
       const res = await api.get('/business-operations/employees', {
-        params: { page: 1, pageSize: 200, sortBy: 'createdAt', sortOrder: 'desc' },
+        params: { page: 1, pageSize: 200, sortBy: 'createdAt', sortOrder: 'desc', locationId: selectedLocationId || undefined },
       });
       setEmployees(Array.isArray(res?.data?.data) ? res.data.data : []);
     } catch (_err) {
       setEmployees([]);
     }
-  }, []);
+  }, [selectedLocationId]);
 
   const fetchPayrollPeriods = useCallback(async (pg = periodPage) => {
     setPeriodsLoading(true);
@@ -106,6 +106,7 @@ const PayrollTab = ({ refreshKey = 0 }) => {
       if (periodFilters.search.trim()) params.search = periodFilters.search.trim();
       if (periodFilters.status) params.status = periodFilters.status;
       if (periodFilters.payrollMode) params.payrollMode = periodFilters.payrollMode;
+      if (selectedLocationId) params.locationId = selectedLocationId;
 
       const res = await api.get('/business-operations/payroll/periods', { params });
       const data = Array.isArray(res?.data?.data) ? res.data.data : [];
@@ -118,7 +119,7 @@ const PayrollTab = ({ refreshKey = 0 }) => {
     } finally {
       setPeriodsLoading(false);
     }
-  }, [periodFilters.payrollMode, periodFilters.search, periodFilters.status, periodPage]);
+  }, [periodFilters.payrollMode, periodFilters.search, periodFilters.status, periodPage, selectedLocationId]);
 
   const fetchPeriodDetail = useCallback(async (periodId) => {
     if (!periodId) {
@@ -153,6 +154,7 @@ const PayrollTab = ({ refreshKey = 0 }) => {
           pageSize: 12,
           sortBy: 'createdAt',
           sortOrder: 'desc',
+          locationId: selectedLocationId || undefined,
         },
       });
 
@@ -170,7 +172,7 @@ const PayrollTab = ({ refreshKey = 0 }) => {
     } finally {
       setEntriesLoading(false);
     }
-  }, [entriesPage, selectedEntryId]);
+  }, [entriesPage, selectedEntryId, selectedLocationId]);
 
   const fetchSupportData = useCallback(async (employeeId) => {
     if (!employeeId) {
@@ -265,7 +267,7 @@ const PayrollTab = ({ refreshKey = 0 }) => {
 
   useEffect(() => {
     setPeriodPage(1);
-  }, [periodFilters.payrollMode, periodFilters.search, periodFilters.status]);
+  }, [periodFilters.payrollMode, periodFilters.search, periodFilters.status, selectedLocationId]);
 
   useEffect(() => {
     if (periodsLoading) return;
@@ -325,10 +327,10 @@ const PayrollTab = ({ refreshKey = 0 }) => {
     try {
       let saved;
       if (periodModal.period) {
-        const res = await api.put(`/business-operations/payroll/periods/${periodModal.period.id}`, payload);
+        const res = await api.put(`/business-operations/payroll/periods/${periodModal.period.id}`, { ...payload, locationId: selectedLocationId || undefined });
         saved = res?.data?.data;
       } else {
-        const res = await api.post('/business-operations/payroll/periods', payload);
+        const res = await api.post('/business-operations/payroll/periods', { ...payload, locationId: selectedLocationId || undefined });
         saved = res?.data?.data;
       }
 
@@ -417,6 +419,7 @@ const PayrollTab = ({ refreshKey = 0 }) => {
           search: periodFilters.search,
           status: periodFilters.status,
           payrollMode: periodFilters.payrollMode,
+          locationId: selectedLocationId,
         },
       });
     } catch (error) {

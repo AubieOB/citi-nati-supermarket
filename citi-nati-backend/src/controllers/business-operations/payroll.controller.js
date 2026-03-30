@@ -64,6 +64,7 @@ async function createPayrollPeriod(req, res) {
       payrollMode,
       description: req.body.description,
       status: req.body.status,
+      locationId: toInt(req.body.locationId),
       createdBy: req.body.createdBy || req.user?.email || null,
     });
 
@@ -84,6 +85,7 @@ async function updatePayrollPeriod(req, res) {
       payrollMode: req.body.payrollMode ? String(req.body.payrollMode).toLowerCase() : undefined,
       description: req.body.description,
       status: req.body.status,
+      locationId: req.body.locationId !== undefined ? toInt(req.body.locationId) : undefined,
       createdBy: req.body.createdBy,
     };
 
@@ -110,6 +112,7 @@ async function listPayrollPeriods(req, res) {
       status: req.query.status ? String(req.query.status).trim() : null,
       payrollMode: req.query.payrollMode ? String(req.query.payrollMode).toLowerCase() : null,
       reportingPeriodId: toInt(req.query.reportingPeriodId),
+      locationId: toInt(req.query.locationId),
     };
 
     const { data, total } = await payrollService.listPayrollPeriods({
@@ -192,6 +195,7 @@ async function listPayrollEntries(req, res) {
     const filters = {
       payrollPeriodId: toInt(req.query.payrollPeriodId),
       employeeId: toInt(req.query.employeeId),
+      locationId: toInt(req.query.locationId),
     };
 
     const { data, total } = await payrollService.listPayrollEntries({
