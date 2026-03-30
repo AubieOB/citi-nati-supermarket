@@ -41,6 +41,7 @@ const {
   getSalesUsers,
   getSalesPayments,
 } = require('../controllers/salesReporting.controller');
+const { resetImportedData } = require('../controllers/business-operations/adminReset.controller');
 const suppliersRoutes = require('./business-operations/suppliers.routes');
 const expensesRoutes = require('./business-operations/expenses.routes');
 const employeesRoutes = require('./business-operations/employees.routes');
@@ -58,6 +59,9 @@ router.get('/reports/sales/invoices', getSalesInvoices);
 router.get('/reports/sales/products', getSalesProducts);
 router.get('/reports/sales/users', getSalesUsers);
 router.get('/reports/sales/payments', getSalesPayments);
+
+// Admin safety endpoint for workbook-import cleanup.
+router.post('/admin/reset-imported-data', resetImportedData);
 
 // Import-first foundation endpoints
 router.use('/suppliers', suppliersRoutes);
