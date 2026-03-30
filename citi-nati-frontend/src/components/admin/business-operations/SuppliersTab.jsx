@@ -335,7 +335,7 @@ const SuppliersTab = ({ refreshKey = 0 }) => {
           <select
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value)}
-            style={{ minWidth: '180px', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem', backgroundColor: '#fff' }}
+            style={{ minWidth: '140px', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem', backgroundColor: '#fff' }}
           >
             <option value="">All statuses</option>
             <option value="active">Active</option>
@@ -344,7 +344,7 @@ const SuppliersTab = ({ refreshKey = 0 }) => {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1rem', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem', alignItems: 'start' }}>
         <div style={{ ...cardStyle, overflow: 'hidden' }}>
           <div style={{ padding: '1rem 1.05rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
             <strong style={{ color: '#0f172a' }}>Supplier Register</strong>

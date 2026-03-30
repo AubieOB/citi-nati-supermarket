@@ -449,7 +449,7 @@ const PayrollTab = ({ refreshKey = 0 }) => {
         <select
           value={periodFilters.status}
           onChange={(event) => setPeriodFilters((prev) => ({ ...prev, status: event.target.value }))}
-          style={{ padding: '0.72rem 0.84rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc', minWidth: '130px' }}
+          style={{ padding: '0.72rem 0.84rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc', minWidth: '120px' }}
         >
           <option value="">All Statuses</option>
           <option value="draft">Draft</option>
@@ -461,7 +461,7 @@ const PayrollTab = ({ refreshKey = 0 }) => {
         <select
           value={periodFilters.payrollMode}
           onChange={(event) => setPeriodFilters((prev) => ({ ...prev, payrollMode: event.target.value }))}
-          style={{ padding: '0.72rem 0.84rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc', minWidth: '145px' }}
+          style={{ padding: '0.72rem 0.84rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc', minWidth: '120px' }}
         >
           <option value="">All Modes</option>
           <option value="mid_month">Mid Month</option>
@@ -477,7 +477,7 @@ const PayrollTab = ({ refreshKey = 0 }) => {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '1rem', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem', alignItems: 'start' }}>
         <PayrollPeriodsList
           periods={periods}
           loading={periodsLoading}

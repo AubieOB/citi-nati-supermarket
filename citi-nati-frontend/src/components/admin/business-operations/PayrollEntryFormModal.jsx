@@ -197,21 +197,21 @@ const PayrollEntryFormModal = ({
             </select>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(140px, 1fr))', gap: '0.75rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.75rem' }}>
             <div><label style={labelStyle}>Basic Salary</label><input type="number" step="0.01" min="0" value={form.basicSalary} onChange={set('basicSalary')} style={fieldStyle} /></div>
             <div><label style={labelStyle}>Increment Amount</label><input type="number" step="0.01" min="0" value={form.incrementAmount} onChange={set('incrementAmount')} style={fieldStyle} /></div>
             <div><label style={labelStyle}>Gross Pay</label><input type="number" step="0.01" min="0" value={form.grossPay} onChange={set('grossPay')} style={fieldStyle} /></div>
             <div><label style={labelStyle}>Total Deductions</label><input type="number" step="0.01" min="0" value={form.totalDeductions} onChange={set('totalDeductions')} style={fieldStyle} /></div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(140px, 1fr))', gap: '0.75rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.75rem' }}>
             <div><label style={labelStyle}>Net Pay</label><input type="number" step="0.01" min="0" value={form.netPay} onChange={set('netPay')} style={{ ...fieldStyle, backgroundColor: '#f8fafc' }} /></div>
             <div><label style={labelStyle}>Days Worked</label><input type="number" step="0.01" min="0" value={form.daysWorked} onChange={set('daysWorked')} style={fieldStyle} /></div>
             <div><label style={labelStyle}>Days Absent</label><input type="number" step="0.01" min="0" value={form.daysAbsent} onChange={set('daysAbsent')} style={fieldStyle} /></div>
             <div><label style={labelStyle}>Overtime Hours</label><input type="number" step="0.01" min="0" value={form.overtimeHours} onChange={set('overtimeHours')} style={fieldStyle} /></div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(120px, 1fr))', gap: '0.75rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(155px, 1fr))', gap: '0.75rem' }}>
             <div><label style={labelStyle}>Overtime Amount</label><input type="number" step="0.01" min="0" value={form.overtimeAmount} onChange={set('overtimeAmount')} style={fieldStyle} /></div>
             <div><label style={labelStyle}>Loan Deduction</label><input type="number" step="0.01" min="0" value={form.loanDeductionAmount} onChange={set('loanDeductionAmount')} style={fieldStyle} /></div>
             <div><label style={labelStyle}>Other Deduction</label><input type="number" step="0.01" min="0" value={form.otherDeductionAmount} onChange={set('otherDeductionAmount')} style={fieldStyle} /></div>
@@ -220,7 +220,7 @@ const PayrollEntryFormModal = ({
             <div><label style={labelStyle}>Leave Pay</label><input type="number" step="0.01" min="0" value={form.leavePayAmount} onChange={set('leavePayAmount')} style={fieldStyle} /></div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '0.75rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
             <div><label style={labelStyle}>PAYE Amount</label><input type="number" step="0.01" min="0" value={form.payeAmount} onChange={set('payeAmount')} style={fieldStyle} /></div>
             <div>
               <label style={labelStyle}>Notes</label>

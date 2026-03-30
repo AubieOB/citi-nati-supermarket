@@ -158,7 +158,7 @@ const EmployeeFormModal = ({ isOpen, employee, saving, error, onClose, onSubmit 
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ padding: '1.3rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+        <form onSubmit={handleSubmit} style={{ padding: '1.3rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '1rem' }}>
 
           {/* ── Employment info ── */}
           <div style={sectionLabel}>Employment Information</div>

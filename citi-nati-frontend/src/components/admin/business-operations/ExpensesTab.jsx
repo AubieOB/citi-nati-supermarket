@@ -307,7 +307,7 @@ const ExpensesTab = ({ refreshKey = 0 }) => {
               <select
                 value={filters.expenseCategoryId}
                 onChange={(e) => setFilters((prev) => ({ ...prev, expenseCategoryId: e.target.value }))}
-                style={{ minWidth: '200px', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem', backgroundColor: '#fff' }}
+                style={{ minWidth: '150px', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem', backgroundColor: '#fff' }}
               >
                 <option value="">All categories</option>
                 {categories.map((cat) => (
@@ -346,7 +346,7 @@ const ExpensesTab = ({ refreshKey = 0 }) => {
           </div>
 
           {/* Two-panel layout */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1rem', alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem', alignItems: 'start' }}>
 
             {/* Left — expense register */}
             <div style={{ ...cardStyle, overflow: 'hidden' }}>

@@ -147,7 +147,7 @@ const SalaryStructureFormModal = ({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ padding: '1.3rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+        <form onSubmit={handleSubmit} style={{ padding: '1.3rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
 
           <div>
             <label style={labelStyle}>Agreed Salary / Month <span style={{ color: '#ef4444' }}>*</span></label>
