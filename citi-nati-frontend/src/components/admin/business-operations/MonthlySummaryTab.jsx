@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../../../utils/api.js';
+import { downloadBusinessReport } from '../../../utils/exportService.js';
 import SummaryFiltersBar from './monthly-summary/SummaryFiltersBar.jsx';
 import SummaryCards from './monthly-summary/SummaryCards.jsx';
 import SalesSummarySection from './monthly-summary/SalesSummarySection.jsx';
@@ -74,6 +75,8 @@ const MonthlySummaryTab = ({ refreshKey = 0, onNavigateTab }) => {
   const [expensesState, setExpensesState] = useState({ ...defaultSectionState, summary: null });
   const [payrollState, setPayrollState] = useState({ ...defaultSectionState, data: null });
   const [supplierState, setSupplierState] = useState({ ...defaultSectionState, data: null });
+  const [exportingExcel, setExportingExcel] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   const activeRange = useMemo(() => {
     if (filters.periodType === 'month') return monthRange(filters.year, filters.month);
@@ -313,6 +316,33 @@ const MonthlySummaryTab = ({ refreshKey = 0, onNavigateTab }) => {
     locationCode: filters.locationCode?.trim() || '',
   }), [activeRange.endDate, activeRange.startDate, filters.locationCode, filters.month, filters.periodType, filters.year]);
 
+  const handleExport = async (format) => {
+    if (format === 'excel') setExportingExcel(true);
+    if (format === 'pdf') setExportingPdf(true);
+
+    try {
+      await downloadBusinessReport({
+        format,
+        module: 'monthly-summary',
+        type: 'summary',
+        filters: {
+          periodType: filters.periodType,
+          month: filters.month,
+          year: filters.year,
+          startDate: activeRange.startDate,
+          endDate: activeRange.endDate,
+          locationCode: filters.locationCode,
+        },
+      });
+    } catch (error) {
+      const message = error?.response?.data?.error || `Failed to export ${format.toUpperCase()} report.`;
+      window.alert(message);
+    } finally {
+      if (format === 'excel') setExportingExcel(false);
+      if (format === 'pdf') setExportingPdf(false);
+    }
+  };
+
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
       <div style={{ ...cardStyle, padding: '1.08rem 1.15rem' }}>
@@ -336,6 +366,10 @@ const MonthlySummaryTab = ({ refreshKey = 0, onNavigateTab }) => {
             onChange={handleFilterChange}
             onRefresh={() => setRefreshTick((current) => current + 1)}
             onClear={resetFilters}
+            exportingExcel={exportingExcel}
+            exportingPdf={exportingPdf}
+            onExportExcel={() => handleExport('excel')}
+            onExportPdf={() => handleExport('pdf')}
           />
         </div>
       </div>

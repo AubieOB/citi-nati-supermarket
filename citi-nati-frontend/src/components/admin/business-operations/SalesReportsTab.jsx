@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../../../utils/api.js';
+import { downloadBusinessReport } from '../../../utils/exportService.js';
 import SalesReportFilters from './SalesReportFilters.jsx';
 import SalesSummaryCards from './SalesSummaryCards.jsx';
 
@@ -143,6 +144,8 @@ const SalesReportsTab = ({ drilldownRequest = null }) => {
   const [productsState, setProductsState] = useState({ data: [], pagination: null, loading: false, error: '' });
   const [usersState, setUsersState] = useState({ data: [], pagination: null, loading: false, error: '' });
   const [paymentsState, setPaymentsState] = useState({ data: [], totals: null, loading: false, error: '' });
+  const [exportingExcel, setExportingExcel] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   const queryKey = useMemo(() => JSON.stringify(filters), [filters]);
 
@@ -318,6 +321,26 @@ const SalesReportsTab = ({ drilldownRequest = null }) => {
     if (summaryMeta?.filters?.syncSourceCode) chips.push(`Source: ${summaryMeta.filters.syncSourceCode}`);
     return chips;
   }, [summaryMeta]);
+
+  const handleExport = useCallback(async (format) => {
+    if (format === 'excel') setExportingExcel(true);
+    if (format === 'pdf') setExportingPdf(true);
+
+    try {
+      await downloadBusinessReport({
+        format,
+        module: 'sales',
+        type: activeView,
+        filters,
+      });
+    } catch (error) {
+      const message = error?.response?.data?.error || `Failed to export ${format.toUpperCase()} report.`;
+      window.alert(message);
+    } finally {
+      if (format === 'excel') setExportingExcel(false);
+      if (format === 'pdf') setExportingPdf(false);
+    }
+  }, [activeView, filters]);
 
   const renderPagination = (view, pagination) => {
     if (!pagination) return null;
@@ -557,6 +580,10 @@ const SalesReportsTab = ({ drilldownRequest = null }) => {
         onReset={resetFilters}
         resolvedRange={summaryMeta.dateRange}
         loading={summaryLoading}
+        exportingExcel={exportingExcel}
+        exportingPdf={exportingPdf}
+        onExportExcel={() => handleExport('excel')}
+        onExportPdf={() => handleExport('pdf')}
       />
 
       <div style={{ display: 'flex', gap: '0.55rem', overflowX: 'auto' }}>

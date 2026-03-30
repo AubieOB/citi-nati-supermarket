@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../../../utils/api.js';
+import { downloadBusinessReport } from '../../../utils/exportService.js';
 import PayrollPeriodsList from './PayrollPeriodsList.jsx';
 import PayrollPeriodFormModal from './PayrollPeriodFormModal.jsx';
 import PayrollPeriodDetailPanel from './PayrollPeriodDetailPanel.jsx';
@@ -78,6 +79,8 @@ const PayrollTab = ({ refreshKey = 0 }) => {
   const [periodSaveError, setPeriodSaveError] = useState('');
   const [entrySaveError, setEntrySaveError] = useState('');
   const [entryEmployeeSalary, setEntryEmployeeSalary] = useState(null);
+  const [exportingExcel, setExportingExcel] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   const fetchEmployees = useCallback(async () => {
     try {
@@ -400,6 +403,31 @@ const PayrollTab = ({ refreshKey = 0 }) => {
     openSupportDrawerForEntry(selectedEntry);
   };
 
+  const handleExport = async (format) => {
+    if (format === 'excel') setExportingExcel(true);
+    if (format === 'pdf') setExportingPdf(true);
+
+    try {
+      await downloadBusinessReport({
+        format,
+        module: 'payroll',
+        type: 'period',
+        filters: {
+          payrollPeriodId: selectedPeriodId,
+          search: periodFilters.search,
+          status: periodFilters.status,
+          payrollMode: periodFilters.payrollMode,
+        },
+      });
+    } catch (error) {
+      const message = error?.response?.data?.error || `Failed to export ${format.toUpperCase()} report.`;
+      window.alert(message);
+    } finally {
+      if (format === 'excel') setExportingExcel(false);
+      if (format === 'pdf') setExportingPdf(false);
+    }
+  };
+
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
       <div style={{ ...cardStyle, padding: '1.1rem 1.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -426,10 +454,19 @@ const PayrollTab = ({ refreshKey = 0 }) => {
           </button>
           <button
             type="button"
-            style={{ border: '1px dashed #cbd5e1', backgroundColor: '#fff', color: '#475569', borderRadius: '10px', padding: '0.64rem 0.95rem', fontWeight: 700, cursor: 'not-allowed', fontSize: '0.85rem' }}
-            title="Export/Print is planned for a future release"
+            onClick={() => handleExport('pdf')}
+            disabled={exportingExcel || exportingPdf}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.64rem 0.95rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
           >
-            <i className="fas fa-file-export" style={{ marginRight: '0.38rem' }}></i>Export (Soon)
+            <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.38rem' }}></i>Export PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => handleExport('excel')}
+            disabled={exportingExcel || exportingPdf}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.64rem 0.95rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
+          >
+            <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.38rem' }}></i>Export Excel
           </button>
         </div>
       </div>

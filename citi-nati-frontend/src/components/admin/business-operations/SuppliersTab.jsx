@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../../../utils/api.js';
+import { downloadBusinessReport } from '../../../utils/exportService.js';
 import SuppliersList from './SuppliersList.jsx';
 import SupplierDetailPanel from './SupplierDetailPanel.jsx';
 import SupplierFormModal from './SupplierFormModal.jsx';
@@ -73,6 +74,8 @@ const SuppliersTab = ({ refreshKey = 0 }) => {
   const [transactionModalState, setTransactionModalState] = useState({ open: false, transaction: null });
   const [transactionFormSaving, setTransactionFormSaving] = useState(false);
   const [transactionFormError, setTransactionFormError] = useState('');
+  const [exportingExcel, setExportingExcel] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   const [pendingSelectedSupplierId, setPendingSelectedSupplierId] = useState(null);
 
@@ -283,6 +286,30 @@ const SuppliersTab = ({ refreshKey = 0 }) => {
   const pageBalanceMeta = balanceMeta(totals.pageBalance, 'Page Exposure (Debt)', 'Page Credit');
   const selectedBalanceMeta = balanceMeta(selectedSummary?.outstandingBalance, 'Selected Outstanding', 'Selected Credit');
 
+  const handleExport = async (format) => {
+    if (format === 'excel') setExportingExcel(true);
+    if (format === 'pdf') setExportingPdf(true);
+
+    try {
+      await downloadBusinessReport({
+        format,
+        module: 'suppliers',
+        type: 'all',
+        filters: {
+          search,
+          status: statusFilter,
+          supplierId: selectedSupplierId,
+        },
+      });
+    } catch (error) {
+      const message = error?.response?.data?.error || `Failed to export ${format.toUpperCase()} report.`;
+      window.alert(message);
+    } finally {
+      if (format === 'excel') setExportingExcel(false);
+      if (format === 'pdf') setExportingPdf(false);
+    }
+  };
+
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
       <div style={{ ...cardStyle, padding: '1.2rem 1.3rem' }}>
@@ -318,12 +345,21 @@ const SuppliersTab = ({ refreshKey = 0 }) => {
             </button>
             <button
               type="button"
-              disabled
-              title="Export will be added when the verified-data workflow is fully settled"
-              style={{ border: '1px dashed #cbd5e1', backgroundColor: '#fff', color: '#94a3b8', borderRadius: '10px', padding: '0.72rem 1rem', fontWeight: 700, cursor: 'not-allowed' }}
+              onClick={() => handleExport('pdf')}
+              disabled={exportingExcel || exportingPdf}
+              style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.72rem 1rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}
             >
-              <i className="fas fa-file-export" style={{ marginRight: '0.45rem' }}></i>
-              Export
+              <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.45rem' }}></i>
+              Export PDF
+            </button>
+            <button
+              type="button"
+              onClick={() => handleExport('excel')}
+              disabled={exportingExcel || exportingPdf}
+              style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.72rem 1rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}
+            >
+              <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.45rem' }}></i>
+              Export Excel
             </button>
           </div>
         </div>

@@ -1,5 +1,6 @@
 ﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../../../utils/api.js';
+import { downloadBusinessReport } from '../../../utils/exportService.js';
 import ExpensesList from './ExpensesList.jsx';
 import ExpenseDetailPanel from './ExpenseDetailPanel.jsx';
 import ExpenseFormModal from './ExpenseFormModal.jsx';
@@ -67,6 +68,8 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null }) => {
   const [categoryModal, setCategoryModal] = useState({ open: false, category: null });
   const [categorySaving, setCategorySaving] = useState(false);
   const [categoryError, setCategoryError] = useState('');
+  const [exportingExcel, setExportingExcel] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   // ---- fetch helpers ----
 
@@ -213,6 +216,31 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null }) => {
   const activeCategories = useMemo(() => categories.filter((c) => c.isActive), [categories]);
   const isLoading = listLoading || categoriesLoading;
 
+  const handleExport = useCallback(async (format) => {
+    if (format === 'excel') setExportingExcel(true);
+    if (format === 'pdf') setExportingPdf(true);
+
+    try {
+      await downloadBusinessReport({
+        format,
+        module: 'expenses',
+        type: activeTab === TAB_CATEGORIES ? 'category-summary' : 'list',
+        filters: {
+          search: filters.search,
+          expenseCategoryId: filters.expenseCategoryId,
+          startDate: filters.startDate,
+          endDate: filters.endDate,
+        },
+      });
+    } catch (error) {
+      const message = error?.response?.data?.error || `Failed to export ${format.toUpperCase()} report.`;
+      window.alert(message);
+    } finally {
+      if (format === 'excel') setExportingExcel(false);
+      if (format === 'pdf') setExportingPdf(false);
+    }
+  }, [activeTab, filters.endDate, filters.expenseCategoryId, filters.search, filters.startDate]);
+
   const tabBtnStyle = (active) => ({
     border: 'none',
     borderBottom: `2px solid ${active ? '#5B4B8A' : 'transparent'}`,
@@ -269,12 +297,21 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null }) => {
             </button>
             <button
               type="button"
-              disabled
-              title="Export coming soon"
-              style={{ border: '1px dashed #cbd5e1', backgroundColor: '#fff', color: '#94a3b8', borderRadius: '10px', padding: '0.72rem 1rem', fontWeight: 700, cursor: 'not-allowed' }}
+              onClick={() => handleExport('pdf')}
+              disabled={exportingExcel || exportingPdf}
+              style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.72rem 1rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}
             >
-              <i className="fas fa-file-export" style={{ marginRight: '0.45rem' }} />
-              Export
+              <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.45rem' }} />
+              Export PDF
+            </button>
+            <button
+              type="button"
+              onClick={() => handleExport('excel')}
+              disabled={exportingExcel || exportingPdf}
+              style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.72rem 1rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}
+            >
+              <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.45rem' }} />
+              Export Excel
             </button>
           </div>
         </div>

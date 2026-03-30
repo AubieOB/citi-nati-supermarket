@@ -1,5 +1,6 @@
 ﻿import React, { useCallback, useEffect, useState } from 'react';
 import api from '../../../utils/api.js';
+import { downloadBusinessReport } from '../../../utils/exportService.js';
 import EmployeesEmptyState from './EmployeesEmptyState.jsx';
 import EmployeeSummaryCards from './EmployeeSummaryCards.jsx';
 import EmployeesList from './EmployeesList.jsx';
@@ -51,6 +52,8 @@ const EmployeesTab = () => {
   const [empSaveError, setEmpSaveError] = useState('');
   const [salSaving, setSalSaving] = useState(false);
   const [salSaveError, setSalSaveError] = useState('');
+  const [exportingExcel, setExportingExcel] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   // ── Summary counts ──
   const activeCount = employees.filter((e) => e.status === 'active').length;
@@ -225,6 +228,29 @@ const EmployeesTab = () => {
   const selectedEmployee = detail || employees.find((e) => e.id === selectedEmployeeId) || null;
   const employeeFullName = selectedEmployee ? buildFullName(selectedEmployee) : '';
 
+  const handleExport = async (format) => {
+    if (format === 'excel') setExportingExcel(true);
+    if (format === 'pdf') setExportingPdf(true);
+
+    try {
+      await downloadBusinessReport({
+        format,
+        module: 'employees',
+        type: 'list',
+        filters: {
+          search,
+          status: statusFilter,
+        },
+      });
+    } catch (error) {
+      const message = error?.response?.data?.error || `Failed to export ${format.toUpperCase()} report.`;
+      window.alert(message);
+    } finally {
+      if (format === 'excel') setExportingExcel(false);
+      if (format === 'pdf') setExportingPdf(false);
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
 
@@ -240,6 +266,20 @@ const EmployeesTab = () => {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => handleExport('pdf')}
+            disabled={exportingExcel || exportingPdf}
+            style={{ border: '1px solid #e2e8f0', backgroundColor: '#fff', color: '#475569', borderRadius: '10px', padding: '0.65rem 1rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.88rem' }}
+          >
+            <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.4rem' }} />Export PDF
+          </button>
+          <button
+            onClick={() => handleExport('excel')}
+            disabled={exportingExcel || exportingPdf}
+            style={{ border: '1px solid #e2e8f0', backgroundColor: '#fff', color: '#475569', borderRadius: '10px', padding: '0.65rem 1rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.88rem' }}
+          >
+            <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.4rem' }} />Export Excel
+          </button>
           <button
             onClick={() => refreshData()}
             style={{ border: '1px solid #e2e8f0', backgroundColor: '#fff', color: '#475569', borderRadius: '10px', padding: '0.65rem 1rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.88rem' }}

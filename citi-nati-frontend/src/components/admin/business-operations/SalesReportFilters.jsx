@@ -43,7 +43,17 @@ const Field = ({ label, children }) => (
   </label>
 );
 
-const SalesReportFilters = ({ filters, onChange, onReset, resolvedRange, loading }) => {
+const SalesReportFilters = ({
+  filters,
+  onChange,
+  onReset,
+  resolvedRange,
+  loading,
+  exportingExcel,
+  exportingPdf,
+  onExportExcel,
+  onExportPdf,
+}) => {
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 8 }, (_, index) => currentYear - 3 + index);
 
@@ -134,19 +144,21 @@ const SalesReportFilters = ({ filters, onChange, onReset, resolvedRange, loading
         <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
           <button
             type="button"
-            disabled
-            style={{ border: '1px solid #cbd5e1', background: '#f8fafc', color: '#94a3b8', borderRadius: '10px', padding: '0.7rem 1rem', fontWeight: 700, cursor: 'not-allowed' }}
+            onClick={onExportPdf}
+            disabled={exportingPdf || exportingExcel}
+            style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.7rem 1rem', fontWeight: 700, cursor: exportingPdf || exportingExcel ? 'not-allowed' : 'pointer' }}
           >
-            <i className="fas fa-print" style={{ marginRight: '0.4rem' }}></i>
-            Print
+            <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.4rem' }}></i>
+            Export PDF
           </button>
           <button
             type="button"
-            disabled
-            style={{ border: '1px solid #cbd5e1', background: '#f8fafc', color: '#94a3b8', borderRadius: '10px', padding: '0.7rem 1rem', fontWeight: 700, cursor: 'not-allowed' }}
+            onClick={onExportExcel}
+            disabled={exportingPdf || exportingExcel}
+            style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.7rem 1rem', fontWeight: 700, cursor: exportingPdf || exportingExcel ? 'not-allowed' : 'pointer' }}
           >
-            <i className="fas fa-file-export" style={{ marginRight: '0.4rem' }}></i>
-            Export
+            <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.4rem' }}></i>
+            Export Excel
           </button>
           <button
             type="button"

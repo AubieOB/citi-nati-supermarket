@@ -23,7 +23,19 @@ const fieldStyle = {
   backgroundColor: '#fff',
 };
 
-const SummaryFiltersBar = ({ filters, rangeLabel, loading, validationError, onChange, onRefresh, onClear }) => (
+const SummaryFiltersBar = ({
+  filters,
+  rangeLabel,
+  loading,
+  validationError,
+  onChange,
+  onRefresh,
+  onClear,
+  exportingExcel,
+  exportingPdf,
+  onExportExcel,
+  onExportPdf,
+}) => (
   <div style={{ border: '1px solid #e2e8f0', borderRadius: '14px', padding: '0.95rem 1rem', backgroundColor: '#fff' }}>
     <div style={{ display: 'flex', gap: '0.7rem', flexWrap: 'wrap', alignItems: 'center' }}>
       <select value={filters.periodType} onChange={(event) => onChange('periodType', event.target.value)} style={{ ...fieldStyle, minWidth: '120px' }}>
@@ -65,12 +77,22 @@ const SummaryFiltersBar = ({ filters, rangeLabel, loading, validationError, onCh
 
       <button
         type="button"
-        disabled
-        title="Export for Monthly Summary will be added in a future release"
-        style={{ border: '1px dashed #cbd5e1', backgroundColor: '#fff', color: '#64748b', borderRadius: '10px', padding: '0.7rem 0.92rem', fontWeight: 700, cursor: 'not-allowed' }}
+        onClick={onExportPdf}
+        disabled={exportingExcel || exportingPdf || Boolean(validationError)}
+        style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.7rem 0.92rem', fontWeight: 700, cursor: exportingExcel || exportingPdf || validationError ? 'not-allowed' : 'pointer' }}
       >
-        <i className="fas fa-file-export" style={{ marginRight: '0.38rem' }}></i>
-        Export (Soon)
+        <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.38rem' }}></i>
+        Export PDF
+      </button>
+
+      <button
+        type="button"
+        onClick={onExportExcel}
+        disabled={exportingExcel || exportingPdf || Boolean(validationError)}
+        style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.7rem 0.92rem', fontWeight: 700, cursor: exportingExcel || exportingPdf || validationError ? 'not-allowed' : 'pointer' }}
+      >
+        <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.38rem' }}></i>
+        Export Excel
       </button>
 
       <button
