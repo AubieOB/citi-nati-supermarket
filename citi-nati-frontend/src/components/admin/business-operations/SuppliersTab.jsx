@@ -344,7 +344,7 @@ const SuppliersTab = ({ refreshKey = 0 }) => {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', alignItems: 'start' }}>
         <div style={{ ...cardStyle, overflow: 'hidden' }}>
           <div style={{ padding: '1rem 1.05rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
             <strong style={{ color: '#0f172a' }}>Supplier Register</strong>

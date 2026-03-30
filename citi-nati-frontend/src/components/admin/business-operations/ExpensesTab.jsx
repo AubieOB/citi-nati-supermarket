@@ -346,7 +346,7 @@ const ExpensesTab = ({ refreshKey = 0 }) => {
           </div>
 
           {/* Two-panel layout */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem', alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', alignItems: 'start' }}>
 
             {/* Left — expense register */}
             <div style={{ ...cardStyle, overflow: 'hidden' }}>
