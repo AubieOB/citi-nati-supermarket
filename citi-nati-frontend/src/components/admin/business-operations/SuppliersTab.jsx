@@ -15,6 +15,32 @@ const cardStyle = {
 
 const money = (value) => `MWK ${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+const balanceMeta = (value, debtLabel, creditLabel) => {
+  const amount = Number(value || 0);
+
+  if (amount > 0) {
+    return {
+      label: debtLabel,
+      amount: money(amount),
+      color: '#b91c1c',
+    };
+  }
+
+  if (amount < 0) {
+    return {
+      label: creditLabel,
+      amount: money(Math.abs(amount)),
+      color: '#166534',
+    };
+  }
+
+  return {
+    label: 'Balanced',
+    amount: money(0),
+    color: '#0f172a',
+  };
+};
+
 const INITIAL_DETAIL_STATE = {
   supplier: null,
   summary: null,
@@ -254,6 +280,8 @@ const SuppliersTab = ({ refreshKey = 0 }) => {
 
   const selectedSupplier = detailState.supplier;
   const selectedSummary = detailState.summary;
+  const pageBalanceMeta = balanceMeta(totals.pageBalance, 'Page Exposure (Debt)', 'Page Credit');
+  const selectedBalanceMeta = balanceMeta(selectedSummary?.outstandingBalance, 'Selected Outstanding', 'Selected Credit');
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
@@ -310,12 +338,12 @@ const SuppliersTab = ({ refreshKey = 0 }) => {
             <div style={{ marginTop: '0.35rem', fontSize: '1.6rem', fontWeight: 800, color: '#0f172a' }}>{totals.activeSuppliers.toLocaleString('en-US')}</div>
           </div>
           <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
-            <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Page Exposure</div>
-            <div style={{ marginTop: '0.35rem', fontSize: '1.6rem', fontWeight: 800, color: '#0f172a' }}>{money(totals.pageBalance)}</div>
+            <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>{pageBalanceMeta.label}</div>
+            <div style={{ marginTop: '0.35rem', fontSize: '1.6rem', fontWeight: 800, color: pageBalanceMeta.color }}>{pageBalanceMeta.amount}</div>
           </div>
           <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
-            <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Selected Outstanding</div>
-            <div style={{ marginTop: '0.35rem', fontSize: '1.6rem', fontWeight: 800, color: '#0f172a' }}>{money(selectedSummary?.outstandingBalance)}</div>
+            <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>{selectedBalanceMeta.label}</div>
+            <div style={{ marginTop: '0.35rem', fontSize: '1.6rem', fontWeight: 800, color: selectedBalanceMeta.color }}>{selectedBalanceMeta.amount}</div>
           </div>
         </div>
       </div>
