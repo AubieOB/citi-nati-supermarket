@@ -22,6 +22,11 @@ const employeesService = require('./employees.service');
 const COMPANY_NAME = 'Citi-Nati Supermarket';
 const COMPANY_CONTACT = process.env.EXPORT_COMPANY_CONTACT || 'Lilongwe, Malawi';
 const MWK_FORMAT = '"MWK" #,##0.00';
+const PDF_BRAND_PURPLE = '#5B4B8A';
+const PDF_BRAND_GREEN = '#2D8659';
+const PDF_BRAND_ORANGE = '#B45309';
+const PDF_SLATE = '#111827';
+const PDF_MUTED = '#6B7280';
 
 function money(value) {
   return Number(value || 0);
@@ -192,97 +197,265 @@ function addTotalsRow(sheet, columns, totals = {}) {
   });
 }
 
-function drawPdfHeader(doc, title, subtitle) {
-  const logoPath = resolveLogoPath();
-  if (logoPath) {
-    doc.image(logoPath, 50, 35, { fit: [70, 70] });
+function hexToRgb(hex) {
+  const normalized = String(hex || '').replace('#', '');
+  const full = normalized.length === 3
+    ? normalized.split('').map((ch) => `${ch}${ch}`).join('')
+    : normalized;
+
+  const value = parseInt(full, 16);
+  return [
+    (value >> 16) & 255,
+    (value >> 8) & 255,
+    value & 255,
+  ];
+}
+
+function formatCurrencyDisplay(value) {
+  return `MWK ${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function formatCountDisplay(value) {
+  return Number(value || 0).toLocaleString('en-US');
+}
+
+function getReportPeriodText(report) {
+  if (report?.dateRange?.startDate && report?.dateRange?.endDate) {
+    return `${report.dateRange.startDate} to ${report.dateRange.endDate}`;
   }
 
+  if (report?.range?.startDate && report?.range?.endDate) {
+    return `${report.range.startDate} to ${report.range.endDate}`;
+  }
+
+  if (report?.filters?.startDate && report?.filters?.endDate) {
+    return `${report.filters.startDate} to ${report.filters.endDate}`;
+  }
+
+  if (report?.filters?.month && report?.filters?.year) {
+    return `${String(report.filters.month).padStart(2, '0')}/${report.filters.year}`;
+  }
+
+  return 'Current selection';
+}
+
+function buildAppliedFilterText(filters = {}) {
+  const ignored = new Set(['periodType', 'date', 'month', 'year', 'quarter', 'startDate', 'endDate']);
+  const entries = Object.entries(filters)
+    .filter(([key, value]) => !ignored.has(key) && value !== null && value !== undefined && value !== '')
+    .map(([key, value]) => `${titleCase(key)}: ${value}`);
+
+  return entries.length ? entries.join(', ') : 'None';
+}
+
+function createPdfContext(report) {
+  return {
+    title: report.title,
+    subtitle: `${titleCase(report.module)} • ${titleCase(report.type || 'summary')}`,
+    periodText: getReportPeriodText(report),
+    generatedText: `${new Date().toLocaleDateString('en-GB')} ${new Date().toLocaleTimeString('en-GB')}`,
+  };
+}
+
+function drawPdfHeader(doc, context) {
+  const margin = doc.page.margins.left;
+  const pageWidth = doc.page.width;
+  const logoPath = resolveLogoPath();
+
+  doc.y = 34;
+
+  if (logoPath) {
+    doc.image(logoPath, margin, 28, { fit: [42, 42], align: 'left' });
+  }
+
+  doc.font('Helvetica-Bold').fontSize(20);
+  const brandLeft = 'Citi';
+  const brandRight = '- Nati Supermarket';
+  const leftWidth = doc.widthOfString(brandLeft);
+  const rightWidth = doc.widthOfString(brandRight);
+  const totalWidth = leftWidth + rightWidth + 3;
+  const brandX = (pageWidth / 2) - (totalWidth / 2);
+
+  doc.fillColor(PDF_BRAND_PURPLE).text(brandLeft, brandX, 34, { lineBreak: false });
+  doc.fillColor(PDF_BRAND_GREEN).text(brandRight, brandX + leftWidth + 3, 34, { lineBreak: false });
+
   doc
+    .fillColor(PDF_SLATE)
     .font('Helvetica-Bold')
-    .fontSize(18)
-    .text(COMPANY_NAME, 130, 38)
+    .fontSize(13)
+    .text(context.title, margin, 58, { width: pageWidth - (margin * 2), align: 'center' })
     .font('Helvetica')
-    .fontSize(10)
-    .fillColor('#4B5563')
-    .text(COMPANY_CONTACT, 130, 60)
-    .fillColor('#111827')
-    .font('Helvetica-Bold')
-    .fontSize(14)
-    .text(title, 50, 102)
-    .font('Helvetica')
-    .fontSize(9)
-    .fillColor('#374151')
-    .text(subtitle, 50, 122)
-    .text(`Generated: ${new Date().toLocaleString('en-GB')}`, 50, 136)
-    .fillColor('#111827');
+    .fontSize(9.5)
+    .fillColor(PDF_MUTED)
+    .text(context.subtitle, margin, 74, { width: pageWidth - (margin * 2), align: 'center' })
+    .text(`Period: ${context.periodText}`, margin, 88, { width: 220, align: 'left' })
+    .text(`Generated: ${context.generatedText}`, pageWidth - margin - 220, 88, { width: 220, align: 'right' })
+    .text(COMPANY_CONTACT, margin, 102, { width: pageWidth - (margin * 2), align: 'center' });
 
-  doc.moveTo(50, 154).lineTo(545, 154).strokeColor('#D1D5DB').stroke();
+  doc
+    .moveTo(margin, 118)
+    .lineTo(pageWidth - margin, 118)
+    .lineWidth(1.5)
+    .strokeColor(PDF_BRAND_GREEN)
+    .stroke();
+
+  doc.y = 130;
 }
 
-function drawPdfSectionTitle(doc, title) {
-  doc.moveDown(0.5);
-  doc.font('Helvetica-Bold').fontSize(12).fillColor('#111827').text(title);
-  doc.moveDown(0.2);
+function addPdfPage(doc, context) {
+  doc.addPage();
+  drawPdfHeader(doc, context);
 }
 
-function drawPdfKeyValues(doc, rows) {
-  rows.forEach((row) => {
-    doc
-      .font('Helvetica')
-      .fontSize(10)
-      .fillColor('#374151')
-      .text(`${row.label}:`, { continued: true })
-      .font('Helvetica-Bold')
-      .fillColor('#111827')
-      .text(` ${row.value}`);
-  });
+function ensurePdfSpace(doc, neededHeight, context) {
+  if (doc.y + neededHeight > doc.page.height - 48) {
+    addPdfPage(doc, context);
+  }
 }
 
-function drawPdfTable(doc, columns, rows) {
-  const pageWidth = 545 - 50;
-  const totalWeight = columns.reduce((sum, col) => sum + (col.weight || 1), 0);
-  const widths = columns.map((col) => (pageWidth * (col.weight || 1)) / totalWeight);
-  const startX = 50;
+function drawPdfSummaryCards(doc, cards, context) {
+  if (!cards.length) return;
 
-  const drawHeader = () => {
-    let x = startX;
+  const margin = doc.page.margins.left;
+  const pageWidth = doc.page.width - (margin * 2);
+  const columns = Math.min(3, cards.length);
+  const gap = 10;
+  const cardWidth = (pageWidth - (gap * (columns - 1))) / columns;
+  const cardHeight = 40;
+
+  for (let index = 0; index < cards.length; index += columns) {
+    const rowCards = cards.slice(index, index + columns);
+    ensurePdfSpace(doc, cardHeight + 8, context);
     const y = doc.y;
-    columns.forEach((column, idx) => {
-      doc.rect(x, y, widths[idx], 20).fillAndStroke('#F3F4F6', '#E5E7EB');
+
+    rowCards.forEach((card, rowIndex) => {
+      const x = margin + (rowIndex * (cardWidth + gap));
+      const fill = hexToRgb(card.fill || '#F8FAFC');
+      const accent = hexToRgb(card.accent || PDF_BRAND_PURPLE);
+
+      doc.roundedRect(x, y, cardWidth, cardHeight, 4, 4).fillAndStroke(fill, '#E2E8F0');
       doc
-        .fillColor('#111827')
+        .fillColor('#6B7280')
         .font('Helvetica-Bold')
-        .fontSize(9)
-        .text(column.header, x + 4, y + 6, { width: widths[idx] - 8, ellipsis: true });
-      x += widths[idx];
+        .fontSize(7.5)
+        .text(String(card.label || '').toUpperCase(), x + 8, y + 8, { width: cardWidth - 16, ellipsis: true })
+        .fillColor(accent)
+        .font('Helvetica-Bold')
+        .fontSize(12)
+        .text(card.value, x + 8, y + 20, { width: cardWidth - 16, ellipsis: true });
     });
-    doc.y = y + 22;
+
+    doc.y = y + cardHeight + 8;
+  }
+}
+
+function drawPdfInfoBand(doc, items, context) {
+  if (!items.length) return;
+  ensurePdfSpace(doc, 28 + (items.length * 10), context);
+
+  const margin = doc.page.margins.left;
+  const width = doc.page.width - (margin * 2);
+  const height = 16 + (items.length * 10);
+  const y = doc.y;
+
+  doc.roundedRect(margin, y, width, height, 4, 4).fillAndStroke('#F5F5F5', '#E5E7EB');
+
+  let cursorY = y + 8;
+  items.forEach((item) => {
+    doc
+      .fillColor(PDF_MUTED)
+      .font('Helvetica')
+      .fontSize(9)
+      .text(`${item.label}:`, margin + 10, cursorY, { continued: true })
+      .fillColor(PDF_SLATE)
+      .font('Helvetica-Bold')
+      .text(` ${item.value}`);
+    cursorY += 10;
+  });
+
+  doc.y = y + height + 10;
+}
+
+function drawPdfSectionTitle(doc, title, context) {
+  ensurePdfSpace(doc, 24, context);
+
+  const margin = doc.page.margins.left;
+  const width = doc.page.width - (margin * 2);
+  const y = doc.y;
+
+  doc.roundedRect(margin, y, width, 18, 3, 3).fillAndStroke('#F8FAFC', '#E2E8F0');
+  doc
+    .fillColor(PDF_SLATE)
+    .font('Helvetica-Bold')
+    .fontSize(11)
+    .text(title, margin + 8, y + 5, { width: width - 16 });
+  doc.y = y + 24;
+}
+
+function drawPdfTable(doc, columns, rows, context) {
+  if (!rows.length) {
+    ensurePdfSpace(doc, 20, context);
+    doc.font('Helvetica').fontSize(9.5).fillColor(PDF_MUTED).text('No rows available for this section.');
+    doc.moveDown(0.8);
+    return;
+  }
+
+  const margin = doc.page.margins.left;
+  const availableWidth = doc.page.width - (margin * 2);
+  const totalWeight = columns.reduce((sum, column) => sum + (column.weight || 1), 0);
+  const widths = columns.map((column) => (availableWidth * (column.weight || 1)) / totalWeight);
+  const headerHeight = 18;
+  const rowHeight = 18;
+
+  const drawTableHeader = () => {
+    let x = margin;
+    const y = doc.y;
+
+    columns.forEach((column, index) => {
+      doc.rect(x, y, widths[index], headerHeight).fillAndStroke(PDF_BRAND_GREEN, '#D1D5DB');
+      doc
+        .fillColor('#FFFFFF')
+        .font('Helvetica-Bold')
+        .fontSize(8.2)
+        .text(column.header, x + 4, y + 5, { width: widths[index] - 8, ellipsis: true });
+      x += widths[index];
+    });
+
+    doc.y = y + headerHeight;
   };
 
-  const rowHeight = 20;
-  drawHeader();
+  ensurePdfSpace(doc, headerHeight + rowHeight, context);
+  drawTableHeader();
 
-  rows.forEach((row) => {
-    if (doc.y + rowHeight > doc.page.height - 50) {
-      doc.addPage();
-      drawHeader();
+  rows.forEach((row, rowIndex) => {
+    if (doc.y + rowHeight > doc.page.height - 48) {
+      addPdfPage(doc, context);
+      drawTableHeader();
     }
 
-    let x = startX;
+    let x = margin;
     const y = doc.y;
-    columns.forEach((column, idx) => {
+    const fillColor = rowIndex % 2 === 0 ? '#FFFFFF' : '#FAFAFA';
+
+    columns.forEach((column, index) => {
       const value = row[column.key] === null || row[column.key] === undefined ? '' : String(row[column.key]);
-      doc.rect(x, y, widths[idx], rowHeight).stroke('#E5E7EB');
+      doc.rect(x, y, widths[index], rowHeight).fillAndStroke(fillColor, '#E5E7EB');
       doc
-        .fillColor('#111827')
+        .fillColor(PDF_SLATE)
         .font('Helvetica')
-        .fontSize(8.5)
-        .text(value, x + 4, y + 5, { width: widths[idx] - 8, ellipsis: true });
-      x += widths[idx];
+        .fontSize(8)
+        .text(value, x + 4, y + 5, {
+          width: widths[index] - 8,
+          align: column.align || 'left',
+          ellipsis: true,
+        });
+      x += widths[index];
     });
+
     doc.y = y + rowHeight;
   });
+
+  doc.moveDown(0.6);
 }
 
 async function buildSalesReport(type, filters) {
@@ -1024,151 +1197,307 @@ async function buildPdfBuffer(report) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 50, size: 'A4' });
     const chunks = [];
+    const context = createPdfContext(report);
 
     doc.on('data', (chunk) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    drawPdfHeader(doc, report.title, `${titleCase(report.module)} • ${titleCase(report.type || 'summary')}`);
+    drawPdfHeader(doc, context);
 
-    if (report.module === 'sales' && report.data.summary) {
-      drawPdfSectionTitle(doc, 'Sales Summary');
-      drawPdfKeyValues(doc, [
-        { label: 'Date Range', value: `${report.dateRange.startDate} to ${report.dateRange.endDate}` },
-        { label: 'Total Invoices', value: Number(report.data.summary.totalInvoices || 0).toLocaleString('en-US') },
-        { label: 'Net Sales', value: `MWK ${Number(report.data.summary.netSales || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
-        { label: 'Gross Sales', value: `MWK ${Number(report.data.summary.grossSales || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
-      ]);
-    }
+    const summaryCards = [];
+    const infoItems = [
+      { label: 'Applied Filters', value: buildAppliedFilterText(report.filters || {}) },
+    ];
 
-    if (report.module === 'sales' && report.data.invoices.length) {
-      drawPdfSectionTitle(doc, 'Invoices');
-      const rows = report.data.invoices.map((row) => ({
-        invoiceDate: toDateString(row.invoiceDate),
-        invoiceNo: row.sourceInvoiceNo || row.refNo || String(row.id),
-        userName: row.userName || '',
-        netSale: `MWK ${Number(row.netSale || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-      }));
-      drawPdfTable(doc, [
-        { header: 'Date', key: 'invoiceDate', weight: 1 },
-        { header: 'Invoice', key: 'invoiceNo', weight: 1.8 },
-        { header: 'Cashier', key: 'userName', weight: 1.5 },
-        { header: 'Net Sale', key: 'netSale', weight: 1.4 },
-      ], rows);
+    if (report.module === 'sales') {
+      if (report.data.summary) {
+        summaryCards.push(
+          { label: 'Total Invoices', value: formatCountDisplay(report.data.summary.totalInvoices), fill: '#F0F9F6', accent: PDF_BRAND_GREEN },
+          { label: 'Net Sales', value: formatCurrencyDisplay(report.data.summary.netSales), fill: '#F4F0F7', accent: PDF_BRAND_PURPLE },
+          { label: 'Gross Sales', value: formatCurrencyDisplay(report.data.summary.grossSales), fill: '#FFF4DB', accent: PDF_BRAND_ORANGE },
+        );
+      }
+
+      drawPdfSummaryCards(doc, summaryCards, context);
+      drawPdfInfoBand(doc, infoItems, context);
+
+      if (report.data.invoices.length) {
+        drawPdfSectionTitle(doc, 'Invoices', context);
+        drawPdfTable(doc, [
+          { header: 'Date', key: 'invoiceDate', weight: 1 },
+          { header: 'Invoice No', key: 'invoiceNo', weight: 1.7 },
+          { header: 'Branch', key: 'branchCode', weight: 0.9 },
+          { header: 'Cashier', key: 'userName', weight: 1.3 },
+          { header: 'Net Sale', key: 'netSale', weight: 1.1, align: 'right' },
+        ], report.data.invoices.map((row) => ({
+          invoiceDate: toDateString(row.invoiceDate),
+          invoiceNo: row.sourceInvoiceNo || row.refNo || String(row.id),
+          branchCode: row.branchCode || '-',
+          userName: row.userName || '-',
+          netSale: formatCurrencyDisplay(row.netSale),
+        })), context);
+      }
+
+      if (report.data.products.length) {
+        drawPdfSectionTitle(doc, 'Product Sales', context);
+        drawPdfTable(doc, [
+          { header: 'Code', key: 'productCode', weight: 1.1 },
+          { header: 'Product', key: 'productName', weight: 1.8 },
+          { header: 'Qty', key: 'totalQuantitySold', weight: 0.8, align: 'right' },
+          { header: 'Sales', key: 'totalSales', weight: 1, align: 'right' },
+          { header: 'Tax', key: 'totalTax', weight: 0.9, align: 'right' },
+        ], report.data.products.map((row) => ({
+          productCode: row.productCode || '-',
+          productName: row.productName || '-',
+          totalQuantitySold: Number(row.totalQuantitySold || 0).toLocaleString('en-US', { maximumFractionDigits: 2 }),
+          totalSales: formatCurrencyDisplay(row.totalSales),
+          totalTax: formatCurrencyDisplay(row.totalTax),
+        })), context);
+      }
+
+      if (report.data.users.length) {
+        drawPdfSectionTitle(doc, 'Cashier Performance', context);
+        drawPdfTable(doc, [
+          { header: 'Cashier', key: 'userName', weight: 1.6 },
+          { header: 'Invoices', key: 'totalInvoices', weight: 0.8, align: 'right' },
+          { header: 'Gross Sales', key: 'grossSales', weight: 1.1, align: 'right' },
+          { header: 'Net Sales', key: 'totalSales', weight: 1.1, align: 'right' },
+          { header: 'Avg Invoice', key: 'averageInvoiceValue', weight: 1.1, align: 'right' },
+        ], report.data.users.map((row) => ({
+          userName: row.userName || '-',
+          totalInvoices: formatCountDisplay(row.totalInvoices),
+          grossSales: formatCurrencyDisplay(row.grossSales),
+          totalSales: formatCurrencyDisplay(row.totalSales),
+          averageInvoiceValue: formatCurrencyDisplay(row.averageInvoiceValue),
+        })), context);
+      }
+
+      if (report.data.payments.length) {
+        drawPdfSectionTitle(doc, 'Payment Methods', context);
+        drawPdfTable(doc, [
+          { header: 'Method', key: 'payMethod', weight: 1.6 },
+          { header: 'Invoice Count', key: 'invoiceCount', weight: 0.9, align: 'right' },
+          { header: 'Amount', key: 'totalAmount', weight: 1.1, align: 'right' },
+        ], report.data.payments.map((row) => ({
+          payMethod: row.payMethod || '-',
+          invoiceCount: formatCountDisplay(row.invoiceCount),
+          totalAmount: formatCurrencyDisplay(row.totalAmount),
+        })), context);
+      }
     }
 
     if (report.module === 'expenses') {
-      drawPdfSectionTitle(doc, 'Expense Totals');
-      drawPdfKeyValues(doc, [
-        { label: 'Total Expenses', value: Number(report.data.summary?.totals?.totalExpenses || 0).toLocaleString('en-US') },
-        { label: 'Total Amount', value: `MWK ${Number(report.data.summary?.totals?.totalAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
-        { label: 'Average Amount', value: `MWK ${Number(report.data.summary?.totals?.averageAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
-      ]);
+      summaryCards.push(
+        { label: 'Expense Count', value: formatCountDisplay(report.data.summary?.totals?.totalExpenses || 0), fill: '#F0F9F6', accent: PDF_BRAND_GREEN },
+        { label: 'Total Amount', value: formatCurrencyDisplay(report.data.summary?.totals?.totalAmount || 0), fill: '#F4F0F7', accent: PDF_BRAND_PURPLE },
+        { label: 'Average Amount', value: formatCurrencyDisplay(report.data.summary?.totals?.averageAmount || 0), fill: '#FFF4DB', accent: PDF_BRAND_ORANGE },
+      );
+
+      drawPdfSummaryCards(doc, summaryCards, context);
+      drawPdfInfoBand(doc, infoItems, context);
+
+      if (report.data.summary?.topCategories?.length) {
+        drawPdfSectionTitle(doc, 'Top Expense Categories', context);
+        drawPdfTable(doc, [
+          { header: 'Category', key: 'categoryName', weight: 1.8 },
+          { header: 'Entries', key: 'expenseCount', weight: 0.8, align: 'right' },
+          { header: 'Amount', key: 'totalAmount', weight: 1, align: 'right' },
+        ], report.data.summary.topCategories.map((row) => ({
+          categoryName: row.category?.name || 'Uncategorized',
+          expenseCount: formatCountDisplay(row.expenseCount),
+          totalAmount: formatCurrencyDisplay(row.totalAmount),
+        })), context);
+      }
 
       if (report.data.expenses.length) {
-        drawPdfSectionTitle(doc, 'Expense List');
-        const rows = report.data.expenses.map((row) => ({
-          expenseDate: toDateString(row.expenseDate),
-          category: row.expenseCategory?.name || '',
-          description: row.description || '',
-          amount: `MWK ${Number(row.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-        }));
-
+        drawPdfSectionTitle(doc, 'Expense Register', context);
         drawPdfTable(doc, [
-          { header: 'Date', key: 'expenseDate', weight: 1 },
-          { header: 'Category', key: 'category', weight: 1.2 },
+          { header: 'Date', key: 'expenseDate', weight: 0.9 },
+          { header: 'Category', key: 'category', weight: 1.3 },
           { header: 'Description', key: 'description', weight: 2.1 },
-          { header: 'Amount', key: 'amount', weight: 1.1 },
-        ], rows);
+          { header: 'Amount', key: 'amount', weight: 1, align: 'right' },
+        ], report.data.expenses.map((row) => ({
+          expenseDate: toDateString(row.expenseDate),
+          category: row.expenseCategory?.name || '-',
+          description: row.description || '-',
+          amount: formatCurrencyDisplay(row.amount),
+        })), context);
       }
     }
 
     if (report.module === 'suppliers') {
-      drawPdfSectionTitle(doc, 'Supplier Balances');
-      drawPdfKeyValues(doc, [
-        { label: 'Total Suppliers', value: Number(report.data.balances.totalSuppliers || 0).toLocaleString('en-US') },
-        { label: 'Active Suppliers', value: Number(report.data.balances.activeSuppliers || 0).toLocaleString('en-US') },
-        { label: 'Outstanding Debt', value: `MWK ${Number(report.data.balances.totalDebt || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
-        { label: 'Supplier Credit', value: `MWK ${Number(report.data.balances.totalCredit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
-      ]);
+      summaryCards.push(
+        { label: 'Total Suppliers', value: formatCountDisplay(report.data.balances.totalSuppliers), fill: '#F0F9F6', accent: PDF_BRAND_GREEN },
+        { label: 'Outstanding Debt', value: formatCurrencyDisplay(report.data.balances.totalDebt), fill: '#FFF1F2', accent: '#BE123C' },
+        { label: 'Supplier Credit', value: formatCurrencyDisplay(report.data.balances.totalCredit), fill: '#F4F0F7', accent: PDF_BRAND_PURPLE },
+      );
+
+      drawPdfSummaryCards(doc, summaryCards, context);
+      drawPdfInfoBand(doc, infoItems, context);
+
+      if (report.data.suppliers.length) {
+        drawPdfSectionTitle(doc, 'Supplier Register', context);
+        drawPdfTable(doc, [
+          { header: 'Code', key: 'supplierCode', weight: 1 },
+          { header: 'Supplier', key: 'name', weight: 1.9 },
+          { header: 'Status', key: 'status', weight: 0.8 },
+          { header: 'Phone', key: 'phone', weight: 1 },
+          { header: 'Balance', key: 'currentBalance', weight: 1.1, align: 'right' },
+        ], report.data.suppliers.map((row) => ({
+          supplierCode: row.supplierCode || '-',
+          name: row.name || '-',
+          status: titleCase(row.status),
+          phone: row.phone || '-',
+          currentBalance: formatCurrencyDisplay(row.currentBalance),
+        })), context);
+      }
 
       if (report.data.transactions.length) {
-        drawPdfSectionTitle(doc, 'Supplier Transactions');
-        const rows = report.data.transactions.map((row) => ({
-          transactionDate: toDateString(row.transactionDate),
-          supplierName: row.supplier?.name || '',
-          transactionType: titleCase(row.transactionType),
-          amount: `MWK ${Number(row.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-        }));
-
+        drawPdfSectionTitle(doc, 'Supplier Transactions', context);
         drawPdfTable(doc, [
-          { header: 'Date', key: 'transactionDate', weight: 1 },
+          { header: 'Date', key: 'transactionDate', weight: 0.9 },
           { header: 'Supplier', key: 'supplierName', weight: 1.7 },
-          { header: 'Type', key: 'transactionType', weight: 1 },
-          { header: 'Amount', key: 'amount', weight: 1.2 },
-        ], rows);
+          { header: 'Type', key: 'transactionType', weight: 0.8 },
+          { header: 'Method', key: 'paymentMethod', weight: 0.9 },
+          { header: 'Amount', key: 'amount', weight: 1, align: 'right' },
+        ], report.data.transactions.map((row) => ({
+          transactionDate: toDateString(row.transactionDate),
+          supplierName: row.supplier?.name || '-',
+          transactionType: titleCase(row.transactionType),
+          paymentMethod: titleCase(row.paymentMethod),
+          amount: formatCurrencyDisplay(row.amount),
+        })), context);
       }
     }
 
     if (report.module === 'payroll') {
-      drawPdfSectionTitle(doc, 'Payroll Totals');
-      drawPdfKeyValues(doc, [
-        { label: 'Employees', value: Number(report.data.totals.employeeCount || 0).toLocaleString('en-US') },
-        { label: 'Gross Pay', value: `MWK ${Number(report.data.totals.grossPay || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
-        { label: 'Deductions', value: `MWK ${Number(report.data.totals.deductions || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
-        { label: 'Net Pay', value: `MWK ${Number(report.data.totals.netPay || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
-      ]);
+      summaryCards.push(
+        { label: 'Employees', value: formatCountDisplay(report.data.totals.employeeCount), fill: '#F0F9F6', accent: PDF_BRAND_GREEN },
+        { label: 'Gross Pay', value: formatCurrencyDisplay(report.data.totals.grossPay), fill: '#F4F0F7', accent: PDF_BRAND_PURPLE },
+        { label: 'Net Pay', value: formatCurrencyDisplay(report.data.totals.netPay), fill: '#FFF4DB', accent: PDF_BRAND_ORANGE },
+      );
+
+      if (report.data.selectedPeriod) {
+        infoItems.push({ label: 'Selected Period', value: `${report.data.selectedPeriod.description || 'Payroll Period'} (${titleCase(report.data.selectedPeriod.payrollMode)})` });
+      }
+
+      drawPdfSummaryCards(doc, summaryCards, context);
+      drawPdfInfoBand(doc, infoItems, context);
+
+      if (report.data.periods.length) {
+        drawPdfSectionTitle(doc, 'Payroll Periods', context);
+        drawPdfTable(doc, [
+          { header: 'ID', key: 'id', weight: 0.5, align: 'right' },
+          { header: 'Mode', key: 'payrollMode', weight: 0.9 },
+          { header: 'Status', key: 'status', weight: 0.9 },
+          { header: 'Description', key: 'description', weight: 1.8 },
+          { header: 'Net Pay', key: 'totalNetPay', weight: 1.1, align: 'right' },
+        ], report.data.periods.map((row) => ({
+          id: String(row.id),
+          payrollMode: titleCase(row.payrollMode),
+          status: titleCase(row.status),
+          description: row.description || '-',
+          totalNetPay: formatCurrencyDisplay(row.totalNetPay),
+        })), context);
+      }
 
       if (report.data.entries.length) {
-        drawPdfSectionTitle(doc, 'Payroll Entries');
-        const rows = report.data.entries.map((row) => ({
-          employeeName: `${row.employee?.firstName || ''} ${row.employee?.surname || ''}`.trim(),
-          grossPay: `MWK ${Number(row.grossPay || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-          deductions: `MWK ${Number(row.totalDeductions || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-          netPay: `MWK ${Number(row.netPay || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-        }));
-
+        drawPdfSectionTitle(doc, 'Payroll Entries', context);
         drawPdfTable(doc, [
-          { header: 'Employee', key: 'employeeName', weight: 1.8 },
-          { header: 'Gross', key: 'grossPay', weight: 1.1 },
-          { header: 'Deductions', key: 'deductions', weight: 1.1 },
-          { header: 'Net', key: 'netPay', weight: 1.1 },
-        ], rows);
+          { header: 'Employee No', key: 'employeeNo', weight: 0.9 },
+          { header: 'Employee', key: 'employeeName', weight: 1.7 },
+          { header: 'Gross', key: 'grossPay', weight: 1, align: 'right' },
+          { header: 'Deductions', key: 'deductions', weight: 1, align: 'right' },
+          { header: 'Net', key: 'netPay', weight: 1, align: 'right' },
+        ], report.data.entries.map((row) => ({
+          employeeNo: row.employee?.employeeNo || '-',
+          employeeName: `${row.employee?.firstName || ''} ${row.employee?.surname || ''}`.trim() || '-',
+          grossPay: formatCurrencyDisplay(row.grossPay),
+          deductions: formatCurrencyDisplay(row.totalDeductions),
+          netPay: formatCurrencyDisplay(row.netPay),
+        })), context);
       }
     }
 
     if (report.module === 'monthly-summary') {
-      drawPdfSectionTitle(doc, 'Monthly Summary');
-      drawPdfKeyValues(doc, [
-        { label: 'Range', value: `${report.range.startDate} to ${report.range.endDate}` },
-        { label: 'Sales', value: `MWK ${Number(report.data.salesTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
-        { label: 'Expenses', value: `MWK ${Number(report.data.expensesTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
-        { label: 'Payroll', value: `MWK ${Number(report.data.payrollTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
-        { label: 'Supplier Payments', value: `MWK ${Number(report.data.supplierPaymentTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
-        { label: 'Net Position', value: `MWK ${Number(report.data.netPosition || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
-      ]);
+      summaryCards.push(
+        { label: 'Sales', value: formatCurrencyDisplay(report.data.salesTotal), fill: '#F0F9F6', accent: PDF_BRAND_GREEN },
+        { label: 'Expenses', value: formatCurrencyDisplay(report.data.expensesTotal), fill: '#FFF4DB', accent: PDF_BRAND_ORANGE },
+        { label: 'Payroll', value: formatCurrencyDisplay(report.data.payrollTotal), fill: '#F4F0F7', accent: PDF_BRAND_PURPLE },
+        { label: 'Supplier Payments', value: formatCurrencyDisplay(report.data.supplierPaymentTotal), fill: '#ECFDF5', accent: PDF_BRAND_GREEN },
+        { label: 'Supplier Debt', value: formatCurrencyDisplay(report.data.supplierDebtTotal), fill: '#FFF1F2', accent: '#BE123C' },
+        { label: 'Net Position', value: formatCurrencyDisplay(report.data.netPosition), fill: report.data.netPosition >= 0 ? '#F0F9F6' : '#FFF1F2', accent: report.data.netPosition >= 0 ? PDF_BRAND_GREEN : '#BE123C' },
+      );
+
+      drawPdfSummaryCards(doc, summaryCards, context);
+      drawPdfInfoBand(doc, infoItems, context);
+
+      if (report.data.paymentRows?.length) {
+        drawPdfSectionTitle(doc, 'Sales Payment Methods', context);
+        drawPdfTable(doc, [
+          { header: 'Method', key: 'payMethod', weight: 1.5 },
+          { header: 'Invoices', key: 'invoiceCount', weight: 0.8, align: 'right' },
+          { header: 'Amount', key: 'totalAmount', weight: 1, align: 'right' },
+        ], report.data.paymentRows.map((row) => ({
+          payMethod: row.payMethod || '-',
+          invoiceCount: formatCountDisplay(row.invoiceCount),
+          totalAmount: formatCurrencyDisplay(row.totalAmount),
+        })), context);
+      }
+
+      if (report.data.expensesSummary?.topCategories?.length) {
+        drawPdfSectionTitle(doc, 'Top Expense Categories', context);
+        drawPdfTable(doc, [
+          { header: 'Category', key: 'categoryName', weight: 1.7 },
+          { header: 'Entries', key: 'expenseCount', weight: 0.8, align: 'right' },
+          { header: 'Amount', key: 'totalAmount', weight: 1, align: 'right' },
+        ], report.data.expensesSummary.topCategories.map((row) => ({
+          categoryName: row.category?.name || 'Uncategorized',
+          expenseCount: formatCountDisplay(row.expenseCount),
+          totalAmount: formatCurrencyDisplay(row.totalAmount),
+        })), context);
+      }
     }
 
     if (report.module === 'employees') {
-      drawPdfSectionTitle(doc, 'Employee Register');
-      const rows = report.data.employees.map((row) => ({
-        employeeNo: row.employeeNo || '-',
-        name: `${row.firstName || ''} ${row.surname || ''}`.trim(),
-        status: titleCase(row.status),
-        department: row.department || '-',
-      }));
-      drawPdfTable(doc, [
-        { header: 'Employee No', key: 'employeeNo', weight: 1.2 },
-        { header: 'Name', key: 'name', weight: 2 },
-        { header: 'Status', key: 'status', weight: 1 },
-        { header: 'Department', key: 'department', weight: 1.4 },
-      ], rows);
+      const activeEmployees = report.data.employees.filter((row) => String(row.status || '').toLowerCase() === 'active').length;
+      const departments = new Set(report.data.employees.map((row) => row.department).filter(Boolean)).size;
+
+      summaryCards.push(
+        { label: 'Total Employees', value: formatCountDisplay(report.data.employees.length), fill: '#F0F9F6', accent: PDF_BRAND_GREEN },
+        { label: 'Active Employees', value: formatCountDisplay(activeEmployees), fill: '#F4F0F7', accent: PDF_BRAND_PURPLE },
+        { label: 'Departments', value: formatCountDisplay(departments), fill: '#FFF4DB', accent: PDF_BRAND_ORANGE },
+      );
+
+      drawPdfSummaryCards(doc, summaryCards, context);
+      drawPdfInfoBand(doc, infoItems, context);
+
+      if (report.data.employees.length) {
+        drawPdfSectionTitle(doc, 'Employee Register', context);
+        drawPdfTable(doc, [
+          { header: 'Employee No', key: 'employeeNo', weight: 1 },
+          { header: 'Name', key: 'name', weight: 1.8 },
+          { header: 'Status', key: 'status', weight: 0.8 },
+          { header: 'Department', key: 'department', weight: 1 },
+          { header: 'Current Salary', key: 'currentSalary', weight: 1, align: 'right' },
+        ], report.data.employees.map((row) => ({
+          employeeNo: row.employeeNo || '-',
+          name: `${row.firstName || ''} ${row.surname || ''}`.trim() || '-',
+          status: titleCase(row.status),
+          department: row.department || '-',
+          currentSalary: formatCurrencyDisplay(row.salaryStructures?.[0]?.agreedSalaryPerMonth || 0),
+        })), context);
+      }
     }
 
     doc
       .fontSize(8)
-      .fillColor('#6B7280')
-      .text(`Generated by ${COMPANY_NAME} Business Operations`, 50, doc.page.height - 30);
+      .fillColor(PDF_MUTED)
+      .text('Automated report generated by Citi-Nati Supermarket Business Operations', doc.page.margins.left, doc.page.height - 32, {
+        width: doc.page.width - (doc.page.margins.left * 2),
+        align: 'center',
+      });
 
     doc.end();
   });

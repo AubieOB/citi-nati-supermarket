@@ -26,16 +26,40 @@ function triggerDownload(blob, fileName) {
   window.URL.revokeObjectURL(url);
 }
 
+async function readBlobError(blob) {
+  if (!(blob instanceof Blob)) return null;
+
+  try {
+    const text = await blob.text();
+    const parsed = JSON.parse(text);
+    return parsed?.error || parsed?.message || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function downloadBusinessReport({ format, module, type, filters = {} }) {
   const safeFormat = format === 'pdf' ? 'pdf' : 'excel';
   const extension = safeFormat === 'pdf' ? 'pdf' : 'xlsx';
   const fallbackName = `${String(module || 'report').replace(/\s+/g, '_').toLowerCase()}_${String(type || 'summary').replace(/\s+/g, '_').toLowerCase()}.${extension}`;
 
-  const response = await api.post(
-    `/business-operations/export/${safeFormat}`,
-    { module, type, filters },
-    { responseType: 'blob' },
-  );
+  let response;
+
+  try {
+    response = await api.post(
+      `/business-operations/export/${safeFormat}`,
+      { module, type, filters },
+      { responseType: 'blob' },
+    );
+  } catch (error) {
+    const blobMessage = await readBlobError(error?.response?.data);
+    if (blobMessage) {
+      const wrapped = new Error(blobMessage);
+      wrapped.response = { data: { error: blobMessage } };
+      throw wrapped;
+    }
+    throw error;
+  }
 
   const fileName = parseFileName(response.headers?.['content-disposition'], fallbackName);
   triggerDownload(response.data, fileName);
