@@ -15,6 +15,21 @@ const {
 const EMPLOYEE_SORT_FIELDS = new Set(['id', 'employeeNo', 'firstName', 'surname', 'department', 'status', 'createdAt']);
 const SALARY_SORT_FIELDS = new Set(['id', 'effectiveFrom', 'agreedSalaryPerMonth', 'isCurrent', 'createdAt']);
 
+function normalizeEmployeeNo(value) {
+  if (value === undefined || value === null) return null;
+  const trimmed = String(value).trim();
+  return trimmed === '' ? null : trimmed;
+}
+
+function isEmployeeNoUniqueError(err) {
+  return (
+    err &&
+    err.code === 'P2002' &&
+    Array.isArray(err.meta?.target) &&
+    err.meta.target.includes('employee_no')
+  );
+}
+
 async function createEmployee(req, res) {
   try {
     const firstNameErr = requiredString(req.body.firstName, 'firstName');
@@ -24,7 +39,7 @@ async function createEmployee(req, res) {
     }
 
     const employee = await employeesService.createEmployee({
-      employeeNo: req.body.employeeNo,
+      employeeNo: normalizeEmployeeNo(req.body.employeeNo),
       firstName: req.body.firstName.trim(),
       surname: req.body.surname.trim(),
       middleName: req.body.middleName,
@@ -47,6 +62,12 @@ async function createEmployee(req, res) {
 
     return res.status(201).json({ success: true, data: employee });
   } catch (err) {
+    if (isEmployeeNoUniqueError(err)) {
+      return res.status(409).json({
+        success: false,
+        error: 'Employee number already exists. Use a different employee number or leave it blank.',
+      });
+    }
     console.error('[BO][EMPLOYEES] createEmployee error:', err);
     return res.status(500).json({ success: false, error: 'Failed to create employee' });
   }
@@ -58,7 +79,7 @@ async function updateEmployee(req, res) {
     if (!id) return res.status(400).json({ success: false, error: 'Invalid employee id' });
 
     const employee = await employeesService.updateEmployee(id, {
-      employeeNo: req.body.employeeNo,
+      employeeNo: normalizeEmployeeNo(req.body.employeeNo),
       firstName: req.body.firstName,
       surname: req.body.surname,
       middleName: req.body.middleName,
@@ -81,6 +102,12 @@ async function updateEmployee(req, res) {
 
     return res.json({ success: true, data: employee });
   } catch (err) {
+    if (isEmployeeNoUniqueError(err)) {
+      return res.status(409).json({
+        success: false,
+        error: 'Employee number already exists. Use a different employee number or leave it blank.',
+      });
+    }
     console.error('[BO][EMPLOYEES] updateEmployee error:', err);
     return res.status(500).json({ success: false, error: 'Failed to update employee' });
   }

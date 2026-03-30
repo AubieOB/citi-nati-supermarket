@@ -17,6 +17,9 @@ const cardStyle = {
 const buildFullName = (emp) =>
   [emp?.firstName, emp?.middleName, emp?.surname].filter(Boolean).join(' ');
 
+const getApiError = (err, fallback) =>
+  err?.response?.data?.error || err?.response?.data?.message || err?.message || fallback;
+
 const EmployeesTab = () => {
   // ── List state ──
   const [employees, setEmployees] = useState([]);
@@ -64,11 +67,14 @@ const EmployeesTab = () => {
       if (search.trim()) params.search = search.trim();
       if (statusFilter) params.status = statusFilter;
       const res = await api.get('/business-operations/employees', { params });
-      const data = res.data;
-      setEmployees(Array.isArray(data.employees) ? data.employees : []);
-      setPagination({ total: data.total ?? 0, skip, take: 20 });
+      const payload = res.data;
+      const list = Array.isArray(payload?.data) ? payload.data : Array.isArray(payload?.employees) ? payload.employees : [];
+      const total = payload?.pagination?.total ?? payload?.total ?? list.length;
+      const take = payload?.pagination?.pageSize ?? 20;
+      setEmployees(list);
+      setPagination({ total, skip, take });
     } catch (err) {
-      setListError(err?.response?.data?.message || err.message || 'Failed to load employees.');
+      setListError(getApiError(err, 'Failed to load employees.'));
     } finally {
       setListLoading(false);
     }
@@ -86,10 +92,10 @@ const EmployeesTab = () => {
         api.get(`/business-operations/employees/${id}`),
         api.get(`/business-operations/employees/${id}/salary-structures`),
       ]);
-      setDetail(detailRes.data);
-      setSalaryHistory(Array.isArray(salaryRes.data) ? salaryRes.data : []);
+      setDetail(detailRes?.data?.data ?? detailRes?.data ?? null);
+      setSalaryHistory(Array.isArray(salaryRes?.data?.data) ? salaryRes.data.data : []);
     } catch (err) {
-      setDetailError(err?.response?.data?.message || err.message || 'Failed to load employee details.');
+      setDetailError(getApiError(err, 'Failed to load employee details.'));
     } finally {
       setDetailLoading(false);
       setSalaryLoading(false);
@@ -167,7 +173,7 @@ const EmployeesTab = () => {
         saved = res.data;
       }
       setEmployeeModal({ open: false, employee: null });
-      const id = saved?.id ?? saved?.employee?.id;
+      const id = saved?.data?.id ?? saved?.id ?? saved?.employee?.id;
       if (id) setPendingSelectId(id);
       await refreshData(1);
       setPage(1);
@@ -176,7 +182,7 @@ const EmployeesTab = () => {
         fetchDetail(id);
       }
     } catch (err) {
-      setEmpSaveError(err?.response?.data?.message || err.message || 'Failed to save employee.');
+      setEmpSaveError(getApiError(err, 'Failed to save employee.'));
     } finally {
       setEmpSaving(false);
     }
@@ -210,7 +216,7 @@ const EmployeesTab = () => {
       // Refresh list to update displayed salary
       await fetchEmployees(page);
     } catch (err) {
-      setSalSaveError(err?.response?.data?.message || err.message || 'Failed to save salary structure.');
+      setSalSaveError(getApiError(err, 'Failed to save salary structure.'));
     } finally {
       setSalSaving(false);
     }
