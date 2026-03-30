@@ -4,6 +4,7 @@ import PayrollPeriodsList from './PayrollPeriodsList.jsx';
 import PayrollPeriodFormModal from './PayrollPeriodFormModal.jsx';
 import PayrollPeriodDetailPanel from './PayrollPeriodDetailPanel.jsx';
 import PayrollEntryFormModal from './PayrollEntryFormModal.jsx';
+import PayrollSupportDrawer from './PayrollSupportDrawer.jsx';
 
 const cardStyle = {
   backgroundColor: '#fff',
@@ -60,6 +61,15 @@ const PayrollTab = ({ refreshKey = 0 }) => {
   const [selectedEntryId, setSelectedEntryId] = useState(null);
   const [supportData, setSupportData] = useState(null);
   const [supportLoading, setSupportLoading] = useState(false);
+  const [supportDrawer, setSupportDrawer] = useState({
+    open: false,
+    employeeName: '',
+    loading: false,
+    error: '',
+    loans: [],
+    terminations: [],
+    reengagements: [],
+  });
 
   const [periodModal, setPeriodModal] = useState({ open: false, period: null });
   const [entryModal, setEntryModal] = useState({ open: false, entry: null });
@@ -181,6 +191,56 @@ const PayrollTab = ({ refreshKey = 0 }) => {
       setSupportData({ loansTotal: 0, terminationsTotal: 0, reengagementsTotal: 0 });
     } finally {
       setSupportLoading(false);
+    }
+  }, []);
+
+  const openSupportDrawerForEntry = useCallback(async (entry) => {
+    if (!entry?.employeeId) return;
+
+    const employeeName = [entry?.employee?.firstName, entry?.employee?.surname].filter(Boolean).join(' ') || 'Selected Employee';
+
+    setSupportDrawer({
+      open: true,
+      employeeName,
+      loading: true,
+      error: '',
+      loans: [],
+      terminations: [],
+      reengagements: [],
+    });
+
+    try {
+      const [loansRes, terminationsRes, reengagementsRes] = await Promise.all([
+        api.get('/business-operations/payroll/loans', {
+          params: { employeeId: entry.employeeId, page: 1, pageSize: 25, sortBy: 'createdAt', sortOrder: 'desc' },
+        }),
+        api.get('/business-operations/payroll/terminations', {
+          params: { employeeId: entry.employeeId, page: 1, pageSize: 25, sortBy: 'terminationDate', sortOrder: 'desc' },
+        }),
+        api.get('/business-operations/payroll/reengagements', {
+          params: { employeeId: entry.employeeId, page: 1, pageSize: 25, sortBy: 'effectiveDate', sortOrder: 'desc' },
+        }),
+      ]);
+
+      setSupportDrawer({
+        open: true,
+        employeeName,
+        loading: false,
+        error: '',
+        loans: Array.isArray(loansRes?.data?.data) ? loansRes.data.data : [],
+        terminations: Array.isArray(terminationsRes?.data?.data) ? terminationsRes.data.data : [],
+        reengagements: Array.isArray(reengagementsRes?.data?.data) ? reengagementsRes.data.data : [],
+      });
+    } catch (err) {
+      setSupportDrawer({
+        open: true,
+        employeeName,
+        loading: false,
+        error: getApiError(err, 'Failed to load payroll support records.'),
+        loans: [],
+        terminations: [],
+        reengagements: [],
+      });
     }
   }, []);
 
@@ -334,6 +394,12 @@ const PayrollTab = ({ refreshKey = 0 }) => {
     fetchSupportData(entry.employeeId);
   };
 
+  const handleOpenSupportDrawer = () => {
+    const selectedEntry = entries.find((entry) => entry.id === selectedEntryId);
+    if (!selectedEntry) return;
+    openSupportDrawerForEntry(selectedEntry);
+  };
+
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
       <div style={{ ...cardStyle, padding: '1.1rem 1.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -426,6 +492,7 @@ const PayrollTab = ({ refreshKey = 0 }) => {
             setEntriesPage(1);
             setSelectedEntryId(null);
             setSupportData(null);
+            setSupportDrawer((prev) => ({ ...prev, open: false, error: '', loans: [], terminations: [], reengagements: [] }));
           }}
           onEditPeriod={handleEditPeriod}
           onCreatePeriod={handleCreatePeriod}
@@ -446,6 +513,7 @@ const PayrollTab = ({ refreshKey = 0 }) => {
           onEditEntry={handleEditEntry}
           onPageChange={setEntriesPage}
           onAddEntry={handleAddEntry}
+          onOpenSupportDrawer={handleOpenSupportDrawer}
         />
       </div>
 
@@ -469,6 +537,17 @@ const PayrollTab = ({ refreshKey = 0 }) => {
         onClose={() => setEntryModal({ open: false, entry: null })}
         onEmployeeChange={handleEntryEmployeeChange}
         onSubmit={handleEntrySubmit}
+      />
+
+      <PayrollSupportDrawer
+        isOpen={supportDrawer.open}
+        employeeName={supportDrawer.employeeName}
+        loading={supportDrawer.loading}
+        error={supportDrawer.error}
+        loans={supportDrawer.loans}
+        terminations={supportDrawer.terminations}
+        reengagements={supportDrawer.reengagements}
+        onClose={() => setSupportDrawer((prev) => ({ ...prev, open: false }))}
       />
     </div>
   );

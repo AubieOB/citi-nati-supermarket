@@ -34,6 +34,7 @@ const PayrollPeriodDetailPanel = ({
   onEditEntry,
   onPageChange,
   onAddEntry,
+  onOpenSupportDrawer,
 }) => {
   if (!period) {
     return (
@@ -61,7 +62,17 @@ const PayrollPeriodDetailPanel = ({
       <PayrollSummaryCards summary={summary} />
 
       <div style={{ border: '1px solid #e2e8f0', borderRadius: '14px', padding: '0.8rem 0.9rem', backgroundColor: '#f8fafc' }}>
-        <div style={{ color: '#334155', fontWeight: 700, fontSize: '0.88rem', marginBottom: '0.4rem' }}>Linked Employee Payroll Support Records</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.55rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '0.4rem' }}>
+          <div style={{ color: '#334155', fontWeight: 700, fontSize: '0.88rem' }}>Linked Employee Payroll Support Records</div>
+          <button
+            type="button"
+            onClick={onOpenSupportDrawer}
+            disabled={!selectedEntryId}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '8px', color: '#334155', padding: '0.36rem 0.64rem', cursor: selectedEntryId ? 'pointer' : 'not-allowed', fontWeight: 700, fontSize: '0.76rem' }}
+          >
+            <i className="fas fa-up-right-from-square" style={{ marginRight: '0.3rem' }}></i>View Records
+          </button>
+        </div>
         {supportLoading ? (
           <div style={{ color: '#64748b', fontSize: '0.83rem' }}>Loading linked records...</div>
         ) : supportData ? (
