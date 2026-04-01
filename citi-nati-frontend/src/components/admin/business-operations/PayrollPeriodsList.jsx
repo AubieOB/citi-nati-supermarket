@@ -38,6 +38,13 @@ const formatDate = (value) => {
 
 const money = (value) => `MWK ${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+const locationLabel = (item) => {
+  if (item?.locationName) return item.locationName;
+  if (item?.locationCode) return item.locationCode;
+  if (item?.locationId) return `Location #${item.locationId}`;
+  return null;
+};
+
 const PayrollPeriodsList = ({
   periods,
   loading,
@@ -108,6 +115,7 @@ const PayrollPeriodsList = ({
                       <td style={tdStyle}>
                         <div style={{ fontWeight: 700 }}>{period.description || `Period #${period.id}`}</div>
                         <div style={{ color: '#64748b', fontSize: '0.8rem' }}>RP: {period.reportingPeriodId || 'N/A'}</div>
+                        {locationLabel(period) && <div style={{ color: '#94a3b8', fontSize: '0.79rem' }}>{locationLabel(period)}</div>}
                       </td>
                       <td style={{ ...tdStyle, textTransform: 'capitalize' }}>{modeLabel(period.payrollMode) || 'Not set'}</td>
                       <td style={tdStyle}>

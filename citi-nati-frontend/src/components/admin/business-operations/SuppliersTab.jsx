@@ -49,7 +49,7 @@ const INITIAL_DETAIL_STATE = {
   transactionPagination: null,
 };
 
-const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null }) => {
+const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] }) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
@@ -225,8 +225,8 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null }) => {
 
     try {
       const response = supplierModalState.supplier
-        ? await api.put(`/business-operations/suppliers/${supplierModalState.supplier.id}`, { ...payload, locationId: selectedLocationId || undefined })
-        : await api.post('/business-operations/suppliers', { ...payload, locationId: selectedLocationId || undefined });
+        ? await api.put(`/business-operations/suppliers/${supplierModalState.supplier.id}`, { ...payload, locationId: payload.locationId ?? selectedLocationId ?? undefined })
+        : await api.post('/business-operations/suppliers', { ...payload, locationId: payload.locationId ?? selectedLocationId ?? undefined });
 
       const savedSupplier = response.data?.data || null;
       setSupplierModalState({ open: false, supplier: null });
@@ -250,8 +250,8 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null }) => {
 
     try {
       await (transactionModalState.transaction
-        ? api.put(`/business-operations/suppliers/transactions/${transactionModalState.transaction.id}`, { ...payload, locationId: selectedLocationId || undefined })
-        : api.post('/business-operations/suppliers/transactions', { ...payload, locationId: selectedLocationId || undefined }));
+        ? api.put(`/business-operations/suppliers/transactions/${transactionModalState.transaction.id}`, { ...payload, locationId: payload.locationId ?? selectedLocationId ?? undefined })
+        : api.post('/business-operations/suppliers/transactions', { ...payload, locationId: payload.locationId ?? selectedLocationId ?? undefined }));
 
       setTransactionModalState({ open: false, transaction: null });
       setTransactionPage(1);
@@ -462,6 +462,8 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null }) => {
       <SupplierFormModal
         isOpen={supplierModalState.open}
         supplier={supplierModalState.supplier}
+        selectedLocationId={selectedLocationId}
+        locations={locations}
         saving={supplierFormSaving}
         error={supplierFormError}
         onClose={() => setSupplierModalState({ open: false, supplier: null })}
@@ -473,6 +475,8 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null }) => {
         transaction={transactionModalState.transaction}
         supplier={selectedSupplier}
         supplierOptions={supplierOptions}
+        selectedLocationId={selectedLocationId}
+        locations={locations}
         saving={transactionFormSaving}
         error={transactionFormError}
         onClose={() => setTransactionModalState({ open: false, transaction: null })}

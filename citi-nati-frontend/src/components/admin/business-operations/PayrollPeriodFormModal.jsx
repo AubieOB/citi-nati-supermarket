@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 const defaultForm = {
+  locationId: '',
   reportingPeriodId: '',
   payrollMode: 'full_month',
   description: '',
@@ -25,18 +26,25 @@ const labelStyle = {
   fontSize: '0.87rem',
 };
 
-const PayrollPeriodFormModal = ({ isOpen, period, saving, error, onClose, onSubmit }) => {
+const PayrollPeriodFormModal = ({ isOpen, period, selectedLocationId = null, locations = [], saving, error, onClose, onSubmit }) => {
   const [form, setForm] = useState(defaultForm);
+  const [validationError, setValidationError] = useState('');
+  const isCreateMode = !period;
+  const isLocationLocked = isCreateMode && Boolean(selectedLocationId);
 
   useEffect(() => {
     if (!isOpen) return;
+    setValidationError('');
+    const scopedLocationId = selectedLocationId ? String(selectedLocationId) : '';
+    const existingLocationId = period?.locationId ? String(period.locationId) : '';
     setForm({
+      locationId: existingLocationId || scopedLocationId,
       reportingPeriodId: period?.reportingPeriodId ? String(period.reportingPeriodId) : '',
       payrollMode: period?.payrollMode || 'full_month',
       description: period?.description || '',
       status: period?.status || 'draft',
     });
-  }, [isOpen, period]);
+  }, [isOpen, period, selectedLocationId]);
 
   if (!isOpen) return null;
 
@@ -47,7 +55,12 @@ const PayrollPeriodFormModal = ({ isOpen, period, saving, error, onClose, onSubm
 
   const handleSubmit = (event) => {
     event.preventDefault();
+    if (!form.locationId) {
+      setValidationError('Location is required.');
+      return;
+    }
     onSubmit({
+      locationId: Number(form.locationId),
       reportingPeriodId: form.reportingPeriodId ? Number(form.reportingPeriodId) : null,
       payrollMode: form.payrollMode,
       description: form.description.trim() || null,
@@ -63,14 +76,23 @@ const PayrollPeriodFormModal = ({ isOpen, period, saving, error, onClose, onSubm
           <h3 style={{ margin: '0.3rem 0 0', color: '#0f172a' }}>{period ? 'Edit Payroll Period' : 'Create Payroll Period'}</h3>
         </div>
 
-        {error && (
+        {(validationError || error) && (
           <div style={{ margin: '1rem 1.2rem 0', padding: '0.85rem 0.95rem', backgroundColor: '#fef2f2', color: '#b91c1c', borderRadius: '12px', border: '1px solid #fecaca' }}>
-            {error}
+            {validationError || error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} style={{ padding: '1.1rem 1.2rem', display: 'grid', gap: '0.9rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.8rem' }}>
+            <div>
+              <label style={labelStyle}>Location</label>
+              <select value={form.locationId} onChange={set('locationId')} disabled={isLocationLocked} style={{ ...fieldStyle, backgroundColor: isLocationLocked ? '#f8fafc' : '#fff' }}>
+                {!isLocationLocked && <option value="">Select location</option>}
+                {locations.map((location) => (
+                  <option key={location.id} value={location.id}>{location.name}{location.code ? ` (${location.code})` : ''}</option>
+                ))}
+              </select>
+            </div>
             <div>
               <label style={labelStyle}>Reporting Period ID</label>
               <input type="number" min="1" value={form.reportingPeriodId} onChange={set('reportingPeriodId')} placeholder="Optional internal period id" style={fieldStyle} />

@@ -38,6 +38,11 @@ async function createEmployee(req, res) {
       return res.status(400).json({ success: false, error: firstNameErr || surnameErr });
     }
 
+    const locationId = toInt(req.body.locationId);
+    if (!locationId) {
+      return res.status(400).json({ success: false, error: 'locationId is required' });
+    }
+
     const employee = await employeesService.createEmployee({
       employeeNo: normalizeEmployeeNo(req.body.employeeNo),
       firstName: req.body.firstName.trim(),
@@ -54,7 +59,7 @@ async function createEmployee(req, res) {
       dateOfEmployment: req.body.dateOfEmployment ? toDate(req.body.dateOfEmployment) : null,
       position: req.body.position,
       department: req.body.department,
-      locationId: toInt(req.body.locationId),
+      locationId,
       employmentType: req.body.employmentType,
       status: req.body.status,
       notes: req.body.notes,
@@ -77,6 +82,10 @@ async function updateEmployee(req, res) {
   try {
     const id = toInt(req.params.id);
     if (!id) return res.status(400).json({ success: false, error: 'Invalid employee id' });
+
+    if (req.body.locationId !== undefined && !toInt(req.body.locationId)) {
+      return res.status(400).json({ success: false, error: 'locationId must be a valid integer' });
+    }
 
     const employee = await employeesService.updateEmployee(id, {
       employeeNo: normalizeEmployeeNo(req.body.employeeNo),

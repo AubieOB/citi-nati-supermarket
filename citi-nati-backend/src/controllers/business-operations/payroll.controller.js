@@ -59,12 +59,17 @@ async function createPayrollPeriod(req, res) {
       return res.status(400).json({ success: false, error: 'payrollMode must be one of: mid_month, full_month' });
     }
 
+    const locationId = toInt(req.body.locationId);
+    if (!locationId) {
+      return res.status(400).json({ success: false, error: 'locationId is required' });
+    }
+
     const period = await payrollService.createPayrollPeriod({
       reportingPeriodId: toInt(req.body.reportingPeriodId),
       payrollMode,
       description: req.body.description,
       status: req.body.status,
-      locationId: toInt(req.body.locationId),
+      locationId,
       createdBy: req.body.createdBy || req.user?.email || null,
     });
 
@@ -79,6 +84,10 @@ async function updatePayrollPeriod(req, res) {
   try {
     const id = toInt(req.params.id);
     if (!id) return res.status(400).json({ success: false, error: 'Invalid payroll period id' });
+
+    if (req.body.locationId !== undefined && !toInt(req.body.locationId)) {
+      return res.status(400).json({ success: false, error: 'locationId must be a valid integer' });
+    }
 
     const payload = {
       reportingPeriodId: req.body.reportingPeriodId !== undefined ? toInt(req.body.reportingPeriodId) : undefined,
@@ -155,6 +164,9 @@ async function createPayrollEntry(req, res) {
     const data = await payrollService.createPayrollEntry(payload);
     return res.status(201).json({ success: true, data });
   } catch (err) {
+    if (err?.statusCode === 400) {
+      return res.status(400).json({ success: false, error: err.message || 'Invalid payroll entry payload' });
+    }
     if (isPayrollEntryUniqueError(err)) {
       return res.status(409).json({
         success: false,
@@ -175,6 +187,9 @@ async function updatePayrollEntry(req, res) {
     const data = await payrollService.updatePayrollEntry(id, payload);
     return res.json({ success: true, data });
   } catch (err) {
+    if (err?.statusCode === 400) {
+      return res.status(400).json({ success: false, error: err.message || 'Invalid payroll entry payload' });
+    }
     if (isPayrollEntryUniqueError(err)) {
       return res.status(409).json({
         success: false,

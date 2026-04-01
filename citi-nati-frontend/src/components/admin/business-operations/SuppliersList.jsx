@@ -36,6 +36,13 @@ const statusBadgeStyle = (status) => ({
   color: status === 'active' ? '#166534' : '#475569',
 });
 
+const locationLabel = (item) => {
+  if (item?.locationName) return item.locationName;
+  if (item?.locationCode) return item.locationCode;
+  if (item?.locationId) return `Location #${item.locationId}`;
+  return null;
+};
+
 const SuppliersList = ({
   suppliers,
   loading,
@@ -95,6 +102,7 @@ const SuppliersList = ({
                     <div style={{ display: 'grid', gap: '0.25rem' }}>
                       <strong>{supplier.name}</strong>
                       <span style={{ color: '#64748b', fontSize: '0.84rem' }}>{supplier.supplierCode || 'No supplier code'}</span>
+                      {locationLabel(supplier) && <span style={{ color: '#94a3b8', fontSize: '0.79rem' }}>{locationLabel(supplier)}</span>}
                     </div>
                   </td>
                   <td style={tdStyle}>

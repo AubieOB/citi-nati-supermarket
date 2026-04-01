@@ -35,6 +35,13 @@ const statusBadge = (status) => ({
   color: status === 'active' ? '#166534' : status === 'terminated' ? '#b91c1c' : '#475569',
 });
 
+const formatLocation = (item) => {
+  if (item?.locationName) return item.locationName;
+  if (item?.locationCode) return item.locationCode;
+  if (item?.locationId) return `Location #${item.locationId}`;
+  return '—';
+};
+
 const row = { display: 'grid', gap: '0.2rem' };
 
 const EmployeeDetailPanel = ({
@@ -133,6 +140,10 @@ const EmployeeDetailPanel = ({
           <div style={row}>
             <span style={{ color: '#64748b', fontSize: '0.79rem' }}>Department</span>
             <strong style={{ color: '#0f172a' }}>{employee.department || '—'}</strong>
+          </div>
+          <div style={row}>
+            <span style={{ color: '#64748b', fontSize: '0.79rem' }}>Location</span>
+            <strong style={{ color: '#0f172a' }}>{formatLocation(employee)}</strong>
           </div>
           <div style={row}>
             <span style={{ color: '#64748b', fontSize: '0.79rem' }}>Employment Type</span>

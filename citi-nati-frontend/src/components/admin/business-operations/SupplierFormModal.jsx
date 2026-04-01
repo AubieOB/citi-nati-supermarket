@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 
 const defaultForm = {
+  locationId: '',
   supplierCode: '',
   name: '',
   contactPerson: '',
@@ -22,16 +23,21 @@ const fieldStyle = {
   backgroundColor: '#fff',
 };
 
-const SupplierFormModal = ({ isOpen, supplier, saving, error, onClose, onSubmit }) => {
+const SupplierFormModal = ({ isOpen, supplier, selectedLocationId = null, locations = [], saving, error, onClose, onSubmit }) => {
   const [form, setForm] = useState(defaultForm);
   const [validationError, setValidationError] = useState('');
+  const isCreateMode = !supplier;
+  const isLocationLocked = isCreateMode && Boolean(selectedLocationId);
 
   const title = useMemo(() => (supplier ? 'Edit Supplier' : 'Add New Supplier'), [supplier]);
 
   useEffect(() => {
     if (!isOpen) return;
     setValidationError('');
+    const scopedLocationId = selectedLocationId ? String(selectedLocationId) : '';
+    const existingLocationId = supplier?.locationId ? String(supplier.locationId) : '';
     setForm({
+      locationId: existingLocationId || scopedLocationId,
       supplierCode: supplier?.supplierCode || '',
       name: supplier?.name || '',
       contactPerson: supplier?.contactPerson || '',
@@ -42,7 +48,7 @@ const SupplierFormModal = ({ isOpen, supplier, saving, error, onClose, onSubmit 
       status: supplier?.status || 'active',
       notes: supplier?.notes || '',
     });
-  }, [isOpen, supplier]);
+  }, [isOpen, supplier, selectedLocationId]);
 
   if (!isOpen) return null;
 
@@ -58,9 +64,14 @@ const SupplierFormModal = ({ isOpen, supplier, saving, error, onClose, onSubmit 
       setValidationError('Opening balance must be numeric.');
       return;
     }
+    if (!form.locationId) {
+      setValidationError('Location is required.');
+      return;
+    }
 
     setValidationError('');
     onSubmit({
+      locationId: Number(form.locationId),
       supplierCode: form.supplierCode.trim() || null,
       name: form.name.trim(),
       contactPerson: form.contactPerson.trim() || null,
@@ -94,6 +105,15 @@ const SupplierFormModal = ({ isOpen, supplier, saving, error, onClose, onSubmit 
           ) : null}
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.9rem' }}>
+            <label style={{ display: 'grid', gap: '0.45rem' }}>
+              <span style={{ fontWeight: 700, color: '#334155' }}>Location</span>
+              <select value={form.locationId} onChange={(event) => setForm((current) => ({ ...current, locationId: event.target.value }))} disabled={isLocationLocked} style={{ ...fieldStyle, backgroundColor: isLocationLocked ? '#f8fafc' : '#fff' }}>
+                {!isLocationLocked && <option value="">Select location</option>}
+                {locations.map((location) => (
+                  <option key={location.id} value={location.id}>{location.name}{location.code ? ` (${location.code})` : ''}</option>
+                ))}
+              </select>
+            </label>
             <label style={{ display: 'grid', gap: '0.45rem' }}>
               <span style={{ fontWeight: 700, color: '#334155' }}>Supplier Code</span>
               <input value={form.supplierCode} onChange={(event) => setForm((current) => ({ ...current, supplierCode: event.target.value }))} style={fieldStyle} placeholder="Optional internal code" />

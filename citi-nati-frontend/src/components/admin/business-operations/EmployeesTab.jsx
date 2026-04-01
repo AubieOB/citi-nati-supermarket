@@ -21,7 +21,7 @@ const buildFullName = (emp) =>
 const getApiError = (err, fallback) =>
   err?.response?.data?.error || err?.response?.data?.message || err?.message || fallback;
 
-const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null }) => {
+const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] }) => {
   // ── List state ──
   const [employees, setEmployees] = useState([]);
   const [pagination, setPagination] = useState({ total: 0, skip: 0, take: 20 });
@@ -170,10 +170,10 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null }) => {
     try {
       let saved;
       if (employeeModal.employee) {
-        const res = await api.put(`/business-operations/employees/${employeeModal.employee.id}`, payload);
+        const res = await api.put(`/business-operations/employees/${employeeModal.employee.id}`, { ...payload, locationId: payload.locationId ?? selectedLocationId ?? undefined });
         saved = res.data;
       } else {
-        const res = await api.post('/business-operations/employees', { ...payload, locationId: selectedLocationId || undefined });
+        const res = await api.post('/business-operations/employees', { ...payload, locationId: payload.locationId ?? selectedLocationId ?? undefined });
         saved = res.data;
       }
       setEmployeeModal({ open: false, employee: null });
@@ -364,6 +364,8 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null }) => {
       <EmployeeFormModal
         isOpen={employeeModal.open}
         employee={employeeModal.employee}
+        selectedLocationId={selectedLocationId}
+        locations={locations}
         saving={empSaving}
         error={empSaveError}
         onClose={() => setEmployeeModal({ open: false, employee: null })}

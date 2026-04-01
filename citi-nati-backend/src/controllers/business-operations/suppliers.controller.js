@@ -23,6 +23,10 @@ async function createSupplier(req, res) {
   try {
     const err = requiredString(req.body.name, 'name');
     if (err) return res.status(400).json({ success: false, error: err });
+    const locationId = toInt(req.body.locationId);
+    if (!locationId) {
+      return res.status(400).json({ success: false, error: 'locationId is required' });
+    }
 
     const supplier = await suppliersService.createSupplier({
       supplierCode: req.body.supplierCode,
@@ -31,7 +35,7 @@ async function createSupplier(req, res) {
       phone: req.body.phone,
       email: req.body.email,
       address: req.body.address,
-      locationId: toInt(req.body.locationId),
+      locationId,
       openingBalance: toNumber(req.body.openingBalance, 0),
       status: req.body.status,
       notes: req.body.notes,
@@ -48,6 +52,10 @@ async function updateSupplier(req, res) {
   try {
     const id = toInt(req.params.id);
     if (!id) return res.status(400).json({ success: false, error: 'Invalid supplier id' });
+
+    if (req.body.locationId !== undefined && !toInt(req.body.locationId)) {
+      return res.status(400).json({ success: false, error: 'locationId must be a valid integer' });
+    }
 
     const supplier = await suppliersService.updateSupplier(id, {
       supplierCode: req.body.supplierCode,
@@ -126,8 +134,10 @@ async function createSupplierTransaction(req, res) {
     const transactionDate = toDate(req.body.transactionDate);
     const transactionType = req.body.transactionType ? String(req.body.transactionType).toLowerCase() : null;
     const paymentMethod = req.body.paymentMethod ? String(req.body.paymentMethod).toLowerCase() : null;
+    const locationId = toInt(req.body.locationId);
 
     if (!supplierId) return res.status(400).json({ success: false, error: 'supplierId is required' });
+    if (!locationId) return res.status(400).json({ success: false, error: 'locationId is required' });
     if (!transactionDate) return res.status(400).json({ success: false, error: 'transactionDate is required and must be valid' });
     if (!Number.isFinite(amount)) return res.status(400).json({ success: false, error: 'amount is required and must be numeric' });
     if (!SUPPLIER_TRANSACTION_TYPES.has(transactionType)) {
@@ -143,7 +153,7 @@ async function createSupplierTransaction(req, res) {
       transactionDate,
       transactionType,
       paymentMethod,
-      locationId: toInt(req.body.locationId),
+      locationId,
       amount,
       description: req.body.description,
       referenceNo: req.body.referenceNo,
@@ -161,6 +171,10 @@ async function updateSupplierTransaction(req, res) {
   try {
     const id = toInt(req.params.id);
     if (!id) return res.status(400).json({ success: false, error: 'Invalid transaction id' });
+
+    if (req.body.locationId !== undefined && !toInt(req.body.locationId)) {
+      return res.status(400).json({ success: false, error: 'locationId must be a valid integer' });
+    }
 
     const payload = {
       reportingPeriodId: req.body.reportingPeriodId !== undefined ? toInt(req.body.reportingPeriodId) : undefined,

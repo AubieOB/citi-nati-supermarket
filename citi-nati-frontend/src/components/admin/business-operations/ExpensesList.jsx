@@ -41,6 +41,13 @@ const METHOD_LABELS = {
   other: 'Other',
 };
 
+const locationLabel = (item) => {
+  if (item?.locationName) return item.locationName;
+  if (item?.locationCode) return item.locationCode;
+  if (item?.locationId) return `Location #${item.locationId}`;
+  return null;
+};
+
 const ExpensesList = ({
   expenses,
   loading,
@@ -112,6 +119,9 @@ const ExpensesList = ({
                     <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {expense.description || '—'}
                     </span>
+                    {locationLabel(expense) && (
+                      <span style={{ color: '#94a3b8', fontSize: '0.79rem', marginRight: '0.35rem' }}>{locationLabel(expense)}</span>
+                    )}
                     {expense.referenceNo && (
                       <span style={{ color: '#94a3b8', fontSize: '0.79rem' }}>Ref: {expense.referenceNo}</span>
                     )}

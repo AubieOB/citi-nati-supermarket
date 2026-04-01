@@ -27,6 +27,13 @@ const METHOD_LABELS = {
   other: 'Other',
 };
 
+const formatLocation = (item) => {
+  if (item?.locationName) return item.locationName;
+  if (item?.locationCode) return item.locationCode;
+  if (item?.locationId) return `Location #${item.locationId}`;
+  return '—';
+};
+
 const detailRow = { display: 'grid', gap: '0.2rem' };
 
 const ExpenseDetailPanel = ({ expense, loading, error, onEdit, onAddExpense }) => {
@@ -90,6 +97,10 @@ const ExpenseDetailPanel = ({ expense, loading, error, onEdit, onAddExpense }) =
         <div style={detailRow}>
           <span style={{ color: '#64748b', fontSize: '0.8rem' }}>Category</span>
           <strong style={{ color: '#0f172a' }}>{expense.expenseCategory?.name || '—'}</strong>
+        </div>
+        <div style={detailRow}>
+          <span style={{ color: '#64748b', fontSize: '0.8rem' }}>Location</span>
+          <strong style={{ color: '#0f172a' }}>{formatLocation(expense)}</strong>
         </div>
         <div style={detailRow}>
           <span style={{ color: '#64748b', fontSize: '0.8rem' }}>Payment Method</span>

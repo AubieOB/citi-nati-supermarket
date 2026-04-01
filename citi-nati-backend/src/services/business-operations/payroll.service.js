@@ -15,6 +15,38 @@ function modelHasField(modelName, fieldName) {
 
 const payrollPeriodHasLocation = modelHasField('PayrollPeriod', 'locationId');
 
+async function validatePayrollEntryLocationAlignment(payload, existingEntryId = null) {
+  const payrollPeriodId = payload?.payrollPeriodId;
+  const employeeId = payload?.employeeId;
+  if (!payrollPeriodId || !employeeId || !payrollPeriodHasLocation) return;
+
+  const [period, employee] = await Promise.all([
+    prisma.payrollPeriod.findUnique({ where: { id: payrollPeriodId }, select: { id: true, locationId: true } }),
+    prisma.employee.findUnique({ where: { id: employeeId }, select: { id: true, locationId: true } }),
+  ]);
+
+  if (!period) {
+    const error = new Error('Payroll period not found.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!employee) {
+    const error = new Error('Employee not found.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!period.locationId) return;
+
+  if (!employee.locationId || Number(employee.locationId) !== Number(period.locationId)) {
+    const error = new Error('Selected employee location does not match the payroll period location.');
+    error.statusCode = 400;
+    error.details = { existingEntryId, payrollPeriodId: period.id, employeeId: employee.id };
+    throw error;
+  }
+}
+
 function parseDate(value) {
   if (!value) return null;
   const d = new Date(value);
@@ -128,6 +160,7 @@ async function getPayrollPeriodById(id) {
 }
 
 async function createPayrollEntry(payload) {
+  await validatePayrollEntryLocationAlignment(payload);
   return prisma.payrollEntry.create({
     data: payload,
     include: {
@@ -138,6 +171,21 @@ async function createPayrollEntry(payload) {
 }
 
 async function updatePayrollEntry(id, payload) {
+  const currentEntry = await prisma.payrollEntry.findUnique({
+    where: { id },
+    select: { payrollPeriodId: true, employeeId: true },
+  });
+  if (!currentEntry) {
+    const error = new Error('Payroll entry not found.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  await validatePayrollEntryLocationAlignment({
+    payrollPeriodId: payload.payrollPeriodId || currentEntry.payrollPeriodId,
+    employeeId: payload.employeeId || currentEntry.employeeId,
+  }, id);
+
   return prisma.payrollEntry.update({
     where: { id },
     data: payload,

@@ -48,6 +48,13 @@ const statusBadge = (status) => ({
   color: status === 'active' ? '#166534' : status === 'terminated' ? '#b91c1c' : '#475569',
 });
 
+const locationLabel = (item) => {
+  if (item?.locationName) return item.locationName;
+  if (item?.locationCode) return item.locationCode;
+  if (item?.locationId) return `Location #${item.locationId}`;
+  return null;
+};
+
 const EmployeesList = ({
   employees,
   loading,
@@ -117,6 +124,7 @@ const EmployeesList = ({
                     <div style={{ display: 'grid', gap: '0.2rem' }}>
                       <span>{emp.department || '—'}</span>
                       <span style={{ color: '#64748b', fontSize: '0.83rem' }}>{emp.position || '—'}</span>
+                      {locationLabel(emp) && <span style={{ color: '#94a3b8', fontSize: '0.79rem' }}>{locationLabel(emp)}</span>}
                     </div>
                   </td>
                   <td style={tdStyle}>

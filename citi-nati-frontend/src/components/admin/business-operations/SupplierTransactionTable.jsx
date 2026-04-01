@@ -32,6 +32,13 @@ const tdStyle = {
   verticalAlign: 'top',
 };
 
+const locationLabel = (item) => {
+  if (item?.locationName) return item.locationName;
+  if (item?.locationCode) return item.locationCode;
+  if (item?.locationId) return `Location #${item.locationId}`;
+  return null;
+};
+
 const SupplierTransactionTable = ({ transactions, loading, error, onEditTransaction }) => {
   if (error) {
     return <div style={{ padding: '1rem', color: '#b91c1c' }}>{error}</div>;
@@ -68,7 +75,10 @@ const SupplierTransactionTable = ({ transactions, loading, error, onEditTransact
               <td style={tdStyle}>{transaction.paymentMethod || 'Not set'}</td>
               <td style={tdStyle}>{money(transaction.amount)}</td>
               <td style={tdStyle}>{transaction.referenceNo || 'Not set'}</td>
-              <td style={tdStyle}>{transaction.description || 'No description'}</td>
+              <td style={tdStyle}>
+                {transaction.description || 'No description'}
+                {locationLabel(transaction) ? <div style={{ color: '#94a3b8', fontSize: '0.79rem', marginTop: '0.2rem' }}>{locationLabel(transaction)}</div> : null}
+              </td>
               <td style={tdStyle}>{transaction.enteredBy || 'System'}</td>
               <td style={tdStyle}>
                 <button

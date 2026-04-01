@@ -5,6 +5,7 @@ const GENDERS = ['male', 'female', 'other'];
 const STATUSES = ['active', 'inactive', 'terminated'];
 
 const defaultForm = {
+  locationId: '',
   employeeNo: '',
   firstName: '',
   surname: '',
@@ -61,14 +62,19 @@ const toDateValue = (value) => {
   return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
 };
 
-const EmployeeFormModal = ({ isOpen, employee, saving, error, onClose, onSubmit }) => {
+const EmployeeFormModal = ({ isOpen, employee, selectedLocationId = null, locations = [], saving, error, onClose, onSubmit }) => {
   const [form, setForm] = useState(defaultForm);
   const [validationError, setValidationError] = useState('');
+  const isCreateMode = !employee;
+  const isLocationLocked = isCreateMode && Boolean(selectedLocationId);
 
   useEffect(() => {
     if (!isOpen) return;
     setValidationError('');
+    const scopedLocationId = selectedLocationId ? String(selectedLocationId) : '';
+    const existingLocationId = employee?.locationId ? String(employee.locationId) : '';
     setForm({
+      locationId: existingLocationId || scopedLocationId,
       employeeNo: employee?.employeeNo || '',
       firstName: employee?.firstName || '',
       surname: employee?.surname || '',
@@ -88,7 +94,7 @@ const EmployeeFormModal = ({ isOpen, employee, saving, error, onClose, onSubmit 
       status: employee?.status || 'active',
       notes: employee?.notes || '',
     });
-  }, [isOpen, employee]);
+  }, [isOpen, employee, selectedLocationId]);
 
   if (!isOpen) return null;
 
@@ -104,8 +110,13 @@ const EmployeeFormModal = ({ isOpen, employee, saving, error, onClose, onSubmit 
       setValidationError('Surname is required.');
       return;
     }
+    if (!form.locationId) {
+      setValidationError('Location is required.');
+      return;
+    }
     setValidationError('');
     onSubmit({
+      locationId: Number(form.locationId),
       employeeNo: form.employeeNo.trim() || null,
       firstName: form.firstName.trim(),
       surname: form.surname.trim(),
@@ -162,6 +173,16 @@ const EmployeeFormModal = ({ isOpen, employee, saving, error, onClose, onSubmit 
 
           {/* ── Employment info ── */}
           <div style={sectionLabel}>Employment Information</div>
+
+          <div>
+            <label style={labelStyle}>Location <span style={{ color: '#ef4444' }}>*</span></label>
+            <select value={form.locationId} onChange={set('locationId')} disabled={isLocationLocked} style={{ ...fieldStyle, backgroundColor: isLocationLocked ? '#f8fafc' : '#fff' }}>
+              {!isLocationLocked && <option value="">Select location</option>}
+              {locations.map((location) => (
+                <option key={location.id} value={location.id}>{location.name}{location.code ? ` (${location.code})` : ''}</option>
+              ))}
+            </select>
+          </div>
 
           <div>
             <label style={labelStyle}>Employee Number</label>

@@ -11,6 +11,7 @@ const PAYMENT_METHODS = [
 
 const defaultForm = {
   expenseCategoryId: '',
+  locationId: '',
   expenseDate: '',
   amount: '',
   description: '',
@@ -46,15 +47,20 @@ const toDateInputValue = (value) => {
   return d.toISOString().slice(0, 10);
 };
 
-const ExpenseFormModal = ({ isOpen, expense, categories, saving, error, onClose, onSubmit }) => {
+const ExpenseFormModal = ({ isOpen, expense, categories, selectedLocationId = null, locations = [], saving, error, onClose, onSubmit }) => {
   const [form, setForm] = useState(defaultForm);
   const [validationError, setValidationError] = useState('');
+  const isCreateMode = !expense;
+  const isLocationLocked = isCreateMode && Boolean(selectedLocationId);
 
   useEffect(() => {
     if (!isOpen) return;
     setValidationError('');
+    const scopedLocationId = selectedLocationId ? String(selectedLocationId) : '';
+    const existingLocationId = expense?.locationId ? String(expense.locationId) : '';
     setForm({
       expenseCategoryId: expense?.expenseCategoryId || '',
+      locationId: existingLocationId || scopedLocationId,
       expenseDate: toDateInputValue(expense?.expenseDate) || toDateInputValue(new Date()),
       amount: expense?.amount != null ? String(expense.amount) : '',
       description: expense?.description || '',
@@ -62,7 +68,7 @@ const ExpenseFormModal = ({ isOpen, expense, categories, saving, error, onClose,
       referenceNo: expense?.referenceNo || '',
       enteredBy: expense?.enteredBy || '',
     });
-  }, [isOpen, expense]);
+  }, [isOpen, expense, selectedLocationId]);
 
   if (!isOpen) return null;
 
@@ -78,6 +84,10 @@ const ExpenseFormModal = ({ isOpen, expense, categories, saving, error, onClose,
       setValidationError('Expense date is required.');
       return;
     }
+    if (!form.locationId) {
+      setValidationError('Location is required.');
+      return;
+    }
     const amount = Number(form.amount);
     if (!form.amount || !Number.isFinite(amount) || amount <= 0) {
       setValidationError('Amount must be a positive number.');
@@ -86,6 +96,7 @@ const ExpenseFormModal = ({ isOpen, expense, categories, saving, error, onClose,
     setValidationError('');
     onSubmit({
       expenseCategoryId: form.expenseCategoryId,
+      locationId: Number(form.locationId),
       expenseDate: form.expenseDate,
       amount,
       description: form.description.trim() || null,
@@ -126,6 +137,17 @@ const ExpenseFormModal = ({ isOpen, expense, categories, saving, error, onClose,
 
         <form onSubmit={handleSubmit} style={{ padding: '1.3rem', display: 'grid', gap: '1rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.9rem' }}>
+            <div>
+              <label style={labelStyle}>
+                Location <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <select value={form.locationId} onChange={set('locationId')} disabled={isLocationLocked} style={{ ...fieldStyle, backgroundColor: isLocationLocked ? '#f8fafc' : '#fff' }}>
+                {!isLocationLocked && <option value="">Select a location</option>}
+                {locations.map((location) => (
+                  <option key={location.id} value={location.id}>{location.name}{location.code ? ` (${location.code})` : ''}</option>
+                ))}
+              </select>
+            </div>
             <div>
               <label style={labelStyle}>
                 Category <span style={{ color: '#ef4444' }}>*</span>

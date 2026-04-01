@@ -19,6 +19,13 @@ const formatDate = (value) => {
 
 const modeLabel = (mode) => String(mode || '').replace('_', ' ');
 
+const formatLocation = (item) => {
+  if (item?.locationName) return item.locationName;
+  if (item?.locationCode) return item.locationCode;
+  if (item?.locationId) return `Location #${item.locationId}`;
+  return '—';
+};
+
 const PayrollPeriodDetailPanel = ({
   period,
   summary,
@@ -52,6 +59,9 @@ const PayrollPeriodDetailPanel = ({
           <h3 style={{ margin: '0.28rem 0 0', color: '#0f172a', fontSize: '1.06rem' }}>{period.description || `Period #${period.id}`}</h3>
           <p style={{ margin: '0.3rem 0 0', color: '#64748b', fontSize: '0.86rem' }}>
             {modeLabel(period.payrollMode)} | Status: {period.status || 'draft'} | Created by {period.createdBy || 'System'} on {formatDate(period.createdAt)}
+          </p>
+          <p style={{ margin: '0.2rem 0 0', color: '#64748b', fontSize: '0.83rem' }}>
+            Location: {formatLocation(period)}
           </p>
         </div>
         <button type="button" onClick={onAddEntry} style={{ border: 'none', backgroundColor: '#0f766e', color: '#fff', borderRadius: '10px', padding: '0.62rem 0.94rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}>

@@ -28,7 +28,7 @@ function getCurrentMonthRange() {
 const TAB_EXPENSES = 'expenses';
 const TAB_CATEGORIES = 'categories';
 
-const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocationId = null }) => {
+const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocationId = null, locations = [] }) => {
   const initialRange = getCurrentMonthRange();
 
   // Sub-tab
@@ -179,8 +179,8 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
     setExpenseError('');
     try {
       const res = expenseModal.expense
-        ? await api.put(`/business-operations/expenses/${expenseModal.expense.id}`, { ...payload, locationId: selectedLocationId || undefined })
-        : await api.post('/business-operations/expenses', { ...payload, locationId: selectedLocationId || undefined });
+        ? await api.put(`/business-operations/expenses/${expenseModal.expense.id}`, { ...payload, locationId: payload.locationId ?? selectedLocationId ?? undefined })
+        : await api.post('/business-operations/expenses', { ...payload, locationId: payload.locationId ?? selectedLocationId ?? undefined });
 
       const saved = res.data?.data || null;
       setExpenseModal({ open: false, expense: null });
@@ -468,6 +468,8 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
         isOpen={expenseModal.open}
         expense={expenseModal.expense}
         categories={activeCategories}
+        selectedLocationId={selectedLocationId}
+        locations={locations}
         saving={expenseSaving}
         error={expenseError}
         onClose={() => setExpenseModal({ open: false, expense: null })}

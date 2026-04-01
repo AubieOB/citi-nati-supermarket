@@ -195,6 +195,11 @@ const PayrollEntryFormModal = ({
                 </option>
               ))}
             </select>
+            {!employees.length && !payrollEntry ? (
+              <div style={{ marginTop: '0.35rem', color: '#b45309', fontSize: '0.8rem' }}>
+                No employees available for the selected period/location scope.
+              </div>
+            ) : null}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.75rem' }}>

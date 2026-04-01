@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 
 const defaultForm = {
   supplierId: '',
+  locationId: '',
   transactionDate: '',
   transactionType: 'debt',
   paymentMethod: 'cash',
@@ -46,6 +47,8 @@ const SupplierTransactionFormModal = ({
   transaction,
   supplier,
   supplierOptions,
+  selectedLocationId = null,
+  locations = [],
   saving,
   error,
   onClose,
@@ -53,14 +56,19 @@ const SupplierTransactionFormModal = ({
 }) => {
   const [form, setForm] = useState(defaultForm);
   const [validationError, setValidationError] = useState('');
+  const isCreateMode = !transaction;
+  const isLocationLocked = isCreateMode && Boolean(selectedLocationId);
 
   const title = useMemo(() => (transaction ? 'Edit Supplier Transaction' : 'Add Supplier Transaction'), [transaction]);
 
   useEffect(() => {
     if (!isOpen) return;
     setValidationError('');
+    const scopedLocationId = selectedLocationId ? String(selectedLocationId) : '';
+    const existingLocationId = transaction?.locationId ? String(transaction.locationId) : '';
     setForm({
       supplierId: String(transaction?.supplierId || supplier?.id || ''),
+      locationId: existingLocationId || scopedLocationId,
       transactionDate: toDateInput(transaction?.transactionDate) || toDateInput(new Date()),
       transactionType: transaction?.transactionType || 'debt',
       paymentMethod: transaction?.paymentMethod || 'cash',
@@ -89,10 +97,15 @@ const SupplierTransactionFormModal = ({
       setValidationError('Transaction date is required.');
       return;
     }
+    if (!form.locationId) {
+      setValidationError('Location is required.');
+      return;
+    }
 
     setValidationError('');
     onSubmit({
       supplierId: Number(form.supplierId),
+      locationId: Number(form.locationId),
       transactionDate: form.transactionDate,
       transactionType: form.transactionType,
       paymentMethod: form.paymentMethod,
@@ -123,6 +136,15 @@ const SupplierTransactionFormModal = ({
           ) : null}
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.9rem' }}>
+            <label style={{ display: 'grid', gap: '0.45rem' }}>
+              <span style={{ fontWeight: 700, color: '#334155' }}>Location</span>
+              <select value={form.locationId} onChange={(event) => setForm((current) => ({ ...current, locationId: event.target.value }))} disabled={isLocationLocked} style={{ ...fieldStyle, backgroundColor: isLocationLocked ? '#f8fafc' : '#fff' }}>
+                {!isLocationLocked && <option value="">Select location</option>}
+                {locations.map((location) => (
+                  <option key={location.id} value={location.id}>{location.name}{location.code ? ` (${location.code})` : ''}</option>
+                ))}
+              </select>
+            </label>
             <label style={{ display: 'grid', gap: '0.45rem' }}>
               <span style={{ fontWeight: 700, color: '#334155' }}>Supplier</span>
               <select value={form.supplierId} onChange={(event) => setForm((current) => ({ ...current, supplierId: event.target.value }))} style={fieldStyle}>

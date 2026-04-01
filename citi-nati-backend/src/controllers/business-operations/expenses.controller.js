@@ -91,17 +91,19 @@ async function listExpenseCategories(req, res) {
 async function createExpense(req, res) {
   try {
     const expenseCategoryId = toInt(req.body.expenseCategoryId);
+    const locationId = toInt(req.body.locationId);
     const expenseDate = toDate(req.body.expenseDate);
     const amount = toNumber(req.body.amount);
 
     if (!expenseCategoryId) return res.status(400).json({ success: false, error: 'expenseCategoryId is required' });
+    if (!locationId) return res.status(400).json({ success: false, error: 'locationId is required' });
     if (!expenseDate) return res.status(400).json({ success: false, error: 'expenseDate is required and must be valid' });
     if (!Number.isFinite(amount)) return res.status(400).json({ success: false, error: 'amount is required and must be numeric' });
 
     const expense = await expensesService.createExpense({
       reportingPeriodId: toInt(req.body.reportingPeriodId),
       expenseCategoryId,
-      locationId: toInt(req.body.locationId),
+      locationId,
       expenseDate,
       amount,
       description: req.body.description,
@@ -121,6 +123,10 @@ async function updateExpense(req, res) {
   try {
     const id = toInt(req.params.id);
     if (!id) return res.status(400).json({ success: false, error: 'Invalid expense id' });
+
+    if (req.body.locationId !== undefined && !toInt(req.body.locationId)) {
+      return res.status(400).json({ success: false, error: 'locationId must be a valid integer' });
+    }
 
     const expense = await expensesService.updateExpense(id, {
       reportingPeriodId: req.body.reportingPeriodId !== undefined ? toInt(req.body.reportingPeriodId) : undefined,

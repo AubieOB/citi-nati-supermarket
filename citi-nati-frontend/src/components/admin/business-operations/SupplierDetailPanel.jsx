@@ -33,6 +33,13 @@ const detailRowStyle = {
   gap: '0.2rem',
 };
 
+const formatLocation = (item) => {
+  if (item?.locationName) return item.locationName;
+  if (item?.locationCode) return item.locationCode;
+  if (item?.locationId) return `Location #${item.locationId}`;
+  return '—';
+};
+
 const SupplierDetailPanel = ({
   supplier,
   balanceSummary,
@@ -101,6 +108,10 @@ const SupplierDetailPanel = ({
           <div style={detailRowStyle}>
             <span style={{ color: '#64748b', fontSize: '0.8rem' }}>Contact Person</span>
             <strong style={{ color: '#0f172a' }}>{supplier?.contactPerson || 'Not set'}</strong>
+          </div>
+          <div style={detailRowStyle}>
+            <span style={{ color: '#64748b', fontSize: '0.8rem' }}>Location</span>
+            <strong style={{ color: '#0f172a' }}>{formatLocation(supplier)}</strong>
           </div>
           <div style={detailRowStyle}>
             <span style={{ color: '#64748b', fontSize: '0.8rem' }}>Phone</span>

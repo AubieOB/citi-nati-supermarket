@@ -34,7 +34,7 @@ const reduceSummary = (entries = []) => entries.reduce((acc, entry) => {
   totalLoanDeductionAmount: 0,
 });
 
-const PayrollTab = ({ refreshKey = 0, selectedLocationId = null }) => {
+const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] }) => {
   const [employees, setEmployees] = useState([]);
 
   const [periodFilters, setPeriodFilters] = useState({
@@ -311,6 +311,13 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null }) => {
     };
   }, [entries, entriesPagination?.total, selectedPeriod]);
 
+  const entryEmployees = useMemo(() => {
+    const periodLocationId = selectedPeriod?.locationId ? Number(selectedPeriod.locationId) : null;
+    const targetLocationId = periodLocationId || selectedLocationId || null;
+    if (!targetLocationId) return employees;
+    return employees.filter((employee) => Number(employee.locationId) === Number(targetLocationId));
+  }, [employees, selectedLocationId, selectedPeriod?.locationId]);
+
   const handleCreatePeriod = () => {
     setPeriodSaveError('');
     setPeriodModal({ open: true, period: null });
@@ -327,10 +334,10 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null }) => {
     try {
       let saved;
       if (periodModal.period) {
-        const res = await api.put(`/business-operations/payroll/periods/${periodModal.period.id}`, { ...payload, locationId: selectedLocationId || undefined });
+        const res = await api.put(`/business-operations/payroll/periods/${periodModal.period.id}`, { ...payload, locationId: payload.locationId ?? selectedLocationId ?? undefined });
         saved = res?.data?.data;
       } else {
-        const res = await api.post('/business-operations/payroll/periods', { ...payload, locationId: selectedLocationId || undefined });
+        const res = await api.post('/business-operations/payroll/periods', { ...payload, locationId: payload.locationId ?? selectedLocationId ?? undefined });
         saved = res?.data?.data;
       }
 
@@ -560,6 +567,8 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null }) => {
       <PayrollPeriodFormModal
         isOpen={periodModal.open}
         period={periodModal.period}
+        selectedLocationId={selectedLocationId}
+        locations={locations}
         saving={periodSaving}
         error={periodSaveError}
         onClose={() => setPeriodModal({ open: false, period: null })}
@@ -570,7 +579,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null }) => {
         isOpen={entryModal.open}
         payrollEntry={entryModal.entry}
         periodId={selectedPeriodId}
-        employees={employees}
+        employees={entryEmployees}
         employeeSalary={entryEmployeeSalary}
         saving={entrySaving}
         error={entrySaveError}
