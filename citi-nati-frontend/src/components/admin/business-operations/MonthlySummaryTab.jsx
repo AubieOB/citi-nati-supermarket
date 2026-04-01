@@ -64,7 +64,8 @@ const MonthlySummaryTab = ({
   selectedLocationCode = '',
   selectedLocationName = '',
 }) => {
-  const [isControlsModalOpen, setIsControlsModalOpen] = useState(false);
+  const [showControls, setShowControls] = useState(false);
+  const [isInsightsModalOpen, setIsInsightsModalOpen] = useState(false);
   const now = new Date();
   const initialMonthRange = monthRange(now.getFullYear(), now.getMonth() + 1);
 
@@ -362,24 +363,19 @@ const MonthlySummaryTab = ({
       <div style={{ ...cardStyle, padding: '0.7rem 0.95rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
         <button
           type="button"
-          onClick={() => setIsControlsModalOpen(true)}
+          onClick={() => setShowControls((prev) => !prev)}
           style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
         >
           <i className="fas fa-sliders" style={{ marginRight: '0.42rem' }}></i>
-          Open Dashboard Controls
+          {showControls ? 'Hide Dashboard Controls' : 'Show Dashboard Controls'}
         </button>
         <div style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
-          Dashboard controls open in modal.
+          {showControls ? 'Dashboard controls are visible.' : 'Dashboard controls are hidden.'}
         </div>
       </div>
 
-      {isControlsModalOpen && (
-      <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 160, display: 'grid', placeItems: 'center', padding: '1rem' }}>
-      <div style={{ ...cardStyle, width: 'min(1000px, 96vw)', maxHeight: '88vh', overflow: 'auto', padding: '1.08rem 1.15rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.7rem' }}>
-          <strong style={{ color: '#0f172a' }}>Monthly Dashboard Controls</strong>
-          <button type="button" onClick={() => setIsControlsModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}>Close</button>
-        </div>
+      {showControls && (
+      <div style={{ ...cardStyle, padding: '1.08rem 1.15rem' }}>
         <div style={{ display: 'grid', gap: '0.9rem' }}>
           <div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.42rem', color: '#5B4B8A', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.74rem', letterSpacing: '0.05em' }}>
@@ -409,51 +405,77 @@ const MonthlySummaryTab = ({
           />
         </div>
       </div>
-      </div>
       )}
 
       <SummaryCards cards={summaryCards} />
 
-      <div style={{ display: 'grid', gap: '0.9rem' }}>
-        <SalesSummarySection
-          loading={salesState.loading}
-          error={salesState.error}
-          summary={salesState.summary}
-          payments={salesState.payments}
-          onOpen={() => onNavigateTab?.('sales-reports', drilldownPayload)}
-        />
-
-        <ExpensesSummarySection
-          loading={expensesState.loading}
-          error={expensesState.error}
-          summary={expensesState.summary}
-          onOpen={() => onNavigateTab?.('expenses', drilldownPayload)}
-        />
-
-        <PayrollSummarySection
-          loading={payrollState.loading}
-          error={payrollState.error}
-          data={payrollState.data}
-          onOpen={() => onNavigateTab?.('payroll', drilldownPayload)}
-        />
-
-        <SupplierSummarySection
-          loading={supplierState.loading}
-          error={supplierState.error}
-          data={supplierState.data}
-          onOpen={() => onNavigateTab?.('suppliers', drilldownPayload)}
-        />
+      <div style={{ ...cardStyle, padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div>
+          <strong style={{ color: '#0f172a' }}>Monthly Insights Workspace</strong>
+          <p style={{ margin: '0.32rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>Open detailed summary sections only when needed.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsInsightsModalOpen(true)}
+          style={{ border: 'none', backgroundColor: '#0f172a', color: '#fff', borderRadius: '10px', padding: '0.62rem 0.95rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.88rem' }}
+        >
+          Open Insights Workspace
+        </button>
       </div>
 
-      <NetSummaryCard
-        sales={money(salesTotal)}
-        expenses={money(expensesTotal)}
-        payroll={money(payrollTotal)}
-        supplierPayments={money(supplierPaymentsTotal)}
-        netValue={money(netPosition)}
-        rawNetValue={netPosition}
-        isComplete={sectionComplete}
-      />
+      {isInsightsModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: '1rem' }}>
+          <div style={{ ...cardStyle, width: 'min(1240px, 97vw)', maxHeight: '90vh', overflow: 'auto', padding: '0.95rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <strong style={{ color: '#0f172a' }}>Monthly Insights Workspace</strong>
+              <button type="button" onClick={() => setIsInsightsModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}>Close</button>
+            </div>
+
+            <div style={{ display: 'grid', gap: '0.9rem' }}>
+              <SalesSummarySection
+                loading={salesState.loading}
+                error={salesState.error}
+                summary={salesState.summary}
+                payments={salesState.payments}
+                onOpen={() => onNavigateTab?.('sales-reports', drilldownPayload)}
+              />
+
+              <ExpensesSummarySection
+                loading={expensesState.loading}
+                error={expensesState.error}
+                summary={expensesState.summary}
+                onOpen={() => onNavigateTab?.('expenses', drilldownPayload)}
+              />
+
+              <PayrollSummarySection
+                loading={payrollState.loading}
+                error={payrollState.error}
+                data={payrollState.data}
+                onOpen={() => onNavigateTab?.('payroll', drilldownPayload)}
+              />
+
+              <SupplierSummarySection
+                loading={supplierState.loading}
+                error={supplierState.error}
+                data={supplierState.data}
+                onOpen={() => onNavigateTab?.('suppliers', drilldownPayload)}
+              />
+            </div>
+
+            <div style={{ marginTop: '0.9rem' }}>
+              <NetSummaryCard
+                sales={money(salesTotal)}
+                expenses={money(expensesTotal)}
+                payroll={money(payrollTotal)}
+                supplierPayments={money(supplierPaymentsTotal)}
+                netValue={money(netPosition)}
+                rawNetValue={netPosition}
+                isComplete={sectionComplete}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

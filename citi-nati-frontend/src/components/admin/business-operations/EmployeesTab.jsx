@@ -22,7 +22,8 @@ const getApiError = (err, fallback) =>
   err?.response?.data?.error || err?.response?.data?.message || err?.message || fallback;
 
 const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] }) => {
-  const [isFiltersModalOpen, setIsFiltersModalOpen] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [isEmployeesWorkspaceModalOpen, setIsEmployeesWorkspaceModalOpen] = useState(false);
 
   // ── List state ──
   const [employees, setEmployees] = useState([]);
@@ -263,15 +264,17 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
         <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
           <button
             type="button"
-            onClick={() => setIsFiltersModalOpen(true)}
+            onClick={() => setShowFilters((prev) => !prev)}
             style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
           >
             <i className="fas fa-sliders" style={{ marginRight: '0.42rem' }} />
-            Open Register Filters
+            {showFilters ? 'Hide Register Filters' : 'Show Register Filters'}
           </button>
         </div>
         <div style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
-          {`Filters open in modal${hasActiveFilters ? ' • active filters applied' : ''}.`}
+          {showFilters
+            ? 'Register filters are visible.'
+            : `Register filters hidden${hasActiveFilters ? ' • active filters applied' : ''}.`}
         </div>
       </div>
 
@@ -324,13 +327,8 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
         departmentCount={departmentCount}
       />
 
-      {isFiltersModalOpen && (
-      <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 160, display: 'grid', placeItems: 'center', padding: '1rem' }}>
-      <div style={{ ...cardStyle, width: 'min(850px, 96vw)', maxHeight: '88vh', overflow: 'auto', padding: '0.85rem 1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
-          <strong style={{ color: '#0f172a' }}>Employee Register Filters</strong>
-          <button type="button" onClick={() => setIsFiltersModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}>Close</button>
-        </div>
+      {showFilters && (
+      <div style={{ ...cardStyle, padding: '0.85rem 1rem' }}>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ position: 'relative', flex: '1 1 220px' }}>
             <i className="fas fa-search" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none', fontSize: '0.88rem' }} />
@@ -354,39 +352,59 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
           </select>
         </div>
       </div>
-      </div>
       )}
 
-      {/* ── Main two-panel layout ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', alignItems: 'start' }}>
-
-        {/* Left: list */}
-        <EmployeesList
-          employees={employees}
-          loading={listLoading}
-          error={listError}
-          pagination={pagination}
-          page={page}
-          onPageChange={(pg) => setPage(pg)}
-          selectedEmployeeId={selectedEmployeeId}
-          onSelectEmployee={handleSelectEmployee}
-          onEditEmployee={() => handleEditEmployee()}
-        />
-
-        {/* Right: detail */}
-        <EmployeeDetailPanel
-          employee={selectedEmployee}
-          salaryHistory={salaryHistory}
-          salaryLoading={salaryLoading}
-          salaryError={salaryError}
-          detailLoading={detailLoading}
-          detailError={detailError}
-          onEditEmployee={handleEditEmployee}
-          onAddSalary={handleAddSalary}
-          onEditSalary={handleEditSalary}
-          onAddEmployee={handleAddEmployee}
-        />
+      <div style={{ ...cardStyle, padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div>
+          <strong style={{ color: '#0f172a' }}>Employees Workspace</strong>
+          <p style={{ margin: '0.32rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>Launch the full employee register and details workspace on demand.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsEmployeesWorkspaceModalOpen(true)}
+          style={{ border: 'none', backgroundColor: '#0f172a', color: '#fff', borderRadius: '10px', padding: '0.62rem 0.95rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.88rem' }}
+        >
+          Open Employees Workspace
+        </button>
       </div>
+
+      {isEmployeesWorkspaceModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: '1rem' }}>
+          <div style={{ ...cardStyle, width: 'min(1240px, 97vw)', maxHeight: '90vh', overflow: 'auto', padding: '0.95rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <strong style={{ color: '#0f172a' }}>Employees Workspace</strong>
+              <button type="button" onClick={() => setIsEmployeesWorkspaceModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}>Close</button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', alignItems: 'start' }}>
+              <EmployeesList
+                employees={employees}
+                loading={listLoading}
+                error={listError}
+                pagination={pagination}
+                page={page}
+                onPageChange={(pg) => setPage(pg)}
+                selectedEmployeeId={selectedEmployeeId}
+                onSelectEmployee={handleSelectEmployee}
+                onEditEmployee={() => handleEditEmployee()}
+              />
+
+              <EmployeeDetailPanel
+                employee={selectedEmployee}
+                salaryHistory={salaryHistory}
+                salaryLoading={salaryLoading}
+                salaryError={salaryError}
+                detailLoading={detailLoading}
+                detailError={detailError}
+                onEditEmployee={handleEditEmployee}
+                onAddSalary={handleAddSalary}
+                onEditSalary={handleEditSalary}
+                onAddEmployee={handleAddEmployee}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Modals ── */}
       <EmployeeFormModal

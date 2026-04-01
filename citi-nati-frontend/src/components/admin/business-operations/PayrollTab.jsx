@@ -35,8 +35,8 @@ const reduceSummary = (entries = []) => entries.reduce((acc, entry) => {
 });
 
 const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] }) => {
-  const [isManagementModalOpen, setIsManagementModalOpen] = useState(false);
-  const [isPeriodFiltersModalOpen, setIsPeriodFiltersModalOpen] = useState(false);
+  const [showPeriodFilters, setShowPeriodFilters] = useState(false);
+  const [isPayrollWorkspaceModalOpen, setIsPayrollWorkspaceModalOpen] = useState(false);
   const [employees, setEmployees] = useState([]);
 
   const [periodFilters, setPeriodFilters] = useState({
@@ -447,82 +447,57 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
         <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
           <button
             type="button"
-            onClick={() => setIsManagementModalOpen(true)}
-            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+            onClick={handleCreatePeriod}
+            style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
           >
-            <i className="fas fa-layer-group" style={{ marginRight: '0.42rem' }}></i>
-            Open Payroll Actions
+            <i className="fas fa-plus" style={{ marginRight: '0.42rem' }}></i>
+            Create Payroll Period
           </button>
           <button
             type="button"
-            onClick={() => setIsPeriodFiltersModalOpen(true)}
+            onClick={() => setShowPeriodFilters((prev) => !prev)}
             style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
           >
             <i className="fas fa-sliders" style={{ marginRight: '0.42rem' }}></i>
-            Open Period Filters
-          </button>
-        </div>
-        <div style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
-          {`Sections open in modals${hasActivePeriodFilters ? ' • active filters applied' : ''}.`}
-        </div>
-      </div>
-
-      {isManagementModalOpen && (
-      <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 160, display: 'grid', placeItems: 'center', padding: '1rem' }}>
-      <div style={{ ...cardStyle, width: 'min(1000px, 96vw)', maxHeight: '88vh', overflow: 'auto', padding: '1.1rem 1.2rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.7rem' }}>
-          <strong style={{ color: '#0f172a' }}>Payroll Management Actions</strong>
-          <button type="button" onClick={() => setIsManagementModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}>Close</button>
-        </div>
-        <div>
-          <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.14rem' }}>Payroll Management</h3>
-          <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.88rem', lineHeight: 1.6 }}>
-            Manage payroll periods, employee entries, deductions, allowances, and payroll support records in one structured workspace.
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            onClick={handleCreatePeriod}
-            style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.64rem 0.95rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
-          >
-            <i className="fas fa-plus" style={{ marginRight: '0.38rem' }}></i>Create Payroll Period
+            {showPeriodFilters ? 'Hide Period Filters' : 'Show Period Filters'}
           </button>
           <button
             type="button"
             onClick={refreshAll}
-            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.64rem 0.95rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
           >
-            <i className="fas fa-rotate-right" style={{ marginRight: '0.38rem' }}></i>Refresh
-          </button>
-          <button
-            type="button"
-            onClick={() => handleExport('pdf')}
-            disabled={exportingExcel || exportingPdf}
-            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.64rem 0.95rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
-          >
-            <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.38rem' }}></i>Export PDF
-          </button>
-          <button
-            type="button"
-            onClick={() => handleExport('excel')}
-            disabled={exportingExcel || exportingPdf}
-            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.64rem 0.95rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
-          >
-            <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.38rem' }}></i>Export Excel
+            <i className="fas fa-rotate-right" style={{ marginRight: '0.42rem' }}></i>
+            Refresh
           </button>
         </div>
+        <div style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
+          {showPeriodFilters
+            ? 'Period filters are visible.'
+            : `Period filters hidden${hasActivePeriodFilters ? ' • active filters applied' : ''}.`}
+        </div>
       </div>
-      </div>
-      )}
 
-      {isPeriodFiltersModalOpen && (
-      <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 160, display: 'grid', placeItems: 'center', padding: '1rem' }}>
-      <div style={{ ...cardStyle, width: 'min(950px, 96vw)', maxHeight: '88vh', overflow: 'auto', padding: '0.9rem 1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
-          <strong style={{ color: '#0f172a' }}>Payroll Period Filters</strong>
-          <button type="button" onClick={() => setIsPeriodFiltersModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}>Close</button>
-        </div>
+      <div style={{ ...cardStyle, padding: '0.72rem 0.95rem', display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={() => handleExport('pdf')}
+          disabled={exportingExcel || exportingPdf}
+          style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.64rem 0.95rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
+        >
+          <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.38rem' }}></i>Export PDF
+        </button>
+        <button
+          type="button"
+          onClick={() => handleExport('excel')}
+          disabled={exportingExcel || exportingPdf}
+          style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.64rem 0.95rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
+        >
+          <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.38rem' }}></i>Export Excel
+        </button>
+      </div>
+
+      {showPeriodFilters && (
+      <div style={{ ...cardStyle, padding: '0.9rem 1rem' }}>
         <div style={{ position: 'relative', flex: '1 1 250px' }}>
           <i className="fas fa-search" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none', fontSize: '0.85rem' }}></i>
           <input
@@ -564,48 +539,72 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
           Clear
         </button>
       </div>
-      </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', alignItems: 'start' }}>
-        <PayrollPeriodsList
-          periods={periods}
-          loading={periodsLoading}
-          error={periodsError}
-          page={periodPage}
-          pagination={periodsPagination}
-          selectedPeriodId={selectedPeriodId}
-          onPageChange={setPeriodPage}
-          onSelectPeriod={(period) => {
-            setSelectedPeriodId(period.id);
-            setSelectedPeriod(period);
-            setEntriesPage(1);
-            setSelectedEntryId(null);
-            setSupportData(null);
-            setSupportDrawer((prev) => ({ ...prev, open: false, error: '', loans: [], terminations: [], reengagements: [] }));
-          }}
-          onEditPeriod={handleEditPeriod}
-          onCreatePeriod={handleCreatePeriod}
-        />
-
-        <PayrollPeriodDetailPanel
-          period={selectedPeriod}
-          summary={summary}
-          entries={entries}
-          entriesLoading={entriesLoading}
-          entriesError={entriesError}
-          entriesPage={entriesPage}
-          entriesPagination={entriesPagination}
-          selectedEntryId={selectedEntryId}
-          supportData={supportData}
-          supportLoading={supportLoading}
-          onSelectEntry={handleSelectEntry}
-          onEditEntry={handleEditEntry}
-          onPageChange={setEntriesPage}
-          onAddEntry={handleAddEntry}
-          onOpenSupportDrawer={handleOpenSupportDrawer}
-        />
+      <div style={{ ...cardStyle, padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div>
+          <strong style={{ color: '#0f172a' }}>Payroll Workspace</strong>
+          <p style={{ margin: '0.32rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>Open periods and entries workspace only when you are actively managing payroll.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsPayrollWorkspaceModalOpen(true)}
+          style={{ border: 'none', backgroundColor: '#0f172a', color: '#fff', borderRadius: '10px', padding: '0.62rem 0.95rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.88rem' }}
+        >
+          Open Payroll Workspace
+        </button>
       </div>
+
+      {isPayrollWorkspaceModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: '1rem' }}>
+          <div style={{ ...cardStyle, width: 'min(1240px, 97vw)', maxHeight: '90vh', overflow: 'auto', padding: '0.95rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <strong style={{ color: '#0f172a' }}>Payroll Workspace</strong>
+              <button type="button" onClick={() => setIsPayrollWorkspaceModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}>Close</button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', alignItems: 'start' }}>
+              <PayrollPeriodsList
+                periods={periods}
+                loading={periodsLoading}
+                error={periodsError}
+                page={periodPage}
+                pagination={periodsPagination}
+                selectedPeriodId={selectedPeriodId}
+                onPageChange={setPeriodPage}
+                onSelectPeriod={(period) => {
+                  setSelectedPeriodId(period.id);
+                  setSelectedPeriod(period);
+                  setEntriesPage(1);
+                  setSelectedEntryId(null);
+                  setSupportData(null);
+                  setSupportDrawer((prev) => ({ ...prev, open: false, error: '', loans: [], terminations: [], reengagements: [] }));
+                }}
+                onEditPeriod={handleEditPeriod}
+                onCreatePeriod={handleCreatePeriod}
+              />
+
+              <PayrollPeriodDetailPanel
+                period={selectedPeriod}
+                summary={summary}
+                entries={entries}
+                entriesLoading={entriesLoading}
+                entriesError={entriesError}
+                entriesPage={entriesPage}
+                entriesPagination={entriesPagination}
+                selectedEntryId={selectedEntryId}
+                supportData={supportData}
+                supportLoading={supportLoading}
+                onSelectEntry={handleSelectEntry}
+                onEditEntry={handleEditEntry}
+                onPageChange={setEntriesPage}
+                onAddEntry={handleAddEntry}
+                onOpenSupportDrawer={handleOpenSupportDrawer}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <PayrollPeriodFormModal
         isOpen={periodModal.open}
