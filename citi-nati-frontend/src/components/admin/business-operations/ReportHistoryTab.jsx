@@ -56,7 +56,7 @@ const ActivitySection = ({ title, description, items, renderItem }) => (
   </div>
 );
 
-const ReportHistoryTab = ({ refreshKey = 0 }) => {
+const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null }) => {
   const [state, setState] = useState({
     loading: true,
     error: '',
@@ -69,15 +69,15 @@ const ReportHistoryTab = ({ refreshKey = 0 }) => {
 
   const fetchActivity = useCallback(async () => {
     setState((current) => ({ ...current, loading: true, error: '' }));
-    const monthParams = getCurrentMonthParams();
+    const monthParams = { ...getCurrentMonthParams(), ...(selectedLocationId && { locationId: selectedLocationId }) };
 
     try {
       const [salesSummaryResponse, invoicesResponse, expensesResponse, supplierTransactionsResponse, payrollPeriodsResponse] = await Promise.all([
         api.get('/business-operations/reports/sales/summary', { params: monthParams }),
         api.get('/business-operations/reports/sales/invoices', { params: { ...monthParams, page: 1, pageSize: 5, sortBy: 'invoiceDate', sortOrder: 'desc' } }),
-        api.get('/business-operations/expenses', { params: { page: 1, pageSize: 5, sortBy: 'expenseDate', sortOrder: 'desc' } }),
-        api.get('/business-operations/suppliers/transactions/list', { params: { page: 1, pageSize: 5, sortBy: 'transactionDate', sortOrder: 'desc' } }),
-        api.get('/business-operations/payroll/periods', { params: { page: 1, pageSize: 5, sortBy: 'createdAt', sortOrder: 'desc' } }),
+        api.get('/business-operations/expenses', { params: { page: 1, pageSize: 5, sortBy: 'expenseDate', sortOrder: 'desc', ...(selectedLocationId && { locationId: selectedLocationId }) } }),
+        api.get('/business-operations/suppliers/transactions/list', { params: { page: 1, pageSize: 5, sortBy: 'transactionDate', sortOrder: 'desc', ...(selectedLocationId && { locationId: selectedLocationId }) } }),
+        api.get('/business-operations/payroll/periods', { params: { page: 1, pageSize: 5, sortBy: 'createdAt', sortOrder: 'desc', ...(selectedLocationId && { locationId: selectedLocationId }) } }),
       ]);
 
       setState({
@@ -100,7 +100,7 @@ const ReportHistoryTab = ({ refreshKey = 0 }) => {
         payrollPeriods: [],
       });
     }
-  }, []);
+  }, [selectedLocationId]);
 
   useEffect(() => {
     fetchActivity();

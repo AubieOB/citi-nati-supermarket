@@ -29,6 +29,7 @@ const AdminBusinessOperations = () => {
   const [drilldownRequests, setDrilldownRequests] = useState({});
   const [locations, setLocations] = useState([]);
   const [selectedLocationId, setSelectedLocationId] = useState('all');
+  const [locationRefreshKey, setLocationRefreshKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,6 +56,10 @@ const AdminBusinessOperations = () => {
     };
   }, []);
 
+  useEffect(() => {
+    setLocationRefreshKey((prev) => prev + 1);
+  }, [selectedLocationId]);
+
   const selectedLocation = useMemo(() => {
     if (selectedLocationId === 'all') return null;
     const asNumber = Number(selectedLocationId);
@@ -65,7 +70,7 @@ const AdminBusinessOperations = () => {
   const selectedLocationIdNumber = selectedLocation ? Number(selectedLocation.id) : null;
 
   const handleImportSuccess = () => {
-    setDataRefreshKey((current) => current + 1);
+    setLocationRefreshKey((current) => current + 1);
   };
 
   const handleViewImportedData = ({ importResult }) => {
@@ -98,12 +103,12 @@ const AdminBusinessOperations = () => {
 
   const contentByTab = {
     'sales-reports': <SalesReportsTab drilldownRequest={drilldownRequests['sales-reports']} selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} />,
-    suppliers: <SuppliersTab refreshKey={dataRefreshKey} selectedLocationId={selectedLocationIdNumber} />,
-    expenses: <ExpensesTab refreshKey={dataRefreshKey} drilldownRequest={drilldownRequests.expenses} selectedLocationId={selectedLocationIdNumber} />,
-    'monthly-summary': <MonthlySummaryTab refreshKey={dataRefreshKey} onNavigateTab={handleNavigateTab} selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} selectedLocationName={selectedLocation?.name || ''} />,
-    employees: <EmployeesTab refreshKey={dataRefreshKey} selectedLocationId={selectedLocationIdNumber} />,
-    payroll: <PayrollTab refreshKey={dataRefreshKey} selectedLocationId={selectedLocationIdNumber} />,
-    'report-history': <ReportHistoryTab refreshKey={dataRefreshKey} />,
+    suppliers: <SuppliersTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} />,
+    expenses: <ExpensesTab refreshKey={locationRefreshKey} drilldownRequest={drilldownRequests.expenses} selectedLocationId={selectedLocationIdNumber} />,
+    'monthly-summary': <MonthlySummaryTab refreshKey={locationRefreshKey} onNavigateTab={handleNavigateTab} selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} selectedLocationName={selectedLocation?.name || ''} />,
+    employees: <EmployeesTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} />,
+    payroll: <PayrollTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} />,
+    'report-history': <ReportHistoryTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} />,
   };
 
   return (
