@@ -632,7 +632,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
         <div style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
           {showFilters
             ? 'Filters are visible.'
-            : `Filters hidden for cleaner view${activeFilterCount > 0 ? ` • ${activeFilterCount} active` : ''}.`}
+            : `Filters hidden${activeFilterCount > 0 ? ` • ${activeFilterCount} active` : ''}.`}
         </div>
       </div>
 
