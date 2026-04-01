@@ -132,10 +132,7 @@ const AdminBusinessOperations = () => {
                 <i className="fas fa-briefcase"></i>
                 Business Operations
               </div>
-              <h2 style={{ margin: '0.35rem 0 0', fontSize: 'clamp(1.25rem, 2.3vw, 1.65rem)', color: '#0f172a' }}>Unified Business Management Workspace</h2>
-              <p style={{ margin: '0.4rem 0 0', color: '#64748b', maxWidth: '860px', lineHeight: 1.5, fontSize: '0.95rem' }}>
-                Review branch-aware sales performance now, then extend the same workspace to suppliers, expenses, employees, payroll, and import-driven operational workflows.
-              </p>
+
             </div>
             <div style={{ display: 'grid', gap: '0.6rem', justifyItems: 'end', minWidth: '240px' }}>
               <label style={{ display: 'grid', gap: '0.25rem', minWidth: '220px' }}>
