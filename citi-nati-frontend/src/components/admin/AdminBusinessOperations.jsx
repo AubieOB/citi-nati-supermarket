@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useRef, useMemo, useState } from 'react';
 import BusinessOperationsTabs from './business-operations/BusinessOperationsTabs.jsx';
 import SalesReportsTab from './business-operations/SalesReportsTab.jsx';
 import ComingSoonTabPanel from './business-operations/ComingSoonTabPanel.jsx';
@@ -25,11 +25,56 @@ const TABS = [
 const AdminBusinessOperations = () => {
   const [activeTab, setActiveTab] = useState('sales-reports');
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
+  const [filterBarHeight, setFilterBarHeight] = useState(0);
+  const filterBarRef = useRef(null);
   const [dataRefreshKey, setDataRefreshKey] = useState(0);
   const [drilldownRequests, setDrilldownRequests] = useState({});
   const [locations, setLocations] = useState([]);
   const [selectedLocationId, setSelectedLocationId] = useState('all');
   const [locationRefreshKey, setLocationRefreshKey] = useState(0);
+
+  useEffect(() => {
+    let resizeObserver;
+
+    const updateFilterBarLayout = () => {
+      const contentArea = document.querySelector('.admin-content-area');
+      if (!contentArea) return;
+
+      const rect = contentArea.getBoundingClientRect();
+      const mobileTopOffset = 56;
+
+      setFilterBarLayout({
+        left: rect.left,
+        width: rect.width,
+        top: window.innerWidth <= 768 ? mobileTopOffset : 0,
+      });
+
+      if (filterBarRef.current) {
+        setFilterBarHeight(filterBarRef.current.offsetHeight);
+      }
+    };
+
+    updateFilterBarLayout();
+    window.addEventListener('resize', updateFilterBarLayout);
+
+    const contentArea = document.querySelector('.admin-content-area');
+    if (contentArea && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(updateFilterBarLayout);
+      resizeObserver.observe(contentArea);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateFilterBarLayout);
+      if (resizeObserver) resizeObserver.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (filterBarRef.current) {
+      setFilterBarHeight(filterBarRef.current.offsetHeight);
+    }
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -113,19 +158,23 @@ const AdminBusinessOperations = () => {
 
   return (
     <div style={{ position: 'relative' }}>
-      <div style={{ position: 'sticky', top: '0.5rem', zIndex: 35 }}>
-        <div
-          style={{
-            ...{
-              backgroundColor: '#ffffff',
-              border: '1px solid #e2e8f0',
-              borderRadius: '22px',
-              boxShadow: '0 14px 34px rgba(15, 23, 42, 0.08)',
-              padding: '0.55rem 1rem',
-              backdropFilter: 'blur(6px)',
-            },
-          }}
-        >
+      <div
+        ref={filterBarRef}
+        style={{
+          position: 'fixed',
+          top: `${filterBarLayout.top}px`,
+          left: `${filterBarLayout.left}px`,
+          width: `${filterBarLayout.width}px`,
+          zIndex: 80,
+          backgroundColor: '#ffffff',
+          border: '1px solid #e2e8f0',
+          borderRadius: '22px',
+          boxShadow: '0 14px 34px rgba(15, 23, 42, 0.08)',
+          padding: '0.55rem 1rem',
+          backdropFilter: 'blur(6px)',
+          boxSizing: 'border-box',
+        }}
+      >
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.55rem', color: '#5B4B8A', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.78rem', letterSpacing: '0.06em' }}>
               <i className="fas fa-briefcase"></i>
@@ -164,8 +213,9 @@ const AdminBusinessOperations = () => {
           <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #edf2f7' }}>
             <BusinessOperationsTabs tabs={TABS} activeTab={activeTab} onChange={handleNavigateTab} />
           </div>
-        </div>
       </div>
+
+      <div style={{ height: `${filterBarHeight}px` }}></div>
 
       <div style={{ display: 'grid', gap: '1rem', marginTop: '0.8rem' }}>
         {contentByTab[activeTab]}
