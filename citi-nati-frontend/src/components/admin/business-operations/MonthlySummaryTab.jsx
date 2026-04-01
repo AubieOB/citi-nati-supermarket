@@ -409,6 +409,7 @@ const MonthlySummaryTab = ({
           />
         </div>
       </div>
+      </div>
       )}
 
       <SummaryCards cards={summaryCards} />

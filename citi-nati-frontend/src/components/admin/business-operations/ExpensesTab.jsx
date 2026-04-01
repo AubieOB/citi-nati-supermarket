@@ -355,6 +355,7 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
         </div>
 
       </div>
+      </div>
       )}
 
       <div style={{ ...cardStyle, padding: '1.1rem' }}>
@@ -438,6 +439,7 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
                 </button>
               )}
             </div>
+          </div>
           </div>
           )}
 

@@ -513,6 +513,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
           </button>
         </div>
       </div>
+      </div>
       )}
 
       {isPeriodFiltersModalOpen && (
@@ -562,6 +563,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
         >
           Clear
         </button>
+      </div>
       </div>
       )}
 
