@@ -22,7 +22,6 @@ const getApiError = (err, fallback) =>
   err?.response?.data?.error || err?.response?.data?.message || err?.message || fallback;
 
 const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] }) => {
-  const [showSummaryPanel, setShowSummaryPanel] = useState(false);
   const [showRegisterFilters, setShowRegisterFilters] = useState(false);
 
   // ── List state ──
@@ -264,14 +263,6 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
         <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
           <button
             type="button"
-            onClick={() => setShowSummaryPanel((prev) => !prev)}
-            style={{ border: '1px solid #cbd5e1', backgroundColor: showSummaryPanel ? '#0f172a' : '#fff', color: showSummaryPanel ? '#fff' : '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
-          >
-            <i className={`fas ${showSummaryPanel ? 'fa-chevron-up' : 'fa-chart-simple'}`} style={{ marginRight: '0.42rem' }} />
-            {showSummaryPanel ? 'Hide Employee Summary' : 'Show Employee Summary'}
-          </button>
-          <button
-            type="button"
             onClick={() => setShowRegisterFilters((prev) => !prev)}
             style={{ border: '1px solid #cbd5e1', backgroundColor: showRegisterFilters ? '#0f172a' : '#fff', color: showRegisterFilters ? '#fff' : '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
           >
@@ -326,14 +317,12 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
       </div>
 
       {/* ── Summary cards ── */}
-      {showSummaryPanel && (
       <EmployeeSummaryCards
         totalEmployees={pagination.total || employees.length}
         activeCount={activeCount}
         inactiveCount={inactiveCount}
         departmentCount={departmentCount}
       />
-      )}
 
       {/* ── Filter bar ── */}
       {showRegisterFilters && (

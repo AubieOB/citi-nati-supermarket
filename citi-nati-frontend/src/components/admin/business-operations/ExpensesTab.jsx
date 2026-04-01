@@ -273,7 +273,7 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
             style={{ border: '1px solid #cbd5e1', backgroundColor: showWorkspacePanel ? '#0f172a' : '#fff', color: showWorkspacePanel ? '#fff' : '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
           >
             <i className={`fas ${showWorkspacePanel ? 'fa-chevron-up' : 'fa-layer-group'}`} style={{ marginRight: '0.42rem' }} />
-            {showWorkspacePanel ? 'Hide Expense Management' : 'Show Expense Management'}
+            {showWorkspacePanel ? 'Hide Header Actions' : 'Show Header Actions'}
           </button>
           <button
             type="button"
@@ -350,12 +350,12 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
           </div>
         </div>
 
-        {/* Summary cards */}
-        <div style={{ marginTop: '1.1rem' }}>
-          <ExpenseSummaryCards summary={summary} categoryCount={activeCategories.length} />
-        </div>
       </div>
       )}
+
+      <div style={{ ...cardStyle, padding: '1.1rem' }}>
+        <ExpenseSummaryCards summary={summary} categoryCount={activeCategories.length} />
+      </div>
 
       {/* ── Sub-tabs ── */}
       <div style={{ ...cardStyle, padding: '0 1.1rem', display: 'flex', gap: 0, borderBottom: 'none', overflow: 'hidden' }}>

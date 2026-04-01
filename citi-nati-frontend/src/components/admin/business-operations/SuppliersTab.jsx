@@ -326,7 +326,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
             style={{ border: '1px solid #cbd5e1', backgroundColor: showWorkspacePanel ? '#0f172a' : '#fff', color: showWorkspacePanel ? '#fff' : '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
           >
             <i className={`fas ${showWorkspacePanel ? 'fa-chevron-up' : 'fa-layer-group'}`} style={{ marginRight: '0.42rem' }}></i>
-            {showWorkspacePanel ? 'Hide Supplier Management' : 'Show Supplier Management'}
+            {showWorkspacePanel ? 'Hide Header Actions' : 'Show Header Actions'}
           </button>
           <button
             type="button"
@@ -395,7 +395,11 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.9rem', marginTop: '1rem' }}>
+      </div>
+      )}
+
+      <div style={{ ...cardStyle, padding: '1.05rem 1.1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.9rem' }}>
           <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
             <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Total Suppliers</div>
             <div style={{ marginTop: '0.35rem', fontSize: '1.6rem', fontWeight: 800, color: '#0f172a' }}>{totals.totalSuppliers.toLocaleString('en-US')}</div>
@@ -414,7 +418,6 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
           </div>
         </div>
       </div>
-      )}
 
       {showRegisterFilters && (
       <div style={{ ...cardStyle, padding: '1rem' }}>
