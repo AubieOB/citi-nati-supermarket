@@ -72,6 +72,7 @@ function extractFilters(query) {
  */
 function buildInvoiceWhere(dateRange, filters = {}) {
   const where = {};
+  const andConditions = [];
 
   if (dateRange) {
     where.invoiceDate = {
@@ -82,8 +83,22 @@ function buildInvoiceWhere(dateRange, filters = {}) {
 
   if (filters.branchCode) where.branchCode = filters.branchCode;
   if (filters.syncSourceCode) where.syncSourceCode = filters.syncSourceCode;
-  if (filters.locationCode) where.locationCode = filters.locationCode;
-  if (filters.locationId !== null && filters.locationId !== undefined) {
+
+  const hasLocationCode = !!filters.locationCode;
+  const hasLocationId = filters.locationId !== null && filters.locationId !== undefined;
+
+  if (hasLocationCode && hasLocationId) {
+    // Synced datasets may carry one location identifier but not the other.
+    // Match either to avoid unintentionally excluding valid branch rows.
+    andConditions.push({
+      OR: [
+        { locationCode: filters.locationCode },
+        { locationId: filters.locationId },
+      ],
+    });
+  } else if (hasLocationCode) {
+    where.locationCode = filters.locationCode;
+  } else if (hasLocationId) {
     where.locationId = filters.locationId;
   }
 
@@ -97,10 +112,14 @@ function buildInvoiceWhere(dateRange, filters = {}) {
 
   // payMethod can match either payMethod1 or payMethod2
   if (filters.payMethod) {
-    where.OR = [
+    andConditions.push({ OR: [
       { payMethod1: { equals: filters.payMethod, mode: 'insensitive' } },
       { payMethod2: { equals: filters.payMethod, mode: 'insensitive' } },
-    ];
+    ] });
+  }
+
+  if (andConditions.length > 0) {
+    where.AND = andConditions;
   }
 
   return where;
