@@ -121,22 +121,19 @@ const AdminBusinessOperations = () => {
               border: '1px solid #e2e8f0',
               borderRadius: '22px',
               boxShadow: '0 14px 34px rgba(15, 23, 42, 0.08)',
-              padding: '0.95rem 1rem 0.85rem',
+              padding: '0.55rem 1rem',
               backdropFilter: 'blur(6px)',
             },
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-            <div>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.55rem', color: '#5B4B8A', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.78rem', letterSpacing: '0.06em' }}>
-                <i className="fas fa-briefcase"></i>
-                Business Operations
-              </div>
-
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.55rem', color: '#5B4B8A', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.78rem', letterSpacing: '0.06em' }}>
+              <i className="fas fa-briefcase"></i>
+              Business Operations
             </div>
-            <div style={{ display: 'grid', gap: '0.6rem', justifyItems: 'end', minWidth: '240px' }}>
-              <label style={{ display: 'grid', gap: '0.25rem', minWidth: '220px' }}>
-                <span style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: '240px', justifyContent: 'flex-end' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: '220px' }}>
+                <span style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
                   Location Scope
                 </span>
                 <select
