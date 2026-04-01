@@ -132,7 +132,7 @@ const ErrorState = ({ message }) => (
 
 const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, selectedLocationCode = '' }) => {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
-  const [showFilters, setShowFilters] = useState(false);
+  const [isFiltersModalOpen, setIsFiltersModalOpen] = useState(false);
   const [activeView, setActiveView] = useState('summary');
   const [viewState, setViewState] = useState(DEFAULT_VIEW_STATE);
 
@@ -608,11 +608,11 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
       <div style={{ ...baseCardStyle, padding: '0.7rem 0.95rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
         <button
           type="button"
-          onClick={() => setShowFilters((prev) => !prev)}
+          onClick={() => setIsFiltersModalOpen(true)}
           style={{
             border: '1px solid #cbd5e1',
-            backgroundColor: showFilters ? '#0f172a' : '#fff',
-            color: showFilters ? '#fff' : '#0f172a',
+            backgroundColor: '#fff',
+            color: '#0f172a',
             borderRadius: '10px',
             padding: '0.55rem 0.85rem',
             fontWeight: 700,
@@ -622,11 +622,10 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
             alignItems: 'center',
             gap: '0.45rem',
           }}
-          aria-expanded={showFilters}
-          aria-label={showFilters ? 'Hide sales report filters' : 'Show sales report filters'}
+          aria-label="Open sales report filters"
         >
-          <i className={`fas ${showFilters ? 'fa-chevron-up' : 'fa-sliders'}`}></i>
-          {showFilters ? 'Hide Filters' : 'Show Filters'}
+          <i className="fas fa-sliders"></i>
+          Open Filters
         </button>
 
         <div style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
@@ -636,18 +635,35 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
         </div>
       </div>
 
-      {showFilters && (
-        <SalesReportFilters
-          filters={filters}
-          onChange={updateFilter}
-          onReset={resetFilters}
-          resolvedRange={summaryMeta.dateRange}
-          loading={summaryLoading}
-          exportingExcel={exportingExcel}
-          exportingPdf={exportingPdf}
-          onExportExcel={() => handleExport('excel')}
-          onExportPdf={() => handleExport('pdf')}
-        />
+      {isFiltersModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 160, display: 'grid', placeItems: 'center', padding: '1rem' }}>
+          <div style={{ width: 'min(1100px, 96vw)', maxHeight: '88vh', overflow: 'auto', borderRadius: '16px' }}>
+            <div style={{ ...baseCardStyle, borderRadius: '16px', padding: '0.85rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.7rem' }}>
+                <strong style={{ color: '#0f172a' }}>Sales Report Filters</strong>
+                <button
+                  type="button"
+                  onClick={() => setIsFiltersModalOpen(false)}
+                  style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}
+                >
+                  Close
+                </button>
+              </div>
+
+              <SalesReportFilters
+                filters={filters}
+                onChange={updateFilter}
+                onReset={resetFilters}
+                resolvedRange={summaryMeta.dateRange}
+                loading={summaryLoading}
+                exportingExcel={exportingExcel}
+                exportingPdf={exportingPdf}
+                onExportExcel={() => handleExport('excel')}
+                onExportPdf={() => handleExport('pdf')}
+              />
+            </div>
+          </div>
+        </div>
       )}
 
       <div style={{ display: 'flex', gap: '0.55rem', overflowX: 'auto' }}>

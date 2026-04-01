@@ -52,8 +52,8 @@ const INITIAL_DETAIL_STATE = {
 const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] }) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [showWorkspacePanel, setShowWorkspacePanel] = useState(false);
-  const [showRegisterFilters, setShowRegisterFilters] = useState(false);
+  const [isHeaderActionsModalOpen, setIsHeaderActionsModalOpen] = useState(false);
+  const [isRegisterFiltersModalOpen, setIsRegisterFiltersModalOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [transactionPage, setTransactionPage] = useState(1);
 
@@ -322,28 +322,33 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
         <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
           <button
             type="button"
-            onClick={() => setShowWorkspacePanel((prev) => !prev)}
-            style={{ border: '1px solid #cbd5e1', backgroundColor: showWorkspacePanel ? '#0f172a' : '#fff', color: showWorkspacePanel ? '#fff' : '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+            onClick={() => setIsHeaderActionsModalOpen(true)}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
           >
-            <i className={`fas ${showWorkspacePanel ? 'fa-chevron-up' : 'fa-layer-group'}`} style={{ marginRight: '0.42rem' }}></i>
-            {showWorkspacePanel ? 'Hide Header Actions' : 'Show Header Actions'}
+            <i className="fas fa-layer-group" style={{ marginRight: '0.42rem' }}></i>
+            Open Header Actions
           </button>
           <button
             type="button"
-            onClick={() => setShowRegisterFilters((prev) => !prev)}
-            style={{ border: '1px solid #cbd5e1', backgroundColor: showRegisterFilters ? '#0f172a' : '#fff', color: showRegisterFilters ? '#fff' : '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+            onClick={() => setIsRegisterFiltersModalOpen(true)}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
           >
-            <i className={`fas ${showRegisterFilters ? 'fa-chevron-up' : 'fa-sliders'}`} style={{ marginRight: '0.42rem' }}></i>
-            {showRegisterFilters ? 'Hide Register Filters' : 'Show Register Filters'}
+            <i className="fas fa-sliders" style={{ marginRight: '0.42rem' }}></i>
+            Open Register Filters
           </button>
         </div>
         <div style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
-          {showRegisterFilters ? 'Register filters are visible.' : `Register filters hidden${hasActiveFilters ? ' • active filters applied' : ''}.`}
+          {`Sections open in modals${hasActiveFilters ? ' • active filters applied' : ''}.`}
         </div>
       </div>
 
-      {showWorkspacePanel && (
-      <div style={{ ...cardStyle, padding: '1.2rem 1.3rem' }}>
+      {isHeaderActionsModalOpen && (
+      <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 160, display: 'grid', placeItems: 'center', padding: '1rem' }}>
+      <div style={{ ...cardStyle, width: 'min(1000px, 96vw)', maxHeight: '88vh', overflow: 'auto', padding: '1.2rem 1.3rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+          <strong style={{ color: '#0f172a' }}>Supplier Management Actions</strong>
+          <button type="button" onClick={() => setIsHeaderActionsModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}>Close</button>
+        </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
           <div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', color: '#5B4B8A', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.76rem', letterSpacing: '0.05em' }}>
@@ -396,6 +401,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
         </div>
 
       </div>
+      </div>
       )}
 
       <div style={{ ...cardStyle, padding: '1.05rem 1.1rem' }}>
@@ -419,8 +425,13 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
         </div>
       </div>
 
-      {showRegisterFilters && (
-      <div style={{ ...cardStyle, padding: '1rem' }}>
+      {isRegisterFiltersModalOpen && (
+      <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 160, display: 'grid', placeItems: 'center', padding: '1rem' }}>
+      <div style={{ ...cardStyle, width: 'min(900px, 96vw)', maxHeight: '88vh', overflow: 'auto', padding: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+          <strong style={{ color: '#0f172a' }}>Supplier Register Filters</strong>
+          <button type="button" onClick={() => setIsRegisterFiltersModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}>Close</button>
+        </div>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 280px', position: 'relative' }}>
             <i className="fas fa-search" style={{ position: 'absolute', top: '50%', left: '0.95rem', transform: 'translateY(-50%)', color: '#94a3b8' }}></i>
@@ -442,6 +453,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
             <option value="inactive">Inactive</option>
           </select>
         </div>
+      </div>
       </div>
       )}
 

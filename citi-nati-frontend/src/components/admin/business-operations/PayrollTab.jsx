@@ -35,8 +35,8 @@ const reduceSummary = (entries = []) => entries.reduce((acc, entry) => {
 });
 
 const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] }) => {
-  const [showManagementPanel, setShowManagementPanel] = useState(false);
-  const [showPeriodFilters, setShowPeriodFilters] = useState(false);
+  const [isManagementModalOpen, setIsManagementModalOpen] = useState(false);
+  const [isPeriodFiltersModalOpen, setIsPeriodFiltersModalOpen] = useState(false);
   const [employees, setEmployees] = useState([]);
 
   const [periodFilters, setPeriodFilters] = useState({
@@ -447,28 +447,33 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
         <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
           <button
             type="button"
-            onClick={() => setShowManagementPanel((prev) => !prev)}
-            style={{ border: '1px solid #cbd5e1', backgroundColor: showManagementPanel ? '#0f172a' : '#fff', color: showManagementPanel ? '#fff' : '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+            onClick={() => setIsManagementModalOpen(true)}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
           >
-            <i className={`fas ${showManagementPanel ? 'fa-chevron-up' : 'fa-layer-group'}`} style={{ marginRight: '0.42rem' }}></i>
-            {showManagementPanel ? 'Hide Payroll Management' : 'Show Payroll Management'}
+            <i className="fas fa-layer-group" style={{ marginRight: '0.42rem' }}></i>
+            Open Payroll Actions
           </button>
           <button
             type="button"
-            onClick={() => setShowPeriodFilters((prev) => !prev)}
-            style={{ border: '1px solid #cbd5e1', backgroundColor: showPeriodFilters ? '#0f172a' : '#fff', color: showPeriodFilters ? '#fff' : '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+            onClick={() => setIsPeriodFiltersModalOpen(true)}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
           >
-            <i className={`fas ${showPeriodFilters ? 'fa-chevron-up' : 'fa-sliders'}`} style={{ marginRight: '0.42rem' }}></i>
-            {showPeriodFilters ? 'Hide Period Filters' : 'Show Period Filters'}
+            <i className="fas fa-sliders" style={{ marginRight: '0.42rem' }}></i>
+            Open Period Filters
           </button>
         </div>
         <div style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
-          {showPeriodFilters ? 'Period filters are visible.' : `Period filters hidden${hasActivePeriodFilters ? ' • active filters applied' : ''}.`}
+          {`Sections open in modals${hasActivePeriodFilters ? ' • active filters applied' : ''}.`}
         </div>
       </div>
 
-      {showManagementPanel && (
-      <div style={{ ...cardStyle, padding: '1.1rem 1.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', flexWrap: 'wrap' }}>
+      {isManagementModalOpen && (
+      <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 160, display: 'grid', placeItems: 'center', padding: '1rem' }}>
+      <div style={{ ...cardStyle, width: 'min(1000px, 96vw)', maxHeight: '88vh', overflow: 'auto', padding: '1.1rem 1.2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.7rem' }}>
+          <strong style={{ color: '#0f172a' }}>Payroll Management Actions</strong>
+          <button type="button" onClick={() => setIsManagementModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}>Close</button>
+        </div>
         <div>
           <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.14rem' }}>Payroll Management</h3>
           <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.88rem', lineHeight: 1.6 }}>
@@ -510,8 +515,13 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
       </div>
       )}
 
-      {showPeriodFilters && (
-      <div style={{ ...cardStyle, padding: '0.9rem 1rem', display: 'flex', gap: '0.65rem', flexWrap: 'wrap', alignItems: 'center' }}>
+      {isPeriodFiltersModalOpen && (
+      <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 160, display: 'grid', placeItems: 'center', padding: '1rem' }}>
+      <div style={{ ...cardStyle, width: 'min(950px, 96vw)', maxHeight: '88vh', overflow: 'auto', padding: '0.9rem 1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+          <strong style={{ color: '#0f172a' }}>Payroll Period Filters</strong>
+          <button type="button" onClick={() => setIsPeriodFiltersModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}>Close</button>
+        </div>
         <div style={{ position: 'relative', flex: '1 1 250px' }}>
           <i className="fas fa-search" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none', fontSize: '0.85rem' }}></i>
           <input

@@ -22,7 +22,7 @@ const getApiError = (err, fallback) =>
   err?.response?.data?.error || err?.response?.data?.message || err?.message || fallback;
 
 const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] }) => {
-  const [showRegisterFilters, setShowRegisterFilters] = useState(false);
+  const [isFiltersModalOpen, setIsFiltersModalOpen] = useState(false);
 
   // ── List state ──
   const [employees, setEmployees] = useState([]);
@@ -263,15 +263,15 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
         <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
           <button
             type="button"
-            onClick={() => setShowRegisterFilters((prev) => !prev)}
-            style={{ border: '1px solid #cbd5e1', backgroundColor: showRegisterFilters ? '#0f172a' : '#fff', color: showRegisterFilters ? '#fff' : '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+            onClick={() => setIsFiltersModalOpen(true)}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
           >
-            <i className={`fas ${showRegisterFilters ? 'fa-chevron-up' : 'fa-sliders'}`} style={{ marginRight: '0.42rem' }} />
-            {showRegisterFilters ? 'Hide Register Filters' : 'Show Register Filters'}
+            <i className="fas fa-sliders" style={{ marginRight: '0.42rem' }} />
+            Open Register Filters
           </button>
         </div>
         <div style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
-          {showRegisterFilters ? 'Register filters are visible.' : `Register filters hidden${hasActiveFilters ? ' • active filters applied' : ''}.`}
+          {`Filters open in modal${hasActiveFilters ? ' • active filters applied' : ''}.`}
         </div>
       </div>
 
@@ -324,29 +324,36 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
         departmentCount={departmentCount}
       />
 
-      {/* ── Filter bar ── */}
-      {showRegisterFilters && (
-      <div style={{ ...cardStyle, padding: '0.85rem 1rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ position: 'relative', flex: '1 1 220px' }}>
-          <i className="fas fa-search" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none', fontSize: '0.88rem' }} />
-          <input
-            type="text"
-            placeholder="Search employees…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ width: '100%', boxSizing: 'border-box', padding: '0.72rem 0.9rem 0.72rem 2.2rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc' }}
-          />
+      {isFiltersModalOpen && (
+      <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 160, display: 'grid', placeItems: 'center', padding: '1rem' }}>
+      <div style={{ ...cardStyle, width: 'min(850px, 96vw)', maxHeight: '88vh', overflow: 'auto', padding: '0.85rem 1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+          <strong style={{ color: '#0f172a' }}>Employee Register Filters</strong>
+          <button type="button" onClick={() => setIsFiltersModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}>Close</button>
         </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          style={{ padding: '0.72rem 0.9rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc', cursor: 'pointer', minWidth: '130px' }}
-        >
-          <option value="">All Statuses</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-          <option value="terminated">Terminated</option>
-        </select>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ position: 'relative', flex: '1 1 220px' }}>
+            <i className="fas fa-search" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none', fontSize: '0.88rem' }} />
+            <input
+              type="text"
+              placeholder="Search employees…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ width: '100%', boxSizing: 'border-box', padding: '0.72rem 0.9rem 0.72rem 2.2rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc' }}
+            />
+          </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            style={{ padding: '0.72rem 0.9rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc', cursor: 'pointer', minWidth: '130px' }}
+          >
+            <option value="">All Statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="terminated">Terminated</option>
+          </select>
+        </div>
+      </div>
       </div>
       )}
 

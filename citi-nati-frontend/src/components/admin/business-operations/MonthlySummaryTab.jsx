@@ -64,7 +64,7 @@ const MonthlySummaryTab = ({
   selectedLocationCode = '',
   selectedLocationName = '',
 }) => {
-  const [showDashboardControls, setShowDashboardControls] = useState(false);
+  const [isControlsModalOpen, setIsControlsModalOpen] = useState(false);
   const now = new Date();
   const initialMonthRange = monthRange(now.getFullYear(), now.getMonth() + 1);
 
@@ -362,19 +362,24 @@ const MonthlySummaryTab = ({
       <div style={{ ...cardStyle, padding: '0.7rem 0.95rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
         <button
           type="button"
-          onClick={() => setShowDashboardControls((prev) => !prev)}
-          style={{ border: '1px solid #cbd5e1', backgroundColor: showDashboardControls ? '#0f172a' : '#fff', color: showDashboardControls ? '#fff' : '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+          onClick={() => setIsControlsModalOpen(true)}
+          style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
         >
-          <i className={`fas ${showDashboardControls ? 'fa-chevron-up' : 'fa-sliders'}`} style={{ marginRight: '0.42rem' }}></i>
-          {showDashboardControls ? 'Hide Dashboard Controls' : 'Show Dashboard Controls'}
+          <i className="fas fa-sliders" style={{ marginRight: '0.42rem' }}></i>
+          Open Dashboard Controls
         </button>
         <div style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
-          {showDashboardControls ? 'Dashboard controls are visible.' : 'Dashboard controls hidden.'}
+          Dashboard controls open in modal.
         </div>
       </div>
 
-      {showDashboardControls && (
-      <div style={{ ...cardStyle, padding: '1.08rem 1.15rem' }}>
+      {isControlsModalOpen && (
+      <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 160, display: 'grid', placeItems: 'center', padding: '1rem' }}>
+      <div style={{ ...cardStyle, width: 'min(1000px, 96vw)', maxHeight: '88vh', overflow: 'auto', padding: '1.08rem 1.15rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.7rem' }}>
+          <strong style={{ color: '#0f172a' }}>Monthly Dashboard Controls</strong>
+          <button type="button" onClick={() => setIsControlsModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}>Close</button>
+        </div>
         <div style={{ display: 'grid', gap: '0.9rem' }}>
           <div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.42rem', color: '#5B4B8A', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.74rem', letterSpacing: '0.05em' }}>
