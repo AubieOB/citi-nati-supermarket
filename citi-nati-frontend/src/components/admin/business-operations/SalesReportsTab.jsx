@@ -132,6 +132,7 @@ const ErrorState = ({ message }) => (
 
 const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, selectedLocationCode = '' }) => {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [showFilters, setShowFilters] = useState(false);
   const [activeView, setActiveView] = useState('summary');
   const [viewState, setViewState] = useState(DEFAULT_VIEW_STATE);
 
@@ -359,6 +360,18 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
       if (format === 'pdf') setExportingPdf(false);
     }
   }, [activeView, filters]);
+
+  const activeFilterCount = useMemo(() => {
+    const baseline = {
+      ...DEFAULT_FILTERS,
+      locationId: selectedLocationId ? String(selectedLocationId) : '',
+      locationCode: selectedLocationId ? String(selectedLocationCode || '').trim().toUpperCase() : '',
+    };
+
+    return Object.keys(filters).reduce((count, key) => {
+      return filters[key] !== baseline[key] ? count + 1 : count;
+    }, 0);
+  }, [filters, selectedLocationCode, selectedLocationId]);
 
   const renderPagination = (view, pagination) => {
     if (!pagination) return null;
@@ -592,17 +605,50 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
-      <SalesReportFilters
-        filters={filters}
-        onChange={updateFilter}
-        onReset={resetFilters}
-        resolvedRange={summaryMeta.dateRange}
-        loading={summaryLoading}
-        exportingExcel={exportingExcel}
-        exportingPdf={exportingPdf}
-        onExportExcel={() => handleExport('excel')}
-        onExportPdf={() => handleExport('pdf')}
-      />
+      <div style={{ ...baseCardStyle, padding: '0.7rem 0.95rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={() => setShowFilters((prev) => !prev)}
+          style={{
+            border: '1px solid #cbd5e1',
+            backgroundColor: showFilters ? '#0f172a' : '#fff',
+            color: showFilters ? '#fff' : '#0f172a',
+            borderRadius: '10px',
+            padding: '0.55rem 0.85rem',
+            fontWeight: 700,
+            fontSize: '0.86rem',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.45rem',
+          }}
+          aria-expanded={showFilters}
+          aria-label={showFilters ? 'Hide sales report filters' : 'Show sales report filters'}
+        >
+          <i className={`fas ${showFilters ? 'fa-chevron-up' : 'fa-sliders'}`}></i>
+          {showFilters ? 'Hide Filters' : 'Show Filters'}
+        </button>
+
+        <div style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
+          {showFilters
+            ? 'Filters are visible.'
+            : `Filters hidden for cleaner view${activeFilterCount > 0 ? ` • ${activeFilterCount} active` : ''}.`}
+        </div>
+      </div>
+
+      {showFilters && (
+        <SalesReportFilters
+          filters={filters}
+          onChange={updateFilter}
+          onReset={resetFilters}
+          resolvedRange={summaryMeta.dateRange}
+          loading={summaryLoading}
+          exportingExcel={exportingExcel}
+          exportingPdf={exportingPdf}
+          onExportExcel={() => handleExport('excel')}
+          onExportPdf={() => handleExport('pdf')}
+        />
+      )}
 
       <div style={{ display: 'flex', gap: '0.55rem', overflowX: 'auto' }}>
         {REPORT_VIEWS.map((view) => (
