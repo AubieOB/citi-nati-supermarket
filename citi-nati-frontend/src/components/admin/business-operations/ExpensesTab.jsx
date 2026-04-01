@@ -33,6 +33,8 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
 
   // Sub-tab
   const [activeTab, setActiveTab] = useState(TAB_EXPENSES);
+  const [showWorkspacePanel, setShowWorkspacePanel] = useState(false);
+  const [showRegisterFilters, setShowRegisterFilters] = useState(false);
 
   // Expense list state
   const [filters, setFilters] = useState({
@@ -216,6 +218,12 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
 
   const activeCategories = useMemo(() => categories.filter((c) => c.isActive), [categories]);
   const isLoading = listLoading || categoriesLoading;
+  const hasActiveExpenseFilters = Boolean(
+    filters.search
+    || filters.expenseCategoryId
+    || filters.startDate !== initialRange.startDate
+    || filters.endDate !== initialRange.endDate,
+  );
 
   const handleExport = useCallback(async (format) => {
     if (format === 'excel') setExportingExcel(true);
@@ -257,8 +265,32 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
+      <div style={{ ...cardStyle, padding: '0.7rem 0.95rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => setShowWorkspacePanel((prev) => !prev)}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: showWorkspacePanel ? '#0f172a' : '#fff', color: showWorkspacePanel ? '#fff' : '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+          >
+            <i className={`fas ${showWorkspacePanel ? 'fa-chevron-up' : 'fa-layer-group'}`} style={{ marginRight: '0.42rem' }} />
+            {showWorkspacePanel ? 'Hide Expense Management' : 'Show Expense Management'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowRegisterFilters((prev) => !prev)}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: showRegisterFilters ? '#0f172a' : '#fff', color: showRegisterFilters ? '#fff' : '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+          >
+            <i className={`fas ${showRegisterFilters ? 'fa-chevron-up' : 'fa-sliders'}`} style={{ marginRight: '0.42rem' }} />
+            {showRegisterFilters ? 'Hide Register Filters' : 'Show Register Filters'}
+          </button>
+        </div>
+        <div style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
+          {showRegisterFilters ? 'Register filters are visible.' : `Register filters hidden${hasActiveExpenseFilters ? ' • active filters applied' : ''}.`}
+        </div>
+      </div>
 
       {/* ── Header ── */}
+      {showWorkspacePanel && (
       <div style={{ ...cardStyle, padding: '1.2rem 1.3rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
           <div>
@@ -323,6 +355,7 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
           <ExpenseSummaryCards summary={summary} categoryCount={activeCategories.length} />
         </div>
       </div>
+      )}
 
       {/* ── Sub-tabs ── */}
       <div style={{ ...cardStyle, padding: '0 1.1rem', display: 'flex', gap: 0, borderBottom: 'none', overflow: 'hidden' }}>
@@ -345,6 +378,7 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
       {activeTab === TAB_EXPENSES && (
         <>
           {/* Filter bar */}
+          {showRegisterFilters && (
           <div style={{ ...cardStyle, padding: '1rem' }}>
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               <div style={{ flex: '1 1 280px', position: 'relative' }}>
@@ -397,6 +431,7 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
               )}
             </div>
           </div>
+          )}
 
           {/* Two-panel layout */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', alignItems: 'start' }}>

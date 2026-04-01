@@ -52,6 +52,8 @@ const INITIAL_DETAIL_STATE = {
 const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] }) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [showWorkspacePanel, setShowWorkspacePanel] = useState(false);
+  const [showRegisterFilters, setShowRegisterFilters] = useState(false);
   const [page, setPage] = useState(1);
   const [transactionPage, setTransactionPage] = useState(1);
 
@@ -287,6 +289,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
   const selectedSummary = detailState.summary;
   const pageBalanceMeta = balanceMeta(totals.pageBalance, 'Page Exposure (Debt)', 'Page Credit');
   const selectedBalanceMeta = balanceMeta(selectedSummary?.outstandingBalance, 'Selected Outstanding', 'Selected Credit');
+  const hasActiveFilters = Boolean(search || statusFilter);
 
   const handleExport = async (format) => {
     if (format === 'excel') setExportingExcel(true);
@@ -315,6 +318,31 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
+      <div style={{ ...cardStyle, padding: '0.7rem 0.95rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => setShowWorkspacePanel((prev) => !prev)}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: showWorkspacePanel ? '#0f172a' : '#fff', color: showWorkspacePanel ? '#fff' : '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+          >
+            <i className={`fas ${showWorkspacePanel ? 'fa-chevron-up' : 'fa-layer-group'}`} style={{ marginRight: '0.42rem' }}></i>
+            {showWorkspacePanel ? 'Hide Supplier Management' : 'Show Supplier Management'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowRegisterFilters((prev) => !prev)}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: showRegisterFilters ? '#0f172a' : '#fff', color: showRegisterFilters ? '#fff' : '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+          >
+            <i className={`fas ${showRegisterFilters ? 'fa-chevron-up' : 'fa-sliders'}`} style={{ marginRight: '0.42rem' }}></i>
+            {showRegisterFilters ? 'Hide Register Filters' : 'Show Register Filters'}
+          </button>
+        </div>
+        <div style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
+          {showRegisterFilters ? 'Register filters are visible.' : `Register filters hidden${hasActiveFilters ? ' • active filters applied' : ''}.`}
+        </div>
+      </div>
+
+      {showWorkspacePanel && (
       <div style={{ ...cardStyle, padding: '1.2rem 1.3rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
           <div>
@@ -386,7 +414,9 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
           </div>
         </div>
       </div>
+      )}
 
+      {showRegisterFilters && (
       <div style={{ ...cardStyle, padding: '1rem' }}>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 280px', position: 'relative' }}>
@@ -410,6 +440,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
           </select>
         </div>
       </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', alignItems: 'start' }}>
         <div style={{ ...cardStyle, overflow: 'hidden' }}>

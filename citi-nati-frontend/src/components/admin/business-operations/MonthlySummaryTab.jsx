@@ -64,6 +64,7 @@ const MonthlySummaryTab = ({
   selectedLocationCode = '',
   selectedLocationName = '',
 }) => {
+  const [showDashboardControls, setShowDashboardControls] = useState(false);
   const now = new Date();
   const initialMonthRange = monthRange(now.getFullYear(), now.getMonth() + 1);
 
@@ -358,6 +359,21 @@ const MonthlySummaryTab = ({
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
+      <div style={{ ...cardStyle, padding: '0.7rem 0.95rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={() => setShowDashboardControls((prev) => !prev)}
+          style={{ border: '1px solid #cbd5e1', backgroundColor: showDashboardControls ? '#0f172a' : '#fff', color: showDashboardControls ? '#fff' : '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+        >
+          <i className={`fas ${showDashboardControls ? 'fa-chevron-up' : 'fa-sliders'}`} style={{ marginRight: '0.42rem' }}></i>
+          {showDashboardControls ? 'Hide Dashboard Controls' : 'Show Dashboard Controls'}
+        </button>
+        <div style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
+          {showDashboardControls ? 'Dashboard controls are visible.' : 'Dashboard controls hidden.'}
+        </div>
+      </div>
+
+      {showDashboardControls && (
       <div style={{ ...cardStyle, padding: '1.08rem 1.15rem' }}>
         <div style={{ display: 'grid', gap: '0.9rem' }}>
           <div>
@@ -388,6 +404,7 @@ const MonthlySummaryTab = ({
           />
         </div>
       </div>
+      )}
 
       <SummaryCards cards={summaryCards} />
 

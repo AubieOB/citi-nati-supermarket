@@ -35,6 +35,8 @@ const reduceSummary = (entries = []) => entries.reduce((acc, entry) => {
 });
 
 const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] }) => {
+  const [showManagementPanel, setShowManagementPanel] = useState(false);
+  const [showPeriodFilters, setShowPeriodFilters] = useState(false);
   const [employees, setEmployees] = useState([]);
 
   const [periodFilters, setPeriodFilters] = useState({
@@ -81,6 +83,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
   const [entryEmployeeSalary, setEntryEmployeeSalary] = useState(null);
   const [exportingExcel, setExportingExcel] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const hasActivePeriodFilters = Boolean(periodFilters.search || periodFilters.status || periodFilters.payrollMode);
 
   const fetchEmployees = useCallback(async () => {
     try {
@@ -440,6 +443,31 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
+      <div style={{ ...cardStyle, padding: '0.7rem 0.95rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => setShowManagementPanel((prev) => !prev)}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: showManagementPanel ? '#0f172a' : '#fff', color: showManagementPanel ? '#fff' : '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+          >
+            <i className={`fas ${showManagementPanel ? 'fa-chevron-up' : 'fa-layer-group'}`} style={{ marginRight: '0.42rem' }}></i>
+            {showManagementPanel ? 'Hide Payroll Management' : 'Show Payroll Management'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowPeriodFilters((prev) => !prev)}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: showPeriodFilters ? '#0f172a' : '#fff', color: showPeriodFilters ? '#fff' : '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+          >
+            <i className={`fas ${showPeriodFilters ? 'fa-chevron-up' : 'fa-sliders'}`} style={{ marginRight: '0.42rem' }}></i>
+            {showPeriodFilters ? 'Hide Period Filters' : 'Show Period Filters'}
+          </button>
+        </div>
+        <div style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
+          {showPeriodFilters ? 'Period filters are visible.' : `Period filters hidden${hasActivePeriodFilters ? ' • active filters applied' : ''}.`}
+        </div>
+      </div>
+
+      {showManagementPanel && (
       <div style={{ ...cardStyle, padding: '1.1rem 1.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', flexWrap: 'wrap' }}>
         <div>
           <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.14rem' }}>Payroll Management</h3>
@@ -480,7 +508,9 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
           </button>
         </div>
       </div>
+      )}
 
+      {showPeriodFilters && (
       <div style={{ ...cardStyle, padding: '0.9rem 1rem', display: 'flex', gap: '0.65rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: '1 1 250px' }}>
           <i className="fas fa-search" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none', fontSize: '0.85rem' }}></i>
@@ -523,6 +553,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
           Clear
         </button>
       </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', alignItems: 'start' }}>
         <PayrollPeriodsList

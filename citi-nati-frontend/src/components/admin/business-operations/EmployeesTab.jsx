@@ -22,6 +22,9 @@ const getApiError = (err, fallback) =>
   err?.response?.data?.error || err?.response?.data?.message || err?.message || fallback;
 
 const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] }) => {
+  const [showSummaryPanel, setShowSummaryPanel] = useState(false);
+  const [showRegisterFilters, setShowRegisterFilters] = useState(false);
+
   // ── List state ──
   const [employees, setEmployees] = useState([]);
   const [pagination, setPagination] = useState({ total: 0, skip: 0, take: 20 });
@@ -59,6 +62,7 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
   const activeCount = employees.filter((e) => e.status === 'active').length;
   const inactiveCount = employees.filter((e) => e.status !== 'active').length;
   const departmentCount = new Set(employees.map((e) => e.department).filter(Boolean)).size;
+  const hasActiveFilters = Boolean(search || statusFilter);
 
   // ── Fetch employee list ──
   const fetchEmployees = useCallback(async (pg = page) => {
@@ -256,6 +260,30 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
 
+      <div style={{ ...cardStyle, padding: '0.7rem 0.95rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => setShowSummaryPanel((prev) => !prev)}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: showSummaryPanel ? '#0f172a' : '#fff', color: showSummaryPanel ? '#fff' : '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+          >
+            <i className={`fas ${showSummaryPanel ? 'fa-chevron-up' : 'fa-chart-simple'}`} style={{ marginRight: '0.42rem' }} />
+            {showSummaryPanel ? 'Hide Employee Summary' : 'Show Employee Summary'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowRegisterFilters((prev) => !prev)}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: showRegisterFilters ? '#0f172a' : '#fff', color: showRegisterFilters ? '#fff' : '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+          >
+            <i className={`fas ${showRegisterFilters ? 'fa-chevron-up' : 'fa-sliders'}`} style={{ marginRight: '0.42rem' }} />
+            {showRegisterFilters ? 'Hide Register Filters' : 'Show Register Filters'}
+          </button>
+        </div>
+        <div style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
+          {showRegisterFilters ? 'Register filters are visible.' : `Register filters hidden${hasActiveFilters ? ' • active filters applied' : ''}.`}
+        </div>
+      </div>
+
       {/* ── Header ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
         <div>
@@ -298,14 +326,17 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
       </div>
 
       {/* ── Summary cards ── */}
+      {showSummaryPanel && (
       <EmployeeSummaryCards
         totalEmployees={pagination.total || employees.length}
         activeCount={activeCount}
         inactiveCount={inactiveCount}
         departmentCount={departmentCount}
       />
+      )}
 
       {/* ── Filter bar ── */}
+      {showRegisterFilters && (
       <div style={{ ...cardStyle, padding: '0.85rem 1rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: '1 1 220px' }}>
           <i className="fas fa-search" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none', fontSize: '0.88rem' }} />
@@ -328,6 +359,7 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
           <option value="terminated">Terminated</option>
         </select>
       </div>
+      )}
 
       {/* ── Main two-panel layout ── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', alignItems: 'start' }}>
