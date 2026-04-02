@@ -266,125 +266,6 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
-      <div style={{ ...cardStyle, padding: '0.7rem 0.95rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            onClick={openAddExpense}
-            style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
-          >
-            <i className="fas fa-plus" style={{ marginRight: '0.42rem' }} />
-            Add Expense
-          </button>
-          <button
-            type="button"
-            onClick={openAddCategory}
-            style={{ border: '1px solid #5B4B8A', backgroundColor: '#fff', color: '#5B4B8A', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
-          >
-            <i className="fas fa-tags" style={{ marginRight: '0.42rem' }} />
-            Add Category
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowFilters((prev) => !prev)}
-            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
-          >
-            <i className="fas fa-sliders" style={{ marginRight: '0.42rem' }} />
-            {showFilters ? 'Hide Register Filters' : 'Show Register Filters'}
-          </button>
-          <button
-            type="button"
-            onClick={refreshAll}
-            disabled={isLoading}
-            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: isLoading ? 'not-allowed' : 'pointer' }}
-          >
-            <i className={`fas ${isLoading ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`} style={{ marginRight: '0.42rem' }} />
-            Refresh
-          </button>
-        </div>
-        <div style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
-          {showFilters
-            ? 'Register filters are visible.'
-            : `Register filters hidden${hasActiveExpenseFilters ? ' • active filters applied' : ''}.`}
-        </div>
-      </div>
-
-      <div style={{ ...cardStyle, padding: '0.72rem 0.95rem', display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
-        <button
-          type="button"
-          onClick={() => handleExport('pdf')}
-          disabled={exportingExcel || exportingPdf}
-          style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}
-        >
-          <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.42rem' }} />
-          Export PDF
-        </button>
-        <button
-          type="button"
-          onClick={() => handleExport('excel')}
-          disabled={exportingExcel || exportingPdf}
-          style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}
-        >
-          <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.42rem' }} />
-          Export Excel
-        </button>
-      </div>
-
-      {showFilters && (
-        <div style={{ ...cardStyle, padding: '1rem' }}>
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <div style={{ flex: '1 1 280px', position: 'relative' }}>
-              <i className="fas fa-search" style={{ position: 'absolute', top: '50%', left: '0.95rem', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-              <input
-                type="text"
-                value={filters.search}
-                onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
-                placeholder="Search by description, reference, payment method, or category"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '0.85rem 1rem 0.85rem 2.7rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem' }}
-              />
-            </div>
-            <select
-              value={filters.expenseCategoryId}
-              onChange={(e) => setFilters((prev) => ({ ...prev, expenseCategoryId: e.target.value }))}
-              style={{ minWidth: '150px', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem', backgroundColor: '#fff' }}
-            >
-              <option value="">All categories</option>
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
-              ))}
-            </select>
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <span style={{ color: '#64748b', fontSize: '0.87rem', whiteSpace: 'nowrap' }}>From</span>
-              <input
-                type="date"
-                value={filters.startDate}
-                onChange={(e) => setFilters((prev) => ({ ...prev, startDate: e.target.value }))}
-                style={{ padding: '0.85rem 0.9rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem' }}
-              />
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <span style={{ color: '#64748b', fontSize: '0.87rem', whiteSpace: 'nowrap' }}>To</span>
-              <input
-                type="date"
-                value={filters.endDate}
-                onChange={(e) => setFilters((prev) => ({ ...prev, endDate: e.target.value }))}
-                style={{ padding: '0.85rem 0.9rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem' }}
-              />
-            </div>
-            {(filters.search || filters.expenseCategoryId || filters.startDate !== initialRange.startDate || filters.endDate !== initialRange.endDate) && (
-              <button
-                type="button"
-                onClick={() => setFilters({ search: '', expenseCategoryId: '', startDate: initialRange.startDate, endDate: initialRange.endDate })}
-                style={{ border: '1px solid #fecaca', backgroundColor: '#fef2f2', color: '#b91c1c', borderRadius: '10px', padding: '0.72rem 0.9rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.87rem' }}
-              >
-                <i className="fas fa-xmark" style={{ marginRight: '0.4rem' }} />
-                Clear filters
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
       <div style={{ ...cardStyle, padding: '1.1rem' }}>
         <ExpenseSummaryCards summary={summary} categoryCount={activeCategories.length} />
       </div>
@@ -411,7 +292,9 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
         <div style={{ ...cardStyle, padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <div>
             <strong style={{ color: '#0f172a' }}>Expense Register Workspace</strong>
-            <p style={{ margin: '0.32rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>Open the full register and details workspace only when needed.</p>
+            <p style={{ margin: '0.32rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>
+              {hasActiveExpenseFilters ? 'Filters are applied inside this workspace.' : 'Open the full register and details workspace only when needed.'}
+            </p>
           </div>
           <button
             type="button"
@@ -443,9 +326,111 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
       {isExpensesWorkspaceModalOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: '1rem' }}>
           <div style={{ ...cardStyle, width: 'min(1240px, 97vw)', maxHeight: '90vh', overflow: 'auto', padding: '0.95rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-              <strong style={{ color: '#0f172a' }}>Expense Register Workspace</strong>
-              <button type="button" onClick={() => setIsExpensesWorkspaceModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}>Close</button>
+            <div style={{ display: 'grid', gap: '0.85rem', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <strong style={{ color: '#0f172a' }}>Expense Register Workspace</strong>
+                <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={openAddExpense}
+                    style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+                  >
+                    <i className="fas fa-plus" style={{ marginRight: '0.42rem' }} />
+                    Add Expense
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowFilters((prev) => !prev)}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+                  >
+                    <i className="fas fa-sliders" style={{ marginRight: '0.42rem' }} />
+                    {showFilters ? 'Hide Filters' : 'Show Filters'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={refreshAll}
+                    disabled={isLoading}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: isLoading ? 'not-allowed' : 'pointer' }}
+                  >
+                    <i className={`fas ${isLoading ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`} style={{ marginRight: '0.42rem' }} />
+                    Refresh
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleExport('pdf')}
+                    disabled={exportingExcel || exportingPdf}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}
+                  >
+                    <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.42rem' }} />
+                    Export PDF
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleExport('excel')}
+                    disabled={exportingExcel || exportingPdf}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}
+                  >
+                    <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.42rem' }} />
+                    Export Excel
+                  </button>
+                  <button type="button" onClick={() => setIsExpensesWorkspaceModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}>Close</button>
+                </div>
+              </div>
+
+              {showFilters && (
+                <div style={{ ...cardStyle, padding: '1rem' }}>
+                  <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    <div style={{ flex: '1 1 280px', position: 'relative' }}>
+                      <i className="fas fa-search" style={{ position: 'absolute', top: '50%', left: '0.95rem', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                      <input
+                        type="text"
+                        value={filters.search}
+                        onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+                        placeholder="Search by description, reference, payment method, or category"
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '0.85rem 1rem 0.85rem 2.7rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem' }}
+                      />
+                    </div>
+                    <select
+                      value={filters.expenseCategoryId}
+                      onChange={(e) => setFilters((prev) => ({ ...prev, expenseCategoryId: e.target.value }))}
+                      style={{ minWidth: '150px', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem', backgroundColor: '#fff' }}
+                    >
+                      <option value="">All categories</option>
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))}
+                    </select>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <span style={{ color: '#64748b', fontSize: '0.87rem', whiteSpace: 'nowrap' }}>From</span>
+                      <input
+                        type="date"
+                        value={filters.startDate}
+                        onChange={(e) => setFilters((prev) => ({ ...prev, startDate: e.target.value }))}
+                        style={{ padding: '0.85rem 0.9rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <span style={{ color: '#64748b', fontSize: '0.87rem', whiteSpace: 'nowrap' }}>To</span>
+                      <input
+                        type="date"
+                        value={filters.endDate}
+                        onChange={(e) => setFilters((prev) => ({ ...prev, endDate: e.target.value }))}
+                        style={{ padding: '0.85rem 0.9rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem' }}
+                      />
+                    </div>
+                    {(filters.search || filters.expenseCategoryId || filters.startDate !== initialRange.startDate || filters.endDate !== initialRange.endDate) && (
+                      <button
+                        type="button"
+                        onClick={() => setFilters({ search: '', expenseCategoryId: '', startDate: initialRange.startDate, endDate: initialRange.endDate })}
+                        style={{ border: '1px solid #fecaca', backgroundColor: '#fef2f2', color: '#b91c1c', borderRadius: '10px', padding: '0.72rem 0.9rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.87rem' }}
+                      >
+                        <i className="fas fa-xmark" style={{ marginRight: '0.4rem' }} />
+                        Clear filters
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', alignItems: 'start' }}>
@@ -500,9 +485,19 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
       {isCategoriesWorkspaceModalOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: '1rem' }}>
           <div style={{ ...cardStyle, width: 'min(1100px, 97vw)', maxHeight: '90vh', overflow: 'auto', padding: '0.95rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
               <strong style={{ color: '#0f172a' }}>Categories Workspace</strong>
-              <button type="button" onClick={() => setIsCategoriesWorkspaceModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}>Close</button>
+              <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={openAddCategory}
+                  style={{ border: '1px solid #5B4B8A', backgroundColor: '#fff', color: '#5B4B8A', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+                >
+                  <i className="fas fa-tags" style={{ marginRight: '0.42rem' }} />
+                  Add Category
+                </button>
+                <button type="button" onClick={() => setIsCategoriesWorkspaceModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}>Close</button>
+              </div>
             </div>
             <div style={{ ...cardStyle, overflow: 'hidden' }}>
               <ExpenseCategoriesPanel

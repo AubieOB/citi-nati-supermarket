@@ -132,7 +132,6 @@ const ErrorState = ({ message }) => (
 
 const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, selectedLocationCode = '' }) => {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
-  const [showFilters, setShowFilters] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [activeView, setActiveView] = useState('summary');
   const [viewState, setViewState] = useState(DEFAULT_VIEW_STATE);
@@ -611,51 +610,6 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
-      <div style={{ ...baseCardStyle, padding: '0.7rem 0.95rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-        <button
-          type="button"
-          onClick={() => setShowFilters((prev) => !prev)}
-          style={{
-            border: '1px solid #cbd5e1',
-            backgroundColor: '#fff',
-            color: '#0f172a',
-            borderRadius: '10px',
-            padding: '0.55rem 0.85rem',
-            fontWeight: 700,
-            fontSize: '0.86rem',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.45rem',
-          }}
-          aria-expanded={showFilters}
-          aria-label={showFilters ? 'Hide sales report filters' : 'Show sales report filters'}
-        >
-          <i className="fas fa-sliders"></i>
-          {showFilters ? 'Hide Filters' : 'Show Filters'}
-        </button>
-
-        <div style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
-          {showFilters
-            ? 'Filters are visible.'
-            : `Filters hidden${activeFilterCount > 0 ? ` • ${activeFilterCount} active` : ''}.`}
-        </div>
-      </div>
-
-      {showFilters && (
-        <SalesReportFilters
-          filters={filters}
-          onChange={updateFilter}
-          onReset={resetFilters}
-          resolvedRange={summaryMeta.dateRange}
-          loading={summaryLoading}
-          exportingExcel={exportingExcel}
-          exportingPdf={exportingPdf}
-          onExportExcel={() => handleExport('excel')}
-          onExportPdf={() => handleExport('pdf')}
-        />
-      )}
-
       <div style={{ display: 'flex', gap: '0.55rem', overflowX: 'auto' }}>
         {REPORT_VIEWS.map((view) => (
           <button key={view.id} type="button" onClick={() => setActiveView(view.id)} style={sectionTabStyle(activeView === view.id)}>
@@ -665,16 +619,41 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
         ))}
       </div>
 
-      <div style={{ ...baseCardStyle, padding: '0.95rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-        <div style={{ color: '#334155', fontWeight: 700 }}>{activeViewLabel} workspace</div>
-        <button
-          type="button"
-          onClick={() => setIsReportModalOpen(true)}
-          style={{ border: 'none', backgroundColor: '#0f172a', color: '#fff', borderRadius: '10px', padding: '0.58rem 0.92rem', fontWeight: 700, cursor: 'pointer' }}
-        >
-          Open {activeViewLabel}
-        </button>
-      </div>
+      {activeView === 'summary' && (
+        <>
+          <SalesReportFilters
+            filters={filters}
+            onChange={updateFilter}
+            onReset={resetFilters}
+            resolvedRange={summaryMeta.dateRange}
+            loading={summaryLoading}
+            exportingExcel={exportingExcel}
+            exportingPdf={exportingPdf}
+            onExportExcel={() => handleExport('excel')}
+            onExportPdf={() => handleExport('pdf')}
+          />
+
+          {renderSummaryView()}
+        </>
+      )}
+
+      {activeView !== 'summary' && (
+        <div style={{ ...baseCardStyle, padding: '0.95rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ color: '#334155', fontWeight: 700 }}>{activeViewLabel} workspace</div>
+            <div style={{ color: '#64748b', fontSize: '0.86rem', marginTop: '0.2rem' }}>
+              {activeFilterCount > 0 ? `${activeFilterCount} filters active in this workspace.` : 'Open the workspace to adjust filters and review results.'}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsReportModalOpen(true)}
+            style={{ border: 'none', backgroundColor: '#0f172a', color: '#fff', borderRadius: '10px', padding: '0.58rem 0.92rem', fontWeight: 700, cursor: 'pointer' }}
+          >
+            Open {activeViewLabel}
+          </button>
+        </div>
+      )}
 
       {isReportModalOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: '1rem' }}>
@@ -690,7 +669,18 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
               </button>
             </div>
 
-            {activeView === 'summary' && renderSummaryView()}
+            <SalesReportFilters
+              filters={filters}
+              onChange={updateFilter}
+              onReset={resetFilters}
+              resolvedRange={summaryMeta.dateRange}
+              loading={summaryLoading}
+              exportingExcel={exportingExcel}
+              exportingPdf={exportingPdf}
+              onExportExcel={() => handleExport('excel')}
+              onExportPdf={() => handleExport('pdf')}
+            />
+
             {activeView === 'invoices' && renderInvoicesView()}
             {activeView === 'products' && renderProductsView()}
             {activeView === 'users' && renderUsersView()}

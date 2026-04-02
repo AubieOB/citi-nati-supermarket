@@ -360,59 +360,12 @@ const MonthlySummaryTab = ({
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
-      <div style={{ ...cardStyle, padding: '0.7rem 0.95rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-        <button
-          type="button"
-          onClick={() => setShowControls((prev) => !prev)}
-          style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
-        >
-          <i className="fas fa-sliders" style={{ marginRight: '0.42rem' }}></i>
-          {showControls ? 'Hide Dashboard Controls' : 'Show Dashboard Controls'}
-        </button>
-        <div style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
-          {showControls ? 'Dashboard controls are visible.' : 'Dashboard controls are hidden.'}
-        </div>
-      </div>
-
-      {showControls && (
-      <div style={{ ...cardStyle, padding: '1.08rem 1.15rem' }}>
-        <div style={{ display: 'grid', gap: '0.9rem' }}>
-          <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.42rem', color: '#5B4B8A', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.74rem', letterSpacing: '0.05em' }}>
-              <i className="fas fa-chart-line"></i>
-              Management Dashboard
-            </div>
-            <h3 style={{ margin: '0.38rem 0 0', color: '#0f172a', fontSize: '1.16rem' }}>Monthly Summary</h3>
-            <p style={{ margin: '0.4rem 0 0', color: '#64748b', lineHeight: 1.55, fontSize: '0.9rem' }}>
-              Executive overview combining Sales, Expenses, Payroll, and Suppliers to estimate business performance at a glance.
-            </p>
-          </div>
-
-          <SummaryFiltersBar
-            filters={filters}
-            rangeLabel={activeRange.label}
-            locationLabel={selectedLocationName || selectedLocationCode || ''}
-            locationCode={selectedLocationCode || ''}
-            loading={anyLoading}
-            validationError={validationError}
-            onChange={handleFilterChange}
-            onRefresh={() => setRefreshTick((current) => current + 1)}
-            onClear={resetFilters}
-            exportingExcel={exportingExcel}
-            exportingPdf={exportingPdf}
-            onExportExcel={() => handleExport('excel')}
-            onExportPdf={() => handleExport('pdf')}
-          />
-        </div>
-      </div>
-      )}
-
-      <SummaryCards cards={summaryCards} />
-
       <div style={{ ...cardStyle, padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
         <div>
           <strong style={{ color: '#0f172a' }}>Monthly Insights Workspace</strong>
-          <p style={{ margin: '0.32rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>Open detailed summary sections only when needed.</p>
+          <p style={{ margin: '0.32rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>
+            {showControls ? 'Controls are available inside this workspace.' : 'Open detailed summary sections only when needed.'}
+          </p>
         </div>
         <button
           type="button"
@@ -426,9 +379,56 @@ const MonthlySummaryTab = ({
       {isInsightsModalOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: '1rem' }}>
           <div style={{ ...cardStyle, width: 'min(1240px, 97vw)', maxHeight: '90vh', overflow: 'auto', padding: '0.95rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-              <strong style={{ color: '#0f172a' }}>Monthly Insights Workspace</strong>
-              <button type="button" onClick={() => setIsInsightsModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}>Close</button>
+            <div style={{ display: 'grid', gap: '0.9rem', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <strong style={{ color: '#0f172a' }}>Monthly Insights Workspace</strong>
+                <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowControls((prev) => !prev)}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+                  >
+                    <i className="fas fa-sliders" style={{ marginRight: '0.42rem' }}></i>
+                    {showControls ? 'Hide Controls' : 'Show Controls'}
+                  </button>
+                  <button type="button" onClick={() => setIsInsightsModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}>Close</button>
+                </div>
+              </div>
+
+              {showControls && (
+                <div style={{ ...cardStyle, padding: '1.08rem 1.15rem' }}>
+                  <div style={{ display: 'grid', gap: '0.9rem' }}>
+                    <div>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.42rem', color: '#5B4B8A', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.74rem', letterSpacing: '0.05em' }}>
+                        <i className="fas fa-chart-line"></i>
+                        Management Dashboard
+                      </div>
+                      <h3 style={{ margin: '0.38rem 0 0', color: '#0f172a', fontSize: '1.16rem' }}>Monthly Summary</h3>
+                      <p style={{ margin: '0.4rem 0 0', color: '#64748b', lineHeight: 1.55, fontSize: '0.9rem' }}>
+                        Executive overview combining Sales, Expenses, Payroll, and Suppliers to estimate business performance at a glance.
+                      </p>
+                    </div>
+
+                    <SummaryFiltersBar
+                      filters={filters}
+                      rangeLabel={activeRange.label}
+                      locationLabel={selectedLocationName || selectedLocationCode || ''}
+                      locationCode={selectedLocationCode || ''}
+                      loading={anyLoading}
+                      validationError={validationError}
+                      onChange={handleFilterChange}
+                      onRefresh={() => setRefreshTick((current) => current + 1)}
+                      onClear={resetFilters}
+                      exportingExcel={exportingExcel}
+                      exportingPdf={exportingPdf}
+                      onExportExcel={() => handleExport('excel')}
+                      onExportPdf={() => handleExport('pdf')}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <SummaryCards cards={summaryCards} />
             </div>
 
             <div style={{ display: 'grid', gap: '0.9rem' }}>

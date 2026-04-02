@@ -259,25 +259,6 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
-
-      <div style={{ ...cardStyle, padding: '0.7rem 0.95rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            onClick={() => setShowFilters((prev) => !prev)}
-            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
-          >
-            <i className="fas fa-sliders" style={{ marginRight: '0.42rem' }} />
-            {showFilters ? 'Hide Register Filters' : 'Show Register Filters'}
-          </button>
-        </div>
-        <div style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
-          {showFilters
-            ? 'Register filters are visible.'
-            : `Register filters hidden${hasActiveFilters ? ' • active filters applied' : ''}.`}
-        </div>
-      </div>
-
       {/* ── Header ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
         <div>
@@ -289,34 +270,6 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
             Manage staff, employment details, and salary structures
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
-          <button
-            onClick={() => handleExport('pdf')}
-            disabled={exportingExcel || exportingPdf}
-            style={{ border: '1px solid #e2e8f0', backgroundColor: '#fff', color: '#475569', borderRadius: '10px', padding: '0.65rem 1rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.88rem' }}
-          >
-            <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.4rem' }} />Export PDF
-          </button>
-          <button
-            onClick={() => handleExport('excel')}
-            disabled={exportingExcel || exportingPdf}
-            style={{ border: '1px solid #e2e8f0', backgroundColor: '#fff', color: '#475569', borderRadius: '10px', padding: '0.65rem 1rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.88rem' }}
-          >
-            <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.4rem' }} />Export Excel
-          </button>
-          <button
-            onClick={() => refreshData()}
-            style={{ border: '1px solid #e2e8f0', backgroundColor: '#fff', color: '#475569', borderRadius: '10px', padding: '0.65rem 1rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.88rem' }}
-          >
-            <i className="fas fa-sync-alt" style={{ marginRight: '0.4rem' }} />Refresh
-          </button>
-          <button
-            onClick={handleAddEmployee}
-            style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.65rem 1.1rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.88rem' }}
-          >
-            <i className="fas fa-plus" style={{ marginRight: '0.4rem' }} />Add Employee
-          </button>
-        </div>
       </div>
 
       {/* ── Summary cards ── */}
@@ -327,37 +280,12 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
         departmentCount={departmentCount}
       />
 
-      {showFilters && (
-      <div style={{ ...cardStyle, padding: '0.85rem 1rem' }}>
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ position: 'relative', flex: '1 1 220px' }}>
-            <i className="fas fa-search" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none', fontSize: '0.88rem' }} />
-            <input
-              type="text"
-              placeholder="Search employees…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{ width: '100%', boxSizing: 'border-box', padding: '0.72rem 0.9rem 0.72rem 2.2rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc' }}
-            />
-          </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            style={{ padding: '0.72rem 0.9rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc', cursor: 'pointer', minWidth: '130px' }}
-          >
-            <option value="">All Statuses</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-            <option value="terminated">Terminated</option>
-          </select>
-        </div>
-      </div>
-      )}
-
       <div style={{ ...cardStyle, padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
         <div>
           <strong style={{ color: '#0f172a' }}>Employees Workspace</strong>
-          <p style={{ margin: '0.32rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>Launch the full employee register and details workspace on demand.</p>
+          <p style={{ margin: '0.32rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>
+            {hasActiveFilters ? 'Filters are applied inside this workspace.' : 'Launch the full employee register and details workspace on demand.'}
+          </p>
         </div>
         <button
           type="button"
@@ -371,9 +299,78 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
       {isEmployeesWorkspaceModalOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: '1rem' }}>
           <div style={{ ...cardStyle, width: 'min(1240px, 97vw)', maxHeight: '90vh', overflow: 'auto', padding: '0.95rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-              <strong style={{ color: '#0f172a' }}>Employees Workspace</strong>
-              <button type="button" onClick={() => setIsEmployeesWorkspaceModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}>Close</button>
+            <div style={{ display: 'grid', gap: '0.85rem', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <strong style={{ color: '#0f172a' }}>Employees Workspace</strong>
+                <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={handleAddEmployee}
+                    style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.65rem 1.1rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.88rem' }}
+                  >
+                    <i className="fas fa-plus" style={{ marginRight: '0.4rem' }} />Add Employee
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowFilters((prev) => !prev)}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+                  >
+                    <i className="fas fa-sliders" style={{ marginRight: '0.42rem' }} />
+                    {showFilters ? 'Hide Filters' : 'Show Filters'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => refreshData()}
+                    style={{ border: '1px solid #e2e8f0', backgroundColor: '#fff', color: '#475569', borderRadius: '10px', padding: '0.65rem 1rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.88rem' }}
+                  >
+                    <i className="fas fa-sync-alt" style={{ marginRight: '0.4rem' }} />Refresh
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleExport('pdf')}
+                    disabled={exportingExcel || exportingPdf}
+                    style={{ border: '1px solid #e2e8f0', backgroundColor: '#fff', color: '#475569', borderRadius: '10px', padding: '0.65rem 1rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.88rem' }}
+                  >
+                    <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.4rem' }} />Export PDF
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleExport('excel')}
+                    disabled={exportingExcel || exportingPdf}
+                    style={{ border: '1px solid #e2e8f0', backgroundColor: '#fff', color: '#475569', borderRadius: '10px', padding: '0.65rem 1rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.88rem' }}
+                  >
+                    <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.4rem' }} />Export Excel
+                  </button>
+                  <button type="button" onClick={() => setIsEmployeesWorkspaceModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}>Close</button>
+                </div>
+              </div>
+
+              {showFilters && (
+                <div style={{ ...cardStyle, padding: '0.85rem 1rem' }}>
+                  <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div style={{ position: 'relative', flex: '1 1 220px' }}>
+                      <i className="fas fa-search" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none', fontSize: '0.88rem' }} />
+                      <input
+                        type="text"
+                        placeholder="Search employees..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '0.72rem 0.9rem 0.72rem 2.2rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc' }}
+                      />
+                    </div>
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      style={{ padding: '0.72rem 0.9rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc', cursor: 'pointer', minWidth: '130px' }}
+                    >
+                      <option value="">All Statuses</option>
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                      <option value="terminated">Terminated</option>
+                    </select>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', alignItems: 'start' }}>
