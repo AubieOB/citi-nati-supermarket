@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../../../utils/api.js';
 import { downloadBusinessReport } from '../../../utils/exportService.js';
+import { exportActiveSalesReportPdf } from '../../../utils/salesReportsPdfExport.js';
 import SalesReportFilters from './SalesReportFilters.jsx';
 import SalesSummaryCards from './SalesSummaryCards.jsx';
 
@@ -348,6 +349,35 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
     if (format === 'pdf') setExportingPdf(true);
 
     try {
+      if (format === 'pdf') {
+        const activeViewLabelForExport = REPORT_VIEWS.find((view) => view.id === activeView)?.label || 'Report';
+        const activeLoading = (
+          (activeView === 'summary' && summaryLoading)
+          || (activeView === 'invoices' && invoicesState.loading)
+          || (activeView === 'products' && productsState.loading)
+          || (activeView === 'users' && usersState.loading)
+          || (activeView === 'payments' && paymentsState.loading)
+        );
+
+        if (activeLoading) {
+          throw new Error('Please wait for the active report data to finish loading before exporting.');
+        }
+
+        exportActiveSalesReportPdf({
+          activeView,
+          activeViewLabel: activeViewLabelForExport,
+          filters,
+          resolvedDateRange: summaryMeta?.dateRange || null,
+          summaryMetaLine,
+          summary,
+          invoicesState,
+          productsState,
+          usersState,
+          paymentsState,
+        });
+        return;
+      }
+
       await downloadBusinessReport({
         format,
         module: 'sales',
@@ -361,7 +391,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
       if (format === 'excel') setExportingExcel(false);
       if (format === 'pdf') setExportingPdf(false);
     }
-  }, [activeView, filters]);
+  }, [activeView, filters, invoicesState, paymentsState, productsState, summary, summaryLoading, summaryMeta, summaryMetaLine, usersState]);
 
   const activeFilterCount = useMemo(() => {
     const baseline = {
