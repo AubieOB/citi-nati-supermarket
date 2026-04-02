@@ -219,12 +219,6 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
 
   const activeCategories = useMemo(() => categories.filter((c) => c.isActive), [categories]);
   const isLoading = listLoading || categoriesLoading;
-  const hasActiveExpenseFilters = Boolean(
-    filters.search
-    || filters.expenseCategoryId
-    || filters.startDate !== initialRange.startDate
-    || filters.endDate !== initialRange.endDate,
-  );
 
   const handleExport = useCallback(async (format) => {
     if (format === 'excel') setExportingExcel(true);
@@ -272,11 +266,27 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
 
       {/* ── Sub-tabs ── */}
       <div style={{ ...cardStyle, padding: '0 1.1rem', display: 'flex', gap: 0, borderBottom: 'none', overflow: 'hidden' }}>
-        <button type="button" style={tabBtnStyle(activeTab === TAB_EXPENSES)} onClick={() => setActiveTab(TAB_EXPENSES)}>
+        <button
+          type="button"
+          style={tabBtnStyle(activeTab === TAB_EXPENSES)}
+          onClick={() => {
+            setActiveTab(TAB_EXPENSES);
+            setIsCategoriesWorkspaceModalOpen(false);
+            setIsExpensesWorkspaceModalOpen(true);
+          }}
+        >
           <i className="fas fa-list-ul" style={{ marginRight: '0.45rem' }} />
           Expenses
         </button>
-        <button type="button" style={tabBtnStyle(activeTab === TAB_CATEGORIES)} onClick={() => setActiveTab(TAB_CATEGORIES)}>
+        <button
+          type="button"
+          style={tabBtnStyle(activeTab === TAB_CATEGORIES)}
+          onClick={() => {
+            setActiveTab(TAB_CATEGORIES);
+            setIsExpensesWorkspaceModalOpen(false);
+            setIsCategoriesWorkspaceModalOpen(true);
+          }}
+        >
           <i className="fas fa-tags" style={{ marginRight: '0.45rem' }} />
           Categories
           {categories.length > 0 && (
@@ -286,42 +296,6 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
           )}
         </button>
       </div>
-
-      {/* ── Expenses tab ── */}
-      {activeTab === TAB_EXPENSES && (
-        <div style={{ ...cardStyle, padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <div>
-            <strong style={{ color: '#0f172a' }}>Expense Register Workspace</strong>
-            <p style={{ margin: '0.32rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>
-              {hasActiveExpenseFilters ? 'Filters are applied inside this workspace.' : 'Open the full register and details workspace only when needed.'}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsExpensesWorkspaceModalOpen(true)}
-            style={{ border: 'none', backgroundColor: '#0f172a', color: '#fff', borderRadius: '10px', padding: '0.62rem 0.95rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.88rem' }}
-          >
-            Open Expense Workspace
-          </button>
-        </div>
-      )}
-
-      {/* ── Categories tab ── */}
-      {activeTab === TAB_CATEGORIES && (
-        <div style={{ ...cardStyle, padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <div>
-            <strong style={{ color: '#0f172a' }}>Categories Workspace</strong>
-            <p style={{ margin: '0.32rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>Launch the category manager when you need full category operations.</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsCategoriesWorkspaceModalOpen(true)}
-            style={{ border: 'none', backgroundColor: '#0f172a', color: '#fff', borderRadius: '10px', padding: '0.62rem 0.95rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.88rem' }}
-          >
-            Open Categories Workspace
-          </button>
-        </div>
-      )}
 
       {isExpensesWorkspaceModalOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: '1rem' }}>
