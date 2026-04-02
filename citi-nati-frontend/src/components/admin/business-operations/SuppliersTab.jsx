@@ -358,7 +358,8 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
       {isSuppliersWorkspaceModalOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: '1rem' }}>
           <div style={{ ...cardStyle, width: 'min(1240px, 97vw)', maxHeight: '90vh', overflow: 'auto', padding: '0.95rem' }}>
-            <div style={{ display: 'grid', gap: '0.85rem', marginBottom: '0.75rem' }}>
+            <div style={{ position: 'sticky', top: '-0.95rem', zIndex: 5, backgroundColor: '#fff', margin: '-0.95rem -0.95rem 0.75rem', padding: '0.95rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)' }}>
+              <div style={{ display: 'grid', gap: '0.85rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <strong style={{ color: '#0f172a' }}>Suppliers Workspace</strong>
                 <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
@@ -434,6 +435,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
                   </div>
                 </div>
               )}
+              </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', alignItems: 'start' }}>

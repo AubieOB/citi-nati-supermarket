@@ -133,6 +133,8 @@ const ErrorState = ({ message }) => (
 const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, selectedLocationCode = '' }) => {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [showSummaryFilters, setShowSummaryFilters] = useState(false);
+  const [showWorkspaceFilters, setShowWorkspaceFilters] = useState(false);
   const [activeView, setActiveView] = useState('summary');
   const [viewState, setViewState] = useState(DEFAULT_VIEW_STATE);
 
@@ -621,17 +623,33 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
 
       {activeView === 'summary' && (
         <>
-          <SalesReportFilters
-            filters={filters}
-            onChange={updateFilter}
-            onReset={resetFilters}
-            resolvedRange={summaryMeta.dateRange}
-            loading={summaryLoading}
-            exportingExcel={exportingExcel}
-            exportingPdf={exportingPdf}
-            onExportExcel={() => handleExport('excel')}
-            onExportPdf={() => handleExport('pdf')}
-          />
+          <div style={{ ...baseCardStyle, padding: '0.8rem 0.95rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => setShowSummaryFilters((prev) => !prev)}
+              style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+            >
+              <i className="fas fa-sliders" style={{ marginRight: '0.42rem' }}></i>
+              {showSummaryFilters ? 'Hide Filters' : 'Show Filters'}
+            </button>
+            <div style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
+              {showSummaryFilters ? 'Summary filters are visible.' : `Summary filters hidden${activeFilterCount > 0 ? ` • ${activeFilterCount} active` : ''}.`}
+            </div>
+          </div>
+
+          {showSummaryFilters && (
+            <SalesReportFilters
+              filters={filters}
+              onChange={updateFilter}
+              onReset={resetFilters}
+              resolvedRange={summaryMeta.dateRange}
+              loading={summaryLoading}
+              exportingExcel={exportingExcel}
+              exportingPdf={exportingPdf}
+              onExportExcel={() => handleExport('excel')}
+              onExportPdf={() => handleExport('pdf')}
+            />
+          )}
 
           {renderSummaryView()}
         </>
@@ -658,28 +676,44 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
       {isReportModalOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: '1rem' }}>
           <div style={{ ...baseCardStyle, width: 'min(1240px, 97vw)', maxHeight: '90vh', overflow: 'auto', padding: '0.9rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-              <strong style={{ color: '#0f172a' }}>{activeViewLabel}</strong>
-              <button
-                type="button"
-                onClick={() => setIsReportModalOpen(false)}
-                style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}
-              >
-                Close
-              </button>
-            </div>
+            <div style={{ position: 'sticky', top: '-0.9rem', zIndex: 5, backgroundColor: '#fff', margin: '-0.9rem -0.9rem 0.75rem', padding: '0.9rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <strong style={{ color: '#0f172a' }}>{activeViewLabel}</strong>
+                <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowWorkspaceFilters((prev) => !prev)}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+                  >
+                    <i className="fas fa-sliders" style={{ marginRight: '0.42rem' }}></i>
+                    {showWorkspaceFilters ? 'Hide Filters' : 'Show Filters'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsReportModalOpen(false)}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
 
-            <SalesReportFilters
-              filters={filters}
-              onChange={updateFilter}
-              onReset={resetFilters}
-              resolvedRange={summaryMeta.dateRange}
-              loading={summaryLoading}
-              exportingExcel={exportingExcel}
-              exportingPdf={exportingPdf}
-              onExportExcel={() => handleExport('excel')}
-              onExportPdf={() => handleExport('pdf')}
-            />
+              {showWorkspaceFilters && (
+                <div style={{ marginTop: '0.75rem' }}>
+                  <SalesReportFilters
+                    filters={filters}
+                    onChange={updateFilter}
+                    onReset={resetFilters}
+                    resolvedRange={summaryMeta.dateRange}
+                    loading={summaryLoading}
+                    exportingExcel={exportingExcel}
+                    exportingPdf={exportingPdf}
+                    onExportExcel={() => handleExport('excel')}
+                    onExportPdf={() => handleExport('pdf')}
+                  />
+                </div>
+              )}
+            </div>
 
             {activeView === 'invoices' && renderInvoicesView()}
             {activeView === 'products' && renderProductsView()}
