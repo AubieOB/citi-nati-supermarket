@@ -644,7 +644,21 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
     <div style={{ display: 'grid', gap: '1rem' }}>
       <div style={{ display: 'flex', gap: '0.55rem', overflowX: 'auto' }}>
         {REPORT_VIEWS.map((view) => (
-          <button key={view.id} type="button" onClick={() => setActiveView(view.id)} style={sectionTabStyle(activeView === view.id)}>
+          <button
+            key={view.id}
+            type="button"
+            onClick={() => {
+              if (view.id === 'summary') {
+                setActiveView('summary');
+                setIsReportModalOpen(false);
+                return;
+              }
+
+              setActiveView(view.id);
+              setIsReportModalOpen(true);
+            }}
+            style={sectionTabStyle(activeView === view.id)}
+          >
             <i className={`fas ${view.icon}`}></i>
             {view.label}
           </button>
@@ -685,25 +699,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
         </>
       )}
 
-      {activeView !== 'summary' && (
-        <div style={{ ...baseCardStyle, padding: '0.95rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <div>
-            <div style={{ color: '#334155', fontWeight: 700 }}>{activeViewLabel} workspace</div>
-            <div style={{ color: '#64748b', fontSize: '0.86rem', marginTop: '0.2rem' }}>
-              {activeFilterCount > 0 ? `${activeFilterCount} filters active in this workspace.` : 'Open the workspace to adjust filters and review results.'}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsReportModalOpen(true)}
-            style={{ border: 'none', backgroundColor: '#0f172a', color: '#fff', borderRadius: '10px', padding: '0.58rem 0.92rem', fontWeight: 700, cursor: 'pointer' }}
-          >
-            Open {activeViewLabel}
-          </button>
-        </div>
-      )}
-
-      {isReportModalOpen && (
+      {activeView !== 'summary' && isReportModalOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: '1rem' }}>
           <div style={{ ...baseCardStyle, width: 'min(1240px, 97vw)', maxHeight: '90vh', overflow: 'auto', padding: '0.9rem' }}>
             <div style={{ position: 'sticky', top: '-0.9rem', zIndex: 5, backgroundColor: '#fff', margin: '-0.9rem -0.9rem 0.75rem', padding: '0.9rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)' }}>
