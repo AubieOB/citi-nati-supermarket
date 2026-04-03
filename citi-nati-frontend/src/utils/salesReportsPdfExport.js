@@ -521,9 +521,6 @@ export function exportActiveSalesReportPdf({
         fillColor: [249, 250, 251],
       },
       columnStyles: tableConfig.columnStyles,
-      didDrawPage: () => {
-        drawPageHeader(doc, reportTitle, activeViewLabel);
-      },
     });
   }
 
