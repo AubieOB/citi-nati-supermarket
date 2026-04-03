@@ -10,6 +10,14 @@ const cardStyle = {
   boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)',
 };
 
+const sectionCardStyle = {
+  border: '1px solid #e2e8f0',
+  borderRadius: '14px',
+  backgroundColor: '#fff',
+  boxShadow: '0 4px 12px rgba(15,23,42,0.04)',
+  overflow: 'hidden',
+};
+
 const formatDate = (value) => {
   if (!value) return 'Not set';
   const d = new Date(value);
@@ -52,33 +60,38 @@ const PayrollPeriodDetailPanel = ({
   }
 
   return (
-    <div style={{ ...cardStyle, padding: '1rem 1.05rem', display: 'grid', gap: '0.95rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.8rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        <div>
-          <div style={{ color: '#5B4B8A', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em', fontSize: '0.73rem' }}>Selected Payroll Period</div>
-          <h3 style={{ margin: '0.28rem 0 0', color: '#0f172a', fontSize: '1.06rem' }}>{period.description || `Period #${period.id}`}</h3>
-          <p style={{ margin: '0.3rem 0 0', color: '#64748b', fontSize: '0.86rem' }}>
-            {modeLabel(period.payrollMode)} | Status: {period.status || 'draft'} | Created by {period.createdBy || 'System'} on {formatDate(period.createdAt)}
-          </p>
-          <p style={{ margin: '0.2rem 0 0', color: '#64748b', fontSize: '0.83rem' }}>
-            Location: {formatLocation(period)}
-          </p>
+    <div style={{ display: 'grid', gap: '0.95rem' }}>
+      {/* Period header */}
+      <div style={{ ...sectionCardStyle, padding: '1rem 1.05rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.8rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ color: '#5B4B8A', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em', fontSize: '0.73rem' }}>Selected Payroll Period</div>
+            <h3 style={{ margin: '0.28rem 0 0', color: '#0f172a', fontSize: '1.06rem' }}>{period.description || `Period #${period.id}`}</h3>
+            <p style={{ margin: '0.3rem 0 0', color: '#64748b', fontSize: '0.86rem' }}>
+              {modeLabel(period.payrollMode)} &middot; Status: <strong style={{ color: '#0f172a' }}>{period.status || 'draft'}</strong> &middot; Created by {period.createdBy || 'System'} on {formatDate(period.createdAt)}
+            </p>
+            <p style={{ margin: '0.2rem 0 0', color: '#64748b', fontSize: '0.83rem' }}>Location: {formatLocation(period)}</p>
+          </div>
+          <button type="button" onClick={onAddEntry} style={{ border: 'none', backgroundColor: '#0f766e', color: '#fff', borderRadius: '10px', padding: '0.62rem 0.94rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
+            <i className="fas fa-plus" style={{ marginRight: '0.35rem' }}></i>Add Payroll Entry
+          </button>
         </div>
-        <button type="button" onClick={onAddEntry} style={{ border: 'none', backgroundColor: '#0f766e', color: '#fff', borderRadius: '10px', padding: '0.62rem 0.94rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}>
-          <i className="fas fa-plus" style={{ marginRight: '0.35rem' }}></i>Add Payroll Entry
-        </button>
       </div>
 
       <PayrollSummaryCards summary={summary} />
 
-      <div style={{ border: '1px solid #e2e8f0', borderRadius: '14px', padding: '0.8rem 0.9rem', backgroundColor: '#f8fafc' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.55rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '0.4rem' }}>
-          <div style={{ color: '#334155', fontWeight: 700, fontSize: '0.88rem' }}>Linked Employee Payroll Support Records</div>
+      {/* Support records section */}
+      <div style={{ ...sectionCardStyle, padding: '0.85rem 0.95rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.55rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '0.55rem' }}>
+          <div>
+            <strong style={{ color: '#0f172a', fontSize: '0.9rem' }}>Payroll Support Records</strong>
+            <p style={{ margin: '0.18rem 0 0', color: '#64748b', fontSize: '0.8rem' }}>Linked loans, terminations, and reengagements for the selected entry.</p>
+          </div>
           <button
             type="button"
             onClick={onOpenSupportDrawer}
             disabled={!selectedEntryId}
-            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '8px', color: '#334155', padding: '0.36rem 0.64rem', cursor: selectedEntryId ? 'pointer' : 'not-allowed', fontWeight: 700, fontSize: '0.76rem' }}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '8px', color: '#334155', padding: '0.36rem 0.64rem', cursor: selectedEntryId ? 'pointer' : 'not-allowed', fontWeight: 700, fontSize: '0.76rem', whiteSpace: 'nowrap' }}
           >
             <i className="fas fa-up-right-from-square" style={{ marginRight: '0.3rem' }}></i>View Records
           </button>
@@ -92,12 +105,13 @@ const PayrollPeriodDetailPanel = ({
             <span style={{ backgroundColor: '#ede9fe', color: '#5b21b6', borderRadius: '999px', padding: '0.22rem 0.58rem', fontSize: '0.76rem', fontWeight: 700 }}>Reengagements: {Number(supportData.reengagementsTotal || 0).toLocaleString('en-US')}</span>
           </div>
         ) : (
-          <div style={{ color: '#64748b', fontSize: '0.83rem' }}>Select a payroll entry to view linked loans, terminations, and reengagements.</div>
+          <div style={{ color: '#64748b', fontSize: '0.83rem' }}>Select a payroll entry to view linked support records.</div>
         )}
       </div>
 
-      <div style={{ border: '1px solid #e2e8f0', borderRadius: '14px', padding: '0.9rem 0.9rem 0.75rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.7rem', alignItems: 'center', marginBottom: '0.65rem', flexWrap: 'wrap' }}>
+      {/* Payroll entries section */}
+      <div style={sectionCardStyle}>
+        <div style={{ padding: '0.85rem 0.95rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', gap: '0.7rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <div>
             <strong style={{ color: '#0f172a', fontSize: '0.96rem' }}>Payroll Entries</strong>
             <p style={{ margin: '0.22rem 0 0', color: '#64748b', fontSize: '0.82rem' }}>Entries linked to this payroll period.</p>
@@ -106,19 +120,20 @@ const PayrollPeriodDetailPanel = ({
             <i className="fas fa-pen" style={{ marginRight: '0.35rem' }}></i>Edit Selected
           </button>
         </div>
-
-        <PayrollEntriesTable
-          entries={entries}
-          loading={entriesLoading}
-          error={entriesError}
-          page={entriesPage}
-          pagination={entriesPagination}
-          selectedEntryId={selectedEntryId}
-          onSelectEntry={onSelectEntry}
-          onEditEntry={onEditEntry}
-          onPageChange={onPageChange}
-          onAddEntry={onAddEntry}
-        />
+        <div style={{ padding: '0.85rem 0.95rem' }}>
+          <PayrollEntriesTable
+            entries={entries}
+            loading={entriesLoading}
+            error={entriesError}
+            page={entriesPage}
+            pagination={entriesPagination}
+            selectedEntryId={selectedEntryId}
+            onSelectEntry={onSelectEntry}
+            onEditEntry={onEditEntry}
+            onPageChange={onPageChange}
+            onAddEntry={onAddEntry}
+          />
+        </div>
       </div>
     </div>
   );

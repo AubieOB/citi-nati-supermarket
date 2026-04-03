@@ -494,12 +494,16 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
 
       {isPayrollWorkspaceModalOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: '1rem' }}>
-          <div style={{ ...cardStyle, width: 'min(1240px, 97vw)', maxHeight: '90vh', overflow: 'auto', padding: '0.95rem' }}>
-            <div style={{ position: 'sticky', top: '-0.95rem', zIndex: 5, backgroundColor: '#fff', margin: '-0.95rem -0.95rem 0.75rem', padding: '0.95rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)' }}>
-              <div style={{ display: 'grid', gap: '0.85rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <strong style={{ color: '#0f172a' }}>Payroll Workspace</strong>
-                <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+          <div style={{ ...cardStyle, width: 'min(1400px, 97vw)', height: '92vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+
+            {/* Fixed modal header */}
+            <div style={{ flexShrink: 0, padding: '1rem 1.1rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(15,23,42,0.04)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <div>
+                  <h2 style={{ margin: 0, color: '#0f172a', fontSize: '1.15rem', fontWeight: 800 }}>Payroll Workspace</h2>
+                  <p style={{ margin: '0.28rem 0 0', color: '#64748b', fontSize: '0.86rem' }}>Manage payroll periods and process employee salary entries.</p>
+                </div>
+                <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', alignItems: 'center' }}>
                   <button
                     type="button"
                     onClick={handleCreatePeriod}
@@ -528,7 +532,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
                     type="button"
                     onClick={() => handleExport('pdf')}
                     disabled={exportingExcel || exportingPdf}
-                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.64rem 0.95rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
                   >
                     <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.38rem' }}></i>Export PDF
                   </button>
@@ -536,7 +540,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
                     type="button"
                     onClick={() => handleExport('excel')}
                     disabled={exportingExcel || exportingPdf}
-                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.64rem 0.95rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
                   >
                     <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.38rem' }}></i>Export Excel
                   </button>
@@ -545,7 +549,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
               </div>
 
               {showPeriodFilters && (
-                <div style={{ ...cardStyle, padding: '0.9rem 1rem' }}>
+                <div style={{ marginTop: '0.85rem', display: 'flex', gap: '0.65rem', flexWrap: 'wrap', alignItems: 'center' }}>
                   <div style={{ position: 'relative', flex: '1 1 250px' }}>
                     <i className="fas fa-search" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none', fontSize: '0.85rem' }}></i>
                     <input
@@ -556,11 +560,10 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
                       style={{ width: '100%', boxSizing: 'border-box', padding: '0.72rem 0.84rem 0.72rem 2.2rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc' }}
                     />
                   </div>
-
                   <select
                     value={periodFilters.status}
                     onChange={(event) => setPeriodFilters((prev) => ({ ...prev, status: event.target.value }))}
-                    style={{ padding: '0.72rem 0.84rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc', minWidth: '120px' }}
+                    style={{ padding: '0.72rem 0.84rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc', minWidth: '130px' }}
                   >
                     <option value="">All Statuses</option>
                     <option value="draft">Draft</option>
@@ -568,17 +571,15 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
                     <option value="approved">Approved</option>
                     <option value="finalized">Finalized</option>
                   </select>
-
                   <select
                     value={periodFilters.payrollMode}
                     onChange={(event) => setPeriodFilters((prev) => ({ ...prev, payrollMode: event.target.value }))}
-                    style={{ padding: '0.72rem 0.84rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc', minWidth: '120px' }}
+                    style={{ padding: '0.72rem 0.84rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc', minWidth: '130px' }}
                   >
                     <option value="">All Modes</option>
                     <option value="mid_month">Mid Month</option>
                     <option value="full_month">Full Month</option>
                   </select>
-
                   <button
                     type="button"
                     onClick={() => setPeriodFilters({ search: '', status: '', payrollMode: '' })}
@@ -588,47 +589,79 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
                   </button>
                 </div>
               )}
-              </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', alignItems: 'start' }}>
-              <PayrollPeriodsList
-                periods={periods}
-                loading={periodsLoading}
-                error={periodsError}
-                page={periodPage}
-                pagination={periodsPagination}
-                selectedPeriodId={selectedPeriodId}
-                onPageChange={setPeriodPage}
-                onSelectPeriod={(period) => {
-                  setSelectedPeriodId(period.id);
-                  setSelectedPeriod(period);
-                  setEntriesPage(1);
-                  setSelectedEntryId(null);
-                  setSupportData(null);
-                  setSupportDrawer((prev) => ({ ...prev, open: false, error: '', loans: [], terminations: [], reengagements: [] }));
-                }}
-                onEditPeriod={handleEditPeriod}
-                onCreatePeriod={handleCreatePeriod}
-              />
+            {/* Split content panes */}
+            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'minmax(360px, 420px) 1fr', minHeight: 0 }}>
 
-              <PayrollPeriodDetailPanel
-                period={selectedPeriod}
-                summary={summary}
-                entries={entries}
-                entriesLoading={entriesLoading}
-                entriesError={entriesError}
-                entriesPage={entriesPage}
-                entriesPagination={entriesPagination}
-                selectedEntryId={selectedEntryId}
-                supportData={supportData}
-                supportLoading={supportLoading}
-                onSelectEntry={handleSelectEntry}
-                onEditEntry={handleEditEntry}
-                onPageChange={setEntriesPage}
-                onAddEntry={handleAddEntry}
-                onOpenSupportDrawer={handleOpenSupportDrawer}
-              />
+              {/* Left pane — Payroll Periods */}
+              <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, borderRight: '1px solid #e2e8f0' }}>
+                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                  <div style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '0.52rem 0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
+                    <span>Visible: {periods.length} {periods.length === 1 ? 'period' : 'periods'}</span>
+                    <span style={{ color: '#334155', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      Selected: {selectedPeriod ? (selectedPeriod.description || `Period #${selectedPeriod.id}`) : 'None'}
+                    </span>
+                  </div>
+                  <div style={{ padding: '0.85rem' }}>
+                    <PayrollPeriodsList
+                      periods={periods}
+                      loading={periodsLoading}
+                      error={periodsError}
+                      page={periodPage}
+                      pagination={periodsPagination}
+                      selectedPeriodId={selectedPeriodId}
+                      onPageChange={setPeriodPage}
+                      onSelectPeriod={(period) => {
+                        setSelectedPeriodId(period.id);
+                        setSelectedPeriod(period);
+                        setEntriesPage(1);
+                        setSelectedEntryId(null);
+                        setSupportData(null);
+                        setSupportDrawer((prev) => ({ ...prev, open: false, error: '', loans: [], terminations: [], reengagements: [] }));
+                      }}
+                      onEditPeriod={handleEditPeriod}
+                      onCreatePeriod={handleCreatePeriod}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Right pane — Period Detail & Entries */}
+              <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                  <div style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '0.52rem 0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
+                    <span style={{ maxWidth: '340px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {selectedPeriod
+                        ? `${selectedPeriod.description || `Period #${selectedPeriod.id}`}${selectedPeriod.payrollMode ? ` · ${String(selectedPeriod.payrollMode).replace('_', ' ')}` : ''}`
+                        : 'No period selected'}
+                    </span>
+                    <span style={{ color: selectedPeriod?.status === 'finalized' ? '#166534' : '#334155', fontWeight: 700, textTransform: 'capitalize' }}>
+                      {selectedPeriod ? `Status: ${selectedPeriod.status || 'draft'}` : '—'}
+                    </span>
+                  </div>
+                  <div style={{ padding: '0.85rem' }}>
+                    <PayrollPeriodDetailPanel
+                      period={selectedPeriod}
+                      summary={summary}
+                      entries={entries}
+                      entriesLoading={entriesLoading}
+                      entriesError={entriesError}
+                      entriesPage={entriesPage}
+                      entriesPagination={entriesPagination}
+                      selectedEntryId={selectedEntryId}
+                      supportData={supportData}
+                      supportLoading={supportLoading}
+                      onSelectEntry={handleSelectEntry}
+                      onEditEntry={handleEditEntry}
+                      onPageChange={setEntriesPage}
+                      onAddEntry={handleAddEntry}
+                      onOpenSupportDrawer={handleOpenSupportDrawer}
+                    />
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
         </div>

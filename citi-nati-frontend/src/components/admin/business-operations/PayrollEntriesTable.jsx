@@ -75,13 +75,16 @@ const PayrollEntriesTable = ({
             </tr>
           </thead>
           <tbody>
-            {entries.map((entry) => {
+            {entries.map((entry, index) => {
               const selected = selectedEntryId === entry.id;
+              const zebraBase = index % 2 === 0 ? '#fff' : '#fcfdff';
               return (
                 <tr
                   key={entry.id}
                   onClick={() => onSelectEntry(entry)}
-                  style={{ backgroundColor: selected ? '#ecfeff' : '#fff', cursor: 'pointer' }}
+                  onMouseEnter={(event) => { if (!selected) event.currentTarget.style.backgroundColor = '#f0fdf4'; }}
+                  onMouseLeave={(event) => { if (!selected) event.currentTarget.style.backgroundColor = zebraBase; }}
+                  style={{ backgroundColor: selected ? '#ecfeff' : zebraBase, cursor: 'pointer', transition: 'background-color 0.12s ease' }}
                 >
                   <td style={tdStyle}>
                     <div style={{ fontWeight: 700 }}>{fullName(entry.employee)}</div>

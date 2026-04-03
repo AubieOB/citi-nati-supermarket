@@ -104,13 +104,16 @@ const PayrollPeriodsList = ({
                 </tr>
               </thead>
               <tbody>
-                {periods.map((period) => {
+                {periods.map((period, index) => {
                   const selected = selectedPeriodId === period.id;
+                  const zebraBase = index % 2 === 0 ? '#fff' : '#fcfdff';
                   return (
                     <tr
                       key={period.id}
                       onClick={() => onSelectPeriod(period)}
-                      style={{ backgroundColor: selected ? '#f5f3ff' : '#fff', cursor: 'pointer' }}
+                      onMouseEnter={(event) => { if (!selected) event.currentTarget.style.backgroundColor = '#f8fafc'; }}
+                      onMouseLeave={(event) => { if (!selected) event.currentTarget.style.backgroundColor = zebraBase; }}
+                      style={{ backgroundColor: selected ? '#f5f3ff' : zebraBase, cursor: 'pointer', transition: 'background-color 0.12s ease' }}
                     >
                       <td style={tdStyle}>
                         <div style={{ fontWeight: 700 }}>{period.description || `Period #${period.id}`}</div>

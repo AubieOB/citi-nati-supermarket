@@ -10,6 +10,9 @@ const cardStyle = {
   padding: '0.9rem 1rem',
   display: 'grid',
   gap: '0.34rem',
+  boxShadow: '0 6px 16px rgba(15,23,42,0.05)',
+  overflow: 'hidden',
+  position: 'relative',
 };
 
 const PayrollSummaryCards = ({ summary }) => {
@@ -26,6 +29,7 @@ const PayrollSummaryCards = ({ summary }) => {
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '0.75rem' }}>
       {cards.map((card) => (
         <div key={card.label} style={cardStyle}>
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', backgroundColor: card.tone, borderRadius: '14px 14px 0 0' }} />
           <span style={{ color: '#64748b', fontSize: '0.74rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
             {card.label}
           </span>
