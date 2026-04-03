@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../../../utils/api.js';
 import { downloadBusinessReport } from '../../../utils/exportService.js';
+import { exportSuppliersPdf } from '../../../utils/businessOperationsPdfExports.js';
 import SuppliersList from './SuppliersList.jsx';
 import SupplierDetailPanel from './SupplierDetailPanel.jsx';
 import SupplierFormModal from './SupplierFormModal.jsx';
@@ -296,6 +297,19 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
     if (format === 'pdf') setExportingPdf(true);
 
     try {
+      if (format === 'pdf') {
+        exportSuppliersPdf({
+          suppliers,
+          pagination,
+          selectedSupplier,
+          selectedSummary,
+          search,
+          statusFilter,
+          selectedLocationId,
+        });
+        return;
+      }
+
       await downloadBusinessReport({
         format,
         module: 'suppliers',

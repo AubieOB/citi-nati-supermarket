@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../../../utils/api.js';
 import { downloadBusinessReport } from '../../../utils/exportService.js';
+import { exportPayrollPdf } from '../../../utils/businessOperationsPdfExports.js';
 import PayrollPeriodsList from './PayrollPeriodsList.jsx';
 import PayrollPeriodFormModal from './PayrollPeriodFormModal.jsx';
 import PayrollPeriodDetailPanel from './PayrollPeriodDetailPanel.jsx';
@@ -420,6 +421,18 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
     if (format === 'pdf') setExportingPdf(true);
 
     try {
+      if (format === 'pdf') {
+        exportPayrollPdf({
+          selectedPeriod,
+          periodFilters,
+          selectedLocationId,
+          periods,
+          entries,
+          summary,
+        });
+        return;
+      }
+
       await downloadBusinessReport({
         format,
         module: 'payroll',

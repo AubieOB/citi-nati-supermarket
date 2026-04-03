@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../../../utils/api.js';
 import { downloadBusinessReport } from '../../../utils/exportService.js';
+import { exportMonthlySummaryPdf } from '../../../utils/businessOperationsPdfExports.js';
 import SummaryFiltersBar from './monthly-summary/SummaryFiltersBar.jsx';
 import SummaryCards from './monthly-summary/SummaryCards.jsx';
 import SalesSummarySection from './monthly-summary/SalesSummarySection.jsx';
@@ -335,6 +336,20 @@ const MonthlySummaryTab = ({
     if (format === 'pdf') setExportingPdf(true);
 
     try {
+      if (format === 'pdf') {
+        exportMonthlySummaryPdf({
+          filters,
+          activeRange,
+          selectedLocationId,
+          selectedLocationCode,
+          salesState,
+          expensesState,
+          payrollState,
+          supplierState,
+        });
+        return;
+      }
+
       await downloadBusinessReport({
         format,
         module: 'monthly-summary',

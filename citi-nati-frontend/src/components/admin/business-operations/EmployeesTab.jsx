@@ -1,6 +1,7 @@
 ﻿import React, { useCallback, useEffect, useState } from 'react';
 import api from '../../../utils/api.js';
 import { downloadBusinessReport } from '../../../utils/exportService.js';
+import { exportEmployeesPdf } from '../../../utils/businessOperationsPdfExports.js';
 import EmployeesEmptyState from './EmployeesEmptyState.jsx';
 import EmployeeSummaryCards from './EmployeeSummaryCards.jsx';
 import EmployeesList from './EmployeesList.jsx';
@@ -238,6 +239,17 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
     if (format === 'pdf') setExportingPdf(true);
 
     try {
+      if (format === 'pdf') {
+        exportEmployeesPdf({
+          employees,
+          pagination,
+          search,
+          statusFilter,
+          selectedLocationId,
+        });
+        return;
+      }
+
       await downloadBusinessReport({
         format,
         module: 'employees',

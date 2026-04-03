@@ -1,6 +1,7 @@
 ﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../../../utils/api.js';
 import { downloadBusinessReport } from '../../../utils/exportService.js';
+import { exportExpensesPdf } from '../../../utils/businessOperationsPdfExports.js';
 import ExpensesList from './ExpensesList.jsx';
 import ExpenseDetailPanel from './ExpenseDetailPanel.jsx';
 import ExpenseFormModal from './ExpenseFormModal.jsx';
@@ -225,6 +226,18 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
     if (format === 'pdf') setExportingPdf(true);
 
     try {
+      if (format === 'pdf') {
+        exportExpensesPdf({
+          activeTab,
+          filters,
+          selectedLocationId,
+          expenses,
+          categories,
+          summary,
+        });
+        return;
+      }
+
       await downloadBusinessReport({
         format,
         module: 'expenses',
@@ -244,7 +257,7 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
       if (format === 'excel') setExportingExcel(false);
       if (format === 'pdf') setExportingPdf(false);
     }
-  }, [activeTab, filters.endDate, filters.expenseCategoryId, filters.search, filters.startDate, selectedLocationId]);
+  }, [activeTab, categories, expenses, filters, selectedLocationId, summary]);
 
   const tabBtnStyle = (active) => ({
     border: 'none',
