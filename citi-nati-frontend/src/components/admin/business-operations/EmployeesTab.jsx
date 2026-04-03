@@ -330,8 +330,8 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
 
       {isEmployeesWorkspaceModalOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: '1rem' }}>
-          <div style={{ ...cardStyle, width: 'min(1320px, 98vw)', maxHeight: '92vh', overflow: 'auto', padding: '1rem', background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 30%)' }}>
-            <div style={{ position: 'sticky', top: '-1rem', zIndex: 5, backgroundColor: '#fff', margin: '-1rem -1rem 0.85rem', padding: '1rem 1rem 0.9rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)' }}>
+          <div style={{ ...cardStyle, width: 'min(1320px, 98vw)', height: '92vh', overflow: 'hidden', padding: '1rem', background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 30%)', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ backgroundColor: '#fff', margin: '-1rem -1rem 0.85rem', padding: '1rem 1rem 0.9rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)' }}>
               <div style={{ display: 'grid', gap: '0.85rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <div>
@@ -410,42 +410,46 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(460px, 1fr))', gap: '1rem', alignItems: 'start' }}>
-              <div style={{ ...cardStyle, overflow: 'hidden', borderRadius: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(460px, 1fr))', gap: '1rem', alignItems: 'stretch', minHeight: 0, flex: 1, overflow: 'hidden' }}>
+              <div style={{ ...cardStyle, overflow: 'hidden', borderRadius: '16px', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                 <div style={{ padding: '0.88rem 1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
                   <strong style={{ color: '#0f172a' }}>Employee Register</strong>
                   <p style={{ margin: '0.26rem 0 0', color: '#64748b', fontSize: '0.84rem' }}>Select any row to inspect full profile and salary history.</p>
                 </div>
-                <EmployeesList
-                  employees={employees}
-                  loading={listLoading}
-                  error={listError}
-                  pagination={pagination}
-                  page={page}
-                  onPageChange={(pg) => setPage(pg)}
-                  selectedEmployeeId={selectedEmployeeId}
-                  onSelectEmployee={handleSelectEmployee}
-                  onEditEmployee={() => handleEditEmployee()}
-                />
+                <div style={{ minHeight: 0, overflowY: 'auto' }}>
+                  <EmployeesList
+                    employees={employees}
+                    loading={listLoading}
+                    error={listError}
+                    pagination={pagination}
+                    page={page}
+                    onPageChange={(pg) => setPage(pg)}
+                    selectedEmployeeId={selectedEmployeeId}
+                    onSelectEmployee={handleSelectEmployee}
+                    onEditEmployee={() => handleEditEmployee()}
+                  />
+                </div>
               </div>
 
-              <div style={{ ...cardStyle, overflow: 'hidden', borderRadius: '16px' }}>
+              <div style={{ ...cardStyle, overflow: 'hidden', borderRadius: '16px', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                 <div style={{ padding: '0.88rem 1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
                   <strong style={{ color: '#0f172a' }}>Employee Insight Panel</strong>
                   <p style={{ margin: '0.26rem 0 0', color: '#64748b', fontSize: '0.84rem' }}>View profile details, employment fields, and salary structures.</p>
                 </div>
-                <EmployeeDetailPanel
-                  employee={selectedEmployee}
-                  salaryHistory={salaryHistory}
-                  salaryLoading={salaryLoading}
-                  salaryError={salaryError}
-                  detailLoading={detailLoading}
-                  detailError={detailError}
-                  onEditEmployee={handleEditEmployee}
-                  onAddSalary={handleAddSalary}
-                  onEditSalary={handleEditSalary}
-                  onAddEmployee={handleAddEmployee}
-                />
+                <div style={{ minHeight: 0, overflowY: 'auto' }}>
+                  <EmployeeDetailPanel
+                    employee={selectedEmployee}
+                    salaryHistory={salaryHistory}
+                    salaryLoading={salaryLoading}
+                    salaryError={salaryError}
+                    detailLoading={detailLoading}
+                    detailError={detailError}
+                    onEditEmployee={handleEditEmployee}
+                    onAddSalary={handleAddSalary}
+                    onEditSalary={handleEditSalary}
+                    onAddEmployee={handleAddEmployee}
+                  />
+                </div>
               </div>
             </div>
           </div>
