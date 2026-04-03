@@ -273,8 +273,8 @@ function getViewTableConfig(activeView, states) {
         ['Average Invoice', fmtCurrency(summary?.averageInvoiceValue)],
       ],
       columnStyles: {
-        0: { cellWidth: 182, halign: 'left' },
-        1: { cellWidth: 85, halign: 'right' },
+        0: { cellWidth: 187, halign: 'left' },
+        1: { cellWidth: 90, halign: 'right' },
       },
     };
   }
@@ -302,13 +302,13 @@ function getViewTableConfig(activeView, states) {
       ]),
       columnStyles: {
         0: { cellWidth: 28 },
-        1: { cellWidth: 26 },
+        1: { cellWidth: 28 },
         2: { cellWidth: 22 },
-        3: { cellWidth: 28 },
-        4: { cellWidth: 22 },
-        5: { cellWidth: 22 },
-        6: { cellWidth: 24 },
-        7: { cellWidth: 30, halign: 'right' },
+        3: { cellWidth: 40 },
+        4: { cellWidth: 26 },
+        5: { cellWidth: 32 },
+        6: { cellWidth: 31 },
+        7: { cellWidth: 70, halign: 'right' },
       },
     };
   }
@@ -333,12 +333,12 @@ function getViewTableConfig(activeView, states) {
         fmtCurrency(row?.totalDiscount),
       ]),
       columnStyles: {
-        0: { cellWidth: 30 },
-        1: { cellWidth: 95 },
+        0: { cellWidth: 35 },
+        1: { cellWidth: 102 },
         2: { cellWidth: 28, halign: 'right' },
         3: { cellWidth: 38, halign: 'right' },
-        4: { cellWidth: 38, halign: 'right' },
-        5: { cellWidth: 38, halign: 'right' },
+        4: { cellWidth: 37, halign: 'right' },
+        5: { cellWidth: 37, halign: 'right' },
       },
     };
   }
@@ -364,11 +364,11 @@ function getViewTableConfig(activeView, states) {
       ]),
       columnStyles: {
         0: { cellWidth: 73 },
-        1: { cellWidth: 32, halign: 'right' },
+        1: { cellWidth: 30, halign: 'right' },
         2: { cellWidth: 40, halign: 'right' },
         3: { cellWidth: 40, halign: 'right' },
-        4: { cellWidth: 40, halign: 'right' },
-        5: { cellWidth: 40, halign: 'right' },
+        4: { cellWidth: 43, halign: 'right' },
+        5: { cellWidth: 51, halign: 'right' },
       },
     };
   }
@@ -396,9 +396,9 @@ function getViewTableConfig(activeView, states) {
       ]),
       foot: [['TOTAL', fmtCount(totals.invoiceCount), fmtCurrency(totals.totalAmount)]],
       columnStyles: {
-        0: { cellWidth: 150 },
-        1: { cellWidth: 55, halign: 'right' },
-        2: { cellWidth: 62, halign: 'right' },
+        0: { cellWidth: 157 },
+        1: { cellWidth: 45, halign: 'right' },
+        2: { cellWidth: 75, halign: 'right' },
       },
     };
   }
