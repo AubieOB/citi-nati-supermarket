@@ -212,6 +212,20 @@ function drawPageFooter(doc) {
   doc.text(`Page ${page} of ${total}`, pageWidth - margin, pageHeight - 5, { align: 'right' });
 }
 
+function drawContinuationHeader(doc, activeViewLabel) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 10;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(51, 65, 85);
+  doc.text(`Report Data - ${activeViewLabel} (cont.)`, margin, 12);
+
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.3);
+  doc.line(margin, 14.5, pageWidth - margin, 14.5);
+}
+
 function drawNoData(doc, message, y) {
   autoTable(doc, {
     startY: y,
@@ -495,7 +509,7 @@ export function exportActiveSalesReportPdf({
   } else {
     autoTable(doc, {
       startY: tableY,
-      margin: { left: 10, right: 10 },
+      margin: { left: 10, right: 10, top: 18, bottom: 12 },
       head: tableConfig.head,
       body: tableConfig.body,
       foot: tableConfig.foot || undefined,
@@ -521,6 +535,11 @@ export function exportActiveSalesReportPdf({
         fillColor: [249, 250, 251],
       },
       columnStyles: tableConfig.columnStyles,
+      didDrawPage: (data) => {
+        if (data.pageNumber > 1) {
+          drawContinuationHeader(doc, activeViewLabel);
+        }
+      },
     });
   }
 
