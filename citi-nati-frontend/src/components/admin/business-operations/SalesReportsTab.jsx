@@ -7,37 +7,37 @@ import SalesSummaryCards from './SalesSummaryCards.jsx';
 
 const REPORT_VIEWS = [
   { id: 'summary', label: 'Summary', icon: 'fa-chart-pie' },
-  { id: 'invoices', label: 'Sales by Invoices', icon: 'fa-receipt' },
-  { id: 'products', label: 'Sales by Products', icon: 'fa-cubes' },
-  { id: 'users', label: 'Sales by Users', icon: 'fa-users' },
-  { id: 'payments', label: 'Sales by Payments', icon: 'fa-wallet' },
+  { id: 'invoices', label: 'Sales by Invoice', icon: 'fa-receipt' },
+  { id: 'products', label: 'Sales by Product', icon: 'fa-cubes' },
+  { id: 'users', label: 'Sales by User', icon: 'fa-users' },
+  { id: 'payments', label: 'Sales by Payment', icon: 'fa-wallet' },
 ];
 
 const SALES_BY_CARDS = [
   {
     id: 'invoices',
-    title: 'Sales by Invoices',
+    title: 'Sales by Invoice',
     subtitle: 'Invoice-level sales, discounts, taxes, and payment split.',
     icon: 'fa-receipt',
     tone: '#0369a1',
   },
   {
     id: 'products',
-    title: 'Sales by Products',
+    title: 'Sales by Product',
     subtitle: 'Product movement, revenue contribution, and margins.',
     icon: 'fa-cubes',
     tone: '#166534',
   },
   {
     id: 'users',
-    title: 'Sales by Users',
+    title: 'Sales by User',
     subtitle: 'Cashier performance, invoice throughput, and value.',
     icon: 'fa-users',
     tone: '#7c3aed',
   },
   {
     id: 'payments',
-    title: 'Sales by Payments',
+    title: 'Sales by Payment',
     subtitle: 'Payment method mix and amount concentration.',
     icon: 'fa-wallet',
     tone: '#b45309',
