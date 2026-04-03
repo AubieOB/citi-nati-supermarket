@@ -1,17 +1,15 @@
-import html2pdf from 'html2pdf.js';
+﻿import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import logo from '../assets/citi-nati-logo.png.png';
 
 const BRAND_PURPLE = '#5B4B8A';
 const BRAND_GREEN = '#2D8659';
-
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+const COLOR_TEXT = [15, 23, 42];
+const COLOR_MUTED = [100, 116, 139];
+const COLOR_BORDER = [226, 232, 240];
+const COLOR_CARD_BG = [248, 250, 252];
+const COLOR_ALT_ROW = [249, 250, 251];
+const PAGE_MARGIN = 12;
 
 function fmtCurrency(value) {
   return `MWK ${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -62,22 +60,53 @@ function getPeriodText(filters = {}, resolvedDateRange = null) {
   return 'Current selection';
 }
 
-function buildBrandedHeader({ reportTitle, subText = '', metaText = '' }) {
-  return `
-    <div style="margin-bottom: 18px; border-bottom: 3px solid ${BRAND_GREEN}; padding-bottom: 12px;">
-      <div style="display: flex; align-items: center; gap: 10px;">
-        <img src="${logo}" alt="Citi-Nati logo" style="height: 46px; width: auto; object-fit: contain; flex: 0 0 auto;" />
-        <div style="flex: 1;">
-          <h1 style="margin: 0; font-size: 26px; font-weight: 700; line-height: 1.2;">
-            <span style="color: ${BRAND_PURPLE};">Citi</span><span style="color: ${BRAND_GREEN};"> - Nati Supermarket</span>
-          </h1>
-          <p style="margin: 6px 0 0 0; color: #111827; font-size: 16px; font-weight: 700;">${escapeHtml(reportTitle)}</p>
-          ${subText ? `<p style="margin: 3px 0 0 0; color: #475569; font-size: 12px;">${escapeHtml(subText)}</p>` : ''}
-          ${metaText ? `<p style="margin: 2px 0 0 0; color: #64748b; font-size: 12px;">${escapeHtml(metaText)}</p>` : ''}
-        </div>
-      </div>
-    </div>
-  `;
+function toRgb(hex) {
+  const normalized = String(hex || '').replace('#', '');
+  const value = normalized.length === 3
+    ? normalized.split('').map((ch) => `${ch}${ch}`).join('')
+    : normalized;
+  const intVal = parseInt(value, 16);
+  return [(intVal >> 16) & 255, (intVal >> 8) & 255, intVal & 255];
+}
+
+function formatGeneratedTimestamp() {
+  const now = new Date();
+  return `${now.toLocaleDateString('en-GB')} ${now.toLocaleTimeString('en-GB')}`;
+}
+
+function buildMetadataRows(filters = {}, resolvedDateRange = null, summaryMetaLine = []) {
+  const rows = [
+    ['Period Type', titleCase(filters.periodType || 'month')],
+    ['Reporting Period', getPeriodText(filters, resolvedDateRange)],
+  ];
+
+  const optionalKeys = [
+    'branchCode',
+    'locationCode',
+    'syncSourceCode',
+    'locationId',
+    'userName',
+    'productCode',
+    'productName',
+    'payMethod',
+    'invoiceType',
+  ];
+
+  optionalKeys.forEach((key) => {
+    const value = filters[key];
+    if (value !== '' && value !== null && value !== undefined) {
+      rows.push([titleCase(key), String(value)]);
+    }
+  });
+
+  if (Array.isArray(summaryMetaLine)) {
+    summaryMetaLine.forEach((line, index) => {
+      if (!line) return;
+      rows.push([`Context ${index + 1}`, String(line)]);
+    });
+  }
+
+  return rows;
 }
 
 function summarizeView(activeView, states) {
@@ -125,21 +154,6 @@ function summarizeView(activeView, states) {
   return { count: 0, amount: 0 };
 }
 
-function buildActiveFilterText(filters = {}, summaryMetaLine = []) {
-  const ignored = new Set(['periodType', 'date', 'month', 'year', 'quarter', 'startDate', 'endDate']);
-  const parts = Object.entries(filters)
-    .filter(([key, value]) => !ignored.has(key) && value !== null && value !== undefined && value !== '')
-    .map(([key, value]) => `${titleCase(key)}: ${value}`);
-
-  if (Array.isArray(summaryMetaLine)) {
-    summaryMetaLine.forEach((item) => {
-      if (item) parts.push(String(item));
-    });
-  }
-
-  return parts.length ? parts.join(' | ') : 'No additional filters';
-}
-
 function tableConfig(activeView, summary, invoicesState, productsState, usersState, paymentsState) {
   if (activeView === 'summary') {
     const rows = Number(summary?.totalInvoices || 0) > 0
@@ -158,8 +172,10 @@ function tableConfig(activeView, summary, invoicesState, productsState, usersSta
     return {
       headers: ['Metric', 'Value'],
       rows,
-      aligns: ['left', 'right'],
-      colgroup: '<col style="width:68%;" /><col style="width:32%;" />',
+      columnStyles: {
+        0: { cellWidth: 176, halign: 'left' },
+        1: { cellWidth: 80, halign: 'right' },
+      },
     };
   }
 
@@ -178,8 +194,16 @@ function tableConfig(activeView, summary, invoicesState, productsState, usersSta
     return {
       headers: ['Invoice', 'Date', 'Time', 'User', 'Location', 'Branch', 'Payment', 'Net'],
       rows: rows.length ? rows : [['No invoice records were found for the selected criteria.', '', '', '', '', '', '', '']],
-      aligns: ['left', 'left', 'left', 'left', 'left', 'left', 'left', 'right'],
-      colgroup: '<col style="width:10%;" /><col style="width:10%;" /><col style="width:8%;" /><col style="width:14%;" /><col style="width:9%;" /><col style="width:12%;" /><col style="width:11%;" /><col style="width:26%;" />',
+      columnStyles: {
+        0: { cellWidth: 21 },
+        1: { cellWidth: 24 },
+        2: { cellWidth: 20 },
+        3: { cellWidth: 36 },
+        4: { cellWidth: 24 },
+        5: { cellWidth: 30 },
+        6: { cellWidth: 29 },
+        7: { cellWidth: 72, halign: 'right' },
+      },
     };
   }
 
@@ -196,8 +220,14 @@ function tableConfig(activeView, summary, invoicesState, productsState, usersSta
     return {
       headers: ['Code', 'Product', 'Quantity', 'Sales', 'Tax', 'Discount'],
       rows: rows.length ? rows : [['No product aggregates were found for the selected criteria.', '', '', '', '', '']],
-      aligns: ['left', 'left', 'right', 'right', 'right', 'right'],
-      colgroup: '<col style="width:12%;" /><col style="width:38%;" /><col style="width:10%;" /><col style="width:14%;" /><col style="width:13%;" /><col style="width:13%;" />',
+      columnStyles: {
+        0: { cellWidth: 32 },
+        1: { cellWidth: 100 },
+        2: { cellWidth: 26, halign: 'right' },
+        3: { cellWidth: 34, halign: 'right' },
+        4: { cellWidth: 32, halign: 'right' },
+        5: { cellWidth: 32, halign: 'right' },
+      },
     };
   }
 
@@ -214,8 +244,14 @@ function tableConfig(activeView, summary, invoicesState, productsState, usersSta
     return {
       headers: ['User', 'Invoices', 'Gross', 'VAT', 'Net', 'Avg Invoice'],
       rows: rows.length ? rows : [['No user/cashier aggregates were found for the selected criteria.', '', '', '', '', '']],
-      aligns: ['left', 'right', 'right', 'right', 'right', 'right'],
-      colgroup: '<col style="width:30%;" /><col style="width:10%;" /><col style="width:15%;" /><col style="width:15%;" /><col style="width:15%;" /><col style="width:15%;" />',
+      columnStyles: {
+        0: { cellWidth: 78 },
+        1: { cellWidth: 24, halign: 'right' },
+        2: { cellWidth: 38, halign: 'right' },
+        3: { cellWidth: 38, halign: 'right' },
+        4: { cellWidth: 38, halign: 'right' },
+        5: { cellWidth: 40, halign: 'right' },
+      },
     };
   }
 
@@ -238,29 +274,171 @@ function tableConfig(activeView, summary, invoicesState, productsState, usersSta
   return {
     headers: ['Payment Method', 'Invoice Count', 'Amount'],
     rows: rows.length ? rows : [['No payment method rows were found for the selected criteria.', '', '']],
-    aligns: ['left', 'right', 'right'],
-    colgroup: '<col style="width:56%;" /><col style="width:14%;" /><col style="width:30%;" />',
+    columnStyles: {
+      0: { cellWidth: 158 },
+      1: { cellWidth: 30, halign: 'right' },
+      2: { cellWidth: 68, halign: 'right' },
+    },
   };
 }
 
-function renderTable(headers, rows, aligns, colgroup = '') {
-  return `
-    <table class="sales-pdf-table">
-      ${colgroup ? `<colgroup>${colgroup}</colgroup>` : ''}
-      <thead>
-        <tr>
-          ${headers.map((header, i) => `<th style="text-align:${aligns[i] || 'left'}">${escapeHtml(header)}</th>`).join('')}
-        </tr>
-      </thead>
-      <tbody>
-        ${rows.map((row, rowIndex) => `
-          <tr style="background:${rowIndex % 2 === 0 ? '#fff' : '#f9fafb'};">
-            ${row.map((cell, i) => `<td style="text-align:${aligns[i] || 'left'}">${escapeHtml(cell)}</td>`).join('')}
-          </tr>
-        `).join('')}
-      </tbody>
-    </table>
-  `;
+function drawHeader(doc, { reportTitle, viewLabel, periodText, generatedText, showCompact = false }) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  if (!showCompact) {
+    try {
+      doc.addImage(logo, 'PNG', PAGE_MARGIN, 8, 26, 15);
+    } catch {
+      // Ignore logo rendering issues.
+    }
+
+    const titleX = PAGE_MARGIN + 30;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.setTextColor(...toRgb(BRAND_PURPLE));
+    doc.text('Citi', titleX, 14);
+    const citiWidth = doc.getTextWidth('Citi');
+    doc.setTextColor(...toRgb(BRAND_GREEN));
+    doc.text('- Nati Supermarket', titleX + citiWidth + 1, 14);
+
+    doc.setTextColor(...COLOR_TEXT);
+    doc.setFontSize(12);
+    doc.text(reportTitle, titleX, 19.5);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(...COLOR_MUTED);
+    doc.text(`${viewLabel} View`, titleX, 24.5);
+
+    doc.text(`Generated: ${generatedText}`, pageWidth - PAGE_MARGIN, 14, { align: 'right' });
+    doc.text(`Period: ${periodText}`, pageWidth - PAGE_MARGIN, 19.5, { align: 'right' });
+
+    doc.setDrawColor(...toRgb(BRAND_GREEN));
+    doc.setLineWidth(0.45);
+    doc.line(PAGE_MARGIN, 28, pageWidth - PAGE_MARGIN, 28);
+  } else {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...COLOR_MUTED);
+    doc.text(`${reportTitle} - ${viewLabel} (cont.)`, PAGE_MARGIN, 10.5);
+    doc.setDrawColor(...COLOR_BORDER);
+    doc.setLineWidth(0.3);
+    doc.line(PAGE_MARGIN, 12.5, pageWidth - PAGE_MARGIN, 12.5);
+  }
+}
+
+function drawSectionTitle(doc, text, y) {
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(...COLOR_TEXT);
+  doc.text(text, PAGE_MARGIN, y);
+}
+
+function drawSummaryCards(doc, cards, startY) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const innerWidth = pageWidth - (PAGE_MARGIN * 2);
+  const gap = 6;
+  const count = cards.length;
+  const cardWidth = (innerWidth - gap * (count - 1)) / count;
+  const cardHeight = 20;
+
+  cards.forEach((card, index) => {
+    const x = PAGE_MARGIN + index * (cardWidth + gap);
+    doc.setFillColor(...COLOR_CARD_BG);
+    doc.setDrawColor(...COLOR_BORDER);
+    doc.roundedRect(x, startY, cardWidth, cardHeight, 2, 2, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.8);
+    doc.setTextColor(...COLOR_MUTED);
+    doc.text(card.label.toUpperCase(), x + 3, startY + 5.8);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10.6);
+    doc.setTextColor(...toRgb(card.color || BRAND_GREEN));
+    doc.text(card.value, x + 3, startY + 13.4, {
+      maxWidth: cardWidth - 6,
+    });
+  });
+
+  return startY + cardHeight + 6;
+}
+
+function drawMetadataTable(doc, rows, startY) {
+  autoTable(doc, {
+    startY,
+    margin: { left: PAGE_MARGIN, right: PAGE_MARGIN, top: 16, bottom: 12 },
+    head: [['Report Metadata', 'Value']],
+    body: rows,
+    theme: 'grid',
+    styles: {
+      fontSize: 8.2,
+      cellPadding: 2.6,
+      textColor: COLOR_TEXT,
+      lineColor: COLOR_BORDER,
+      lineWidth: 0.22,
+      valign: 'middle',
+    },
+    headStyles: {
+      fillColor: toRgb(BRAND_PURPLE),
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+    },
+    alternateRowStyles: {
+      fillColor: COLOR_ALT_ROW,
+    },
+    columnStyles: {
+      0: { cellWidth: 66, fontStyle: 'bold', textColor: COLOR_MUTED },
+      1: { cellWidth: 190 },
+    },
+  });
+
+  return (doc.lastAutoTable?.finalY || startY) + 6;
+}
+
+function drawMainDataTable(doc, config, startY, headerContext) {
+  autoTable(doc, {
+    startY,
+    margin: { left: PAGE_MARGIN, right: PAGE_MARGIN, top: 16, bottom: 12 },
+    head: [config.headers],
+    body: config.rows,
+    theme: 'grid',
+    styles: {
+      fontSize: 8.0,
+      cellPadding: 2.2,
+      textColor: [30, 41, 59],
+      lineColor: [218, 222, 228],
+      lineWidth: 0.2,
+      overflow: 'linebreak',
+      valign: 'middle',
+    },
+    headStyles: {
+      fillColor: toRgb(BRAND_GREEN),
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      minCellHeight: 7.5,
+    },
+    alternateRowStyles: {
+      fillColor: COLOR_ALT_ROW,
+    },
+    columnStyles: config.columnStyles,
+    didDrawPage: (data) => {
+      if (data.pageNumber > 1) {
+        drawHeader(doc, { ...headerContext, showCompact: true });
+        drawSectionTitle(doc, 'Report Data', 17.2);
+      }
+    },
+  });
+}
+
+function drawFooter(doc, pageNumber, totalPages) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...COLOR_MUTED);
+  doc.setFontSize(8);
+  doc.text('Citi-Nati Supermarket Sales Reports', PAGE_MARGIN, pageHeight - 5);
+  doc.text(`Page ${pageNumber} of ${totalPages}`, pageWidth - PAGE_MARGIN, pageHeight - 5, { align: 'right' });
 }
 
 export function exportActiveSalesReportPdf({
@@ -277,6 +455,8 @@ export function exportActiveSalesReportPdf({
 }) {
   const today = new Date();
   const periodText = getPeriodText(filters, resolvedDateRange);
+  const generatedText = formatGeneratedTimestamp();
+  const reportTitle = 'Sales Report Export';
   const viewStats = summarizeView(activeView, {
     summary,
     invoicesState,
@@ -284,88 +464,42 @@ export function exportActiveSalesReportPdf({
     usersState,
     paymentsState,
   });
-  const filterText = buildActiveFilterText(filters, summaryMetaLine);
+  const metadataRows = buildMetadataRows(filters, resolvedDateRange, summaryMetaLine);
   const dataTable = tableConfig(activeView, summary, invoicesState, productsState, usersState, paymentsState);
 
-  const html = `
-    <div style="font-family: Arial, sans-serif; color: #1f2937; padding: 16px; width: 1120px; box-sizing: border-box;">
-      <style>
-        .sales-pdf-table {
-          width: 100%;
-          border-collapse: collapse;
-          font-size: 12px;
-          table-layout: fixed;
-          page-break-inside: auto;
-        }
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
-        .sales-pdf-table thead {
-          display: table-header-group;
-        }
-
-        .sales-pdf-table tr {
-          page-break-inside: avoid;
-          break-inside: avoid;
-        }
-
-        .sales-pdf-table td,
-        .sales-pdf-table th {
-          border: 1px solid #d1d5db;
-          padding: 8px;
-          vertical-align: top;
-          word-break: break-word;
-        }
-
-        .sales-pdf-table th {
-          background: ${BRAND_GREEN};
-          color: #fff;
-          font-weight: 700;
-        }
-      </style>
-
-      ${buildBrandedHeader({
-        reportTitle: 'Sales Report Export',
-        subText: `${activeViewLabel} View`,
-        metaText: `Period: ${periodText} | Records: ${fmtCount(viewStats.count)} | Amount: ${fmtCurrency(viewStats.amount)}`,
-      })}
-
-      <div style="margin-bottom: 12px; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 8px; background: #f8fafc; font-size: 12px; color: #475569;">
-        <strong style="color:#334155;">Applied Filters:</strong> ${escapeHtml(filterText)}
-      </div>
-
-      <h3 style="margin: 0 0 8px 0; font-size: 16px; color: #334155;">Report Data</h3>
-      ${renderTable(dataTable.headers, dataTable.rows, dataTable.aligns, dataTable.colgroup)}
-
-      <div style="text-align:center; margin-top:12px; padding-top:8px; border-top:1px solid #e5e7eb; color:#94a3b8; font-size:11px;">
-        Automated report generated by Citi-Nati Supermarket Sales System
-      </div>
-    </div>
-  `;
-
-  const element = document.createElement('div');
-  element.innerHTML = html;
-
-  const fileDate = today.toISOString().slice(0, 10);
-  const fileName = `sales_${String(activeView || 'summary').toLowerCase()}_${fileDate}.pdf`;
-  const options = {
-    margin: 6,
-    filename: fileName,
-    image: { type: 'png', quality: 1.0 },
-    html2canvas: {
-      scale: 4,
-      logging: false,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      letterRendering: true,
-      windowWidth: 1200,
-      scrollX: 0,
-      scrollY: 0,
-    },
-    jsPDF: { orientation: 'landscape', unit: 'mm', format: 'a4', compress: false },
-    pagebreak: {
-      mode: ['css', 'legacy'],
-      avoid: ['tr', 'td', 'th', 'thead', 'tbody'],
-    },
+  const headerContext = {
+    reportTitle,
+    viewLabel: activeViewLabel,
+    periodText,
+    generatedText,
   };
 
-  return html2pdf().set(options).from(element).save();
+  drawHeader(doc, headerContext);
+
+  let y = 33;
+  const summaryCards = [
+    { label: 'Active View', value: activeViewLabel, color: BRAND_PURPLE },
+    { label: 'Visible Records', value: fmtCount(viewStats.count), color: BRAND_GREEN },
+    { label: 'Visible Amount', value: fmtCurrency(viewStats.amount), color: '#0f766e' },
+  ];
+  y = drawSummaryCards(doc, summaryCards, y);
+
+  drawSectionTitle(doc, 'Report Metadata', y);
+  y += 3.2;
+  y = drawMetadataTable(doc, metadataRows, y);
+
+  drawSectionTitle(doc, 'Report Data', y);
+  y += 3.2;
+  drawMainDataTable(doc, dataTable, y, headerContext);
+
+  const totalPages = doc.getNumberOfPages();
+  for (let page = 1; page <= totalPages; page += 1) {
+    doc.setPage(page);
+    drawFooter(doc, page, totalPages);
+  }
+
+  const fileDate = today.toISOString().slice(0, 10);
+  doc.save(`sales_${String(activeView || 'summary').toLowerCase()}_${fileDate}.pdf`);
 }
