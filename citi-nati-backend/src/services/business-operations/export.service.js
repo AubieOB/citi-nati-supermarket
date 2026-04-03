@@ -66,6 +66,8 @@ function logoPathCandidates() {
     process.env.EXPORT_LOGO_PATH,
     path.resolve(__dirname, '../../../../citi-nati-frontend/src/assets/citi-nati-logo.png.png'),
     path.resolve(__dirname, '../../../../citi-nati-frontend/src/assets/citi-nati-logo.png'),
+    path.resolve(process.cwd(), 'citi-nati-frontend/src/assets/citi-nati-logo.png.png'),
+    path.resolve(process.cwd(), 'citi-nati-frontend/src/assets/citi-nati-logo.png'),
   ].filter(Boolean);
 }
 
@@ -238,7 +240,7 @@ function ensureExcelLogoImage(workbook) {
   try {
     const extension = path.extname(logoPath).replace('.', '').toLowerCase() === 'jpg' ? 'jpeg' : 'png';
     const imageId = workbook.addImage({
-      buffer: fs.readFileSync(logoPath),
+      filename: logoPath,
       extension,
     });
     workbook.__brandLogoImageId = imageId;
@@ -330,8 +332,9 @@ function applyExcelSheetBranding(workbook, sheet, report) {
   const logoImageId = ensureExcelLogoImage(workbook);
   if (logoImageId) {
     sheet.addImage(logoImageId, {
-      tl: { col: 0, row: 0 },
-      ext: { width: 70, height: 56 },
+      tl: { col: 0.15, row: 0.2 },
+      ext: { width: 72, height: 52 },
+      editAs: 'oneCell',
     });
   }
 
