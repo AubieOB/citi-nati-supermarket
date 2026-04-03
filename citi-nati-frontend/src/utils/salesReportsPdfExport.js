@@ -10,6 +10,7 @@ const COLOR_BORDER = [226, 232, 240];
 const COLOR_CARD_BG = [248, 250, 252];
 const COLOR_ALT_ROW = [249, 250, 251];
 const PAGE_MARGIN = 12;
+const CONTENT_MAX_WIDTH = 256;
 
 function fmtCurrency(value) {
   return `MWK ${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -72,6 +73,17 @@ function toRgb(hex) {
 function formatGeneratedTimestamp() {
   const now = new Date();
   return `${now.toLocaleDateString('en-GB')} ${now.toLocaleTimeString('en-GB')}`;
+}
+
+function getContentBounds(doc) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const width = Math.min(CONTENT_MAX_WIDTH, pageWidth - (PAGE_MARGIN * 2));
+  const left = (pageWidth - width) / 2;
+  return {
+    left,
+    right: left + width,
+    width,
+  };
 }
 
 function buildMetadataRows(filters = {}, resolvedDateRange = null, summaryMetaLine = []) {
@@ -283,16 +295,18 @@ function tableConfig(activeView, summary, invoicesState, productsState, usersSta
 }
 
 function drawHeader(doc, { reportTitle, viewLabel, periodText, generatedText, showCompact = false }) {
-  const pageWidth = doc.internal.pageSize.getWidth();
+  const { left, right } = getContentBounds(doc);
 
   if (!showCompact) {
+    const logoWidth = 20;
+    const logoHeight = 14;
     try {
-      doc.addImage(logo, 'PNG', PAGE_MARGIN, 8, 26, 15);
+      doc.addImage(logo, 'PNG', left, 8.5, logoWidth, logoHeight);
     } catch {
       // Ignore logo rendering issues.
     }
 
-    const titleX = PAGE_MARGIN + 30;
+    const titleX = left + logoWidth + 4;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(16);
     doc.setTextColor(...toRgb(BRAND_PURPLE));
@@ -310,54 +324,54 @@ function drawHeader(doc, { reportTitle, viewLabel, periodText, generatedText, sh
     doc.setTextColor(...COLOR_MUTED);
     doc.text(`${viewLabel} View`, titleX, 24.5);
 
-    doc.text(`Generated: ${generatedText}`, pageWidth - PAGE_MARGIN, 14, { align: 'right' });
-    doc.text(`Period: ${periodText}`, pageWidth - PAGE_MARGIN, 19.5, { align: 'right' });
+    doc.text(`Generated: ${generatedText}`, right, 14, { align: 'right' });
+    doc.text(`Period: ${periodText}`, right, 19.5, { align: 'right' });
 
     doc.setDrawColor(...toRgb(BRAND_GREEN));
     doc.setLineWidth(0.45);
-    doc.line(PAGE_MARGIN, 28, pageWidth - PAGE_MARGIN, 28);
+    doc.line(left, 28, right, 28);
   } else {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(...COLOR_MUTED);
-    doc.text(`${reportTitle} - ${viewLabel} (cont.)`, PAGE_MARGIN, 10.5);
+    doc.text(`${reportTitle} - ${viewLabel} (cont.)`, left, 10.5);
     doc.setDrawColor(...COLOR_BORDER);
     doc.setLineWidth(0.3);
-    doc.line(PAGE_MARGIN, 12.5, pageWidth - PAGE_MARGIN, 12.5);
+    doc.line(left, 12.5, right, 12.5);
   }
 }
 
 function drawSectionTitle(doc, text, y) {
+  const { left } = getContentBounds(doc);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.setTextColor(...COLOR_TEXT);
-  doc.text(text, PAGE_MARGIN, y);
+  doc.text(text, left, y);
 }
 
 function drawSummaryCards(doc, cards, startY) {
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const innerWidth = pageWidth - (PAGE_MARGIN * 2);
-  const gap = 6;
+  const { left, width } = getContentBounds(doc);
+  const gap = 4;
   const count = cards.length;
-  const cardWidth = (innerWidth - gap * (count - 1)) / count;
-  const cardHeight = 20;
+  const cardWidth = (width - gap * (count - 1)) / count;
+  const cardHeight = 16;
 
   cards.forEach((card, index) => {
-    const x = PAGE_MARGIN + index * (cardWidth + gap);
+    const x = left + index * (cardWidth + gap);
     doc.setFillColor(...COLOR_CARD_BG);
     doc.setDrawColor(...COLOR_BORDER);
     doc.roundedRect(x, startY, cardWidth, cardHeight, 2, 2, 'FD');
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.8);
+    doc.setFontSize(7.2);
     doc.setTextColor(...COLOR_MUTED);
-    doc.text(card.label.toUpperCase(), x + 3, startY + 5.8);
+    doc.text(card.label.toUpperCase(), x + 2.5, startY + 4.8, { maxWidth: cardWidth - 5 });
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10.6);
+    doc.setFontSize(9.5);
     doc.setTextColor(...toRgb(card.color || BRAND_GREEN));
-    doc.text(card.value, x + 3, startY + 13.4, {
-      maxWidth: cardWidth - 6,
+    doc.text(card.value, x + 2.5, startY + 11.6, {
+      maxWidth: cardWidth - 5,
     });
   });
 
@@ -365,9 +379,10 @@ function drawSummaryCards(doc, cards, startY) {
 }
 
 function drawMetadataTable(doc, rows, startY) {
+  const { left, right, width } = getContentBounds(doc);
   autoTable(doc, {
     startY,
-    margin: { left: PAGE_MARGIN, right: PAGE_MARGIN, top: 16, bottom: 12 },
+    margin: { left, right, top: 16, bottom: 12 },
     head: [['Report Metadata', 'Value']],
     body: rows,
     theme: 'grid',
@@ -389,7 +404,7 @@ function drawMetadataTable(doc, rows, startY) {
     },
     columnStyles: {
       0: { cellWidth: 66, fontStyle: 'bold', textColor: COLOR_MUTED },
-      1: { cellWidth: 190 },
+      1: { cellWidth: width - 66 },
     },
   });
 
@@ -397,9 +412,10 @@ function drawMetadataTable(doc, rows, startY) {
 }
 
 function drawMainDataTable(doc, config, startY, headerContext) {
+  const { left, right } = getContentBounds(doc);
   autoTable(doc, {
     startY,
-    margin: { left: PAGE_MARGIN, right: PAGE_MARGIN, top: 16, bottom: 12 },
+    margin: { left, right, top: 16, bottom: 12 },
     head: [config.headers],
     body: config.rows,
     theme: 'grid',
@@ -432,13 +448,13 @@ function drawMainDataTable(doc, config, startY, headerContext) {
 }
 
 function drawFooter(doc, pageNumber, totalPages) {
-  const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
+  const { left, right } = getContentBounds(doc);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...COLOR_MUTED);
   doc.setFontSize(8);
-  doc.text('Citi-Nati Supermarket Sales Reports', PAGE_MARGIN, pageHeight - 5);
-  doc.text(`Page ${pageNumber} of ${totalPages}`, pageWidth - PAGE_MARGIN, pageHeight - 5, { align: 'right' });
+  doc.text('Citi-Nati Supermarket Sales Reports', left, pageHeight - 5);
+  doc.text(`Page ${pageNumber} of ${totalPages}`, right, pageHeight - 5, { align: 'right' });
 }
 
 export function exportActiveSalesReportPdf({
