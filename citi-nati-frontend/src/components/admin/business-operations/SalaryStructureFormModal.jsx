@@ -70,6 +70,13 @@ const SalaryStructureFormModal = ({
     });
   }, [isOpen, salaryStructure]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (event) => { if (event.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const set = (key) => (e) => {

@@ -373,6 +373,13 @@ const MonthlySummaryTab = ({
     }
   };
 
+  useEffect(() => {
+    if (!isInsightsModalOpen) return;
+    const handler = (event) => { if (event.key === 'Escape') setIsInsightsModalOpen(false); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isInsightsModalOpen]);
+
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
       <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>

@@ -453,6 +453,13 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
     }
   };
 
+  useEffect(() => {
+    if (!isPayrollWorkspaceModalOpen || periodModal.open || entryModal.open || supportDrawer.open) return;
+    const handler = (event) => { if (event.key === 'Escape') setIsPayrollWorkspaceModalOpen(false); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isPayrollWorkspaceModalOpen, periodModal.open, entryModal.open, supportDrawer.open]);
+
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
       <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>

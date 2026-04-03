@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import api from '../../../utils/api.js';
 import WorkbookTypeSelector from './WorkbookTypeSelector.jsx';
 import WorkbookFileUploader from './WorkbookFileUploader.jsx';
@@ -324,6 +324,13 @@ const BusinessOperationsImportModal = ({ isOpen, onClose, onImportSuccess, onVie
         break;
     }
   };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (event) => { if (event.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 

@@ -745,6 +745,13 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
     );
   };
 
+  useEffect(() => {
+    if (!isReportModalOpen) return;
+    const handler = (event) => { if (event.key === 'Escape') setIsReportModalOpen(false); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isReportModalOpen]);
+
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
       <div style={{ display: 'flex', gap: '0.55rem', overflowX: 'auto' }}>

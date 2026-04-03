@@ -329,6 +329,13 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
     }
   };
 
+  useEffect(() => {
+    if (!isSuppliersWorkspaceModalOpen || supplierModalState.open || transactionModalState.open) return;
+    const handler = (event) => { if (event.key === 'Escape') setIsSuppliersWorkspaceModalOpen(false); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isSuppliersWorkspaceModalOpen, supplierModalState.open, transactionModalState.open]);
+
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
       <div style={{ ...cardStyle, padding: '1.05rem 1.1rem' }}>

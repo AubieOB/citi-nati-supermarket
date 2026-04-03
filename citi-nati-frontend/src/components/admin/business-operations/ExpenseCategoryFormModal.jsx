@@ -40,6 +40,13 @@ const ExpenseCategoryFormModal = ({ isOpen, category, saving, error, onClose, on
     });
   }, [isOpen, category]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (event) => { if (event.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const set = (key) => (event) => setForm((prev) => ({ ...prev, [key]: event.target.value }));

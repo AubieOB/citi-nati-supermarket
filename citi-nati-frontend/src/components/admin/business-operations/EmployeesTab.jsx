@@ -268,6 +268,13 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
     }
   };
 
+  useEffect(() => {
+    if (!isEmployeesWorkspaceModalOpen || employeeModal.open || salaryModal.open) return;
+    const handler = (event) => { if (event.key === 'Escape') setIsEmployeesWorkspaceModalOpen(false); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isEmployeesWorkspaceModalOpen, employeeModal.open, salaryModal.open]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
       {/* ── Header ── */}

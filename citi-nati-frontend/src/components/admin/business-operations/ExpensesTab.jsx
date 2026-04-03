@@ -259,6 +259,19 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
     }
   }, [activeTab, categories, expenses, filters, selectedLocationId, summary]);
 
+  useEffect(() => {
+    const anySubModal = expenseModal.open || categoryModal.open;
+    if (anySubModal) return;
+    if (!isExpensesWorkspaceModalOpen && !isCategoriesWorkspaceModalOpen) return;
+    const handler = (event) => {
+      if (event.key !== 'Escape') return;
+      if (isExpensesWorkspaceModalOpen) setIsExpensesWorkspaceModalOpen(false);
+      else if (isCategoriesWorkspaceModalOpen) setIsCategoriesWorkspaceModalOpen(false);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isExpensesWorkspaceModalOpen, isCategoriesWorkspaceModalOpen, expenseModal.open, categoryModal.open]);
+
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
       <div style={{ ...cardStyle, padding: '1.1rem' }}>
