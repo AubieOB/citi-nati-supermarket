@@ -22,6 +22,13 @@ const employeesService = require('./employees.service');
 const COMPANY_NAME = 'Citi-Nati Supermarket';
 const COMPANY_CONTACT = process.env.EXPORT_COMPANY_CONTACT || 'Blantyre, Malawi';
 const MWK_FORMAT = '"MWK" #,##0.00';
+const EXCEL_BRAND_PURPLE = 'FF5B4B8A';
+const EXCEL_BRAND_GREEN = 'FF2D8659';
+const EXCEL_TEXT_DARK = 'FF0F172A';
+const EXCEL_TEXT_MUTED = 'FF64748B';
+const EXCEL_BG_LIGHT = 'FFF8FAFC';
+const EXCEL_BG_ALT = 'FFF6F8FC';
+const EXCEL_BORDER = 'FFE2E8F0';
 const PDF_BRAND_PURPLE = '#5B4B8A';
 const PDF_BRAND_GREEN = '#2D8659';
 const PDF_BRAND_ORANGE = '#B45309';
@@ -136,8 +143,19 @@ async function collectPaged(fetchPage, pageSize = 500) {
   while (page <= totalPages) {
     const pagination = { page, pageSize, skip: (page - 1) * pageSize, take: pageSize };
     const result = await fetchPage(pagination);
-    const data = Array.isArray(result.data) ? result.data : [];
-    const total = Number(result.total || 0);
+    // Handle polymorphic data structures: result.data, result.invoices, result.products, etc.
+    let data = [];
+    if (Array.isArray(result.data)) {
+      data = result.data;
+    } else {
+      // Look for first array property (invoices, products, users, payments, expenses, etc.)
+      const arrayKey = Object.keys(result).find(
+        key => Array.isArray(result[key]) && key !== 'total' && key !== 'pagination'
+      );
+      data = arrayKey ? result[arrayKey] : [];
+    }
+    
+    const total = Number(result.total || result.pagination?.total || result.pagination?.count || 0);
 
     rows.push(...data);
     totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -156,9 +174,9 @@ function setWorksheetColumns(sheet, columns) {
 
   const headerRow = sheet.getRow(1);
   headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4B5563' } };
+  headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: EXCEL_BRAND_PURPLE } };
   headerRow.alignment = { vertical: 'middle', horizontal: 'left' };
-  headerRow.height = 22;
+  headerRow.height = 24;
   sheet.views = [{ state: 'frozen', ySplit: 1 }];
 }
 
@@ -179,6 +197,12 @@ function appendRows(sheet, columns, rows) {
       if (column.type === 'date') {
         cell.numFmt = 'yyyy-mm-dd';
       }
+      cell.border = {
+        top: { style: 'thin', color: { argb: EXCEL_BORDER } },
+        left: { style: 'thin', color: { argb: EXCEL_BORDER } },
+        bottom: { style: 'thin', color: { argb: EXCEL_BORDER } },
+        right: { style: 'thin', color: { argb: EXCEL_BORDER } },
+      };
       cell.alignment = { vertical: 'top', horizontal: column.align || 'left' };
     });
   });
@@ -188,13 +212,142 @@ function addTotalsRow(sheet, columns, totals = {}) {
   if (!totals || !Object.keys(totals).length) return;
   const row = sheet.addRow(totals);
   row.font = { bold: true };
-  row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFF6FF' } };
+  row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8EEF9' } };
   columns.forEach((column, index) => {
     const cell = row.getCell(index + 1);
+    cell.border = {
+      top: { style: 'thin', color: { argb: EXCEL_BORDER } },
+      left: { style: 'thin', color: { argb: EXCEL_BORDER } },
+      bottom: { style: 'thin', color: { argb: EXCEL_BORDER } },
+      right: { style: 'thin', color: { argb: EXCEL_BORDER } },
+    };
     if (column.type === 'currency') cell.numFmt = MWK_FORMAT;
     if (column.type === 'number') cell.numFmt = '#,##0.00';
     if (column.type === 'integer') cell.numFmt = '#,##0';
   });
+}
+
+function ensureExcelLogoImage(workbook) {
+  if (workbook.__brandLogoImageId !== undefined) return workbook.__brandLogoImageId;
+  const logoPath = resolveLogoPath();
+  if (!logoPath) {
+    workbook.__brandLogoImageId = null;
+    return null;
+  }
+
+  try {
+    const extension = path.extname(logoPath).replace('.', '').toLowerCase() === 'jpg' ? 'jpeg' : 'png';
+    const imageId = workbook.addImage({
+      buffer: fs.readFileSync(logoPath),
+      extension,
+    });
+    workbook.__brandLogoImageId = imageId;
+    return imageId;
+  } catch {
+    workbook.__brandLogoImageId = null;
+    return null;
+  }
+}
+
+function styleExcelDataRows(sheet, headerRowIndex) {
+  const totalRows = sheet.rowCount;
+  let stripe = false;
+
+  for (let rowIndex = headerRowIndex + 1; rowIndex <= totalRows; rowIndex += 1) {
+    const row = sheet.getRow(rowIndex);
+    const first = String(row.getCell(1).value || '').toUpperCase();
+    const isTotals = first === 'TOTAL';
+
+    if (!isTotals) {
+      row.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: stripe ? EXCEL_BG_ALT : 'FFFFFFFF' },
+      };
+      stripe = !stripe;
+    }
+
+    row.eachCell({ includeEmpty: true }, (cell) => {
+      if (!cell.border) {
+        cell.border = {
+          top: { style: 'thin', color: { argb: EXCEL_BORDER } },
+          left: { style: 'thin', color: { argb: EXCEL_BORDER } },
+          bottom: { style: 'thin', color: { argb: EXCEL_BORDER } },
+          right: { style: 'thin', color: { argb: EXCEL_BORDER } },
+        };
+      }
+    });
+  }
+}
+
+function applyExcelSheetBranding(workbook, sheet, report) {
+  const headerRowIndex = 7;
+  const generatedText = new Date().toLocaleString('en-GB');
+  const periodText = getReportPeriodText(report);
+  const filtersText = buildAppliedFilterText(report.filters || {});
+
+  sheet.spliceRows(1, 0, [], [], [], [], [], []);
+
+  const maxCol = Math.max(2, sheet.columnCount || 2);
+  sheet.mergeCells(1, 2, 1, maxCol);
+  sheet.mergeCells(2, 2, 2, maxCol);
+  sheet.mergeCells(3, 2, 3, maxCol);
+  sheet.mergeCells(4, 2, 4, maxCol);
+  sheet.mergeCells(5, 2, 5, maxCol);
+
+  sheet.getCell('B1').value = COMPANY_NAME;
+  sheet.getCell('B1').font = { bold: true, size: 18, color: { argb: EXCEL_BRAND_PURPLE } };
+  sheet.getCell('B1').alignment = { vertical: 'middle', horizontal: 'left' };
+
+  sheet.getCell('B2').value = `${report.title} - ${sheet.name}`;
+  sheet.getCell('B2').font = { bold: true, size: 12, color: { argb: EXCEL_TEXT_DARK } };
+
+  sheet.getCell('B3').value = `Reporting Period: ${periodText}`;
+  sheet.getCell('B3').font = { size: 10, color: { argb: EXCEL_TEXT_MUTED } };
+
+  sheet.getCell('B4').value = `Generated: ${generatedText}`;
+  sheet.getCell('B4').font = { size: 10, color: { argb: EXCEL_TEXT_MUTED } };
+
+  sheet.getCell('B5').value = `Applied Filters: ${filtersText}`;
+  sheet.getCell('B5').font = { size: 10, color: { argb: EXCEL_TEXT_MUTED } };
+  sheet.getCell('B5').alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
+
+  sheet.getCell('B6').value = COMPANY_CONTACT;
+  sheet.getCell('B6').font = { size: 9, color: { argb: EXCEL_TEXT_MUTED }, italic: true };
+
+  [1, 2, 3, 4, 5, 6].forEach((rowNo) => {
+    const row = sheet.getRow(rowNo);
+    row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: EXCEL_BG_LIGHT } };
+  });
+
+  sheet.getRow(1).height = 24;
+  sheet.getRow(2).height = 20;
+  sheet.getRow(3).height = 16;
+  sheet.getRow(4).height = 16;
+  sheet.getRow(5).height = 28;
+  sheet.getRow(6).height = 14;
+
+  const logoImageId = ensureExcelLogoImage(workbook);
+  if (logoImageId) {
+    sheet.addImage(logoImageId, {
+      tl: { col: 0, row: 0 },
+      ext: { width: 70, height: 56 },
+    });
+  }
+
+  const headerRow = sheet.getRow(headerRowIndex);
+  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: EXCEL_BRAND_PURPLE } };
+  headerRow.alignment = { vertical: 'middle', horizontal: 'left' };
+  headerRow.height = 24;
+
+  sheet.views = [{ state: 'frozen', ySplit: headerRowIndex }];
+  sheet.autoFilter = {
+    from: { row: headerRowIndex, column: 1 },
+    to: { row: headerRowIndex, column: Math.max(1, sheet.columnCount) },
+  };
+
+  styleExcelDataRows(sheet, headerRowIndex);
 }
 
 function hexToRgb(hex) {
@@ -245,7 +398,7 @@ function buildAppliedFilterText(filters = {}) {
     .filter(([key, value]) => !ignored.has(key) && value !== null && value !== undefined && value !== '')
     .map(([key, value]) => `${titleCase(key)}: ${value}`);
 
-  return entries.length ? entries.join(', ') : 'None';
+  return entries.length ? entries.join(', ') : 'None (selected period only)';
 }
 
 function createPdfContext(report) {
@@ -374,6 +527,23 @@ function drawPdfInfoBand(doc, items, context) {
   });
 
   doc.y = y + height + 10;
+}
+
+function drawPdfNoDataMessage(doc, message, context) {
+  ensurePdfSpace(doc, 52, context);
+
+  const margin = doc.page.margins.left;
+  const width = doc.page.width - (margin * 2);
+  const y = doc.y;
+
+  doc.roundedRect(margin, y, width, 42, 6).fillAndStroke('#F8FAFC', '#CBD5E1');
+  doc
+    .fillColor(PDF_MUTED)
+    .font('Helvetica-Oblique')
+    .fontSize(9)
+    .text(message, margin + 10, y + 14, { width: width - 20, align: 'center' });
+
+  doc.y = y + 52;
 }
 
 function drawPdfSectionTitle(doc, title, context) {
@@ -1190,6 +1360,10 @@ async function buildExcelBuffer(report) {
     })));
   }
 
+  workbook.worksheets.forEach((sheet) => {
+    applyExcelSheetBranding(workbook, sheet, report);
+  });
+
   return workbook.xlsx.writeBuffer();
 }
 
@@ -1211,6 +1385,14 @@ async function buildPdfBuffer(report) {
     ];
 
     if (report.module === 'sales') {
+      const hasSalesRows = (
+        (report.data.invoices?.length || 0)
+        + (report.data.products?.length || 0)
+        + (report.data.users?.length || 0)
+        + (report.data.payments?.length || 0)
+      ) > 0;
+      const hasSummaryData = Number(report.data.summary?.totalInvoices || 0) > 0;
+
       if (report.data.summary) {
         summaryCards.push(
           { label: 'Total Invoices', value: formatCountDisplay(report.data.summary.totalInvoices), fill: '#F0F9F6', accent: PDF_BRAND_GREEN },
@@ -1284,6 +1466,10 @@ async function buildPdfBuffer(report) {
           invoiceCount: formatCountDisplay(row.invoiceCount),
           totalAmount: formatCurrencyDisplay(row.totalAmount),
         })), context);
+      }
+
+      if (!hasSalesRows && !hasSummaryData) {
+        drawPdfNoDataMessage(doc, 'No rows matched this period/filter selection.', context);
       }
     }
 
