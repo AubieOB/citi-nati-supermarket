@@ -676,8 +676,28 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
               <i className="fas fa-sliders" style={{ marginRight: '0.42rem' }}></i>
               {showSummaryFilters ? 'Hide Filters' : 'Show Filters'}
             </button>
-            <div style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
-              {showSummaryFilters ? 'Summary filters are visible.' : `Summary filters hidden${activeFilterCount > 0 ? ` • ${activeFilterCount} active` : ''}.`}
+            <div style={{ display: 'flex', gap: '0.55rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
+                {showSummaryFilters ? 'Summary filters are visible.' : `Summary filters hidden${activeFilterCount > 0 ? ` • ${activeFilterCount} active` : ''}.`}
+              </div>
+              <button
+                type="button"
+                onClick={() => handleExport('pdf')}
+                disabled={summaryLoading || exportingExcel || exportingPdf}
+                style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 700, cursor: summaryLoading || exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}
+              >
+                <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.42rem' }}></i>
+                Export PDF
+              </button>
+              <button
+                type="button"
+                onClick={() => handleExport('excel')}
+                disabled={summaryLoading || exportingExcel || exportingPdf}
+                style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 700, cursor: summaryLoading || exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}
+              >
+                <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.42rem' }}></i>
+                Export Excel
+              </button>
             </div>
           </div>
 
@@ -688,10 +708,6 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
               onReset={resetFilters}
               resolvedRange={summaryMeta.dateRange}
               loading={summaryLoading}
-              exportingExcel={exportingExcel}
-              exportingPdf={exportingPdf}
-              onExportExcel={() => handleExport('excel')}
-              onExportPdf={() => handleExport('pdf')}
             />
           )}
 
@@ -706,6 +722,24 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <strong style={{ color: '#0f172a' }}>{activeViewLabel}</strong>
                 <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleExport('pdf')}
+                    disabled={summaryLoading || exportingExcel || exportingPdf}
+                    style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 700, cursor: summaryLoading || exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}
+                  >
+                    <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.42rem' }}></i>
+                    Export PDF
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleExport('excel')}
+                    disabled={summaryLoading || exportingExcel || exportingPdf}
+                    style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 700, cursor: summaryLoading || exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}
+                  >
+                    <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.42rem' }}></i>
+                    Export Excel
+                  </button>
                   <button
                     type="button"
                     onClick={() => setShowWorkspaceFilters((prev) => !prev)}
@@ -732,10 +766,6 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
                     onReset={resetFilters}
                     resolvedRange={summaryMeta.dateRange}
                     loading={summaryLoading}
-                    exportingExcel={exportingExcel}
-                    exportingPdf={exportingPdf}
-                    onExportExcel={() => handleExport('excel')}
-                    onExportPdf={() => handleExport('pdf')}
                   />
                 </div>
               )}

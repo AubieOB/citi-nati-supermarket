@@ -49,10 +49,6 @@ const SalesReportFilters = ({
   onReset,
   resolvedRange,
   loading,
-  exportingExcel,
-  exportingPdf,
-  onExportExcel,
-  onExportPdf,
 }) => {
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 8 }, (_, index) => currentYear - 3 + index);
@@ -142,24 +138,6 @@ const SalesReportFilters = ({
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-          <button
-            type="button"
-            onClick={onExportPdf}
-            disabled={exportingPdf || exportingExcel}
-            style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.7rem 1rem', fontWeight: 700, cursor: exportingPdf || exportingExcel ? 'not-allowed' : 'pointer' }}
-          >
-            <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.4rem' }}></i>
-            Export PDF
-          </button>
-          <button
-            type="button"
-            onClick={onExportExcel}
-            disabled={exportingPdf || exportingExcel}
-            style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.7rem 1rem', fontWeight: 700, cursor: exportingPdf || exportingExcel ? 'not-allowed' : 'pointer' }}
-          >
-            <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.4rem' }}></i>
-            Export Excel
-          </button>
           <button
             type="button"
             onClick={onReset}
