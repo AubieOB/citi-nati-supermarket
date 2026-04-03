@@ -706,6 +706,18 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
                   setActiveView(card.id);
                   setIsReportModalOpen(true);
                 }}
+                onMouseEnter={(event) => {
+                  event.currentTarget.style.transform = 'translateY(-2px)';
+                  event.currentTarget.style.boxShadow = '0 12px 24px rgba(15, 23, 42, 0.12)';
+                  event.currentTarget.style.borderColor = '#cbd5e1';
+                  event.currentTarget.style.backgroundColor = '#f8fafc';
+                }}
+                onMouseLeave={(event) => {
+                  event.currentTarget.style.transform = 'translateY(0)';
+                  event.currentTarget.style.boxShadow = '0 6px 20px rgba(15, 23, 42, 0.04)';
+                  event.currentTarget.style.borderColor = '#e2e8f0';
+                  event.currentTarget.style.backgroundColor = '#fff';
+                }}
                 style={{
                   border: '1px solid #e2e8f0',
                   backgroundColor: '#fff',
@@ -714,6 +726,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
                   cursor: 'pointer',
                   textAlign: 'left',
                   boxShadow: '0 6px 20px rgba(15, 23, 42, 0.04)',
+                  transition: 'transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background-color 0.16s ease',
                   display: 'grid',
                   gap: '0.48rem',
                 }}

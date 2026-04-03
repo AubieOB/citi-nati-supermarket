@@ -303,7 +303,19 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
             <button
               type="button"
               onClick={() => setIsEmployeesWorkspaceModalOpen(true)}
-              style={{ border: '1px solid #e2e8f0', backgroundColor: '#fff', borderRadius: '14px', padding: '0.95rem 1rem', cursor: 'pointer', textAlign: 'left', display: 'grid', gap: '0.42rem', boxShadow: '0 6px 18px rgba(15, 23, 42, 0.04)' }}
+              onMouseEnter={(event) => {
+                event.currentTarget.style.transform = 'translateY(-2px)';
+                event.currentTarget.style.boxShadow = '0 12px 24px rgba(15, 23, 42, 0.12)';
+                event.currentTarget.style.borderColor = '#cbd5e1';
+                event.currentTarget.style.backgroundColor = '#f8fafc';
+              }}
+              onMouseLeave={(event) => {
+                event.currentTarget.style.transform = 'translateY(0)';
+                event.currentTarget.style.boxShadow = '0 6px 18px rgba(15, 23, 42, 0.04)';
+                event.currentTarget.style.borderColor = '#e2e8f0';
+                event.currentTarget.style.backgroundColor = '#fff';
+              }}
+              style={{ border: '1px solid #e2e8f0', backgroundColor: '#fff', borderRadius: '14px', padding: '0.95rem 1rem', cursor: 'pointer', textAlign: 'left', display: 'grid', gap: '0.42rem', boxShadow: '0 6px 18px rgba(15, 23, 42, 0.04)', transition: 'transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background-color 0.16s ease' }}
             >
               <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '34px', height: '34px', borderRadius: '10px', backgroundColor: '#ede9fe', color: '#6d28d9' }}>
                 <i className="fas fa-users" />
