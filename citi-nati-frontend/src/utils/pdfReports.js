@@ -38,7 +38,7 @@ const buildBrandedHeader = ({
         <img src="${logo}" alt="Citi-Nati logo" style="height: ${logoHeight}px; width: auto; object-fit: contain; flex: 0 0 auto;" />
         <div style="flex: 1; text-align: center;">
           <h1 style="margin: 0; font-size: ${brandFontSize}px; font-weight: 700; line-height: 1.2;">
-            <span style="color: ${BRAND_PURPLE};">Citi</span><span style="color: ${BRAND_GREEN};">- Nati Supermarket</span>
+            <span style="color: ${BRAND_PURPLE};">Citi-</span><span style="color: ${BRAND_GREEN};">Nati Supermarket</span>
           </h1>
           <p style="margin: 6px 0 0 0; color: #111; font-size: ${titleFontSize}px; font-weight: 600;">${reportTitle}</p>
           ${subText ? `<p style="margin: 4px 0 0 0; color: #666; font-size: 12px;">${subText}</p>` : ''}
@@ -1438,10 +1438,10 @@ export const generateQuotationPDF = async (quotation) => {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
   doc.setTextColor(91, 75, 138);
-  doc.text('Citi', textLeft, logoTopY + 7);
-  const citiW = doc.getTextWidth('Citi');
+  doc.text('Citi-', textLeft, logoTopY + 7);
+  const citiW = doc.getTextWidth('Citi-');
   doc.setTextColor(45, 134, 89);
-  doc.text('- Nati Supermarket', textLeft + citiW, logoTopY + 7);
+  doc.text('Nati Supermarket', textLeft + citiW, logoTopY + 7);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);

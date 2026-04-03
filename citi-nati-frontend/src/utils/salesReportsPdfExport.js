@@ -310,10 +310,10 @@ function drawHeader(doc, { reportTitle, viewLabel, periodText, generatedText, sh
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(16);
     doc.setTextColor(...toRgb(BRAND_PURPLE));
-    doc.text('Citi', titleX, 14);
-    const citiWidth = doc.getTextWidth('Citi');
+    doc.text('Citi-', titleX, 14);
+    const citiWidth = doc.getTextWidth('Citi-');
     doc.setTextColor(...toRgb(BRAND_GREEN));
-    doc.text('- Nati Supermarket', titleX + citiWidth + 1, 14);
+    doc.text('Nati Supermarket', titleX + citiWidth, 14);
 
     doc.setTextColor(...COLOR_TEXT);
     doc.setFontSize(12);
