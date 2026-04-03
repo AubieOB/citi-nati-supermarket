@@ -401,6 +401,24 @@ const MonthlySummaryTab = ({
                 <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
                   <button
                     type="button"
+                    onClick={() => handleExport('pdf')}
+                    disabled={anyLoading || exportingExcel || exportingPdf || Boolean(validationError)}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 700, cursor: anyLoading || exportingExcel || exportingPdf || validationError ? 'not-allowed' : 'pointer' }}
+                  >
+                    <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.42rem' }}></i>
+                    Export PDF
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleExport('excel')}
+                    disabled={anyLoading || exportingExcel || exportingPdf || Boolean(validationError)}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 700, cursor: anyLoading || exportingExcel || exportingPdf || validationError ? 'not-allowed' : 'pointer' }}
+                  >
+                    <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.42rem' }}></i>
+                    Export Excel
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setShowControls((prev) => !prev)}
                     style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
                   >
@@ -435,10 +453,6 @@ const MonthlySummaryTab = ({
                       onChange={handleFilterChange}
                       onRefresh={() => setRefreshTick((current) => current + 1)}
                       onClear={resetFilters}
-                      exportingExcel={exportingExcel}
-                      exportingPdf={exportingPdf}
-                      onExportExcel={() => handleExport('excel')}
-                      onExportPdf={() => handleExport('pdf')}
                     />
                   </div>
                 </div>

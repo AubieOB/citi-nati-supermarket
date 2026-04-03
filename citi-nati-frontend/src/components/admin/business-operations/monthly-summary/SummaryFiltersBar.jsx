@@ -31,10 +31,6 @@ const SummaryFiltersBar = ({
   onChange,
   onRefresh,
   onClear,
-  exportingExcel,
-  exportingPdf,
-  onExportExcel,
-  onExportPdf,
 }) => (
   <div style={{ border: '1px solid #e2e8f0', borderRadius: '14px', padding: '0.95rem 1rem', backgroundColor: '#fff' }}>
     <div style={{ display: 'flex', gap: '0.7rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -73,26 +69,6 @@ const SummaryFiltersBar = ({
       >
         <i className={`fas ${loading ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`} style={{ marginRight: '0.38rem' }}></i>
         Refresh
-      </button>
-
-      <button
-        type="button"
-        onClick={onExportPdf}
-        disabled={exportingExcel || exportingPdf || Boolean(validationError)}
-        style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.7rem 0.92rem', fontWeight: 700, cursor: exportingExcel || exportingPdf || validationError ? 'not-allowed' : 'pointer' }}
-      >
-        <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.38rem' }}></i>
-        Export PDF
-      </button>
-
-      <button
-        type="button"
-        onClick={onExportExcel}
-        disabled={exportingExcel || exportingPdf || Boolean(validationError)}
-        style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.7rem 0.92rem', fontWeight: 700, cursor: exportingExcel || exportingPdf || validationError ? 'not-allowed' : 'pointer' }}
-      >
-        <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.38rem' }}></i>
-        Export Excel
       </button>
 
       <button
