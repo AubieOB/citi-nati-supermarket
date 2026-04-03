@@ -399,12 +399,15 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
 
       {isSuppliersWorkspaceModalOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: isSuppliersWorkspaceMaximized ? '0.35rem' : '1rem' }}>
-          <div style={{ ...cardStyle, width: isSuppliersWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1240px, 97vw)', height: isSuppliersWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'auto', borderRadius: isSuppliersWorkspaceMaximized ? '10px' : '18px', padding: '0.95rem' }}>
-            <div style={{ position: 'sticky', top: '-0.95rem', zIndex: 5, backgroundColor: '#fff', margin: '-0.95rem -0.95rem 0.75rem', padding: '0.95rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)' }}>
+          <div style={{ ...cardStyle, width: isSuppliersWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1400px, 97vw)', height: isSuppliersWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isSuppliersWorkspaceMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ flexShrink: 0, padding: '1rem 1.1rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(15,23,42,0.04)' }}>
               <div style={{ display: 'grid', gap: '0.85rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <strong style={{ color: '#0f172a' }}>Suppliers Workspace</strong>
-                <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <div>
+                    <h2 style={{ margin: 0, color: '#0f172a', fontSize: '1.15rem', fontWeight: 800 }}>Suppliers Workspace</h2>
+                    <p style={{ margin: '0.28rem 0 0', color: '#64748b', fontSize: '0.86rem' }}>Manage supplier records, balance position, and transaction activity from one view.</p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', alignItems: 'center' }}>
                   <button
                     type="button"
                     onClick={openCreateSupplier}
@@ -470,7 +473,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
               </div>
 
               {showFilters && (
-                <div style={{ ...cardStyle, padding: '1rem' }}>
+                <div style={{ marginTop: '0.2rem', display: 'flex', gap: '0.65rem', flexWrap: 'wrap', alignItems: 'center' }}>
                   <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                     <div style={{ flex: '1 1 280px', position: 'relative' }}>
                       <i className="fas fa-search" style={{ position: 'absolute', top: '50%', left: '0.95rem', transform: 'translateY(-50%)', color: '#94a3b8' }}></i>
@@ -479,13 +482,13 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
                         value={search}
                         onChange={(event) => setSearch(event.target.value)}
                         placeholder="Search by supplier name, code, contact, phone, or email"
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '0.85rem 1rem 0.85rem 2.7rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem' }}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '0.78rem 0.9rem 0.78rem 2.5rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc' }}
                       />
                     </div>
                     <select
                       value={statusFilter}
                       onChange={(event) => setStatusFilter(event.target.value)}
-                      style={{ minWidth: '140px', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem', backgroundColor: '#fff' }}
+                      style={{ minWidth: '140px', padding: '0.78rem 0.9rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc' }}
                     >
                       <option value="">All statuses</option>
                       <option value="active">Active</option>
@@ -497,51 +500,77 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', alignItems: 'start' }}>
-              <div style={{ ...cardStyle, overflow: 'hidden' }}>
-                <div style={{ padding: '1rem 1.05rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-                  <strong style={{ color: '#0f172a' }}>Supplier Register</strong>
-                  <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>Select a supplier to inspect balance history, edit details, or record new transactions.</p>
+            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'minmax(360px, 420px) 1fr', minHeight: 0 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, borderRight: '1px solid #e2e8f0' }}>
+                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                  <div style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '0.52rem 0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
+                    <span>Visible: {suppliers.length} {suppliers.length === 1 ? 'supplier' : 'suppliers'}</span>
+                    <span style={{ color: '#334155', maxWidth: '170px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      Selected: {selectedSupplier ? selectedSupplier.name : 'None'}
+                    </span>
+                  </div>
+                  <div style={{ padding: '0.85rem' }}>
+                    <div style={{ ...cardStyle, overflow: 'hidden' }}>
+                      <div style={{ padding: '1rem 1.05rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+                        <strong style={{ color: '#0f172a' }}>Supplier Register</strong>
+                        <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>Select a supplier to inspect balance history, edit details, or record transactions.</p>
+                      </div>
+                      <SuppliersList
+                        suppliers={suppliers}
+                        loading={listLoading}
+                        error={listError}
+                        pagination={pagination}
+                        page={page}
+                        onPageChange={setPage}
+                        selectedSupplierId={selectedSupplierId}
+                        onSelectSupplier={(supplier) => setSelectedSupplierId(supplier.id)}
+                        onEditSupplier={openEditSupplier}
+                      />
+                    </div>
+                  </div>
                 </div>
-                <SuppliersList
-                  suppliers={suppliers}
-                  loading={listLoading}
-                  error={listError}
-                  pagination={pagination}
-                  page={page}
-                  onPageChange={setPage}
-                  selectedSupplierId={selectedSupplierId}
-                  onSelectSupplier={(supplier) => setSelectedSupplierId(supplier.id)}
-                  onEditSupplier={openEditSupplier}
-                />
               </div>
 
-              <div style={{ ...cardStyle, padding: '1rem' }}>
-                {selectedSupplierId || detailLoading ? (
-                  <SupplierDetailPanel
-                    supplier={selectedSupplier}
-                    balanceSummary={selectedSummary}
-                    detailLoading={detailLoading}
-                    detailError={detailError}
-                    transactions={detailState.transactions}
-                    transactionsLoading={transactionsLoading}
-                    transactionsError={transactionsError}
-                    transactionPagination={detailState.transactionPagination}
-                    transactionPage={transactionPage}
-                    onTransactionPageChange={setTransactionPage}
-                    onEditSupplier={() => openEditSupplier(selectedSupplier)}
-                    onAddTransaction={openCreateTransaction}
-                    onEditTransaction={openEditTransaction}
-                  />
-                ) : (
-                  <SupplierEmptyState
-                    title="No supplier selected"
-                    message="Add your first supplier or choose one from the list to begin manual supplier management."
-                    actionLabel="Add New Supplier"
-                    onAction={openCreateSupplier}
-                    icon="fa-truck-field"
-                  />
-                )}
+              <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                  <div style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '0.52rem 0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
+                    <span style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {selectedSupplier ? `${selectedSupplier.name}${selectedSupplier.supplierCode ? ` · ${selectedSupplier.supplierCode}` : ''}` : 'No supplier selected'}
+                    </span>
+                    <span style={{ color: String(selectedSupplier?.status || '').toLowerCase() === 'active' ? '#166534' : '#334155', fontWeight: 700, textTransform: 'capitalize' }}>
+                      {selectedSupplier ? `Status: ${selectedSupplier.status || 'unknown'}` : '—'}
+                    </span>
+                  </div>
+                  <div style={{ padding: '0.85rem' }}>
+                    {selectedSupplierId || detailLoading ? (
+                      <SupplierDetailPanel
+                        supplier={selectedSupplier}
+                        balanceSummary={selectedSummary}
+                        detailLoading={detailLoading}
+                        detailError={detailError}
+                        transactions={detailState.transactions}
+                        transactionsLoading={transactionsLoading}
+                        transactionsError={transactionsError}
+                        transactionPagination={detailState.transactionPagination}
+                        transactionPage={transactionPage}
+                        onTransactionPageChange={setTransactionPage}
+                        onEditSupplier={() => openEditSupplier(selectedSupplier)}
+                        onAddTransaction={openCreateTransaction}
+                        onEditTransaction={openEditTransaction}
+                      />
+                    ) : (
+                      <div style={{ ...cardStyle, padding: '1rem' }}>
+                        <SupplierEmptyState
+                          title="No supplier selected"
+                          message="Add your first supplier or choose one from the register to begin supplier operations."
+                          actionLabel="Add New Supplier"
+                          onAction={openCreateSupplier}
+                          icon="fa-truck-field"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

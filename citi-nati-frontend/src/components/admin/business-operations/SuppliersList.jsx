@@ -72,7 +72,7 @@ const SuppliersList = ({
 
   return (
     <>
-      <div style={{ overflowX: 'auto', maxHeight: '620px' }}>
+      <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
           <thead>
             <tr>
@@ -85,17 +85,21 @@ const SuppliersList = ({
             </tr>
           </thead>
           <tbody>
-            {suppliers.map((supplier) => {
+            {suppliers.map((supplier, index) => {
               const selected = supplier.id === selectedSupplierId;
               const normalizedStatus = String(supplier.status || '').toLowerCase();
+              const zebraBase = index % 2 === 0 ? '#fff' : '#fcfdff';
 
               return (
                 <tr
                   key={supplier.id}
                   onClick={() => onSelectSupplier(supplier)}
+                  onMouseEnter={(event) => { if (!selected) event.currentTarget.style.backgroundColor = '#f8fafc'; }}
+                  onMouseLeave={(event) => { if (!selected) event.currentTarget.style.backgroundColor = zebraBase; }}
                   style={{
-                    backgroundColor: selected ? '#f8fafc' : '#fff',
+                    backgroundColor: selected ? '#f8fafc' : zebraBase,
                     cursor: 'pointer',
+                    transition: 'background-color 0.12s ease',
                   }}
                 >
                   <td style={tdStyle}>
