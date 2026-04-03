@@ -67,6 +67,7 @@ const MonthlySummaryTab = ({
 }) => {
   const [showControls, setShowControls] = useState(false);
   const [isInsightsModalOpen, setIsInsightsModalOpen] = useState(false);
+  const [isInsightsModalMaximized, setIsInsightsModalMaximized] = useState(false);
   const now = new Date();
   const initialMonthRange = monthRange(now.getFullYear(), now.getMonth() + 1);
 
@@ -375,7 +376,7 @@ const MonthlySummaryTab = ({
 
   useEffect(() => {
     if (!isInsightsModalOpen) return;
-    const handler = (event) => { if (event.key === 'Escape') setIsInsightsModalOpen(false); };
+    const handler = (event) => { if (event.key === 'Escape') { setIsInsightsModalOpen(false); setIsInsightsModalMaximized(false); } };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [isInsightsModalOpen]);
@@ -394,7 +395,7 @@ const MonthlySummaryTab = ({
             <button
               type="button"
               title="Click to open"
-              onClick={() => setIsInsightsModalOpen(true)}
+              onClick={() => { setIsInsightsModalMaximized(false); setIsInsightsModalOpen(true); }}
               onMouseEnter={(event) => {
                 event.currentTarget.style.transform = 'translateY(-2px)';
                 event.currentTarget.style.boxShadow = '0 12px 24px rgba(15, 23, 42, 0.12)';
@@ -420,8 +421,8 @@ const MonthlySummaryTab = ({
       </div>
 
       {isInsightsModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: '1rem' }}>
-          <div style={{ ...cardStyle, width: 'min(1240px, 97vw)', maxHeight: '90vh', overflow: 'auto', padding: '0.95rem' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: isInsightsModalMaximized ? '0.35rem' : '1rem' }}>
+          <div style={{ ...cardStyle, width: isInsightsModalMaximized ? 'calc(100vw - 0.7rem)' : 'min(1240px, 97vw)', height: isInsightsModalMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'auto', borderRadius: isInsightsModalMaximized ? '10px' : '18px', padding: '0.95rem' }}>
             <div style={{ position: 'sticky', top: '-0.95rem', zIndex: 5, backgroundColor: '#fff', margin: '-0.95rem -0.95rem 0.75rem', padding: '0.95rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)' }}>
               <div style={{ display: 'grid', gap: '0.9rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -453,7 +454,24 @@ const MonthlySummaryTab = ({
                     <i className="fas fa-sliders" style={{ marginRight: '0.42rem' }}></i>
                     {showControls ? 'Hide Controls' : 'Show Controls'}
                   </button>
-                  <button type="button" onClick={() => setIsInsightsModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}>Close</button>
+                  <button
+                    type="button"
+                    title={isInsightsModalMaximized ? 'Restore' : 'Maximize'}
+                    aria-label={isInsightsModalMaximized ? 'Restore workspace' : 'Maximize workspace'}
+                    onClick={() => setIsInsightsModalMaximized((prev) => !prev)}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
+                  >
+                    <i className={`fas ${isInsightsModalMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
+                  </button>
+                  <button
+                    type="button"
+                    title="Close"
+                    aria-label="Close workspace"
+                    onClick={() => { setIsInsightsModalOpen(false); setIsInsightsModalMaximized(false); }}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
+                  >
+                    <i className="fas fa-times" />
+                  </button>
                 </div>
               </div>
 

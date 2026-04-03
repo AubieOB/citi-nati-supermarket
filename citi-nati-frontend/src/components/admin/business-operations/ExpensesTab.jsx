@@ -37,6 +37,8 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
   const [showFilters, setShowFilters] = useState(false);
   const [isExpensesWorkspaceModalOpen, setIsExpensesWorkspaceModalOpen] = useState(false);
   const [isCategoriesWorkspaceModalOpen, setIsCategoriesWorkspaceModalOpen] = useState(false);
+  const [isExpensesWorkspaceMaximized, setIsExpensesWorkspaceMaximized] = useState(false);
+  const [isCategoriesWorkspaceMaximized, setIsCategoriesWorkspaceMaximized] = useState(false);
 
   // Expense list state
   const [filters, setFilters] = useState({
@@ -265,8 +267,13 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
     if (!isExpensesWorkspaceModalOpen && !isCategoriesWorkspaceModalOpen) return;
     const handler = (event) => {
       if (event.key !== 'Escape') return;
-      if (isExpensesWorkspaceModalOpen) setIsExpensesWorkspaceModalOpen(false);
-      else if (isCategoriesWorkspaceModalOpen) setIsCategoriesWorkspaceModalOpen(false);
+      if (isExpensesWorkspaceModalOpen) {
+        setIsExpensesWorkspaceModalOpen(false);
+        setIsExpensesWorkspaceMaximized(false);
+      } else if (isCategoriesWorkspaceModalOpen) {
+        setIsCategoriesWorkspaceModalOpen(false);
+        setIsCategoriesWorkspaceMaximized(false);
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -293,6 +300,8 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
               onClick={() => {
                 setActiveTab(TAB_EXPENSES);
                 setIsCategoriesWorkspaceModalOpen(false);
+                setIsCategoriesWorkspaceMaximized(false);
+                setIsExpensesWorkspaceMaximized(false);
                 setIsExpensesWorkspaceModalOpen(true);
               }}
               onMouseEnter={(event) => {
@@ -322,6 +331,8 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
               onClick={() => {
                 setActiveTab(TAB_CATEGORIES);
                 setIsExpensesWorkspaceModalOpen(false);
+                setIsExpensesWorkspaceMaximized(false);
+                setIsCategoriesWorkspaceMaximized(false);
                 setIsCategoriesWorkspaceModalOpen(true);
               }}
               onMouseEnter={(event) => {
@@ -351,8 +362,8 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
       </div>
 
       {isExpensesWorkspaceModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: '1rem' }}>
-          <div style={{ ...cardStyle, width: 'min(1240px, 97vw)', maxHeight: '90vh', overflow: 'auto', padding: '0.95rem' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: isExpensesWorkspaceMaximized ? '0.35rem' : '1rem' }}>
+          <div style={{ ...cardStyle, width: isExpensesWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1240px, 97vw)', height: isExpensesWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'auto', borderRadius: isExpensesWorkspaceMaximized ? '10px' : '18px', padding: '0.95rem' }}>
             <div style={{ position: 'sticky', top: '-0.95rem', zIndex: 5, backgroundColor: '#fff', margin: '-0.95rem -0.95rem 0.75rem', padding: '0.95rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)' }}>
               <div style={{ display: 'grid', gap: '0.85rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -401,7 +412,24 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
                     <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.42rem' }} />
                     Export Excel
                   </button>
-                  <button type="button" onClick={() => setIsExpensesWorkspaceModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}>Close</button>
+                  <button
+                    type="button"
+                    title={isExpensesWorkspaceMaximized ? 'Restore' : 'Maximize'}
+                    aria-label={isExpensesWorkspaceMaximized ? 'Restore workspace' : 'Maximize workspace'}
+                    onClick={() => setIsExpensesWorkspaceMaximized((prev) => !prev)}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
+                  >
+                    <i className={`fas ${isExpensesWorkspaceMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
+                  </button>
+                  <button
+                    type="button"
+                    title="Close"
+                    aria-label="Close workspace"
+                    onClick={() => { setIsExpensesWorkspaceModalOpen(false); setIsExpensesWorkspaceMaximized(false); }}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
+                  >
+                    <i className="fas fa-times" />
+                  </button>
                 </div>
               </div>
 
@@ -512,8 +540,8 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
       )}
 
       {isCategoriesWorkspaceModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: '1rem' }}>
-          <div style={{ ...cardStyle, width: 'min(1100px, 97vw)', maxHeight: '90vh', overflow: 'auto', padding: '0.95rem' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: isCategoriesWorkspaceMaximized ? '0.35rem' : '1rem' }}>
+          <div style={{ ...cardStyle, width: isCategoriesWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1100px, 97vw)', height: isCategoriesWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'auto', borderRadius: isCategoriesWorkspaceMaximized ? '10px' : '18px', padding: '0.95rem' }}>
             <div style={{ position: 'sticky', top: '-0.95rem', zIndex: 5, backgroundColor: '#fff', margin: '-0.95rem -0.95rem 0.75rem', padding: '0.95rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
               <strong style={{ color: '#0f172a' }}>Categories Workspace</strong>
               <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
@@ -525,7 +553,24 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
                   <i className="fas fa-tags" style={{ marginRight: '0.42rem' }} />
                   Add Category
                 </button>
-                <button type="button" onClick={() => setIsCategoriesWorkspaceModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}>Close</button>
+                <button
+                  type="button"
+                  title={isCategoriesWorkspaceMaximized ? 'Restore' : 'Maximize'}
+                  aria-label={isCategoriesWorkspaceMaximized ? 'Restore workspace' : 'Maximize workspace'}
+                  onClick={() => setIsCategoriesWorkspaceMaximized((prev) => !prev)}
+                  style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
+                >
+                  <i className={`fas ${isCategoriesWorkspaceMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
+                </button>
+                <button
+                  type="button"
+                  title="Close"
+                  aria-label="Close workspace"
+                  onClick={() => { setIsCategoriesWorkspaceModalOpen(false); setIsCategoriesWorkspaceMaximized(false); }}
+                  style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
+                >
+                  <i className="fas fa-times" />
+                </button>
               </div>
             </div>
             <div style={{ ...cardStyle, overflow: 'hidden' }}>

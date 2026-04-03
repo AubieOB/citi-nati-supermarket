@@ -25,6 +25,7 @@ const getApiError = (err, fallback) =>
 const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] }) => {
   const [showFilters, setShowFilters] = useState(false);
   const [isEmployeesWorkspaceModalOpen, setIsEmployeesWorkspaceModalOpen] = useState(false);
+  const [isEmployeesWorkspaceMaximized, setIsEmployeesWorkspaceMaximized] = useState(false);
 
   // ── List state ──
   const [employees, setEmployees] = useState([]);
@@ -270,7 +271,7 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
 
   useEffect(() => {
     if (!isEmployeesWorkspaceModalOpen || employeeModal.open || salaryModal.open) return;
-    const handler = (event) => { if (event.key === 'Escape') setIsEmployeesWorkspaceModalOpen(false); };
+    const handler = (event) => { if (event.key === 'Escape') { setIsEmployeesWorkspaceModalOpen(false); setIsEmployeesWorkspaceMaximized(false); } };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [isEmployeesWorkspaceModalOpen, employeeModal.open, salaryModal.open]);
@@ -310,7 +311,7 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
             <button
               type="button"
               title="Click to open"
-              onClick={() => setIsEmployeesWorkspaceModalOpen(true)}
+              onClick={() => { setIsEmployeesWorkspaceMaximized(false); setIsEmployeesWorkspaceModalOpen(true); }}
               onMouseEnter={(event) => {
                 event.currentTarget.style.transform = 'translateY(-2px)';
                 event.currentTarget.style.boxShadow = '0 12px 24px rgba(15, 23, 42, 0.12)';
@@ -336,8 +337,8 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
       </div>
 
       {isEmployeesWorkspaceModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: '1rem' }}>
-          <div style={{ ...cardStyle, width: 'min(1320px, 98vw)', height: '92vh', overflow: 'hidden', padding: '1rem', background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 30%)', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: isEmployeesWorkspaceMaximized ? '0.35rem' : '1rem' }}>
+          <div style={{ ...cardStyle, width: isEmployeesWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1320px, 98vw)', height: isEmployeesWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', overflow: 'hidden', padding: '1rem', borderRadius: isEmployeesWorkspaceMaximized ? '10px' : '18px', background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 30%)', display: 'flex', flexDirection: 'column' }}>
             <div style={{ backgroundColor: '#fff', margin: '-1rem -1rem 0.85rem', padding: '1rem 1rem 0.9rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)' }}>
               <div style={{ display: 'grid', gap: '0.85rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -384,7 +385,24 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
                   >
                     <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.4rem' }} />Export Excel
                   </button>
-                  <button type="button" onClick={() => setIsEmployeesWorkspaceModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}>Close</button>
+                  <button
+                    type="button"
+                    title={isEmployeesWorkspaceMaximized ? 'Restore' : 'Maximize'}
+                    aria-label={isEmployeesWorkspaceMaximized ? 'Restore workspace' : 'Maximize workspace'}
+                    onClick={() => setIsEmployeesWorkspaceMaximized((prev) => !prev)}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
+                  >
+                    <i className={`fas ${isEmployeesWorkspaceMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
+                  </button>
+                  <button
+                    type="button"
+                    title="Close"
+                    aria-label="Close workspace"
+                    onClick={() => { setIsEmployeesWorkspaceModalOpen(false); setIsEmployeesWorkspaceMaximized(false); }}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
+                  >
+                    <i className="fas fa-times" />
+                  </button>
                 </div>
               </div>
 

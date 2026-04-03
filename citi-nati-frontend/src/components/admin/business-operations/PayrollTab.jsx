@@ -38,6 +38,7 @@ const reduceSummary = (entries = []) => entries.reduce((acc, entry) => {
 const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] }) => {
   const [showPeriodFilters, setShowPeriodFilters] = useState(false);
   const [isPayrollWorkspaceModalOpen, setIsPayrollWorkspaceModalOpen] = useState(false);
+  const [isPayrollWorkspaceMaximized, setIsPayrollWorkspaceMaximized] = useState(false);
   const [employees, setEmployees] = useState([]);
 
   const [periodFilters, setPeriodFilters] = useState({
@@ -455,7 +456,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
 
   useEffect(() => {
     if (!isPayrollWorkspaceModalOpen || periodModal.open || entryModal.open || supportDrawer.open) return;
-    const handler = (event) => { if (event.key === 'Escape') setIsPayrollWorkspaceModalOpen(false); };
+    const handler = (event) => { if (event.key === 'Escape') { setIsPayrollWorkspaceModalOpen(false); setIsPayrollWorkspaceMaximized(false); } };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [isPayrollWorkspaceModalOpen, periodModal.open, entryModal.open, supportDrawer.open]);
@@ -474,7 +475,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
             <button
               type="button"
               title="Click to open"
-              onClick={() => setIsPayrollWorkspaceModalOpen(true)}
+              onClick={() => { setIsPayrollWorkspaceMaximized(false); setIsPayrollWorkspaceModalOpen(true); }}
               onMouseEnter={(event) => {
                 event.currentTarget.style.transform = 'translateY(-2px)';
                 event.currentTarget.style.boxShadow = '0 12px 24px rgba(15, 23, 42, 0.12)';
@@ -500,8 +501,8 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
       </div>
 
       {isPayrollWorkspaceModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: '1rem' }}>
-          <div style={{ ...cardStyle, width: 'min(1400px, 97vw)', height: '92vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: isPayrollWorkspaceMaximized ? '0.35rem' : '1rem' }}>
+          <div style={{ ...cardStyle, width: isPayrollWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1400px, 97vw)', height: isPayrollWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isPayrollWorkspaceMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column' }}>
 
             {/* Fixed modal header */}
             <div style={{ flexShrink: 0, padding: '1rem 1.1rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(15,23,42,0.04)' }}>
@@ -551,7 +552,24 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
                   >
                     <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.38rem' }}></i>Export Excel
                   </button>
-                  <button type="button" onClick={() => setIsPayrollWorkspaceModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}>Close</button>
+                  <button
+                    type="button"
+                    title={isPayrollWorkspaceMaximized ? 'Restore' : 'Maximize'}
+                    aria-label={isPayrollWorkspaceMaximized ? 'Restore workspace' : 'Maximize workspace'}
+                    onClick={() => setIsPayrollWorkspaceMaximized((prev) => !prev)}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
+                  >
+                    <i className={`fas ${isPayrollWorkspaceMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
+                  </button>
+                  <button
+                    type="button"
+                    title="Close"
+                    aria-label="Close workspace"
+                    onClick={() => { setIsPayrollWorkspaceModalOpen(false); setIsPayrollWorkspaceMaximized(false); }}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
+                  >
+                    <i className="fas fa-times" />
+                  </button>
                 </div>
               </div>
 

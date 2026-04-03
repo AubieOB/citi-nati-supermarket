@@ -55,6 +55,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
   const [statusFilter, setStatusFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [isSuppliersWorkspaceModalOpen, setIsSuppliersWorkspaceModalOpen] = useState(false);
+  const [isSuppliersWorkspaceMaximized, setIsSuppliersWorkspaceMaximized] = useState(false);
   const [page, setPage] = useState(1);
   const [transactionPage, setTransactionPage] = useState(1);
 
@@ -331,7 +332,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
 
   useEffect(() => {
     if (!isSuppliersWorkspaceModalOpen || supplierModalState.open || transactionModalState.open) return;
-    const handler = (event) => { if (event.key === 'Escape') setIsSuppliersWorkspaceModalOpen(false); };
+    const handler = (event) => { if (event.key === 'Escape') { setIsSuppliersWorkspaceModalOpen(false); setIsSuppliersWorkspaceMaximized(false); } };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [isSuppliersWorkspaceModalOpen, supplierModalState.open, transactionModalState.open]);
@@ -371,7 +372,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
             <button
               type="button"
               title="Click to open"
-              onClick={() => setIsSuppliersWorkspaceModalOpen(true)}
+              onClick={() => { setIsSuppliersWorkspaceMaximized(false); setIsSuppliersWorkspaceModalOpen(true); }}
               onMouseEnter={(event) => {
                 event.currentTarget.style.transform = 'translateY(-2px)';
                 event.currentTarget.style.boxShadow = '0 12px 24px rgba(15, 23, 42, 0.12)';
@@ -397,8 +398,8 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
       </div>
 
       {isSuppliersWorkspaceModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: '1rem' }}>
-          <div style={{ ...cardStyle, width: 'min(1240px, 97vw)', maxHeight: '90vh', overflow: 'auto', padding: '0.95rem' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: isSuppliersWorkspaceMaximized ? '0.35rem' : '1rem' }}>
+          <div style={{ ...cardStyle, width: isSuppliersWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1240px, 97vw)', height: isSuppliersWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'auto', borderRadius: isSuppliersWorkspaceMaximized ? '10px' : '18px', padding: '0.95rem' }}>
             <div style={{ position: 'sticky', top: '-0.95rem', zIndex: 5, backgroundColor: '#fff', margin: '-0.95rem -0.95rem 0.75rem', padding: '0.95rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)' }}>
               <div style={{ display: 'grid', gap: '0.85rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -447,7 +448,24 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
                     <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.42rem' }}></i>
                     Export Excel
                   </button>
-                  <button type="button" onClick={() => setIsSuppliersWorkspaceModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}>Close</button>
+                  <button
+                    type="button"
+                    title={isSuppliersWorkspaceMaximized ? 'Restore' : 'Maximize'}
+                    aria-label={isSuppliersWorkspaceMaximized ? 'Restore workspace' : 'Maximize workspace'}
+                    onClick={() => setIsSuppliersWorkspaceMaximized((prev) => !prev)}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
+                  >
+                    <i className={`fas ${isSuppliersWorkspaceMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
+                  </button>
+                  <button
+                    type="button"
+                    title="Close"
+                    aria-label="Close workspace"
+                    onClick={() => { setIsSuppliersWorkspaceModalOpen(false); setIsSuppliersWorkspaceMaximized(false); }}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
+                  >
+                    <i className="fas fa-times" />
+                  </button>
                 </div>
               </div>
 

@@ -179,6 +179,7 @@ const ErrorState = ({ message }) => (
 const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, selectedLocationCode = '' }) => {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isReportModalMaximized, setIsReportModalMaximized] = useState(false);
   const [showSummaryFilters, setShowSummaryFilters] = useState(false);
   const [showWorkspaceFilters, setShowWorkspaceFilters] = useState(false);
   const [activeSection, setActiveSection] = useState('summary');
@@ -705,6 +706,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
                 title="Click to open"
                 onClick={() => {
                   setActiveView(card.id);
+                  setIsReportModalMaximized(false);
                   setIsReportModalOpen(true);
                 }}
                 onMouseEnter={(event) => {
@@ -747,7 +749,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
 
   useEffect(() => {
     if (!isReportModalOpen) return;
-    const handler = (event) => { if (event.key === 'Escape') setIsReportModalOpen(false); };
+    const handler = (event) => { if (event.key === 'Escape') { setIsReportModalOpen(false); setIsReportModalMaximized(false); } };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [isReportModalOpen]);
@@ -761,6 +763,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
             setActiveSection('summary');
             setActiveView('summary');
             setIsReportModalOpen(false);
+            setIsReportModalMaximized(false);
           }}
           style={navigationTabStyle(activeSection === 'summary')}
         >
@@ -772,6 +775,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
           onClick={() => {
             setActiveSection('sales-by');
             setIsReportModalOpen(false);
+            setIsReportModalMaximized(false);
             if (activeView === 'summary') {
               setActiveView('invoices');
             }
@@ -836,8 +840,8 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
       {activeSection === 'sales-by' && renderSalesByNavigator()}
 
       {activeView !== 'summary' && isReportModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: '1rem' }}>
-          <div style={{ ...baseCardStyle, width: 'min(1240px, 97vw)', maxHeight: '90vh', overflow: 'auto', padding: '0.9rem' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: isReportModalMaximized ? '0.35rem' : '1rem' }}>
+          <div style={{ ...baseCardStyle, width: isReportModalMaximized ? 'calc(100vw - 0.7rem)' : 'min(1240px, 97vw)', height: isReportModalMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'auto', borderRadius: isReportModalMaximized ? '10px' : '18px', padding: '0.9rem' }}>
             <div style={{ position: 'sticky', top: '-0.9rem', zIndex: 5, backgroundColor: '#fff', margin: '-0.9rem -0.9rem 0.75rem', padding: '0.9rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <strong style={{ color: '#0f172a' }}>{activeViewLabel}</strong>
@@ -870,10 +874,21 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
                   </button>
                   <button
                     type="button"
-                    onClick={() => setIsReportModalOpen(false)}
-                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.7rem', cursor: 'pointer', fontWeight: 700 }}
+                    title={isReportModalMaximized ? 'Restore' : 'Maximize'}
+                    aria-label={isReportModalMaximized ? 'Restore report modal' : 'Maximize report modal'}
+                    onClick={() => setIsReportModalMaximized((prev) => !prev)}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
                   >
-                    Close
+                    <i className={`fas ${isReportModalMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
+                  </button>
+                  <button
+                    type="button"
+                    title="Close"
+                    aria-label="Close report modal"
+                    onClick={() => { setIsReportModalOpen(false); setIsReportModalMaximized(false); }}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
+                  >
+                    <i className="fas fa-times" />
                   </button>
                 </div>
               </div>
