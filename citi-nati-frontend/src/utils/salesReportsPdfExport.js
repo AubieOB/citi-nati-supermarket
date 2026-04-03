@@ -167,14 +167,16 @@ function summarizeView(activeView, states) {
 function drawPageHeader(doc, reportTitle, activeViewLabel) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 10;
+  const logoWidth = 24;
+  const logoHeight = 16;
 
   try {
-    doc.addImage(logo, 'PNG', margin, 8, 18, 18);
+    doc.addImage(logo, 'PNG', margin, 9, logoWidth, logoHeight);
   } catch {
     // Logo rendering failure should not block export.
   }
 
-  const textLeft = 32;
+  const textLeft = margin + logoWidth + 4;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);
   doc.setTextColor(91, 75, 138);
@@ -468,19 +470,16 @@ export function exportActiveSalesReportPdf({
     },
     columnStyles: {
       0: { cellWidth: 127 },
-      1: { cellWidth: 70, halign: 'right' },
-      2: { cellWidth: 70, halign: 'right' },
+      1: { cellWidth: 70, halign: 'left' },
+      2: { cellWidth: 70, halign: 'left' },
     },
   });
 
   const reportHeadingY = (doc.lastAutoTable?.finalY || summaryStartY) + 6;
-  doc.setFillColor(248, 250, 252);
-  doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(10, reportHeadingY - 4, 277, 9, 2, 2, 'FD');
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(51, 65, 85);
   doc.setFontSize(10);
-  doc.text('Report Data', 13, reportHeadingY + 1.7);
+  doc.text('Report Data', 10, reportHeadingY + 1.7);
 
   const tableY = reportHeadingY + 7;
   const tableConfig = getViewTableConfig(activeView, {
