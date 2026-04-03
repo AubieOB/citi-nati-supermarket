@@ -1,10 +1,8 @@
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import html2pdf from 'html2pdf.js';
 import logo from '../assets/citi-nati-logo.png.png';
 
 const BRAND_PURPLE = '#5B4B8A';
 const BRAND_GREEN = '#2D8659';
-const BRAND_SLATE = '#334155';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -46,26 +44,6 @@ function toTime(value) {
   return date.toLocaleTimeString('en-GB');
 }
 
-function buildBrandedHeader({ reportTitle, subText = '', periodText = '', generatedText = '', accentColor = BRAND_PURPLE }) {
-  return `
-    <div style="margin-bottom: 24px; border-bottom: 3px solid ${accentColor}; padding-bottom: 14px;">
-      <div style="display: flex; align-items: center; gap: 10px;">
-        <img src="${logo}" alt="Citi-Nati logo" style="height: 56px; width: auto; object-fit: contain; flex: 0 0 auto;" />
-        <div style="flex: 1; text-align: center;">
-          <h1 style="margin: 0; font-size: 27px; font-weight: 700; line-height: 1.2;">
-            <span style="color: ${BRAND_PURPLE};">Citi</span><span style="color: ${BRAND_GREEN};">- Nati Supermarket</span>
-          </h1>
-          <p style="margin: 6px 0 0 0; color: #111; font-size: 16px; font-weight: 600;">${escapeHtml(reportTitle)}</p>
-          ${subText ? `<p style="margin: 4px 0 0 0; color: #555; font-size: 12px;">${escapeHtml(subText)}</p>` : ''}
-          ${periodText ? `<p style="margin: 4px 0 0 0; color: #666; font-size: 12px;">${escapeHtml(periodText)}</p>` : ''}
-          ${generatedText ? `<p style="margin: 4px 0 0 0; color: #777; font-size: 12px;">${escapeHtml(generatedText)}</p>` : ''}
-        </div>
-        <div style="width: 56px; flex: 0 0 56px;"></div>
-      </div>
-    </div>
-  `;
-}
-
 function getPeriodText(filters = {}, resolvedDateRange = null) {
   if (resolvedDateRange?.startDate && resolvedDateRange?.endDate) {
     return `${resolvedDateRange.startDate} to ${resolvedDateRange.endDate}`;
@@ -84,10 +62,29 @@ function getPeriodText(filters = {}, resolvedDateRange = null) {
   return 'Current selection';
 }
 
-function buildFilterChips(filters = {}, resolvedDateRange = null, summaryMetaLine = []) {
-  const chips = [
-    { label: 'Period Type', value: titleCase(filters.periodType || 'month') },
-    { label: 'Reporting Period', value: getPeriodText(filters, resolvedDateRange) },
+function buildBrandedHeader({ reportTitle, subText = '', periodText = '', generatedText = '', accentColor = BRAND_PURPLE }) {
+  return `
+    <div style="margin-bottom: 20px; border-bottom: 3px solid ${accentColor}; padding-bottom: 12px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <img src="${logo}" alt="Citi-Nati logo" style="height: 44px; width: auto; object-fit: contain; flex: 0 0 auto;" />
+        <div style="flex: 1; text-align: left;">
+          <h1 style="margin: 0; font-size: 37px; font-weight: 700; line-height: 1;">
+            <span style="color: ${BRAND_PURPLE};">Citi</span><span style="color: ${BRAND_GREEN};"> - Nati Supermarket</span>
+          </h1>
+          <p style="margin: 6px 0 0 0; color: #111; font-size: 18px; font-weight: 600;">${escapeHtml(reportTitle)}</p>
+          ${subText ? `<p style="margin: 3px 0 0 0; color: #475569; font-size: 13px;">${escapeHtml(subText)}</p>` : ''}
+          ${periodText ? `<p style="margin: 2px 0 0 0; color: #64748b; font-size: 12px;">${escapeHtml(periodText)}</p>` : ''}
+          ${generatedText ? `<p style="margin: 2px 0 0 0; color: #64748b; font-size: 12px;">${escapeHtml(generatedText)}</p>` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function buildFilterRows(filters = {}, resolvedDateRange = null, summaryMetaLine = []) {
+  const rows = [
+    ['Period Type', titleCase(filters.periodType || 'month')],
+    ['Reporting Period', getPeriodText(filters, resolvedDateRange)],
   ];
 
   const optionalKeys = [
@@ -105,18 +102,18 @@ function buildFilterChips(filters = {}, resolvedDateRange = null, summaryMetaLin
   optionalKeys.forEach((key) => {
     const value = filters[key];
     if (value !== '' && value !== null && value !== undefined) {
-      chips.push({ label: titleCase(key), value: String(value) });
+      rows.push([titleCase(key), String(value)]);
     }
   });
 
   if (Array.isArray(summaryMetaLine)) {
     summaryMetaLine.forEach((line, index) => {
       if (!line) return;
-      chips.push({ label: `Context ${index + 1}`, value: String(line) });
+      rows.push([`Context ${index + 1}`, String(line)]);
     });
   }
 
-  return chips;
+  return rows;
 }
 
 function summarizeView(activeView, states) {
@@ -164,105 +161,19 @@ function summarizeView(activeView, states) {
   return { count: 0, amount: 0 };
 }
 
-function drawPageHeader(doc, reportTitle, activeViewLabel) {
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 10;
-  const logoWidth = 24;
-  const logoHeight = 16;
-
-  try {
-    doc.addImage(logo, 'PNG', margin, 9, logoWidth, logoHeight);
-  } catch {
-    // Logo rendering failure should not block export.
-  }
-
-  const textLeft = margin + logoWidth + 4;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.setTextColor(91, 75, 138);
-  doc.text('Citi', textLeft, 14);
-  const citiWidth = doc.getTextWidth('Citi');
-  doc.setTextColor(45, 134, 89);
-  doc.text('- Nati Supermarket', textLeft + citiWidth + 1, 14);
-
-  doc.setFontSize(11);
-  doc.setTextColor(22, 28, 36);
-  doc.text(reportTitle, textLeft, 20);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(71, 85, 105);
-  doc.text(`${activeViewLabel} View`, textLeft, 25);
-
-  doc.setDrawColor(45, 134, 89);
-  doc.setLineWidth(0.45);
-  doc.line(margin, 29, pageWidth - margin, 29);
-}
-
-function drawPageFooter(doc) {
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 10;
-  const page = doc.internal.getCurrentPageInfo().pageNumber;
-  const total = doc.internal.getNumberOfPages();
-
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(120, 120, 120);
-  doc.setFontSize(8);
-  doc.text('Automated report generated by Citi-Nati Supermarket Sales System', margin, pageHeight - 5);
-  doc.text(`Page ${page} of ${total}`, pageWidth - margin, pageHeight - 5, { align: 'right' });
-}
-
-function drawContinuationHeader(doc, activeViewLabel) {
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 10;
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(51, 65, 85);
-  doc.text(`Report Data - ${activeViewLabel} (cont.)`, margin, 12);
-
-  doc.setDrawColor(226, 232, 240);
-  doc.setLineWidth(0.3);
-  doc.line(margin, 14.5, pageWidth - margin, 14.5);
-}
-
-function drawNoData(doc, message, y) {
-  autoTable(doc, {
-    startY: y,
-    margin: { left: 10, right: 10 },
-    head: [['No Records']],
-    body: [[message]],
-    styles: {
-      fontSize: 9,
-      textColor: [71, 85, 105],
-      cellPadding: 5,
-      halign: 'center',
-      valign: 'middle',
-      lineColor: [203, 213, 225],
-      lineWidth: 0.3,
-    },
-    headStyles: {
-      fillColor: [241, 245, 249],
-      textColor: [51, 65, 85],
-      fontStyle: 'bold',
-    },
-  });
-}
-
-function getViewTableConfig(activeView, states) {
-  const { summary, invoicesState, productsState, usersState, paymentsState } = states;
-
+function buildTableConfig(activeView, summary, invoicesState, productsState, usersState, paymentsState) {
   if (activeView === 'summary') {
     if (Number(summary?.totalInvoices || 0) <= 0) {
       return {
-        empty: true,
-        emptyMessage: 'No records were found for the selected criteria in Summary view.',
+        headers: ['No Records'],
+        rows: [['No records were found for the selected criteria in Summary view.']],
+        aligns: ['center'],
       };
     }
 
     return {
-      head: [['Metric', 'Value']],
-      body: [
+      headers: ['Metric', 'Value'],
+      rows: [
         ['Total Invoices', fmtCount(summary?.totalInvoices)],
         ['Total Items Sold', fmtCount(summary?.totalItemsSold)],
         ['Gross Sales', fmtCurrency(summary?.grossSales)],
@@ -272,25 +183,15 @@ function getViewTableConfig(activeView, states) {
         ['Levy Total', fmtCurrency(summary?.levyTotal)],
         ['Average Invoice', fmtCurrency(summary?.averageInvoiceValue)],
       ],
-      columnStyles: {
-        0: { cellWidth: 187, halign: 'left' },
-        1: { cellWidth: 90, halign: 'right' },
-      },
+      aligns: ['left', 'right'],
     };
   }
 
   if (activeView === 'invoices') {
     const rows = Array.isArray(invoicesState?.data) ? invoicesState.data : [];
-    if (!rows.length) {
-      return {
-        empty: true,
-        emptyMessage: 'No invoice records were found for the selected criteria.',
-      };
-    }
-
     return {
-      head: [['Invoice', 'Date', 'Time', 'User', 'Location', 'Branch', 'Payment', 'Net']],
-      body: rows.map((row) => [
+      headers: ['Invoice', 'Date', 'Time', 'User', 'Location', 'Branch', 'Payment', 'Net'],
+      rows: rows.map((row) => [
         row?.sourceInvoiceNo || '-',
         toDate(row?.invoiceDate),
         toTime(row?.invoiceTime),
@@ -300,31 +201,16 @@ function getViewTableConfig(activeView, states) {
         row?.payMethod1 || '-',
         fmtCurrency(row?.netSale),
       ]),
-      columnStyles: {
-        0: { cellWidth: 28 },
-        1: { cellWidth: 28 },
-        2: { cellWidth: 22 },
-        3: { cellWidth: 40 },
-        4: { cellWidth: 26 },
-        5: { cellWidth: 32 },
-        6: { cellWidth: 31 },
-        7: { cellWidth: 70, halign: 'right' },
-      },
+      aligns: ['left', 'left', 'left', 'left', 'left', 'left', 'left', 'right'],
+      emptyMessage: 'No invoice records were found for the selected criteria.',
     };
   }
 
   if (activeView === 'products') {
     const rows = Array.isArray(productsState?.data) ? productsState.data : [];
-    if (!rows.length) {
-      return {
-        empty: true,
-        emptyMessage: 'No product aggregates were found for the selected criteria.',
-      };
-    }
-
     return {
-      head: [['Code', 'Product', 'Quantity', 'Sales', 'Tax', 'Discount']],
-      body: rows.map((row) => [
+      headers: ['Code', 'Product', 'Quantity', 'Sales', 'Tax', 'Discount'],
+      rows: rows.map((row) => [
         row?.productCode || '-',
         row?.productName || '-',
         fmtCount(row?.totalQuantitySold),
@@ -332,29 +218,16 @@ function getViewTableConfig(activeView, states) {
         fmtCurrency(row?.totalTax),
         fmtCurrency(row?.totalDiscount),
       ]),
-      columnStyles: {
-        0: { cellWidth: 35 },
-        1: { cellWidth: 102 },
-        2: { cellWidth: 28, halign: 'right' },
-        3: { cellWidth: 38, halign: 'right' },
-        4: { cellWidth: 37, halign: 'right' },
-        5: { cellWidth: 37, halign: 'right' },
-      },
+      aligns: ['left', 'left', 'right', 'right', 'right', 'right'],
+      emptyMessage: 'No product aggregates were found for the selected criteria.',
     };
   }
 
   if (activeView === 'users') {
     const rows = Array.isArray(usersState?.data) ? usersState.data : [];
-    if (!rows.length) {
-      return {
-        empty: true,
-        emptyMessage: 'No user/cashier aggregates were found for the selected criteria.',
-      };
-    }
-
     return {
-      head: [['User', 'Invoices', 'Gross', 'VAT', 'Net', 'Avg Invoice']],
-      body: rows.map((row) => [
+      headers: ['User', 'Invoices', 'Gross', 'VAT', 'Net', 'Avg Invoice'],
+      rows: rows.map((row) => [
         row?.userName || '-',
         fmtCount(row?.totalInvoices),
         fmtCurrency(row?.grossSales),
@@ -362,51 +235,64 @@ function getViewTableConfig(activeView, states) {
         fmtCurrency(row?.totalSales),
         fmtCurrency(row?.averageInvoiceValue),
       ]),
-      columnStyles: {
-        0: { cellWidth: 73 },
-        1: { cellWidth: 30, halign: 'right' },
-        2: { cellWidth: 40, halign: 'right' },
-        3: { cellWidth: 40, halign: 'right' },
-        4: { cellWidth: 43, halign: 'right' },
-        5: { cellWidth: 51, halign: 'right' },
-      },
+      aligns: ['left', 'right', 'right', 'right', 'right', 'right'],
+      emptyMessage: 'No user/cashier aggregates were found for the selected criteria.',
     };
   }
 
   if (activeView === 'payments') {
     const rows = Array.isArray(paymentsState?.data) ? paymentsState.data : [];
-    if (!rows.length) {
-      return {
-        empty: true,
-        emptyMessage: 'No payment method rows were found for the selected criteria.',
-      };
-    }
-
     const totals = paymentsState?.totals || {
       invoiceCount: rows.reduce((sum, row) => sum + Number(row?.invoiceCount || 0), 0),
       totalAmount: rows.reduce((sum, row) => sum + Number(row?.totalAmount || 0), 0),
     };
 
+    const baseRows = rows.map((row) => [
+      row?.payMethod || '-',
+      fmtCount(row?.invoiceCount),
+      fmtCurrency(row?.totalAmount),
+    ]);
+
+    if (baseRows.length) {
+      baseRows.push(['TOTAL', fmtCount(totals.invoiceCount), fmtCurrency(totals.totalAmount)]);
+    }
+
     return {
-      head: [['Payment Method', 'Invoice Count', 'Amount']],
-      body: rows.map((row) => [
-        row?.payMethod || '-',
-        fmtCount(row?.invoiceCount),
-        fmtCurrency(row?.totalAmount),
-      ]),
-      foot: [['TOTAL', fmtCount(totals.invoiceCount), fmtCurrency(totals.totalAmount)]],
-      columnStyles: {
-        0: { cellWidth: 157 },
-        1: { cellWidth: 45, halign: 'right' },
-        2: { cellWidth: 75, halign: 'right' },
-      },
+      headers: ['Payment Method', 'Invoice Count', 'Amount'],
+      rows: baseRows,
+      aligns: ['left', 'right', 'right'],
+      emptyMessage: 'No payment method rows were found for the selected criteria.',
     };
   }
 
   return {
-    empty: true,
-    emptyMessage: 'The selected report view is not available for export.',
+    headers: ['No Records'],
+    rows: [['The selected report view is not available for export.']],
+    aligns: ['center'],
   };
+}
+
+function renderTable(headers, rows, aligns, emptyMessage = 'No records found.') {
+  const safeRows = rows && rows.length ? rows : [[emptyMessage]];
+  const hasData = rows && rows.length;
+
+  return `
+    <table class="sales-pdf-table">
+      <thead>
+        <tr>
+          ${headers.map((h, i) => `<th style="text-align:${aligns[i] || 'left'}">${escapeHtml(h)}</th>`).join('')}
+        </tr>
+      </thead>
+      <tbody>
+        ${safeRows.map((row, rowIndex) => `
+          <tr style="background-color:${rowIndex % 2 === 0 ? '#fff' : '#f9f9f9'};">
+            ${row.map((cell, cellIndex) => `<td style="text-align:${aligns[cellIndex] || 'left'}">${escapeHtml(cell)}</td>`).join('')}
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    ${!hasData ? `<div style="margin-top: 10px; color: #64748b; font-size: 12px;">${escapeHtml(emptyMessage)}</div>` : ''}
+  `;
 }
 
 export function exportActiveSalesReportPdf({
@@ -421,8 +307,8 @@ export function exportActiveSalesReportPdf({
   usersState,
   paymentsState,
 }) {
-  const reportTitle = 'Sales Report Export';
   const today = new Date();
+  const generatedText = `${today.toLocaleDateString('en-GB')} ${today.toLocaleTimeString('en-GB')}`;
   const viewSummary = summarizeView(activeView, {
     summary,
     invoicesState,
@@ -430,126 +316,103 @@ export function exportActiveSalesReportPdf({
     usersState,
     paymentsState,
   });
-  const chips = buildFilterChips(filters, resolvedDateRange, summaryMetaLine);
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
-  drawPageHeader(doc, reportTitle, activeViewLabel);
+  const filterRows = buildFilterRows(filters, resolvedDateRange, summaryMetaLine);
+  const tableConfig = buildTableConfig(activeView, summary, invoicesState, productsState, usersState, paymentsState);
 
-  autoTable(doc, {
-    startY: 34,
-    margin: { left: 10, right: 10 },
-    head: [['Context', 'Value']],
-    body: chips.map((chip) => [chip.label, chip.value]),
-    styles: {
-      fontSize: 8.5,
-      cellPadding: 2.2,
-      textColor: [30, 41, 59],
-      lineColor: [226, 232, 240],
-      lineWidth: 0.25,
-    },
-    headStyles: {
-      fillColor: [91, 75, 138],
-      textColor: [255, 255, 255],
-      fontStyle: 'bold',
-    },
-    alternateRowStyles: {
-      fillColor: [248, 250, 252],
-    },
-    columnStyles: {
-      0: { cellWidth: 58, fontStyle: 'bold', textColor: [71, 85, 105] },
-      1: { cellWidth: 209 },
-    },
-  });
-
-  const summaryStartY = (doc.lastAutoTable?.finalY || 34) + 4;
-  autoTable(doc, {
-    startY: summaryStartY,
-    margin: { left: 10, right: 10 },
-    head: [['Active View', 'Visible Records', 'Visible Amount']],
-    body: [[activeViewLabel, fmtCount(viewSummary.count), fmtCurrency(viewSummary.amount)]],
-    styles: {
-      fontSize: 9,
-      cellPadding: 3,
-      textColor: [17, 24, 39],
-      lineColor: [219, 234, 254],
-      lineWidth: 0.3,
-    },
-    headStyles: {
-      fillColor: [45, 134, 89],
-      textColor: [255, 255, 255],
-      fontStyle: 'bold',
-    },
-    bodyStyles: {
-      fillColor: [240, 249, 246],
-    },
-    columnStyles: {
-      0: { cellWidth: 127 },
-      1: { cellWidth: 70, halign: 'left' },
-      2: { cellWidth: 70, halign: 'left' },
-    },
-  });
-
-  const reportHeadingY = (doc.lastAutoTable?.finalY || summaryStartY) + 6;
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(51, 65, 85);
-  doc.setFontSize(10);
-  doc.text('Report Data', 10, reportHeadingY + 1.7);
-
-  const tableY = reportHeadingY + 7;
-  const tableConfig = getViewTableConfig(activeView, {
-    summary,
-    invoicesState,
-    productsState,
-    usersState,
-    paymentsState,
-  });
-
-  if (tableConfig.empty) {
-    drawNoData(doc, tableConfig.emptyMessage, tableY);
-  } else {
-    autoTable(doc, {
-      startY: tableY,
-      margin: { left: 10, right: 10, top: 18, bottom: 12 },
-      head: tableConfig.head,
-      body: tableConfig.body,
-      foot: tableConfig.foot || undefined,
-      theme: 'grid',
-      styles: {
-        fontSize: 8,
-        textColor: [34, 34, 34],
-        cellPadding: 2,
-        lineColor: [225, 225, 225],
-        lineWidth: 0.2,
-      },
-      headStyles: {
-        fillColor: [45, 134, 89],
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-      },
-      footStyles: {
-        fillColor: [240, 249, 246],
-        textColor: [17, 24, 39],
-        fontStyle: 'bold',
-      },
-      alternateRowStyles: {
-        fillColor: [249, 250, 251],
-      },
-      columnStyles: tableConfig.columnStyles,
-      didDrawPage: (data) => {
-        if (data.pageNumber > 1) {
-          drawContinuationHeader(doc, activeViewLabel);
+  const html = `
+    <div style="font-family: Arial, sans-serif; color: #222; padding: 16px; width: 1120px; box-sizing: border-box;">
+      <style>
+        .sales-pdf-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 12px;
+          table-layout: fixed;
+          page-break-inside: auto;
         }
-      },
-    });
-  }
 
-  const pages = doc.getNumberOfPages();
-  for (let i = 1; i <= pages; i += 1) {
-    doc.setPage(i);
-    drawPageFooter(doc);
-  }
+        .sales-pdf-table thead {
+          display: table-header-group;
+        }
+
+        .sales-pdf-table tr {
+          page-break-inside: avoid;
+          break-inside: avoid;
+          page-break-after: auto;
+        }
+
+        .sales-pdf-table td,
+        .sales-pdf-table th {
+          border: 1px solid #d4d4d4;
+          padding: 7px 8px;
+          vertical-align: top;
+          word-break: break-word;
+        }
+
+        .sales-pdf-table th {
+          background-color: #2D8659;
+          color: #fff;
+          font-weight: 700;
+          font-size: 12px;
+        }
+      </style>
+
+      ${buildBrandedHeader({
+        reportTitle: 'Sales Report Export',
+        subText: `${activeViewLabel} View`,
+        periodText: `Reporting Period: ${getPeriodText(filters, resolvedDateRange)}`,
+        generatedText: `Generated: ${generatedText}`,
+        accentColor: BRAND_GREEN,
+      })}
+
+      ${renderTable(
+        ['Context', 'Value'],
+        filterRows,
+        ['left', 'left'],
+      )}
+
+      <div style="margin-top: 12px;">
+        ${renderTable(
+          ['Active View', 'Visible Records', 'Visible Amount'],
+          [[activeViewLabel, fmtCount(viewSummary.count), fmtCurrency(viewSummary.amount)]],
+          ['left', 'left', 'left'],
+        )}
+      </div>
+
+      <h3 style="margin: 14px 0 8px 0; font-size: 22px; color: #334155;">Report Data</h3>
+      ${renderTable(tableConfig.headers, tableConfig.rows, tableConfig.aligns, tableConfig.emptyMessage)}
+
+      <div style="text-align: center; margin-top: 14px; padding-top: 10px; border-top: 1px solid #ddd; color: #94a3b8; font-size: 11px;">
+        <p style="margin: 0;">Automated report generated by Citi-Nati Supermarket Sales System</p>
+      </div>
+    </div>
+  `;
+
+  const element = document.createElement('div');
+  element.innerHTML = html;
 
   const fileDate = today.toISOString().slice(0, 10);
   const fileName = `sales_${String(activeView || 'summary').toLowerCase()}_${fileDate}.pdf`;
-  doc.save(fileName);
+  const opt = {
+    margin: 6,
+    filename: fileName,
+    image: { type: 'png', quality: 1.0 },
+    html2canvas: {
+      scale: 4,
+      logging: false,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      letterRendering: true,
+      windowWidth: 1200,
+      scrollX: 0,
+      scrollY: 0,
+    },
+    jsPDF: { orientation: 'landscape', unit: 'mm', format: 'a4', compress: false },
+    pagebreak: {
+      mode: ['avoid-all', 'css', 'legacy'],
+      avoid: ['tr', 'td', 'th', 'thead', 'tbody'],
+    },
+  };
+
+  return html2pdf().set(opt).from(element).save();
 }
