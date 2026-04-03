@@ -335,9 +335,6 @@ function drawHeader(doc, { reportTitle, viewLabel, periodText, generatedText, sh
     doc.setFontSize(9);
     doc.setTextColor(...COLOR_MUTED);
     doc.text(`${reportTitle} - ${viewLabel} (cont.)`, left, 10.5);
-    doc.setDrawColor(...COLOR_BORDER);
-    doc.setLineWidth(0.3);
-    doc.line(left, 12.5, right, 12.5);
   }
 }
 
