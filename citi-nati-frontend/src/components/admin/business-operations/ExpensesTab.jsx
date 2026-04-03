@@ -363,12 +363,15 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
 
       {isExpensesWorkspaceModalOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: isExpensesWorkspaceMaximized ? '0.35rem' : '1rem' }}>
-          <div style={{ ...cardStyle, width: isExpensesWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1240px, 97vw)', height: isExpensesWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'auto', borderRadius: isExpensesWorkspaceMaximized ? '10px' : '18px', padding: '0.95rem' }}>
-            <div style={{ position: 'sticky', top: '-0.95rem', zIndex: 5, backgroundColor: '#fff', margin: '-0.95rem -0.95rem 0.75rem', padding: '0.95rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)' }}>
+          <div style={{ ...cardStyle, width: isExpensesWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1400px, 97vw)', height: isExpensesWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isExpensesWorkspaceMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ flexShrink: 0, padding: '1rem 1.1rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(15,23,42,0.04)' }}>
               <div style={{ display: 'grid', gap: '0.85rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <strong style={{ color: '#0f172a' }}>Expense Register Workspace</strong>
-                <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <div>
+                    <h2 style={{ margin: 0, color: '#0f172a', fontSize: '1.15rem', fontWeight: 800 }}>Expense Register Workspace</h2>
+                    <p style={{ margin: '0.28rem 0 0', color: '#64748b', fontSize: '0.86rem' }}>Track expense entries, inspect details, and maintain audit-ready records.</p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', alignItems: 'center' }}>
                   <button
                     type="button"
                     onClick={openAddExpense}
@@ -434,7 +437,7 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
               </div>
 
               {showFilters && (
-                <div style={{ ...cardStyle, padding: '1rem' }}>
+                <div style={{ marginTop: '0.2rem', display: 'flex', gap: '0.65rem', flexWrap: 'wrap', alignItems: 'center' }}>
                   <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                     <div style={{ flex: '1 1 280px', position: 'relative' }}>
                       <i className="fas fa-search" style={{ position: 'absolute', top: '50%', left: '0.95rem', transform: 'translateY(-50%)', color: '#94a3b8' }} />
@@ -443,13 +446,13 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
                         value={filters.search}
                         onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
                         placeholder="Search by description, reference, payment method, or category"
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '0.85rem 1rem 0.85rem 2.7rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem' }}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '0.78rem 0.9rem 0.78rem 2.5rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc' }}
                       />
                     </div>
                     <select
                       value={filters.expenseCategoryId}
                       onChange={(e) => setFilters((prev) => ({ ...prev, expenseCategoryId: e.target.value }))}
-                      style={{ minWidth: '150px', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem', backgroundColor: '#fff' }}
+                      style={{ minWidth: '150px', padding: '0.78rem 0.9rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc' }}
                     >
                       <option value="">All categories</option>
                       {categories.map((cat) => (
@@ -462,7 +465,7 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
                         type="date"
                         value={filters.startDate}
                         onChange={(e) => setFilters((prev) => ({ ...prev, startDate: e.target.value }))}
-                        style={{ padding: '0.85rem 0.9rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem' }}
+                        style={{ padding: '0.78rem 0.85rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc' }}
                       />
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -471,14 +474,14 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
                         type="date"
                         value={filters.endDate}
                         onChange={(e) => setFilters((prev) => ({ ...prev, endDate: e.target.value }))}
-                        style={{ padding: '0.85rem 0.9rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.92rem' }}
+                        style={{ padding: '0.78rem 0.85rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc' }}
                       />
                     </div>
                     {(filters.search || filters.expenseCategoryId || filters.startDate !== initialRange.startDate || filters.endDate !== initialRange.endDate) && (
                       <button
                         type="button"
                         onClick={() => setFilters({ search: '', expenseCategoryId: '', startDate: initialRange.startDate, endDate: initialRange.endDate })}
-                        style={{ border: '1px solid #fecaca', backgroundColor: '#fef2f2', color: '#b91c1c', borderRadius: '10px', padding: '0.72rem 0.9rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.87rem' }}
+                        style={{ border: '1px solid #fecaca', backgroundColor: '#fef2f2', color: '#b91c1c', borderRadius: '10px', padding: '0.68rem 0.88rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
                       >
                         <i className="fas fa-xmark" style={{ marginRight: '0.4rem' }} />
                         Clear filters
@@ -490,49 +493,75 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', alignItems: 'start' }}>
-              <div style={{ ...cardStyle, overflow: 'hidden' }}>
-                <div style={{ padding: '1rem 1.05rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                  <div>
-                    <strong style={{ color: '#0f172a' }}>Expense Register</strong>
-                    <p style={{ margin: '0.3rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>
-                      Select a row to view full details or click Edit inline.
-                    </p>
+            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'minmax(360px, 420px) 1fr', minHeight: 0 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, borderRight: '1px solid #e2e8f0' }}>
+                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                  <div style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '0.52rem 0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
+                    <span>Visible: {expenses.length} {expenses.length === 1 ? 'expense' : 'expenses'}</span>
+                    <span style={{ color: '#334155', maxWidth: '170px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      Selected: {selectedExpense?.referenceNo || selectedExpense?.description || 'None'}
+                    </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={openAddExpense}
-                    style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.6rem 0.95rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.88rem' }}
-                  >
-                    <i className="fas fa-plus" style={{ marginRight: '0.4rem' }} />
-                    Add Expense
-                  </button>
+                  <div style={{ padding: '0.85rem' }}>
+                    <div style={{ ...cardStyle, overflow: 'hidden' }}>
+                      <div style={{ padding: '1rem 1.05rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                        <div>
+                          <strong style={{ color: '#0f172a' }}>Expense Register</strong>
+                          <p style={{ margin: '0.3rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>
+                            Select a row to view full details or click Edit inline.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={openAddExpense}
+                          style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.6rem 0.95rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.88rem' }}
+                        >
+                          <i className="fas fa-plus" style={{ marginRight: '0.4rem' }} />
+                          Add Expense
+                        </button>
+                      </div>
+                      {listError ? (
+                        <div style={{ padding: '1rem', color: '#b91c1c', fontSize: '0.9rem' }}>{listError}</div>
+                      ) : (
+                        <ExpensesList
+                          expenses={expenses}
+                          loading={listLoading}
+                          error={listError}
+                          pagination={expensePagination}
+                          page={expensePage}
+                          onPageChange={setExpensePage}
+                          selectedExpenseId={selectedExpense?.id ?? null}
+                          onSelectExpense={(expense) => setSelectedExpense(expense)}
+                          onEditExpense={openEditExpense}
+                        />
+                      )}
+                    </div>
+                  </div>
                 </div>
-                {listError ? (
-                  <div style={{ padding: '1rem', color: '#b91c1c', fontSize: '0.9rem' }}>{listError}</div>
-                ) : (
-                  <ExpensesList
-                    expenses={expenses}
-                    loading={listLoading}
-                    error={listError}
-                    pagination={expensePagination}
-                    page={expensePage}
-                    onPageChange={setExpensePage}
-                    selectedExpenseId={selectedExpense?.id ?? null}
-                    onSelectExpense={(expense) => setSelectedExpense(expense)}
-                    onEditExpense={openEditExpense}
-                  />
-                )}
               </div>
 
-              <div style={{ ...cardStyle, overflow: 'hidden' }}>
-                <ExpenseDetailPanel
-                  expense={selectedExpense}
-                  loading={listLoading}
-                  error={listError}
-                  onEdit={openEditExpense}
-                  onAddExpense={openAddExpense}
-                />
+              <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                  <div style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '0.52rem 0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
+                    <span style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {selectedExpense?.description || selectedExpense?.referenceNo || 'No expense selected'}
+                    </span>
+                    <span style={{ color: '#334155', fontWeight: 700 }}>
+                      {selectedExpense ? `Amount: MWK ${Number(selectedExpense.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                    </span>
+                  </div>
+                  <div style={{ padding: '0.85rem' }}>
+                    <div style={{ ...cardStyle, overflow: 'hidden' }}>
+                      <ExpenseDetailPanel
+                        expense={selectedExpense}
+                        loading={listLoading}
+                        error={listError}
+                        onEdit={openEditExpense}
+                        onAddExpense={openAddExpense}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
