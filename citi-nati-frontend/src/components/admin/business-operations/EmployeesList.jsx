@@ -90,7 +90,7 @@ const EmployeesList = ({
 
   return (
     <>
-      <div style={{ overflowX: 'auto', maxHeight: '560px', overflowY: 'auto' }}>
+      <div style={{ overflowX: 'auto', maxHeight: '560px', overflowY: 'auto', backgroundColor: '#fff' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
           <thead>
             <tr>
@@ -103,7 +103,7 @@ const EmployeesList = ({
             </tr>
           </thead>
           <tbody>
-            {employees.map((emp) => {
+            {employees.map((emp, index) => {
               const selected = emp.id === selectedEmployeeId;
               const latestSalary = emp.salaryStructures?.[0] || null;
               const normalStatus = String(emp.status || '').toLowerCase();
@@ -112,7 +112,13 @@ const EmployeesList = ({
                 <tr
                   key={emp.id}
                   onClick={() => onSelectEmployee(emp)}
-                  style={{ backgroundColor: selected ? '#f5f3ff' : '#fff', cursor: 'pointer' }}
+                  onMouseEnter={(event) => {
+                    if (!selected) event.currentTarget.style.backgroundColor = '#f8fafc';
+                  }}
+                  onMouseLeave={(event) => {
+                    if (!selected) event.currentTarget.style.backgroundColor = index % 2 === 0 ? '#fff' : '#fcfdff';
+                  }}
+                  style={{ backgroundColor: selected ? '#ede9fe' : (index % 2 === 0 ? '#fff' : '#fcfdff'), cursor: 'pointer', transition: 'background-color 0.15s ease' }}
                 >
                   <td style={tdStyle}>
                     <div style={{ display: 'grid', gap: '0.2rem' }}>
@@ -144,12 +150,12 @@ const EmployeesList = ({
                       type="button"
                       onClick={(e) => { e.stopPropagation(); onEditEmployee(emp); }}
                       style={{
-                        border: '1px solid #cbd5e1',
+                        border: '1px solid #dbe2ea',
                         backgroundColor: '#fff',
-                        color: '#475569',
+                        color: '#334155',
                         borderRadius: '8px',
-                        padding: '0.38rem 0.7rem',
-                        fontSize: '0.8rem',
+                        padding: '0.42rem 0.75rem',
+                        fontSize: '0.79rem',
                         fontWeight: 700,
                         cursor: 'pointer',
                       }}

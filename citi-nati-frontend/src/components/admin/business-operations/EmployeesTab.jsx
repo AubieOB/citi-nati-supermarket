@@ -330,16 +330,19 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
 
       {isEmployeesWorkspaceModalOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: '1rem' }}>
-          <div style={{ ...cardStyle, width: 'min(1240px, 97vw)', maxHeight: '90vh', overflow: 'auto', padding: '0.95rem' }}>
-            <div style={{ position: 'sticky', top: '-0.95rem', zIndex: 5, backgroundColor: '#fff', margin: '-0.95rem -0.95rem 0.75rem', padding: '0.95rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)' }}>
+          <div style={{ ...cardStyle, width: 'min(1320px, 98vw)', maxHeight: '92vh', overflow: 'auto', padding: '1rem', background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 30%)' }}>
+            <div style={{ position: 'sticky', top: '-1rem', zIndex: 5, backgroundColor: '#fff', margin: '-1rem -1rem 0.85rem', padding: '1rem 1rem 0.9rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)' }}>
               <div style={{ display: 'grid', gap: '0.85rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <strong style={{ color: '#0f172a' }}>Employees Workspace</strong>
+                <div>
+                  <strong style={{ color: '#0f172a', fontSize: '1rem' }}>Employees Workspace</strong>
+                  <p style={{ margin: '0.22rem 0 0', color: '#64748b', fontSize: '0.84rem' }}>Modern profile management, salary history, and quick employee operations.</p>
+                </div>
                 <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
                   <button
                     type="button"
                     onClick={handleAddEmployee}
-                    style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.65rem 1.1rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.88rem' }}
+                    style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.65rem 1rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.86rem' }}
                   >
                     <i className="fas fa-plus" style={{ marginRight: '0.4rem' }} />Add Employee
                   </button>
@@ -354,7 +357,7 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
                   <button
                     type="button"
                     onClick={() => refreshData()}
-                    style={{ border: '1px solid #e2e8f0', backgroundColor: '#fff', color: '#475569', borderRadius: '10px', padding: '0.65rem 1rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.88rem' }}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#475569', borderRadius: '10px', padding: '0.58rem 0.9rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
                   >
                     <i className="fas fa-sync-alt" style={{ marginRight: '0.4rem' }} />Refresh
                   </button>
@@ -362,7 +365,7 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
                     type="button"
                     onClick={() => handleExport('pdf')}
                     disabled={exportingExcel || exportingPdf}
-                    style={{ border: '1px solid #e2e8f0', backgroundColor: '#fff', color: '#475569', borderRadius: '10px', padding: '0.65rem 1rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.88rem' }}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#475569', borderRadius: '10px', padding: '0.58rem 0.9rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
                   >
                     <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.4rem' }} />Export PDF
                   </button>
@@ -370,7 +373,7 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
                     type="button"
                     onClick={() => handleExport('excel')}
                     disabled={exportingExcel || exportingPdf}
-                    style={{ border: '1px solid #e2e8f0', backgroundColor: '#fff', color: '#475569', borderRadius: '10px', padding: '0.65rem 1rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.88rem' }}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#475569', borderRadius: '10px', padding: '0.58rem 0.9rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
                   >
                     <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.4rem' }} />Export Excel
                   </button>
@@ -379,7 +382,7 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
               </div>
 
               {showFilters && (
-                <div style={{ ...cardStyle, padding: '0.85rem 1rem' }}>
+                <div style={{ ...cardStyle, padding: '0.82rem 0.9rem', borderRadius: '12px', boxShadow: 'none', backgroundColor: '#f8fafc' }}>
                   <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
                     <div style={{ position: 'relative', flex: '1 1 220px' }}>
                       <i className="fas fa-search" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none', fontSize: '0.88rem' }} />
@@ -407,31 +410,43 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', alignItems: 'start' }}>
-              <EmployeesList
-                employees={employees}
-                loading={listLoading}
-                error={listError}
-                pagination={pagination}
-                page={page}
-                onPageChange={(pg) => setPage(pg)}
-                selectedEmployeeId={selectedEmployeeId}
-                onSelectEmployee={handleSelectEmployee}
-                onEditEmployee={() => handleEditEmployee()}
-              />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(460px, 1fr))', gap: '1rem', alignItems: 'start' }}>
+              <div style={{ ...cardStyle, overflow: 'hidden', borderRadius: '16px' }}>
+                <div style={{ padding: '0.88rem 1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+                  <strong style={{ color: '#0f172a' }}>Employee Register</strong>
+                  <p style={{ margin: '0.26rem 0 0', color: '#64748b', fontSize: '0.84rem' }}>Select any row to inspect full profile and salary history.</p>
+                </div>
+                <EmployeesList
+                  employees={employees}
+                  loading={listLoading}
+                  error={listError}
+                  pagination={pagination}
+                  page={page}
+                  onPageChange={(pg) => setPage(pg)}
+                  selectedEmployeeId={selectedEmployeeId}
+                  onSelectEmployee={handleSelectEmployee}
+                  onEditEmployee={() => handleEditEmployee()}
+                />
+              </div>
 
-              <EmployeeDetailPanel
-                employee={selectedEmployee}
-                salaryHistory={salaryHistory}
-                salaryLoading={salaryLoading}
-                salaryError={salaryError}
-                detailLoading={detailLoading}
-                detailError={detailError}
-                onEditEmployee={handleEditEmployee}
-                onAddSalary={handleAddSalary}
-                onEditSalary={handleEditSalary}
-                onAddEmployee={handleAddEmployee}
-              />
+              <div style={{ ...cardStyle, overflow: 'hidden', borderRadius: '16px' }}>
+                <div style={{ padding: '0.88rem 1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+                  <strong style={{ color: '#0f172a' }}>Employee Insight Panel</strong>
+                  <p style={{ margin: '0.26rem 0 0', color: '#64748b', fontSize: '0.84rem' }}>View profile details, employment fields, and salary structures.</p>
+                </div>
+                <EmployeeDetailPanel
+                  employee={selectedEmployee}
+                  salaryHistory={salaryHistory}
+                  salaryLoading={salaryLoading}
+                  salaryError={salaryError}
+                  detailLoading={detailLoading}
+                  detailError={detailError}
+                  onEditEmployee={handleEditEmployee}
+                  onAddSalary={handleAddSalary}
+                  onEditSalary={handleEditSalary}
+                  onAddEmployee={handleAddEmployee}
+                />
+              </div>
             </div>
           </div>
         </div>
