@@ -417,6 +417,12 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
                   <p style={{ margin: '0.26rem 0 0', color: '#64748b', fontSize: '0.84rem' }}>Select any row to inspect full profile and salary history.</p>
                 </div>
                 <div style={{ minHeight: 0, overflowY: 'auto' }}>
+                  <div style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '0.52rem 0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                    <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>Visible: {Number(employees.length || 0).toLocaleString('en-US')} employees</span>
+                    <span style={{ color: '#334155', fontSize: '0.78rem', fontWeight: 700 }}>
+                      Selected: {selectedEmployee ? buildFullName(selectedEmployee) : 'None'}
+                    </span>
+                  </div>
                   <EmployeesList
                     employees={employees}
                     loading={listLoading}
@@ -437,6 +443,14 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
                   <p style={{ margin: '0.26rem 0 0', color: '#64748b', fontSize: '0.84rem' }}>View profile details, employment fields, and salary structures.</p>
                 </div>
                 <div style={{ minHeight: 0, overflowY: 'auto' }}>
+                  <div style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '0.52rem 0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                    <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>
+                      {selectedEmployee?.employeeNo ? `Employee #${selectedEmployee.employeeNo}` : 'No employee selected'}
+                    </span>
+                    <span style={{ color: '#334155', fontSize: '0.78rem', fontWeight: 700, textTransform: 'capitalize' }}>
+                      Status: {selectedEmployee?.status || 'N/A'}
+                    </span>
+                  </div>
                   <EmployeeDetailPanel
                     employee={selectedEmployee}
                     salaryHistory={salaryHistory}
