@@ -417,6 +417,7 @@ function drawMainDataTable(doc, config, startY, headerContext) {
     startY,
     margin: { left, right, top: 16, bottom: 12 },
     head: [config.headers],
+    showHead: 'firstPage',
     body: config.rows,
     theme: 'grid',
     styles: {
@@ -441,7 +442,6 @@ function drawMainDataTable(doc, config, startY, headerContext) {
     didDrawPage: (data) => {
       if (data.pageNumber > 1) {
         drawHeader(doc, { ...headerContext, showCompact: true });
-        drawSectionTitle(doc, 'Report Data', 17.2);
       }
     },
   });
