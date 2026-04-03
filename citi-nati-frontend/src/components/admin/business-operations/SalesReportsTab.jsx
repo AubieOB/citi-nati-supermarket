@@ -7,10 +7,41 @@ import SalesSummaryCards from './SalesSummaryCards.jsx';
 
 const REPORT_VIEWS = [
   { id: 'summary', label: 'Summary', icon: 'fa-chart-pie' },
-  { id: 'invoices', label: 'Invoices', icon: 'fa-receipt' },
-  { id: 'products', label: 'Products', icon: 'fa-cubes' },
-  { id: 'users', label: 'Users', icon: 'fa-users' },
-  { id: 'payments', label: 'Payments', icon: 'fa-wallet' },
+  { id: 'invoices', label: 'Sales by Invoices', icon: 'fa-receipt' },
+  { id: 'products', label: 'Sales by Products', icon: 'fa-cubes' },
+  { id: 'users', label: 'Sales by Users', icon: 'fa-users' },
+  { id: 'payments', label: 'Sales by Payments', icon: 'fa-wallet' },
+];
+
+const SALES_BY_CARDS = [
+  {
+    id: 'invoices',
+    title: 'Sales by Invoices',
+    subtitle: 'Invoice-level sales, discounts, taxes, and payment split.',
+    icon: 'fa-receipt',
+    tone: '#0369a1',
+  },
+  {
+    id: 'products',
+    title: 'Sales by Products',
+    subtitle: 'Product movement, revenue contribution, and margins.',
+    icon: 'fa-cubes',
+    tone: '#166534',
+  },
+  {
+    id: 'users',
+    title: 'Sales by Users',
+    subtitle: 'Cashier performance, invoice throughput, and value.',
+    icon: 'fa-users',
+    tone: '#7c3aed',
+  },
+  {
+    id: 'payments',
+    title: 'Sales by Payments',
+    subtitle: 'Payment method mix and amount concentration.',
+    icon: 'fa-wallet',
+    tone: '#b45309',
+  },
 ];
 
 const baseCardStyle = {
@@ -100,6 +131,20 @@ const viewButtonStyle = (direction) => ({
   opacity: direction ? 1 : 0.6,
 });
 
+const navigationTabStyle = (active) => ({
+  border: 'none',
+  backgroundColor: active ? '#0f172a' : '#e2e8f0',
+  color: active ? '#fff' : '#334155',
+  borderRadius: '999px',
+  padding: '0.65rem 0.95rem',
+  fontSize: '0.88rem',
+  fontWeight: 700,
+  cursor: 'pointer',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '0.45rem',
+});
+
 function compactParams(filters) {
   return Object.entries(filters).reduce((acc, [key, value]) => {
     if (value !== '' && value !== null && value !== undefined) {
@@ -136,6 +181,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [showSummaryFilters, setShowSummaryFilters] = useState(false);
   const [showWorkspaceFilters, setShowWorkspaceFilters] = useState(false);
+  const [activeSection, setActiveSection] = useState('summary');
   const [activeView, setActiveView] = useState('summary');
   const [viewState, setViewState] = useState(DEFAULT_VIEW_STATE);
 
@@ -171,6 +217,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
     });
 
     setViewState(DEFAULT_VIEW_STATE);
+    setActiveSection('summary');
     setActiveView('summary');
   }, [drilldownRequest]);
 
@@ -640,32 +687,82 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
     );
   };
 
+  const renderSalesByNavigator = () => {
+    return (
+      <div style={{ ...baseCardStyle, padding: '1.1rem' }}>
+        <div style={{ display: 'grid', gap: '0.85rem' }}>
+          <div>
+            <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.03rem' }}>Sales by Dimension</h3>
+            <p style={{ margin: '0.3rem 0 0', color: '#64748b', fontSize: '0.9rem' }}>
+              Open a report dimension below to inspect detailed sales analytics with the current filters.
+            </p>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.8rem' }}>
+            {SALES_BY_CARDS.map((card) => (
+              <button
+                key={card.id}
+                type="button"
+                onClick={() => {
+                  setActiveView(card.id);
+                  setIsReportModalOpen(true);
+                }}
+                style={{
+                  border: '1px solid #e2e8f0',
+                  backgroundColor: '#fff',
+                  borderRadius: '14px',
+                  padding: '0.95rem 1rem',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  boxShadow: '0 6px 20px rgba(15, 23, 42, 0.04)',
+                  display: 'grid',
+                  gap: '0.48rem',
+                }}
+              >
+                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '34px', height: '34px', borderRadius: '10px', backgroundColor: `${card.tone}1A`, color: card.tone }}>
+                  <i className={`fas ${card.icon}`}></i>
+                </div>
+                <div style={{ color: '#0f172a', fontWeight: 800, fontSize: '0.95rem' }}>{card.title}</div>
+                <div style={{ color: '#64748b', fontSize: '0.84rem', lineHeight: 1.45 }}>{card.subtitle}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
       <div style={{ display: 'flex', gap: '0.55rem', overflowX: 'auto' }}>
-        {REPORT_VIEWS.map((view) => (
-          <button
-            key={view.id}
-            type="button"
-            onClick={() => {
-              if (view.id === 'summary') {
-                setActiveView('summary');
-                setIsReportModalOpen(false);
-                return;
-              }
-
-              setActiveView(view.id);
-              setIsReportModalOpen(true);
-            }}
-            style={sectionTabStyle(activeView === view.id)}
-          >
-            <i className={`fas ${view.icon}`}></i>
-            {view.label}
-          </button>
-        ))}
+        <button
+          type="button"
+          onClick={() => {
+            setActiveSection('summary');
+            setActiveView('summary');
+            setIsReportModalOpen(false);
+          }}
+          style={navigationTabStyle(activeSection === 'summary')}
+        >
+          <i className="fas fa-chart-pie"></i>
+          Summary
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setActiveSection('sales-by');
+            setIsReportModalOpen(false);
+            if (activeView === 'summary') {
+              setActiveView('invoices');
+            }
+          }}
+          style={navigationTabStyle(activeSection === 'sales-by')}
+        >
+          <i className="fas fa-chart-column"></i>
+          Sales by Dimension
+        </button>
       </div>
 
-      {activeView === 'summary' && (
+      {activeSection === 'summary' && (
         <>
           <div style={{ ...baseCardStyle, padding: '0.8rem 0.95rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             <button
@@ -714,6 +811,8 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
           {renderSummaryView()}
         </>
       )}
+
+      {activeSection === 'sales-by' && renderSalesByNavigator()}
 
       {activeView !== 'summary' && isReportModalOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: '1rem' }}>
