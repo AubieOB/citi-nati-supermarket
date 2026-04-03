@@ -49,7 +49,7 @@ const SalaryStructurePanel = ({
   onAddSalary,
   onEditSalary,
 }) => (
-  <div style={{ border: '1px solid #e2e8f0', borderRadius: '18px', overflow: 'hidden', backgroundColor: '#fff' }}>
+  <div style={{ border: '1px solid #e2e8f0', borderRadius: '16px', overflow: 'hidden', backgroundColor: '#fff', boxShadow: '0 8px 20px rgba(15, 23, 42, 0.04)' }}>
     <div style={{
       padding: '1rem 1.05rem',
       borderBottom: '1px solid #e2e8f0',
@@ -73,11 +73,11 @@ const SalaryStructurePanel = ({
           border: 'none',
           backgroundColor: '#0f766e',
           color: '#fff',
-          borderRadius: '10px',
-          padding: '0.6rem 0.95rem',
+          borderRadius: '9px',
+          padding: '0.56rem 0.85rem',
           fontWeight: 700,
           cursor: 'pointer',
-          fontSize: '0.88rem',
+          fontSize: '0.84rem',
         }}
       >
         <i className="fas fa-plus" style={{ marginRight: '0.4rem' }} />
@@ -98,7 +98,7 @@ const SalaryStructurePanel = ({
         onAction={onAddSalary}
       />
     ) : (
-      <div style={{ overflowX: 'auto' }}>
+      <div style={{ overflowX: 'auto', backgroundColor: '#fff' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.87rem' }}>
           <thead>
             <tr>
@@ -113,31 +113,31 @@ const SalaryStructurePanel = ({
             </tr>
           </thead>
           <tbody>
-            {salaryHistory.map((s) => (
+            {salaryHistory.map((s, index) => (
               <tr key={s.id}>
-                <td style={tdStyle}>{formatDate(s.effectiveFrom)}</td>
-                <td style={tdStyle}>{s.effectiveTo ? formatDate(s.effectiveTo) : 'Ongoing'}</td>
-                <td style={{ ...tdStyle, fontWeight: 700 }}>{money(s.agreedSalaryPerMonth, s.currency)}</td>
-                <td style={tdStyle}>{s.annualIncrementAmount ? money(s.annualIncrementAmount, s.currency) : '—'}</td>
-                <td style={tdStyle}>{s.salaryAfterIncrement ? money(s.salaryAfterIncrement, s.currency) : '—'}</td>
-                <td style={tdStyle}>{s.currency || 'MWK'}</td>
-                <td style={tdStyle}>
+                <td style={{ ...tdStyle, backgroundColor: index % 2 === 0 ? '#fff' : '#fcfdff' }}>{formatDate(s.effectiveFrom)}</td>
+                <td style={{ ...tdStyle, backgroundColor: index % 2 === 0 ? '#fff' : '#fcfdff' }}>{s.effectiveTo ? formatDate(s.effectiveTo) : 'Ongoing'}</td>
+                <td style={{ ...tdStyle, fontWeight: 700, backgroundColor: index % 2 === 0 ? '#fff' : '#fcfdff' }}>{money(s.agreedSalaryPerMonth, s.currency)}</td>
+                <td style={{ ...tdStyle, backgroundColor: index % 2 === 0 ? '#fff' : '#fcfdff' }}>{s.annualIncrementAmount ? money(s.annualIncrementAmount, s.currency) : '—'}</td>
+                <td style={{ ...tdStyle, backgroundColor: index % 2 === 0 ? '#fff' : '#fcfdff' }}>{s.salaryAfterIncrement ? money(s.salaryAfterIncrement, s.currency) : '—'}</td>
+                <td style={{ ...tdStyle, backgroundColor: index % 2 === 0 ? '#fff' : '#fcfdff' }}>{s.currency || 'MWK'}</td>
+                <td style={{ ...tdStyle, backgroundColor: index % 2 === 0 ? '#fff' : '#fcfdff' }}>
                   {s.isCurrent ? (
                     <span style={currentBadge}>Current</span>
                   ) : (
                     <span style={{ color: '#94a3b8', fontSize: '0.78rem' }}>Historical</span>
                   )}
                 </td>
-                <td style={tdStyle}>
+                <td style={{ ...tdStyle, backgroundColor: index % 2 === 0 ? '#fff' : '#fcfdff' }}>
                   <button
                     type="button"
                     onClick={() => onEditSalary(s)}
                     style={{
-                      border: '1px solid #cbd5e1',
+                      border: '1px solid #dbe2ea',
                       backgroundColor: '#fff',
-                      color: '#475569',
+                      color: '#334155',
                       borderRadius: '8px',
-                      padding: '0.35rem 0.65rem',
+                      padding: '0.38rem 0.68rem',
                       fontSize: '0.79rem',
                       fontWeight: 700,
                       cursor: 'pointer',

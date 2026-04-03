@@ -7,14 +7,14 @@ const EmployeesEmptyState = ({
   onAction = null,
   icon = 'fa-users',
 }) => (
-  <div style={{ padding: '2.5rem 1.5rem', textAlign: 'center', color: '#64748b' }}>
+  <div style={{ padding: '2.2rem 1.2rem', textAlign: 'center', color: '#64748b', backgroundColor: '#fff' }}>
     <i
       className={`fas ${icon}`}
-      style={{ fontSize: '2rem', marginBottom: '0.75rem', display: 'block', opacity: 0.35 }}
+      style={{ fontSize: '1.85rem', marginBottom: '0.72rem', display: 'block', opacity: 0.4 }}
     />
-    <div style={{ fontWeight: 700, marginBottom: '0.4rem', color: '#0f172a', fontSize: '1rem' }}>{title}</div>
+    <div style={{ fontWeight: 700, marginBottom: '0.35rem', color: '#0f172a', fontSize: '0.98rem' }}>{title}</div>
     {message && (
-      <div style={{ fontSize: '0.9rem', lineHeight: 1.6, maxWidth: '340px', margin: '0 auto 1rem' }}>
+      <div style={{ fontSize: '0.88rem', lineHeight: 1.55, maxWidth: '340px', margin: '0 auto 0.95rem' }}>
         {message}
       </div>
     )}

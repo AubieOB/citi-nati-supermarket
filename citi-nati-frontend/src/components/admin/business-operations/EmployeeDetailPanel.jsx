@@ -43,6 +43,13 @@ const formatLocation = (item) => {
 };
 
 const row = { display: 'grid', gap: '0.2rem' };
+const sectionCardStyle = {
+  border: '1px solid #e2e8f0',
+  borderRadius: '14px',
+  padding: '0.95rem',
+  backgroundColor: '#fff',
+  boxShadow: '0 6px 16px rgba(15, 23, 42, 0.03)',
+};
 
 const EmployeeDetailPanel = ({
   employee,
@@ -86,7 +93,7 @@ const EmployeeDetailPanel = ({
   const normalStatus = String(employee.status || '').toLowerCase();
 
   return (
-    <div style={{ display: 'grid', gap: '1rem', padding: '1rem 1.05rem' }}>
+    <div style={{ display: 'grid', gap: '0.9rem', padding: '0.95rem 1rem' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', flexWrap: 'wrap' }}>
         <div>
@@ -102,7 +109,7 @@ const EmployeeDetailPanel = ({
         <button
           type="button"
           onClick={() => onEditEmployee(employee)}
-          style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.65rem 0.95rem', fontWeight: 700, cursor: 'pointer' }}
+          style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '9px', padding: '0.55rem 0.82rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.84rem' }}
         >
           <i className="fas fa-pen" style={{ marginRight: '0.45rem' }} />
           Edit
@@ -111,7 +118,7 @@ const EmployeeDetailPanel = ({
 
       {/* Current salary highlight */}
       {currentSalary && (
-        <div style={{ padding: '0.9rem 1rem', backgroundColor: '#f0fdf4', borderRadius: '14px', border: '1px solid #bbf7d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div style={{ padding: '0.88rem 0.95rem', background: 'linear-gradient(135deg, #ecfdf5 0%, #f8fafc 100%)', borderRadius: '14px', border: '1px solid #bbf7d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div>
             <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Current Salary</div>
             <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', marginTop: '0.2rem' }}>
@@ -128,7 +135,7 @@ const EmployeeDetailPanel = ({
       )}
 
       {/* Employment info */}
-      <div style={{ border: '1px solid #e2e8f0', borderRadius: '14px', padding: '1rem', backgroundColor: '#fafbfc' }}>
+      <div style={sectionCardStyle}>
         <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#5B4B8A', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>
           Employment
         </div>
@@ -157,7 +164,7 @@ const EmployeeDetailPanel = ({
       </div>
 
       {/* Personal biodata */}
-      <div style={{ border: '1px solid #e2e8f0', borderRadius: '14px', padding: '1rem', backgroundColor: '#fafbfc' }}>
+      <div style={sectionCardStyle}>
         <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#5B4B8A', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>
           Personal
         </div>
@@ -190,7 +197,7 @@ const EmployeeDetailPanel = ({
       </div>
 
       {/* Identification */}
-      <div style={{ border: '1px solid #e2e8f0', borderRadius: '14px', padding: '1rem', backgroundColor: '#fafbfc' }}>
+      <div style={sectionCardStyle}>
         <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#5B4B8A', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>
           Identification
         </div>
@@ -208,16 +215,16 @@ const EmployeeDetailPanel = ({
 
       {/* Notes */}
       {employee.notes && (
-        <div>
+        <div style={sectionCardStyle}>
           <div style={{ color: '#64748b', fontSize: '0.8rem', marginBottom: '0.35rem' }}>Notes</div>
-          <div style={{ color: '#0f172a', lineHeight: 1.7, padding: '0.85rem', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '0.91rem' }}>
+          <div style={{ color: '#0f172a', lineHeight: 1.65, padding: '0.8rem', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '0.89rem' }}>
             {employee.notes}
           </div>
         </div>
       )}
 
       {/* Timestamps */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+      <div style={{ ...sectionCardStyle, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
         <div style={row}>
           <span style={{ color: '#94a3b8', fontSize: '0.77rem' }}>Created</span>
           <span style={{ color: '#64748b', fontSize: '0.83rem' }}>{formatDateTime(employee.createdAt)}</span>
