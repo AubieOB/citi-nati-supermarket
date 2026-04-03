@@ -290,7 +290,6 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
   const selectedSummary = detailState.summary;
   const pageBalanceMeta = balanceMeta(totals.pageBalance, 'Page Exposure (Debt)', 'Page Credit');
   const selectedBalanceMeta = balanceMeta(selectedSummary?.outstandingBalance, 'Selected Outstanding', 'Selected Credit');
-  const hasActiveFilters = Boolean(search || statusFilter);
 
   const handleExport = async (format) => {
     if (format === 'excel') setExportingExcel(true);
@@ -353,20 +352,28 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
         </div>
       </div>
 
-      <div style={{ ...cardStyle, padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-        <div>
-          <strong style={{ color: '#0f172a' }}>Suppliers Workspace</strong>
-          <p style={{ margin: '0.32rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>
-            {hasActiveFilters ? 'Filters are applied inside this workspace.' : 'Launch supplier register and detail operations only when needed.'}
-          </p>
+      <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
+        <div style={{ display: 'grid', gap: '0.78rem' }}>
+          <div>
+            <strong style={{ color: '#0f172a' }}>Supplier Workspaces</strong>
+            <p style={{ margin: '0.3rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>
+              Open supplier register and balance operations from the launcher card.
+            </p>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '0.75rem' }}>
+            <button
+              type="button"
+              onClick={() => setIsSuppliersWorkspaceModalOpen(true)}
+              style={{ border: '1px solid #e2e8f0', backgroundColor: '#fff', borderRadius: '14px', padding: '0.95rem 1rem', cursor: 'pointer', textAlign: 'left', display: 'grid', gap: '0.42rem', boxShadow: '0 6px 18px rgba(15, 23, 42, 0.04)' }}
+            >
+              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '34px', height: '34px', borderRadius: '10px', backgroundColor: '#fee2e2', color: '#b91c1c' }}>
+                <i className="fas fa-truck-field" />
+              </span>
+              <span style={{ color: '#0f172a', fontWeight: 800, fontSize: '0.95rem' }}>Supplier Register Workspace</span>
+              <span style={{ color: '#64748b', fontSize: '0.84rem', lineHeight: 1.45 }}>Manage suppliers, balances, and transaction history records.</span>
+            </button>
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setIsSuppliersWorkspaceModalOpen(true)}
-          style={{ border: 'none', backgroundColor: '#0f172a', color: '#fff', borderRadius: '10px', padding: '0.62rem 0.95rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.88rem' }}
-        >
-          Open Suppliers Workspace
-        </button>
       </div>
 
       {isSuppliersWorkspaceModalOpen && (

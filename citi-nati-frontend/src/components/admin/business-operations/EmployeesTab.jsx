@@ -63,7 +63,6 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
   const activeCount = employees.filter((e) => e.status === 'active').length;
   const inactiveCount = employees.filter((e) => e.status !== 'active').length;
   const departmentCount = new Set(employees.map((e) => e.department).filter(Boolean)).size;
-  const hasActiveFilters = Boolean(search || statusFilter);
 
   // ── Fetch employee list ──
   const fetchEmployees = useCallback(async (pg = page) => {
@@ -292,20 +291,28 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
         departmentCount={departmentCount}
       />
 
-      <div style={{ ...cardStyle, padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-        <div>
-          <strong style={{ color: '#0f172a' }}>Employees Workspace</strong>
-          <p style={{ margin: '0.32rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>
-            {hasActiveFilters ? 'Filters are applied inside this workspace.' : 'Launch the full employee register and details workspace on demand.'}
-          </p>
+      <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
+        <div style={{ display: 'grid', gap: '0.78rem' }}>
+          <div>
+            <strong style={{ color: '#0f172a' }}>Employee Workspaces</strong>
+            <p style={{ margin: '0.3rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>
+              Open the employee register workspace to manage profiles and salary structures.
+            </p>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '0.75rem' }}>
+            <button
+              type="button"
+              onClick={() => setIsEmployeesWorkspaceModalOpen(true)}
+              style={{ border: '1px solid #e2e8f0', backgroundColor: '#fff', borderRadius: '14px', padding: '0.95rem 1rem', cursor: 'pointer', textAlign: 'left', display: 'grid', gap: '0.42rem', boxShadow: '0 6px 18px rgba(15, 23, 42, 0.04)' }}
+            >
+              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '34px', height: '34px', borderRadius: '10px', backgroundColor: '#ede9fe', color: '#6d28d9' }}>
+                <i className="fas fa-users" />
+              </span>
+              <span style={{ color: '#0f172a', fontWeight: 800, fontSize: '0.95rem' }}>Employee Register Workspace</span>
+              <span style={{ color: '#64748b', fontSize: '0.84rem', lineHeight: 1.45 }}>Manage staff details, salary history, and employment status.</span>
+            </button>
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setIsEmployeesWorkspaceModalOpen(true)}
-          style={{ border: 'none', backgroundColor: '#0f172a', color: '#fff', borderRadius: '10px', padding: '0.62rem 0.95rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.88rem' }}
-        >
-          Open Employees Workspace
-        </button>
       </div>
 
       {isEmployeesWorkspaceModalOpen && (

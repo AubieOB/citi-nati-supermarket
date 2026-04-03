@@ -84,7 +84,6 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
   const [entryEmployeeSalary, setEntryEmployeeSalary] = useState(null);
   const [exportingExcel, setExportingExcel] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
-  const hasActivePeriodFilters = Boolean(periodFilters.search || periodFilters.status || periodFilters.payrollMode);
 
   const fetchEmployees = useCallback(async () => {
     try {
@@ -456,20 +455,28 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
-      <div style={{ ...cardStyle, padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-        <div>
-          <strong style={{ color: '#0f172a' }}>Payroll Workspace</strong>
-          <p style={{ margin: '0.32rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>
-            {hasActivePeriodFilters ? 'Filters are applied inside this workspace.' : 'Open periods and entries workspace only when you are actively managing payroll.'}
-          </p>
+      <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
+        <div style={{ display: 'grid', gap: '0.78rem' }}>
+          <div>
+            <strong style={{ color: '#0f172a' }}>Payroll Workspaces</strong>
+            <p style={{ margin: '0.3rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>
+              Launch payroll periods and entries management from the workspace card below.
+            </p>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '0.75rem' }}>
+            <button
+              type="button"
+              onClick={() => setIsPayrollWorkspaceModalOpen(true)}
+              style={{ border: '1px solid #e2e8f0', backgroundColor: '#fff', borderRadius: '14px', padding: '0.95rem 1rem', cursor: 'pointer', textAlign: 'left', display: 'grid', gap: '0.42rem', boxShadow: '0 6px 18px rgba(15, 23, 42, 0.04)' }}
+            >
+              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '34px', height: '34px', borderRadius: '10px', backgroundColor: '#dbeafe', color: '#1d4ed8' }}>
+                <i className="fas fa-money-check-dollar" />
+              </span>
+              <span style={{ color: '#0f172a', fontWeight: 800, fontSize: '0.95rem' }}>Payroll Periods and Entries</span>
+              <span style={{ color: '#64748b', fontSize: '0.84rem', lineHeight: 1.45 }}>Create periods, process payroll entries, and inspect support records.</span>
+            </button>
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setIsPayrollWorkspaceModalOpen(true)}
-          style={{ border: 'none', backgroundColor: '#0f172a', color: '#fff', borderRadius: '10px', padding: '0.62rem 0.95rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.88rem' }}
-        >
-          Open Payroll Workspace
-        </button>
       </div>
 
       {isPayrollWorkspaceModalOpen && (
