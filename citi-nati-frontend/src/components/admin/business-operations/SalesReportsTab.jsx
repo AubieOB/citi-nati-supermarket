@@ -702,6 +702,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
               <button
                 key={card.id}
                 type="button"
+                title="Click to open"
                 onClick={() => {
                   setActiveView(card.id);
                   setIsReportModalOpen(true);

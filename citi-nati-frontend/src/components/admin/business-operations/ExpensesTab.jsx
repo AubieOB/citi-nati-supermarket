@@ -276,6 +276,7 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '0.75rem' }}>
             <button
               type="button"
+              title="Click to open"
               onClick={() => {
                 setActiveTab(TAB_EXPENSES);
                 setIsCategoriesWorkspaceModalOpen(false);
@@ -304,6 +305,7 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
 
             <button
               type="button"
+              title="Click to open"
               onClick={() => {
                 setActiveTab(TAB_CATEGORIES);
                 setIsExpensesWorkspaceModalOpen(false);

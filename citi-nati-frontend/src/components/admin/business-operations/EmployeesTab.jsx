@@ -302,6 +302,7 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '0.75rem' }}>
             <button
               type="button"
+              title="Click to open"
               onClick={() => setIsEmployeesWorkspaceModalOpen(true)}
               onMouseEnter={(event) => {
                 event.currentTarget.style.transform = 'translateY(-2px)';
