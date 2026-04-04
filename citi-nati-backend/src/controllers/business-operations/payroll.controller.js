@@ -18,6 +18,8 @@ const LOAN_SORT_FIELDS = new Set(['id', 'principalAmount', 'balanceAmount', 'sta
 const LOAN_TX_SORT_FIELDS = new Set(['id', 'amount', 'createdAt']);
 const TERMINATION_SORT_FIELDS = new Set(['id', 'terminationDate', 'settlementAmount', 'createdAt']);
 const REENGAGEMENT_SORT_FIELDS = new Set(['id', 'effectiveDate', 'createdAt']);
+const TAX_BRACKET_SORT_FIELDS = new Set(['id', 'effectiveFrom', 'effectiveTo', 'minIncome', 'maxIncome', 'ratePercent', 'createdAt']);
+const INCREMENT_POLICY_SORT_FIELDS = new Set(['id', 'effectiveFrom', 'effectiveTo', 'minServiceMonths', 'maxServiceMonths', 'createdAt']);
 
 function isPayrollEntryUniqueError(err) {
   return (
@@ -696,6 +698,173 @@ async function importReengagements(req, res) {
   }
 }
 
+async function createTaxBracket(req, res) {
+  try {
+    const effectiveFrom = toDate(req.body.effectiveFrom);
+    if (!effectiveFrom) return res.status(400).json({ success: false, error: 'effectiveFrom is required and must be valid' });
+
+    const minIncome = toNumber(req.body.minIncome);
+    const ratePercent = toNumber(req.body.ratePercent);
+    if (!Number.isFinite(minIncome) || !Number.isFinite(ratePercent)) {
+      return res.status(400).json({ success: false, error: 'minIncome and ratePercent are required and must be numeric' });
+    }
+
+    const data = await payrollService.createTaxBracket({
+      locationId: req.body.locationId !== undefined ? toInt(req.body.locationId) : null,
+      effectiveFrom,
+      effectiveTo: req.body.effectiveTo ? toDate(req.body.effectiveTo) : null,
+      minIncome,
+      maxIncome: req.body.maxIncome !== undefined ? toNumber(req.body.maxIncome) : null,
+      ratePercent,
+      fixedTaxAmount: req.body.fixedTaxAmount !== undefined ? toNumber(req.body.fixedTaxAmount) : null,
+      description: req.body.description || null,
+      isActive: req.body.isActive !== undefined ? Boolean(req.body.isActive) : true,
+    });
+
+    return res.status(201).json({ success: true, data });
+  } catch (err) {
+    console.error('[BO][PAYROLL] createTaxBracket error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to create tax bracket' });
+  }
+}
+
+async function updateTaxBracket(req, res) {
+  try {
+    const id = toInt(req.params.id);
+    if (!id) return res.status(400).json({ success: false, error: 'Invalid tax bracket id' });
+
+    const data = await payrollService.updateTaxBracket(id, {
+      locationId: req.body.locationId !== undefined ? toInt(req.body.locationId) : undefined,
+      effectiveFrom: req.body.effectiveFrom ? toDate(req.body.effectiveFrom) : undefined,
+      effectiveTo: req.body.effectiveTo ? toDate(req.body.effectiveTo) : req.body.effectiveTo === null ? null : undefined,
+      minIncome: req.body.minIncome !== undefined ? toNumber(req.body.minIncome) : undefined,
+      maxIncome: req.body.maxIncome !== undefined ? toNumber(req.body.maxIncome) : undefined,
+      ratePercent: req.body.ratePercent !== undefined ? toNumber(req.body.ratePercent) : undefined,
+      fixedTaxAmount: req.body.fixedTaxAmount !== undefined ? toNumber(req.body.fixedTaxAmount) : undefined,
+      description: req.body.description,
+      isActive: req.body.isActive !== undefined ? Boolean(req.body.isActive) : undefined,
+    });
+
+    return res.json({ success: true, data });
+  } catch (err) {
+    console.error('[BO][PAYROLL] updateTaxBracket error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to update tax bracket' });
+  }
+}
+
+async function listTaxBrackets(req, res) {
+  try {
+    const pagination = parsePagination(req.query);
+    const sort = parseSort(req.query, TAX_BRACKET_SORT_FIELDS, 'effectiveFrom', 'desc');
+    if (sort.error) return res.status(400).json({ success: false, error: sort.error });
+
+    const effectiveDate = req.query.effectiveDate ? toDate(req.query.effectiveDate) : null;
+    const isActive = req.query.isActive === undefined ? null : String(req.query.isActive).toLowerCase() === 'true';
+
+    const filters = {
+      locationId: toInt(req.query.locationId),
+      isActive,
+      effectiveDate,
+    };
+
+    const { data, total } = await payrollService.listTaxBrackets({
+      ...filters,
+      skip: pagination.skip,
+      take: pagination.take,
+      sortBy: sort.sortBy,
+      sortOrder: sort.sortOrder,
+    });
+
+    return res.json(listResponse({ data, total, page: pagination.page, pageSize: pagination.pageSize, filters: { ...filters, effectiveDate: req.query.effectiveDate || null } }));
+  } catch (err) {
+    console.error('[BO][PAYROLL] listTaxBrackets error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to list tax brackets' });
+  }
+}
+
+async function createIncrementPolicy(req, res) {
+  try {
+    const effectiveFrom = toDate(req.body.effectiveFrom);
+    if (!effectiveFrom) return res.status(400).json({ success: false, error: 'effectiveFrom is required and must be valid' });
+
+    const minServiceMonths = toInt(req.body.minServiceMonths);
+    if (!Number.isInteger(minServiceMonths)) {
+      return res.status(400).json({ success: false, error: 'minServiceMonths is required and must be an integer' });
+    }
+
+    const data = await payrollService.createIncrementPolicy({
+      locationId: req.body.locationId !== undefined ? toInt(req.body.locationId) : null,
+      minServiceMonths,
+      maxServiceMonths: req.body.maxServiceMonths !== undefined ? toInt(req.body.maxServiceMonths) : null,
+      incrementPercent: req.body.incrementPercent !== undefined ? toNumber(req.body.incrementPercent) : null,
+      incrementAmount: req.body.incrementAmount !== undefined ? toNumber(req.body.incrementAmount) : null,
+      effectiveFrom,
+      effectiveTo: req.body.effectiveTo ? toDate(req.body.effectiveTo) : null,
+      notes: req.body.notes || null,
+      isActive: req.body.isActive !== undefined ? Boolean(req.body.isActive) : true,
+    });
+
+    return res.status(201).json({ success: true, data });
+  } catch (err) {
+    console.error('[BO][PAYROLL] createIncrementPolicy error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to create increment policy' });
+  }
+}
+
+async function updateIncrementPolicy(req, res) {
+  try {
+    const id = toInt(req.params.id);
+    if (!id) return res.status(400).json({ success: false, error: 'Invalid increment policy id' });
+
+    const data = await payrollService.updateIncrementPolicy(id, {
+      locationId: req.body.locationId !== undefined ? toInt(req.body.locationId) : undefined,
+      minServiceMonths: req.body.minServiceMonths !== undefined ? toInt(req.body.minServiceMonths) : undefined,
+      maxServiceMonths: req.body.maxServiceMonths !== undefined ? toInt(req.body.maxServiceMonths) : undefined,
+      incrementPercent: req.body.incrementPercent !== undefined ? toNumber(req.body.incrementPercent) : undefined,
+      incrementAmount: req.body.incrementAmount !== undefined ? toNumber(req.body.incrementAmount) : undefined,
+      effectiveFrom: req.body.effectiveFrom ? toDate(req.body.effectiveFrom) : undefined,
+      effectiveTo: req.body.effectiveTo ? toDate(req.body.effectiveTo) : req.body.effectiveTo === null ? null : undefined,
+      notes: req.body.notes,
+      isActive: req.body.isActive !== undefined ? Boolean(req.body.isActive) : undefined,
+    });
+
+    return res.json({ success: true, data });
+  } catch (err) {
+    console.error('[BO][PAYROLL] updateIncrementPolicy error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to update increment policy' });
+  }
+}
+
+async function listIncrementPolicies(req, res) {
+  try {
+    const pagination = parsePagination(req.query);
+    const sort = parseSort(req.query, INCREMENT_POLICY_SORT_FIELDS, 'effectiveFrom', 'desc');
+    if (sort.error) return res.status(400).json({ success: false, error: sort.error });
+
+    const effectiveDate = req.query.effectiveDate ? toDate(req.query.effectiveDate) : null;
+    const isActive = req.query.isActive === undefined ? null : String(req.query.isActive).toLowerCase() === 'true';
+
+    const filters = {
+      locationId: toInt(req.query.locationId),
+      isActive,
+      effectiveDate,
+    };
+
+    const { data, total } = await payrollService.listIncrementPolicies({
+      ...filters,
+      skip: pagination.skip,
+      take: pagination.take,
+      sortBy: sort.sortBy,
+      sortOrder: sort.sortOrder,
+    });
+
+    return res.json(listResponse({ data, total, page: pagination.page, pageSize: pagination.pageSize, filters: { ...filters, effectiveDate: req.query.effectiveDate || null } }));
+  } catch (err) {
+    console.error('[BO][PAYROLL] listIncrementPolicies error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to list increment policies' });
+  }
+}
+
 module.exports = {
   createPayrollPeriod,
   updatePayrollPeriod,
@@ -718,6 +887,12 @@ module.exports = {
   createReengagement,
   updateReengagement,
   listReengagements,
+  createTaxBracket,
+  updateTaxBracket,
+  listTaxBrackets,
+  createIncrementPolicy,
+  updateIncrementPolicy,
+  listIncrementPolicies,
   importPayrollPeriods,
   importPayrollEntries,
   importLoans,

@@ -11,6 +11,8 @@ import EmployeeLoanFormModal from './EmployeeLoanFormModal.jsx';
 import LoanTransactionFormModal from './LoanTransactionFormModal.jsx';
 import EmployeeTerminationFormModal from './EmployeeTerminationFormModal.jsx';
 import EmployeeReengagementFormModal from './EmployeeReengagementFormModal.jsx';
+import PayrollTaxBracketFormModal from './PayrollTaxBracketFormModal.jsx';
+import PayrollIncrementPolicyFormModal from './PayrollIncrementPolicyFormModal.jsx';
 
 const cardStyle = {
   backgroundColor: '#fff',
@@ -41,6 +43,7 @@ const reduceSummary = (entries = []) => entries.reduce((acc, entry) => {
 
 const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] }) => {
   const [showPeriodFilters, setShowPeriodFilters] = useState(false);
+  const [showPolicyPanel, setShowPolicyPanel] = useState(false);
   const [isPayrollWorkspaceModalOpen, setIsPayrollWorkspaceModalOpen] = useState(false);
   const [isPayrollWorkspaceMaximized, setIsPayrollWorkspaceMaximized] = useState(false);
   const [employees, setEmployees] = useState([]);
@@ -87,12 +90,20 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
   const [loanTxModal, setLoanTxModal] = useState({ open: false, transaction: null, defaultLoanId: null });
   const [terminationModal, setTerminationModal] = useState({ open: false, termination: null });
   const [reengagementModal, setReengagementModal] = useState({ open: false, reengagement: null });
+  const [taxBracketModal, setTaxBracketModal] = useState({ open: false, taxBracket: null });
+  const [incrementPolicyModal, setIncrementPolicyModal] = useState({ open: false, incrementPolicy: null });
+  const [taxBrackets, setTaxBrackets] = useState([]);
+  const [incrementPolicies, setIncrementPolicies] = useState([]);
+  const [policyLoading, setPolicyLoading] = useState(false);
+  const [policyError, setPolicyError] = useState('');
   const [periodSaving, setPeriodSaving] = useState(false);
   const [entrySaving, setEntrySaving] = useState(false);
   const [supportSaving, setSupportSaving] = useState(false);
+  const [policySaving, setPolicySaving] = useState(false);
   const [periodSaveError, setPeriodSaveError] = useState('');
   const [entrySaveError, setEntrySaveError] = useState('');
   const [supportSaveError, setSupportSaveError] = useState('');
+  const [policySaveError, setPolicySaveError] = useState('');
   const [entryEmployeeSalary, setEntryEmployeeSalary] = useState(null);
   const [exportingExcel, setExportingExcel] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
@@ -135,6 +146,34 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
       setPeriodsLoading(false);
     }
   }, [periodFilters.payrollMode, periodFilters.search, periodFilters.status, periodPage, selectedLocationId]);
+
+  const fetchPolicies = useCallback(async () => {
+    setPolicyLoading(true);
+    setPolicyError('');
+    try {
+      const params = {
+        page: 1,
+        pageSize: 50,
+        sortBy: 'effectiveFrom',
+        sortOrder: 'desc',
+        locationId: selectedLocationId || undefined,
+      };
+
+      const [taxRes, incrementRes] = await Promise.all([
+        api.get('/business-operations/payroll/tax-brackets', { params }),
+        api.get('/business-operations/payroll/increment-policies', { params }),
+      ]);
+
+      setTaxBrackets(Array.isArray(taxRes?.data?.data) ? taxRes.data.data : []);
+      setIncrementPolicies(Array.isArray(incrementRes?.data?.data) ? incrementRes.data.data : []);
+    } catch (err) {
+      setTaxBrackets([]);
+      setIncrementPolicies([]);
+      setPolicyError(getApiError(err, 'Failed to load payroll policies.'));
+    } finally {
+      setPolicyLoading(false);
+    }
+  }, [selectedLocationId]);
 
   const fetchPeriodDetail = useCallback(async (periodId) => {
     if (!periodId) {
@@ -269,11 +308,12 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
 
   const refreshAll = useCallback(async () => {
     await fetchPayrollPeriods(periodPage);
+    await fetchPolicies();
     if (selectedPeriodId) {
       await fetchPeriodDetail(selectedPeriodId);
       await fetchPayrollEntries(selectedPeriodId, entriesPage);
     }
-  }, [entriesPage, fetchPayrollEntries, fetchPayrollPeriods, fetchPeriodDetail, periodPage, selectedPeriodId]);
+  }, [entriesPage, fetchPayrollEntries, fetchPayrollPeriods, fetchPeriodDetail, fetchPolicies, periodPage, selectedPeriodId]);
 
   useEffect(() => {
     fetchEmployees();
@@ -282,6 +322,10 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
   useEffect(() => {
     fetchPayrollPeriods(periodPage);
   }, [fetchPayrollPeriods, periodPage, refreshKey]);
+
+  useEffect(() => {
+    fetchPolicies();
+  }, [fetchPolicies, refreshKey]);
 
   useEffect(() => {
     setPeriodPage(1);
@@ -600,12 +644,84 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
     }
   };
 
+  const handleCreateTaxBracket = () => {
+    setPolicySaveError('');
+    setTaxBracketModal({
+      open: true,
+      taxBracket: selectedLocationId ? { locationId: selectedLocationId } : null,
+    });
+  };
+
+  const handleEditTaxBracket = (taxBracket) => {
+    if (!taxBracket) return;
+    setPolicySaveError('');
+    setTaxBracketModal({ open: true, taxBracket });
+  };
+
+  const handleTaxBracketSubmit = async (payload) => {
+    setPolicySaving(true);
+    setPolicySaveError('');
+    try {
+      const requestPayload = {
+        ...payload,
+        locationId: payload.locationId || selectedLocationId || undefined,
+      };
+      if (taxBracketModal.taxBracket?.id) {
+        await api.put(`/business-operations/payroll/tax-brackets/${taxBracketModal.taxBracket.id}`, requestPayload);
+      } else {
+        await api.post('/business-operations/payroll/tax-brackets', requestPayload);
+      }
+      setTaxBracketModal({ open: false, taxBracket: null });
+      await fetchPolicies();
+    } catch (err) {
+      setPolicySaveError(getApiError(err, 'Failed to save tax bracket.'));
+    } finally {
+      setPolicySaving(false);
+    }
+  };
+
+  const handleCreateIncrementPolicy = () => {
+    setPolicySaveError('');
+    setIncrementPolicyModal({
+      open: true,
+      incrementPolicy: selectedLocationId ? { locationId: selectedLocationId } : null,
+    });
+  };
+
+  const handleEditIncrementPolicy = (incrementPolicy) => {
+    if (!incrementPolicy) return;
+    setPolicySaveError('');
+    setIncrementPolicyModal({ open: true, incrementPolicy });
+  };
+
+  const handleIncrementPolicySubmit = async (payload) => {
+    setPolicySaving(true);
+    setPolicySaveError('');
+    try {
+      const requestPayload = {
+        ...payload,
+        locationId: payload.locationId || selectedLocationId || undefined,
+      };
+      if (incrementPolicyModal.incrementPolicy?.id) {
+        await api.put(`/business-operations/payroll/increment-policies/${incrementPolicyModal.incrementPolicy.id}`, requestPayload);
+      } else {
+        await api.post('/business-operations/payroll/increment-policies', requestPayload);
+      }
+      setIncrementPolicyModal({ open: false, incrementPolicy: null });
+      await fetchPolicies();
+    } catch (err) {
+      setPolicySaveError(getApiError(err, 'Failed to save increment policy.'));
+    } finally {
+      setPolicySaving(false);
+    }
+  };
+
   useEffect(() => {
-    if (!isPayrollWorkspaceModalOpen || periodModal.open || entryModal.open || supportDrawer.open || loanModal.open || loanTxModal.open || terminationModal.open || reengagementModal.open) return;
+    if (!isPayrollWorkspaceModalOpen || periodModal.open || entryModal.open || supportDrawer.open || loanModal.open || loanTxModal.open || terminationModal.open || reengagementModal.open || taxBracketModal.open || incrementPolicyModal.open) return;
     const handler = (event) => { if (event.key === 'Escape') { setIsPayrollWorkspaceModalOpen(false); setIsPayrollWorkspaceMaximized(false); } };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isPayrollWorkspaceModalOpen, periodModal.open, entryModal.open, supportDrawer.open, loanModal.open, loanTxModal.open, terminationModal.open, reengagementModal.open]);
+  }, [isPayrollWorkspaceModalOpen, periodModal.open, entryModal.open, supportDrawer.open, loanModal.open, loanTxModal.open, terminationModal.open, reengagementModal.open, taxBracketModal.open, incrementPolicyModal.open]);
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
@@ -684,6 +800,30 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
                   </button>
                   <button
                     type="button"
+                    onClick={handleCreateTaxBracket}
+                    style={{ border: '1px solid #d6d3d1', backgroundColor: '#fff', color: '#44403c', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+                  >
+                    <i className="fas fa-percent" style={{ marginRight: '0.42rem' }}></i>
+                    New Tax Bracket
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCreateIncrementPolicy}
+                    style={{ border: '1px solid #bbf7d0', backgroundColor: '#fff', color: '#166534', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+                  >
+                    <i className="fas fa-chart-line" style={{ marginRight: '0.42rem' }}></i>
+                    New Increment Policy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowPolicyPanel((prev) => !prev)}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+                  >
+                    <i className="fas fa-briefcase" style={{ marginRight: '0.42rem' }}></i>
+                    {showPolicyPanel ? 'Hide Policies' : 'Show Policies'}
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => handleExport('pdf')}
                     disabled={exportingExcel || exportingPdf}
                     style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
@@ -758,6 +898,63 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
                   >
                     Clear
                   </button>
+                </div>
+              )}
+
+              {showPolicyPanel && (
+                <div style={{ marginTop: '0.85rem', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.8rem', backgroundColor: '#f8fafc' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '0.6rem' }}>
+                    <strong style={{ color: '#0f172a', fontSize: '0.88rem' }}>Payroll Policy Center</strong>
+                    <span style={{ color: '#64748b', fontSize: '0.8rem' }}>Tax Brackets: {taxBrackets.length} | Increment Policies: {incrementPolicies.length}</span>
+                  </div>
+
+                  {policyError ? (
+                    <div style={{ padding: '0.7rem 0.8rem', borderRadius: '10px', backgroundColor: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', fontSize: '0.82rem' }}>{policyError}</div>
+                  ) : policyLoading ? (
+                    <div style={{ color: '#64748b', fontSize: '0.82rem' }}><i className="fas fa-spinner fa-spin" style={{ marginRight: '0.35rem' }}></i>Loading policies...</div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '0.75rem' }}>
+                      <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', backgroundColor: '#fff', padding: '0.65rem' }}>
+                        <div style={{ fontWeight: 800, color: '#334155', marginBottom: '0.45rem', fontSize: '0.82rem' }}>Tax Brackets</div>
+                        {!taxBrackets.length ? (
+                          <div style={{ color: '#64748b', fontSize: '0.8rem' }}>No tax brackets configured.</div>
+                        ) : taxBrackets.slice(0, 6).map((item) => (
+                          <div key={item.id} style={{ borderTop: '1px solid #f1f5f9', paddingTop: '0.45rem', marginTop: '0.45rem', display: 'grid', gap: '0.2rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.79rem' }}>MWK {Number(item.minIncome || 0).toLocaleString('en-US')} - MWK {Number(item.maxIncome || 0).toLocaleString('en-US')}</span>
+                              <span style={{ fontSize: '0.75rem', color: item.isActive ? '#166534' : '#9a3412' }}>{item.isActive ? 'Active' : 'Inactive'}</span>
+                            </div>
+                            <div style={{ color: '#64748b', fontSize: '0.76rem' }}>Rate: {Number(item.ratePercent || 0).toLocaleString('en-US')}% | Fixed: MWK {Number(item.fixedTaxAmount || 0).toLocaleString('en-US')}</div>
+                            <div>
+                              <button type="button" onClick={() => handleEditTaxBracket(item)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '8px', padding: '0.3rem 0.5rem', fontSize: '0.74rem', cursor: 'pointer', fontWeight: 700 }}>
+                                <i className="fas fa-pen" style={{ marginRight: '0.28rem' }}></i>Edit
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', backgroundColor: '#fff', padding: '0.65rem' }}>
+                        <div style={{ fontWeight: 800, color: '#334155', marginBottom: '0.45rem', fontSize: '0.82rem' }}>Increment Policies</div>
+                        {!incrementPolicies.length ? (
+                          <div style={{ color: '#64748b', fontSize: '0.8rem' }}>No increment policies configured.</div>
+                        ) : incrementPolicies.slice(0, 6).map((item) => (
+                          <div key={item.id} style={{ borderTop: '1px solid #f1f5f9', paddingTop: '0.45rem', marginTop: '0.45rem', display: 'grid', gap: '0.2rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.79rem' }}>{item.minServiceMonths} - {item.maxServiceMonths || '∞'} months</span>
+                              <span style={{ fontSize: '0.75rem', color: item.isActive ? '#166534' : '#9a3412' }}>{item.isActive ? 'Active' : 'Inactive'}</span>
+                            </div>
+                            <div style={{ color: '#64748b', fontSize: '0.76rem' }}>Increment: {item.incrementPercent ? `${Number(item.incrementPercent).toLocaleString('en-US')}%` : '0%'} + MWK {Number(item.incrementAmount || 0).toLocaleString('en-US')}</div>
+                            <div>
+                              <button type="button" onClick={() => handleEditIncrementPolicy(item)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '8px', padding: '0.3rem 0.5rem', fontSize: '0.74rem', cursor: 'pointer', fontWeight: 700 }}>
+                                <i className="fas fa-pen" style={{ marginRight: '0.28rem' }}></i>Edit
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -920,6 +1117,26 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
         error={supportSaveError}
         onClose={() => setReengagementModal({ open: false, reengagement: null })}
         onSubmit={handleReengagementSubmit}
+      />
+
+      <PayrollTaxBracketFormModal
+        isOpen={taxBracketModal.open}
+        taxBracket={taxBracketModal.taxBracket}
+        locations={locations}
+        saving={policySaving}
+        error={policySaveError}
+        onClose={() => setTaxBracketModal({ open: false, taxBracket: null })}
+        onSubmit={handleTaxBracketSubmit}
+      />
+
+      <PayrollIncrementPolicyFormModal
+        isOpen={incrementPolicyModal.open}
+        incrementPolicy={incrementPolicyModal.incrementPolicy}
+        locations={locations}
+        saving={policySaving}
+        error={policySaveError}
+        onClose={() => setIncrementPolicyModal({ open: false, incrementPolicy: null })}
+        onSubmit={handleIncrementPolicySubmit}
       />
     </div>
   );

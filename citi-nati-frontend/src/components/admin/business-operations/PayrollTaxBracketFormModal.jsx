@@ -2,15 +2,14 @@ import React, { useEffect, useState } from 'react';
 
 const defaultForm = {
   locationId: '',
-  effectiveFromMonth: new Date().getMonth() + 1,
-  effectiveFromYear: new Date().getFullYear(),
-  effectiveToMonth: 12,
-  effectiveToYear: new Date().getFullYear(),
+  effectiveFrom: new Date().toISOString().split('T')[0],
+  effectiveTo: '',
   minIncome: '0',
   maxIncome: '999999',
   ratePercent: '0',
   fixedTaxAmount: '0',
-  notes: '',
+  description: '',
+  isActive: 'true',
 };
 
 const fieldStyle = {
@@ -57,21 +56,16 @@ const PayrollTaxBracketFormModal = ({
     if (!isOpen) return;
     setValidationError('');
     
-    const now = new Date();
-    const currentMonth = now.getMonth() + 1;
-    const currentYear = now.getFullYear();
-    
     setForm({
       locationId: toStringValue(taxBracket?.locationId, ''),
-      effectiveFromMonth: taxBracket?.effectiveFromMonth || currentMonth,
-      effectiveFromYear: taxBracket?.effectiveFromYear || currentYear,
-      effectiveToMonth: taxBracket?.effectiveToMonth || 12,
-      effectiveToYear: taxBracket?.effectiveToYear || currentYear,
+      effectiveFrom: taxBracket?.effectiveFrom ? taxBracket.effectiveFrom.split('T')[0] : new Date().toISOString().split('T')[0],
+      effectiveTo: taxBracket?.effectiveTo ? taxBracket.effectiveTo.split('T')[0] : '',
       minIncome: toStringValue(taxBracket?.minIncome, '0'),
       maxIncome: toStringValue(taxBracket?.maxIncome, '999999'),
       ratePercent: toStringValue(taxBracket?.ratePercent, '0'),
       fixedTaxAmount: toStringValue(taxBracket?.fixedTaxAmount, '0'),
-      notes: taxBracket?.notes || '',
+      description: taxBracket?.description || '',
+      isActive: String(taxBracket?.isActive ?? true),
     });
   }, [isOpen, taxBracket]);
 
@@ -103,15 +97,14 @@ const PayrollTaxBracketFormModal = ({
     setValidationError('');
     onSubmit({
       locationId: Number(form.locationId),
-      effectiveFromMonth: Number(form.effectiveFromMonth),
-      effectiveFromYear: Number(form.effectiveFromYear),
-      effectiveToMonth: Number(form.effectiveToMonth),
-      effectiveToYear: Number(form.effectiveToYear),
+      effectiveFrom: form.effectiveFrom,
+      effectiveTo: form.effectiveTo || null,
       minIncome: asNumber(form.minIncome, 0),
       maxIncome: asNumber(form.maxIncome, 0),
       ratePercent: asNumber(form.ratePercent, 0),
       fixedTaxAmount: asNumber(form.fixedTaxAmount, 0),
-      notes: form.notes.trim() || null,
+      description: form.description.trim() || null,
+      isActive: form.isActive === 'true',
     });
   };
 
@@ -144,25 +137,9 @@ const PayrollTaxBracketFormModal = ({
 
           <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.8rem' }}>
             <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.6rem' }}>Effective Period</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
-              <div>
-                <label style={labelStyle}>From Month</label>
-                <select value={form.effectiveFromMonth} onChange={set('effectiveFromMonth')} style={fieldStyle}>
-                  {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                    <option key={m} value={m}>{new Date(2000, m - 1, 1).toLocaleDateString('en-US', { month: 'short' })}</option>
-                  ))}
-                </select>
-              </div>
-              <div><label style={labelStyle}>From Year</label><input type="number" min="2020" max="2050" value={form.effectiveFromYear} onChange={set('effectiveFromYear')} style={fieldStyle} /></div>
-              <div>
-                <label style={labelStyle}>To Month</label>
-                <select value={form.effectiveToMonth} onChange={set('effectiveToMonth')} style={fieldStyle}>
-                  {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                    <option key={m} value={m}>{new Date(2000, m - 1, 1).toLocaleDateString('en-US', { month: 'short' })}</option>
-                  ))}
-                </select>
-              </div>
-              <div><label style={labelStyle}>To Year</label><input type="number" min="2020" max="2050" value={form.effectiveToYear} onChange={set('effectiveToYear')} style={fieldStyle} /></div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
+              <div><label style={labelStyle}>Effective From</label><input type="date" value={form.effectiveFrom} onChange={set('effectiveFrom')} style={fieldStyle} /></div>
+              <div><label style={labelStyle}>Effective To (Optional)</label><input type="date" value={form.effectiveTo} onChange={set('effectiveTo')} style={fieldStyle} /></div>
             </div>
           </div>
 
@@ -177,8 +154,16 @@ const PayrollTaxBracketFormModal = ({
           </div>
 
           <div>
-            <label style={labelStyle}>Notes</label>
-            <textarea rows={2} value={form.notes} onChange={set('notes')} style={{ ...fieldStyle, resize: 'vertical', fontFamily: 'inherit' }} placeholder="e.g. Applies to all employees, PAYE bracket 2026, etc." />
+            <label style={labelStyle}>Description</label>
+            <textarea rows={2} value={form.description} onChange={set('description')} style={{ ...fieldStyle, resize: 'vertical', fontFamily: 'inherit' }} placeholder="e.g. Applies to all employees, PAYE bracket 2026, etc." />
+          </div>
+
+          <div>
+            <label style={labelStyle}>Status</label>
+            <select value={form.isActive} onChange={set('isActive')} style={fieldStyle}>
+              <option value="true">Active</option>
+              <option value="false">Inactive</option>
+            </select>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', paddingTop: '0.45rem', borderTop: '1px solid #e2e8f0' }}>

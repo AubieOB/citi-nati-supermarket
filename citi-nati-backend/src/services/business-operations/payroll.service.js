@@ -385,6 +385,62 @@ async function listReengagements({ employeeId, startDate, endDate, skip, take, s
   return { data, total, where };
 }
 
+async function createTaxBracket(payload) {
+  return prisma.payrollTaxBracket.create({ data: payload });
+}
+
+async function updateTaxBracket(id, payload) {
+  return prisma.payrollTaxBracket.update({ where: { id }, data: payload });
+}
+
+async function listTaxBrackets({ locationId, isActive, effectiveDate, skip, take, sortBy, sortOrder }) {
+  const where = {};
+  if (locationId) where.locationId = locationId;
+  if (isActive !== null && isActive !== undefined) where.isActive = Boolean(isActive);
+  if (effectiveDate) {
+    where.effectiveFrom = { lte: effectiveDate };
+    where.OR = [
+      { effectiveTo: null },
+      { effectiveTo: { gte: effectiveDate } },
+    ];
+  }
+
+  const [data, total] = await Promise.all([
+    prisma.payrollTaxBracket.findMany({ where, skip, take, orderBy: { [sortBy]: sortOrder } }),
+    prisma.payrollTaxBracket.count({ where }),
+  ]);
+
+  return { data, total, where };
+}
+
+async function createIncrementPolicy(payload) {
+  return prisma.payrollIncrementPolicy.create({ data: payload });
+}
+
+async function updateIncrementPolicy(id, payload) {
+  return prisma.payrollIncrementPolicy.update({ where: { id }, data: payload });
+}
+
+async function listIncrementPolicies({ locationId, isActive, effectiveDate, skip, take, sortBy, sortOrder }) {
+  const where = {};
+  if (locationId) where.locationId = locationId;
+  if (isActive !== null && isActive !== undefined) where.isActive = Boolean(isActive);
+  if (effectiveDate) {
+    where.effectiveFrom = { lte: effectiveDate };
+    where.OR = [
+      { effectiveTo: null },
+      { effectiveTo: { gte: effectiveDate } },
+    ];
+  }
+
+  const [data, total] = await Promise.all([
+    prisma.payrollIncrementPolicy.findMany({ where, skip, take, orderBy: { [sortBy]: sortOrder } }),
+    prisma.payrollIncrementPolicy.count({ where }),
+  ]);
+
+  return { data, total, where };
+}
+
 async function bulkImportPayrollPeriods(records = []) {
   const result = { inserted: 0, updated: 0, skipped: 0 };
 
@@ -717,6 +773,12 @@ module.exports = {
   createReengagement,
   updateReengagement,
   listReengagements,
+  createTaxBracket,
+  updateTaxBracket,
+  listTaxBrackets,
+  createIncrementPolicy,
+  updateIncrementPolicy,
+  listIncrementPolicies,
   bulkImportPayrollPeriods,
   bulkImportPayrollEntries,
   bulkImportLoans,

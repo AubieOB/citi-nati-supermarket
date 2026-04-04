@@ -23,6 +23,12 @@ const {
   createReengagement,
   updateReengagement,
   listReengagements,
+  createTaxBracket,
+  updateTaxBracket,
+  listTaxBrackets,
+  createIncrementPolicy,
+  updateIncrementPolicy,
+  listIncrementPolicies,
   importPayrollPeriods,
   importPayrollEntries,
   importLoans,
@@ -64,5 +70,13 @@ router.get('/terminations', listTerminations);
 router.post('/reengagements', createReengagement);
 router.put('/reengagements/:id', updateReengagement);
 router.get('/reengagements', listReengagements);
+
+router.post('/tax-brackets', createTaxBracket);
+router.put('/tax-brackets/:id', updateTaxBracket);
+router.get('/tax-brackets', listTaxBrackets);
+
+router.post('/increment-policies', createIncrementPolicy);
+router.put('/increment-policies/:id', updateIncrementPolicy);
+router.get('/increment-policies', listIncrementPolicies);
 
 module.exports = router;
