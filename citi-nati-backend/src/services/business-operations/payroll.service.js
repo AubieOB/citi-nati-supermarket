@@ -1270,6 +1270,38 @@ async function bulkImportReengagements(records = []) {
   return result;
 }
 
+async function purgeAllPayrollData() {
+  // Delete in FK-safe order (children before parents)
+  const tables = [
+    'payroll_entries',
+    'employee_loan_transactions',
+    'employee_loans',
+    'employee_terminations',
+    'employee_reengagements',
+    'payroll_periods',
+    'payroll_tax_brackets',
+    'payroll_increment_policies',
+  ];
+
+  const counts = {};
+  for (const table of tables) {
+    try {
+      const result = await prisma.$queryRawUnsafe(`DELETE FROM "${table}"`);
+      counts[table] = typeof result === 'number' ? result : 'ok';
+    } catch (err) {
+      // Table may not exist on older schema – skip gracefully
+      if (err.code === 'P2021' || (err.message && err.message.includes('does not exist'))) {
+        counts[table] = 'skipped (table missing)';
+      } else {
+        throw err;
+      }
+    }
+  }
+  // Clear the column cache so fresh queries start clean
+  tableColumnCache.clear();
+  return counts;
+}
+
 module.exports = {
   createPayrollPeriod,
   updatePayrollPeriod,
@@ -1304,4 +1336,5 @@ module.exports = {
   bulkImportLoanTransactions,
   bulkImportTerminations,
   bulkImportReengagements,
+  purgeAllPayrollData,
 };

@@ -865,6 +865,17 @@ async function listIncrementPolicies(req, res) {
   }
 }
 
+async function purgeAllPayrollData(req, res) {
+  try {
+    const counts = await payrollService.purgeAllPayrollData();
+    console.warn('[BO][PAYROLL] purgeAllPayrollData executed by admin – tables cleared:', counts);
+    return res.json({ success: true, message: 'All payroll data purged', counts });
+  } catch (err) {
+    console.error('[BO][PAYROLL] purgeAllPayrollData error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to purge payroll data' });
+  }
+}
+
 module.exports = {
   createPayrollPeriod,
   updatePayrollPeriod,
@@ -898,4 +909,5 @@ module.exports = {
   importLoans,
   importTerminations,
   importReengagements,
+  purgeAllPayrollData,
 };

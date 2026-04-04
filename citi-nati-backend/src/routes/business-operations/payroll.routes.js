@@ -34,6 +34,7 @@ const {
   importLoans,
   importTerminations,
   importReengagements,
+  purgeAllPayrollData,
 } = require('../../controllers/business-operations/payroll.controller');
 
 const router = express.Router();
@@ -78,5 +79,7 @@ router.get('/tax-brackets', listTaxBrackets);
 router.post('/increment-policies', createIncrementPolicy);
 router.put('/increment-policies/:id', updateIncrementPolicy);
 router.get('/increment-policies', listIncrementPolicies);
+
+router.delete('/purge', purgeAllPayrollData);
 
 module.exports = router;
