@@ -160,7 +160,7 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, onNavigat
           <div>
             <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.15rem' }}>Report History</h3>
             <p style={{ margin: '0.45rem 0 0', color: '#64748b', lineHeight: 1.6, maxWidth: '860px' }}>
-              There is no persisted export log in the backend yet, so this panel surfaces the latest operational reporting activity across sales, expenses, suppliers, and payroll until report storage is added.
+              Monitor recent operational reporting activity across sales, expenses, suppliers, payroll, and run instant exports from one unified workspace.
             </p>
           </div>
           <button
