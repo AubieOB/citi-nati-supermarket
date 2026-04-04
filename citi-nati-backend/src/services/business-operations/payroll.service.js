@@ -98,6 +98,14 @@ function isMissingPayrollEntriesColumnError(err) {
   return isMissingColumnError(err) && String(err?.meta?.column || '').toLowerCase().startsWith('payroll_entries.');
 }
 
+function isMissingTerminationsColumnError(err) {
+  return isMissingColumnError(err) && String(err?.meta?.column || '').toLowerCase().startsWith('employee_terminations.');
+}
+
+function isMissingReengagementsColumnError(err) {
+  return isMissingColumnError(err) && String(err?.meta?.column || '').toLowerCase().startsWith('employee_reengagements.');
+}
+
 function isMissingTableError(err, tableName = null) {
   const missing = err?.code === 'P2021';
   if (!missing) return false;
@@ -825,18 +833,51 @@ async function listLoanTransactions({ employeeLoanId, payrollPeriodId, transacti
 }
 
 async function createTermination(payload) {
-  return prisma.employeeTermination.create({
-    data: payload,
-    include: { employee: true },
-  });
+  try {
+    return await prisma.employeeTermination.create({
+      data: payload,
+      include: { employee: true },
+    });
+  } catch (err) {
+    if (!isMissingTerminationsColumnError(err)) throw err;
+    const safePayload = {
+      employeeId: payload.employeeId,
+      terminationDate: payload.terminationDate,
+      reason: payload.reason || null,
+      daysWorkedInFinalMonth: payload.daysWorkedInFinalMonth || null,
+      halfPayReceived: payload.halfPayReceived || null,
+      settlementAmount: payload.settlementAmount || null,
+      notes: payload.notes || null,
+    };
+    return prisma.employeeTermination.create({
+      data: safePayload,
+      include: { employee: true },
+    });
+  }
 }
 
 async function updateTermination(id, payload) {
-  return prisma.employeeTermination.update({
-    where: { id },
-    data: payload,
-    include: { employee: true },
-  });
+  try {
+    return await prisma.employeeTermination.update({
+      where: { id },
+      data: payload,
+      include: { employee: true },
+    });
+  } catch (err) {
+    if (!isMissingTerminationsColumnError(err)) throw err;
+    const safePayload = {};
+    if (payload.terminationDate !== undefined) safePayload.terminationDate = payload.terminationDate;
+    if (payload.reason !== undefined) safePayload.reason = payload.reason;
+    if (payload.daysWorkedInFinalMonth !== undefined) safePayload.daysWorkedInFinalMonth = payload.daysWorkedInFinalMonth;
+    if (payload.halfPayReceived !== undefined) safePayload.halfPayReceived = payload.halfPayReceived;
+    if (payload.settlementAmount !== undefined) safePayload.settlementAmount = payload.settlementAmount;
+    if (payload.notes !== undefined) safePayload.notes = payload.notes;
+    return prisma.employeeTermination.update({
+      where: { id },
+      data: safePayload,
+      include: { employee: true },
+    });
+  }
 }
 
 async function listTerminations({ employeeId, startDate, endDate, skip, take, sortBy, sortOrder }) {
@@ -848,27 +889,89 @@ async function listTerminations({ employeeId, startDate, endDate, skip, take, so
     if (endDate) where.terminationDate.lte = endDate;
   }
 
-  const [data, total] = await Promise.all([
-    prisma.employeeTermination.findMany({ where, include: { employee: true }, skip, take, orderBy: { [sortBy]: sortOrder } }),
-    prisma.employeeTermination.count({ where }),
-  ]);
+  let data = [];
+  let total = 0;
+
+  try {
+    [data, total] = await Promise.all([
+      prisma.employeeTermination.findMany({ where, include: { employee: true }, skip, take, orderBy: { [sortBy]: sortOrder } }),
+      prisma.employeeTermination.count({ where }),
+    ]);
+  } catch (err) {
+    if (!isMissingTerminationsColumnError(err)) throw err;
+    // Fall back to selecting only the original columns that definitely exist
+    const rows = await prisma.$queryRawUnsafe(
+      `SELECT t.id, t.employee_id, t.termination_date, t.reason,
+              t.days_worked_in_final_month, t.half_pay_received, t.settlement_amount,
+              t.notes, t.created_at, t.updated_at
+       FROM employee_terminations t
+       ${employeeId ? 'WHERE t.employee_id = $1' : ''}
+       ORDER BY t.termination_date DESC
+       OFFSET ${skip || 0} LIMIT ${take || 50}`,
+      ...(employeeId ? [employeeId] : []),
+    );
+    data = (Array.isArray(rows) ? rows : []).map((row) => ({
+      id: Number(row.id), employeeId: Number(row.employee_id),
+      terminationDate: row.termination_date, reason: row.reason ?? null,
+      terminationType: null, daysWorkedInFinalMonth: row.days_worked_in_final_month ?? null,
+      halfPayReceived: row.half_pay_received ?? null, settlementAmount: row.settlement_amount ?? null,
+      halfPayDueInTerminationMonth: null, amountPaidInTerminationMonth: null,
+      leavePayAccruedDays: null, leavePayAmount: null, outstandingLoanObligations: null,
+      grossSettlementAmount: null, netSettlementAmount: null,
+      notes: row.notes ?? null, createdAt: row.created_at, updatedAt: row.updated_at,
+    }));
+    total = data.length;
+  }
 
   return { data, total, where };
 }
 
 async function createReengagement(payload) {
-  return prisma.employeeReengagement.create({
-    data: payload,
-    include: { employee: true },
-  });
+  try {
+    return await prisma.employeeReengagement.create({
+      data: payload,
+      include: { employee: true },
+    });
+  } catch (err) {
+    if (!isMissingReengagementsColumnError(err)) throw err;
+    const safePayload = {
+      employeeId: payload.employeeId,
+      effectiveDate: payload.effectiveDate,
+      previousWage: payload.previousWage || null,
+      reengagementWage: payload.reengagementWage || null,
+      occupation: payload.occupation || null,
+      contractExpiryDate: payload.contractExpiryDate || null,
+      notes: payload.notes || null,
+    };
+    return prisma.employeeReengagement.create({
+      data: safePayload,
+      include: { employee: true },
+    });
+  }
 }
 
 async function updateReengagement(id, payload) {
-  return prisma.employeeReengagement.update({
-    where: { id },
-    data: payload,
-    include: { employee: true },
-  });
+  try {
+    return await prisma.employeeReengagement.update({
+      where: { id },
+      data: payload,
+      include: { employee: true },
+    });
+  } catch (err) {
+    if (!isMissingReengagementsColumnError(err)) throw err;
+    const safePayload = {};
+    if (payload.effectiveDate !== undefined) safePayload.effectiveDate = payload.effectiveDate;
+    if (payload.previousWage !== undefined) safePayload.previousWage = payload.previousWage;
+    if (payload.reengagementWage !== undefined) safePayload.reengagementWage = payload.reengagementWage;
+    if (payload.occupation !== undefined) safePayload.occupation = payload.occupation;
+    if (payload.contractExpiryDate !== undefined) safePayload.contractExpiryDate = payload.contractExpiryDate;
+    if (payload.notes !== undefined) safePayload.notes = payload.notes;
+    return prisma.employeeReengagement.update({
+      where: { id },
+      data: safePayload,
+      include: { employee: true },
+    });
+  }
 }
 
 async function listReengagements({ employeeId, startDate, endDate, skip, take, sortBy, sortOrder }) {
@@ -880,20 +983,61 @@ async function listReengagements({ employeeId, startDate, endDate, skip, take, s
     if (endDate) where.effectiveDate.lte = endDate;
   }
 
-  const [data, total] = await Promise.all([
-    prisma.employeeReengagement.findMany({ where, include: { employee: true }, skip, take, orderBy: { [sortBy]: sortOrder } }),
-    prisma.employeeReengagement.count({ where }),
-  ]);
+  let data = [];
+  let total = 0;
+
+  try {
+    [data, total] = await Promise.all([
+      prisma.employeeReengagement.findMany({ where, include: { employee: true }, skip, take, orderBy: { [sortBy]: sortOrder } }),
+      prisma.employeeReengagement.count({ where }),
+    ]);
+  } catch (err) {
+    if (!isMissingReengagementsColumnError(err)) throw err;
+    // Fall back to selecting only the original columns that definitely exist
+    const rows = await prisma.$queryRawUnsafe(
+      `SELECT r.id, r.employee_id, r.previous_wage, r.reengagement_wage,
+              r.occupation, r.effective_date, r.contract_expiry_date,
+              r.notes, r.created_at, r.updated_at
+       FROM employee_reengagements r
+       ${employeeId ? 'WHERE r.employee_id = $1' : ''}
+       ORDER BY r.effective_date DESC
+       OFFSET ${skip || 0} LIMIT ${take || 50}`,
+      ...(employeeId ? [employeeId] : []),
+    );
+    data = (Array.isArray(rows) ? rows : []).map((row) => ({
+      id: Number(row.id), employeeId: Number(row.employee_id),
+      linkedTerminationId: null, wageAtRetrenchment: null,
+      previousWage: row.previous_wage ?? null, reengagementWage: row.reengagement_wage ?? null,
+      occupation: row.occupation ?? null, effectiveDate: row.effective_date,
+      contractExpiryDate: row.contract_expiry_date ?? null,
+      notes: row.notes ?? null, createdAt: row.created_at, updatedAt: row.updated_at,
+    }));
+    total = data.length;
+  }
 
   return { data, total, where };
 }
 
 async function createTaxBracket(payload) {
-  return prisma.payrollTaxBracket.create({ data: payload });
+  try {
+    return await prisma.payrollTaxBracket.create({ data: payload });
+  } catch (err) {
+    if (!isMissingTableError(err, 'payroll_tax_brackets')) throw err;
+    const error = new Error('Tax bracket table is not yet available. Please run database migrations.');
+    error.statusCode = 503;
+    throw error;
+  }
 }
 
 async function updateTaxBracket(id, payload) {
-  return prisma.payrollTaxBracket.update({ where: { id }, data: payload });
+  try {
+    return await prisma.payrollTaxBracket.update({ where: { id }, data: payload });
+  } catch (err) {
+    if (!isMissingTableError(err, 'payroll_tax_brackets')) throw err;
+    const error = new Error('Tax bracket table is not yet available. Please run database migrations.');
+    error.statusCode = 503;
+    throw error;
+  }
 }
 
 async function listTaxBrackets({ locationId, isActive, effectiveDate, skip, take, sortBy, sortOrder }) {
@@ -925,11 +1069,25 @@ async function listTaxBrackets({ locationId, isActive, effectiveDate, skip, take
 }
 
 async function createIncrementPolicy(payload) {
-  return prisma.payrollIncrementPolicy.create({ data: payload });
+  try {
+    return await prisma.payrollIncrementPolicy.create({ data: payload });
+  } catch (err) {
+    if (!isMissingTableError(err, 'payroll_increment_policies')) throw err;
+    const error = new Error('Increment policy table is not yet available. Please run database migrations.');
+    error.statusCode = 503;
+    throw error;
+  }
 }
 
 async function updateIncrementPolicy(id, payload) {
-  return prisma.payrollIncrementPolicy.update({ where: { id }, data: payload });
+  try {
+    return await prisma.payrollIncrementPolicy.update({ where: { id }, data: payload });
+  } catch (err) {
+    if (!isMissingTableError(err, 'payroll_increment_policies')) throw err;
+    const error = new Error('Increment policy table is not yet available. Please run database migrations.');
+    error.statusCode = 503;
+    throw error;
+  }
 }
 
 async function listIncrementPolicies({ locationId, isActive, effectiveDate, skip, take, sortBy, sortOrder }) {
@@ -1295,11 +1453,21 @@ async function deleteReengagement(id) {
 }
 
 async function deleteTaxBracket(id) {
-  return prisma.payrollTaxBracket.delete({ where: { id } });
+  try {
+    return await prisma.payrollTaxBracket.delete({ where: { id } });
+  } catch (err) {
+    if (!isMissingTableError(err, 'payroll_tax_brackets')) throw err;
+    return null;
+  }
 }
 
 async function deleteIncrementPolicy(id) {
-  return prisma.payrollIncrementPolicy.delete({ where: { id } });
+  try {
+    return await prisma.payrollIncrementPolicy.delete({ where: { id } });
+  } catch (err) {
+    if (!isMissingTableError(err, 'payroll_increment_policies')) throw err;
+    return null;
+  }
 }
 
 async function purgeAllPayrollData() {
