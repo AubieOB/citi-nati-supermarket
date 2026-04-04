@@ -60,6 +60,10 @@ function isMissingColumnError(err, columnName = null) {
   return String(err?.meta?.column || '').toLowerCase().includes(String(columnName).toLowerCase());
 }
 
+function isMissingPayrollPeriodsColumnError(err) {
+  return isMissingColumnError(err) && String(err?.meta?.column || '').toLowerCase().startsWith('payroll_periods.');
+}
+
 function isMissingTableError(err, tableName = null) {
   const missing = err?.code === 'P2021';
   if (!missing) return false;
@@ -179,7 +183,7 @@ async function createPayrollPeriod(payload) {
       data: createData,
     });
   } catch (err) {
-    if (!isMissingColumnError(err, 'payroll_periods.location_id')) throw err;
+    if (!isMissingPayrollPeriodsColumnError(err)) throw err;
     return prisma.payrollPeriod.create({
       data: {
         reportingPeriodId: payload.reportingPeriodId || null,
@@ -216,7 +220,7 @@ async function updatePayrollPeriod(id, payload) {
       data: updateData,
     });
   } catch (err) {
-    if (!isMissingColumnError(err, 'payroll_periods.location_id')) throw err;
+    if (!isMissingPayrollPeriodsColumnError(err)) throw err;
     return prisma.payrollPeriod.update({
       where: { id },
       data: {
@@ -266,7 +270,7 @@ async function listPayrollPeriods({ search, status, payrollMode, payrollMonth, p
       prisma.payrollPeriod.count({ where }),
     ]);
   } catch (err) {
-    if (!isMissingColumnError(err, 'payroll_periods.location_id')) throw err;
+    if (!isMissingPayrollPeriodsColumnError(err)) throw err;
     const legacy = await listPayrollPeriodsLegacy({ search, status, payrollMode, reportingPeriodId, locationId, skip, take, sortBy, sortOrder });
     periods = legacy.periods;
     total = legacy.total;
@@ -277,19 +281,42 @@ async function listPayrollPeriods({ search, status, payrollMode, payrollMonth, p
     return { data: periods, total, where };
   }
 
-  const grouped = await prisma.payrollEntry.groupBy({
-    by: ['payrollPeriodId'],
-    where: { payrollPeriodId: { in: ids } },
-    _count: { id: true },
-    _sum: {
-      grossPay: true,
-      totalDeductions: true,
-      netPay: true,
-      overtimeAmount: true,
-      loanDeductionAmount: true,
-      accruedInterestAtPayroll: true,
-    },
-  });
+  let grouped = [];
+  try {
+    grouped = await prisma.payrollEntry.groupBy({
+      by: ['payrollPeriodId'],
+      where: { payrollPeriodId: { in: ids } },
+      _count: { id: true },
+      _sum: {
+        grossPay: true,
+        totalDeductions: true,
+        netPay: true,
+        overtimeAmount: true,
+        loanDeductionAmount: true,
+        accruedInterestAtPayroll: true,
+      },
+    });
+  } catch (err) {
+    if (!isMissingColumnError(err)) throw err;
+    const counts = await prisma.$queryRaw`
+      SELECT payroll_period_id AS "payrollPeriodId", COUNT(*)::int AS "entryCount"
+      FROM payroll_entries
+      WHERE payroll_period_id IN (${Prisma.join(ids)})
+      GROUP BY payroll_period_id
+    `;
+    grouped = (Array.isArray(counts) ? counts : []).map((row) => ({
+      payrollPeriodId: Number(row.payrollPeriodId),
+      _count: { id: Number(row.entryCount || 0) },
+      _sum: {
+        grossPay: 0,
+        totalDeductions: 0,
+        netPay: 0,
+        overtimeAmount: 0,
+        loanDeductionAmount: 0,
+        accruedInterestAtPayroll: 0,
+      },
+    }));
+  }
 
   const groupedMap = new Map(grouped.map((g) => [g.payrollPeriodId, g]));
   const data = periods.map((period) => {
@@ -313,7 +340,7 @@ async function getPayrollPeriodById(id) {
   try {
     return await prisma.payrollPeriod.findUnique({ where: { id } });
   } catch (err) {
-    if (!isMissingColumnError(err, 'payroll_periods.location_id')) throw err;
+    if (!isMissingPayrollPeriodsColumnError(err)) throw err;
     const rows = await prisma.$queryRaw`
       SELECT
         p.id,
