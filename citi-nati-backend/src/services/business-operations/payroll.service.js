@@ -3,6 +3,26 @@
 const { PrismaClient, Prisma } = require('@prisma/client');
 
 const prisma = new PrismaClient();
+const tableColumnCache = new Map();
+
+async function getTableColumns(tableName) {
+  if (tableColumnCache.has(tableName)) {
+    return tableColumnCache.get(tableName);
+  }
+
+  const rows = await prisma.$queryRawUnsafe(
+    `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = $1
+    `,
+    tableName,
+  );
+
+  const set = new Set((Array.isArray(rows) ? rows : []).map((row) => String(row.column_name)));
+  tableColumnCache.set(tableName, set);
+  return set;
+}
 
 function modelHasField(modelName, fieldName) {
   try {
@@ -88,19 +108,19 @@ function isMissingTableError(err, tableName = null) {
 function mapLegacyPeriodRow(row) {
   return {
     id: Number(row.id),
-    reportingPeriodId: row.reporting_period_id === null ? null : Number(row.reporting_period_id),
-    payrollMode: row.payroll_mode,
+    reportingPeriodId: row.reporting_period_id === undefined || row.reporting_period_id === null ? null : Number(row.reporting_period_id),
+    payrollMode: row.payroll_mode || null,
     locationId: null,
     payrollMonth: null,
     payrollYear: null,
     payrollPositionInMonth: null,
-    description: row.description,
-    status: row.status,
-    createdBy: row.created_by,
+    description: row.description ?? null,
+    status: row.status ?? 'draft',
+    createdBy: row.created_by ?? null,
     runStartedAt: null,
     finalizedAt: null,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    createdAt: row.created_at || new Date(),
+    updatedAt: row.updated_at || new Date(),
   };
 }
 
@@ -150,6 +170,7 @@ function mapLegacyPayrollEntryRow(row) {
 }
 
 async function listPayrollPeriodsLegacy({ search, status, payrollMode, reportingPeriodId, locationId, skip, take, sortBy, sortOrder }) {
+  const periodColumns = await getTableColumns('payroll_periods');
   const conditions = [];
   const params = [];
 
@@ -158,17 +179,18 @@ async function listPayrollPeriodsLegacy({ search, status, payrollMode, reporting
     return `$${params.length}`;
   };
 
-  if (status) conditions.push(`p.status = ${bind(status)}`);
-  if (payrollMode) conditions.push(`p.payroll_mode = ${bind(payrollMode)}`);
-  if (reportingPeriodId) conditions.push(`p.reporting_period_id = ${bind(reportingPeriodId)}`);
+  if (status && periodColumns.has('status')) conditions.push(`p.status = ${bind(status)}`);
+  if (payrollMode && periodColumns.has('payroll_mode')) conditions.push(`p.payroll_mode = ${bind(payrollMode)}`);
+  if (reportingPeriodId && periodColumns.has('reporting_period_id')) conditions.push(`p.reporting_period_id = ${bind(reportingPeriodId)}`);
 
   if (search) {
     const like = `%${search}%`;
-    const p1 = bind(like);
-    const p2 = bind(like);
-    const p3 = bind(like);
-    const p4 = bind(like);
-    conditions.push(`(p.description ILIKE ${p1} OR p.created_by ILIKE ${p2} OR p.payroll_mode ILIKE ${p3} OR p.status ILIKE ${p4})`);
+    const searchParts = [];
+    if (periodColumns.has('description')) searchParts.push(`p.description ILIKE ${bind(like)}`);
+    if (periodColumns.has('created_by')) searchParts.push(`p.created_by ILIKE ${bind(like)}`);
+    if (periodColumns.has('payroll_mode')) searchParts.push(`p.payroll_mode ILIKE ${bind(like)}`);
+    if (periodColumns.has('status')) searchParts.push(`p.status ILIKE ${bind(like)}`);
+    if (searchParts.length) conditions.push(`(${searchParts.join(' OR ')})`);
   }
 
   if (locationId) {
@@ -180,13 +202,21 @@ async function listPayrollPeriodsLegacy({ search, status, payrollMode, reporting
 
   const legacySortMap = {
     id: 'p.id',
-    payrollMode: 'p.payroll_mode',
-    status: 'p.status',
-    createdAt: 'p.created_at',
-    updatedAt: 'p.updated_at',
+    payrollMode: periodColumns.has('payroll_mode') ? 'p.payroll_mode' : 'p.id',
+    status: periodColumns.has('status') ? 'p.status' : 'p.id',
+    createdAt: periodColumns.has('created_at') ? 'p.created_at' : 'p.id',
+    updatedAt: periodColumns.has('updated_at') ? 'p.updated_at' : (periodColumns.has('created_at') ? 'p.created_at' : 'p.id'),
   };
-  const orderColumn = legacySortMap[sortBy] || 'p.created_at';
+  const orderColumn = legacySortMap[sortBy] || (periodColumns.has('created_at') ? 'p.created_at' : 'p.id');
   const orderDirection = String(sortOrder).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+
+  const reportingPeriodSelect = periodColumns.has('reporting_period_id') ? 'p.reporting_period_id' : 'NULL::int AS reporting_period_id';
+  const payrollModeSelect = periodColumns.has('payroll_mode') ? 'p.payroll_mode' : 'NULL::text AS payroll_mode';
+  const descriptionSelect = periodColumns.has('description') ? 'p.description' : 'NULL::text AS description';
+  const statusSelect = periodColumns.has('status') ? 'p.status' : `'draft'::text AS status`;
+  const createdBySelect = periodColumns.has('created_by') ? 'p.created_by' : 'NULL::text AS created_by';
+  const createdAtSelect = periodColumns.has('created_at') ? 'p.created_at' : 'NOW() AS created_at';
+  const updatedAtSelect = periodColumns.has('updated_at') ? 'p.updated_at' : 'NOW() AS updated_at';
 
   const offsetPlaceholder = bind(Number(skip) || 0);
   const limitPlaceholder = bind(Number(take) || 10);
@@ -195,13 +225,13 @@ async function listPayrollPeriodsLegacy({ search, status, payrollMode, reporting
     `
       SELECT
         p.id,
-        p.reporting_period_id,
-        p.payroll_mode,
-        p.description,
-        p.status,
-        p.created_by,
-        p.created_at,
-        p.updated_at
+        ${reportingPeriodSelect},
+        ${payrollModeSelect},
+        ${descriptionSelect},
+        ${statusSelect},
+        ${createdBySelect},
+        ${createdAtSelect},
+        ${updatedAtSelect}
       FROM payroll_periods p
       ${whereClause}
       ORDER BY ${orderColumn} ${orderDirection}
@@ -334,15 +364,50 @@ async function createPayrollPeriod(payload) {
     });
   } catch (err) {
     if (!isMissingPayrollPeriodsColumnError(err)) throw err;
-    return prisma.payrollPeriod.create({
-      data: {
-        reportingPeriodId: payload.reportingPeriodId || null,
-        payrollMode: payload.payrollMode,
-        description: payload.description || null,
-        status: payload.status || 'draft',
-        createdBy: payload.createdBy || null,
-      },
-    });
+
+    const periodColumns = await getTableColumns('payroll_periods');
+    const insertColumns = [];
+    const insertValues = [];
+
+    const pushValue = (column, value) => {
+      if (!periodColumns.has(column)) return;
+      insertColumns.push(column);
+      insertValues.push(value);
+    };
+
+    pushValue('reporting_period_id', payload.reportingPeriodId || null);
+    pushValue('payroll_mode', payload.payrollMode);
+    pushValue('description', payload.description || null);
+    pushValue('status', payload.status || 'draft');
+    pushValue('created_by', payload.createdBy || null);
+    if (periodColumns.has('created_at')) {
+      insertColumns.push('created_at');
+      insertValues.push(new Date());
+    }
+    if (periodColumns.has('updated_at')) {
+      insertColumns.push('updated_at');
+      insertValues.push(new Date());
+    }
+
+    if (!insertColumns.length) {
+      throw err;
+    }
+
+    const placeholders = insertValues.map((_, idx) => `$${idx + 1}`).join(', ');
+    const createdRows = await prisma.$queryRawUnsafe(
+      `
+        INSERT INTO payroll_periods (${insertColumns.join(', ')})
+        VALUES (${placeholders})
+        RETURNING id
+      `,
+      ...insertValues,
+    );
+
+    const createdId = Array.isArray(createdRows) && createdRows[0] ? Number(createdRows[0].id) : null;
+    if (!createdId) {
+      return mapLegacyPeriodRow({ id: 0, payroll_mode: payload.payrollMode, status: payload.status || 'draft' });
+    }
+    return getPayrollPeriodById(createdId);
   }
 }
 
@@ -371,16 +436,40 @@ async function updatePayrollPeriod(id, payload) {
     });
   } catch (err) {
     if (!isMissingPayrollPeriodsColumnError(err)) throw err;
-    return prisma.payrollPeriod.update({
-      where: { id },
-      data: {
-        reportingPeriodId: payload.reportingPeriodId,
-        payrollMode: payload.payrollMode,
-        description: payload.description,
-        status: payload.status,
-        createdBy: payload.createdBy,
-      },
-    });
+
+    const periodColumns = await getTableColumns('payroll_periods');
+    const setClauses = [];
+    const values = [];
+
+    const setColumn = (column, value) => {
+      if (!periodColumns.has(column) || value === undefined) return;
+      values.push(value);
+      setClauses.push(`${column} = $${values.length}`);
+    };
+
+    setColumn('reporting_period_id', payload.reportingPeriodId);
+    setColumn('payroll_mode', payload.payrollMode);
+    setColumn('description', payload.description);
+    setColumn('status', payload.status);
+    setColumn('created_by', payload.createdBy);
+    if (periodColumns.has('updated_at')) {
+      values.push(new Date());
+      setClauses.push(`updated_at = $${values.length}`);
+    }
+
+    if (setClauses.length) {
+      values.push(id);
+      await prisma.$queryRawUnsafe(
+        `
+          UPDATE payroll_periods
+          SET ${setClauses.join(', ')}
+          WHERE id = $${values.length}
+        `,
+        ...values,
+      );
+    }
+
+    return getPayrollPeriodById(id);
   }
 }
 
