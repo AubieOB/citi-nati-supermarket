@@ -175,10 +175,19 @@ function setWorksheetColumns(sheet, columns) {
   }));
 
   const headerRow = sheet.getRow(1);
-  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: EXCEL_BRAND_PURPLE } };
-  headerRow.alignment = { vertical: 'middle', horizontal: 'left' };
   headerRow.height = 24;
+  for (let colIndex = 1; colIndex <= columns.length; colIndex += 1) {
+    const cell = headerRow.getCell(colIndex);
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: EXCEL_BRAND_PURPLE } };
+    cell.alignment = { vertical: 'middle', horizontal: 'left' };
+    cell.border = {
+      top: { style: 'thin', color: { argb: EXCEL_BORDER } },
+      left: { style: 'thin', color: { argb: EXCEL_BORDER } },
+      bottom: { style: 'thin', color: { argb: EXCEL_BORDER } },
+      right: { style: 'thin', color: { argb: EXCEL_BORDER } },
+    };
+  }
   sheet.views = [{ state: 'frozen', ySplit: 1 }];
 }
 
@@ -214,9 +223,9 @@ function addTotalsRow(sheet, columns, totals = {}) {
   if (!totals || !Object.keys(totals).length) return;
   const row = sheet.addRow(totals);
   row.font = { bold: true };
-  row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8EEF9' } };
   columns.forEach((column, index) => {
     const cell = row.getCell(index + 1);
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8EEF9' } };
     cell.border = {
       top: { style: 'thin', color: { argb: EXCEL_BORDER } },
       left: { style: 'thin', color: { argb: EXCEL_BORDER } },
@@ -229,41 +238,9 @@ function addTotalsRow(sheet, columns, totals = {}) {
   });
 }
 
-function ensureExcelLogoImage(workbook) {
-  if (workbook.__brandLogoImageId !== undefined) return workbook.__brandLogoImageId;
-  const logoPath = resolveLogoPath();
-  if (!logoPath) {
-    workbook.__brandLogoImageId = null;
-    return null;
-  }
-
-  try {
-    const extension = path.extname(logoPath).replace('.', '').toLowerCase() === 'jpg' ? 'jpeg' : 'png';
-    // Try filename first, then fall back to in-memory buffer for environments
-    // where ExcelJS path loading is restricted.
-    try {
-      const imageId = workbook.addImage({
-        filename: logoPath,
-        extension,
-      });
-      workbook.__brandLogoImageId = imageId;
-      return imageId;
-    } catch {
-      const imageId = workbook.addImage({
-        buffer: fs.readFileSync(logoPath),
-        extension,
-      });
-      workbook.__brandLogoImageId = imageId;
-      return imageId;
-    }
-  } catch {
-    workbook.__brandLogoImageId = null;
-    return null;
-  }
-}
-
 function styleExcelDataRows(sheet, headerRowIndex) {
   const totalRows = sheet.rowCount;
+  const columnCount = Math.max(1, sheet.columnCount);
   let stripe = false;
 
   for (let rowIndex = headerRowIndex + 1; rowIndex <= totalRows; rowIndex += 1) {
@@ -271,16 +248,16 @@ function styleExcelDataRows(sheet, headerRowIndex) {
     const first = String(row.getCell(1).value || '').toUpperCase();
     const isTotals = first === 'TOTAL';
 
-    if (!isTotals) {
-      row.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: stripe ? EXCEL_BG_ALT : 'FFFFFFFF' },
-      };
-      stripe = !stripe;
-    }
+    for (let colIndex = 1; colIndex <= columnCount; colIndex += 1) {
+      const cell = row.getCell(colIndex);
+      if (!isTotals) {
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: stripe ? EXCEL_BG_ALT : 'FFFFFFFF' },
+        };
+      }
 
-    row.eachCell({ includeEmpty: true }, (cell) => {
       if (!cell.border) {
         cell.border = {
           top: { style: 'thin', color: { argb: EXCEL_BORDER } },
@@ -289,7 +266,9 @@ function styleExcelDataRows(sheet, headerRowIndex) {
           right: { style: 'thin', color: { argb: EXCEL_BORDER } },
         };
       }
-    });
+    }
+
+    if (!isTotals) stripe = !stripe;
   }
 }
 
@@ -313,9 +292,13 @@ function applyExcelSheetBranding(workbook, sheet, report) {
   sheet.mergeCells(4, 2, 4, maxCol);
   sheet.mergeCells(5, 2, 5, maxCol);
 
-  sheet.getCell('B1').value = COMPANY_NAME;
-  sheet.getCell('B1').font = { bold: true, size: 18, color: { argb: EXCEL_BRAND_PURPLE } };
-  sheet.getCell('B1').alignment = { vertical: 'middle', horizontal: 'left' };
+  sheet.getCell('A1').value = {
+    richText: [
+      { text: 'Citi-', font: { name: 'Calibri', size: 18, bold: true, color: { argb: EXCEL_BRAND_PURPLE } } },
+      { text: 'Nati Supermarket', font: { name: 'Calibri', size: 18, bold: true, color: { argb: EXCEL_BRAND_GREEN } } },
+    ],
+  };
+  sheet.getCell('A1').alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
 
   sheet.getCell('B2').value = `${report.title} - ${sheet.name}`;
   sheet.getCell('B2').font = { bold: true, size: 12, color: { argb: EXCEL_TEXT_DARK } };
@@ -354,24 +337,26 @@ function applyExcelSheetBranding(workbook, sheet, report) {
   sheet.getRow(6).height = 16;
   sheet.getRow(7).height = 8;
 
-  const logoImageId = ensureExcelLogoImage(workbook);
-  if (logoImageId) {
-    sheet.addImage(logoImageId, {
-      tl: { col: 0, row: 0 },
-      br: { col: 1, row: 6 },
-    });
-  }
-
   const headerRow = sheet.getRow(headerRowIndex);
-  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: EXCEL_BRAND_PURPLE } };
-  headerRow.alignment = { vertical: 'middle', horizontal: 'left' };
   headerRow.height = 24;
+  const columnCount = Math.max(1, sheet.columnCount);
+  for (let colIndex = 1; colIndex <= columnCount; colIndex += 1) {
+    const cell = headerRow.getCell(colIndex);
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: EXCEL_BRAND_PURPLE } };
+    cell.alignment = { vertical: 'middle', horizontal: 'left' };
+    cell.border = {
+      top: { style: 'thin', color: { argb: EXCEL_BORDER } },
+      left: { style: 'thin', color: { argb: EXCEL_BORDER } },
+      bottom: { style: 'thin', color: { argb: EXCEL_BORDER } },
+      right: { style: 'thin', color: { argb: EXCEL_BORDER } },
+    };
+  }
 
   sheet.views = [{ state: 'frozen', ySplit: headerRowIndex }];
   sheet.autoFilter = {
     from: { row: headerRowIndex, column: 1 },
-    to: { row: headerRowIndex, column: Math.max(1, sheet.columnCount) },
+    to: { row: headerRowIndex, column: columnCount },
   };
 
   styleExcelDataRows(sheet, headerRowIndex);
@@ -1083,18 +1068,18 @@ async function buildExcelBuffer(report) {
       const sheet = workbook.addWorksheet('Summary');
       const columns = [
         { header: 'Metric', key: 'metric', width: 34 },
-        { header: 'Value', key: 'value', width: 24, type: 'currency' },
+        { header: 'Value', key: 'value', width: 24, align: 'right' },
       ];
       setWorksheetColumns(sheet, columns);
       appendRows(sheet, columns, [
-        { metric: 'Total Invoices', value: money(report.data.summary.totalInvoices) },
-        { metric: 'Total Items Sold', value: money(report.data.summary.totalItemsSold) },
-        { metric: 'Gross Sales', value: money(report.data.summary.grossSales) },
-        { metric: 'VAT Total', value: money(report.data.summary.vatTotal) },
-        { metric: 'Discount Total', value: money(report.data.summary.discountTotal) },
-        { metric: 'Net Sales', value: money(report.data.summary.netSales) },
-        { metric: 'Levy Total', value: money(report.data.summary.levyTotal) },
-        { metric: 'Average Invoice Value', value: money(report.data.summary.averageInvoiceValue) },
+        { metric: 'Total Invoices', value: formatCountDisplay(report.data.summary.totalInvoices) },
+        { metric: 'Total Items Sold', value: formatCountDisplay(report.data.summary.totalItemsSold) },
+        { metric: 'Gross Sales', value: formatCurrencyDisplay(report.data.summary.grossSales) },
+        { metric: 'VAT Total', value: formatCurrencyDisplay(report.data.summary.vatTotal) },
+        { metric: 'Discount Total', value: formatCurrencyDisplay(report.data.summary.discountTotal) },
+        { metric: 'Net Sales', value: formatCurrencyDisplay(report.data.summary.netSales) },
+        { metric: 'Levy Total', value: formatCurrencyDisplay(report.data.summary.levyTotal) },
+        { metric: 'Average Invoice Value', value: formatCurrencyDisplay(report.data.summary.averageInvoiceValue) },
       ]);
     }
 
@@ -1206,13 +1191,13 @@ async function buildExcelBuffer(report) {
       const sheet = workbook.addWorksheet('Summary');
       const columns = [
         { header: 'Metric', key: 'metric', width: 28 },
-        { header: 'Value', key: 'value', width: 24, type: 'currency', align: 'right' },
+        { header: 'Value', key: 'value', width: 24, align: 'right' },
       ];
       setWorksheetColumns(sheet, columns);
       appendRows(sheet, columns, [
-        { metric: 'Total Expenses', value: money(report.data.summary?.totals?.totalExpenses || 0) },
-        { metric: 'Total Amount', value: money(report.data.summary?.totals?.totalAmount || 0) },
-        { metric: 'Average Amount', value: money(report.data.summary?.totals?.averageAmount || 0) },
+        { metric: 'Total Expenses', value: formatCountDisplay(report.data.summary?.totals?.totalExpenses || 0) },
+        { metric: 'Total Amount', value: formatCurrencyDisplay(report.data.summary?.totals?.totalAmount || 0) },
+        { metric: 'Average Amount', value: formatCurrencyDisplay(report.data.summary?.totals?.averageAmount || 0) },
       ]);
     }
 
@@ -1280,14 +1265,14 @@ async function buildExcelBuffer(report) {
     const summarySheet = workbook.addWorksheet('Balances');
     const summaryColumns = [
       { header: 'Metric', key: 'metric', width: 30 },
-      { header: 'Value', key: 'value', width: 24, type: 'currency', align: 'right' },
+      { header: 'Value', key: 'value', width: 24, align: 'right' },
     ];
     setWorksheetColumns(summarySheet, summaryColumns);
     appendRows(summarySheet, summaryColumns, [
-      { metric: 'Total Suppliers', value: money(report.data.balances.totalSuppliers) },
-      { metric: 'Active Suppliers', value: money(report.data.balances.activeSuppliers) },
-      { metric: 'Outstanding Debt', value: money(report.data.balances.totalDebt) },
-      { metric: 'Supplier Credit', value: money(report.data.balances.totalCredit) },
+      { metric: 'Total Suppliers', value: formatCountDisplay(report.data.balances.totalSuppliers) },
+      { metric: 'Active Suppliers', value: formatCountDisplay(report.data.balances.activeSuppliers) },
+      { metric: 'Outstanding Debt', value: formatCurrencyDisplay(report.data.balances.totalDebt) },
+      { metric: 'Supplier Credit', value: formatCurrencyDisplay(report.data.balances.totalCredit) },
     ]);
   }
 
