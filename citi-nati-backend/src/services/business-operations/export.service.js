@@ -188,7 +188,6 @@ function setWorksheetColumns(sheet, columns) {
       right: { style: 'thin', color: { argb: EXCEL_BORDER } },
     };
   }
-  sheet.views = [{ state: 'frozen', ySplit: 1 }];
 }
 
 function appendRows(sheet, columns, rows) {
@@ -273,7 +272,7 @@ function styleExcelDataRows(sheet, headerRowIndex) {
 }
 
 function applyExcelSheetBranding(workbook, sheet, report) {
-  const headerRowIndex = 8;
+  const headerRowIndex = 7;
   const generatedText = new Date().toLocaleString('en-GB');
   const periodText = getReportPeriodText(report);
   const filtersText = buildAppliedFilterText(report.filters || {});
@@ -281,16 +280,12 @@ function applyExcelSheetBranding(workbook, sheet, report) {
   sheet.spliceRows(1, 0, [], [], [], [], [], []);
 
   const maxCol = Math.max(2, sheet.columnCount || 2);
-  if ((sheet.getColumn(1).width || 8) < 12) {
-    sheet.getColumn(1).width = 12;
-  }
-
-  sheet.mergeCells(1, 1, 6, 1);
-  sheet.mergeCells(1, 2, 1, maxCol);
-  sheet.mergeCells(2, 2, 2, maxCol);
-  sheet.mergeCells(3, 2, 3, maxCol);
-  sheet.mergeCells(4, 2, 4, maxCol);
-  sheet.mergeCells(5, 2, 5, maxCol);
+  sheet.mergeCells(1, 1, 1, maxCol);
+  sheet.mergeCells(2, 1, 2, maxCol);
+  sheet.mergeCells(3, 1, 3, maxCol);
+  sheet.mergeCells(4, 1, 4, maxCol);
+  sheet.mergeCells(5, 1, 5, maxCol);
+  sheet.mergeCells(6, 1, 6, maxCol);
 
   sheet.getCell('A1').value = {
     richText: [
@@ -300,42 +295,33 @@ function applyExcelSheetBranding(workbook, sheet, report) {
   };
   sheet.getCell('A1').alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
 
-  sheet.getCell('B2').value = `${report.title} - ${sheet.name}`;
-  sheet.getCell('B2').font = { bold: true, size: 12, color: { argb: EXCEL_TEXT_DARK } };
+  sheet.getCell('A2').value = `${report.title} - ${sheet.name}`;
+  sheet.getCell('A2').font = { bold: true, size: 12, color: { argb: EXCEL_TEXT_DARK } };
 
-  sheet.getCell('B3').value = `Reporting Period: ${periodText}`;
-  sheet.getCell('B3').font = { size: 10, color: { argb: EXCEL_TEXT_MUTED } };
+  sheet.getCell('A3').value = `Reporting Period: ${periodText}`;
+  sheet.getCell('A3').font = { size: 10, color: { argb: EXCEL_TEXT_MUTED } };
 
-  sheet.getCell('B4').value = `Generated: ${generatedText}`;
-  sheet.getCell('B4').font = { size: 10, color: { argb: EXCEL_TEXT_MUTED } };
+  sheet.getCell('A4').value = `Generated: ${generatedText}`;
+  sheet.getCell('A4').font = { size: 10, color: { argb: EXCEL_TEXT_MUTED } };
 
-  sheet.getCell('B5').value = `Applied Filters: ${filtersText}`;
-  sheet.getCell('B5').font = { size: 10, color: { argb: EXCEL_TEXT_MUTED } };
-  sheet.getCell('B5').alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
+  sheet.getCell('A5').value = `Applied Filters: ${filtersText}`;
+  sheet.getCell('A5').font = { size: 10, color: { argb: EXCEL_TEXT_MUTED } };
+  sheet.getCell('A5').alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
 
-  sheet.getCell('B6').value = COMPANY_CONTACT;
-  sheet.getCell('B6').font = { size: 9, color: { argb: EXCEL_TEXT_MUTED }, italic: true };
+  sheet.getCell('A6').value = COMPANY_CONTACT;
+  sheet.getCell('A6').font = { size: 9, color: { argb: EXCEL_TEXT_MUTED }, italic: true };
 
   [1, 2, 3, 4, 5, 6].forEach((rowNo) => {
     const row = sheet.getRow(rowNo);
     row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: EXCEL_BG_LIGHT } };
   });
-  const logoBlock = sheet.getCell('A1');
-  logoBlock.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: EXCEL_BG_LIGHT } };
-  logoBlock.border = {
-    top: { style: 'thin', color: { argb: EXCEL_BORDER } },
-    left: { style: 'thin', color: { argb: EXCEL_BORDER } },
-    bottom: { style: 'thin', color: { argb: EXCEL_BORDER } },
-    right: { style: 'thin', color: { argb: EXCEL_BORDER } },
-  };
 
   sheet.getRow(1).height = 24;
   sheet.getRow(2).height = 20;
-  sheet.getRow(3).height = 18;
-  sheet.getRow(4).height = 18;
+  sheet.getRow(3).height = 16;
+  sheet.getRow(4).height = 16;
   sheet.getRow(5).height = 28;
-  sheet.getRow(6).height = 16;
-  sheet.getRow(7).height = 8;
+  sheet.getRow(6).height = 14;
 
   const headerRow = sheet.getRow(headerRowIndex);
   headerRow.height = 24;
@@ -352,12 +338,6 @@ function applyExcelSheetBranding(workbook, sheet, report) {
       right: { style: 'thin', color: { argb: EXCEL_BORDER } },
     };
   }
-
-  sheet.views = [{ state: 'frozen', ySplit: headerRowIndex }];
-  sheet.autoFilter = {
-    from: { row: headerRowIndex, column: 1 },
-    to: { row: headerRowIndex, column: columnCount },
-  };
 
   styleExcelDataRows(sheet, headerRowIndex);
 }
