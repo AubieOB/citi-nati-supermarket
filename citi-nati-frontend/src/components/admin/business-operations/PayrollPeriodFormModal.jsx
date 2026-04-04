@@ -4,6 +4,11 @@ const defaultForm = {
   locationId: '',
   reportingPeriodId: '',
   payrollMode: 'full_month',
+  payrollMonth: new Date().getMonth() + 1,
+  payrollYear: new Date().getFullYear(),
+  payrollPositionInMonth: 'full',
+  runStartedAt: '',
+  finalizedAt: '',
   description: '',
   status: 'draft',
 };
@@ -37,10 +42,20 @@ const PayrollPeriodFormModal = ({ isOpen, period, selectedLocationId = null, loc
     setValidationError('');
     const scopedLocationId = selectedLocationId ? String(selectedLocationId) : '';
     const existingLocationId = period?.locationId ? String(period.locationId) : '';
+    
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
+    
     setForm({
       locationId: existingLocationId || scopedLocationId,
       reportingPeriodId: period?.reportingPeriodId ? String(period.reportingPeriodId) : '',
       payrollMode: period?.payrollMode || 'full_month',
+      payrollMonth: period?.payrollMonth || currentMonth,
+      payrollYear: period?.payrollYear || currentYear,
+      payrollPositionInMonth: period?.payrollPositionInMonth || 'full',
+      runStartedAt: period?.runStartedAt ? period.runStartedAt.split('T')[0] : '',
+      finalizedAt: period?.finalizedAt ? period.finalizedAt.split('T')[0] : '',
       description: period?.description || '',
       status: period?.status || 'draft',
     });
@@ -70,6 +85,11 @@ const PayrollPeriodFormModal = ({ isOpen, period, selectedLocationId = null, loc
       locationId: Number(form.locationId),
       reportingPeriodId: form.reportingPeriodId ? Number(form.reportingPeriodId) : null,
       payrollMode: form.payrollMode,
+      payrollMonth: Number(form.payrollMonth),
+      payrollYear: Number(form.payrollYear),
+      payrollPositionInMonth: form.payrollPositionInMonth,
+      runStartedAt: form.runStartedAt || null,
+      finalizedAt: form.finalizedAt || null,
       description: form.description.trim() || null,
       status: form.status,
     });
@@ -110,6 +130,40 @@ const PayrollPeriodFormModal = ({ isOpen, period, selectedLocationId = null, loc
                 <option value="mid_month">Mid Month</option>
                 <option value="full_month">Full Month</option>
               </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.8rem' }}>
+            <div>
+              <label style={labelStyle}>Payroll Month</label>
+              <select value={form.payrollMonth} onChange={set('payrollMonth')} style={fieldStyle}>
+                {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                  <option key={m} value={m}>{new Date(2000, m - 1, 1).toLocaleDateString('en-US', { month: 'long' })}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Payroll Year</label>
+              <input type="number" min="2020" max="2050" value={form.payrollYear} onChange={set('payrollYear')} style={fieldStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Position in Month</label>
+              <select value={form.payrollPositionInMonth} onChange={set('payrollPositionInMonth')} style={fieldStyle}>
+                <option value="full">Full Month</option>
+                <option value="mid">Mid-Month</option>
+                <option value="half">Half Month</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.8rem' }}>
+            <div>
+              <label style={labelStyle}>Run Started Date</label>
+              <input type="date" value={form.runStartedAt} onChange={set('runStartedAt')} style={fieldStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Finalized Date</label>
+              <input type="date" value={form.finalizedAt} onChange={set('finalizedAt')} style={fieldStyle} />
             </div>
           </div>
 

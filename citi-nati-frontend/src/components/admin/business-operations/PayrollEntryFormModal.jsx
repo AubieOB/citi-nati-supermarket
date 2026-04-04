@@ -11,11 +11,20 @@ const defaultForm = {
   daysAbsent: '',
   overtimeHours: '',
   overtimeAmount: '0',
+  overtimeNormalHours: '',
+  overtimeNormalAmount: '0',
+  overtimeDoubleHours: '',
+  overtimeDoubleAmount: '0',
+  absenceDeductionAmount: '0',
   loanDeductionAmount: '0',
+  loanBalanceAtPayroll: '0',
+  accruedInterestAtPayroll: '0',
   otherDeductionAmount: '0',
   bonusAmount: '0',
   giftAmount: '0',
   leavePayAmount: '0',
+  netPayMidPortion: '0',
+  netPayEndPortion: '0',
   payeAmount: '0',
   notes: '',
 };
@@ -77,11 +86,20 @@ const PayrollEntryFormModal = ({
       daysAbsent: toStringValue(payrollEntry?.daysAbsent),
       overtimeHours: toStringValue(payrollEntry?.overtimeHours),
       overtimeAmount: toStringValue(payrollEntry?.overtimeAmount, '0'),
+      overtimeNormalHours: toStringValue(payrollEntry?.overtimeNormalHours),
+      overtimeNormalAmount: toStringValue(payrollEntry?.overtimeNormalAmount, '0'),
+      overtimeDoubleHours: toStringValue(payrollEntry?.overtimeDoubleHours),
+      overtimeDoubleAmount: toStringValue(payrollEntry?.overtimeDoubleAmount, '0'),
+      absenceDeductionAmount: toStringValue(payrollEntry?.absenceDeductionAmount, '0'),
       loanDeductionAmount: toStringValue(payrollEntry?.loanDeductionAmount, '0'),
+      loanBalanceAtPayroll: toStringValue(payrollEntry?.loanBalanceAtPayroll, '0'),
+      accruedInterestAtPayroll: toStringValue(payrollEntry?.accruedInterestAtPayroll, '0'),
       otherDeductionAmount: toStringValue(payrollEntry?.otherDeductionAmount, '0'),
       bonusAmount: toStringValue(payrollEntry?.bonusAmount, '0'),
       giftAmount: toStringValue(payrollEntry?.giftAmount, '0'),
       leavePayAmount: toStringValue(payrollEntry?.leavePayAmount, '0'),
+      netPayMidPortion: toStringValue(payrollEntry?.netPayMidPortion, '0'),
+      netPayEndPortion: toStringValue(payrollEntry?.netPayEndPortion, '0'),
       payeAmount: toStringValue(payrollEntry?.payeAmount, '0'),
       notes: toStringValue(payrollEntry?.notes, ''),
     });
@@ -165,11 +183,20 @@ const PayrollEntryFormModal = ({
       daysAbsent: form.daysAbsent === '' ? null : asNumber(form.daysAbsent, 0),
       overtimeHours: form.overtimeHours === '' ? null : asNumber(form.overtimeHours, 0),
       overtimeAmount: asNumber(form.overtimeAmount, 0),
+      overtimeNormalHours: form.overtimeNormalHours === '' ? null : asNumber(form.overtimeNormalHours, 0),
+      overtimeNormalAmount: asNumber(form.overtimeNormalAmount, 0),
+      overtimeDoubleHours: form.overtimeDoubleHours === '' ? null : asNumber(form.overtimeDoubleHours, 0),
+      overtimeDoubleAmount: asNumber(form.overtimeDoubleAmount, 0),
+      absenceDeductionAmount: asNumber(form.absenceDeductionAmount, 0),
       loanDeductionAmount: asNumber(form.loanDeductionAmount, 0),
+      loanBalanceAtPayroll: asNumber(form.loanBalanceAtPayroll, 0),
+      accruedInterestAtPayroll: asNumber(form.accruedInterestAtPayroll, 0),
       otherDeductionAmount: asNumber(form.otherDeductionAmount, 0),
       bonusAmount: asNumber(form.bonusAmount, 0),
       giftAmount: asNumber(form.giftAmount, 0),
       leavePayAmount: asNumber(form.leavePayAmount, 0),
+      netPayMidPortion: asNumber(form.netPayMidPortion, 0),
+      netPayEndPortion: asNumber(form.netPayEndPortion, 0),
       payeAmount: asNumber(form.payeAmount, 0),
       notes: form.notes.trim() || null,
     });
@@ -223,16 +250,40 @@ const PayrollEntryFormModal = ({
             <div><label style={labelStyle}>Overtime Hours</label><input type="number" step="0.01" min="0" value={form.overtimeHours} onChange={set('overtimeHours')} style={fieldStyle} /></div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(155px, 1fr))', gap: '0.75rem' }}>
-            <div><label style={labelStyle}>Overtime Amount</label><input type="number" step="0.01" min="0" value={form.overtimeAmount} onChange={set('overtimeAmount')} style={fieldStyle} /></div>
-            <div><label style={labelStyle}>Loan Deduction</label><input type="number" step="0.01" min="0" value={form.loanDeductionAmount} onChange={set('loanDeductionAmount')} style={fieldStyle} /></div>
-            <div><label style={labelStyle}>Other Deduction</label><input type="number" step="0.01" min="0" value={form.otherDeductionAmount} onChange={set('otherDeductionAmount')} style={fieldStyle} /></div>
-            <div><label style={labelStyle}>Bonus Amount</label><input type="number" step="0.01" min="0" value={form.bonusAmount} onChange={set('bonusAmount')} style={fieldStyle} /></div>
-            <div><label style={labelStyle}>Gift Amount</label><input type="number" step="0.01" min="0" value={form.giftAmount} onChange={set('giftAmount')} style={fieldStyle} /></div>
-            <div><label style={labelStyle}>Leave Pay</label><input type="number" step="0.01" min="0" value={form.leavePayAmount} onChange={set('leavePayAmount')} style={fieldStyle} /></div>
+          <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.8rem', marginTop: '0.6rem' }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.6rem' }}>Overtime Details (Advanced)</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(155px, 1fr))', gap: '0.75rem' }}>
+              <div><label style={labelStyle}>Normal Rate Hours</label><input type="number" step="0.01" min="0" value={form.overtimeNormalHours} onChange={set('overtimeNormalHours')} style={fieldStyle} /></div>
+              <div><label style={labelStyle}>Normal Rate Amount</label><input type="number" step="0.01" min="0" value={form.overtimeNormalAmount} onChange={set('overtimeNormalAmount')} style={fieldStyle} /></div>
+              <div><label style={labelStyle}>Double Rate Hours</label><input type="number" step="0.01" min="0" value={form.overtimeDoubleHours} onChange={set('overtimeDoubleHours')} style={fieldStyle} /></div>
+              <div><label style={labelStyle}>Double Rate Amount</label><input type="number" step="0.01" min="0" value={form.overtimeDoubleAmount} onChange={set('overtimeDoubleAmount')} style={fieldStyle} /></div>
+            </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
+          <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.8rem', marginTop: '0.6rem' }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.6rem' }}>Deductions & Loan Details</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(155px, 1fr))', gap: '0.75rem' }}>
+              <div><label style={labelStyle}>Absence Deduction</label><input type="number" step="0.01" min="0" value={form.absenceDeductionAmount} onChange={set('absenceDeductionAmount')} style={fieldStyle} /></div>
+              <div><label style={labelStyle}>Loan Deduction</label><input type="number" step="0.01" min="0" value={form.loanDeductionAmount} onChange={set('loanDeductionAmount')} style={fieldStyle} /></div>
+              <div><label style={labelStyle}>Loan Balance @ Payroll</label><input type="number" step="0.01" min="0" value={form.loanBalanceAtPayroll} onChange={set('loanBalanceAtPayroll')} style={fieldStyle} /></div>
+              <div><label style={labelStyle}>Accrued Interest @ Payroll</label><input type="number" step="0.01" min="0" value={form.accruedInterestAtPayroll} onChange={set('accruedInterestAtPayroll')} style={fieldStyle} /></div>
+              <div><label style={labelStyle}>Other Deduction</label><input type="number" step="0.01" min="0" value={form.otherDeductionAmount} onChange={set('otherDeductionAmount')} style={fieldStyle} /></div>
+            </div>
+          </div>
+
+          <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.8rem', marginTop: '0.6rem' }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.6rem' }}>Allowances & Net Pay Split</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(155px, 1fr))', gap: '0.75rem' }}>
+              <div><label style={labelStyle}>Bonus Amount</label><input type="number" step="0.01" min="0" value={form.bonusAmount} onChange={set('bonusAmount')} style={fieldStyle} /></div>
+              <div><label style={labelStyle}>Gift Amount</label><input type="number" step="0.01" min="0" value={form.giftAmount} onChange={set('giftAmount')} style={fieldStyle} /></div>
+              <div><label style={labelStyle}>Leave Pay</label><input type="number" step="0.01" min="0" value={form.leavePayAmount} onChange={set('leavePayAmount')} style={fieldStyle} /></div>
+              <div><label style={labelStyle}>Net Pay (Mid-Month)</label><input type="number" step="0.01" min="0" value={form.netPayMidPortion} onChange={set('netPayMidPortion')} style={fieldStyle} /></div>
+              <div><label style={labelStyle}>Net Pay (End-Month)</label><input type="number" step="0.01" min="0" value={form.netPayEndPortion} onChange={set('netPayEndPortion')} style={fieldStyle} /></div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.8rem', marginTop: '0.6rem' }}>
+            <div><label style={labelStyle}>Overtime Amount</label><input type="number" step="0.01" min="0" value={form.overtimeAmount} onChange={set('overtimeAmount')} style={fieldStyle} /></div>
             <div><label style={labelStyle}>PAYE Amount</label><input type="number" step="0.01" min="0" value={form.payeAmount} onChange={set('payeAmount')} style={fieldStyle} /></div>
             <div>
               <label style={labelStyle}>Notes</label>
