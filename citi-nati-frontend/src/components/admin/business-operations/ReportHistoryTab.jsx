@@ -41,22 +41,6 @@ function getCurrentMonthParams() {
   };
 }
 
-const ActivitySection = ({ title, description, items, renderItem }) => (
-  <div style={{ ...cardStyle, overflow: 'hidden' }}>
-    <div style={{ padding: '1rem 1.1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-      <strong style={{ color: '#0f172a' }}>{title}</strong>
-      <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>{description}</p>
-    </div>
-    {!items.length ? (
-      <EmptyState message={`No ${title.toLowerCase()} available right now.`} />
-    ) : (
-      <div style={{ display: 'grid', gap: '0.75rem', padding: '1rem' }}>
-        {items.map(renderItem)}
-      </div>
-    )}
-  </div>
-);
-
 const exportButtonStyle = (disabled) => ({
   border: '1px solid #cbd5e1',
   backgroundColor: '#fff',
@@ -66,6 +50,17 @@ const exportButtonStyle = (disabled) => ({
   fontWeight: 700,
   cursor: disabled ? 'not-allowed' : 'pointer',
   fontSize: '0.82rem',
+});
+
+const activityTabStyle = (active) => ({
+  border: active ? '1px solid #5B4B8A' : '1px solid #d1d5db',
+  backgroundColor: active ? '#5B4B8A' : '#fff',
+  color: active ? '#fff' : '#334155',
+  borderRadius: '999px',
+  padding: '0.45rem 0.8rem',
+  fontSize: '0.8rem',
+  fontWeight: 700,
+  cursor: 'pointer',
 });
 
 const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, onNavigateTab }) => {
@@ -79,6 +74,7 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, onNavigat
     payrollPeriods: [],
   });
   const [exporting, setExporting] = useState({});
+  const [activeActivity, setActiveActivity] = useState('sales');
 
   const fetchActivity = useCallback(async () => {
     setState((current) => ({ ...current, loading: true, error: '' }));
@@ -134,6 +130,15 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, onNavigat
     { id: 'employees', title: 'Employees', module: 'employees', type: 'list', tabId: 'employees', icon: 'fa-users', tone: '#15803d' },
     { id: 'monthly-summary', title: 'Monthly Summary', module: 'monthly-summary', type: 'summary', tabId: 'monthly-summary', icon: 'fa-calendar-days', tone: '#b45309' },
   ]), []);
+
+  const activityTabs = useMemo(() => ([
+    { id: 'sales', label: 'Sales', count: state.invoices.length, description: 'Most recent sales invoices from the current month reporting window.' },
+    { id: 'expenses', label: 'Expenses', count: state.expenses.length, description: 'Newest imported expense records across the operations workspace.' },
+    { id: 'suppliers', label: 'Suppliers', count: state.supplierTransactions.length, description: 'Latest supplier ledger movement currently recorded.' },
+    { id: 'payroll', label: 'Payroll', count: state.payrollPeriods.length, description: 'Latest payroll periods created in the operations module.' },
+  ]), [state.expenses.length, state.invoices.length, state.payrollPeriods.length, state.supplierTransactions.length]);
+
+  const activeActivityMeta = activityTabs.find((tab) => tab.id === activeActivity) || activityTabs[0];
 
   const handleExport = useCallback(async ({ module, type, format }) => {
     const key = `${module}:${format}`;
@@ -231,82 +236,88 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, onNavigat
       ) : state.loading ? (
         <div style={cardStyle}><EmptyState message="Loading report activity..." /></div>
       ) : (
-        <div style={{ display: 'grid', gap: '1rem' }}>
-          <ActivitySection
-            title="Latest Sales Invoices"
-            description="Most recent sales invoices from the current month reporting window."
-            items={state.invoices}
-            renderItem={(invoice) => (
-              <div key={invoice.id} style={{ border: '1px solid #e2e8f0', borderRadius: '14px', padding: '0.9rem' }}>
-                <strong style={{ color: '#0f172a' }}>{invoice.sourceInvoiceNo || invoice.refNo || `Invoice ${invoice.id}`}</strong>
-                <div style={{ marginTop: '0.25rem', color: '#64748b', fontSize: '0.84rem' }}>{formatDate(invoice.invoiceDate)} • {invoice.userName || 'Unknown cashier'} • {invoice.branchCode || 'No branch'}</div>
-                <div style={{ marginTop: '0.45rem', color: '#0f172a', fontWeight: 800 }}>{money(invoice.netSale)}</div>
-              </div>
-            )}
-          />
+        <div style={{ ...cardStyle, overflow: 'hidden' }}>
+          <div style={{ padding: '1rem 1.1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+            <strong style={{ color: '#0f172a' }}>Recent Activity</strong>
+            <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>{activeActivityMeta.description}</p>
+          </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1rem' }}>
-            <ActivitySection
-              title="Recent Expenses"
-              description="Newest imported expense records across the operations workspace."
-              items={state.expenses}
-              renderItem={(expense) => (
+          <div style={{ padding: '0.8rem 1rem', borderBottom: '1px solid #eef2f7', display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
+            {activityTabs.map((tab) => (
+              <button key={tab.id} type="button" onClick={() => setActiveActivity(tab.id)} style={activityTabStyle(activeActivity === tab.id)}>
+                {tab.label} ({tab.count})
+              </button>
+            ))}
+          </div>
+
+          <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>
+            {activeActivity === 'sales' && (
+              !state.invoices.length ? (
+                <EmptyState message="No sales invoices available right now." />
+              ) : state.invoices.map((invoice) => (
+                <div key={invoice.id} style={{ border: '1px solid #e2e8f0', borderRadius: '14px', padding: '0.9rem' }}>
+                  <strong style={{ color: '#0f172a' }}>{invoice.sourceInvoiceNo || invoice.refNo || `Invoice ${invoice.id}`}</strong>
+                  <div style={{ marginTop: '0.25rem', color: '#64748b', fontSize: '0.84rem' }}>{formatDate(invoice.invoiceDate)} • {invoice.userName || 'Unknown cashier'} • {invoice.branchCode || 'No branch'}</div>
+                  <div style={{ marginTop: '0.45rem', color: '#0f172a', fontWeight: 800 }}>{money(invoice.netSale)}</div>
+                </div>
+              ))
+            )}
+
+            {activeActivity === 'expenses' && (
+              !state.expenses.length ? (
+                <EmptyState message="No expenses available right now." />
+              ) : state.expenses.map((expense) => (
                 <div key={expense.id} style={{ border: '1px solid #e2e8f0', borderRadius: '14px', padding: '0.9rem' }}>
                   <strong style={{ color: '#0f172a' }}>{expense.description || expense.expenseCategory?.name || 'Expense entry'}</strong>
                   <div style={{ marginTop: '0.25rem', color: '#64748b', fontSize: '0.84rem' }}>{formatDate(expense.expenseDate)} • {expense.expenseCategory?.name || 'No category'}</div>
                   <div style={{ marginTop: '0.45rem', color: '#0f172a', fontWeight: 800 }}>{money(expense.amount)}</div>
                 </div>
-              )}
-            />
+              ))
+            )}
 
-            <ActivitySection
-              title="Supplier Transactions"
-              description="Latest supplier ledger movement currently recorded."
-              items={state.supplierTransactions}
-              renderItem={(transaction) => (
+            {activeActivity === 'suppliers' && (
+              !state.supplierTransactions.length ? (
+                <EmptyState message="No supplier transactions available right now." />
+              ) : state.supplierTransactions.map((transaction) => (
                 <div key={transaction.id} style={{ border: '1px solid #e2e8f0', borderRadius: '14px', padding: '0.9rem' }}>
                   <strong style={{ color: '#0f172a' }}>{transaction.supplier?.name || 'Unknown supplier'}</strong>
                   <div style={{ marginTop: '0.25rem', color: '#64748b', fontSize: '0.84rem' }}>{formatDate(transaction.transactionDate)} • {transaction.transactionType || 'Unknown type'}</div>
                   <div style={{ marginTop: '0.45rem', color: '#0f172a', fontWeight: 800 }}>{money(transaction.amount)}</div>
                 </div>
-              )}
-            />
-          </div>
+              ))
+            )}
 
-          <div style={{ ...cardStyle, overflow: 'hidden' }}>
-            <div style={{ padding: '1rem 1.1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-              <strong style={{ color: '#0f172a' }}>Payroll Timeline</strong>
-              <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>Latest payroll periods created in the operations module.</p>
-            </div>
-            {!state.payrollPeriods.length ? (
-              <EmptyState message="No payroll timeline available right now." />
-            ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: 'left', padding: '0.82rem 0.9rem', color: '#475569', fontSize: '0.76rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>Period</th>
-                      <th style={{ textAlign: 'left', padding: '0.82rem 0.9rem', color: '#475569', fontSize: '0.76rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>Mode</th>
-                      <th style={{ textAlign: 'left', padding: '0.82rem 0.9rem', color: '#475569', fontSize: '0.76rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>Status</th>
-                      <th style={{ textAlign: 'left', padding: '0.82rem 0.9rem', color: '#475569', fontSize: '0.76rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>Created</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {state.payrollPeriods.map((period, index) => (
-                      <tr key={period.id} style={{ backgroundColor: index % 2 === 0 ? '#fff' : '#fcfdff' }}>
-                        <td style={{ padding: '0.86rem 0.9rem', borderBottom: '1px solid #eef2f7', color: '#0f172a' }}>{period.description || `Period ${period.id}`}</td>
-                        <td style={{ padding: '0.86rem 0.9rem', borderBottom: '1px solid #eef2f7', color: '#334155', textTransform: 'capitalize' }}>{String(period.payrollMode || '').replace('_', ' ') || '—'}</td>
-                        <td style={{ padding: '0.86rem 0.9rem', borderBottom: '1px solid #eef2f7' }}>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', borderRadius: '999px', padding: '0.22rem 0.58rem', fontSize: '0.76rem', fontWeight: 700, backgroundColor: period.status === 'finalized' ? '#dcfce7' : '#e2e8f0', color: period.status === 'finalized' ? '#166534' : '#334155' }}>
-                            {period.status || 'draft'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '0.86rem 0.9rem', borderBottom: '1px solid #eef2f7', color: '#334155' }}>{formatDate(period.createdAt)}</td>
+            {activeActivity === 'payroll' && (
+              !state.payrollPeriods.length ? (
+                <EmptyState message="No payroll timeline available right now." />
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: 'left', padding: '0.82rem 0.9rem', color: '#475569', fontSize: '0.76rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>Period</th>
+                        <th style={{ textAlign: 'left', padding: '0.82rem 0.9rem', color: '#475569', fontSize: '0.76rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>Mode</th>
+                        <th style={{ textAlign: 'left', padding: '0.82rem 0.9rem', color: '#475569', fontSize: '0.76rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>Status</th>
+                        <th style={{ textAlign: 'left', padding: '0.82rem 0.9rem', color: '#475569', fontSize: '0.76rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>Created</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {state.payrollPeriods.map((period, index) => (
+                        <tr key={period.id} style={{ backgroundColor: index % 2 === 0 ? '#fff' : '#fcfdff' }}>
+                          <td style={{ padding: '0.86rem 0.9rem', borderBottom: '1px solid #eef2f7', color: '#0f172a' }}>{period.description || `Period ${period.id}`}</td>
+                          <td style={{ padding: '0.86rem 0.9rem', borderBottom: '1px solid #eef2f7', color: '#334155', textTransform: 'capitalize' }}>{String(period.payrollMode || '').replace('_', ' ') || '—'}</td>
+                          <td style={{ padding: '0.86rem 0.9rem', borderBottom: '1px solid #eef2f7' }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', borderRadius: '999px', padding: '0.22rem 0.58rem', fontSize: '0.76rem', fontWeight: 700, backgroundColor: period.status === 'finalized' ? '#dcfce7' : '#e2e8f0', color: period.status === 'finalized' ? '#166534' : '#334155' }}>
+                              {period.status || 'draft'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.86rem 0.9rem', borderBottom: '1px solid #eef2f7', color: '#334155' }}>{formatDate(period.createdAt)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
             )}
           </div>
         </div>
