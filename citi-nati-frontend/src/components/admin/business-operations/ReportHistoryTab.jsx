@@ -68,7 +68,7 @@ const exportButtonStyle = (disabled) => ({
   fontSize: '0.82rem',
 });
 
-const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null }) => {
+const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, onNavigateTab }) => {
   const [state, setState] = useState({
     loading: true,
     error: '',
@@ -127,12 +127,12 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null }) => {
   ]), [state.expenses.length, state.salesSummary?.netSales, state.salesSummary?.totalInvoices, state.supplierTransactions.length]);
 
   const quickExports = useMemo(() => ([
-    { id: 'sales', title: 'Sales', module: 'sales', type: 'summary', icon: 'fa-chart-line', tone: '#1d4ed8' },
-    { id: 'expenses', title: 'Expenses', module: 'expenses', type: 'list', icon: 'fa-receipt', tone: '#0369a1' },
-    { id: 'suppliers', title: 'Suppliers', module: 'suppliers', type: 'list', icon: 'fa-truck-field', tone: '#7c3aed' },
-    { id: 'payroll', title: 'Payroll', module: 'payroll', type: 'period', icon: 'fa-money-check-dollar', tone: '#0f766e' },
-    { id: 'employees', title: 'Employees', module: 'employees', type: 'list', icon: 'fa-users', tone: '#15803d' },
-    { id: 'monthly-summary', title: 'Monthly Summary', module: 'monthly-summary', type: 'summary', icon: 'fa-calendar-days', tone: '#b45309' },
+    { id: 'sales', title: 'Sales', module: 'sales', type: 'summary', tabId: 'sales-reports', icon: 'fa-chart-line', tone: '#1d4ed8' },
+    { id: 'expenses', title: 'Expenses', module: 'expenses', type: 'list', tabId: 'expenses', icon: 'fa-receipt', tone: '#0369a1' },
+    { id: 'suppliers', title: 'Suppliers', module: 'suppliers', type: 'list', tabId: 'suppliers', icon: 'fa-truck-field', tone: '#7c3aed' },
+    { id: 'payroll', title: 'Payroll', module: 'payroll', type: 'period', tabId: 'payroll', icon: 'fa-money-check-dollar', tone: '#0f766e' },
+    { id: 'employees', title: 'Employees', module: 'employees', type: 'list', tabId: 'employees', icon: 'fa-users', tone: '#15803d' },
+    { id: 'monthly-summary', title: 'Monthly Summary', module: 'monthly-summary', type: 'summary', tabId: 'monthly-summary', icon: 'fa-calendar-days', tone: '#b45309' },
   ]), []);
 
   const handleExport = useCallback(async ({ module, type, format }) => {
@@ -210,6 +210,14 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null }) => {
                   <button type="button" onClick={() => handleExport({ module: item.module, type: item.type, format: 'excel' })} disabled={disabled} style={exportButtonStyle(disabled)}>
                     <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.35rem' }}></i>
                     Excel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onNavigateTab?.(item.tabId)}
+                    style={{ ...exportButtonStyle(false), borderColor: '#bfdbfe', color: '#1d4ed8' }}
+                  >
+                    <i className="fas fa-up-right-from-square" style={{ marginRight: '0.35rem' }}></i>
+                    Open
                   </button>
                 </div>
               </div>
