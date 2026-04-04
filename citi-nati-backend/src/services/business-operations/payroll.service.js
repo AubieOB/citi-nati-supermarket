@@ -91,68 +91,75 @@ function mapLegacyPeriodRow(row) {
 }
 
 async function listPayrollPeriodsLegacy({ search, status, payrollMode, reportingPeriodId, locationId, skip, take, sortBy, sortOrder }) {
-  const whereParts = [];
+  const conditions = [];
+  const params = [];
 
-  if (status) whereParts.push(Prisma.sql`p.status = ${status}`);
-  if (payrollMode) whereParts.push(Prisma.sql`p.payroll_mode = ${payrollMode}`);
-  if (reportingPeriodId) whereParts.push(Prisma.sql`p.reporting_period_id = ${reportingPeriodId}`);
+  const bind = (value) => {
+    params.push(value);
+    return `$${params.length}`;
+  };
+
+  if (status) conditions.push(`p.status = ${bind(status)}`);
+  if (payrollMode) conditions.push(`p.payroll_mode = ${bind(payrollMode)}`);
+  if (reportingPeriodId) conditions.push(`p.reporting_period_id = ${bind(reportingPeriodId)}`);
 
   if (search) {
     const like = `%${search}%`;
-    whereParts.push(Prisma.sql`(
-      p.description ILIKE ${like}
-      OR p.created_by ILIKE ${like}
-      OR p.payroll_mode ILIKE ${like}
-      OR p.status ILIKE ${like}
-    )`);
+    const p1 = bind(like);
+    const p2 = bind(like);
+    const p3 = bind(like);
+    const p4 = bind(like);
+    conditions.push(`(p.description ILIKE ${p1} OR p.created_by ILIKE ${p2} OR p.payroll_mode ILIKE ${p3} OR p.status ILIKE ${p4})`);
   }
 
   if (locationId) {
-    whereParts.push(Prisma.sql`EXISTS (
-      SELECT 1
-      FROM payroll_entries pe
-      JOIN employees e ON e.id = pe.employee_id
-      WHERE pe.payroll_period_id = p.id
-        AND e.location_id = ${locationId}
-    )`);
+    const pLoc = bind(locationId);
+    conditions.push(`EXISTS (SELECT 1 FROM payroll_entries pe JOIN employees e ON e.id = pe.employee_id WHERE pe.payroll_period_id = p.id AND e.location_id = ${pLoc})`);
   }
 
-  const whereSql = whereParts.length
-    ? Prisma.sql`WHERE ${Prisma.join(whereParts, ' AND ')}`
-    : Prisma.empty;
+  const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
   const legacySortMap = {
-    id: Prisma.sql`p.id`,
-    payrollMode: Prisma.sql`p.payroll_mode`,
-    status: Prisma.sql`p.status`,
-    createdAt: Prisma.sql`p.created_at`,
-    updatedAt: Prisma.sql`p.updated_at`,
+    id: 'p.id',
+    payrollMode: 'p.payroll_mode',
+    status: 'p.status',
+    createdAt: 'p.created_at',
+    updatedAt: 'p.updated_at',
   };
-  const orderColumn = legacySortMap[sortBy] || Prisma.sql`p.created_at`;
-  const orderDirection = String(sortOrder).toLowerCase() === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
+  const orderColumn = legacySortMap[sortBy] || 'p.created_at';
+  const orderDirection = String(sortOrder).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
-  const rows = await prisma.$queryRaw`
-    SELECT
-      p.id,
-      p.reporting_period_id,
-      p.payroll_mode,
-      p.description,
-      p.status,
-      p.created_by,
-      p.created_at,
-      p.updated_at
-    FROM payroll_periods p
-    ${whereSql}
-    ORDER BY ${orderColumn} ${orderDirection}
-    OFFSET ${skip}
-    LIMIT ${take}
-  `;
+  const offsetPlaceholder = bind(Number(skip) || 0);
+  const limitPlaceholder = bind(Number(take) || 10);
 
-  const countRows = await prisma.$queryRaw`
-    SELECT COUNT(*)::int AS total
-    FROM payroll_periods p
-    ${whereSql}
-  `;
+  const rows = await prisma.$queryRawUnsafe(
+    `
+      SELECT
+        p.id,
+        p.reporting_period_id,
+        p.payroll_mode,
+        p.description,
+        p.status,
+        p.created_by,
+        p.created_at,
+        p.updated_at
+      FROM payroll_periods p
+      ${whereClause}
+      ORDER BY ${orderColumn} ${orderDirection}
+      OFFSET ${offsetPlaceholder}
+      LIMIT ${limitPlaceholder}
+    `,
+    ...params,
+  );
+
+  const countRows = await prisma.$queryRawUnsafe(
+    `
+      SELECT COUNT(*)::int AS total
+      FROM payroll_periods p
+      ${whereClause}
+    `,
+    ...params.slice(0, params.length - 2),
+  );
 
   return {
     periods: Array.isArray(rows) ? rows.map(mapLegacyPeriodRow) : [],
