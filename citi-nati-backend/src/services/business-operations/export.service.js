@@ -239,12 +239,23 @@ function ensureExcelLogoImage(workbook) {
 
   try {
     const extension = path.extname(logoPath).replace('.', '').toLowerCase() === 'jpg' ? 'jpeg' : 'png';
-    const imageId = workbook.addImage({
-      filename: logoPath,
-      extension,
-    });
-    workbook.__brandLogoImageId = imageId;
-    return imageId;
+    // Try filename first, then fall back to in-memory buffer for environments
+    // where ExcelJS path loading is restricted.
+    try {
+      const imageId = workbook.addImage({
+        filename: logoPath,
+        extension,
+      });
+      workbook.__brandLogoImageId = imageId;
+      return imageId;
+    } catch {
+      const imageId = workbook.addImage({
+        buffer: fs.readFileSync(logoPath),
+        extension,
+      });
+      workbook.__brandLogoImageId = imageId;
+      return imageId;
+    }
   } catch {
     workbook.__brandLogoImageId = null;
     return null;
@@ -346,9 +357,8 @@ function applyExcelSheetBranding(workbook, sheet, report) {
   const logoImageId = ensureExcelLogoImage(workbook);
   if (logoImageId) {
     sheet.addImage(logoImageId, {
-      tl: { col: 0.18, row: 0.25 },
-      ext: { width: 86, height: 64 },
-      editAs: 'oneCell',
+      tl: { col: 0, row: 0 },
+      br: { col: 1, row: 6 },
     });
   }
 
