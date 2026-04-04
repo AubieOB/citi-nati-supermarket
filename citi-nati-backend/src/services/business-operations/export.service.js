@@ -283,7 +283,7 @@ function styleExcelDataRows(sheet, headerRowIndex) {
 }
 
 function applyExcelSheetBranding(workbook, sheet, report) {
-  const headerRowIndex = 7;
+  const headerRowIndex = 8;
   const generatedText = new Date().toLocaleString('en-GB');
   const periodText = getReportPeriodText(report);
   const filtersText = buildAppliedFilterText(report.filters || {});
@@ -291,6 +291,11 @@ function applyExcelSheetBranding(workbook, sheet, report) {
   sheet.spliceRows(1, 0, [], [], [], [], [], []);
 
   const maxCol = Math.max(2, sheet.columnCount || 2);
+  if ((sheet.getColumn(1).width || 8) < 12) {
+    sheet.getColumn(1).width = 12;
+  }
+
+  sheet.mergeCells(1, 1, 6, 1);
   sheet.mergeCells(1, 2, 1, maxCol);
   sheet.mergeCells(2, 2, 2, maxCol);
   sheet.mergeCells(3, 2, 3, maxCol);
@@ -321,19 +326,28 @@ function applyExcelSheetBranding(workbook, sheet, report) {
     const row = sheet.getRow(rowNo);
     row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: EXCEL_BG_LIGHT } };
   });
+  const logoBlock = sheet.getCell('A1');
+  logoBlock.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: EXCEL_BG_LIGHT } };
+  logoBlock.border = {
+    top: { style: 'thin', color: { argb: EXCEL_BORDER } },
+    left: { style: 'thin', color: { argb: EXCEL_BORDER } },
+    bottom: { style: 'thin', color: { argb: EXCEL_BORDER } },
+    right: { style: 'thin', color: { argb: EXCEL_BORDER } },
+  };
 
   sheet.getRow(1).height = 24;
   sheet.getRow(2).height = 20;
-  sheet.getRow(3).height = 16;
-  sheet.getRow(4).height = 16;
+  sheet.getRow(3).height = 18;
+  sheet.getRow(4).height = 18;
   sheet.getRow(5).height = 28;
-  sheet.getRow(6).height = 14;
+  sheet.getRow(6).height = 16;
+  sheet.getRow(7).height = 8;
 
   const logoImageId = ensureExcelLogoImage(workbook);
   if (logoImageId) {
     sheet.addImage(logoImageId, {
-      tl: { col: 0.15, row: 0.2 },
-      ext: { width: 72, height: 52 },
+      tl: { col: 0.18, row: 0.25 },
+      ext: { width: 86, height: 64 },
       editAs: 'oneCell',
     });
   }
