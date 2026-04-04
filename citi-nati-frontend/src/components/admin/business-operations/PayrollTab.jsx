@@ -390,6 +390,16 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
     setPeriodModal({ open: true, period });
   };
 
+  const handleDeletePeriod = async (period) => {
+    try {
+      await api.delete(`/business-operations/payroll/periods/${period.id}`);
+      if (selectedPeriodId === period.id) setSelectedPeriodId(null);
+      await fetchPayrollPeriods(periodPage);
+    } catch (err) {
+      alert(getApiError(err, 'Failed to delete payroll period.'));
+    }
+  };
+
   const handlePeriodSubmit = async (payload) => {
     setPeriodSaving(true);
     setPeriodSaveError('');
@@ -430,6 +440,17 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
     setEntrySaveError('');
     setEntryEmployeeSalary(null);
     setEntryModal({ open: true, entry });
+  };
+
+  const handleDeleteEntry = async (entry) => {
+    try {
+      await api.delete(`/business-operations/payroll/entries/${entry.id}`);
+      if (selectedEntryId === entry.id) setSelectedEntryId(null);
+      await fetchPayrollEntries(selectedPeriodId, entriesPage);
+      await fetchPayrollPeriods(periodPage);
+    } catch (err) {
+      alert(getApiError(err, 'Failed to delete payroll entry.'));
+    }
   };
 
   const handleEntryEmployeeChange = async (employeeId) => {
@@ -606,6 +627,46 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
     }
   };
 
+  const handleDeleteLoan = async (loan) => {
+    try {
+      await api.delete(`/business-operations/payroll/loans/${loan.id}`);
+      const selectedEntry = entries.find((entry) => entry.id === selectedEntryId);
+      if (selectedEntry) await openSupportDrawerForEntry(selectedEntry);
+    } catch (err) {
+      alert(getApiError(err, 'Failed to delete loan.'));
+    }
+  };
+
+  const handleDeleteLoanTransaction = async (tx) => {
+    try {
+      await api.delete(`/business-operations/payroll/loan-transactions/${tx.id}`);
+      const selectedEntry = entries.find((entry) => entry.id === selectedEntryId);
+      if (selectedEntry) await openSupportDrawerForEntry(selectedEntry);
+    } catch (err) {
+      alert(getApiError(err, 'Failed to delete loan transaction.'));
+    }
+  };
+
+  const handleDeleteTermination = async (termination) => {
+    try {
+      await api.delete(`/business-operations/payroll/terminations/${termination.id}`);
+      const selectedEntry = entries.find((entry) => entry.id === selectedEntryId);
+      if (selectedEntry) await openSupportDrawerForEntry(selectedEntry);
+    } catch (err) {
+      alert(getApiError(err, 'Failed to delete termination.'));
+    }
+  };
+
+  const handleDeleteReengagement = async (reengagement) => {
+    try {
+      await api.delete(`/business-operations/payroll/reengagements/${reengagement.id}`);
+      const selectedEntry = entries.find((entry) => entry.id === selectedEntryId);
+      if (selectedEntry) await openSupportDrawerForEntry(selectedEntry);
+    } catch (err) {
+      alert(getApiError(err, 'Failed to delete reengagement.'));
+    }
+  };
+
   const handleExport = async (format) => {
     if (format === 'excel') setExportingExcel(true);
     if (format === 'pdf') setExportingPdf(true);
@@ -658,6 +719,15 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
     setTaxBracketModal({ open: true, taxBracket });
   };
 
+  const handleDeleteTaxBracket = async (item) => {
+    try {
+      await api.delete(`/business-operations/payroll/tax-brackets/${item.id}`);
+      await fetchPolicies();
+    } catch (err) {
+      alert(getApiError(err, 'Failed to delete tax bracket.'));
+    }
+  };
+
   const handleTaxBracketSubmit = async (payload) => {
     setPolicySaving(true);
     setPolicySaveError('');
@@ -692,6 +762,15 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
     if (!incrementPolicy) return;
     setPolicySaveError('');
     setIncrementPolicyModal({ open: true, incrementPolicy });
+  };
+
+  const handleDeleteIncrementPolicy = async (item) => {
+    try {
+      await api.delete(`/business-operations/payroll/increment-policies/${item.id}`);
+      await fetchPolicies();
+    } catch (err) {
+      alert(getApiError(err, 'Failed to delete increment policy.'));
+    }
   };
 
   const handleIncrementPolicySubmit = async (payload) => {
@@ -925,9 +1004,12 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
                               <span style={{ fontSize: '0.75rem', color: item.isActive ? '#166534' : '#9a3412' }}>{item.isActive ? 'Active' : 'Inactive'}</span>
                             </div>
                             <div style={{ color: '#64748b', fontSize: '0.76rem' }}>Rate: {Number(item.ratePercent || 0).toLocaleString('en-US')}% | Fixed: MWK {Number(item.fixedTaxAmount || 0).toLocaleString('en-US')}</div>
-                            <div>
+                            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                               <button type="button" onClick={() => handleEditTaxBracket(item)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '8px', padding: '0.3rem 0.5rem', fontSize: '0.74rem', cursor: 'pointer', fontWeight: 700 }}>
                                 <i className="fas fa-pen" style={{ marginRight: '0.28rem' }}></i>Edit
+                              </button>
+                              <button type="button" onClick={() => { if (window.confirm(`Delete tax bracket MWK ${Number(item.minIncome || 0).toLocaleString('en-US')} - MWK ${Number(item.maxIncome || 0).toLocaleString('en-US')}? This cannot be undone.`)) handleDeleteTaxBracket(item); }} style={{ border: '1px solid #fca5a5', backgroundColor: '#fff', color: '#b91c1c', borderRadius: '8px', padding: '0.3rem 0.5rem', fontSize: '0.74rem', cursor: 'pointer', fontWeight: 700 }}>
+                                <i className="fas fa-trash" style={{ marginRight: '0.28rem' }}></i>Delete
                               </button>
                             </div>
                           </div>
@@ -945,9 +1027,12 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
                               <span style={{ fontSize: '0.75rem', color: item.isActive ? '#166534' : '#9a3412' }}>{item.isActive ? 'Active' : 'Inactive'}</span>
                             </div>
                             <div style={{ color: '#64748b', fontSize: '0.76rem' }}>Increment: {item.incrementPercent ? `${Number(item.incrementPercent).toLocaleString('en-US')}%` : '0%'} + MWK {Number(item.incrementAmount || 0).toLocaleString('en-US')}</div>
-                            <div>
+                            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                               <button type="button" onClick={() => handleEditIncrementPolicy(item)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '8px', padding: '0.3rem 0.5rem', fontSize: '0.74rem', cursor: 'pointer', fontWeight: 700 }}>
                                 <i className="fas fa-pen" style={{ marginRight: '0.28rem' }}></i>Edit
+                              </button>
+                              <button type="button" onClick={() => { if (window.confirm(`Delete increment policy for ${item.minServiceMonths} - ${item.maxServiceMonths || '∞'} months? This cannot be undone.`)) handleDeleteIncrementPolicy(item); }} style={{ border: '1px solid #fca5a5', backgroundColor: '#fff', color: '#b91c1c', borderRadius: '8px', padding: '0.3rem 0.5rem', fontSize: '0.74rem', cursor: 'pointer', fontWeight: 700 }}>
+                                <i className="fas fa-trash" style={{ marginRight: '0.28rem' }}></i>Delete
                               </button>
                             </div>
                           </div>
@@ -989,6 +1074,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
                         setSupportDrawer((prev) => ({ ...prev, open: false, employeeId: null, error: '', loans: [], terminations: [], reengagements: [] }));
                       }}
                       onEditPeriod={handleEditPeriod}
+                      onDeletePeriod={handleDeletePeriod}
                       onCreatePeriod={handleCreatePeriod}
                     />
                   </div>
@@ -1022,6 +1108,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
                       supportLoading={supportLoading}
                       onSelectEntry={handleSelectEntry}
                       onEditEntry={handleEditEntry}
+                      onDeleteEntry={handleDeleteEntry}
                       onPageChange={setEntriesPage}
                       onAddEntry={handleAddEntry}
                       onOpenSupportDrawer={handleOpenSupportDrawer}
@@ -1069,11 +1156,15 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
         reengagements={supportDrawer.reengagements}
         onAddLoan={handleAddLoan}
         onEditLoan={handleEditLoan}
+        onDeleteLoan={handleDeleteLoan}
         onAddLoanTransaction={handleAddLoanTransaction}
+        onDeleteLoanTransaction={handleDeleteLoanTransaction}
         onAddTermination={handleAddTermination}
         onEditTermination={handleEditTermination}
+        onDeleteTermination={handleDeleteTermination}
         onAddReengagement={handleAddReengagement}
         onEditReengagement={handleEditReengagement}
+        onDeleteReengagement={handleDeleteReengagement}
         onClose={() => setSupportDrawer((prev) => ({ ...prev, open: false }))}
       />
 

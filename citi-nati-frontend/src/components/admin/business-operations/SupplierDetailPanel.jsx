@@ -54,6 +54,7 @@ const SupplierDetailPanel = ({
   onEditSupplier,
   onAddTransaction,
   onEditTransaction,
+  onDeleteTransaction,
 }) => {
   if (!supplier && !detailLoading) {
     return (
@@ -154,6 +155,7 @@ const SupplierDetailPanel = ({
           loading={transactionsLoading}
           error={transactionsError || detailError}
           onEditTransaction={onEditTransaction}
+          onDeleteTransaction={onDeleteTransaction}
         />
         {transactionPagination && (transactionPagination.totalPages || 0) > 1 ? (
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', padding: '0.95rem 1rem', borderTop: '1px solid #e2e8f0', flexWrap: 'wrap' }}>

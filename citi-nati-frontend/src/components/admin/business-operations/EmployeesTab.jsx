@@ -168,6 +168,16 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
     setEmployeeModal({ open: true, employee: detail });
   };
 
+  const handleDeleteEmployee = async (emp) => {
+    try {
+      await api.delete(`/business-operations/employees/${emp.id}`);
+      if (selectedEmployeeId === emp.id) setSelectedEmployeeId(null);
+      await refreshData(page);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to delete employee');
+    }
+  };
+
   // ── Submit employee form ──
   const handleEmployeeSubmit = async (payload) => {
     setEmpSaving(true);
@@ -458,6 +468,7 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
                     selectedEmployeeId={selectedEmployeeId}
                     onSelectEmployee={handleSelectEmployee}
                     onEditEmployee={() => handleEditEmployee()}
+                    onDeleteEmployee={handleDeleteEmployee}
                   />
                 </div>
               </div>

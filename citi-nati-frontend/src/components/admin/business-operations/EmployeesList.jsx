@@ -65,6 +65,7 @@ const EmployeesList = ({
   selectedEmployeeId,
   onSelectEmployee,
   onEditEmployee,
+  onDeleteEmployee,
 }) => {
   if (error) return <div style={{ padding: '1rem', color: '#b91c1c', fontSize: '0.9rem' }}>{error}</div>;
 
@@ -146,22 +147,45 @@ const EmployeesList = ({
                     </div>
                   </td>
                   <td style={tdStyle}>
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); onEditEmployee(emp); }}
-                      style={{
-                        border: '1px solid #dbe2ea',
-                        backgroundColor: '#fff',
-                        color: '#334155',
-                        borderRadius: '8px',
-                        padding: '0.42rem 0.75rem',
-                        fontSize: '0.79rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Edit
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onEditEmployee(emp); }}
+                        style={{
+                          border: '1px solid #dbe2ea',
+                          backgroundColor: '#fff',
+                          color: '#334155',
+                          borderRadius: '8px',
+                          padding: '0.42rem 0.75rem',
+                          fontSize: '0.79rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`Delete employee "${buildFullName(emp)}"? This cannot be undone.`)) {
+                            onDeleteEmployee(emp);
+                          }
+                        }}
+                        style={{
+                          border: '1px solid #fca5a5',
+                          backgroundColor: '#fff',
+                          color: '#b91c1c',
+                          borderRadius: '8px',
+                          padding: '0.42rem 0.75rem',
+                          fontSize: '0.79rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );

@@ -6,6 +6,7 @@ const {
   updateEmployee,
   getEmployeeById,
   listEmployees,
+  deleteEmployee,
   createSalaryStructure,
   updateSalaryStructure,
   getSalaryHistory,
@@ -21,6 +22,7 @@ router.post('/salary-structures/import', importSalaryStructures);
 
 router.post('/', createEmployee);
 router.put('/:id', updateEmployee);
+router.delete('/:id', deleteEmployee);
 router.get('/:id', getEmployeeById);
 router.get('/', listEmployees);
 

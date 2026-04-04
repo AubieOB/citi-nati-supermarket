@@ -39,7 +39,7 @@ const locationLabel = (item) => {
   return null;
 };
 
-const SupplierTransactionTable = ({ transactions, loading, error, onEditTransaction }) => {
+const SupplierTransactionTable = ({ transactions, loading, error, onEditTransaction, onDeleteTransaction }) => {
   if (error) {
     return <div style={{ padding: '1rem', color: '#b91c1c' }}>{error}</div>;
   }
@@ -81,21 +81,42 @@ const SupplierTransactionTable = ({ transactions, loading, error, onEditTransact
               </td>
               <td style={tdStyle}>{transaction.enteredBy || 'System'}</td>
               <td style={tdStyle}>
-                <button
-                  type="button"
-                  onClick={() => onEditTransaction(transaction)}
-                  style={{
-                    border: '1px solid #cbd5e1',
-                    backgroundColor: '#fff',
-                    color: '#0f172a',
-                    borderRadius: '10px',
-                    padding: '0.45rem 0.8rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Edit
-                </button>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => onEditTransaction(transaction)}
+                    style={{
+                      border: '1px solid #cbd5e1',
+                      backgroundColor: '#fff',
+                      color: '#0f172a',
+                      borderRadius: '10px',
+                      padding: '0.45rem 0.8rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(`Delete this ${transaction.transactionType || 'transaction'} of MWK ${Number(transaction.amount || 0).toLocaleString('en-US')}? This cannot be undone.`)) {
+                        onDeleteTransaction(transaction);
+                      }
+                    }}
+                    style={{
+                      border: '1px solid #fca5a5',
+                      backgroundColor: '#fff',
+                      color: '#b91c1c',
+                      borderRadius: '10px',
+                      padding: '0.45rem 0.8rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
               </td>
             </tr>
           ))}

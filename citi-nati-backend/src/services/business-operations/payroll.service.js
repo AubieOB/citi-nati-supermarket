@@ -1270,6 +1270,38 @@ async function bulkImportReengagements(records = []) {
   return result;
 }
 
+async function deletePayrollPeriod(id) {
+  return prisma.payrollPeriod.delete({ where: { id } });
+}
+
+async function deletePayrollEntry(id) {
+  return prisma.payrollEntry.delete({ where: { id } });
+}
+
+async function deleteEmployeeLoan(id) {
+  return prisma.employeeLoan.delete({ where: { id } });
+}
+
+async function deleteLoanTransaction(id) {
+  return prisma.employeeLoanTransaction.delete({ where: { id } });
+}
+
+async function deleteTermination(id) {
+  return prisma.employeeTermination.delete({ where: { id } });
+}
+
+async function deleteReengagement(id) {
+  return prisma.employeeReengagement.delete({ where: { id } });
+}
+
+async function deleteTaxBracket(id) {
+  return prisma.payrollTaxBracket.delete({ where: { id } });
+}
+
+async function deleteIncrementPolicy(id) {
+  return prisma.payrollIncrementPolicy.delete({ where: { id } });
+}
+
 async function purgeAllPayrollData() {
   // Delete in FK-safe order (children before parents)
   const tables = [
@@ -1336,5 +1368,13 @@ module.exports = {
   bulkImportLoanTransactions,
   bulkImportTerminations,
   bulkImportReengagements,
+  deletePayrollPeriod,
+  deletePayrollEntry,
+  deleteEmployeeLoan,
+  deleteLoanTransaction,
+  deleteTermination,
+  deleteReengagement,
+  deleteTaxBracket,
+  deleteIncrementPolicy,
   purgeAllPayrollData,
 };

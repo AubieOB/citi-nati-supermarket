@@ -266,14 +266,40 @@ async function importExpenses(req, res) {
   }
 }
 
+async function deleteExpense(req, res) {
+  try {
+    const id = toInt(req.params.id);
+    if (!id) return res.status(400).json({ success: false, error: 'Invalid expense id' });
+    await expensesService.deleteExpense(id);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[BO][EXPENSES] deleteExpense error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to delete expense' });
+  }
+}
+
+async function deleteExpenseCategory(req, res) {
+  try {
+    const id = toInt(req.params.id);
+    if (!id) return res.status(400).json({ success: false, error: 'Invalid category id' });
+    await expensesService.deleteExpenseCategory(id);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[BO][EXPENSES] deleteExpenseCategory error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to delete expense category' });
+  }
+}
+
 module.exports = {
   createExpenseCategory,
   updateExpenseCategory,
   listExpenseCategories,
+  deleteExpenseCategory,
   createExpense,
   updateExpense,
   getExpenseById,
   listExpenses,
+  deleteExpense,
   getExpenseSummary,
   seedDefaultCategories,
   importExpenseCategories,

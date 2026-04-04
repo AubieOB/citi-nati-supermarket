@@ -53,6 +53,7 @@ const SuppliersList = ({
   selectedSupplierId,
   onSelectSupplier,
   onEditSupplier,
+  onDeleteSupplier,
 }) => {
   if (error) {
     return (
@@ -121,24 +122,46 @@ const SuppliersList = ({
                   <td style={tdStyle}>{money(supplier.openingBalance)}</td>
                   <td style={tdStyle}>{money(supplier.currentBalance)}</td>
                   <td style={tdStyle}>
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onEditSupplier(supplier);
-                      }}
-                      style={{
-                        border: '1px solid #cbd5e1',
-                        backgroundColor: '#fff',
-                        color: '#0f172a',
-                        borderRadius: '10px',
-                        padding: '0.5rem 0.8rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Edit
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onEditSupplier(supplier);
+                        }}
+                        style={{
+                          border: '1px solid #cbd5e1',
+                          backgroundColor: '#fff',
+                          color: '#0f172a',
+                          borderRadius: '10px',
+                          padding: '0.5rem 0.8rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (window.confirm(`Delete supplier "${supplier.name}"? This cannot be undone.`)) {
+                            onDeleteSupplier(supplier);
+                          }
+                        }}
+                        style={{
+                          border: '1px solid #fca5a5',
+                          backgroundColor: '#fff',
+                          color: '#b91c1c',
+                          borderRadius: '10px',
+                          padding: '0.5rem 0.8rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );

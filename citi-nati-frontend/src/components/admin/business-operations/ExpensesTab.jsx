@@ -220,6 +220,25 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
   const openAddCategory = () => { setCategoryError(''); setCategoryModal({ open: true, category: null }); };
   const openEditCategory = (cat) => { setCategoryError(''); setCategoryModal({ open: true, category: cat }); };
 
+  const handleDeleteExpense = async (expense) => {
+    try {
+      await api.delete(`/business-operations/expenses/${expense.id}`);
+      if (selectedExpense?.id === expense.id) setSelectedExpense(null);
+      await refreshAll();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to delete expense');
+    }
+  };
+
+  const handleDeleteCategory = async (cat) => {
+    try {
+      await api.delete(`/business-operations/expenses/categories/${cat.id}`);
+      await fetchCategories();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to delete category');
+    }
+  };
+
   const activeCategories = useMemo(() => categories.filter((c) => c.isActive), [categories]);
   const isLoading = listLoading || categoriesLoading;
 
@@ -533,6 +552,7 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
                           selectedExpenseId={selectedExpense?.id ?? null}
                           onSelectExpense={(expense) => setSelectedExpense(expense)}
                           onEditExpense={openEditExpense}
+                          onDeleteExpense={handleDeleteExpense}
                         />
                       )}
                     </div>
@@ -609,6 +629,7 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
                 error={categoriesError}
                 onAddCategory={openAddCategory}
                 onEditCategory={openEditCategory}
+                onDeleteCategory={handleDeleteCategory}
               />
             </div>
           </div>

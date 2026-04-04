@@ -58,6 +58,7 @@ const ExpensesList = ({
   selectedExpenseId,
   onSelectExpense,
   onEditExpense,
+  onDeleteExpense,
 }) => {
   if (error) {
     return <div style={{ padding: '1rem', color: '#b91c1c', fontSize: '0.9rem' }}>{error}</div>;
@@ -129,22 +130,45 @@ const ExpensesList = ({
                   <td style={tdStyle}>{METHOD_LABELS[expense.paymentMethod] || expense.paymentMethod || '—'}</td>
                   <td style={{ ...tdStyle, fontWeight: 700, whiteSpace: 'nowrap' }}>{money(expense.amount)}</td>
                   <td style={tdStyle}>
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); onEditExpense(expense); }}
-                      style={{
-                        border: '1px solid #cbd5e1',
-                        backgroundColor: '#fff',
-                        color: '#475569',
-                        borderRadius: '8px',
-                        padding: '0.38rem 0.7rem',
-                        fontSize: '0.8rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Edit
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onEditExpense(expense); }}
+                        style={{
+                          border: '1px solid #cbd5e1',
+                          backgroundColor: '#fff',
+                          color: '#475569',
+                          borderRadius: '8px',
+                          padding: '0.38rem 0.7rem',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`Delete this expense of ${money(expense.amount)}? This cannot be undone.`)) {
+                            onDeleteExpense(expense);
+                          }
+                        }}
+                        style={{
+                          border: '1px solid #fca5a5',
+                          backgroundColor: '#fff',
+                          color: '#b91c1c',
+                          borderRadius: '8px',
+                          padding: '0.38rem 0.7rem',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );

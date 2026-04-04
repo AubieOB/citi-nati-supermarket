@@ -305,11 +305,16 @@ async function bulkUpsertSalaryStructures(records = []) {
   return result;
 }
 
+async function deleteEmployee(id) {
+  return prisma.employee.delete({ where: { id } });
+}
+
 module.exports = {
   createEmployee,
   updateEmployee,
   getEmployeeById,
   listEmployees,
+  deleteEmployee,
   createSalaryStructure,
   updateSalaryStructure,
   getEmployeeSalaryHistory,

@@ -287,6 +287,25 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
     setTransactionModalState({ open: true, transaction });
   };
 
+  const handleDeleteSupplier = async (supplier) => {
+    try {
+      await api.delete(`/business-operations/suppliers/${supplier.id}`);
+      if (selectedSupplierId === supplier.id) setSelectedSupplierId(null);
+      await refreshData({ selectedId: null, nextTransactionPage: 1 });
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to delete supplier');
+    }
+  };
+
+  const handleDeleteTransaction = async (transaction) => {
+    try {
+      await api.delete(`/business-operations/suppliers/transactions/${transaction.id}`);
+      await refreshData({ selectedId: selectedSupplierId, nextTransactionPage: 1 });
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to delete transaction');
+    }
+  };
+
   const selectedSupplier = detailState.supplier;
   const selectedSummary = detailState.summary;
   const pageBalanceMeta = balanceMeta(totals.pageBalance, 'Page Exposure (Debt)', 'Page Credit');
@@ -525,6 +544,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
                         selectedSupplierId={selectedSupplierId}
                         onSelectSupplier={(supplier) => setSelectedSupplierId(supplier.id)}
                         onEditSupplier={openEditSupplier}
+                        onDeleteSupplier={handleDeleteSupplier}
                       />
                     </div>
                   </div>
@@ -557,6 +577,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
                         onEditSupplier={() => openEditSupplier(selectedSupplier)}
                         onAddTransaction={openCreateTransaction}
                         onEditTransaction={openEditTransaction}
+                        onDeleteTransaction={handleDeleteTransaction}
                       />
                     ) : (
                       <div style={{ ...cardStyle, padding: '1rem' }}>

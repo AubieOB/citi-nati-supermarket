@@ -32,7 +32,7 @@ const statusBadge = (isActive) => ({
   color: isActive ? '#166534' : '#475569',
 });
 
-const ExpenseCategoriesPanel = ({ categories, loading, error, onAddCategory, onEditCategory }) => {
+const ExpenseCategoriesPanel = ({ categories, loading, error, onAddCategory, onEditCategory, onDeleteCategory }) => {
   const [statusFilter, setStatusFilter] = useState('');
 
   const filteredCategories = categories.filter((cat) => {
@@ -111,22 +111,44 @@ const ExpenseCategoriesPanel = ({ categories, loading, error, onAddCategory, onE
                     <span style={statusBadge(cat.isActive)}>{cat.isActive ? 'Active' : 'Inactive'}</span>
                   </td>
                   <td style={tdStyle}>
-                    <button
-                      type="button"
-                      onClick={() => onEditCategory(cat)}
-                      style={{
-                        border: '1px solid #cbd5e1',
-                        backgroundColor: '#fff',
-                        color: '#475569',
-                        borderRadius: '8px',
-                        padding: '0.38rem 0.7rem',
-                        fontSize: '0.8rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Edit
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={() => onEditCategory(cat)}
+                        style={{
+                          border: '1px solid #cbd5e1',
+                          backgroundColor: '#fff',
+                          color: '#475569',
+                          borderRadius: '8px',
+                          padding: '0.38rem 0.7rem',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm(`Delete category "${cat.name}"? This cannot be undone.`)) {
+                            onDeleteCategory(cat);
+                          }
+                        }}
+                        style={{
+                          border: '1px solid #fca5a5',
+                          backgroundColor: '#fff',
+                          color: '#b91c1c',
+                          borderRadius: '8px',
+                          padding: '0.38rem 0.7rem',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

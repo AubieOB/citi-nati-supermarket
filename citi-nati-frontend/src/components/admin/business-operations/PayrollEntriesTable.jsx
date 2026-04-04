@@ -33,6 +33,7 @@ const PayrollEntriesTable = ({
   selectedEntryId,
   onSelectEntry,
   onEditEntry,
+  onDeleteEntry,
   onPageChange,
   onAddEntry,
 }) => {
@@ -98,16 +99,30 @@ const PayrollEntriesTable = ({
                   <td style={tdStyle}>{money(entry.overtimeAmount)} ({Number(entry.overtimeHours || 0).toLocaleString('en-US')}h)</td>
                   <td style={tdStyle}>{Number(entry.daysAbsent || 0).toLocaleString('en-US')}</td>
                   <td style={tdStyle}>
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onEditEntry(entry);
-                      }}
-                      style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '9px', color: '#334155', padding: '0.43rem 0.72rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem' }}
-                    >
-                      <i className="fas fa-pen" style={{ marginRight: '0.35rem' }}></i>Edit
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onEditEntry(entry);
+                        }}
+                        style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '9px', color: '#334155', padding: '0.43rem 0.72rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem' }}
+                      >
+                        <i className="fas fa-pen" style={{ marginRight: '0.35rem' }}></i>Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (window.confirm(`Delete payroll entry for ${fullName(entry.employee)}?`)) {
+                            onDeleteEntry(entry);
+                          }
+                        }}
+                        style={{ border: '1px solid #fca5a5', backgroundColor: '#fff', borderRadius: '9px', color: '#b91c1c', padding: '0.43rem 0.72rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem' }}
+                      >
+                        <i className="fas fa-trash" style={{ marginRight: '0.35rem' }}></i>Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );

@@ -47,6 +47,7 @@ const PayrollPeriodDetailPanel = ({
   supportLoading,
   onSelectEntry,
   onEditEntry,
+  onDeleteEntry,
   onPageChange,
   onAddEntry,
   onOpenSupportDrawer,
@@ -130,6 +131,7 @@ const PayrollPeriodDetailPanel = ({
             selectedEntryId={selectedEntryId}
             onSelectEntry={onSelectEntry}
             onEditEntry={onEditEntry}
+            onDeleteEntry={onDeleteEntry}
             onPageChange={onPageChange}
             onAddEntry={onAddEntry}
           />

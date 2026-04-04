@@ -319,14 +319,24 @@ async function bulkImportExpenses(records = []) {
   return result;
 }
 
+async function deleteExpense(id) {
+  return prisma.expense.delete({ where: { id } });
+}
+
+async function deleteExpenseCategory(id) {
+  return prisma.expenseCategory.delete({ where: { id } });
+}
+
 module.exports = {
   createExpenseCategory,
   updateExpenseCategory,
   listExpenseCategories,
+  deleteExpenseCategory,
   createExpense,
   updateExpense,
   getExpenseById,
   listExpenses,
+  deleteExpense,
   getExpenseSummary,
   seedDefaultExpenseCategories,
   bulkUpsertExpenseCategories,

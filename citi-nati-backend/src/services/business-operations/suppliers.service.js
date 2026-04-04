@@ -434,14 +434,24 @@ async function bulkImportSupplierTransactions(records = []) {
   return result;
 }
 
+async function deleteSupplier(id) {
+  return prisma.supplier.delete({ where: { id } });
+}
+
+async function deleteSupplierTransaction(id) {
+  return prisma.supplierTransaction.delete({ where: { id } });
+}
+
 module.exports = {
   createSupplier,
   updateSupplier,
   getSupplierById,
   listSuppliers,
+  deleteSupplier,
   createSupplierTransaction,
   updateSupplierTransaction,
   listSupplierTransactions,
+  deleteSupplierTransaction,
   getSupplierBalanceSummary,
   bulkUpsertSuppliers,
   bulkImportSupplierTransactions,

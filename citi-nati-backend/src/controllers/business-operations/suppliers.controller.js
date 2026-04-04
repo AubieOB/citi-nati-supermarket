@@ -283,14 +283,40 @@ async function importSuppliers(req, res) {
   }
 }
 
+async function deleteSupplier(req, res) {
+  try {
+    const id = toInt(req.params.id);
+    if (!id) return res.status(400).json({ success: false, error: 'Invalid supplier id' });
+    await suppliersService.deleteSupplier(id);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[BO][SUPPLIERS] deleteSupplier error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to delete supplier' });
+  }
+}
+
+async function deleteSupplierTransaction(req, res) {
+  try {
+    const id = toInt(req.params.id);
+    if (!id) return res.status(400).json({ success: false, error: 'Invalid transaction id' });
+    await suppliersService.deleteSupplierTransaction(id);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[BO][SUPPLIERS] deleteSupplierTransaction error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to delete transaction' });
+  }
+}
+
 module.exports = {
   createSupplier,
   updateSupplier,
   getSupplierById,
   listSuppliers,
+  deleteSupplier,
   createSupplierTransaction,
   updateSupplierTransaction,
   listSupplierTransactions,
+  deleteSupplierTransaction,
   getSupplierBalance,
   importSuppliers,
 };

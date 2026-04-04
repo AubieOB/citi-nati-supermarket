@@ -282,11 +282,24 @@ async function importSalaryStructures(req, res) {
   }
 }
 
+async function deleteEmployee(req, res) {
+  try {
+    const id = toInt(req.params.id);
+    if (!id) return res.status(400).json({ success: false, error: 'Invalid employee id' });
+    await employeesService.deleteEmployee(id);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[BO][EMPLOYEES] deleteEmployee error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to delete employee' });
+  }
+}
+
 module.exports = {
   createEmployee,
   updateEmployee,
   getEmployeeById,
   listEmployees,
+  deleteEmployee,
   createSalaryStructure,
   updateSalaryStructure,
   getSalaryHistory,

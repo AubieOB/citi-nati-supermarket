@@ -39,11 +39,14 @@ const PayrollSupportDrawer = ({
   reengagements,
   onAddLoan,
   onEditLoan,
+  onDeleteLoan,
   onAddLoanTransaction,
   onAddTermination,
   onEditTermination,
+  onDeleteTermination,
   onAddReengagement,
   onEditReengagement,
+  onDeleteReengagement,
   onClose,
 }) => {
   useEffect(() => {
@@ -109,6 +112,9 @@ const PayrollSupportDrawer = ({
                       <button type="button" onClick={() => onAddLoanTransaction(loan)} style={{ border: '1px solid #bae6fd', backgroundColor: '#f0f9ff', color: '#075985', borderRadius: '8px', padding: '0.35rem 0.55rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.76rem' }}>
                         <i className="fas fa-plus" style={{ marginRight: '0.28rem' }}></i>Payment
                       </button>
+                      <button type="button" onClick={() => { if (window.confirm(`Delete loan "${loan.loanReference || `Loan #${loan.id}`}"? This cannot be undone.`)) onDeleteLoan(loan); }} style={{ border: '1px solid #fca5a5', backgroundColor: '#fff', color: '#b91c1c', borderRadius: '8px', padding: '0.35rem 0.55rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.76rem' }}>
+                        <i className="fas fa-trash" style={{ marginRight: '0.28rem' }}></i>Delete
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -129,9 +135,12 @@ const PayrollSupportDrawer = ({
                     </div>
                     <div style={{ color: '#475569', fontSize: '0.84rem' }}>Reason: {term.reason || 'Not provided'}</div>
                     <div style={{ color: '#64748b', fontSize: '0.8rem' }}>Settlement: {money(term.settlementAmount || 0)} | Final month days worked: {Number(term.daysWorkedInFinalMonth || 0).toLocaleString('en-US')}</div>
-                    <div style={{ marginTop: '0.2rem' }}>
+                    <div style={{ display: 'flex', gap: '0.42rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
                       <button type="button" onClick={() => onEditTermination(term)} style={{ border: '1px solid #fecaca', backgroundColor: '#fef2f2', color: '#991b1b', borderRadius: '8px', padding: '0.35rem 0.55rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.76rem' }}>
                         <i className="fas fa-pen" style={{ marginRight: '0.28rem' }}></i>Edit
+                      </button>
+                      <button type="button" onClick={() => { if (window.confirm(`Delete termination record from ${formatDate(term.terminationDate)}? This cannot be undone.`)) onDeleteTermination(term); }} style={{ border: '1px solid #fca5a5', backgroundColor: '#fff', color: '#b91c1c', borderRadius: '8px', padding: '0.35rem 0.55rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.76rem' }}>
+                        <i className="fas fa-trash" style={{ marginRight: '0.28rem' }}></i>Delete
                       </button>
                     </div>
                   </div>
@@ -153,9 +162,12 @@ const PayrollSupportDrawer = ({
                     </div>
                     <div style={{ color: '#475569', fontSize: '0.84rem' }}>Previous wage: {money(item.previousWage || 0)} | Reengagement wage: {money(item.reengagementWage || 0)}</div>
                     <div style={{ color: '#64748b', fontSize: '0.8rem' }}>Contract expiry: {formatDate(item.contractExpiryDate)}</div>
-                    <div style={{ marginTop: '0.2rem' }}>
+                    <div style={{ display: 'flex', gap: '0.42rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
                       <button type="button" onClick={() => onEditReengagement(item)} style={{ border: '1px solid #ddd6fe', backgroundColor: '#f5f3ff', color: '#5b21b6', borderRadius: '8px', padding: '0.35rem 0.55rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.76rem' }}>
                         <i className="fas fa-pen" style={{ marginRight: '0.28rem' }}></i>Edit
+                      </button>
+                      <button type="button" onClick={() => { if (window.confirm(`Delete reengagement record from ${formatDate(item.effectiveDate)}? This cannot be undone.`)) onDeleteReengagement(item); }} style={{ border: '1px solid #fca5a5', backgroundColor: '#fff', color: '#b91c1c', borderRadius: '8px', padding: '0.35rem 0.55rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.76rem' }}>
+                        <i className="fas fa-trash" style={{ marginRight: '0.28rem' }}></i>Delete
                       </button>
                     </div>
                   </div>

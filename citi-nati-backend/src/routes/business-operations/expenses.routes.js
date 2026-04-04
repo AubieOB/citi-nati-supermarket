@@ -5,10 +5,12 @@ const {
   createExpenseCategory,
   updateExpenseCategory,
   listExpenseCategories,
+  deleteExpenseCategory,
   createExpense,
   updateExpense,
   getExpenseById,
   listExpenses,
+  deleteExpense,
   getExpenseSummary,
   seedDefaultCategories,
   importExpenseCategories,
@@ -23,10 +25,12 @@ router.post('/import', importExpenses);
 
 router.post('/categories', createExpenseCategory);
 router.put('/categories/:id', updateExpenseCategory);
+router.delete('/categories/:id', deleteExpenseCategory);
 router.get('/categories', listExpenseCategories);
 
 router.post('/', createExpense);
 router.put('/:id', updateExpense);
+router.delete('/:id', deleteExpense);
 router.get('/summary/overview', getExpenseSummary);
 router.get('/:id', getExpenseById);
 router.get('/', listExpenses);

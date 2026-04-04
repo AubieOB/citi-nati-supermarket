@@ -865,6 +865,102 @@ async function listIncrementPolicies(req, res) {
   }
 }
 
+async function deletePayrollPeriod(req, res) {
+  try {
+    const id = toInt(req.params.id);
+    if (!id) return res.status(400).json({ success: false, error: 'Invalid period id' });
+    await payrollService.deletePayrollPeriod(id);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[BO][PAYROLL] deletePayrollPeriod error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to delete payroll period' });
+  }
+}
+
+async function deletePayrollEntry(req, res) {
+  try {
+    const id = toInt(req.params.id);
+    if (!id) return res.status(400).json({ success: false, error: 'Invalid entry id' });
+    await payrollService.deletePayrollEntry(id);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[BO][PAYROLL] deletePayrollEntry error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to delete payroll entry' });
+  }
+}
+
+async function deleteEmployeeLoan(req, res) {
+  try {
+    const id = toInt(req.params.id);
+    if (!id) return res.status(400).json({ success: false, error: 'Invalid loan id' });
+    await payrollService.deleteEmployeeLoan(id);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[BO][PAYROLL] deleteEmployeeLoan error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to delete employee loan' });
+  }
+}
+
+async function deleteLoanTransaction(req, res) {
+  try {
+    const id = toInt(req.params.id);
+    if (!id) return res.status(400).json({ success: false, error: 'Invalid transaction id' });
+    await payrollService.deleteLoanTransaction(id);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[BO][PAYROLL] deleteLoanTransaction error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to delete loan transaction' });
+  }
+}
+
+async function deleteTermination(req, res) {
+  try {
+    const id = toInt(req.params.id);
+    if (!id) return res.status(400).json({ success: false, error: 'Invalid termination id' });
+    await payrollService.deleteTermination(id);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[BO][PAYROLL] deleteTermination error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to delete termination' });
+  }
+}
+
+async function deleteReengagement(req, res) {
+  try {
+    const id = toInt(req.params.id);
+    if (!id) return res.status(400).json({ success: false, error: 'Invalid reengagement id' });
+    await payrollService.deleteReengagement(id);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[BO][PAYROLL] deleteReengagement error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to delete reengagement' });
+  }
+}
+
+async function deleteTaxBracket(req, res) {
+  try {
+    const id = toInt(req.params.id);
+    if (!id) return res.status(400).json({ success: false, error: 'Invalid tax bracket id' });
+    await payrollService.deleteTaxBracket(id);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[BO][PAYROLL] deleteTaxBracket error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to delete tax bracket' });
+  }
+}
+
+async function deleteIncrementPolicy(req, res) {
+  try {
+    const id = toInt(req.params.id);
+    if (!id) return res.status(400).json({ success: false, error: 'Invalid increment policy id' });
+    await payrollService.deleteIncrementPolicy(id);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[BO][PAYROLL] deleteIncrementPolicy error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to delete increment policy' });
+  }
+}
+
 async function purgeAllPayrollData(req, res) {
   try {
     const counts = await payrollService.purgeAllPayrollData();
@@ -909,5 +1005,13 @@ module.exports = {
   importLoans,
   importTerminations,
   importReengagements,
+  deletePayrollPeriod,
+  deletePayrollEntry,
+  deleteEmployeeLoan,
+  deleteLoanTransaction,
+  deleteTermination,
+  deleteReengagement,
+  deleteTaxBracket,
+  deleteIncrementPolicy,
   purgeAllPayrollData,
 };

@@ -55,6 +55,7 @@ const PayrollPeriodsList = ({
   onPageChange,
   onSelectPeriod,
   onEditPeriod,
+  onDeletePeriod,
   onCreatePeriod,
 }) => {
   const totalPages = pagination?.totalPages || 1;
@@ -130,16 +131,30 @@ const PayrollPeriodsList = ({
                       <td style={tdStyle}>{money(period.totalNetPay || 0)}</td>
                       <td style={tdStyle}>{formatDate(period.createdAt)}</td>
                       <td style={tdStyle}>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onEditPeriod(period);
-                          }}
-                          style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '9px', color: '#334155', padding: '0.43rem 0.72rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem' }}
-                        >
-                          <i className="fas fa-pen" style={{ marginRight: '0.35rem' }}></i>Edit
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onEditPeriod(period);
+                            }}
+                            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '9px', color: '#334155', padding: '0.43rem 0.72rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem' }}
+                          >
+                            <i className="fas fa-pen" style={{ marginRight: '0.35rem' }}></i>Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              if (window.confirm(`Delete period "${period.description || `Period #${period.id}`}"? All entries in this period will also be deleted.`)) {
+                                onDeletePeriod(period);
+                              }
+                            }}
+                            style={{ border: '1px solid #fca5a5', backgroundColor: '#fff', borderRadius: '9px', color: '#b91c1c', padding: '0.43rem 0.72rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem' }}
+                          >
+                            <i className="fas fa-trash" style={{ marginRight: '0.35rem' }}></i>Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
