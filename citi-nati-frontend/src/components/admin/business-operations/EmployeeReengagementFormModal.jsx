@@ -5,7 +5,8 @@ const defaultForm = {
   linkedTerminationId: '',
   effectiveDate: new Date().toISOString().split('T')[0],
   wageAtRetrenchment: '0',
-  newAgreedSalary: '0',
+  reengagementWage: '0',
+  occupation: '',
   notes: '',
 };
 
@@ -58,7 +59,8 @@ const EmployeeReengagementFormModal = ({
       linkedTerminationId: toStringValue(reengagement?.linkedTerminationId, ''),
       effectiveDate: reengagement?.effectiveDate ? reengagement.effectiveDate.split('T')[0] : new Date().toISOString().split('T')[0],
       wageAtRetrenchment: toStringValue(reengagement?.wageAtRetrenchment, '0'),
-      newAgreedSalary: toStringValue(reengagement?.newAgreedSalary, '0'),
+      reengagementWage: toStringValue(reengagement?.reengagementWage, '0'),
+      occupation: toStringValue(reengagement?.occupation, ''),
       notes: reengagement?.notes || '',
     });
   }, [isOpen, reengagement]);
@@ -83,7 +85,7 @@ const EmployeeReengagementFormModal = ({
       setValidationError('Employee is required.');
       return;
     }
-    if (asNumber(form.newAgreedSalary, 0) <= 0) {
+    if (asNumber(form.reengagementWage, 0) <= 0) {
       setValidationError('New agreed salary must be greater than 0.');
       return;
     }
@@ -94,7 +96,9 @@ const EmployeeReengagementFormModal = ({
       linkedTerminationId: form.linkedTerminationId ? Number(form.linkedTerminationId) : null,
       effectiveDate: form.effectiveDate,
       wageAtRetrenchment: asNumber(form.wageAtRetrenchment, 0),
-      newAgreedSalary: asNumber(form.newAgreedSalary, 0),
+      previousWage: asNumber(form.wageAtRetrenchment, 0),
+      reengagementWage: asNumber(form.reengagementWage, 0),
+      occupation: form.occupation.trim() || null,
       notes: form.notes.trim() || null,
     });
   };
@@ -149,7 +153,8 @@ const EmployeeReengagementFormModal = ({
             <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.6rem' }}>Wage Information</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
               <div><label style={labelStyle}>Wage at Retrenchment</label><input type="number" step="0.01" min="0" value={form.wageAtRetrenchment} onChange={set('wageAtRetrenchment')} style={fieldStyle} /></div>
-              <div><label style={labelStyle}>New Agreed Salary</label><input type="number" step="0.01" min="0" value={form.newAgreedSalary} onChange={set('newAgreedSalary')} style={fieldStyle} /></div>
+              <div><label style={labelStyle}>Reengagement Wage</label><input type="number" step="0.01" min="0" value={form.reengagementWage} onChange={set('reengagementWage')} style={fieldStyle} /></div>
+              <div><label style={labelStyle}>Occupation</label><input type="text" value={form.occupation} onChange={set('occupation')} style={fieldStyle} placeholder="e.g. Cashier, Supervisor" /></div>
             </div>
           </div>
 

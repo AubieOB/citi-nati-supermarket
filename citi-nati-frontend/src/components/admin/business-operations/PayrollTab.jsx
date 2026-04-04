@@ -7,6 +7,10 @@ import PayrollPeriodFormModal from './PayrollPeriodFormModal.jsx';
 import PayrollPeriodDetailPanel from './PayrollPeriodDetailPanel.jsx';
 import PayrollEntryFormModal from './PayrollEntryFormModal.jsx';
 import PayrollSupportDrawer from './PayrollSupportDrawer.jsx';
+import EmployeeLoanFormModal from './EmployeeLoanFormModal.jsx';
+import LoanTransactionFormModal from './LoanTransactionFormModal.jsx';
+import EmployeeTerminationFormModal from './EmployeeTerminationFormModal.jsx';
+import EmployeeReengagementFormModal from './EmployeeReengagementFormModal.jsx';
 
 const cardStyle = {
   backgroundColor: '#fff',
@@ -68,6 +72,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
   const [supportLoading, setSupportLoading] = useState(false);
   const [supportDrawer, setSupportDrawer] = useState({
     open: false,
+    employeeId: null,
     employeeName: '',
     loading: false,
     error: '',
@@ -78,10 +83,16 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
 
   const [periodModal, setPeriodModal] = useState({ open: false, period: null });
   const [entryModal, setEntryModal] = useState({ open: false, entry: null });
+  const [loanModal, setLoanModal] = useState({ open: false, loan: null });
+  const [loanTxModal, setLoanTxModal] = useState({ open: false, transaction: null, defaultLoanId: null });
+  const [terminationModal, setTerminationModal] = useState({ open: false, termination: null });
+  const [reengagementModal, setReengagementModal] = useState({ open: false, reengagement: null });
   const [periodSaving, setPeriodSaving] = useState(false);
   const [entrySaving, setEntrySaving] = useState(false);
+  const [supportSaving, setSupportSaving] = useState(false);
   const [periodSaveError, setPeriodSaveError] = useState('');
   const [entrySaveError, setEntrySaveError] = useState('');
+  const [supportSaveError, setSupportSaveError] = useState('');
   const [entryEmployeeSalary, setEntryEmployeeSalary] = useState(null);
   const [exportingExcel, setExportingExcel] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
@@ -210,6 +221,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
 
     setSupportDrawer({
       open: true,
+      employeeId: entry.employeeId,
       employeeName,
       loading: true,
       error: '',
@@ -233,6 +245,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
 
       setSupportDrawer({
         open: true,
+        employeeId: entry.employeeId,
         employeeName,
         loading: false,
         error: '',
@@ -243,6 +256,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
     } catch (err) {
       setSupportDrawer({
         open: true,
+        employeeId: entry.employeeId,
         employeeName,
         loading: false,
         error: getApiError(err, 'Failed to load payroll support records.'),
@@ -416,6 +430,138 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
     openSupportDrawerForEntry(selectedEntry);
   };
 
+  const handleAddLoan = () => {
+    setSupportSaveError('');
+    setLoanModal({
+      open: true,
+      loan: supportDrawer.employeeId ? { employeeId: supportDrawer.employeeId } : null,
+    });
+  };
+
+  const handleEditLoan = (loan) => {
+    if (!loan) return;
+    setSupportSaveError('');
+    setLoanModal({ open: true, loan });
+  };
+
+  const handleLoanSubmit = async (payload) => {
+    setSupportSaving(true);
+    setSupportSaveError('');
+    try {
+      if (loanModal.loan?.id) {
+        await api.put(`/business-operations/payroll/loans/${loanModal.loan.id}`, payload);
+      } else {
+        await api.post('/business-operations/payroll/loans', payload);
+      }
+      setLoanModal({ open: false, loan: null });
+      const selectedEntry = entries.find((entry) => entry.id === selectedEntryId);
+      if (selectedEntry) await openSupportDrawerForEntry(selectedEntry);
+    } catch (err) {
+      setSupportSaveError(getApiError(err, 'Failed to save employee loan.'));
+    } finally {
+      setSupportSaving(false);
+    }
+  };
+
+  const handleAddLoanTransaction = (loan) => {
+    setSupportSaveError('');
+    setLoanTxModal({
+      open: true,
+      transaction: null,
+      defaultLoanId: loan?.id || null,
+    });
+  };
+
+  const handleLoanTransactionSubmit = async (payload) => {
+    setSupportSaving(true);
+    setSupportSaveError('');
+    try {
+      const requestPayload = {
+        ...payload,
+        payrollPeriodId: selectedPeriodId || undefined,
+        transactionType: 'repayment',
+      };
+      if (loanTxModal.transaction?.id) {
+        await api.put(`/business-operations/payroll/loan-transactions/${loanTxModal.transaction.id}`, requestPayload);
+      } else {
+        await api.post('/business-operations/payroll/loan-transactions', requestPayload);
+      }
+      setLoanTxModal({ open: false, transaction: null, defaultLoanId: null });
+      const selectedEntry = entries.find((entry) => entry.id === selectedEntryId);
+      if (selectedEntry) await openSupportDrawerForEntry(selectedEntry);
+    } catch (err) {
+      setSupportSaveError(getApiError(err, 'Failed to save loan transaction.'));
+    } finally {
+      setSupportSaving(false);
+    }
+  };
+
+  const handleAddTermination = () => {
+    setSupportSaveError('');
+    setTerminationModal({
+      open: true,
+      termination: supportDrawer.employeeId ? { employeeId: supportDrawer.employeeId } : null,
+    });
+  };
+
+  const handleEditTermination = (termination) => {
+    if (!termination) return;
+    setSupportSaveError('');
+    setTerminationModal({ open: true, termination });
+  };
+
+  const handleTerminationSubmit = async (payload) => {
+    setSupportSaving(true);
+    setSupportSaveError('');
+    try {
+      if (terminationModal.termination?.id) {
+        await api.put(`/business-operations/payroll/terminations/${terminationModal.termination.id}`, payload);
+      } else {
+        await api.post('/business-operations/payroll/terminations', payload);
+      }
+      setTerminationModal({ open: false, termination: null });
+      const selectedEntry = entries.find((entry) => entry.id === selectedEntryId);
+      if (selectedEntry) await openSupportDrawerForEntry(selectedEntry);
+    } catch (err) {
+      setSupportSaveError(getApiError(err, 'Failed to save termination record.'));
+    } finally {
+      setSupportSaving(false);
+    }
+  };
+
+  const handleAddReengagement = () => {
+    setSupportSaveError('');
+    setReengagementModal({
+      open: true,
+      reengagement: supportDrawer.employeeId ? { employeeId: supportDrawer.employeeId } : null,
+    });
+  };
+
+  const handleEditReengagement = (reengagement) => {
+    if (!reengagement) return;
+    setSupportSaveError('');
+    setReengagementModal({ open: true, reengagement });
+  };
+
+  const handleReengagementSubmit = async (payload) => {
+    setSupportSaving(true);
+    setSupportSaveError('');
+    try {
+      if (reengagementModal.reengagement?.id) {
+        await api.put(`/business-operations/payroll/reengagements/${reengagementModal.reengagement.id}`, payload);
+      } else {
+        await api.post('/business-operations/payroll/reengagements', payload);
+      }
+      setReengagementModal({ open: false, reengagement: null });
+      const selectedEntry = entries.find((entry) => entry.id === selectedEntryId);
+      if (selectedEntry) await openSupportDrawerForEntry(selectedEntry);
+    } catch (err) {
+      setSupportSaveError(getApiError(err, 'Failed to save reengagement record.'));
+    } finally {
+      setSupportSaving(false);
+    }
+  };
+
   const handleExport = async (format) => {
     if (format === 'excel') setExportingExcel(true);
     if (format === 'pdf') setExportingPdf(true);
@@ -455,11 +601,11 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
   };
 
   useEffect(() => {
-    if (!isPayrollWorkspaceModalOpen || periodModal.open || entryModal.open || supportDrawer.open) return;
+    if (!isPayrollWorkspaceModalOpen || periodModal.open || entryModal.open || supportDrawer.open || loanModal.open || loanTxModal.open || terminationModal.open || reengagementModal.open) return;
     const handler = (event) => { if (event.key === 'Escape') { setIsPayrollWorkspaceModalOpen(false); setIsPayrollWorkspaceMaximized(false); } };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isPayrollWorkspaceModalOpen, periodModal.open, entryModal.open, supportDrawer.open]);
+  }, [isPayrollWorkspaceModalOpen, periodModal.open, entryModal.open, supportDrawer.open, loanModal.open, loanTxModal.open, terminationModal.open, reengagementModal.open]);
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
@@ -643,7 +789,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
                         setEntriesPage(1);
                         setSelectedEntryId(null);
                         setSupportData(null);
-                        setSupportDrawer((prev) => ({ ...prev, open: false, error: '', loans: [], terminations: [], reengagements: [] }));
+                        setSupportDrawer((prev) => ({ ...prev, open: false, employeeId: null, error: '', loans: [], terminations: [], reengagements: [] }));
                       }}
                       onEditPeriod={handleEditPeriod}
                       onCreatePeriod={handleCreatePeriod}
@@ -724,7 +870,56 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
         loans={supportDrawer.loans}
         terminations={supportDrawer.terminations}
         reengagements={supportDrawer.reengagements}
+        onAddLoan={handleAddLoan}
+        onEditLoan={handleEditLoan}
+        onAddLoanTransaction={handleAddLoanTransaction}
+        onAddTermination={handleAddTermination}
+        onEditTermination={handleEditTermination}
+        onAddReengagement={handleAddReengagement}
+        onEditReengagement={handleEditReengagement}
         onClose={() => setSupportDrawer((prev) => ({ ...prev, open: false }))}
+      />
+
+      <EmployeeLoanFormModal
+        isOpen={loanModal.open}
+        loan={loanModal.loan}
+        employees={entryEmployees}
+        saving={supportSaving}
+        error={supportSaveError}
+        onClose={() => setLoanModal({ open: false, loan: null })}
+        onSubmit={handleLoanSubmit}
+      />
+
+      <LoanTransactionFormModal
+        isOpen={loanTxModal.open}
+        transaction={loanTxModal.transaction}
+        loans={supportDrawer.loans}
+        defaultLoanId={loanTxModal.defaultLoanId}
+        saving={supportSaving}
+        error={supportSaveError}
+        onClose={() => setLoanTxModal({ open: false, transaction: null, defaultLoanId: null })}
+        onSubmit={handleLoanTransactionSubmit}
+      />
+
+      <EmployeeTerminationFormModal
+        isOpen={terminationModal.open}
+        termination={terminationModal.termination}
+        employees={entryEmployees}
+        saving={supportSaving}
+        error={supportSaveError}
+        onClose={() => setTerminationModal({ open: false, termination: null })}
+        onSubmit={handleTerminationSubmit}
+      />
+
+      <EmployeeReengagementFormModal
+        isOpen={reengagementModal.open}
+        reengagement={reengagementModal.reengagement}
+        employees={entryEmployees}
+        terminations={supportDrawer.terminations}
+        saving={supportSaving}
+        error={supportSaveError}
+        onClose={() => setReengagementModal({ open: false, reengagement: null })}
+        onSubmit={handleReengagementSubmit}
       />
     </div>
   );

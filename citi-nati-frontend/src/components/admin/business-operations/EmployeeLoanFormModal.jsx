@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 
 const defaultForm = {
   employeeId: '',
-  loanAmount: '0',
+  principalAmount: '0',
+  balanceAmount: '0',
+  monthlyDeductionAmount: '0',
   interestRate: '0',
   accruedInterest: '0',
   loanGrantedMonth: new Date().getMonth() + 1,
@@ -63,7 +65,9 @@ const EmployeeLoanFormModal = ({
     
     setForm({
       employeeId: toStringValue(loan?.employeeId, ''),
-      loanAmount: toStringValue(loan?.loanAmount, '0'),
+      principalAmount: toStringValue(loan?.principalAmount, '0'),
+      balanceAmount: toStringValue(loan?.balanceAmount, '0'),
+      monthlyDeductionAmount: toStringValue(loan?.monthlyDeductionAmount, '0'),
       interestRate: toStringValue(loan?.interestRate, '0'),
       accruedInterest: toStringValue(loan?.accruedInterest, '0'),
       loanGrantedMonth: loan?.loanGrantedMonth || currentMonth,
@@ -95,7 +99,7 @@ const EmployeeLoanFormModal = ({
       setValidationError('Employee is required.');
       return;
     }
-    if (asNumber(form.loanAmount, 0) <= 0) {
+    if (asNumber(form.principalAmount, 0) <= 0) {
       setValidationError('Loan amount must be greater than 0.');
       return;
     }
@@ -103,7 +107,9 @@ const EmployeeLoanFormModal = ({
     setValidationError('');
     onSubmit({
       employeeId: Number(form.employeeId),
-      loanAmount: asNumber(form.loanAmount, 0),
+      principalAmount: asNumber(form.principalAmount, 0),
+      balanceAmount: asNumber(form.balanceAmount, 0),
+      monthlyDeductionAmount: asNumber(form.monthlyDeductionAmount, 0),
       interestRate: asNumber(form.interestRate, 0),
       accruedInterest: asNumber(form.accruedInterest, 0),
       loanGrantedMonth: Number(form.loanGrantedMonth),
@@ -145,7 +151,9 @@ const EmployeeLoanFormModal = ({
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.75rem' }}>
-            <div><label style={labelStyle}>Loan Amount</label><input type="number" step="0.01" min="0" value={form.loanAmount} onChange={set('loanAmount')} style={fieldStyle} /></div>
+            <div><label style={labelStyle}>Principal Amount</label><input type="number" step="0.01" min="0" value={form.principalAmount} onChange={set('principalAmount')} style={fieldStyle} /></div>
+            <div><label style={labelStyle}>Balance Amount</label><input type="number" step="0.01" min="0" value={form.balanceAmount} onChange={set('balanceAmount')} style={fieldStyle} /></div>
+            <div><label style={labelStyle}>Monthly Deduction</label><input type="number" step="0.01" min="0" value={form.monthlyDeductionAmount} onChange={set('monthlyDeductionAmount')} style={fieldStyle} /></div>
             <div><label style={labelStyle}>Interest Rate (%)</label><input type="number" step="0.01" min="0" max="100" value={form.interestRate} onChange={set('interestRate')} style={fieldStyle} /></div>
             <div><label style={labelStyle}>Accrued Interest</label><input type="number" step="0.01" min="0" value={form.accruedInterest} onChange={set('accruedInterest')} style={fieldStyle} /></div>
           </div>

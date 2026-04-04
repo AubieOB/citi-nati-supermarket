@@ -4,7 +4,6 @@ const defaultForm = {
   employeeId: '',
   terminationDate: new Date().toISOString().split('T')[0],
   terminationType: 'resignation',
-  half PayDueInTerminationMonth: '0',
   halfPayDueInTerminationMonth: '0',
   amountPaidInTerminationMonth: '0',
   leavePayAccruedDays: '0',

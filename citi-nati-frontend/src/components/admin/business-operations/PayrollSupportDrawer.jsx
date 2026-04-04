@@ -37,6 +37,13 @@ const PayrollSupportDrawer = ({
   loans,
   terminations,
   reengagements,
+  onAddLoan,
+  onEditLoan,
+  onAddLoanTransaction,
+  onAddTermination,
+  onEditTermination,
+  onAddReengagement,
+  onEditReengagement,
   onClose,
 }) => {
   useEffect(() => {
@@ -68,6 +75,18 @@ const PayrollSupportDrawer = ({
             <div style={{ padding: '0.85rem 0.95rem', borderRadius: '12px', backgroundColor: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca' }}>{error}</div>
           ) : (
             <>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button type="button" onClick={onAddLoan} style={{ border: '1px solid #bae6fd', backgroundColor: '#f0f9ff', color: '#075985', borderRadius: '9px', padding: '0.45rem 0.72rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem' }}>
+                  <i className="fas fa-plus" style={{ marginRight: '0.32rem' }}></i>Loan
+                </button>
+                <button type="button" onClick={onAddTermination} style={{ border: '1px solid #fecaca', backgroundColor: '#fef2f2', color: '#991b1b', borderRadius: '9px', padding: '0.45rem 0.72rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem' }}>
+                  <i className="fas fa-plus" style={{ marginRight: '0.32rem' }}></i>Termination
+                </button>
+                <button type="button" onClick={onAddReengagement} style={{ border: '1px solid #ddd6fe', backgroundColor: '#f5f3ff', color: '#5b21b6', borderRadius: '9px', padding: '0.45rem 0.72rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem' }}>
+                  <i className="fas fa-plus" style={{ marginRight: '0.32rem' }}></i>Reengagement
+                </button>
+              </div>
+
               <div style={sectionStyle}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                   <strong style={{ color: '#0f172a' }}>Employee Loans</strong>
@@ -83,6 +102,14 @@ const PayrollSupportDrawer = ({
                     </div>
                     <div style={{ color: '#475569', fontSize: '0.84rem' }}>Principal: {money(loan.principalAmount)} | Balance: {money(loan.balanceAmount)}</div>
                     <div style={{ color: '#64748b', fontSize: '0.8rem' }}>Monthly deduction: {money(loan.monthlyDeductionAmount || 0)} | Start: {formatDate(loan.startDate)} | End: {formatDate(loan.endDate)}</div>
+                    <div style={{ display: 'flex', gap: '0.42rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
+                      <button type="button" onClick={() => onEditLoan(loan)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '8px', padding: '0.35rem 0.55rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.76rem' }}>
+                        <i className="fas fa-pen" style={{ marginRight: '0.28rem' }}></i>Edit Loan
+                      </button>
+                      <button type="button" onClick={() => onAddLoanTransaction(loan)} style={{ border: '1px solid #bae6fd', backgroundColor: '#f0f9ff', color: '#075985', borderRadius: '8px', padding: '0.35rem 0.55rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.76rem' }}>
+                        <i className="fas fa-plus" style={{ marginRight: '0.28rem' }}></i>Payment
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -102,6 +129,11 @@ const PayrollSupportDrawer = ({
                     </div>
                     <div style={{ color: '#475569', fontSize: '0.84rem' }}>Reason: {term.reason || 'Not provided'}</div>
                     <div style={{ color: '#64748b', fontSize: '0.8rem' }}>Settlement: {money(term.settlementAmount || 0)} | Final month days worked: {Number(term.daysWorkedInFinalMonth || 0).toLocaleString('en-US')}</div>
+                    <div style={{ marginTop: '0.2rem' }}>
+                      <button type="button" onClick={() => onEditTermination(term)} style={{ border: '1px solid #fecaca', backgroundColor: '#fef2f2', color: '#991b1b', borderRadius: '8px', padding: '0.35rem 0.55rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.76rem' }}>
+                        <i className="fas fa-pen" style={{ marginRight: '0.28rem' }}></i>Edit
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -121,6 +153,11 @@ const PayrollSupportDrawer = ({
                     </div>
                     <div style={{ color: '#475569', fontSize: '0.84rem' }}>Previous wage: {money(item.previousWage || 0)} | Reengagement wage: {money(item.reengagementWage || 0)}</div>
                     <div style={{ color: '#64748b', fontSize: '0.8rem' }}>Contract expiry: {formatDate(item.contractExpiryDate)}</div>
+                    <div style={{ marginTop: '0.2rem' }}>
+                      <button type="button" onClick={() => onEditReengagement(item)} style={{ border: '1px solid #ddd6fe', backgroundColor: '#f5f3ff', color: '#5b21b6', borderRadius: '8px', padding: '0.35rem 0.55rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.76rem' }}>
+                        <i className="fas fa-pen" style={{ marginRight: '0.28rem' }}></i>Edit
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

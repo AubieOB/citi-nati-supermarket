@@ -6,7 +6,7 @@ const defaultForm = {
   payrollMode: 'full_month',
   payrollMonth: new Date().getMonth() + 1,
   payrollYear: new Date().getFullYear(),
-  payrollPositionInMonth: 'full',
+  payrollPositionInMonth: '2',
   runStartedAt: '',
   finalizedAt: '',
   description: '',
@@ -53,7 +53,7 @@ const PayrollPeriodFormModal = ({ isOpen, period, selectedLocationId = null, loc
       payrollMode: period?.payrollMode || 'full_month',
       payrollMonth: period?.payrollMonth || currentMonth,
       payrollYear: period?.payrollYear || currentYear,
-      payrollPositionInMonth: period?.payrollPositionInMonth || 'full',
+      payrollPositionInMonth: period?.payrollPositionInMonth ? String(period.payrollPositionInMonth) : '2',
       runStartedAt: period?.runStartedAt ? period.runStartedAt.split('T')[0] : '',
       finalizedAt: period?.finalizedAt ? period.finalizedAt.split('T')[0] : '',
       description: period?.description || '',
@@ -149,9 +149,8 @@ const PayrollPeriodFormModal = ({ isOpen, period, selectedLocationId = null, loc
             <div>
               <label style={labelStyle}>Position in Month</label>
               <select value={form.payrollPositionInMonth} onChange={set('payrollPositionInMonth')} style={fieldStyle}>
-                <option value="full">Full Month</option>
-                <option value="mid">Mid-Month</option>
-                <option value="half">Half Month</option>
+                <option value="1">1 (Mid-Month Run)</option>
+                <option value="2">2 (End-Month Run)</option>
               </select>
             </div>
           </div>

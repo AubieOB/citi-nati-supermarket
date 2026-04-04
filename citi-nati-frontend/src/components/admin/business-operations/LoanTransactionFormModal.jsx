@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
 
 const defaultForm = {
-  loanId: '',
-  transactionAmount: '0',
+  employeeLoanId: '',
+  amount: '0',
   principalComponent: '0',
   interestComponent: '0',
-  transactionDate: new Date().toISOString().split('T')[0],
   notes: '',
 };
 
@@ -41,6 +40,7 @@ const LoanTransactionFormModal = ({
   isOpen,
   transaction,
   loans,
+  defaultLoanId,
   saving,
   error,
   onClose,
@@ -53,14 +53,13 @@ const LoanTransactionFormModal = ({
     if (!isOpen) return;
     setValidationError('');
     setForm({
-      loanId: toStringValue(transaction?.loanId, ''),
-      transactionAmount: toStringValue(transaction?.transactionAmount, '0'),
+      employeeLoanId: toStringValue(transaction?.employeeLoanId, defaultLoanId || ''),
+      amount: toStringValue(transaction?.amount, '0'),
       principalComponent: toStringValue(transaction?.principalComponent, '0'),
       interestComponent: toStringValue(transaction?.interestComponent, '0'),
-      transactionDate: transaction?.transactionDate ? transaction.transactionDate.split('T')[0] : new Date().toISOString().split('T')[0],
       notes: transaction?.notes || '',
     });
-  }, [isOpen, transaction]);
+  }, [defaultLoanId, isOpen, transaction]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -77,7 +76,7 @@ const LoanTransactionFormModal = ({
     if (field === 'principalComponent' || field === 'interestComponent') {
       setForm((prev) => {
         const next = { ...prev, [field]: value };
-        next.transactionAmount = String(asNumber(next.principalComponent) + asNumber(next.interestComponent));
+        next.amount = String(asNumber(next.principalComponent) + asNumber(next.interestComponent));
         return next;
       });
       return;
@@ -88,22 +87,21 @@ const LoanTransactionFormModal = ({
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    if (!form.loanId) {
+    if (!form.employeeLoanId) {
       setValidationError('Loan is required.');
       return;
     }
-    if (asNumber(form.transactionAmount, 0) <= 0) {
+    if (asNumber(form.amount, 0) <= 0) {
       setValidationError('Transaction amount must be greater than 0.');
       return;
     }
 
     setValidationError('');
     onSubmit({
-      loanId: Number(form.loanId),
-      transactionAmount: asNumber(form.transactionAmount, 0),
+      employeeLoanId: Number(form.employeeLoanId),
+      amount: asNumber(form.amount, 0),
       principalComponent: asNumber(form.principalComponent, 0),
       interestComponent: asNumber(form.interestComponent, 0),
-      transactionDate: form.transactionDate,
       notes: form.notes.trim() || null,
     });
   };
@@ -127,11 +125,11 @@ const LoanTransactionFormModal = ({
         <form onSubmit={handleSubmit} style={{ padding: '1.1rem 1.2rem', display: 'grid', gap: '0.95rem' }}>
           <div>
             <label style={labelStyle}>Select Loan</label>
-            <select value={form.loanId} onChange={set('loanId')} disabled={Boolean(transaction)} style={{ ...fieldStyle, backgroundColor: transaction ? '#f8fafc' : '#fff' }}>
+            <select value={form.employeeLoanId} onChange={set('employeeLoanId')} disabled={Boolean(transaction)} style={{ ...fieldStyle, backgroundColor: transaction ? '#f8fafc' : '#fff' }}>
               <option value="">Select loan</option>
               {loans.map((loan) => (
                 <option key={loan.id} value={loan.id}>
-                  Loan #{loan.id} - Amount: {loan.loanAmount}
+                  {loan.loanReference || `Loan #${loan.id}`} - Balance: {loan.balanceAmount || 0}
                 </option>
               ))}
             </select>
@@ -142,13 +140,8 @@ const LoanTransactionFormModal = ({
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.75rem' }}>
               <div><label style={labelStyle}>Principal Component</label><input type="number" step="0.01" min="0" value={form.principalComponent} onChange={set('principalComponent')} style={fieldStyle} /></div>
               <div><label style={labelStyle}>Interest Component</label><input type="number" step="0.01" min="0" value={form.interestComponent} onChange={set('interestComponent')} style={fieldStyle} /></div>
-              <div><label style={labelStyle}>Total Amount</label><input type="number" step="0.01" min="0" value={form.transactionAmount} onChange={set('transactionAmount')} disabled style={{ ...fieldStyle, backgroundColor: '#f8fafc' }} /></div>
+              <div><label style={labelStyle}>Total Amount</label><input type="number" step="0.01" min="0" value={form.amount} onChange={set('amount')} disabled style={{ ...fieldStyle, backgroundColor: '#f8fafc' }} /></div>
             </div>
-          </div>
-
-          <div>
-            <label style={labelStyle}>Transaction Date</label>
-            <input type="date" value={form.transactionDate} onChange={set('transactionDate')} style={fieldStyle} />
           </div>
 
           <div>
