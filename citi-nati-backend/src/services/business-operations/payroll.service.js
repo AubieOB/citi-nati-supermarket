@@ -20,10 +20,20 @@ async function validatePayrollEntryLocationAlignment(payload, existingEntryId = 
   const employeeId = payload?.employeeId;
   if (!payrollPeriodId || !employeeId || !payrollPeriodHasLocation) return;
 
-  const [period, employee] = await Promise.all([
-    prisma.payrollPeriod.findUnique({ where: { id: payrollPeriodId }, select: { id: true, locationId: true } }),
-    prisma.employee.findUnique({ where: { id: employeeId }, select: { id: true, locationId: true } }),
-  ]);
+  let period;
+  let employee;
+
+  try {
+    [period, employee] = await Promise.all([
+      prisma.payrollPeriod.findUnique({ where: { id: payrollPeriodId }, select: { id: true, locationId: true } }),
+      prisma.employee.findUnique({ where: { id: employeeId }, select: { id: true, locationId: true } }),
+    ]);
+  } catch (err) {
+    if (isMissingPayrollPeriodsColumnError(err)) {
+      return;
+    }
+    throw err;
+  }
 
   if (!period) {
     const error = new Error('Payroll period not found.');
@@ -64,6 +74,10 @@ function isMissingPayrollPeriodsColumnError(err) {
   return isMissingColumnError(err) && String(err?.meta?.column || '').toLowerCase().startsWith('payroll_periods.');
 }
 
+function isMissingPayrollEntriesColumnError(err) {
+  return isMissingColumnError(err) && String(err?.meta?.column || '').toLowerCase().startsWith('payroll_entries.');
+}
+
 function isMissingTableError(err, tableName = null) {
   const missing = err?.code === 'P2021';
   if (!missing) return false;
@@ -87,6 +101,51 @@ function mapLegacyPeriodRow(row) {
     finalizedAt: null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function mapLegacyPayrollEntryRow(row) {
+  return {
+    id: Number(row.id),
+    payrollPeriodId: Number(row.payroll_period_id),
+    employeeId: Number(row.employee_id),
+    basicSalary: Number(row.basic_salary || 0),
+    incrementAmount: Number(row.increment_amount || 0),
+    grossPay: Number(row.gross_pay || 0),
+    totalDeductions: Number(row.total_deductions || 0),
+    netPay: Number(row.net_pay || 0),
+    daysWorked: row.days_worked === null ? null : Number(row.days_worked),
+    daysAbsent: row.days_absent === null ? null : Number(row.days_absent),
+    overtimeHours: row.overtime_hours === null ? null : Number(row.overtime_hours),
+    overtimeNormalHours: null,
+    overtimeDoubleHours: null,
+    overtimeAmount: row.overtime_amount === null ? null : Number(row.overtime_amount),
+    overtimeNormalAmount: null,
+    overtimeDoubleAmount: null,
+    loanDeductionAmount: row.loan_deduction_amount === null ? null : Number(row.loan_deduction_amount),
+    absenceDeductionAmount: null,
+    otherDeductionAmount: row.other_deduction_amount === null ? null : Number(row.other_deduction_amount),
+    bonusAmount: row.bonus_amount === null ? null : Number(row.bonus_amount),
+    giftAmount: row.gift_amount === null ? null : Number(row.gift_amount),
+    leavePayAmount: row.leave_pay_amount === null ? null : Number(row.leave_pay_amount),
+    payeAmount: row.paye_amount === null ? null : Number(row.paye_amount),
+    loanBalanceAtPayroll: null,
+    accruedInterestAtPayroll: null,
+    netPayMidPortion: null,
+    netPayEndPortion: null,
+    notes: row.notes,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    employee: {
+      id: Number(row.employee_id),
+      employeeNo: row.employee_no,
+      firstName: row.first_name,
+      surname: row.surname,
+    },
+    payrollPeriod: {
+      id: Number(row.payroll_period_id),
+      payrollMode: row.payroll_mode,
+    },
   };
 }
 
@@ -163,6 +222,90 @@ async function listPayrollPeriodsLegacy({ search, status, payrollMode, reporting
 
   return {
     periods: Array.isArray(rows) ? rows.map(mapLegacyPeriodRow) : [],
+    total: Array.isArray(countRows) && countRows[0] ? Number(countRows[0].total || 0) : 0,
+  };
+}
+
+async function listPayrollEntriesLegacy({ payrollPeriodId, employeeId, locationId, skip, take, sortBy, sortOrder }) {
+  const conditions = [];
+  const params = [];
+
+  const bind = (value) => {
+    params.push(value);
+    return `$${params.length}`;
+  };
+
+  if (payrollPeriodId) conditions.push(`pe.payroll_period_id = ${bind(payrollPeriodId)}`);
+  if (employeeId) conditions.push(`pe.employee_id = ${bind(employeeId)}`);
+  if (locationId) conditions.push(`e.location_id = ${bind(locationId)}`);
+
+  const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const sortMap = {
+    id: 'pe.id',
+    grossPay: 'pe.gross_pay',
+    netPay: 'pe.net_pay',
+    basicSalary: 'pe.basic_salary',
+    createdAt: 'pe.created_at',
+    updatedAt: 'pe.updated_at',
+  };
+  const orderColumn = sortMap[sortBy] || 'pe.created_at';
+  const orderDirection = String(sortOrder).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+
+  const offsetPlaceholder = bind(Number(skip) || 0);
+  const limitPlaceholder = bind(Number(take) || 10);
+
+  const rows = await prisma.$queryRawUnsafe(
+    `
+      SELECT
+        pe.id,
+        pe.payroll_period_id,
+        pe.employee_id,
+        pe.basic_salary,
+        pe.increment_amount,
+        pe.gross_pay,
+        pe.total_deductions,
+        pe.net_pay,
+        pe.days_worked,
+        pe.days_absent,
+        pe.overtime_hours,
+        pe.overtime_amount,
+        pe.loan_deduction_amount,
+        pe.other_deduction_amount,
+        pe.bonus_amount,
+        pe.gift_amount,
+        pe.leave_pay_amount,
+        pe.paye_amount,
+        pe.notes,
+        pe.created_at,
+        pe.updated_at,
+        e.employee_no,
+        e.first_name,
+        e.surname,
+        pp.payroll_mode
+      FROM payroll_entries pe
+      JOIN employees e ON e.id = pe.employee_id
+      LEFT JOIN payroll_periods pp ON pp.id = pe.payroll_period_id
+      ${whereClause}
+      ORDER BY ${orderColumn} ${orderDirection}
+      OFFSET ${offsetPlaceholder}
+      LIMIT ${limitPlaceholder}
+    `,
+    ...params,
+  );
+
+  const countRows = await prisma.$queryRawUnsafe(
+    `
+      SELECT COUNT(*)::int AS total
+      FROM payroll_entries pe
+      JOIN employees e ON e.id = pe.employee_id
+      ${whereClause}
+    `,
+    ...params.slice(0, params.length - 2),
+  );
+
+  return {
+    data: (Array.isArray(rows) ? rows : []).map(mapLegacyPayrollEntryRow),
     total: Array.isArray(countRows) && countRows[0] ? Number(countRows[0].total || 0) : 0,
   };
 }
@@ -369,13 +512,43 @@ async function getPayrollPeriodById(id) {
 
 async function createPayrollEntry(payload) {
   await validatePayrollEntryLocationAlignment(payload);
-  return prisma.payrollEntry.create({
-    data: payload,
-    include: {
-      employee: { select: { id: true, employeeNo: true, firstName: true, surname: true } },
-      payrollPeriod: true,
-    },
-  });
+  try {
+    return await prisma.payrollEntry.create({
+      data: payload,
+      include: {
+        employee: { select: { id: true, employeeNo: true, firstName: true, surname: true } },
+        payrollPeriod: true,
+      },
+    });
+  } catch (err) {
+    if (!isMissingPayrollEntriesColumnError(err) && !isMissingPayrollPeriodsColumnError(err)) throw err;
+    const legacyPayload = {
+      payrollPeriodId: payload.payrollPeriodId,
+      employeeId: payload.employeeId,
+      basicSalary: payload.basicSalary,
+      incrementAmount: payload.incrementAmount,
+      grossPay: payload.grossPay,
+      totalDeductions: payload.totalDeductions,
+      netPay: payload.netPay,
+      daysWorked: payload.daysWorked,
+      daysAbsent: payload.daysAbsent,
+      overtimeHours: payload.overtimeHours,
+      overtimeAmount: payload.overtimeAmount,
+      loanDeductionAmount: payload.loanDeductionAmount,
+      otherDeductionAmount: payload.otherDeductionAmount,
+      bonusAmount: payload.bonusAmount,
+      giftAmount: payload.giftAmount,
+      leavePayAmount: payload.leavePayAmount,
+      payeAmount: payload.payeAmount,
+      notes: payload.notes,
+    };
+    return prisma.payrollEntry.create({
+      data: legacyPayload,
+      include: {
+        employee: { select: { id: true, employeeNo: true, firstName: true, surname: true } },
+      },
+    });
+  }
 }
 
 async function updatePayrollEntry(id, payload) {
@@ -394,24 +567,61 @@ async function updatePayrollEntry(id, payload) {
     employeeId: payload.employeeId || currentEntry.employeeId,
   }, id);
 
-  return prisma.payrollEntry.update({
-    where: { id },
-    data: payload,
-    include: {
-      employee: { select: { id: true, employeeNo: true, firstName: true, surname: true } },
-      payrollPeriod: true,
-    },
-  });
+  try {
+    return await prisma.payrollEntry.update({
+      where: { id },
+      data: payload,
+      include: {
+        employee: { select: { id: true, employeeNo: true, firstName: true, surname: true } },
+        payrollPeriod: true,
+      },
+    });
+  } catch (err) {
+    if (!isMissingPayrollEntriesColumnError(err) && !isMissingPayrollPeriodsColumnError(err)) throw err;
+    const legacyPayload = {
+      payrollPeriodId: payload.payrollPeriodId,
+      employeeId: payload.employeeId,
+      basicSalary: payload.basicSalary,
+      incrementAmount: payload.incrementAmount,
+      grossPay: payload.grossPay,
+      totalDeductions: payload.totalDeductions,
+      netPay: payload.netPay,
+      daysWorked: payload.daysWorked,
+      daysAbsent: payload.daysAbsent,
+      overtimeHours: payload.overtimeHours,
+      overtimeAmount: payload.overtimeAmount,
+      loanDeductionAmount: payload.loanDeductionAmount,
+      otherDeductionAmount: payload.otherDeductionAmount,
+      bonusAmount: payload.bonusAmount,
+      giftAmount: payload.giftAmount,
+      leavePayAmount: payload.leavePayAmount,
+      payeAmount: payload.payeAmount,
+      notes: payload.notes,
+    };
+    return prisma.payrollEntry.update({
+      where: { id },
+      data: legacyPayload,
+      include: {
+        employee: { select: { id: true, employeeNo: true, firstName: true, surname: true } },
+      },
+    });
+  }
 }
 
 async function getPayrollEntryById(id) {
-  return prisma.payrollEntry.findUnique({
-    where: { id },
-    include: {
-      employee: { select: { id: true, employeeNo: true, firstName: true, surname: true } },
-      payrollPeriod: true,
-    },
-  });
+  try {
+    return await prisma.payrollEntry.findUnique({
+      where: { id },
+      include: {
+        employee: { select: { id: true, employeeNo: true, firstName: true, surname: true } },
+        payrollPeriod: true,
+      },
+    });
+  } catch (err) {
+    if (!isMissingPayrollEntriesColumnError(err) && !isMissingPayrollPeriodsColumnError(err)) throw err;
+    const legacy = await listPayrollEntriesLegacy({ payrollPeriodId: null, employeeId: null, locationId: null, skip: 0, take: 5000, sortBy: 'id', sortOrder: 'desc' });
+    return legacy.data.find((entry) => Number(entry.id) === Number(id)) || null;
+  }
 }
 
 async function listPayrollEntries({ payrollPeriodId, employeeId, locationId, skip, take, sortBy, sortOrder }) {
@@ -422,19 +632,29 @@ async function listPayrollEntries({ payrollPeriodId, employeeId, locationId, ski
     where.employee = { locationId };
   }
 
-  const [data, total] = await Promise.all([
-    prisma.payrollEntry.findMany({
-      where,
-      include: {
-        employee: { select: { id: true, employeeNo: true, firstName: true, surname: true } },
-        payrollPeriod: true,
-      },
-      skip,
-      take,
-      orderBy: { [sortBy]: sortOrder },
-    }),
-    prisma.payrollEntry.count({ where }),
-  ]);
+  let data = [];
+  let total = 0;
+
+  try {
+    [data, total] = await Promise.all([
+      prisma.payrollEntry.findMany({
+        where,
+        include: {
+          employee: { select: { id: true, employeeNo: true, firstName: true, surname: true } },
+          payrollPeriod: true,
+        },
+        skip,
+        take,
+        orderBy: { [sortBy]: sortOrder },
+      }),
+      prisma.payrollEntry.count({ where }),
+    ]);
+  } catch (err) {
+    if (!isMissingPayrollEntriesColumnError(err) && !isMissingPayrollPeriodsColumnError(err)) throw err;
+    const legacy = await listPayrollEntriesLegacy({ payrollPeriodId, employeeId, locationId, skip, take, sortBy, sortOrder });
+    data = legacy.data;
+    total = legacy.total;
+  }
 
   return { data, total, where };
 }
