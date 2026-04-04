@@ -57,8 +57,13 @@ async function createPayrollPeriod(payload) {
   const createData = {
     reportingPeriodId: payload.reportingPeriodId || null,
     payrollMode: payload.payrollMode,
+    payrollMonth: payload.payrollMonth || null,
+    payrollYear: payload.payrollYear || null,
+    payrollPositionInMonth: payload.payrollPositionInMonth || null,
     description: payload.description || null,
     status: payload.status || 'draft',
+    runStartedAt: payload.runStartedAt || null,
+    finalizedAt: payload.finalizedAt || null,
     createdBy: payload.createdBy || null,
   };
 
@@ -75,8 +80,13 @@ async function updatePayrollPeriod(id, payload) {
   const updateData = {
     reportingPeriodId: payload.reportingPeriodId,
     payrollMode: payload.payrollMode,
+    payrollMonth: payload.payrollMonth,
+    payrollYear: payload.payrollYear,
+    payrollPositionInMonth: payload.payrollPositionInMonth,
     description: payload.description,
     status: payload.status,
+    runStartedAt: payload.runStartedAt,
+    finalizedAt: payload.finalizedAt,
     createdBy: payload.createdBy,
   };
 
@@ -90,10 +100,12 @@ async function updatePayrollPeriod(id, payload) {
   });
 }
 
-async function listPayrollPeriods({ search, status, payrollMode, reportingPeriodId, locationId, skip, take, sortBy, sortOrder }) {
+async function listPayrollPeriods({ search, status, payrollMode, payrollMonth, payrollYear, reportingPeriodId, locationId, skip, take, sortBy, sortOrder }) {
   const where = {};
   if (status) where.status = status;
   if (payrollMode) where.payrollMode = payrollMode;
+  if (payrollMonth) where.payrollMonth = payrollMonth;
+  if (payrollYear) where.payrollYear = payrollYear;
   if (reportingPeriodId) where.reportingPeriodId = reportingPeriodId;
   if (locationId) {
     if (payrollPeriodHasLocation) {
@@ -135,6 +147,7 @@ async function listPayrollPeriods({ search, status, payrollMode, reportingPeriod
       netPay: true,
       overtimeAmount: true,
       loanDeductionAmount: true,
+      accruedInterestAtPayroll: true,
     },
   });
 
@@ -149,6 +162,7 @@ async function listPayrollPeriods({ search, status, payrollMode, reportingPeriod
       totalNetPay: g?._sum?.netPay || 0,
       totalOvertimeAmount: g?._sum?.overtimeAmount || 0,
       totalLoanDeductionAmount: g?._sum?.loanDeductionAmount || 0,
+      totalAccruedInterestAtPayroll: g?._sum?.accruedInterestAtPayroll || 0,
     };
   });
 
@@ -383,6 +397,9 @@ async function bulkImportPayrollPeriods(records = []) {
     const reportingPeriodId = row.reportingPeriodId || null;
     const payrollMode = row.payrollMode;
     const description = row.description || null;
+    const payrollMonth = row.payrollMonth ? Number(row.payrollMonth) : null;
+    const payrollYear = row.payrollYear ? Number(row.payrollYear) : null;
+    const payrollPositionInMonth = row.payrollPositionInMonth ? Number(row.payrollPositionInMonth) : null;
 
     const existing = await prisma.payrollPeriod.findFirst({
       where: { reportingPeriodId, payrollMode, description },
@@ -392,7 +409,13 @@ async function bulkImportPayrollPeriods(records = []) {
       await prisma.payrollPeriod.update({
         where: { id: existing.id },
         data: {
+          locationId: row.locationId || existing.locationId || null,
+          payrollMonth: Number.isInteger(payrollMonth) ? payrollMonth : existing.payrollMonth,
+          payrollYear: Number.isInteger(payrollYear) ? payrollYear : existing.payrollYear,
+          payrollPositionInMonth: Number.isInteger(payrollPositionInMonth) ? payrollPositionInMonth : existing.payrollPositionInMonth,
           status: row.status || existing.status,
+          runStartedAt: parseDate(row.runStartedAt) || existing.runStartedAt,
+          finalizedAt: parseDate(row.finalizedAt) || existing.finalizedAt,
           createdBy: row.createdBy || existing.createdBy,
         },
       });
@@ -402,8 +425,14 @@ async function bulkImportPayrollPeriods(records = []) {
         data: {
           reportingPeriodId,
           payrollMode,
+          locationId: row.locationId || null,
+          payrollMonth: Number.isInteger(payrollMonth) ? payrollMonth : null,
+          payrollYear: Number.isInteger(payrollYear) ? payrollYear : null,
+          payrollPositionInMonth: Number.isInteger(payrollPositionInMonth) ? payrollPositionInMonth : null,
           description,
           status: row.status || 'draft',
+          runStartedAt: parseDate(row.runStartedAt),
+          finalizedAt: parseDate(row.finalizedAt),
           createdBy: row.createdBy || null,
         },
       });
@@ -437,13 +466,22 @@ async function bulkImportPayrollEntries(records = []) {
       daysWorked: row.daysWorked !== undefined ? Number(row.daysWorked) : null,
       daysAbsent: row.daysAbsent !== undefined ? Number(row.daysAbsent) : null,
       overtimeHours: row.overtimeHours !== undefined ? Number(row.overtimeHours) : null,
+      overtimeNormalHours: row.overtimeNormalHours !== undefined ? Number(row.overtimeNormalHours) : null,
+      overtimeDoubleHours: row.overtimeDoubleHours !== undefined ? Number(row.overtimeDoubleHours) : null,
       overtimeAmount: row.overtimeAmount !== undefined ? Number(row.overtimeAmount) : null,
+      overtimeNormalAmount: row.overtimeNormalAmount !== undefined ? Number(row.overtimeNormalAmount) : null,
+      overtimeDoubleAmount: row.overtimeDoubleAmount !== undefined ? Number(row.overtimeDoubleAmount) : null,
       loanDeductionAmount: row.loanDeductionAmount !== undefined ? Number(row.loanDeductionAmount) : null,
+      absenceDeductionAmount: row.absenceDeductionAmount !== undefined ? Number(row.absenceDeductionAmount) : null,
       otherDeductionAmount: row.otherDeductionAmount !== undefined ? Number(row.otherDeductionAmount) : null,
       bonusAmount: row.bonusAmount !== undefined ? Number(row.bonusAmount) : null,
       giftAmount: row.giftAmount !== undefined ? Number(row.giftAmount) : null,
       leavePayAmount: row.leavePayAmount !== undefined ? Number(row.leavePayAmount) : null,
       payeAmount: row.payeAmount !== undefined ? Number(row.payeAmount) : null,
+      loanBalanceAtPayroll: row.loanBalanceAtPayroll !== undefined ? Number(row.loanBalanceAtPayroll) : null,
+      accruedInterestAtPayroll: row.accruedInterestAtPayroll !== undefined ? Number(row.accruedInterestAtPayroll) : null,
+      netPayMidPortion: row.netPayMidPortion !== undefined ? Number(row.netPayMidPortion) : null,
+      netPayEndPortion: row.netPayEndPortion !== undefined ? Number(row.netPayEndPortion) : null,
       notes: row.notes || null,
     };
 
@@ -498,7 +536,14 @@ async function bulkImportLoans(records = []) {
       loanReference,
       principalAmount,
       balanceAmount,
+      interestRate: row.interestRate !== undefined ? Number(row.interestRate) : null,
+      accruedInterest: row.accruedInterest !== undefined ? Number(row.accruedInterest) : null,
+      loanGrantedMonth: row.loanGrantedMonth !== undefined ? Number(row.loanGrantedMonth) : null,
+      loanGrantedYear: row.loanGrantedYear !== undefined ? Number(row.loanGrantedYear) : null,
       monthlyDeductionAmount: row.monthlyDeductionAmount !== undefined ? Number(row.monthlyDeductionAmount) : null,
+      repaymentEndMonth: row.repaymentEndMonth !== undefined ? Number(row.repaymentEndMonth) : null,
+      repaymentEndYear: row.repaymentEndYear !== undefined ? Number(row.repaymentEndYear) : null,
+      reason: row.reason || null,
       startDate: parseDate(row.startDate),
       endDate: parseDate(row.endDate),
       status: row.status || 'active',
@@ -547,6 +592,8 @@ async function bulkImportLoanTransactions(records = []) {
       payrollPeriodId: Number.isInteger(payrollPeriodId) ? payrollPeriodId : null,
       transactionType,
       amount,
+      principalComponent: row.principalComponent !== undefined ? Number(row.principalComponent) : null,
+      interestComponent: row.interestComponent !== undefined ? Number(row.interestComponent) : null,
       notes: row.notes || null,
     };
 
@@ -582,8 +629,16 @@ async function bulkImportTerminations(records = []) {
       employeeId,
       terminationDate,
       reason: row.reason || null,
+      terminationType: row.terminationType || null,
       daysWorkedInFinalMonth: row.daysWorkedInFinalMonth !== undefined ? Number(row.daysWorkedInFinalMonth) : null,
       halfPayReceived: row.halfPayReceived !== undefined ? Number(row.halfPayReceived) : null,
+      halfPayDueInTerminationMonth: row.halfPayDueInTerminationMonth !== undefined ? Number(row.halfPayDueInTerminationMonth) : null,
+      amountPaidInTerminationMonth: row.amountPaidInTerminationMonth !== undefined ? Number(row.amountPaidInTerminationMonth) : null,
+      leavePayAccruedDays: row.leavePayAccruedDays !== undefined ? Number(row.leavePayAccruedDays) : null,
+      leavePayAmount: row.leavePayAmount !== undefined ? Number(row.leavePayAmount) : null,
+      outstandingLoanObligations: row.outstandingLoanObligations !== undefined ? Number(row.outstandingLoanObligations) : null,
+      grossSettlementAmount: row.grossSettlementAmount !== undefined ? Number(row.grossSettlementAmount) : null,
+      netSettlementAmount: row.netSettlementAmount !== undefined ? Number(row.netSettlementAmount) : null,
       settlementAmount: row.settlementAmount !== undefined ? Number(row.settlementAmount) : null,
       notes: row.notes || null,
     };
@@ -618,6 +673,8 @@ async function bulkImportReengagements(records = []) {
 
     const data = {
       employeeId,
+      linkedTerminationId: row.linkedTerminationId !== undefined ? Number(row.linkedTerminationId) : null,
+      wageAtRetrenchment: row.wageAtRetrenchment !== undefined ? Number(row.wageAtRetrenchment) : null,
       previousWage: row.previousWage !== undefined ? Number(row.previousWage) : null,
       reengagementWage: row.reengagementWage !== undefined ? Number(row.reengagementWage) : null,
       occupation: row.occupation || null,

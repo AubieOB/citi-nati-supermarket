@@ -676,9 +676,15 @@ model PayrollPeriod {
   id                Int                      @id @default(autoincrement())
   reportingPeriodId Int?                     @map("reporting_period_id")
   payrollMode       String                   @map("payroll_mode")
+  locationId        Int?                     @map("location_id")
+  payrollMonth      Int?                     @map("payroll_month")
+  payrollYear       Int?                     @map("payroll_year")
+  payrollPositionInMonth Int?                @map("payroll_position_in_month")
   description       String?
   status            String                   @default("draft")
   createdBy         String?                  @map("created_by")
+  runStartedAt      DateTime?                @map("run_started_at")
+  finalizedAt       DateTime?                @map("finalized_at")
   createdAt         DateTime                 @default(now()) @map("created_at")
   updatedAt         DateTime                 @updatedAt @map("updated_at")
   entries           PayrollEntry[]
@@ -687,6 +693,8 @@ model PayrollPeriod {
   @@index([status])
   @@index([payrollMode])
   @@index([reportingPeriodId])
+  @@index([locationId])
+  @@index([payrollYear, payrollMonth])
   @@map("payroll_periods")
 }
 
@@ -704,13 +712,22 @@ model PayrollEntry {
   daysWorked           Float?        @map("days_worked")
   daysAbsent           Float?        @map("days_absent")
   overtimeHours        Float?        @map("overtime_hours")
+  overtimeNormalHours  Float?        @map("overtime_normal_hours")
+  overtimeDoubleHours  Float?        @map("overtime_double_hours")
   overtimeAmount       Float?        @default(0) @map("overtime_amount")
+  overtimeNormalAmount Float?        @default(0) @map("overtime_normal_amount")
+  overtimeDoubleAmount Float?        @default(0) @map("overtime_double_amount")
   loanDeductionAmount  Float?        @default(0) @map("loan_deduction_amount")
+  absenceDeductionAmount Float?      @default(0) @map("absence_deduction_amount")
   otherDeductionAmount Float?        @default(0) @map("other_deduction_amount")
   bonusAmount          Float?        @default(0) @map("bonus_amount")
   giftAmount           Float?        @default(0) @map("gift_amount")
   leavePayAmount       Float?        @default(0) @map("leave_pay_amount")
   payeAmount           Float?        @default(0) @map("paye_amount")
+  loanBalanceAtPayroll Float?        @default(0) @map("loan_balance_at_payroll")
+  accruedInterestAtPayroll Float?    @default(0) @map("accrued_interest_at_payroll")
+  netPayMidPortion     Float?        @default(0) @map("net_pay_mid_portion")
+  netPayEndPortion     Float?        @default(0) @map("net_pay_end_portion")
   notes                String?
   createdAt            DateTime      @default(now()) @map("created_at")
   updatedAt            DateTime      @updatedAt @map("updated_at")
@@ -728,7 +745,14 @@ model EmployeeLoan {
   loanReference          String?                   @unique @map("loan_reference")
   principalAmount        Float                     @map("principal_amount")
   balanceAmount          Float                     @map("balance_amount")
+  interestRate           Float?                    @map("interest_rate")
+  accruedInterest        Float?                    @default(0) @map("accrued_interest")
+  loanGrantedMonth       Int?                      @map("loan_granted_month")
+  loanGrantedYear        Int?                      @map("loan_granted_year")
   monthlyDeductionAmount Float?                    @map("monthly_deduction_amount")
+  repaymentEndMonth      Int?                      @map("repayment_end_month")
+  repaymentEndYear       Int?                      @map("repayment_end_year")
+  reason                 String?
   startDate              DateTime?                 @map("start_date")
   endDate                DateTime?                 @map("end_date")
   status                 String                    @default("active")
@@ -750,6 +774,8 @@ model EmployeeLoanTransaction {
   payrollPeriod  PayrollPeriod? @relation(fields: [payrollPeriodId], references: [id], onDelete: SetNull)
   transactionType String      @map("transaction_type")
   amount         Float
+  principalComponent Float?   @map("principal_component")
+  interestComponent Float?    @map("interest_component")
   notes          String?
   createdAt      DateTime     @default(now()) @map("created_at")
 
@@ -764,13 +790,22 @@ model EmployeeTermination {
   employeeId            Int       @map("employee_id")
   employee              Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   terminationDate       DateTime  @map("termination_date")
+  terminationType       String?   @map("termination_type")
   reason                String?
   daysWorkedInFinalMonth Float?   @map("days_worked_in_final_month")
   halfPayReceived       Float?    @map("half_pay_received")
+  halfPayDueInTerminationMonth Float? @map("half_pay_due_in_termination_month")
+  amountPaidInTerminationMonth Float? @map("amount_paid_in_termination_month")
+  leavePayAccruedDays   Float?    @map("leave_pay_accrued_days")
+  leavePayAmount        Float?    @map("leave_pay_amount")
+  outstandingLoanObligations Float? @map("outstanding_loan_obligations")
+  grossSettlementAmount Float?    @map("gross_settlement_amount")
+  netSettlementAmount   Float?    @map("net_settlement_amount")
   settlementAmount      Float?    @map("settlement_amount")
   notes                 String?
   createdAt             DateTime  @default(now()) @map("created_at")
   updatedAt             DateTime  @updatedAt @map("updated_at")
+  reengagements         EmployeeReengagement[]
 
   @@index([employeeId])
   @@index([terminationDate])
@@ -781,6 +816,9 @@ model EmployeeReengagement {
   id                 Int       @id @default(autoincrement())
   employeeId         Int       @map("employee_id")
   employee           Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  linkedTerminationId Int?     @map("linked_termination_id")
+  linkedTermination  EmployeeTermination? @relation(fields: [linkedTerminationId], references: [id], onDelete: SetNull)
+  wageAtRetrenchment Float?    @map("wage_at_retrenchment")
   previousWage       Float?    @map("previous_wage")
   reengagementWage   Float?    @map("reengagement_wage")
   occupation         String?
@@ -792,5 +830,44 @@ model EmployeeReengagement {
 
   @@index([employeeId])
   @@index([effectiveDate])
+  @@index([linkedTerminationId])
   @@map("employee_reengagements")
+}
+
+model PayrollTaxBracket {
+  id             Int       @id @default(autoincrement())
+  locationId     Int?      @map("location_id")
+  effectiveFrom  DateTime  @map("effective_from")
+  effectiveTo    DateTime? @map("effective_to")
+  minIncome      Float     @map("min_income")
+  maxIncome      Float?    @map("max_income")
+  ratePercent    Float     @map("rate_percent")
+  fixedTaxAmount Float?    @map("fixed_tax_amount")
+  description    String?
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@index([locationId, effectiveFrom])
+  @@index([isActive, effectiveFrom])
+  @@map("payroll_tax_brackets")
+}
+
+model PayrollIncrementPolicy {
+  id               Int       @id @default(autoincrement())
+  locationId       Int?      @map("location_id")
+  minServiceMonths Int       @map("min_service_months")
+  maxServiceMonths Int?      @map("max_service_months")
+  incrementPercent Float?    @map("increment_percent")
+  incrementAmount  Float?    @map("increment_amount")
+  effectiveFrom    DateTime  @map("effective_from")
+  effectiveTo      DateTime? @map("effective_to")
+  notes            String?
+  isActive         Boolean   @default(true) @map("is_active")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@index([locationId, effectiveFrom])
+  @@index([isActive, minServiceMonths])
+  @@map("payroll_increment_policies")
 }

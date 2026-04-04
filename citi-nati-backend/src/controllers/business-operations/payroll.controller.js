@@ -41,13 +41,22 @@ function parsePayrollEntryPayload(body) {
     daysWorked: body.daysWorked !== undefined ? toNumber(body.daysWorked) : undefined,
     daysAbsent: body.daysAbsent !== undefined ? toNumber(body.daysAbsent) : undefined,
     overtimeHours: body.overtimeHours !== undefined ? toNumber(body.overtimeHours) : undefined,
+    overtimeNormalHours: body.overtimeNormalHours !== undefined ? toNumber(body.overtimeNormalHours) : undefined,
+    overtimeDoubleHours: body.overtimeDoubleHours !== undefined ? toNumber(body.overtimeDoubleHours) : undefined,
     overtimeAmount: body.overtimeAmount !== undefined ? toNumber(body.overtimeAmount) : undefined,
+    overtimeNormalAmount: body.overtimeNormalAmount !== undefined ? toNumber(body.overtimeNormalAmount) : undefined,
+    overtimeDoubleAmount: body.overtimeDoubleAmount !== undefined ? toNumber(body.overtimeDoubleAmount) : undefined,
     loanDeductionAmount: body.loanDeductionAmount !== undefined ? toNumber(body.loanDeductionAmount) : undefined,
+    absenceDeductionAmount: body.absenceDeductionAmount !== undefined ? toNumber(body.absenceDeductionAmount) : undefined,
     otherDeductionAmount: body.otherDeductionAmount !== undefined ? toNumber(body.otherDeductionAmount) : undefined,
     bonusAmount: body.bonusAmount !== undefined ? toNumber(body.bonusAmount) : undefined,
     giftAmount: body.giftAmount !== undefined ? toNumber(body.giftAmount) : undefined,
     leavePayAmount: body.leavePayAmount !== undefined ? toNumber(body.leavePayAmount) : undefined,
     payeAmount: body.payeAmount !== undefined ? toNumber(body.payeAmount) : undefined,
+    loanBalanceAtPayroll: body.loanBalanceAtPayroll !== undefined ? toNumber(body.loanBalanceAtPayroll) : undefined,
+    accruedInterestAtPayroll: body.accruedInterestAtPayroll !== undefined ? toNumber(body.accruedInterestAtPayroll) : undefined,
+    netPayMidPortion: body.netPayMidPortion !== undefined ? toNumber(body.netPayMidPortion) : undefined,
+    netPayEndPortion: body.netPayEndPortion !== undefined ? toNumber(body.netPayEndPortion) : undefined,
     notes: body.notes,
   };
 }
@@ -67,9 +76,14 @@ async function createPayrollPeriod(req, res) {
     const period = await payrollService.createPayrollPeriod({
       reportingPeriodId: toInt(req.body.reportingPeriodId),
       payrollMode,
+      payrollMonth: toInt(req.body.payrollMonth),
+      payrollYear: toInt(req.body.payrollYear),
+      payrollPositionInMonth: toInt(req.body.payrollPositionInMonth),
       description: req.body.description,
       status: req.body.status,
       locationId,
+      runStartedAt: req.body.runStartedAt ? toDate(req.body.runStartedAt) : null,
+      finalizedAt: req.body.finalizedAt ? toDate(req.body.finalizedAt) : null,
       createdBy: req.body.createdBy || req.user?.email || null,
     });
 
@@ -92,9 +106,14 @@ async function updatePayrollPeriod(req, res) {
     const payload = {
       reportingPeriodId: req.body.reportingPeriodId !== undefined ? toInt(req.body.reportingPeriodId) : undefined,
       payrollMode: req.body.payrollMode ? String(req.body.payrollMode).toLowerCase() : undefined,
+      payrollMonth: req.body.payrollMonth !== undefined ? toInt(req.body.payrollMonth) : undefined,
+      payrollYear: req.body.payrollYear !== undefined ? toInt(req.body.payrollYear) : undefined,
+      payrollPositionInMonth: req.body.payrollPositionInMonth !== undefined ? toInt(req.body.payrollPositionInMonth) : undefined,
       description: req.body.description,
       status: req.body.status,
       locationId: req.body.locationId !== undefined ? toInt(req.body.locationId) : undefined,
+      runStartedAt: req.body.runStartedAt ? toDate(req.body.runStartedAt) : undefined,
+      finalizedAt: req.body.finalizedAt ? toDate(req.body.finalizedAt) : undefined,
       createdBy: req.body.createdBy,
     };
 
@@ -120,6 +139,8 @@ async function listPayrollPeriods(req, res) {
       search: req.query.search ? String(req.query.search).trim() : null,
       status: req.query.status ? String(req.query.status).trim() : null,
       payrollMode: req.query.payrollMode ? String(req.query.payrollMode).toLowerCase() : null,
+      payrollMonth: toInt(req.query.payrollMonth),
+      payrollYear: toInt(req.query.payrollYear),
       reportingPeriodId: toInt(req.query.reportingPeriodId),
       locationId: toInt(req.query.locationId),
     };
@@ -257,7 +278,14 @@ async function createEmployeeLoan(req, res) {
       loanReference: req.body.loanReference,
       principalAmount,
       balanceAmount,
+      interestRate: req.body.interestRate !== undefined ? toNumber(req.body.interestRate) : null,
+      accruedInterest: req.body.accruedInterest !== undefined ? toNumber(req.body.accruedInterest) : null,
+      loanGrantedMonth: req.body.loanGrantedMonth !== undefined ? toInt(req.body.loanGrantedMonth) : null,
+      loanGrantedYear: req.body.loanGrantedYear !== undefined ? toInt(req.body.loanGrantedYear) : null,
       monthlyDeductionAmount: req.body.monthlyDeductionAmount !== undefined ? toNumber(req.body.monthlyDeductionAmount) : null,
+      repaymentEndMonth: req.body.repaymentEndMonth !== undefined ? toInt(req.body.repaymentEndMonth) : null,
+      repaymentEndYear: req.body.repaymentEndYear !== undefined ? toInt(req.body.repaymentEndYear) : null,
+      reason: req.body.reason,
       startDate: req.body.startDate ? toDate(req.body.startDate) : null,
       endDate: req.body.endDate ? toDate(req.body.endDate) : null,
       status: req.body.status || 'active',
@@ -281,7 +309,14 @@ async function updateEmployeeLoan(req, res) {
       loanReference: req.body.loanReference,
       principalAmount: req.body.principalAmount !== undefined ? toNumber(req.body.principalAmount) : undefined,
       balanceAmount: req.body.balanceAmount !== undefined ? toNumber(req.body.balanceAmount) : undefined,
+      interestRate: req.body.interestRate !== undefined ? toNumber(req.body.interestRate) : undefined,
+      accruedInterest: req.body.accruedInterest !== undefined ? toNumber(req.body.accruedInterest) : undefined,
+      loanGrantedMonth: req.body.loanGrantedMonth !== undefined ? toInt(req.body.loanGrantedMonth) : undefined,
+      loanGrantedYear: req.body.loanGrantedYear !== undefined ? toInt(req.body.loanGrantedYear) : undefined,
       monthlyDeductionAmount: req.body.monthlyDeductionAmount !== undefined ? toNumber(req.body.monthlyDeductionAmount) : undefined,
+      repaymentEndMonth: req.body.repaymentEndMonth !== undefined ? toInt(req.body.repaymentEndMonth) : undefined,
+      repaymentEndYear: req.body.repaymentEndYear !== undefined ? toInt(req.body.repaymentEndYear) : undefined,
+      reason: req.body.reason,
       startDate: req.body.startDate ? toDate(req.body.startDate) : undefined,
       endDate: req.body.endDate ? toDate(req.body.endDate) : undefined,
       status: req.body.status,
@@ -349,6 +384,8 @@ async function createLoanTransaction(req, res) {
       payrollPeriodId: toInt(req.body.payrollPeriodId),
       transactionType: req.body.transactionType || 'repayment',
       amount,
+      principalComponent: req.body.principalComponent !== undefined ? toNumber(req.body.principalComponent) : null,
+      interestComponent: req.body.interestComponent !== undefined ? toNumber(req.body.interestComponent) : null,
       notes: req.body.notes,
     });
 
@@ -369,6 +406,8 @@ async function updateLoanTransaction(req, res) {
       payrollPeriodId: req.body.payrollPeriodId !== undefined ? toInt(req.body.payrollPeriodId) : undefined,
       transactionType: req.body.transactionType,
       amount: req.body.amount !== undefined ? toNumber(req.body.amount) : undefined,
+      principalComponent: req.body.principalComponent !== undefined ? toNumber(req.body.principalComponent) : undefined,
+      interestComponent: req.body.interestComponent !== undefined ? toNumber(req.body.interestComponent) : undefined,
       notes: req.body.notes,
     });
 
@@ -416,9 +455,17 @@ async function createTermination(req, res) {
     const data = await payrollService.createTermination({
       employeeId,
       terminationDate,
+      terminationType: req.body.terminationType,
       reason: req.body.reason,
       daysWorkedInFinalMonth: req.body.daysWorkedInFinalMonth !== undefined ? toNumber(req.body.daysWorkedInFinalMonth) : null,
       halfPayReceived: req.body.halfPayReceived !== undefined ? toNumber(req.body.halfPayReceived) : null,
+      halfPayDueInTerminationMonth: req.body.halfPayDueInTerminationMonth !== undefined ? toNumber(req.body.halfPayDueInTerminationMonth) : null,
+      amountPaidInTerminationMonth: req.body.amountPaidInTerminationMonth !== undefined ? toNumber(req.body.amountPaidInTerminationMonth) : null,
+      leavePayAccruedDays: req.body.leavePayAccruedDays !== undefined ? toNumber(req.body.leavePayAccruedDays) : null,
+      leavePayAmount: req.body.leavePayAmount !== undefined ? toNumber(req.body.leavePayAmount) : null,
+      outstandingLoanObligations: req.body.outstandingLoanObligations !== undefined ? toNumber(req.body.outstandingLoanObligations) : null,
+      grossSettlementAmount: req.body.grossSettlementAmount !== undefined ? toNumber(req.body.grossSettlementAmount) : null,
+      netSettlementAmount: req.body.netSettlementAmount !== undefined ? toNumber(req.body.netSettlementAmount) : null,
       settlementAmount: req.body.settlementAmount !== undefined ? toNumber(req.body.settlementAmount) : null,
       notes: req.body.notes,
     });
@@ -438,9 +485,17 @@ async function updateTermination(req, res) {
     const data = await payrollService.updateTermination(id, {
       employeeId: req.body.employeeId !== undefined ? toInt(req.body.employeeId) : undefined,
       terminationDate: req.body.terminationDate ? toDate(req.body.terminationDate) : undefined,
+      terminationType: req.body.terminationType,
       reason: req.body.reason,
       daysWorkedInFinalMonth: req.body.daysWorkedInFinalMonth !== undefined ? toNumber(req.body.daysWorkedInFinalMonth) : undefined,
       halfPayReceived: req.body.halfPayReceived !== undefined ? toNumber(req.body.halfPayReceived) : undefined,
+      halfPayDueInTerminationMonth: req.body.halfPayDueInTerminationMonth !== undefined ? toNumber(req.body.halfPayDueInTerminationMonth) : undefined,
+      amountPaidInTerminationMonth: req.body.amountPaidInTerminationMonth !== undefined ? toNumber(req.body.amountPaidInTerminationMonth) : undefined,
+      leavePayAccruedDays: req.body.leavePayAccruedDays !== undefined ? toNumber(req.body.leavePayAccruedDays) : undefined,
+      leavePayAmount: req.body.leavePayAmount !== undefined ? toNumber(req.body.leavePayAmount) : undefined,
+      outstandingLoanObligations: req.body.outstandingLoanObligations !== undefined ? toNumber(req.body.outstandingLoanObligations) : undefined,
+      grossSettlementAmount: req.body.grossSettlementAmount !== undefined ? toNumber(req.body.grossSettlementAmount) : undefined,
+      netSettlementAmount: req.body.netSettlementAmount !== undefined ? toNumber(req.body.netSettlementAmount) : undefined,
       settlementAmount: req.body.settlementAmount !== undefined ? toNumber(req.body.settlementAmount) : undefined,
       notes: req.body.notes,
     });
@@ -498,6 +553,8 @@ async function createReengagement(req, res) {
 
     const data = await payrollService.createReengagement({
       employeeId,
+      linkedTerminationId: req.body.linkedTerminationId !== undefined ? toInt(req.body.linkedTerminationId) : null,
+      wageAtRetrenchment: req.body.wageAtRetrenchment !== undefined ? toNumber(req.body.wageAtRetrenchment) : null,
       previousWage: req.body.previousWage !== undefined ? toNumber(req.body.previousWage) : null,
       reengagementWage: req.body.reengagementWage !== undefined ? toNumber(req.body.reengagementWage) : null,
       occupation: req.body.occupation,
@@ -520,6 +577,8 @@ async function updateReengagement(req, res) {
 
     const data = await payrollService.updateReengagement(id, {
       employeeId: req.body.employeeId !== undefined ? toInt(req.body.employeeId) : undefined,
+      linkedTerminationId: req.body.linkedTerminationId !== undefined ? toInt(req.body.linkedTerminationId) : undefined,
+      wageAtRetrenchment: req.body.wageAtRetrenchment !== undefined ? toNumber(req.body.wageAtRetrenchment) : undefined,
       previousWage: req.body.previousWage !== undefined ? toNumber(req.body.previousWage) : undefined,
       reengagementWage: req.body.reengagementWage !== undefined ? toNumber(req.body.reengagementWage) : undefined,
       occupation: req.body.occupation,
