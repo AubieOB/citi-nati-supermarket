@@ -1,6 +1,6 @@
 'use strict';
 
-const { PrismaClient } = require('@prisma/client');
+const { PrismaClient, Prisma } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
@@ -53,6 +53,109 @@ function parseDate(value) {
   return isNaN(d.getTime()) ? null : d;
 }
 
+function isMissingColumnError(err, columnName = null) {
+  const missing = err?.code === 'P2022';
+  if (!missing) return false;
+  if (!columnName) return true;
+  return String(err?.meta?.column || '').toLowerCase().includes(String(columnName).toLowerCase());
+}
+
+function isMissingTableError(err, tableName = null) {
+  const missing = err?.code === 'P2021';
+  if (!missing) return false;
+  if (!tableName) return true;
+  return String(err?.meta?.table || '').toLowerCase().includes(String(tableName).toLowerCase());
+}
+
+function mapLegacyPeriodRow(row) {
+  return {
+    id: Number(row.id),
+    reportingPeriodId: row.reporting_period_id === null ? null : Number(row.reporting_period_id),
+    payrollMode: row.payroll_mode,
+    locationId: null,
+    payrollMonth: null,
+    payrollYear: null,
+    payrollPositionInMonth: null,
+    description: row.description,
+    status: row.status,
+    createdBy: row.created_by,
+    runStartedAt: null,
+    finalizedAt: null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+async function listPayrollPeriodsLegacy({ search, status, payrollMode, reportingPeriodId, locationId, skip, take, sortBy, sortOrder }) {
+  const whereParts = [];
+
+  if (status) whereParts.push(Prisma.sql`p.status = ${status}`);
+  if (payrollMode) whereParts.push(Prisma.sql`p.payroll_mode = ${payrollMode}`);
+  if (reportingPeriodId) whereParts.push(Prisma.sql`p.reporting_period_id = ${reportingPeriodId}`);
+
+  if (search) {
+    const like = `%${search}%`;
+    whereParts.push(Prisma.sql`(
+      p.description ILIKE ${like}
+      OR p.created_by ILIKE ${like}
+      OR p.payroll_mode ILIKE ${like}
+      OR p.status ILIKE ${like}
+    )`);
+  }
+
+  if (locationId) {
+    whereParts.push(Prisma.sql`EXISTS (
+      SELECT 1
+      FROM payroll_entries pe
+      JOIN employees e ON e.id = pe.employee_id
+      WHERE pe.payroll_period_id = p.id
+        AND e.location_id = ${locationId}
+    )`);
+  }
+
+  const whereSql = whereParts.length
+    ? Prisma.sql`WHERE ${Prisma.join(whereParts, ' AND ')}`
+    : Prisma.empty;
+
+  const legacySortMap = {
+    id: Prisma.sql`p.id`,
+    payrollMode: Prisma.sql`p.payroll_mode`,
+    status: Prisma.sql`p.status`,
+    createdAt: Prisma.sql`p.created_at`,
+    updatedAt: Prisma.sql`p.updated_at`,
+  };
+  const orderColumn = legacySortMap[sortBy] || Prisma.sql`p.created_at`;
+  const orderDirection = String(sortOrder).toLowerCase() === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
+
+  const rows = await prisma.$queryRaw`
+    SELECT
+      p.id,
+      p.reporting_period_id,
+      p.payroll_mode,
+      p.description,
+      p.status,
+      p.created_by,
+      p.created_at,
+      p.updated_at
+    FROM payroll_periods p
+    ${whereSql}
+    ORDER BY ${orderColumn} ${orderDirection}
+    OFFSET ${skip}
+    LIMIT ${take}
+  `;
+
+  const countRows = await prisma.$queryRaw`
+    SELECT COUNT(*)::int AS total
+    FROM payroll_periods p
+    ${whereSql}
+  `;
+
+  return {
+    periods: Array.isArray(rows) ? rows.map(mapLegacyPeriodRow) : [],
+    total: Array.isArray(countRows) && countRows[0] ? Number(countRows[0].total || 0) : 0,
+  };
+}
+
 async function createPayrollPeriod(payload) {
   const createData = {
     reportingPeriodId: payload.reportingPeriodId || null,
@@ -71,9 +174,22 @@ async function createPayrollPeriod(payload) {
     createData.locationId = payload.locationId || null;
   }
 
-  return prisma.payrollPeriod.create({
-    data: createData,
-  });
+  try {
+    return await prisma.payrollPeriod.create({
+      data: createData,
+    });
+  } catch (err) {
+    if (!isMissingColumnError(err, 'payroll_periods.location_id')) throw err;
+    return prisma.payrollPeriod.create({
+      data: {
+        reportingPeriodId: payload.reportingPeriodId || null,
+        payrollMode: payload.payrollMode,
+        description: payload.description || null,
+        status: payload.status || 'draft',
+        createdBy: payload.createdBy || null,
+      },
+    });
+  }
 }
 
 async function updatePayrollPeriod(id, payload) {
@@ -94,10 +210,24 @@ async function updatePayrollPeriod(id, payload) {
     updateData.locationId = payload.locationId;
   }
 
-  return prisma.payrollPeriod.update({
-    where: { id },
-    data: updateData,
-  });
+  try {
+    return await prisma.payrollPeriod.update({
+      where: { id },
+      data: updateData,
+    });
+  } catch (err) {
+    if (!isMissingColumnError(err, 'payroll_periods.location_id')) throw err;
+    return prisma.payrollPeriod.update({
+      where: { id },
+      data: {
+        reportingPeriodId: payload.reportingPeriodId,
+        payrollMode: payload.payrollMode,
+        description: payload.description,
+        status: payload.status,
+        createdBy: payload.createdBy,
+      },
+    });
+  }
 }
 
 async function listPayrollPeriods({ search, status, payrollMode, payrollMonth, payrollYear, reportingPeriodId, locationId, skip, take, sortBy, sortOrder }) {
@@ -127,10 +257,20 @@ async function listPayrollPeriods({ search, status, payrollMode, payrollMonth, p
     ];
   }
 
-  const [periods, total] = await Promise.all([
-    prisma.payrollPeriod.findMany({ where, skip, take, orderBy: { [sortBy]: sortOrder } }),
-    prisma.payrollPeriod.count({ where }),
-  ]);
+  let periods = [];
+  let total = 0;
+
+  try {
+    [periods, total] = await Promise.all([
+      prisma.payrollPeriod.findMany({ where, skip, take, orderBy: { [sortBy]: sortOrder } }),
+      prisma.payrollPeriod.count({ where }),
+    ]);
+  } catch (err) {
+    if (!isMissingColumnError(err, 'payroll_periods.location_id')) throw err;
+    const legacy = await listPayrollPeriodsLegacy({ search, status, payrollMode, reportingPeriodId, locationId, skip, take, sortBy, sortOrder });
+    periods = legacy.periods;
+    total = legacy.total;
+  }
 
   const ids = periods.map((p) => p.id);
   if (!ids.length) {
@@ -170,7 +310,27 @@ async function listPayrollPeriods({ search, status, payrollMode, payrollMonth, p
 }
 
 async function getPayrollPeriodById(id) {
-  return prisma.payrollPeriod.findUnique({ where: { id } });
+  try {
+    return await prisma.payrollPeriod.findUnique({ where: { id } });
+  } catch (err) {
+    if (!isMissingColumnError(err, 'payroll_periods.location_id')) throw err;
+    const rows = await prisma.$queryRaw`
+      SELECT
+        p.id,
+        p.reporting_period_id,
+        p.payroll_mode,
+        p.description,
+        p.status,
+        p.created_by,
+        p.created_at,
+        p.updated_at
+      FROM payroll_periods p
+      WHERE p.id = ${id}
+      LIMIT 1
+    `;
+    if (!Array.isArray(rows) || !rows[0]) return null;
+    return mapLegacyPeriodRow(rows[0]);
+  }
 }
 
 async function createPayrollEntry(payload) {
@@ -405,10 +565,18 @@ async function listTaxBrackets({ locationId, isActive, effectiveDate, skip, take
     ];
   }
 
-  const [data, total] = await Promise.all([
-    prisma.payrollTaxBracket.findMany({ where, skip, take, orderBy: { [sortBy]: sortOrder } }),
-    prisma.payrollTaxBracket.count({ where }),
-  ]);
+  let data = [];
+  let total = 0;
+
+  try {
+    [data, total] = await Promise.all([
+      prisma.payrollTaxBracket.findMany({ where, skip, take, orderBy: { [sortBy]: sortOrder } }),
+      prisma.payrollTaxBracket.count({ where }),
+    ]);
+  } catch (err) {
+    if (!isMissingTableError(err, 'payroll_tax_brackets')) throw err;
+    return { data: [], total: 0, where };
+  }
 
   return { data, total, where };
 }
@@ -433,10 +601,18 @@ async function listIncrementPolicies({ locationId, isActive, effectiveDate, skip
     ];
   }
 
-  const [data, total] = await Promise.all([
-    prisma.payrollIncrementPolicy.findMany({ where, skip, take, orderBy: { [sortBy]: sortOrder } }),
-    prisma.payrollIncrementPolicy.count({ where }),
-  ]);
+  let data = [];
+  let total = 0;
+
+  try {
+    [data, total] = await Promise.all([
+      prisma.payrollIncrementPolicy.findMany({ where, skip, take, orderBy: { [sortBy]: sortOrder } }),
+      prisma.payrollIncrementPolicy.count({ where }),
+    ]);
+  } catch (err) {
+    if (!isMissingTableError(err, 'payroll_increment_policies')) throw err;
+    return { data: [], total: 0, where };
+  }
 
   return { data, total, where };
 }
