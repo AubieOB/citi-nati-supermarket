@@ -14,6 +14,68 @@ const prisma = new PrismaClient();
 const SNAPSHOT_VERSION = '1.0.0';
 const MAX_BATCH_SIZE = 1000;
 
+function camelToSnake(value) {
+  return String(value || '').replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+}
+
+function extractMissingColumn(error) {
+  const message = String(error?.message || '');
+  const match = message.match(/The column `([^`]+)` does not exist in the current database/i);
+  return match?.[1] || null;
+}
+
+function buildDbColumnToFieldMap(tableName, fields = []) {
+  const map = {};
+  fields.forEach((field) => {
+    const snake = camelToSnake(field);
+    map[`${tableName}.${snake}`] = field;
+    map[snake] = field;
+  });
+  return map;
+}
+
+async function findManyWithSelectFallback({
+  delegate,
+  args = {},
+  selectFields = [],
+  tableName,
+  extraSelect = null,
+  warnings = [],
+  label = 'section',
+}) {
+  let activeFields = [...selectFields];
+  const dbColumnToField = buildDbColumnToFieldMap(tableName, selectFields);
+
+  while (true) {
+    const select = activeFields.reduce((acc, field) => {
+      acc[field] = true;
+      return acc;
+    }, {});
+
+    if (extraSelect && typeof extraSelect === 'object') {
+      Object.assign(select, extraSelect);
+    }
+
+    try {
+      return await delegate.findMany({ ...args, select });
+    } catch (error) {
+      const missingColumn = extractMissingColumn(error);
+      const field = missingColumn ? (dbColumnToField[missingColumn] || dbColumnToField[String(missingColumn).split('.').pop()]) : null;
+
+      if (!field || !activeFields.includes(field)) {
+        throw error;
+      }
+
+      activeFields = activeFields.filter((name) => name !== field);
+      warnings.push(`${label}: missing column ${missingColumn} was skipped during export`);
+
+      if (!activeFields.length) {
+        return [];
+      }
+    }
+  }
+}
+
 /**
  * PAYROLL EXPORT - Exports all payroll data with complete relationships
  */
@@ -37,6 +99,8 @@ async function exportPayrollSnapshot(filters = {}) {
       metadata: {},
     },
   };
+
+  const compatibilityWarnings = [];
 
   try {
     // Fetch all employees with related data
@@ -110,17 +174,53 @@ async function exportPayrollSnapshot(filters = {}) {
     }));
 
     // Fetch payroll entries
-    const payrollEntries = await prisma.payrollEntry.findMany({
-      where: filters.locationId
-        ? {
-            payrollPeriod: { locationId: Number(filters.locationId) },
-          }
-        : undefined,
-      include: {
+    const payrollEntries = await findManyWithSelectFallback({
+      delegate: prisma.payrollEntry,
+      args: {
+        where: filters.locationId
+          ? {
+              payrollPeriod: { locationId: Number(filters.locationId) },
+            }
+          : undefined,
+      },
+      selectFields: [
+        'id',
+        'payrollPeriodId',
+        'employeeId',
+        'basicSalary',
+        'incrementAmount',
+        'grossPay',
+        'totalDeductions',
+        'netPay',
+        'daysWorked',
+        'daysAbsent',
+        'overtimeHours',
+        'overtimeNormalHours',
+        'overtimeDoubleHours',
+        'overtimeAmount',
+        'overtimeNormalAmount',
+        'overtimeDoubleAmount',
+        'loanDeductionAmount',
+        'absenceDeductionAmount',
+        'otherDeductionAmount',
+        'bonusAmount',
+        'giftAmount',
+        'leavePayAmount',
+        'payeAmount',
+        'loanBalanceAtPayroll',
+        'accruedInterestAtPayroll',
+        'netPayMidPortion',
+        'netPayEndPortion',
+        'notes',
+      ],
+      tableName: 'payroll_entries',
+      extraSelect: {
         employee: {
           select: { id: true, employeeNo: true },
         },
       },
+      warnings: compatibilityWarnings,
+      label: 'payrollEntries',
     });
 
     snapshot.data.payrollEntries = payrollEntries.map(pe => ({
@@ -155,10 +255,35 @@ async function exportPayrollSnapshot(filters = {}) {
     }));
 
     // Fetch loans
-    const loans = await prisma.employeeLoan.findMany({
-      where: filters.locationId
-        ? { employee: { locationId: Number(filters.locationId) } }
-        : undefined,
+    const loans = await findManyWithSelectFallback({
+      delegate: prisma.employeeLoan,
+      args: {
+        where: filters.locationId
+          ? { employee: { locationId: Number(filters.locationId) } }
+          : undefined,
+      },
+      selectFields: [
+        'id',
+        'employeeId',
+        'loanReference',
+        'principalAmount',
+        'balanceAmount',
+        'interestRate',
+        'accruedInterest',
+        'loanGrantedMonth',
+        'loanGrantedYear',
+        'monthlyDeductionAmount',
+        'repaymentEndMonth',
+        'repaymentEndYear',
+        'reason',
+        'startDate',
+        'endDate',
+        'status',
+        'notes',
+      ],
+      tableName: 'employee_loans',
+      warnings: compatibilityWarnings,
+      label: 'employeeLoans',
     });
 
     snapshot.data.loans = loans.map(loan => ({
@@ -182,12 +307,28 @@ async function exportPayrollSnapshot(filters = {}) {
     }));
 
     // Fetch loan transactions
-    const loanTransactions = await prisma.employeeLoanTransaction.findMany({
-      where: filters.locationId
-        ? {
-            employeeLoan: { employee: { locationId: Number(filters.locationId) } },
-          }
-        : undefined,
+    const loanTransactions = await findManyWithSelectFallback({
+      delegate: prisma.employeeLoanTransaction,
+      args: {
+        where: filters.locationId
+          ? {
+              employeeLoan: { employee: { locationId: Number(filters.locationId) } },
+            }
+          : undefined,
+      },
+      selectFields: [
+        'id',
+        'employeeLoanId',
+        'payrollPeriodId',
+        'transactionType',
+        'amount',
+        'principalComponent',
+        'interestComponent',
+        'notes',
+      ],
+      tableName: 'employee_loan_transactions',
+      warnings: compatibilityWarnings,
+      label: 'employeeLoanTransactions',
     });
 
     snapshot.data.loanTransactions = loanTransactions.map(lt => ({
@@ -202,10 +343,34 @@ async function exportPayrollSnapshot(filters = {}) {
     }));
 
     // Fetch terminations
-    const terminations = await prisma.employeeTermination.findMany({
-      where: filters.locationId
-        ? { employee: { locationId: Number(filters.locationId) } }
-        : undefined,
+    const terminations = await findManyWithSelectFallback({
+      delegate: prisma.employeeTermination,
+      args: {
+        where: filters.locationId
+          ? { employee: { locationId: Number(filters.locationId) } }
+          : undefined,
+      },
+      selectFields: [
+        'id',
+        'employeeId',
+        'terminationDate',
+        'terminationType',
+        'reason',
+        'daysWorkedInFinalMonth',
+        'halfPayReceived',
+        'halfPayDueInTerminationMonth',
+        'amountPaidInTerminationMonth',
+        'leavePayAccruedDays',
+        'leavePayAmount',
+        'outstandingLoanObligations',
+        'grossSettlementAmount',
+        'netSettlementAmount',
+        'settlementAmount',
+        'notes',
+      ],
+      tableName: 'employee_terminations',
+      warnings: compatibilityWarnings,
+      label: 'employeeTerminations',
     });
 
     snapshot.data.terminations = terminations.map(term => ({
@@ -228,10 +393,28 @@ async function exportPayrollSnapshot(filters = {}) {
     }));
 
     // Fetch reengagements
-    const reengagements = await prisma.employeeReengagement.findMany({
-      where: filters.locationId
-        ? { employee: { locationId: Number(filters.locationId) } }
-        : undefined,
+    const reengagements = await findManyWithSelectFallback({
+      delegate: prisma.employeeReengagement,
+      args: {
+        where: filters.locationId
+          ? { employee: { locationId: Number(filters.locationId) } }
+          : undefined,
+      },
+      selectFields: [
+        'id',
+        'employeeId',
+        'linkedTerminationId',
+        'wageAtRetrenchment',
+        'previousWage',
+        'reengagementWage',
+        'occupation',
+        'effectiveDate',
+        'contractExpiryDate',
+        'notes',
+      ],
+      tableName: 'employee_reengagements',
+      warnings: compatibilityWarnings,
+      label: 'employeeReengagements',
     });
 
     snapshot.data.reengagements = reengagements.map(reeng => ({
@@ -248,8 +431,26 @@ async function exportPayrollSnapshot(filters = {}) {
     }));
 
     // Fetch tax brackets
-    const taxBrackets = await prisma.payrollTaxBracket.findMany({
-      where: filters.locationId ? { locationId: Number(filters.locationId) } : undefined,
+    const taxBrackets = await findManyWithSelectFallback({
+      delegate: prisma.payrollTaxBracket,
+      args: {
+        where: filters.locationId ? { locationId: Number(filters.locationId) } : undefined,
+      },
+      selectFields: [
+        'id',
+        'locationId',
+        'effectiveFrom',
+        'effectiveTo',
+        'minIncome',
+        'maxIncome',
+        'ratePercent',
+        'fixedTaxAmount',
+        'description',
+        'isActive',
+      ],
+      tableName: 'payroll_tax_brackets',
+      warnings: compatibilityWarnings,
+      label: 'payrollTaxBrackets',
     });
 
     snapshot.data.taxBrackets = taxBrackets.map(tb => ({
@@ -266,8 +467,26 @@ async function exportPayrollSnapshot(filters = {}) {
     }));
 
     // Fetch increment policies
-    const incrementPolicies = await prisma.payrollIncrementPolicy.findMany({
-      where: filters.locationId ? { locationId: Number(filters.locationId) } : undefined,
+    const incrementPolicies = await findManyWithSelectFallback({
+      delegate: prisma.payrollIncrementPolicy,
+      args: {
+        where: filters.locationId ? { locationId: Number(filters.locationId) } : undefined,
+      },
+      selectFields: [
+        'id',
+        'locationId',
+        'minServiceMonths',
+        'maxServiceMonths',
+        'incrementPercent',
+        'incrementAmount',
+        'effectiveFrom',
+        'effectiveTo',
+        'notes',
+        'isActive',
+      ],
+      tableName: 'payroll_increment_policies',
+      warnings: compatibilityWarnings,
+      label: 'payrollIncrementPolicies',
     });
 
     snapshot.data.incrementPolicies = incrementPolicies.map(ip => ({
@@ -291,6 +510,7 @@ async function exportPayrollSnapshot(filters = {}) {
       totalLoans: snapshot.data.loans.length,
       totalTerminations: snapshot.data.terminations.length,
       totalReengagements: snapshot.data.reengagements.length,
+      compatibilityWarnings,
     };
 
     return snapshot;
