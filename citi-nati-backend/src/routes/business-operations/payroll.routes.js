@@ -1,6 +1,7 @@
 'use strict';
 
 const express = require('express');
+const uploadWorkbook = require('../../middlewares/uploadWorkbook');
 const {
   createPayrollPeriod,
   updatePayrollPeriod,
@@ -46,6 +47,8 @@ const {
   exportPayrollSnapshot,
   importPayrollSnapshot,
   exportFullBackupZip,
+  exportFullWorkbook,
+  importFullWorkbook,
 } = require('../../controllers/business-operations/payroll.controller');
 
 const router = express.Router();
@@ -105,5 +108,7 @@ router.delete('/purge', purgeAllPayrollData);
 router.get('/export/snapshot', exportPayrollSnapshot);
 router.post('/import/snapshot', importPayrollSnapshot);
 router.get('/export/backup-zip', exportFullBackupZip);
+router.get('/export/full-workbook', exportFullWorkbook);
+router.post('/import/full-workbook', uploadWorkbook.single('workbook'), importFullWorkbook);
 
 module.exports = router;

@@ -3,6 +3,7 @@
 const payrollService = require('../../services/business-operations/payroll.service');
 const importsService = require('../../services/business-operations/imports.service');
 const dataSnapshotService = require('../../services/business-operations/dataSnapshot.service');
+const fullWorkbookService = require('../../services/business-operations/fullWorkbook.service');
 const {
   parsePagination,
   parseSort,
@@ -1046,6 +1047,56 @@ async function exportFullBackupZip(req, res) {
   }
 }
 
+async function exportFullWorkbook(req, res) {
+  try {
+    const options = {
+      payrollFilters: {
+        locationId: req.query.locationId ? toInt(req.query.locationId) : null,
+      },
+      salesFilters: {
+        branchCode: req.query.branchCode ? String(req.query.branchCode) : null,
+        syncSourceCode: req.query.syncSourceCode ? String(req.query.syncSourceCode) : null,
+        startDate: req.query.startDate ? new Date(req.query.startDate) : null,
+        endDate: req.query.endDate ? new Date(req.query.endDate) : null,
+      },
+    };
+
+    const workbookBuffer = await fullWorkbookService.exportFullWorkbook(options);
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="citi-nati-full-workbook-${new Date().toISOString().split('T')[0]}.xlsx"`);
+    res.setHeader('Content-Length', workbookBuffer.length);
+    return res.send(workbookBuffer);
+  } catch (err) {
+    console.error('[BO][PAYROLL] exportFullWorkbook error:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to export full workbook' });
+  }
+}
+
+async function importFullWorkbook(req, res) {
+  try {
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ success: false, error: 'Workbook file is required in field "workbook"' });
+    }
+
+    const options = {
+      upsert: req.body.upsert !== 'false' && req.body.upsert !== false,
+      clearExisting: req.body.clearExisting === 'true' || req.body.clearExisting === true,
+      locationId: req.body.locationId ? toInt(req.body.locationId) : null,
+    };
+
+    const result = await fullWorkbookService.importFullWorkbook(req.file.buffer, options);
+    return res.json({
+      success: true,
+      message: 'Full workbook imported successfully',
+      result,
+    });
+  } catch (err) {
+    console.error('[BO][PAYROLL] importFullWorkbook error:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to import full workbook' });
+  }
+}
+
 module.exports = {
   createPayrollPeriod,
   updatePayrollPeriod,
@@ -1091,4 +1142,6 @@ module.exports = {
   exportPayrollSnapshot,
   importPayrollSnapshot,
   exportFullBackupZip,
+  exportFullWorkbook,
+  importFullWorkbook,
 };
