@@ -106,6 +106,14 @@ function isMissingReengagementsColumnError(err) {
   return isMissingColumnError(err) && String(err?.meta?.column || '').toLowerCase().startsWith('employee_reengagements.');
 }
 
+function isMissingLoansColumnError(err) {
+  return isMissingColumnError(err) && String(err?.meta?.column || '').toLowerCase().startsWith('employee_loans.');
+}
+
+function isMissingLoanTransactionsColumnError(err) {
+  return isMissingColumnError(err) && String(err?.meta?.column || '').toLowerCase().startsWith('employee_loan_transactions.');
+}
+
 function isMissingTableError(err, tableName = null) {
   const missing = err?.code === 'P2021';
   if (!missing) return false;
@@ -174,6 +182,36 @@ function mapLegacyPayrollEntryRow(row) {
       id: Number(row.payroll_period_id),
       payrollMode: row.payroll_mode,
     },
+  };
+}
+
+function mapLegacyLoanRow(row) {
+  return {
+    id: Number(row.id),
+    employeeId: Number(row.employee_id),
+    loanReference: row.loan_reference ?? null,
+    principalAmount: Number(row.principal_amount || 0),
+    balanceAmount: Number(row.balance_amount || 0),
+    interestRate: null,
+    accruedInterest: null,
+    loanGrantedMonth: null,
+    loanGrantedYear: null,
+    monthlyDeductionAmount: row.monthly_deduction_amount != null ? Number(row.monthly_deduction_amount) : null,
+    repaymentEndMonth: null,
+    repaymentEndYear: null,
+    reason: null,
+    startDate: row.start_date ?? null,
+    endDate: row.end_date ?? null,
+    status: row.status ?? 'active',
+    notes: row.notes ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    employee: row.employee_id ? {
+      id: Number(row.employee_id),
+      employeeNo: row.employee_no ?? null,
+      firstName: row.first_name ?? null,
+      surname: row.surname ?? null,
+    } : undefined,
   };
 }
 
@@ -757,25 +795,75 @@ async function listPayrollEntries({ payrollPeriodId, employeeId, locationId, ski
 }
 
 async function createEmployeeLoan(payload) {
-  return prisma.employeeLoan.create({
-    data: payload,
-    include: { employee: true },
-  });
+  try {
+    return await prisma.employeeLoan.create({
+      data: payload,
+      include: { employee: true },
+    });
+  } catch (err) {
+    if (!isMissingLoansColumnError(err)) throw err;
+    const safePayload = {
+      employeeId: payload.employeeId,
+      loanReference: payload.loanReference || null,
+      principalAmount: payload.principalAmount,
+      balanceAmount: payload.balanceAmount,
+      monthlyDeductionAmount: payload.monthlyDeductionAmount || null,
+      startDate: payload.startDate || null,
+      endDate: payload.endDate || null,
+      status: payload.status || 'active',
+      notes: payload.notes || null,
+    };
+    return prisma.employeeLoan.create({
+      data: safePayload,
+      include: { employee: true },
+    });
+  }
 }
 
 async function updateEmployeeLoan(id, payload) {
-  return prisma.employeeLoan.update({
-    where: { id },
-    data: payload,
-    include: { employee: true },
-  });
+  try {
+    return await prisma.employeeLoan.update({
+      where: { id },
+      data: payload,
+      include: { employee: true },
+    });
+  } catch (err) {
+    if (!isMissingLoansColumnError(err)) throw err;
+    const safePayload = {};
+    if (payload.loanReference !== undefined) safePayload.loanReference = payload.loanReference;
+    if (payload.principalAmount !== undefined) safePayload.principalAmount = payload.principalAmount;
+    if (payload.balanceAmount !== undefined) safePayload.balanceAmount = payload.balanceAmount;
+    if (payload.monthlyDeductionAmount !== undefined) safePayload.monthlyDeductionAmount = payload.monthlyDeductionAmount;
+    if (payload.startDate !== undefined) safePayload.startDate = payload.startDate;
+    if (payload.endDate !== undefined) safePayload.endDate = payload.endDate;
+    if (payload.status !== undefined) safePayload.status = payload.status;
+    if (payload.notes !== undefined) safePayload.notes = payload.notes;
+    return prisma.employeeLoan.update({
+      where: { id },
+      data: safePayload,
+      include: { employee: true },
+    });
+  }
 }
 
 async function getEmployeeLoanById(id) {
-  return prisma.employeeLoan.findUnique({
-    where: { id },
-    include: { employee: true },
-  });
+  try {
+    return await prisma.employeeLoan.findUnique({
+      where: { id },
+      include: { employee: true },
+    });
+  } catch (err) {
+    if (!isMissingLoansColumnError(err)) throw err;
+    const rows = await prisma.$queryRawUnsafe(
+      `SELECT l.*, e.id AS emp_id, e.employee_no, e.first_name, e.surname
+       FROM employee_loans l
+       JOIN employees e ON e.id = l.employee_id
+       WHERE l.id = $1 LIMIT 1`,
+      id,
+    );
+    if (!Array.isArray(rows) || !rows[0]) return null;
+    return mapLegacyLoanRow(rows[0]);
+  }
 }
 
 async function listEmployeeLoans({ employeeId, status, skip, take, sortBy, sortOrder }) {
@@ -783,33 +871,96 @@ async function listEmployeeLoans({ employeeId, status, skip, take, sortBy, sortO
   if (employeeId) where.employeeId = employeeId;
   if (status) where.status = status;
 
-  const [data, total] = await Promise.all([
-    prisma.employeeLoan.findMany({
-      where,
-      include: { employee: true },
-      skip,
-      take,
-      orderBy: { [sortBy]: sortOrder },
-    }),
-    prisma.employeeLoan.count({ where }),
-  ]);
+  let data = [];
+  let total = 0;
+
+  try {
+    [data, total] = await Promise.all([
+      prisma.employeeLoan.findMany({
+        where,
+        include: { employee: true },
+        skip,
+        take,
+        orderBy: { [sortBy]: sortOrder },
+      }),
+      prisma.employeeLoan.count({ where }),
+    ]);
+  } catch (err) {
+    if (!isMissingLoansColumnError(err)) throw err;
+    const conditions = [];
+    const params = [];
+    const bind = (v) => { params.push(v); return `$${params.length}`; };
+    if (employeeId) conditions.push(`l.employee_id = ${bind(employeeId)}`);
+    if (status) conditions.push(`l.status = ${bind(status)}`);
+    const where2 = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const countRows = await prisma.$queryRawUnsafe(
+      `SELECT COUNT(*)::int AS total FROM employee_loans l ${where2}`,
+      ...params,
+    );
+    params.push(skip || 0); const offsetPh = `$${params.length}`;
+    params.push(take || 50); const limitPh = `$${params.length}`;
+    const rows = await prisma.$queryRawUnsafe(
+      `SELECT l.id, l.employee_id, l.loan_reference, l.principal_amount, l.balance_amount,
+              l.monthly_deduction_amount, l.start_date, l.end_date, l.status, l.notes,
+              l.created_at, l.updated_at,
+              e.employee_no, e.first_name, e.surname
+       FROM employee_loans l
+       JOIN employees e ON e.id = l.employee_id
+       ${where2}
+       ORDER BY l.created_at DESC
+       OFFSET ${offsetPh} LIMIT ${limitPh}`,
+      ...params,
+    );
+    data = (Array.isArray(rows) ? rows : []).map(mapLegacyLoanRow);
+    total = Array.isArray(countRows) && countRows[0] ? Number(countRows[0].total || 0) : data.length;
+  }
 
   return { data, total, where };
 }
 
 async function createLoanTransaction(payload) {
-  return prisma.employeeLoanTransaction.create({
-    data: payload,
-    include: { employeeLoan: true, payrollPeriod: true },
-  });
+  try {
+    return await prisma.employeeLoanTransaction.create({
+      data: payload,
+      include: { employeeLoan: true, payrollPeriod: true },
+    });
+  } catch (err) {
+    if (!isMissingLoanTransactionsColumnError(err)) throw err;
+    const safePayload = {
+      employeeLoanId: payload.employeeLoanId,
+      payrollPeriodId: payload.payrollPeriodId || null,
+      transactionType: payload.transactionType,
+      amount: payload.amount,
+      notes: payload.notes || null,
+    };
+    return prisma.employeeLoanTransaction.create({
+      data: safePayload,
+      include: { employeeLoan: true, payrollPeriod: true },
+    });
+  }
 }
 
 async function updateLoanTransaction(id, payload) {
-  return prisma.employeeLoanTransaction.update({
-    where: { id },
-    data: payload,
-    include: { employeeLoan: true, payrollPeriod: true },
-  });
+  try {
+    return await prisma.employeeLoanTransaction.update({
+      where: { id },
+      data: payload,
+      include: { employeeLoan: true, payrollPeriod: true },
+    });
+  } catch (err) {
+    if (!isMissingLoanTransactionsColumnError(err)) throw err;
+    const safePayload = {};
+    if (payload.employeeLoanId !== undefined) safePayload.employeeLoanId = payload.employeeLoanId;
+    if (payload.payrollPeriodId !== undefined) safePayload.payrollPeriodId = payload.payrollPeriodId;
+    if (payload.transactionType !== undefined) safePayload.transactionType = payload.transactionType;
+    if (payload.amount !== undefined) safePayload.amount = payload.amount;
+    if (payload.notes !== undefined) safePayload.notes = payload.notes;
+    return prisma.employeeLoanTransaction.update({
+      where: { id },
+      data: safePayload,
+      include: { employeeLoan: true, payrollPeriod: true },
+    });
+  }
 }
 
 async function listLoanTransactions({ employeeLoanId, payrollPeriodId, transactionType, skip, take, sortBy, sortOrder }) {
@@ -818,16 +969,61 @@ async function listLoanTransactions({ employeeLoanId, payrollPeriodId, transacti
   if (payrollPeriodId) where.payrollPeriodId = payrollPeriodId;
   if (transactionType) where.transactionType = transactionType;
 
-  const [data, total] = await Promise.all([
-    prisma.employeeLoanTransaction.findMany({
-      where,
-      include: { employeeLoan: true, payrollPeriod: true },
-      skip,
-      take,
-      orderBy: { [sortBy]: sortOrder },
-    }),
-    prisma.employeeLoanTransaction.count({ where }),
-  ]);
+  let data = [];
+  let total = 0;
+
+  try {
+    [data, total] = await Promise.all([
+      prisma.employeeLoanTransaction.findMany({
+        where,
+        include: { employeeLoan: true, payrollPeriod: true },
+        skip,
+        take,
+        orderBy: { [sortBy]: sortOrder },
+      }),
+      prisma.employeeLoanTransaction.count({ where }),
+    ]);
+  } catch (err) {
+    if (!isMissingLoanTransactionsColumnError(err)) throw err;
+    const conditions = [];
+    const params = [];
+    const bind = (v) => { params.push(v); return `$${params.length}`; };
+    if (employeeLoanId) conditions.push(`t.employee_loan_id = ${bind(employeeLoanId)}`);
+    if (payrollPeriodId) conditions.push(`t.payroll_period_id = ${bind(payrollPeriodId)}`);
+    if (transactionType) conditions.push(`t.transaction_type = ${bind(transactionType)}`);
+    const where2 = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const countRows = await prisma.$queryRawUnsafe(
+      `SELECT COUNT(*)::int AS total FROM employee_loan_transactions t ${where2}`,
+      ...params,
+    );
+
+    params.push(skip || 0); const offsetPh = `$${params.length}`;
+    params.push(take || 50); const limitPh = `$${params.length}`;
+    const rows = await prisma.$queryRawUnsafe(
+      `SELECT t.id, t.employee_loan_id, t.payroll_period_id, t.transaction_type, t.amount,
+              t.notes, t.created_at
+       FROM employee_loan_transactions t
+       ${where2}
+       ORDER BY t.created_at DESC
+       OFFSET ${offsetPh} LIMIT ${limitPh}`,
+      ...params,
+    );
+
+    data = (Array.isArray(rows) ? rows : []).map((row) => ({
+      id: Number(row.id),
+      employeeLoanId: Number(row.employee_loan_id),
+      payrollPeriodId: row.payroll_period_id == null ? null : Number(row.payroll_period_id),
+      transactionType: row.transaction_type,
+      amount: Number(row.amount || 0),
+      principalComponent: null,
+      interestComponent: null,
+      notes: row.notes ?? null,
+      createdAt: row.created_at,
+    }));
+
+    total = Array.isArray(countRows) && countRows[0] ? Number(countRows[0].total || 0) : data.length;
+  }
 
   return { data, total, where };
 }

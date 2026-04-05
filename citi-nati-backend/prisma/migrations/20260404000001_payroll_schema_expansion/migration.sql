@@ -187,7 +187,70 @@ CREATE INDEX IF NOT EXISTS "employee_reengagements_linked_termination_id_idx"
   ON "employee_reengagements"("linked_termination_id");
 
 -- ============================================================
--- 5. payroll_tax_brackets — create table if not exists
+-- 5. employee_loans — add missing columns
+-- ============================================================
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'employee_loans' AND column_name = 'interest_rate') THEN
+    ALTER TABLE "employee_loans" ADD COLUMN "interest_rate" DOUBLE PRECISION;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'employee_loans' AND column_name = 'accrued_interest') THEN
+    ALTER TABLE "employee_loans" ADD COLUMN "accrued_interest" DOUBLE PRECISION DEFAULT 0;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'employee_loans' AND column_name = 'loan_granted_month') THEN
+    ALTER TABLE "employee_loans" ADD COLUMN "loan_granted_month" INTEGER;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'employee_loans' AND column_name = 'loan_granted_year') THEN
+    ALTER TABLE "employee_loans" ADD COLUMN "loan_granted_year" INTEGER;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'employee_loans' AND column_name = 'repayment_end_month') THEN
+    ALTER TABLE "employee_loans" ADD COLUMN "repayment_end_month" INTEGER;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'employee_loans' AND column_name = 'repayment_end_year') THEN
+    ALTER TABLE "employee_loans" ADD COLUMN "repayment_end_year" INTEGER;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'employee_loans' AND column_name = 'reason') THEN
+    ALTER TABLE "employee_loans" ADD COLUMN "reason" TEXT;
+  END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS "employee_loans_status_idx"
+  ON "employee_loans"("status");
+
+-- ============================================================
+-- 6. employee_loan_transactions — add missing columns
+-- ============================================================
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'employee_loan_transactions' AND column_name = 'principal_component') THEN
+    ALTER TABLE "employee_loan_transactions" ADD COLUMN "principal_component" DOUBLE PRECISION;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'employee_loan_transactions' AND column_name = 'interest_component') THEN
+    ALTER TABLE "employee_loan_transactions" ADD COLUMN "interest_component" DOUBLE PRECISION;
+  END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS "employee_loan_transactions_transaction_type_idx"
+  ON "employee_loan_transactions"("transaction_type");
+
+-- ============================================================
+-- 7. payroll_tax_brackets — create table if not exists
 -- ============================================================
 CREATE TABLE IF NOT EXISTS "payroll_tax_brackets" (
   "id"               SERIAL         NOT NULL,
@@ -212,7 +275,7 @@ CREATE INDEX IF NOT EXISTS "payroll_tax_brackets_is_active_effective_from_idx"
   ON "payroll_tax_brackets"("is_active", "effective_from");
 
 -- ============================================================
--- 6. payroll_increment_policies — create table if not exists
+-- 8. payroll_increment_policies — create table if not exists
 -- ============================================================
 CREATE TABLE IF NOT EXISTS "payroll_increment_policies" (
   "id"                  SERIAL         NOT NULL,
