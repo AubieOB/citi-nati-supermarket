@@ -388,6 +388,27 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
     setSelectedRowId(null);
   }, [selectedRowId]);
 
+  const downloadReceiptPDF = useCallback(async (saleId) => {
+    const parsedId = Number(saleId);
+    if (!Number.isFinite(parsedId) || parsedId <= 0) {
+      notifyError('Invalid sale id for PDF download', 2200);
+      return;
+    }
+
+    try {
+      const url = `/${apiBase}/${parsedId}/receipt.pdf`;
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = true;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      notifySuccess('Receipt PDF downloaded', 1800);
+    } catch (error) {
+      notifyError(`PDF download failed: ${error.message}`, 3000);
+    }
+  }, [apiBase]);
+
   const printReceipt = useCallback((receipt) => {
     if (!receipt) {
       notifyInfo('No receipt available to print', 1800);
@@ -520,27 +541,6 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
     document.body.removeChild(anchor);
     URL.revokeObjectURL(url);
   }, []);
-
-  const downloadReceiptPDF = useCallback(async (saleId) => {
-    const parsedId = Number(saleId);
-    if (!Number.isFinite(parsedId) || parsedId <= 0) {
-      notifyError('Invalid sale id for PDF download', 2200);
-      return;
-    }
-
-    try {
-      const url = `/${apiBase}/${parsedId}/receipt.pdf`;
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = true;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      notifySuccess('Receipt PDF downloaded', 1800);
-    } catch (error) {
-      notifyError(`PDF download failed: ${error.message}`, 3000);
-    }
-  }, [apiBase]);
 
   const submitSale = useCallback(async () => {
     if (cart.length === 0) {
