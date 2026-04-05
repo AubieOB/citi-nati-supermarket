@@ -73,6 +73,32 @@ function toDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function camelToSnake(value) {
+  return String(value || '').replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+}
+
+function extractMissingColumn(error) {
+  const message = String(error?.message || '');
+  const match = message.match(/The column `([^`]+)` does not exist in the current database/i);
+  return match?.[1] || null;
+}
+
+function findMissingColumnField(columns = [], missingColumn = null) {
+  if (!missingColumn) return null;
+  const normalizedMissing = String(missingColumn).toLowerCase();
+  const missingLeaf = normalizedMissing.split('.').pop();
+
+  for (const column of columns) {
+    const key = String(column?.key || '');
+    if (!key) continue;
+    const snake = camelToSnake(key).toLowerCase();
+    if (normalizedMissing.endsWith(`.${snake}`) || missingLeaf === snake || missingLeaf === key.toLowerCase()) {
+      return key;
+    }
+  }
+  return null;
+}
+
 function buildCursorWhere(baseWhere, cursorField, lastCursorValue) {
   if (lastCursorValue === null || lastCursorValue === undefined) return baseWhere;
   const cursorClause = { [cursorField]: { gt: lastCursorValue } };
@@ -113,14 +139,41 @@ async function streamModelSheet({
   const sheet = createStreamWorksheet(workbook, title, columns);
   let lastCursor = null;
   let rowsWritten = 0;
+  let activeColumns = [...columns];
 
   while (true) {
-    const batch = await model.findMany({
-      where: buildCursorWhere(where, cursorField, lastCursor),
-      orderBy: { [cursorField]: 'asc' },
-      take: batchSize,
-      select,
-    });
+    let batch = null;
+    while (true) {
+      const select = activeColumns.reduce((acc, column) => {
+        acc[column.key] = true;
+        return acc;
+      }, {});
+
+      try {
+        batch = await model.findMany({
+          where: buildCursorWhere(where, cursorField, lastCursor),
+          orderBy: { [cursorField]: 'asc' },
+          take: batchSize,
+          select,
+        });
+        break;
+      } catch (error) {
+        const missingColumn = extractMissingColumn(error);
+        const missingField = findMissingColumnField(activeColumns, missingColumn);
+
+        if (!missingField) {
+          throw error;
+        }
+
+        activeColumns = activeColumns.filter((column) => column.key !== missingField);
+        logExportProgress(logLabel, `skipping missing column for ${title}`, { missingColumn, missingField });
+
+        if (!activeColumns.length) {
+          batch = [];
+          break;
+        }
+      }
+    }
 
     if (!batch.length) break;
 
