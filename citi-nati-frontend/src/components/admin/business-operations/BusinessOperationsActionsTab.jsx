@@ -68,7 +68,7 @@ const BusinessOperationsActionsTab = () => {
       <div style={{ display: 'flex', gap: '0.55rem', overflowX: 'auto' }}>
         <button type="button" onClick={() => setActiveSubtab('create')} style={subTabStyle(activeSubtab === 'create')}>
           <i className="fas fa-plus-circle"></i>
-          Create
+          Destructive Actions
         </button>
       </div>
 
