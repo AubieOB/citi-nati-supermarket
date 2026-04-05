@@ -1049,6 +1049,7 @@ async function exportFullBackupZip(req, res) {
 
 async function exportFullWorkbook(req, res) {
   try {
+    const includeRawPayload = req.query.includeRawPayload === 'true';
     const options = {
       payrollFilters: {
         locationId: req.query.locationId ? toInt(req.query.locationId) : null,
@@ -1059,6 +1060,7 @@ async function exportFullWorkbook(req, res) {
         startDate: req.query.startDate ? new Date(req.query.startDate) : null,
         endDate: req.query.endDate ? new Date(req.query.endDate) : null,
       },
+      includeRawPayload,
     };
 
     const workbookBuffer = await fullWorkbookService.exportFullWorkbook(options);

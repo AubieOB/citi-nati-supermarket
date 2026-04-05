@@ -16,6 +16,21 @@ function safeJsonStringify(value) {
   });
 }
 
+function normalizeReadCellValue(value) {
+  if (value === null || value === undefined) return null;
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'bigint') return value.toString();
+  if (typeof value === 'object') {
+    if (value.text !== undefined) return String(value.text || '');
+    if (value.result !== undefined) return normalizeReadCellValue(value.result);
+    if (Array.isArray(value.richText)) {
+      return value.richText.map((item) => item?.text || '').join('');
+    }
+    return safeJsonStringify(value);
+  }
+  return value;
+}
+
 function normalizeCellValue(value) {
   if (value === null || value === undefined) return value;
   if (typeof value === 'bigint') return value.toString();
@@ -99,6 +114,94 @@ function addEmbeddedJsonSheet(workbook, sheetName, payload) {
   });
 }
 
+function readTabularSheet(workbook, title) {
+  const sheet = workbook.getWorksheet(safeWorksheetName(title));
+  if (!sheet || sheet.rowCount < 2) return [];
+
+  const headerRow = sheet.getRow(1);
+  const headers = [];
+  for (let col = 1; col <= headerRow.cellCount; col += 1) {
+    const header = normalizeReadCellValue(headerRow.getCell(col).value);
+    headers.push(String(header || '').trim());
+  }
+
+  const rows = [];
+  for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
+    const row = sheet.getRow(rowNumber);
+    const item = {};
+    let hasValue = false;
+
+    headers.forEach((header, index) => {
+      if (!header) return;
+      const cellValue = normalizeReadCellValue(row.getCell(index + 1).value);
+      if (cellValue !== null && cellValue !== '') hasValue = true;
+      item[header] = cellValue;
+    });
+
+    if (hasValue) rows.push(item);
+  }
+
+  return rows;
+}
+
+function buildSnapshotsFromTabularSheets(workbook) {
+  const payrollData = {
+    employees: readTabularSheet(workbook, 'Payroll_Employees'),
+    salaryStructures: readTabularSheet(workbook, 'Payroll_SalaryStructures'),
+    payrollPeriods: readTabularSheet(workbook, 'Payroll_Periods'),
+    payrollEntries: readTabularSheet(workbook, 'Payroll_Entries'),
+    loans: readTabularSheet(workbook, 'Payroll_Loans'),
+    loanTransactions: readTabularSheet(workbook, 'Payroll_LoanTx'),
+    terminations: readTabularSheet(workbook, 'Payroll_Terminations'),
+    reengagements: readTabularSheet(workbook, 'Payroll_Reengagements'),
+    taxBrackets: readTabularSheet(workbook, 'Payroll_TaxBrackets'),
+    incrementPolicies: readTabularSheet(workbook, 'Payroll_IncrementPolicies'),
+  };
+
+  const salesData = {
+    syncSources: readTabularSheet(workbook, 'Sales_SyncSources'),
+    invoices: readTabularSheet(workbook, 'Sales_Invoices'),
+    invoiceItems: readTabularSheet(workbook, 'Sales_InvoiceItems'),
+    products: readTabularSheet(workbook, 'Sales_Products'),
+  };
+
+  const payrollSnapshot = {
+    version: '1.0.0',
+    type: 'payroll',
+    exportedAt: new Date().toISOString(),
+    filters: {},
+    data: {
+      ...payrollData,
+      metadata: {
+        totalEmployees: payrollData.employees.length,
+        totalPeriods: payrollData.payrollPeriods.length,
+        totalEntries: payrollData.payrollEntries.length,
+        totalLoans: payrollData.loans.length,
+        totalTerminations: payrollData.terminations.length,
+        totalReengagements: payrollData.reengagements.length,
+      },
+    },
+  };
+
+  const salesSnapshot = {
+    version: '1.0.0',
+    type: 'sales',
+    exportedAt: new Date().toISOString(),
+    filters: {},
+    data: {
+      ...salesData,
+      metadata: {
+        totalSyncSources: salesData.syncSources.length,
+        totalInvoices: salesData.invoices.length,
+        totalInvoiceItems: salesData.invoiceItems.length,
+        totalProducts: salesData.products.length,
+      },
+    },
+  };
+
+  return { payrollSnapshot, salesSnapshot };
+}
+
 function readEmbeddedJsonSheet(workbook, sheetName) {
   const sheet = workbook.getWorksheet(sheetName);
   if (!sheet) return null;
@@ -139,6 +242,7 @@ async function exportFullWorkbook(options = {}) {
     { field: 'Version', value: payrollSnapshot.version || '1.0.0' },
     { field: 'Exported At', value: new Date().toISOString() },
     { field: 'Restore', value: 'Use POST /api/business-operations/payroll/import/full-workbook with field name workbook' },
+    { field: 'Embedded Raw Payload', value: options.includeRawPayload ? 'Yes' : 'No (tabular import fallback enabled)' },
     { field: 'Payroll Employees', value: Number(payrollSnapshot.data?.metadata?.totalEmployees || 0) },
     { field: 'Payroll Entries', value: Number(payrollSnapshot.data?.metadata?.totalEntries || 0) },
     { field: 'Sales Invoices', value: Number(salesSnapshot.data?.metadata?.totalInvoices || 0) },
@@ -161,9 +265,11 @@ async function exportFullWorkbook(options = {}) {
   addTabularSheet(workbook, 'Sales_InvoiceItems', salesSnapshot.data?.invoiceItems || []);
   addTabularSheet(workbook, 'Sales_Products', salesSnapshot.data?.products || []);
 
-  // Keep exact payloads in hidden sheets so the workbook can be re-imported with full fidelity.
-  addEmbeddedJsonSheet(workbook, PAYROLL_JSON_SHEET, payrollSnapshot);
-  addEmbeddedJsonSheet(workbook, SALES_JSON_SHEET, salesSnapshot);
+  // Hidden raw payload is optional because it can be very large and cause memory pressure.
+  if (options.includeRawPayload === true) {
+    addEmbeddedJsonSheet(workbook, PAYROLL_JSON_SHEET, payrollSnapshot);
+    addEmbeddedJsonSheet(workbook, SALES_JSON_SHEET, salesSnapshot);
+  }
 
   return workbook.xlsx.writeBuffer();
 }
@@ -176,10 +282,20 @@ async function importFullWorkbook(fileBuffer, options = {}) {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(fileBuffer);
 
-  const payrollSnapshot = readEmbeddedJsonSheet(workbook, PAYROLL_JSON_SHEET);
-  const salesSnapshot = readEmbeddedJsonSheet(workbook, SALES_JSON_SHEET);
+  let payrollSnapshot = readEmbeddedJsonSheet(workbook, PAYROLL_JSON_SHEET);
+  let salesSnapshot = readEmbeddedJsonSheet(workbook, SALES_JSON_SHEET);
 
+  // Fallback: reconstruct snapshots from visible tabular sheets.
   if (!payrollSnapshot && !salesSnapshot) {
+    const rebuilt = buildSnapshotsFromTabularSheets(workbook);
+    payrollSnapshot = rebuilt.payrollSnapshot;
+    salesSnapshot = rebuilt.salesSnapshot;
+  }
+
+  const hasPayrollData = payrollSnapshot && Object.values(payrollSnapshot.data || {}).some((value) => Array.isArray(value) && value.length > 0);
+  const hasSalesData = salesSnapshot && Object.values(salesSnapshot.data || {}).some((value) => Array.isArray(value) && value.length > 0);
+
+  if (!hasPayrollData && !hasSalesData) {
     throw new Error('Workbook is missing embedded snapshot payload sheets');
   }
 
@@ -188,7 +304,7 @@ async function importFullWorkbook(fileBuffer, options = {}) {
     sales: null,
   };
 
-  if (payrollSnapshot) {
+  if (hasPayrollData) {
     importResult.payroll = await dataSnapshotService.importPayrollSnapshot(payrollSnapshot, {
       upsert: options.upsert !== false,
       clearExisting: options.clearExisting === true,
@@ -196,7 +312,7 @@ async function importFullWorkbook(fileBuffer, options = {}) {
     });
   }
 
-  if (salesSnapshot) {
+  if (hasSalesData) {
     importResult.sales = await dataSnapshotService.importSalesSnapshot(salesSnapshot, {
       upsert: options.upsert !== false,
     });
