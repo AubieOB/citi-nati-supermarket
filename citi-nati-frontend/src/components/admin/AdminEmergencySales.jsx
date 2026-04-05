@@ -39,7 +39,6 @@ function buildReceiptFromSale(sale) {
   if (!sale) return null;
 
   return {
-    emergency_sale_id: Number(sale.emergency_sale_id ?? sale.id ?? 0) || null,
     sale_ref: sale.sale_ref || sale.saleRef,
     created_at: sale.createdAt || sale.created_at,
     cashier_name: sale.cashier_name || sale.cashierName || '-',
@@ -389,52 +388,10 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
     setSelectedRowId(null);
   }, [selectedRowId]);
 
-  const queueThermalPrint = useCallback(async (saleId, options = {}) => {
-    const parsedId = Number(saleId);
-    if (!Number.isFinite(parsedId) || parsedId <= 0) {
-      if (!options.silentError) {
-        notifyInfo('Thermal print skipped: sale id unavailable', 2200);
-      }
-      return false;
-    }
-
-    try {
-      const response = await api.post(`/${apiBase}/${parsedId}/print-thermal`, {
-        copies: Number(options.copies || 1),
-      });
-
-      if (!options.silentSuccess) {
-        notifySuccess(
-          `Thermal print queued (${response.data?.command_id || 'command pending'})`,
-          2200
-        );
-      }
-
-      return true;
-    } catch (error) {
-      if (!options.silentError) {
-        notifyError(
-          `Thermal print unavailable: ${error.response?.data?.error || error.message}`,
-          3200
-        );
-      }
-      return false;
-    }
-  }, [apiBase]);
-
   const printReceipt = useCallback((receipt) => {
     if (!receipt) {
       notifyInfo('No receipt available to print', 1800);
       return;
-    }
-
-    const thermalSaleId = Number(receipt.emergency_sale_id ?? receipt.id ?? 0);
-    if (Number.isFinite(thermalSaleId) && thermalSaleId > 0) {
-      queueThermalPrint(thermalSaleId, {
-        copies: 1,
-        silentSuccess: false,
-        silentError: false,
-      });
     }
 
     const itemsHtml = (receipt.items || [])
@@ -506,22 +463,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
     popup.document.close();
     popup.focus();
     popup.print();
-  }, [queueThermalPrint]);
-
-  const queueThermalPrintForSale = useCallback((sale) => {
-    if (!sale) {
-      notifyInfo('No sale selected for thermal print', 1800);
-      return;
-    }
-
-    const parsedId = Number(sale.id || sale.emergency_sale_id || 0);
-    if (!Number.isFinite(parsedId) || parsedId <= 0) {
-      notifyError('Cannot queue thermal print: invalid sale id', 2200);
-      return;
-    }
-
-    queueThermalPrint(parsedId, { copies: 1, silentSuccess: false, silentError: false });
-  }, [queueThermalPrint]);
+  }, []);
 
   const viewReceipt = useCallback((sale) => {
     const receipt = buildReceiptFromSale(sale);
@@ -1183,13 +1125,6 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
                             style={{ border: '1px solid #5a8b5f', backgroundColor: '#edf9ef', color: '#1f6a2b', borderRadius: '4px', width: '28px', height: '24px', cursor: 'pointer' }}
                           >
                             <i className="fas fa-download"></i>
-                          </button>
-                          <button
-                            onClick={() => queueThermalPrintForSale(sale)}
-                            title="Thermal reprint"
-                            style={{ border: '1px solid #b17714', backgroundColor: '#fff4de', color: '#8a5b09', borderRadius: '4px', width: '28px', height: '24px', cursor: 'pointer' }}
-                          >
-                            <i className="fas fa-print"></i>
                           </button>
                         </div>
                       </td>

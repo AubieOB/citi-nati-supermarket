@@ -7,7 +7,6 @@ const {
   lookupEmergencyProducts,
   createEmergencySale,
   listEmergencySales,
-  queueEmergencySaleThermalPrint,
 } = require('../controllers/emergencySales.controller');
 
 const router = express.Router();
@@ -85,7 +84,6 @@ router.get('/emergency-sales/lookup', lookupEmergencyProducts);
  * Create a new emergency sale (cashier is the authenticated user).
  */
 router.post('/emergency-sales', createEmergencySale);
-router.post('/emergency-sales/:id/print-thermal', queueEmergencySaleThermalPrint);
 
 /**
  * GET /api/cashier/emergency-sales

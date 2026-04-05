@@ -1697,8 +1697,6 @@ function isCommandTypeEnabled(commandType) {
       return features.enablePromotionSync;
     case 'WRITE_INVOICE':
       return features.enableOnlineOrderWriteback && features.enableInvoiceWriteback;
-    case 'THERMAL_PRINT_RECEIPT':
-      return features.enableThermalPrinting;
     default:
       return false;
   }

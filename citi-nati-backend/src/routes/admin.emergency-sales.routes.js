@@ -7,7 +7,6 @@ const {
   listEmergencySales,
   getEmergencySaleById,
   retryEmergencySaleSync,
-  queueEmergencySaleThermalPrint,
 } = require('../controllers/emergencySales.controller');
 
 const router = express.Router();
@@ -16,7 +15,6 @@ router.use(verifyTokenMiddleware, verifyAdmin);
 
 router.get('/lookup', lookupEmergencyProducts);
 router.post('/', createEmergencySale);
-router.post('/:id/print-thermal', queueEmergencySaleThermalPrint);
 router.get('/', listEmergencySales);
 router.get('/:id', getEmergencySaleById);
 router.post('/:id/retry-sync', retryEmergencySaleSync);

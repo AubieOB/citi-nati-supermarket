@@ -3,7 +3,6 @@ const { PrismaClient } = require('@prisma/client');
 const { resolveEffectiveStock, enrichProductStock } = require('../utils/stockResolver');
 const { notifyLowStock } = require('../utils/messageService');
 const { recordPosSyncEvent } = require('../services/posSyncMonitor.service');
-const { enqueueCommand } = require('../services/posCommandQueue.service');
 
 const prisma = new PrismaClient();
 const EMERGENCY_SALE_MAX_RETRIES = Number.parseInt(process.env.EMERGENCY_SALE_MAX_RETRIES || '10', 10);
@@ -178,35 +177,6 @@ function buildPosWriteInvoicePayload(emergencySale) {
     items,
     emergencySaleId: emergencySale.id,
     saleRef: emergencySale.saleRef,
-  };
-}
-
-function buildEmergencyReceiptPayload(sale) {
-  const formattedSale = formatEmergencySale(sale);
-  const syncNote = formattedSale.sync_status === SYNC_STATUS.SYNCED ? 'Synced to POS' : 'Pending POS Sync';
-
-  return {
-    emergency_sale_id: formattedSale.id,
-    sale_ref: formattedSale.sale_ref,
-    created_at: formattedSale.createdAt,
-    cashier_name: formattedSale.cashier_name,
-    sync_status: formattedSale.sync_status,
-    note: syncNote,
-    items: (formattedSale.items || []).map((item) => ({
-      product_name: item.productName,
-      product_code: item.productCode,
-      barcode: item.barcode,
-      qty: item.qty,
-      unit_price: item.unitPrice,
-      line_total: item.lineTotal,
-    })),
-    subtotal: formattedSale.subtotal,
-    discount: formattedSale.discount,
-    total: formattedSale.total,
-    tendered_amount: formattedSale.tendered_amount,
-    change_amount: formattedSale.change_amount,
-    balance_due: formattedSale.balance_due,
-    payment_method: formattedSale.payment_method,
   };
 }
 
@@ -506,99 +476,38 @@ async function createEmergencySale(req, res) {
 
     const formattedSale = formatEmergencySale(created.sale);
     const posWritePayload = buildPosWriteInvoicePayload(created.sale);
-    const receiptPayload = buildEmergencyReceiptPayload(created.sale);
-
-    console.log('[RECEIPT_PAYLOAD] emergency sale receipt generated:', {
-      saleRef: receiptPayload.sale_ref,
-      emergencySaleId: receiptPayload.emergency_sale_id,
-      itemCount: Array.isArray(receiptPayload.items) ? receiptPayload.items.length : 0,
-      total: receiptPayload.total,
-    });
 
     return res.status(201).json({
       success: true,
       message: 'Emergency sale recorded successfully',
       sale: formattedSale,
-      receipt: receiptPayload,
+      receipt: {
+        sale_ref: formattedSale.sale_ref,
+        created_at: formattedSale.createdAt,
+        cashier_name: formattedSale.cashier_name,
+        sync_status: formattedSale.sync_status,
+        note: 'Pending POS Sync',
+        items: (formattedSale.items || []).map((item) => ({
+          product_name: item.productName,
+          product_code: item.productCode,
+          barcode: item.barcode,
+          qty: item.qty,
+          unit_price: item.unitPrice,
+          line_total: item.lineTotal,
+        })),
+        subtotal: formattedSale.subtotal,
+        discount: formattedSale.discount,
+        total: formattedSale.total,
+        tendered_amount: formattedSale.tendered_amount,
+        change_amount: formattedSale.change_amount,
+        balance_due: formattedSale.balance_due,
+        payment_method: formattedSale.payment_method,
+      },
       pos_write_payload: posWritePayload,
     });
   } catch (error) {
     console.error('[EMERGENCY SALES] create failed:', error.message);
     return res.status(400).json({ success: false, error: error.message || 'Failed to create emergency sale' });
-  }
-}
-
-async function queueEmergencySaleThermalPrint(req, res) {
-  try {
-    const id = toSafeInt(req.params.id ?? req.body?.emergency_sale_id ?? req.body?.emergencySaleId);
-    const saleRef = String(req.body?.sale_ref || req.body?.saleRef || '').trim();
-    const copiesRaw = toSafeInt(req.body?.copies, 1);
-    const copies = Math.max(1, Math.min(3, copiesRaw || 1));
-    const printerName = String(req.body?.printer_name || req.body?.printerName || '').trim();
-
-    if (!id && !saleRef) {
-      return res.status(400).json({ success: false, error: 'Emergency sale id or sale_ref is required' });
-    }
-
-    const sale = await prisma.emergencySale.findFirst({
-      where: id ? { id } : { saleRef },
-      include: { items: true },
-    });
-
-    if (!sale) {
-      return res.status(404).json({ success: false, error: 'Emergency sale not found' });
-    }
-
-    const requesterRole = String(req.user?.role || '').trim().toLowerCase();
-    const requesterUserId = String(req.user?.userId || '').trim();
-    if (requesterRole === 'cashier' && requesterUserId && String(sale.cashierId || '') !== requesterUserId) {
-      return res.status(403).json({ success: false, error: 'Access denied' });
-    }
-
-    const receipt = buildEmergencyReceiptPayload(sale);
-
-    console.log('[EMERGENCY_RECEIPT] queue thermal print requested:', {
-      saleRef: receipt.sale_ref,
-      emergencySaleId: receipt.emergency_sale_id,
-      requestedBy: req.user?.userId || null,
-      copies,
-      hasPrinterOverride: Boolean(printerName),
-    });
-
-    const queued = await enqueueCommand(
-      'THERMAL_PRINT_RECEIPT',
-      {
-        receipt,
-        copies,
-        printerName: printerName || null,
-        source: 'emergency-sales',
-      },
-      {
-        source: 'emergency-sales-controller',
-        relatedEntityType: 'EmergencySale',
-        relatedEntityId: String(sale.id),
-        createdBy: req.user?.userId ? String(req.user.userId) : null,
-      }
-    );
-
-    console.log('[THERMAL_PRINT] queued for POS agent:', {
-      commandId: queued.id,
-      saleRef: sale.saleRef,
-      emergencySaleId: sale.id,
-      copies,
-    });
-
-    return res.status(202).json({
-      success: true,
-      message: 'Thermal print queued for POS agent',
-      command_id: queued.id,
-      sale_ref: sale.saleRef,
-      emergency_sale_id: sale.id,
-      copies,
-    });
-  } catch (error) {
-    console.error('[THERMAL_PRINT] failed to queue emergency thermal print:', error.message);
-    return res.status(500).json({ success: false, error: 'Failed to queue thermal print job' });
   }
 }
 
@@ -970,7 +879,6 @@ module.exports = {
   listEmergencySales,
   getEmergencySaleById,
   retryEmergencySaleSync,
-  queueEmergencySaleThermalPrint,
   getPendingEmergencySalesForPosSync,
   ackEmergencySaleSynced,
   ackEmergencySaleSyncFailed,
