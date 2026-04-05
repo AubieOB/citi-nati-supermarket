@@ -29,6 +29,24 @@ const TARGET_TABLES = [
   { key: 'employees', model: 'employee' },
 ];
 
+const WIPE_TARGET_TABLES = [
+  { key: 'supplierTransactions', model: 'supplierTransaction' },
+  { key: 'supplierBalances', model: 'supplierBalance' },
+  { key: 'suppliers', model: 'supplier' },
+  { key: 'expenses', model: 'expense' },
+  { key: 'expenseCategories', model: 'expenseCategory' },
+  { key: 'payrollEntries', model: 'payrollEntry' },
+  { key: 'employeeLoanTransactions', model: 'employeeLoanTransaction' },
+  { key: 'employeeLoans', model: 'employeeLoan' },
+  { key: 'employeeReengagements', model: 'employeeReengagement' },
+  { key: 'employeeTerminations', model: 'employeeTermination' },
+  { key: 'employeeSalaryStructures', model: 'employeeSalaryStructure' },
+  { key: 'payrollPeriods', model: 'payrollPeriod' },
+  { key: 'payrollTaxBrackets', model: 'payrollTaxBracket' },
+  { key: 'payrollIncrementPolicies', model: 'payrollIncrementPolicy' },
+  { key: 'employees', model: 'employee' },
+];
+
 function getDelegate(client, modelName) {
   const delegate = client[modelName];
   if (!delegate || typeof delegate.count !== 'function') {
@@ -143,4 +161,57 @@ async function resetImportedBusinessOperationsData(options = {}) {
 
 module.exports = {
   resetImportedBusinessOperationsData,
+  wipeAllBusinessOperationsData,
 };
+
+async function wipeAllBusinessOperationsData(options = {}) {
+  const actor = options.actor || 'unknown';
+
+  const beforeCounts = {};
+  for (const table of WIPE_TARGET_TABLES) {
+    const delegate = getDelegate(prisma, table.model);
+    beforeCounts[table.key] = delegate ? await delegate.count() : 0;
+  }
+
+  console.warn('[BO][WIPE] Request received', {
+    actor,
+    beforeCounts,
+    preservedTables: PRESERVED_TABLES,
+  });
+
+  const deletedCounts = await prisma.$transaction(async (tx) => {
+    const deleted = {};
+    for (const table of WIPE_TARGET_TABLES) {
+      const delegate = getDelegate(tx, table.model);
+      if (!delegate || typeof delegate.deleteMany !== 'function') {
+        deleted[table.key] = 0;
+        continue;
+      }
+      deleted[table.key] = (await delegate.deleteMany({})).count;
+    }
+    return deleted;
+  });
+
+  const afterCounts = {};
+  for (const table of WIPE_TARGET_TABLES) {
+    const delegate = getDelegate(prisma, table.model);
+    afterCounts[table.key] = delegate ? await delegate.count() : 0;
+  }
+
+  console.warn('[BO][WIPE] Completed', {
+    actor,
+    deletedCounts,
+    afterCounts,
+  });
+
+  return {
+    deletedCounts,
+    beforeCounts,
+    afterCounts,
+    preservedTables: [...PRESERVED_TABLES],
+    notes: [
+      'Sales report source data (sales_invoices, sales_invoice_items, sales_sync_sources) was preserved.',
+      'This operation removed Business Operations domain data only.',
+    ],
+  };
+}

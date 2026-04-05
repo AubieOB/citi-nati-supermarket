@@ -199,6 +199,9 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingFullWorkbook, setExportingFullWorkbook] = useState(false);
   const [importingFullWorkbook, setImportingFullWorkbook] = useState(false);
+  const [isWipeModalOpen, setIsWipeModalOpen] = useState(false);
+  const [wipeSecurityKey, setWipeSecurityKey] = useState('');
+  const [wipingData, setWipingData] = useState(false);
   const fullWorkbookInputRef = useRef(null);
 
   const queryKey = useMemo(() => JSON.stringify(filters), [filters]);
@@ -504,6 +507,40 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
       setImportingFullWorkbook(false);
     }
   }, [activeView, fetchInvoices, fetchPayments, fetchProducts, fetchSummary, fetchUsers, selectedLocationId]);
+
+  const handleWipeAllBoData = useCallback(async () => {
+    const keyValue = String(wipeSecurityKey || '').trim();
+    if (!keyValue) {
+      window.alert('Enter admin security key before wiping data.');
+      return;
+    }
+
+    setWipingData(true);
+    try {
+      const response = await api.post('/business-operations/admin/wipe-all-data', {
+        securityKey: keyValue,
+      });
+
+      const deletedCounts = response?.data?.result?.deletedCounts || {};
+      const deletedTotal = Object.values(deletedCounts).reduce((sum, value) => sum + Number(value || 0), 0);
+
+      window.alert(`Business Operations wipe completed. Deleted rows: ${deletedTotal}. Sales report sync data was preserved.`);
+
+      setIsWipeModalOpen(false);
+      setWipeSecurityKey('');
+
+      await fetchSummary();
+      if (activeView === 'invoices') await fetchInvoices();
+      if (activeView === 'products') await fetchProducts();
+      if (activeView === 'users') await fetchUsers();
+      if (activeView === 'payments') await fetchPayments();
+    } catch (error) {
+      const message = error?.response?.data?.message || error?.response?.data?.error || error?.message || 'Failed to wipe Business Operations data.';
+      window.alert(message);
+    } finally {
+      setWipingData(false);
+    }
+  }, [activeView, fetchInvoices, fetchPayments, fetchProducts, fetchSummary, fetchUsers, wipeSecurityKey]);
 
   const activeFilterCount = useMemo(() => {
     const baseline = {
@@ -903,11 +940,32 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
               <button
                 type="button"
                 onClick={handleChooseImportWorkbook}
-                disabled={summaryLoading || importingFullWorkbook || exportingFullWorkbook || exportingExcel || exportingPdf}
-                style={{ border: '1px solid #bfdbfe', background: '#eff6ff', color: '#1e3a8a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 800, cursor: summaryLoading || importingFullWorkbook || exportingFullWorkbook || exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}
+                disabled={summaryLoading || importingFullWorkbook || exportingFullWorkbook || exportingExcel || exportingPdf || wipingData}
+                style={{ border: '1px solid #bfdbfe', background: '#eff6ff', color: '#1e3a8a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 800, cursor: summaryLoading || importingFullWorkbook || exportingFullWorkbook || exportingExcel || exportingPdf || wipingData ? 'not-allowed' : 'pointer' }}
               >
                 <i className={`fas ${importingFullWorkbook ? 'fa-spinner fa-spin' : 'fa-file-arrow-up'}`} style={{ marginRight: '0.42rem' }}></i>
                 Import Full Workbook
+              </button>
+            </div>
+          </div>
+
+          <div style={{ ...baseCardStyle, marginTop: '0.7rem', borderColor: '#fecaca', backgroundColor: '#fff7f7' }}>
+            <div style={{ padding: '0.95rem 1rem', display: 'grid', gap: '0.55rem' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', color: '#b91c1c', fontWeight: 900, textTransform: 'uppercase', fontSize: '0.78rem', letterSpacing: '0.05em' }}>
+                <i className="fas fa-triangle-exclamation"></i>
+                Danger Zone
+              </div>
+              <div style={{ color: '#7f1d1d', fontSize: '0.87rem', lineHeight: 1.45 }}>
+                Wipe all Business Operations data (Suppliers, Expenses, Employees, Payroll, and related records). Sales Reports data synced from POS is preserved.
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsWipeModalOpen(true)}
+                disabled={summaryLoading || importingFullWorkbook || exportingFullWorkbook || exportingExcel || exportingPdf || wipingData}
+                style={{ justifySelf: 'start', border: '1px solid #dc2626', backgroundColor: '#dc2626', color: '#fff', borderRadius: '10px', padding: '0.58rem 0.9rem', fontWeight: 900, cursor: summaryLoading || importingFullWorkbook || exportingFullWorkbook || exportingExcel || exportingPdf || wipingData ? 'not-allowed' : 'pointer' }}
+              >
+                <i className={`fas ${wipingData ? 'fa-spinner fa-spin' : 'fa-trash-can'}`} style={{ marginRight: '0.42rem' }}></i>
+                Wipe All BO Data
               </button>
             </div>
           </div>
@@ -1017,6 +1075,58 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
             {activeView === 'products' && renderProductsView()}
             {activeView === 'users' && renderUsersView()}
             {activeView === 'payments' && renderPaymentsView()}
+          </div>
+        </div>
+      )}
+
+      {isWipeModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.5)', zIndex: 210, display: 'grid', placeItems: 'center', padding: '1rem' }}>
+          <div style={{ ...baseCardStyle, width: 'min(520px, 96vw)', border: '1px solid #fecaca', backgroundColor: '#fff' }}>
+            <div style={{ padding: '1rem 1rem 0.85rem', borderBottom: '1px solid #fee2e2', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ color: '#991b1b', fontWeight: 900, fontSize: '1.02rem' }}>
+                <i className="fas fa-triangle-exclamation" style={{ marginRight: '0.45rem' }}></i>
+                Confirm Destructive Wipe
+              </div>
+              <button type="button" onClick={() => { if (!wipingData) { setIsWipeModalOpen(false); setWipeSecurityKey(''); } }} style={{ border: '1px solid #fecaca', backgroundColor: '#fff', color: '#991b1b', borderRadius: '8px', cursor: wipingData ? 'not-allowed' : 'pointer', padding: '0.34rem 0.5rem' }}>
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+            <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>
+              <div style={{ color: '#7f1d1d', fontSize: '0.9rem', lineHeight: 1.45 }}>
+                This action permanently deletes Business Operations data and cannot be undone. Sales Reports sync data from POS will remain intact.
+              </div>
+              <label style={{ display: 'grid', gap: '0.4rem' }}>
+                <span style={{ color: '#7f1d1d', fontSize: '0.84rem', fontWeight: 800 }}>Type Admin Security Key to continue</span>
+                <input
+                  type="password"
+                  value={wipeSecurityKey}
+                  onChange={(event) => setWipeSecurityKey(event.target.value)}
+                  placeholder="Enter admin security key"
+                  autoFocus
+                  style={{ border: '1px solid #fca5a5', borderRadius: '10px', padding: '0.62rem 0.7rem', fontSize: '0.92rem' }}
+                />
+              </label>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.55rem' }}>
+                <button
+                  type="button"
+                  onClick={() => { setIsWipeModalOpen(false); setWipeSecurityKey(''); }}
+                  disabled={wipingData}
+                  style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.55rem 0.85rem', fontWeight: 700, cursor: wipingData ? 'not-allowed' : 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleWipeAllBoData}
+                  disabled={wipingData || !String(wipeSecurityKey || '').trim()}
+                  style={{ border: '1px solid #dc2626', backgroundColor: '#dc2626', color: '#fff', borderRadius: '9px', padding: '0.55rem 0.85rem', fontWeight: 900, cursor: wipingData || !String(wipeSecurityKey || '').trim() ? 'not-allowed' : 'pointer' }}
+                >
+                  <i className={`fas ${wipingData ? 'fa-spinner fa-spin' : 'fa-trash-can'}`} style={{ marginRight: '0.42rem' }}></i>
+                  Confirm Wipe
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
