@@ -3,7 +3,10 @@
 const multer = require('multer');
 const path = require('path');
 
-const MAX_WORKBOOK_FILE_SIZE_BYTES = 80 * 1024 * 1024;
+const MAX_WORKBOOK_FILE_SIZE_BYTES = Math.max(
+  1 * 1024 * 1024,
+  Number(process.env.WORKBOOK_UPLOAD_MAX_BYTES || 20 * 1024 * 1024)
+);
 
 const allowedMimes = new Set([
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

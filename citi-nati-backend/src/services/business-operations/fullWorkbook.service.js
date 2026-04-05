@@ -15,11 +15,21 @@ const DEFAULT_BATCH_SIZE = Math.max(100, Number(process.env.FULL_WORKBOOK_BATCH_
 const MAX_ROWS_PER_SHEET = Math.max(1000, Number(process.env.FULL_WORKBOOK_MAX_ROWS_PER_SHEET || 250000));
 const MAX_ROWS_TOTAL = Math.max(5000, Number(process.env.FULL_WORKBOOK_MAX_ROWS_TOTAL || 700000));
 const MAX_SALES_RANGE_DAYS = Math.max(1, Number(process.env.FULL_WORKBOOK_MAX_SALES_RANGE_DAYS || 370));
+const MAX_IMPORT_WORKBOOK_FILE_BYTES = Math.max(1 * 1024 * 1024, Number(process.env.FULL_WORKBOOK_IMPORT_MAX_FILE_BYTES || 20 * 1024 * 1024));
+const MAX_IMPORT_HEAP_USED_MB = Math.max(128, Number(process.env.FULL_WORKBOOK_IMPORT_MAX_HEAP_MB || 220));
 
 class ExportGuardError extends Error {
   constructor(message, statusCode = 413) {
     super(message);
     this.name = 'ExportGuardError';
+    this.statusCode = statusCode;
+  }
+}
+
+class ImportGuardError extends Error {
+  constructor(message, statusCode = 413) {
+    super(message);
+    this.name = 'ImportGuardError';
     this.statusCode = statusCode;
   }
 }
@@ -120,6 +130,30 @@ function assertSalesRange(filters = {}) {
   }
   if (days > MAX_SALES_RANGE_DAYS) {
     throw new ExportGuardError(`Date range too large for safe synchronous export (${days} days). Please reduce to <= ${MAX_SALES_RANGE_DAYS} days or run multiple scoped exports.`, 413);
+  }
+}
+
+function assertImportGuards(fileBuffer) {
+  const fileBytes = Number(fileBuffer?.length || 0);
+  if (fileBytes <= 0) {
+    throw new ImportGuardError('Workbook file appears empty. Please upload a valid .xlsx workbook.', 400);
+  }
+
+  if (fileBytes > MAX_IMPORT_WORKBOOK_FILE_BYTES) {
+    const maxMb = Math.round(MAX_IMPORT_WORKBOOK_FILE_BYTES / (1024 * 1024));
+    const actualMb = Math.round(fileBytes / (1024 * 1024));
+    throw new ImportGuardError(
+      `Workbook too large for safe import on this server (${actualMb}MB). Max allowed is ${maxMb}MB. Reduce workbook scope (location/date) and retry.`,
+      413,
+    );
+  }
+
+  const heapUsedMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+  if (heapUsedMB >= MAX_IMPORT_HEAP_USED_MB) {
+    throw new ImportGuardError(
+      `Server memory is currently constrained (${heapUsedMB}MB heap in use). Retry shortly or reduce workbook size.`,
+      503,
+    );
   }
 }
 
@@ -990,8 +1024,34 @@ async function importFullWorkbook(fileBuffer, options = {}) {
     throw new Error('A valid workbook file buffer is required');
   }
 
+  assertImportGuards(fileBuffer);
+
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(fileBuffer);
+  try {
+    await workbook.xlsx.load(fileBuffer, {
+      ignoreNodes: [
+        'sheetViews',
+        'sheetFormatPr',
+        'pageMargins',
+        'pageSetup',
+        'headerFooter',
+        'rowBreaks',
+        'colBreaks',
+        'drawing',
+        'picture',
+        'extLst',
+        'conditionalFormatting',
+        'dataValidations',
+        'hyperlinks',
+      ],
+    });
+  } catch (error) {
+    const message = String(error?.message || '').toLowerCase();
+    if (message.includes('heap out of memory') || message.includes('allocation failed')) {
+      throw new ImportGuardError('Workbook import exceeded available server memory. Reduce workbook scope (location/date) and retry.', 413);
+    }
+    throw error;
+  }
 
   let payrollSnapshot = readEmbeddedJsonSheet(workbook, PAYROLL_JSON_SHEET);
   let salesSnapshot = readEmbeddedJsonSheet(workbook, SALES_JSON_SHEET);

@@ -1105,7 +1105,8 @@ async function importFullWorkbook(req, res) {
     });
   } catch (err) {
     console.error('[BO][PAYROLL] importFullWorkbook error:', err);
-    return res.status(500).json({ success: false, error: err.message || 'Failed to import full workbook' });
+    const statusCode = err?.statusCode || 500;
+    return res.status(statusCode).json({ success: false, error: err.message || 'Failed to import full workbook' });
   }
 }
 
