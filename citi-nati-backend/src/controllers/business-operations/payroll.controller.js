@@ -2,6 +2,7 @@
 
 const payrollService = require('../../services/business-operations/payroll.service');
 const importsService = require('../../services/business-operations/imports.service');
+const dataSnapshotService = require('../../services/business-operations/dataSnapshot.service');
 const {
   parsePagination,
   parseSort,
@@ -976,6 +977,75 @@ async function purgeAllPayrollData(req, res) {
   }
 }
 
+async function exportPayrollSnapshot(req, res) {
+  try {
+    const filters = {
+      locationId: req.query.locationId ? toInt(req.query.locationId) : null,
+    };
+
+    const snapshot = await dataSnapshotService.exportPayrollSnapshot(filters);
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="payroll-snapshot-${new Date().toISOString().split('T')[0]}.json"`);
+    return res.json(snapshot);
+  } catch (err) {
+    console.error('[BO][PAYROLL] exportPayrollSnapshot error:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to export payroll snapshot' });
+  }
+}
+
+async function importPayrollSnapshot(req, res) {
+  try {
+    if (!req.body || !req.body.data) {
+      return res.status(400).json({ success: false, error: 'Invalid snapshot format: missing data' });
+    }
+
+    const options = {
+      upsert: req.body.upsert !== false,
+      clearExisting: req.body.clearExisting === true,
+      locationId: req.body.locationId ? toInt(req.body.locationId) : null,
+    };
+
+    const results = await dataSnapshotService.importPayrollSnapshot(req.body, options);
+
+    console.log('[BO][PAYROLL] importPayrollSnapshot completed:', results.imported);
+    return res.json({
+      success: true,
+      message: 'Payroll data imported successfully',
+      imported: results.imported,
+      errors: results.errors,
+    });
+  } catch (err) {
+    console.error('[BO][PAYROLL] importPayrollSnapshot error:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to import payroll snapshot' });
+  }
+}
+
+async function exportFullBackupZip(req, res) {
+  try {
+    const options = {
+      payrollFilters: {
+        locationId: req.query.locationId ? toInt(req.query.locationId) : null,
+      },
+      salesFilters: {
+        branchCode: req.query.branchCode ? String(req.query.branchCode) : null,
+        startDate: req.query.startDate ? new Date(req.query.startDate) : null,
+        endDate: req.query.endDate ? new Date(req.query.endDate) : null,
+      },
+    };
+
+    const zipBuffer = await dataSnapshotService.createFullBackupZip(options);
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="citi-nati-backup-${new Date().toISOString().split('T')[0]}.zip"`);
+    res.setHeader('Content-Length', zipBuffer.length);
+    return res.send(zipBuffer);
+  } catch (err) {
+    console.error('[BO][PAYROLL] exportFullBackupZip error:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to create backup' });
+  }
+}
+
 module.exports = {
   createPayrollPeriod,
   updatePayrollPeriod,
@@ -1018,4 +1088,7 @@ module.exports = {
   deleteTaxBracket,
   deleteIncrementPolicy,
   purgeAllPayrollData,
+  exportPayrollSnapshot,
+  importPayrollSnapshot,
+  exportFullBackupZip,
 };

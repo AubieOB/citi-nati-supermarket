@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const dataSnapshotService = require('../services/business-operations/dataSnapshot.service');
 
 const prisma = new PrismaClient();
 
@@ -275,4 +276,57 @@ const clearSalesHistory = async (req, res) => {
   }
 };
 
-module.exports = { startSalesDay, endSalesDay, getCurrentSalesDay, getSalesDayById, getSalesDayHistory, exportSaleDayCSV, clearSalesHistory };
+/**
+ * Export complete sales data snapshot
+ * GET /admin/sales/export/snapshot
+ */
+const exportSalesSnapshot = async (req, res) => {
+  try {
+    const filters = {
+      branchCode: req.query.branchCode ? String(req.query.branchCode) : null,
+      syncSourceCode: req.query.syncSourceCode ? String(req.query.syncSourceCode) : null,
+      startDate: req.query.startDate ? new Date(req.query.startDate) : null,
+      endDate: req.query.endDate ? new Date(req.query.endDate) : null,
+    };
+
+    const snapshot = await dataSnapshotService.exportSalesSnapshot(filters);
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="sales-snapshot-${new Date().toISOString().split('T')[0]}.json"`);
+    return res.json(snapshot);
+  } catch (err) {
+    console.error('[SALES] exportSalesSnapshot error:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to export sales snapshot' });
+  }
+};
+
+/**
+ * Import complete sales data snapshot
+ * POST /admin/sales/import/snapshot
+ */
+const importSalesSnapshot = async (req, res) => {
+  try {
+    if (!req.body || !req.body.data) {
+      return res.status(400).json({ success: false, error: 'Invalid snapshot format: missing data' });
+    }
+
+    const options = {
+      upsert: req.body.upsert !== false,
+    };
+
+    const results = await dataSnapshotService.importSalesSnapshot(req.body, options);
+
+    console.log('[SALES] importSalesSnapshot completed:', results.imported);
+    return res.json({
+      success: true,
+      message: 'Sales data imported successfully',
+      imported: results.imported,
+      errors: results.errors,
+    });
+  } catch (err) {
+    console.error('[SALES] importSalesSnapshot error:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to import sales snapshot' });
+  }
+};
+
+module.exports = { startSalesDay, endSalesDay, getCurrentSalesDay, getSalesDayById, getSalesDayHistory, exportSaleDayCSV, clearSalesHistory, exportSalesSnapshot, importSalesSnapshot };

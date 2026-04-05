@@ -43,6 +43,9 @@ const {
   deleteReengagement,
   deleteTaxBracket,
   deleteIncrementPolicy,
+  exportPayrollSnapshot,
+  importPayrollSnapshot,
+  exportFullBackupZip,
 } = require('../../controllers/business-operations/payroll.controller');
 
 const router = express.Router();
@@ -97,5 +100,10 @@ router.delete('/increment-policies/:id', deleteIncrementPolicy);
 router.get('/increment-policies', listIncrementPolicies);
 
 router.delete('/purge', purgeAllPayrollData);
+
+// Export/Import endpoints
+router.get('/export/snapshot', exportPayrollSnapshot);
+router.post('/import/snapshot', importPayrollSnapshot);
+router.get('/export/backup-zip', exportFullBackupZip);
 
 module.exports = router;

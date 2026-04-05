@@ -6,7 +6,9 @@ const {
   getSalesDayById,
   getSalesDayHistory,
   exportSaleDayCSV,
-  clearSalesHistory
+  clearSalesHistory,
+  exportSalesSnapshot,
+  importSalesSnapshot
 } = require('../controllers/sales.controller');
 const { verifyTokenMiddleware } = require('../middleware/auth.middleware');
 const { verifyAdmin } = require('../middleware/admin.middleware');
@@ -68,6 +70,22 @@ router.delete(
   verifyTokenMiddleware,
   verifyAdmin,
   clearSalesHistory
+);
+
+// GET /api/sales/export/snapshot - Export complete sales data
+router.get(
+  '/export/snapshot',
+  verifyTokenMiddleware,
+  verifyAdmin,
+  exportSalesSnapshot
+);
+
+// POST /api/sales/import/snapshot - Import complete sales data
+router.post(
+  '/import/snapshot',
+  verifyTokenMiddleware,
+  verifyAdmin,
+  importSalesSnapshot
 );
 
 module.exports = router;
