@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../../../utils/api.js';
-import { downloadBusinessReport } from '../../../utils/exportService.js';
+import { downloadBusinessReport, downloadFullBusinessWorkbook, importFullBusinessWorkbook } from '../../../utils/exportService.js';
 import { exportActiveSalesReportPdf } from '../../../utils/salesReportsPdfExport.js';
 import SalesReportFilters from './SalesReportFilters.jsx';
 import SalesSummaryCards from './SalesSummaryCards.jsx';
@@ -197,6 +197,9 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
   const [paymentsState, setPaymentsState] = useState({ data: [], totals: null, loading: false, error: '' });
   const [exportingExcel, setExportingExcel] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingFullWorkbook, setExportingFullWorkbook] = useState(false);
+  const [importingFullWorkbook, setImportingFullWorkbook] = useState(false);
+  const fullWorkbookInputRef = useRef(null);
 
   const queryKey = useMemo(() => JSON.stringify(filters), [filters]);
 
@@ -440,6 +443,67 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
       if (format === 'pdf') setExportingPdf(false);
     }
   }, [activeView, filters, invoicesState, paymentsState, productsState, summary, summaryLoading, summaryMeta, summaryMetaLine, usersState]);
+
+  const handleExportFullWorkbook = useCallback(async () => {
+    setExportingFullWorkbook(true);
+    try {
+      await downloadFullBusinessWorkbook({
+        filters: {
+          locationId: selectedLocationId || undefined,
+          branchCode: filters.branchCode || undefined,
+          syncSourceCode: filters.syncSourceCode || undefined,
+          startDate: filters.startDate || undefined,
+          endDate: filters.endDate || undefined,
+        },
+      });
+    } catch (error) {
+      const message = error?.response?.data?.error || error?.message || 'Failed to export full workbook.';
+      window.alert(message);
+    } finally {
+      setExportingFullWorkbook(false);
+    }
+  }, [filters.branchCode, filters.endDate, filters.startDate, filters.syncSourceCode, selectedLocationId]);
+
+  const handleChooseImportWorkbook = useCallback(() => {
+    if (importingFullWorkbook) return;
+    fullWorkbookInputRef.current?.click();
+  }, [importingFullWorkbook]);
+
+  const handleImportWorkbookFileChange = useCallback(async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    const confirmed = window.confirm(`Import workbook "${file.name}"? This will re-add/update payroll and sales records.`);
+    if (!confirmed) return;
+
+    setImportingFullWorkbook(true);
+    try {
+      const response = await importFullBusinessWorkbook({
+        file,
+        upsert: true,
+        clearExisting: false,
+        locationId: selectedLocationId || null,
+      });
+
+      const payrollImported = response?.result?.payroll?.imported || {};
+      const salesImported = response?.result?.sales?.imported || {};
+      const payrollCount = Object.values(payrollImported).reduce((sum, value) => sum + Number(value || 0), 0);
+      const salesCount = Object.values(salesImported).reduce((sum, value) => sum + Number(value || 0), 0);
+
+      window.alert(`Workbook import complete. Payroll rows: ${payrollCount}. Sales rows: ${salesCount}.`);
+      await fetchSummary();
+      if (activeView === 'invoices') await fetchInvoices();
+      if (activeView === 'products') await fetchProducts();
+      if (activeView === 'users') await fetchUsers();
+      if (activeView === 'payments') await fetchPayments();
+    } catch (error) {
+      const message = error?.response?.data?.error || error?.message || 'Failed to import full workbook.';
+      window.alert(message);
+    } finally {
+      setImportingFullWorkbook(false);
+    }
+  }, [activeView, fetchInvoices, fetchPayments, fetchProducts, fetchSummary, fetchUsers, selectedLocationId]);
 
   const activeFilterCount = useMemo(() => {
     const baseline = {
@@ -756,6 +820,13 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
+      <input
+        ref={fullWorkbookInputRef}
+        type="file"
+        accept=".xlsx,.xls"
+        style={{ display: 'none' }}
+        onChange={handleImportWorkbookFileChange}
+      />
       <div style={{ display: 'flex', gap: '0.55rem', overflowX: 'auto' }}>
         <button
           type="button"
@@ -805,8 +876,8 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
               <button
                 type="button"
                 onClick={() => handleExport('pdf')}
-                disabled={summaryLoading || exportingExcel || exportingPdf}
-                style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 700, cursor: summaryLoading || exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}
+                disabled={summaryLoading || exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook}
+                style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 700, cursor: summaryLoading || exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook ? 'not-allowed' : 'pointer' }}
               >
                 <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.42rem' }}></i>
                 Export PDF
@@ -814,11 +885,29 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
               <button
                 type="button"
                 onClick={() => handleExport('excel')}
-                disabled={summaryLoading || exportingExcel || exportingPdf}
-                style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 700, cursor: summaryLoading || exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}
+                disabled={summaryLoading || exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook}
+                style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 700, cursor: summaryLoading || exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook ? 'not-allowed' : 'pointer' }}
               >
                 <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.42rem' }}></i>
                 Export Excel
+              </button>
+              <button
+                type="button"
+                onClick={handleExportFullWorkbook}
+                disabled={summaryLoading || exportingFullWorkbook || importingFullWorkbook || exportingExcel || exportingPdf}
+                style={{ border: '1px solid #86efac', background: '#f0fdf4', color: '#166534', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 800, cursor: summaryLoading || exportingFullWorkbook || importingFullWorkbook || exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}
+              >
+                <i className={`fas ${exportingFullWorkbook ? 'fa-spinner fa-spin' : 'fa-file-arrow-down'}`} style={{ marginRight: '0.42rem' }}></i>
+                Export Full Workbook
+              </button>
+              <button
+                type="button"
+                onClick={handleChooseImportWorkbook}
+                disabled={summaryLoading || importingFullWorkbook || exportingFullWorkbook || exportingExcel || exportingPdf}
+                style={{ border: '1px solid #bfdbfe', background: '#eff6ff', color: '#1e3a8a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 800, cursor: summaryLoading || importingFullWorkbook || exportingFullWorkbook || exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}
+              >
+                <i className={`fas ${importingFullWorkbook ? 'fa-spinner fa-spin' : 'fa-file-arrow-up'}`} style={{ marginRight: '0.42rem' }}></i>
+                Import Full Workbook
               </button>
             </div>
           </div>
@@ -849,8 +938,8 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
                   <button
                     type="button"
                     onClick={() => handleExport('pdf')}
-                    disabled={summaryLoading || exportingExcel || exportingPdf}
-                    style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 700, cursor: summaryLoading || exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}
+                    disabled={summaryLoading || exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook}
+                    style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 700, cursor: summaryLoading || exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook ? 'not-allowed' : 'pointer' }}
                   >
                     <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.42rem' }}></i>
                     Export PDF
@@ -858,11 +947,29 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
                   <button
                     type="button"
                     onClick={() => handleExport('excel')}
-                    disabled={summaryLoading || exportingExcel || exportingPdf}
-                    style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 700, cursor: summaryLoading || exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}
+                    disabled={summaryLoading || exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook}
+                    style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 700, cursor: summaryLoading || exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook ? 'not-allowed' : 'pointer' }}
                   >
                     <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.42rem' }}></i>
                     Export Excel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportFullWorkbook}
+                    disabled={summaryLoading || exportingFullWorkbook || importingFullWorkbook || exportingExcel || exportingPdf}
+                    style={{ border: '1px solid #86efac', background: '#f0fdf4', color: '#166534', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 800, cursor: summaryLoading || exportingFullWorkbook || importingFullWorkbook || exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}
+                  >
+                    <i className={`fas ${exportingFullWorkbook ? 'fa-spinner fa-spin' : 'fa-file-arrow-down'}`} style={{ marginRight: '0.42rem' }}></i>
+                    Export Full Workbook
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleChooseImportWorkbook}
+                    disabled={summaryLoading || importingFullWorkbook || exportingFullWorkbook || exportingExcel || exportingPdf}
+                    style={{ border: '1px solid #bfdbfe', background: '#eff6ff', color: '#1e3a8a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 800, cursor: summaryLoading || importingFullWorkbook || exportingFullWorkbook || exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}
+                  >
+                    <i className={`fas ${importingFullWorkbook ? 'fa-spinner fa-spin' : 'fa-file-arrow-up'}`} style={{ marginRight: '0.42rem' }}></i>
+                    Import Full Workbook
                   </button>
                   <button
                     type="button"
