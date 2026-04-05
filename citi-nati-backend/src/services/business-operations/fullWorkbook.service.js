@@ -7,6 +7,25 @@ const MAX_CELL_CHARS = 30000;
 const PAYROLL_JSON_SHEET = '__PAYROLL_SNAPSHOT_JSON';
 const SALES_JSON_SHEET = '__SALES_SNAPSHOT_JSON';
 
+function safeJsonStringify(value) {
+  return JSON.stringify(value, (_key, current) => {
+    if (typeof current === 'bigint') {
+      return current.toString();
+    }
+    return current;
+  });
+}
+
+function normalizeCellValue(value) {
+  if (value === null || value === undefined) return value;
+  if (typeof value === 'bigint') return value.toString();
+  if (value instanceof Date) return value;
+  if (Array.isArray(value) || typeof value === 'object') {
+    return safeJsonStringify(value);
+  }
+  return value;
+}
+
 function chunkString(value, chunkSize = MAX_CELL_CHARS) {
   const text = String(value || '');
   if (!text) return [''];
@@ -50,11 +69,7 @@ function addTabularSheet(workbook, title, rows) {
     const normalized = {};
     headers.forEach((key) => {
       const value = row[key];
-      if (value && typeof value === 'object') {
-        normalized[key] = JSON.stringify(value);
-      } else {
-        normalized[key] = value;
-      }
+      normalized[key] = normalizeCellValue(value);
     });
     sheet.addRow(normalized);
   });
@@ -77,7 +92,7 @@ function addEmbeddedJsonSheet(workbook, sheetName, payload) {
     { header: 'jsonChunk', key: 'jsonChunk', width: 120 },
   ];
 
-  const payloadText = JSON.stringify(payload);
+  const payloadText = safeJsonStringify(payload);
   const chunks = chunkString(payloadText);
   chunks.forEach((chunk, index) => {
     sheet.addRow({ chunkIndex: index + 1, jsonChunk: chunk });
