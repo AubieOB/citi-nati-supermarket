@@ -21,30 +21,13 @@ async function generateEmergencyReceiptPDF(sale) {
     try {
       const doc = new PDFDocument({
         size: 'A4',
-        margin: 40,
+        margin: 50,
         bufferPages: true,
       });
 
-      const pageLeft = doc.page.margins.left;
-      const pageRight = doc.page.width - doc.page.margins.right;
-      const contentWidth = pageRight - pageLeft;
-
-      const drawDivider = () => {
-        doc.moveTo(pageLeft, doc.y).lineTo(pageRight, doc.y).stroke();
-      };
-
-      const drawAmountRow = (label, value, opts = {}) => {
-        const labelX = pageRight - 235;
-        const valueX = pageRight - 110;
-        const rowY = doc.y;
-        const fontName = opts.bold ? 'Helvetica-Bold' : 'Helvetica';
-        const fontSize = opts.bold ? 11 : 10;
-
-        doc.font(fontName).fontSize(fontSize);
-        doc.text(label, labelX, rowY, { width: 120, align: 'left', lineBreak: false });
-        doc.text(toMoney(value).toFixed(2), valueX, rowY, { width: 95, align: 'right', lineBreak: false });
-        doc.y = rowY + 22;
-      };
+      const margin = doc.page.margins.left;
+      const pageWidth = doc.page.width;
+      const contentWidth = pageWidth - margin * 2;
 
       const chunks = [];
       doc.on('data', (chunk) => chunks.push(chunk));
@@ -56,100 +39,122 @@ async function generateEmergencyReceiptPDF(sale) {
       });
 
       // Header
-      doc.fontSize(18).font('Helvetica-Bold').text('CITI-NATI SUPERMARKET', { align: 'center' });
-      doc.fontSize(14).font('Helvetica').text('Emergency Sale Receipt', { align: 'center' });
-      doc.moveDown(0.5);
+      doc.fontSize(20).font('Helvetica-Bold').text('CITI-NATI SUPERMARKET', { align: 'center' });
+      doc.fontSize(12).font('Helvetica').text('Emergency Sale Receipt', { align: 'center' });
+      doc.moveDown(0.3);
 
       // Divider
-      drawDivider();
-      doc.moveDown(0.5);
+      doc.strokeColor('#000000').lineWidth(1);
+      doc.moveTo(margin, doc.y).lineTo(pageWidth - margin, doc.y).stroke();
+      doc.moveDown(0.3);
 
-      // Sale info
-      doc.fontSize(10).font('Helvetica');
-      doc.text(`Ref: ${String(sale.saleRef || sale.sale_ref || '-').trim()}`, { align: 'left' });
-      doc.text(`Date: ${formatDateTime(sale.createdAt || sale.created_at)}`, { align: 'left' });
-      doc.text(`Cashier: ${String(sale.cashierName || sale.cashier_name || '-').trim()}`, { align: 'left' });
-      doc.text(`Payment: ${String(sale.paymentMethod || sale.payment_method || 'CASH').trim()}`, { align: 'left' });
-      doc.moveDown(0.5);
+      // Sale metadata
+      doc.fontSize(9).font('Helvetica');
+      const infoX1 = margin;
+      const infoX2 = margin + contentWidth / 2;
+      const metaY = doc.y;
+
+      doc.text('Ref:', infoX1, metaY, { width: 30 });
+      doc.text(String(sale.saleRef || sale.sale_ref || '-').trim(), infoX1 + 35, metaY);
+      doc.text('Date:', infoX2, metaY, { width: 30 });
+      doc.text(formatDateTime(sale.createdAt || sale.created_at), infoX2 + 35, metaY);
+
+      doc.moveDown(0.2);
+      const cashierY = doc.y;
+      doc.text('Cashier:', infoX1, cashierY, { width: 50 });
+      doc.text(String(sale.cashierName || sale.cashier_name || '-').trim(), infoX1 + 55, cashierY);
+      doc.text('Payment:', infoX2, cashierY, { width: 50 });
+      doc.text(String(sale.paymentMethod || sale.payment_method || 'CASH').trim(), infoX2 + 55, cashierY);
+      doc.moveDown(0.4);
 
       // Divider
-      drawDivider();
-      doc.moveDown(0.5);
+      doc.moveTo(margin, doc.y).lineTo(pageWidth - margin, doc.y).stroke();
+      doc.moveDown(0.3);
 
-      // Items table
-      const tableTop = doc.y;
-      const colNoX = pageLeft + 8;
-      const colCodeX = pageLeft + 40;
-      const colItemX = pageLeft + 145;
-      const colQtyX = pageLeft + 350;
-      const colPriceX = pageLeft + 410;
-      const colTotalX = pageLeft + 475;
-
+      // Items table header
       doc.fontSize(9).font('Helvetica-Bold');
-      doc.text('#', colNoX, tableTop, { width: 20, align: 'left', lineBreak: false });
-      doc.text('Code', colCodeX, tableTop, { width: 95, align: 'left', lineBreak: false });
-      doc.text('Item', colItemX, tableTop, { width: 210, align: 'left', lineBreak: false });
-      doc.text('Qty', colQtyX, tableTop, { width: 45, align: 'right', lineBreak: false });
-      doc.text('Price', colPriceX, tableTop, { width: 60, align: 'right', lineBreak: false });
-      doc.text('Total', colTotalX, tableTop, { width: 60, align: 'right', lineBreak: false });
+      const col1 = margin + 5;
+      const col2 = margin + 40;
+      const col3 = margin + 160;
+      const col4 = margin + 365;
+      const col5 = margin + 425;
+      const col6 = pageWidth - margin - 70;
 
-      let rowY = tableTop + 18;
+      const headerY = doc.y;
+      doc.text('#', col1, headerY, { width: 25, align: 'center' });
+      doc.text('Code', col2, headerY, { width: 110, align: 'left' });
+      doc.text('Item', col3, headerY, { width: 195, align: 'left' });
+      doc.text('Qty', col4, headerY, { width: 50, align: 'right' });
+      doc.text('Price', col5, headerY, { width: 60, align: 'right' });
+      doc.text('Total', col6, headerY, { width: 70, align: 'right' });
+      doc.moveDown(0.25);
+
+      // Items
+      doc.fontSize(8).font('Helvetica');
       const items = Array.isArray(sale.items) ? sale.items : [];
-      doc.font('Helvetica').fontSize(9);
 
       if (items.length === 0) {
-        doc.text('No items', pageLeft + 8, rowY, {
-          width: contentWidth - 16,
-          align: 'center',
-          lineBreak: false,
-        });
-        rowY += 22;
+        doc.text('(No items)', col1, doc.y, { width: contentWidth - 10, align: 'center' });
+        doc.moveDown(0.3);
       } else {
         for (let idx = 0; idx < items.length; idx += 1) {
           const item = items[idx];
-          const rowHeight = 18;
+          const itemY = doc.y;
 
-          if (rowY > doc.page.height - 170) {
+          if (itemY > doc.page.height - 150) {
             doc.addPage();
-            rowY = doc.page.margins.top;
           }
 
-          doc.text(String(idx + 1), colNoX, rowY, { width: 20, align: 'left', lineBreak: false });
-          doc.text(String(item.productCode || item.product_code || '-').slice(0, 22), colCodeX, rowY, { width: 95, align: 'left', lineBreak: false });
-          doc.text(String(item.productName || item.product_name || '-').slice(0, 44), colItemX, rowY, { width: 210, align: 'left', lineBreak: false });
-          doc.text(String(item.qty || 0), colQtyX, rowY, { width: 45, align: 'right', lineBreak: false });
-          doc.text(toMoney(item.unitPrice || item.unit_price).toFixed(2), colPriceX, rowY, { width: 60, align: 'right', lineBreak: false });
-          doc.text(toMoney(item.lineTotal || item.line_total).toFixed(2), colTotalX, rowY, { width: 60, align: 'right', lineBreak: false });
-
-          rowY += rowHeight;
+          doc.text(String(idx + 1), col1, doc.y, { width: 25, align: 'center' });
+          doc.text(String(item.productCode || item.product_code || '-').slice(0, 20), col2, doc.y, { width: 110, align: 'left' });
+          doc.text(String(item.productName || item.product_name || '-').slice(0, 50), col3, doc.y, { width: 195, align: 'left' });
+          doc.text(String(item.qty || 0), col4, doc.y, { width: 50, align: 'right' });
+          doc.text(toMoney(item.unitPrice || item.unit_price).toFixed(2), col5, doc.y, { width: 60, align: 'right' });
+          doc.text(toMoney(item.lineTotal || item.line_total).toFixed(2), col6, doc.y, { width: 70, align: 'right' });
+          doc.moveDown(0.28);
         }
       }
 
-      doc.y = rowY + 6;
-      drawDivider();
-      doc.moveDown(0.5);
+      // Divider
+      doc.moveTo(margin, doc.y).lineTo(pageWidth - margin, doc.y).stroke();
+      doc.moveDown(0.3);
 
-      // Totals block
-      drawAmountRow('Subtotal:', sale.subtotal);
-      drawAmountRow('Discount:', sale.discount);
-      drawAmountRow('Total:', sale.total, { bold: true });
-      drawAmountRow('Tendered:', sale.tenderedAmount || sale.tendered_amount);
-      drawAmountRow('Change:', sale.changeAmount || sale.change_amount);
+      // Totals section - clean two-column layout
+      doc.fontSize(9).font('Helvetica');
+      const labelCol = margin + contentWidth * 0.55;
+      const valueCol = pageWidth - margin - 80;
+      const lineHeight = 18;
+
+      const drawTotal = (label, value, bold = false) => {
+        const font = bold ? 'Helvetica-Bold' : 'Helvetica';
+        const size = bold ? 10 : 9;
+        const curY = doc.y;
+
+        doc.font(font).fontSize(size).text(label, labelCol, curY, { align: 'left', width: 70 });
+        doc.font(font).fontSize(size).text(toMoney(value).toFixed(2), valueCol, curY, { align: 'right', width: 75 });
+        doc.y = curY + lineHeight;
+      };
+
+      drawTotal('Subtotal:', sale.subtotal);
+      drawTotal('Discount:', sale.discount);
+      drawTotal('Total:', sale.total, true);
+      drawTotal('Tendered:', sale.tenderedAmount || sale.tendered_amount);
+      drawTotal('Change:', sale.changeAmount || sale.change_amount);
 
       doc.moveDown(0.2);
-      drawDivider();
-      doc.moveDown(0.5);
+      doc.moveTo(margin, doc.y).lineTo(pageWidth - margin, doc.y).stroke();
+      doc.moveDown(0.3);
 
-      // Status + footer
+      // Status and footer
       const syncNote = sale.syncStatus === 'synced_to_pos' ? 'SYNCED TO POS' : 'PENDING POS SYNC';
-      doc.fontSize(10).font('Helvetica-Bold').text(syncNote, pageLeft, doc.y, {
-        width: contentWidth,
+      doc.fontSize(10).font('Helvetica-Bold').text(syncNote, margin, doc.y, {
         align: 'center',
+        width: contentWidth,
       });
       doc.moveDown(0.2);
-      doc.fontSize(12).font('Helvetica-Bold').text('THANK YOU', pageLeft, doc.y, {
-        width: contentWidth,
+      doc.fontSize(13).font('Helvetica-Bold').text('THANK YOU', margin, doc.y, {
         align: 'center',
+        width: contentWidth,
       });
 
       doc.end();
