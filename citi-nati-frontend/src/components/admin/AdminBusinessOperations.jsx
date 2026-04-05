@@ -8,6 +8,7 @@ import MonthlySummaryTab from './business-operations/MonthlySummaryTab.jsx';
 import PayrollTab from './business-operations/PayrollTab.jsx';
 import SuppliersTab from './business-operations/SuppliersTab.jsx';
 import ReportHistoryTab from './business-operations/ReportHistoryTab.jsx';
+import BusinessOperationsActionsTab from './business-operations/BusinessOperationsActionsTab.jsx';
 import BusinessOperationsImportButton from './business-operations/BusinessOperationsImportButton.jsx';
 import BusinessOperationsImportModal from './business-operations/BusinessOperationsImportModal.jsx';
 import api from '../../utils/api.js';
@@ -20,6 +21,7 @@ const TABS = [
   { id: 'employees', label: 'Employees', icon: 'fa-id-badge' },
   { id: 'payroll', label: 'Payroll', icon: 'fa-money-check-dollar' },
   { id: 'report-history', label: 'Report History', icon: 'fa-clock-rotate-left' },
+  { id: 'actions', label: 'Actions', icon: 'fa-triangle-exclamation' },
 ];
 
 const AdminBusinessOperations = () => {
@@ -154,6 +156,7 @@ const AdminBusinessOperations = () => {
     employees: <EmployeesTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} locations={locations} />,
     payroll: <PayrollTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} locations={locations} />,
     'report-history': <ReportHistoryTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} onNavigateTab={handleNavigateTab} />,
+    actions: <BusinessOperationsActionsTab />,
   };
 
   return (
