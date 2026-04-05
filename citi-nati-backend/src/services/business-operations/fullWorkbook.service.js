@@ -826,8 +826,56 @@ function readEmbeddedJsonSheet(workbook, sheetName) {
 }
 
 async function exportFullWorkbook(options = {}) {
-  const payrollSnapshot = await dataSnapshotService.exportPayrollSnapshot(options.payrollFilters || {});
-  const salesSnapshot = await dataSnapshotService.exportSalesSnapshot(options.salesFilters || {});
+  const warnings = [];
+
+  const emptyPayrollSnapshot = {
+    version: '1.0.0',
+    type: 'payroll',
+    exportedAt: new Date().toISOString(),
+    filters: options.payrollFilters || {},
+    data: {
+      employees: [],
+      salaryStructures: [],
+      payrollPeriods: [],
+      payrollEntries: [],
+      loans: [],
+      loanTransactions: [],
+      terminations: [],
+      reengagements: [],
+      taxBrackets: [],
+      incrementPolicies: [],
+      metadata: {},
+    },
+  };
+
+  const emptySalesSnapshot = {
+    version: '1.0.0',
+    type: 'sales',
+    exportedAt: new Date().toISOString(),
+    filters: options.salesFilters || {},
+    data: {
+      syncSources: [],
+      invoices: [],
+      invoiceItems: [],
+      products: [],
+      metadata: {},
+    },
+  };
+
+  let payrollSnapshot = emptyPayrollSnapshot;
+  let salesSnapshot = emptySalesSnapshot;
+
+  try {
+    payrollSnapshot = await dataSnapshotService.exportPayrollSnapshot(options.payrollFilters || {});
+  } catch (error) {
+    warnings.push(`Payroll snapshot export failed: ${error.message}`);
+  }
+
+  try {
+    salesSnapshot = await dataSnapshotService.exportSalesSnapshot(options.salesFilters || {});
+  } catch (error) {
+    warnings.push(`Sales snapshot export failed: ${error.message}`);
+  }
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Citi-Nati Supermarket';
@@ -849,7 +897,15 @@ async function exportFullWorkbook(options = {}) {
     { field: 'Payroll Entries', value: Number(payrollSnapshot.data?.metadata?.totalEntries || 0) },
     { field: 'Sales Invoices', value: Number(salesSnapshot.data?.metadata?.totalInvoices || 0) },
     { field: 'Sales Invoice Items', value: Number(salesSnapshot.data?.metadata?.totalInvoiceItems || 0) },
+    { field: 'Warnings Count', value: warnings.length },
   ]);
+
+  if (warnings.length > 0) {
+    addTabularSheet(workbook, 'Export_Warnings', warnings.map((warning, index) => ({
+      index: index + 1,
+      message: warning,
+    })));
+  }
 
   addTabularSheet(workbook, 'Payroll_Employees', payrollSnapshot.data?.employees || []);
   addTabularSheet(workbook, 'Payroll_SalaryStructures', payrollSnapshot.data?.salaryStructures || []);
