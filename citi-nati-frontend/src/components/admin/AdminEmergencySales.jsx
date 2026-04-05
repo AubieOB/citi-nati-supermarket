@@ -388,6 +388,85 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
     setSelectedRowId(null);
   }, [selectedRowId]);
 
+  const printReceipt = useCallback((receiptData) => {
+    const receipt = buildReceiptFromSale(receiptData);
+    if (!receipt) {
+      notifyInfo('No receipt available to print', 1800);
+      return;
+    }
+
+    const statusText = receiptData?.sync_status === 'synced_to_pos' ? 'Synced to POS' : 'Pending POS Sync';
+    const itemsHtml = (receipt.items || [])
+      .map(
+        (item, index) => `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${item.product_code || '-'}</td>
+          <td>${item.product_name}</td>
+          <td style="text-align:right;">${item.qty}</td>
+          <td style="text-align:right;">${formatMoney(item.unit_price)}</td>
+          <td style="text-align:right;">${formatMoney(item.line_total)}</td>
+        </tr>`
+      )
+      .join('');
+
+    const html = `<!doctype html>
+    <html>
+    <head>
+      <title>Emergency Receipt ${receipt.sale_ref}</title>
+      <style>
+        body { font-family: Consolas, 'Courier New', monospace; padding: 12px; color: #111; }
+        h2, p { margin: 0; text-align: center; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px; }
+        th, td { border: 1px solid #bbb; padding: 5px; }
+        .meta { margin-top: 10px; font-size: 12px; }
+        .row { display: flex; justify-content: space-between; margin-top: 2px; }
+        .note { margin-top: 12px; color: #9a5d00; font-weight: 700; }
+      </style>
+    </head>
+    <body>
+      <h2>Citi-Nati Supermarket</h2>
+      <p>Emergency Sale Receipt</p>
+      <div class="meta">
+        <div><strong>Ref:</strong> ${receipt.sale_ref}</div>
+        <div><strong>Date:</strong> ${formatDateTime(receipt.created_at)}</div>
+        <div><strong>Cashier:</strong> ${receipt.cashier_name || '-'}</div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Code</th>
+            <th>Item</th>
+            <th>Qty</th>
+            <th>Price</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>${itemsHtml}</tbody>
+      </table>
+      <div class="row"><span>Subtotal</span><span>${formatMoney(receipt.subtotal)}</span></div>
+      <div class="row"><span>Discount</span><span>${formatMoney(receipt.discount)}</span></div>
+      <div class="row"><span>Total</span><span>${formatMoney(receipt.total)}</span></div>
+      <div class="row"><span>Tendered</span><span>${formatMoney(receipt.tendered_amount)}</span></div>
+      <div class="row"><span>Change</span><span>${formatMoney(receipt.change_amount)}</span></div>
+      <div class="note">${statusText}</div>
+    </body>
+    </html>`;
+
+    const popup = window.open('', '_blank', 'width=860,height=760');
+    if (!popup) {
+      notifyError('Popup blocked. Please allow popups to print receipt.', 3000);
+      return;
+    }
+
+    popup.document.open();
+    popup.document.write(html);
+    popup.document.close();
+    popup.focus();
+    popup.print();
+  }, []);
+
   const viewReceipt = useCallback((sale) => {
     const receipt = buildReceiptFromSale(sale);
     if (!receipt) {
@@ -1058,7 +1137,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
             </div>
             {lastReceipt && (
               <div style={{ marginTop: '0.45rem' }}>
-                <button disabled style={{
+                <button onClick={() => printReceipt(lastReceipt)} style={{
                   width: '100%',
                   border: '1px solid #5e61a8',
                   backgroundColor: '#e8e9ff',
