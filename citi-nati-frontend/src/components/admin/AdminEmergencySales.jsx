@@ -396,13 +396,19 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
     }
 
     try {
-      const url = `/${apiBase}/${parsedId}/receipt.pdf`;
+      const response = await api.get(`/${apiBase}/${parsedId}/receipt.pdf`, {
+        responseType: 'blob',
+      });
+
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = true;
+      link.download = `receipt-${parsedId}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      URL.revokeObjectURL(url);
       notifySuccess('Receipt PDF downloaded', 1800);
     } catch (error) {
       notifyError(`PDF download failed: ${error.message}`, 3000);
