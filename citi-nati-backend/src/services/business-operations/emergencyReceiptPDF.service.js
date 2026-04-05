@@ -34,15 +34,15 @@ async function generateEmergencyReceiptPDF(sale) {
       };
 
       const drawAmountRow = (label, value, opts = {}) => {
-        const labelX = pageRight - 210;
-        const valueX = pageRight - 90;
+        const labelX = pageRight - 235;
+        const valueX = pageRight - 110;
         const rowY = doc.y;
         const fontName = opts.bold ? 'Helvetica-Bold' : 'Helvetica';
         const fontSize = opts.bold ? 11 : 10;
 
         doc.font(fontName).fontSize(fontSize);
-        doc.text(label, labelX, rowY, { width: 110, align: 'left', lineBreak: false });
-        doc.text(toMoney(value).toFixed(2), valueX, rowY, { width: 90, align: 'right', lineBreak: false });
+        doc.text(label, labelX, rowY, { width: 120, align: 'left', lineBreak: false });
+        doc.text(toMoney(value).toFixed(2), valueX, rowY, { width: 95, align: 'right', lineBreak: false });
         doc.y = rowY + 22;
       };
 
@@ -81,17 +81,17 @@ async function generateEmergencyReceiptPDF(sale) {
       const colNoX = pageLeft + 8;
       const colCodeX = pageLeft + 40;
       const colItemX = pageLeft + 145;
-      const colQtyX = pageLeft + 365;
-      const colPriceX = pageLeft + 430;
-      const colTotalX = pageLeft + 500;
+      const colQtyX = pageLeft + 350;
+      const colPriceX = pageLeft + 410;
+      const colTotalX = pageLeft + 475;
 
       doc.fontSize(9).font('Helvetica-Bold');
       doc.text('#', colNoX, tableTop, { width: 20, align: 'left', lineBreak: false });
       doc.text('Code', colCodeX, tableTop, { width: 95, align: 'left', lineBreak: false });
       doc.text('Item', colItemX, tableTop, { width: 210, align: 'left', lineBreak: false });
       doc.text('Qty', colQtyX, tableTop, { width: 45, align: 'right', lineBreak: false });
-      doc.text('Price', colPriceX, tableTop, { width: 65, align: 'right', lineBreak: false });
-      doc.text('Total', colTotalX, tableTop, { width: 55, align: 'right', lineBreak: false });
+      doc.text('Price', colPriceX, tableTop, { width: 60, align: 'right', lineBreak: false });
+      doc.text('Total', colTotalX, tableTop, { width: 60, align: 'right', lineBreak: false });
 
       let rowY = tableTop + 18;
       const items = Array.isArray(sale.items) ? sale.items : [];
@@ -118,8 +118,8 @@ async function generateEmergencyReceiptPDF(sale) {
           doc.text(String(item.productCode || item.product_code || '-').slice(0, 22), colCodeX, rowY, { width: 95, align: 'left', lineBreak: false });
           doc.text(String(item.productName || item.product_name || '-').slice(0, 44), colItemX, rowY, { width: 210, align: 'left', lineBreak: false });
           doc.text(String(item.qty || 0), colQtyX, rowY, { width: 45, align: 'right', lineBreak: false });
-          doc.text(toMoney(item.unitPrice || item.unit_price).toFixed(2), colPriceX, rowY, { width: 65, align: 'right', lineBreak: false });
-          doc.text(toMoney(item.lineTotal || item.line_total).toFixed(2), colTotalX, rowY, { width: 55, align: 'right', lineBreak: false });
+          doc.text(toMoney(item.unitPrice || item.unit_price).toFixed(2), colPriceX, rowY, { width: 60, align: 'right', lineBreak: false });
+          doc.text(toMoney(item.lineTotal || item.line_total).toFixed(2), colTotalX, rowY, { width: 60, align: 'right', lineBreak: false });
 
           rowY += rowHeight;
         }
