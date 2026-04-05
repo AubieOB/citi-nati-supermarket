@@ -388,47 +388,6 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
     setSelectedRowId(null);
   }, [selectedRowId]);
 
-  const downloadReceiptPDF = useCallback(async (saleId) => {
-    const parsedId = Number(saleId);
-    if (!Number.isFinite(parsedId) || parsedId <= 0) {
-      notifyError('Invalid sale id for PDF download', 2200);
-      return;
-    }
-
-    try {
-      const response = await api.get(`/${apiBase}/${parsedId}/receipt.pdf`, {
-        responseType: 'blob',
-      });
-
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `receipt-${parsedId}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      notifySuccess('Receipt PDF downloaded', 1800);
-    } catch (error) {
-      notifyError(`PDF download failed: ${error.message}`, 3000);
-    }
-  }, [apiBase]);
-
-  const printReceipt = useCallback((receipt) => {
-    if (!receipt) {
-      notifyInfo('No receipt available to print', 1800);
-      return;
-    }
-
-    const saleId = Number(receipt.emergency_sale_id ?? receipt.id ?? 0);
-    if (Number.isFinite(saleId) && saleId > 0) {
-      downloadReceiptPDF(saleId);
-    } else {
-      notifyError('Cannot download receipt: sale id unavailable', 2200);
-    }
-  }, [downloadReceiptPDF]);
-
   const viewReceipt = useCallback((sale) => {
     const receipt = buildReceiptFromSale(sale);
     if (!receipt) {
@@ -1084,13 +1043,6 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
                             <i className="fas fa-eye"></i>
                           </button>
                           <button
-                            onClick={() => downloadReceiptPDF(sale.id)}
-                            title="Download receipt PDF"
-                            style={{ border: '1px solid #d32f2f', backgroundColor: '#ffebee', color: '#c62828', borderRadius: '4px', width: '28px', height: '24px', cursor: 'pointer' }}
-                          >
-                            <i className="fas fa-file-pdf"></i>
-                          </button>
-                          <button
                             onClick={() => downloadReceipt(sale)}
                             title="Download receipt text"
                             style={{ border: '1px solid #5a8b5f', backgroundColor: '#edf9ef', color: '#1f6a2b', borderRadius: '4px', width: '28px', height: '24px', cursor: 'pointer' }}
@@ -1106,7 +1058,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
             </div>
             {lastReceipt && (
               <div style={{ marginTop: '0.45rem' }}>
-                <button onClick={() => printReceipt(lastReceipt)} style={{
+                <button disabled style={{
                   width: '100%',
                   border: '1px solid #5e61a8',
                   backgroundColor: '#e8e9ff',

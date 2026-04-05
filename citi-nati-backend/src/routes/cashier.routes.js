@@ -7,7 +7,6 @@ const {
   lookupEmergencyProducts,
   createEmergencySale,
   listEmergencySales,
-  downloadEmergencySaleReceiptPDF,
 } = require('../controllers/emergencySales.controller');
 
 const router = express.Router();
@@ -85,12 +84,6 @@ router.get('/emergency-sales/lookup', lookupEmergencyProducts);
  * Create a new emergency sale (cashier is the authenticated user).
  */
 router.post('/emergency-sales', createEmergencySale);
-
-/**
- * GET /api/cashier/emergency-sales/:id/receipt.pdf
- * Download receipt as PDF for a specific emergency sale.
- */
-router.get('/emergency-sales/:id/receipt.pdf', downloadEmergencySaleReceiptPDF);
 
 /**
  * GET /api/cashier/emergency-sales
