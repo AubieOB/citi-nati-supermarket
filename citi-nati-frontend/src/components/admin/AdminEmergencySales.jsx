@@ -394,76 +394,13 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
       return;
     }
 
-    const itemsHtml = (receipt.items || [])
-      .map(
-        (item, index) => `
-        <tr>
-          <td>${index + 1}</td>
-          <td>${item.product_code || '-'}</td>
-          <td>${item.product_name}</td>
-          <td style="text-align:right;">${item.qty}</td>
-          <td style="text-align:right;">${formatMoney(item.unit_price)}</td>
-          <td style="text-align:right;">${formatMoney(item.line_total)}</td>
-        </tr>`
-      )
-      .join('');
-
-    const html = `<!doctype html>
-    <html>
-    <head>
-      <title>Emergency Receipt ${receipt.sale_ref}</title>
-      <style>
-        body { font-family: Consolas, 'Courier New', monospace; padding: 12px; color: #111; }
-        h2, p { margin: 0; text-align: center; }
-        table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px; }
-        th, td { border: 1px solid #bbb; padding: 5px; }
-        .meta { margin-top: 10px; font-size: 12px; }
-        .row { display: flex; justify-content: space-between; margin-top: 2px; }
-        .note { margin-top: 12px; color: #9a5d00; font-weight: 700; }
-      </style>
-    </head>
-    <body>
-      <h2>Citi-Nati Supermarket</h2>
-      <p>Emergency Sale Receipt</p>
-      <div class="meta">
-        <div><strong>Ref:</strong> ${receipt.sale_ref}</div>
-        <div><strong>Date:</strong> ${formatDateTime(receipt.created_at)}</div>
-        <div><strong>Cashier:</strong> ${receipt.cashier_name || '-'}</div>
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Code</th>
-            <th>Item</th>
-            <th>Qty</th>
-            <th>Price</th>
-            <th>Total</th>
-          </tr>
-        </thead>
-        <tbody>${itemsHtml}</tbody>
-      </table>
-      <div class="row"><span>Subtotal</span><span>${formatMoney(receipt.subtotal)}</span></div>
-      <div class="row"><span>Discount</span><span>${formatMoney(receipt.discount)}</span></div>
-      <div class="row"><span>Total</span><span>${formatMoney(receipt.total)}</span></div>
-      <div class="row"><span>Tendered</span><span>${formatMoney(receipt.tendered_amount)}</span></div>
-      <div class="row"><span>Change</span><span>${formatMoney(receipt.change_amount)}</span></div>
-      <div class="note">Pending POS Sync</div>
-    </body>
-    </html>`;
-
-    const popup = window.open('', '_blank', 'width=780,height=680');
-    if (!popup) {
-      notifyError('Popup blocked. Please allow popups to print.', 3000);
-      return;
+    const saleId = Number(receipt.emergency_sale_id ?? receipt.id ?? 0);
+    if (Number.isFinite(saleId) && saleId > 0) {
+      downloadReceiptPDF(saleId);
+    } else {
+      notifyError('Cannot download receipt: sale id unavailable', 2200);
     }
-
-    popup.document.open();
-    popup.document.write(html);
-    popup.document.close();
-    popup.focus();
-    popup.print();
-  }, []);
+  }, [downloadReceiptPDF]);
 
   const viewReceipt = useCallback((sale) => {
     const receipt = buildReceiptFromSale(sale);
@@ -583,6 +520,27 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
     document.body.removeChild(anchor);
     URL.revokeObjectURL(url);
   }, []);
+
+  const downloadReceiptPDF = useCallback(async (saleId) => {
+    const parsedId = Number(saleId);
+    if (!Number.isFinite(parsedId) || parsedId <= 0) {
+      notifyError('Invalid sale id for PDF download', 2200);
+      return;
+    }
+
+    try {
+      const url = `/${apiBase}/${parsedId}/receipt.pdf`;
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = true;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      notifySuccess('Receipt PDF downloaded', 1800);
+    } catch (error) {
+      notifyError(`PDF download failed: ${error.message}`, 3000);
+    }
+  }, [apiBase]);
 
   const submitSale = useCallback(async () => {
     if (cart.length === 0) {
@@ -1120,8 +1078,15 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
                             <i className="fas fa-eye"></i>
                           </button>
                           <button
+                            onClick={() => downloadReceiptPDF(sale.id)}
+                            title="Download receipt PDF"
+                            style={{ border: '1px solid #d32f2f', backgroundColor: '#ffebee', color: '#c62828', borderRadius: '4px', width: '28px', height: '24px', cursor: 'pointer' }}
+                          >
+                            <i className="fas fa-file-pdf"></i>
+                          </button>
+                          <button
                             onClick={() => downloadReceipt(sale)}
-                            title="Download receipt"
+                            title="Download receipt text"
                             style={{ border: '1px solid #5a8b5f', backgroundColor: '#edf9ef', color: '#1f6a2b', borderRadius: '4px', width: '28px', height: '24px', cursor: 'pointer' }}
                           >
                             <i className="fas fa-download"></i>

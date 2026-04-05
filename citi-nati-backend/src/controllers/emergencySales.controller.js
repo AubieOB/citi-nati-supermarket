@@ -3,6 +3,7 @@ const { PrismaClient } = require('@prisma/client');
 const { resolveEffectiveStock, enrichProductStock } = require('../utils/stockResolver');
 const { notifyLowStock } = require('../utils/messageService');
 const { recordPosSyncEvent } = require('../services/posSyncMonitor.service');
+const { generateEmergencyReceiptPDF } = require('../services/business-operations/emergencyReceiptPDF.service');
 
 const prisma = new PrismaClient();
 const EMERGENCY_SALE_MAX_RETRIES = Number.parseInt(process.env.EMERGENCY_SALE_MAX_RETRIES || '10', 10);
@@ -873,12 +874,58 @@ async function ackEmergencySaleSyncFailed(req, res) {
   }
 }
 
+async function downloadEmergencySaleReceiptPDF(req, res) {
+  try {
+    const id = toSafeInt(req.params.id);
+    if (!id) {
+      return res.status(400).json({ success: false, error: 'Invalid emergency sale id' });
+    }
+
+    const sale = await prisma.emergencySale.findUnique({
+      where: { id },
+      include: { items: true },
+    });
+
+    if (!sale) {
+      return res.status(404).json({ success: false, error: 'Emergency sale not found' });
+    }
+
+    const requesterRole = String(req.user?.role || '').trim().toLowerCase();
+    const requesterUserId = String(req.user?.userId || '').trim();
+    if (requesterRole === 'cashier' && requesterUserId && String(sale.cashierId || '') !== requesterUserId) {
+      return res.status(403).json({ success: false, error: 'Access denied' });
+    }
+
+    console.log('[EMERGENCY_RECEIPT] PDF generation requested:', {
+      saleId: sale.id,
+      saleRef: sale.saleRef,
+      requestedBy: req.user?.userId || null,
+    });
+
+    const pdfBuffer = await generateEmergencyReceiptPDF(sale);
+
+    const filename = `emergency-receipt-${sale.saleRef || `sale-${sale.id}`}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('[EMERGENCY RECEIPT] PDF generation failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to generate receipt PDF' });
+  }
+}
+
 module.exports = {
   lookupEmergencyProducts,
   createEmergencySale,
   listEmergencySales,
   getEmergencySaleById,
   retryEmergencySaleSync,
+  downloadEmergencySaleReceiptPDF,
   getPendingEmergencySalesForPosSync,
   ackEmergencySaleSynced,
   ackEmergencySaleSyncFailed,
