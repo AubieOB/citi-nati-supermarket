@@ -66,6 +66,14 @@ function isPrintableKey(event) {
   return typeof event.key === 'string' && event.key.length === 1;
 }
 
+function safeParseJson(value, fallback) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
 const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
   const { user } = useAuth();
 
@@ -107,6 +115,11 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
   });
 
   const [lastReceipt, setLastReceipt] = useState(null);
+
+  const draftStorageKey = useMemo(() => {
+    const userId = user?.id || user?.email || 'anonymous';
+    return `emergency-sales-draft:${apiBase}:${userId}`;
+  }, [apiBase, user]);
 
   const subtotal = useMemo(
     () => toMoney(cart.reduce((sum, line) => sum + toMoney(line.qty * line.unitPrice), 0)),
@@ -162,6 +175,43 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
     fetchEmergencySales();
     focusCaptureInput();
   }, [fetchEmergencySales, focusCaptureInput]);
+
+  useEffect(() => {
+    const draftRaw = localStorage.getItem(draftStorageKey);
+    if (!draftRaw) return;
+
+    const draft = safeParseJson(draftRaw, null);
+    if (!draft || typeof draft !== 'object') return;
+
+    const draftCart = Array.isArray(draft.cart) ? draft.cart : [];
+    if (!draftCart.length) return;
+
+    setCart(draftCart);
+    setSelectedRowId(draft.selectedRowId || null);
+    setPaymentMethod(draft.paymentMethod || 'CASH');
+    setTenderedAmount(draft.tenderedAmount ?? '0.00');
+    setDiscount(draft.discount ?? '0');
+    notifyInfo(`Recovered saved invoice draft (${draftCart.length} lines).`, 2500);
+  }, [draftStorageKey]);
+
+  useEffect(() => {
+    const hasDraft = cart.length > 0;
+    if (!hasDraft) {
+      localStorage.removeItem(draftStorageKey);
+      return;
+    }
+
+    const payload = {
+      savedAt: new Date().toISOString(),
+      cart,
+      selectedRowId,
+      paymentMethod,
+      tenderedAmount,
+      discount,
+    };
+
+    localStorage.setItem(draftStorageKey, JSON.stringify(payload));
+  }, [cart, selectedRowId, paymentMethod, tenderedAmount, discount, draftStorageKey]);
 
   useEffect(() => {
     if (!searchModalOpen) return;
@@ -328,8 +378,9 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
     setSelectedRowId(null);
     setDiscount('0');
     setTenderedAmount('0.00');
+    localStorage.removeItem(draftStorageKey);
     notifyInfo('New invoice started', 1500);
-  }, []);
+  }, [draftStorageKey]);
 
   const removeSelectedRow = useCallback(() => {
     if (!selectedRowId) return;
@@ -565,7 +616,11 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
         printReceipt(receipt);
       }
     } catch (error) {
-      notifyError(`Sale failed: ${error.response?.data?.error || error.message}`, 3500);
+      if (error?.response?.status === 401) {
+        notifyError('Session expired. Re-login in another tab, then click Accept & Print again. Invoice draft is preserved.', 5000);
+      } else {
+        notifyError(`Sale failed: ${error.response?.data?.error || error.message}`, 3500);
+      }
     } finally {
       setIsSubmittingSale(false);
     }
