@@ -4,6 +4,7 @@ const defaultForm = {
   employeeId: '',
   linkedTerminationId: '',
   effectiveDate: new Date().toISOString().split('T')[0],
+  contractExpiryDate: '',
   wageAtRetrenchment: '0',
   reengagementWage: '0',
   occupation: '',
@@ -58,6 +59,7 @@ const EmployeeReengagementFormModal = ({
       employeeId: toStringValue(reengagement?.employeeId, ''),
       linkedTerminationId: toStringValue(reengagement?.linkedTerminationId, ''),
       effectiveDate: reengagement?.effectiveDate ? reengagement.effectiveDate.split('T')[0] : new Date().toISOString().split('T')[0],
+      contractExpiryDate: reengagement?.contractExpiryDate ? reengagement.contractExpiryDate.split('T')[0] : '',
       wageAtRetrenchment: toStringValue(reengagement?.wageAtRetrenchment, '0'),
       reengagementWage: toStringValue(reengagement?.reengagementWage, '0'),
       occupation: toStringValue(reengagement?.occupation, ''),
@@ -95,6 +97,7 @@ const EmployeeReengagementFormModal = ({
       employeeId: Number(form.employeeId),
       linkedTerminationId: form.linkedTerminationId ? Number(form.linkedTerminationId) : null,
       effectiveDate: form.effectiveDate,
+      contractExpiryDate: form.contractExpiryDate || null,
       wageAtRetrenchment: asNumber(form.wageAtRetrenchment, 0),
       previousWage: asNumber(form.wageAtRetrenchment, 0),
       reengagementWage: asNumber(form.reengagementWage, 0),
@@ -146,6 +149,10 @@ const EmployeeReengagementFormModal = ({
             <div>
               <label style={labelStyle}>Effective Date</label>
               <input type="date" value={form.effectiveDate} onChange={set('effectiveDate')} style={fieldStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Contract Expiry Date</label>
+              <input type="date" value={form.contractExpiryDate} onChange={set('contractExpiryDate')} style={fieldStyle} />
             </div>
           </div>
 

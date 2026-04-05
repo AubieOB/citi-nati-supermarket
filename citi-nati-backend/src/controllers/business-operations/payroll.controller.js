@@ -464,7 +464,9 @@ async function createTermination(req, res) {
       halfPayDueInTerminationMonth: req.body.halfPayDueInTerminationMonth !== undefined ? toNumber(req.body.halfPayDueInTerminationMonth) : null,
       amountPaidInTerminationMonth: req.body.amountPaidInTerminationMonth !== undefined ? toNumber(req.body.amountPaidInTerminationMonth) : null,
       leavePayAccruedDays: req.body.leavePayAccruedDays !== undefined ? toNumber(req.body.leavePayAccruedDays) : null,
-      leavePayAmount: req.body.leavePayAmount !== undefined ? toNumber(req.body.leavePayAmount) : null,
+      leavePayAmount: req.body.leavePayAmount !== undefined
+        ? toNumber(req.body.leavePayAmount)
+        : (req.body.leavePayAccruedAmount !== undefined ? toNumber(req.body.leavePayAccruedAmount) : null),
       outstandingLoanObligations: req.body.outstandingLoanObligations !== undefined ? toNumber(req.body.outstandingLoanObligations) : null,
       grossSettlementAmount: req.body.grossSettlementAmount !== undefined ? toNumber(req.body.grossSettlementAmount) : null,
       netSettlementAmount: req.body.netSettlementAmount !== undefined ? toNumber(req.body.netSettlementAmount) : null,
@@ -494,7 +496,9 @@ async function updateTermination(req, res) {
       halfPayDueInTerminationMonth: req.body.halfPayDueInTerminationMonth !== undefined ? toNumber(req.body.halfPayDueInTerminationMonth) : undefined,
       amountPaidInTerminationMonth: req.body.amountPaidInTerminationMonth !== undefined ? toNumber(req.body.amountPaidInTerminationMonth) : undefined,
       leavePayAccruedDays: req.body.leavePayAccruedDays !== undefined ? toNumber(req.body.leavePayAccruedDays) : undefined,
-      leavePayAmount: req.body.leavePayAmount !== undefined ? toNumber(req.body.leavePayAmount) : undefined,
+      leavePayAmount: req.body.leavePayAmount !== undefined
+        ? toNumber(req.body.leavePayAmount)
+        : (req.body.leavePayAccruedAmount !== undefined ? toNumber(req.body.leavePayAccruedAmount) : undefined),
       outstandingLoanObligations: req.body.outstandingLoanObligations !== undefined ? toNumber(req.body.outstandingLoanObligations) : undefined,
       grossSettlementAmount: req.body.grossSettlementAmount !== undefined ? toNumber(req.body.grossSettlementAmount) : undefined,
       netSettlementAmount: req.body.netSettlementAmount !== undefined ? toNumber(req.body.netSettlementAmount) : undefined,

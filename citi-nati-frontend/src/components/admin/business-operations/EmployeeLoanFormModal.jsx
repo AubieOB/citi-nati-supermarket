@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 const defaultForm = {
   employeeId: '',
+  loanReference: '',
   principalAmount: '0',
   balanceAmount: '0',
   monthlyDeductionAmount: '0',
@@ -11,6 +12,8 @@ const defaultForm = {
   loanGrantedYear: new Date().getFullYear(),
   repaymentEndMonth: new Date().getMonth() + 1,
   repaymentEndYear: new Date().getFullYear() + 1,
+  startDate: '',
+  endDate: '',
   reason: '',
   notes: '',
 };
@@ -65,6 +68,7 @@ const EmployeeLoanFormModal = ({
     
     setForm({
       employeeId: toStringValue(loan?.employeeId, ''),
+      loanReference: toStringValue(loan?.loanReference, ''),
       principalAmount: toStringValue(loan?.principalAmount, '0'),
       balanceAmount: toStringValue(loan?.balanceAmount, '0'),
       monthlyDeductionAmount: toStringValue(loan?.monthlyDeductionAmount, '0'),
@@ -74,6 +78,8 @@ const EmployeeLoanFormModal = ({
       loanGrantedYear: loan?.loanGrantedYear || currentYear,
       repaymentEndMonth: loan?.repaymentEndMonth || currentMonth,
       repaymentEndYear: loan?.repaymentEndYear || currentYear + 1,
+      startDate: loan?.startDate ? loan.startDate.split('T')[0] : '',
+      endDate: loan?.endDate ? loan.endDate.split('T')[0] : '',
       reason: loan?.reason || '',
       notes: loan?.notes || '',
     });
@@ -107,6 +113,7 @@ const EmployeeLoanFormModal = ({
     setValidationError('');
     onSubmit({
       employeeId: Number(form.employeeId),
+      loanReference: form.loanReference.trim() || null,
       principalAmount: asNumber(form.principalAmount, 0),
       balanceAmount: asNumber(form.balanceAmount, 0),
       monthlyDeductionAmount: asNumber(form.monthlyDeductionAmount, 0),
@@ -116,6 +123,8 @@ const EmployeeLoanFormModal = ({
       loanGrantedYear: Number(form.loanGrantedYear),
       repaymentEndMonth: Number(form.repaymentEndMonth),
       repaymentEndYear: Number(form.repaymentEndYear),
+      startDate: form.startDate || null,
+      endDate: form.endDate || null,
       reason: form.reason.trim() || null,
       notes: null,
     });
@@ -150,6 +159,11 @@ const EmployeeLoanFormModal = ({
             </select>
           </div>
 
+          <div>
+            <label style={labelStyle}>Loan Reference (Optional)</label>
+            <input type="text" value={form.loanReference} onChange={set('loanReference')} style={fieldStyle} placeholder="e.g. LOAN-2026-001" />
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.75rem' }}>
             <div><label style={labelStyle}>Principal Amount</label><input type="number" step="0.01" min="0" value={form.principalAmount} onChange={set('principalAmount')} style={fieldStyle} /></div>
             <div><label style={labelStyle}>Balance Amount</label><input type="number" step="0.01" min="0" value={form.balanceAmount} onChange={set('balanceAmount')} style={fieldStyle} /></div>
@@ -179,6 +193,8 @@ const EmployeeLoanFormModal = ({
                 </select>
               </div>
               <div><label style={labelStyle}>Repayment End Year</label><input type="number" min="2020" max="2050" value={form.repaymentEndYear} onChange={set('repaymentEndYear')} style={fieldStyle} /></div>
+              <div><label style={labelStyle}>Start Date (Optional)</label><input type="date" value={form.startDate} onChange={set('startDate')} style={fieldStyle} /></div>
+              <div><label style={labelStyle}>End Date (Optional)</label><input type="date" value={form.endDate} onChange={set('endDate')} style={fieldStyle} /></div>
             </div>
           </div>
 

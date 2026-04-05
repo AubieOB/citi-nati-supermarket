@@ -4,10 +4,14 @@ const defaultForm = {
   employeeId: '',
   terminationDate: new Date().toISOString().split('T')[0],
   terminationType: 'resignation',
+  reason: '',
+  daysWorkedInFinalMonth: '0',
+  halfPayReceived: '0',
+  settlementAmount: '0',
   halfPayDueInTerminationMonth: '0',
   amountPaidInTerminationMonth: '0',
   leavePayAccruedDays: '0',
-  leavePayAccruedAmount: '0',
+  leavePayAmount: '0',
   outstandingLoanObligations: '0',
   grossSettlementAmount: '0',
   netSettlementAmount: '0',
@@ -61,10 +65,14 @@ const EmployeeTerminationFormModal = ({
       employeeId: toStringValue(termination?.employeeId, ''),
       terminationDate: termination?.terminationDate ? termination.terminationDate.split('T')[0] : new Date().toISOString().split('T')[0],
       terminationType: termination?.terminationType || 'resignation',
+      reason: toStringValue(termination?.reason, ''),
+      daysWorkedInFinalMonth: toStringValue(termination?.daysWorkedInFinalMonth, '0'),
+      halfPayReceived: toStringValue(termination?.halfPayReceived, '0'),
+      settlementAmount: toStringValue(termination?.settlementAmount, '0'),
       halfPayDueInTerminationMonth: toStringValue(termination?.halfPayDueInTerminationMonth, '0'),
       amountPaidInTerminationMonth: toStringValue(termination?.amountPaidInTerminationMonth, '0'),
       leavePayAccruedDays: toStringValue(termination?.leavePayAccruedDays, '0'),
-      leavePayAccruedAmount: toStringValue(termination?.leavePayAccruedAmount, '0'),
+      leavePayAmount: toStringValue(termination?.leavePayAmount, toStringValue(termination?.leavePayAccruedAmount, '0')),
       outstandingLoanObligations: toStringValue(termination?.outstandingLoanObligations, '0'),
       grossSettlementAmount: toStringValue(termination?.grossSettlementAmount, '0'),
       netSettlementAmount: toStringValue(termination?.netSettlementAmount, '0'),
@@ -98,10 +106,14 @@ const EmployeeTerminationFormModal = ({
       employeeId: Number(form.employeeId),
       terminationDate: form.terminationDate,
       terminationType: form.terminationType,
+      reason: form.reason.trim() || null,
+      daysWorkedInFinalMonth: asNumber(form.daysWorkedInFinalMonth, 0),
+      halfPayReceived: asNumber(form.halfPayReceived, 0),
+      settlementAmount: asNumber(form.settlementAmount, 0),
       halfPayDueInTerminationMonth: asNumber(form.halfPayDueInTerminationMonth, 0),
       amountPaidInTerminationMonth: asNumber(form.amountPaidInTerminationMonth, 0),
       leavePayAccruedDays: asNumber(form.leavePayAccruedDays, 0),
-      leavePayAccruedAmount: asNumber(form.leavePayAccruedAmount, 0),
+      leavePayAmount: asNumber(form.leavePayAmount, 0),
       outstandingLoanObligations: asNumber(form.outstandingLoanObligations, 0),
       grossSettlementAmount: asNumber(form.grossSettlementAmount, 0),
       netSettlementAmount: asNumber(form.netSettlementAmount, 0),
@@ -154,6 +166,20 @@ const EmployeeTerminationFormModal = ({
             </div>
           </div>
 
+          <div>
+            <label style={labelStyle}>Reason</label>
+            <input type="text" value={form.reason} onChange={set('reason')} style={fieldStyle} placeholder="Reason for termination/resignation" />
+          </div>
+
+          <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.8rem' }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.6rem' }}>Work & Settlement Basics</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.75rem' }}>
+              <div><label style={labelStyle}>Days Worked in Final Month</label><input type="number" step="0.01" min="0" value={form.daysWorkedInFinalMonth} onChange={set('daysWorkedInFinalMonth')} style={fieldStyle} /></div>
+              <div><label style={labelStyle}>Half Pay Received</label><input type="number" step="0.01" min="0" value={form.halfPayReceived} onChange={set('halfPayReceived')} style={fieldStyle} /></div>
+              <div><label style={labelStyle}>Settlement Amount</label><input type="number" step="0.01" min="0" value={form.settlementAmount} onChange={set('settlementAmount')} style={fieldStyle} /></div>
+            </div>
+          </div>
+
           <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.8rem' }}>
             <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.6rem' }}>Termination Month Settlement</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.75rem' }}>
@@ -166,7 +192,7 @@ const EmployeeTerminationFormModal = ({
             <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.6rem' }}>Leave Pay Accrual</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.75rem' }}>
               <div><label style={labelStyle}>Accrued Days</label><input type="number" step="0.01" min="0" value={form.leavePayAccruedDays} onChange={set('leavePayAccruedDays')} style={fieldStyle} /></div>
-              <div><label style={labelStyle}>Accrued Amount</label><input type="number" step="0.01" min="0" value={form.leavePayAccruedAmount} onChange={set('leavePayAccruedAmount')} style={fieldStyle} /></div>
+              <div><label style={labelStyle}>Leave Pay Amount</label><input type="number" step="0.01" min="0" value={form.leavePayAmount} onChange={set('leavePayAmount')} style={fieldStyle} /></div>
             </div>
           </div>
 
