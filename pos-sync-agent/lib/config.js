@@ -42,6 +42,7 @@ function buildFeatureFlags() {
     enablePriceSync: parseBoolean(process.env.ENABLE_PRICE_SYNC, true),
     enableManualStockSync: parseBoolean(process.env.ENABLE_MANUAL_STOCK_SYNC, true),
     enableInvoiceWriteback: parseBoolean(process.env.ENABLE_INVOICE_WRITEBACK, true),
+    enableThermalPrinting: parseBoolean(process.env.ENABLE_THERMAL_PRINTING, true),
   };
 }
 
@@ -79,6 +80,10 @@ function buildConfig() {
       password: sqlPassword,
       locationCode: normalizeString(process.env.POS_LOCATION_CODE, 'SH').toUpperCase(),
     },
+    printer: {
+      thermalPrinterName: normalizeString(process.env.THERMAL_PRINTER_NAME, ''),
+      paperWidthChars: parseInteger(process.env.THERMAL_PAPER_WIDTH_CHARS, 48),
+    },
     polling: {
       reportingSyncIntervalMs: pollingIntervalMs,
       commandPollIntervalMs: parseInteger(process.env.COMMAND_POLL_INTERVAL_MS, 5000),
@@ -93,13 +98,15 @@ function buildConfig() {
       || features.enableStockWriteback
       || features.enablePromotionSync
       || features.enablePriceSync
-      || features.enableInvoiceWriteback,
+      || features.enableInvoiceWriteback
+      || features.enableThermalPrinting,
     emergencySalesSync: features.enableOnlineOrderWriteback && features.enableInvoiceWriteback,
     invoiceWriteback: features.enableInvoiceWriteback,
     stockWriteback: features.enableStockWriteback,
     priceSync: features.enablePriceSync,
     promotionSync: features.enablePromotionSync,
     manualStockSync: features.enableManualStockSync,
+    thermalPrinting: features.enableThermalPrinting,
   };
 
   config.reporting = {

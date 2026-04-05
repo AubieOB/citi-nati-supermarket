@@ -2,6 +2,7 @@ const sql = require('mssql');
 const priceUpdates = require('./price-updates');
 const stockUpdates = require('./stock-updates');
 const invoiceWriteback = require('./invoice-writeback');
+const thermalReceipt = require('./thermal-receipt');
 const { buildConfig } = require('./config');
 
 async function executeUpdatePrice(pool, payload) {
@@ -376,6 +377,49 @@ async function executeWriteInvoice(pool, payload, commandId) {
   }
 }
 
+async function executeThermalPrint(payload, commandId) {
+  const config = buildConfig();
+  const copies = Number.parseInt(payload?.copies || 1, 10) || 1;
+  const receipt = payload?.receipt;
+  const printerName = payload?.printerName || config.printer.thermalPrinterName;
+
+  if (!receipt || typeof receipt !== 'object') {
+    throw new Error('NON_RETRYABLE: THERMAL_PRINT_RECEIPT payload missing receipt object');
+  }
+
+  if (!Array.isArray(receipt.items) || receipt.items.length === 0) {
+    throw new Error('NON_RETRYABLE: THERMAL_PRINT_RECEIPT receipt has no items');
+  }
+
+  console.log('[XPRINTER] THERMAL_PRINT_RECEIPT start:', {
+    commandId,
+    saleRef: receipt.sale_ref,
+    emergencySaleId: receipt.emergency_sale_id,
+    copies,
+    printerName: printerName || '(default)',
+  });
+
+  const printSummary = await thermalReceipt.printReceipt(receipt, {
+    copies,
+    printerName,
+    paperWidthChars: config.printer.paperWidthChars,
+  });
+
+  console.log('[XPRINTER] THERMAL_PRINT_RECEIPT success:', {
+    commandId,
+    saleRef: receipt.sale_ref,
+    printerName: printSummary.printerName || '(default)',
+    copies: printSummary.copies,
+  });
+
+  return {
+    message: 'Thermal receipt printed',
+    saleRef: receipt.sale_ref,
+    emergencySaleId: receipt.emergency_sale_id,
+    ...printSummary,
+  };
+}
+
 async function executeCommand(pool, command) {
   const config = buildConfig();
   const { features } = config;
@@ -407,6 +451,11 @@ async function executeCommand(pool, command) {
         throw new Error('NON_RETRYABLE: WRITE_INVOICE command disabled by writeback feature flags');
       }
       return executeWriteInvoice(pool, payload, command.id);
+    case 'THERMAL_PRINT_RECEIPT':
+      if (!features.enableThermalPrinting) {
+        throw new Error('NON_RETRYABLE: THERMAL_PRINT_RECEIPT command disabled by ENABLE_THERMAL_PRINTING=false');
+      }
+      return executeThermalPrint(payload, command.id);
     default:
       throw new Error(`Unsupported command type: ${commandType}`);
   }
