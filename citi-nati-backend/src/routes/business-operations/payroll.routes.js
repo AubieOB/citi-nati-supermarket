@@ -1,6 +1,7 @@
 'use strict';
 
 const express = require('express');
+const multer = require('multer');
 const uploadWorkbook = require('../../middlewares/uploadWorkbook');
 const {
   createPayrollPeriod,
@@ -52,6 +53,65 @@ const {
 } = require('../../controllers/business-operations/payroll.controller');
 
 const router = express.Router();
+
+function buildUploadErrorResponse({ message, details = {}, fileMeta = null }) {
+  return {
+    success: false,
+    stage: 'upload',
+    error: message,
+    details,
+    fileMeta,
+  };
+}
+
+function uploadSingleWorkbook(req, res, next) {
+  const middleware = uploadWorkbook.single('workbook');
+  middleware(req, res, (err) => {
+    if (!err) return next();
+
+    const fileMeta = req.file
+      ? {
+          originalname: req.file.originalname,
+          mimetype: req.file.mimetype,
+          size: req.file.size,
+        }
+      : null;
+
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json(buildUploadErrorResponse({
+          message: `Workbook file too large. Max size is ${Math.round(uploadWorkbook.MAX_WORKBOOK_FILE_SIZE_BYTES / (1024 * 1024))}MB`,
+          details: { multerCode: err.code },
+          fileMeta,
+        }));
+      }
+
+      if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+        return res.status(400).json(buildUploadErrorResponse({
+          message: 'Unexpected upload field name. Use form-data field "workbook"',
+          details: {
+            multerCode: err.code,
+            expectedFieldName: 'workbook',
+            receivedFieldName: err.field || null,
+          },
+          fileMeta,
+        }));
+      }
+
+      return res.status(400).json(buildUploadErrorResponse({
+        message: err.message,
+        details: { multerCode: err.code },
+        fileMeta,
+      }));
+    }
+
+    return res.status(400).json(buildUploadErrorResponse({
+      message: err.message || 'Invalid upload request',
+      details: { expectedFieldName: 'workbook' },
+      fileMeta,
+    }));
+  });
+}
 
 router.post('/import/periods', importPayrollPeriods);
 router.post('/import/entries', importPayrollEntries);
@@ -109,6 +169,6 @@ router.get('/export/snapshot', exportPayrollSnapshot);
 router.post('/import/snapshot', importPayrollSnapshot);
 router.get('/export/backup-zip', exportFullBackupZip);
 router.get('/export/full-workbook', exportFullWorkbook);
-router.post('/import/full-workbook', uploadWorkbook.single('workbook'), importFullWorkbook);
+router.post('/import/full-workbook', uploadSingleWorkbook, importFullWorkbook);
 
 module.exports = router;

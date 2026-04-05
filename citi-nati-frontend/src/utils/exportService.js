@@ -113,6 +113,8 @@ export async function importFullBusinessWorkbook({ file, upsert = true, clearExi
   formData.append('clearExisting', clearExisting ? 'true' : 'false');
   if (locationId) formData.append('locationId', String(locationId));
 
-  const response = await api.post('/business-operations/payroll/import/full-workbook', formData);
+  const response = await api.post('/business-operations/payroll/import/full-workbook', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
   return response?.data;
 }

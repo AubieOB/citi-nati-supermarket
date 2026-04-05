@@ -3,6 +3,8 @@
 const multer = require('multer');
 const path = require('path');
 
+const MAX_WORKBOOK_FILE_SIZE_BYTES = 80 * 1024 * 1024;
+
 const allowedMimes = new Set([
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/vnd.ms-excel',
@@ -14,7 +16,7 @@ const allowedExtensions = new Set(['.xlsx', '.xls']);
 const uploadWorkbook = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 20 * 1024 * 1024, // 20MB
+    fileSize: MAX_WORKBOOK_FILE_SIZE_BYTES,
     files: 1,
   },
   fileFilter: (req, file, cb) => {
@@ -33,5 +35,7 @@ const uploadWorkbook = multer({
     return cb(null, true);
   },
 });
+
+uploadWorkbook.MAX_WORKBOOK_FILE_SIZE_BYTES = MAX_WORKBOOK_FILE_SIZE_BYTES;
 
 module.exports = uploadWorkbook;
