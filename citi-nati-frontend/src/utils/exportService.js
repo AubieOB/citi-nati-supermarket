@@ -70,8 +70,16 @@ export async function downloadFullBusinessWorkbook({ filters = {} } = {}) {
   if (filters.locationId) queryParams.set('locationId', String(filters.locationId));
   if (filters.branchCode) queryParams.set('branchCode', String(filters.branchCode));
   if (filters.syncSourceCode) queryParams.set('syncSourceCode', String(filters.syncSourceCode));
-  if (filters.startDate) queryParams.set('startDate', String(filters.startDate));
-  if (filters.endDate) queryParams.set('endDate', String(filters.endDate));
+  const hasStartDate = Boolean(filters.startDate);
+  const hasEndDate = Boolean(filters.endDate);
+  if (hasStartDate && hasEndDate) {
+    queryParams.set('startDate', String(filters.startDate));
+    queryParams.set('endDate', String(filters.endDate));
+  } else if (hasStartDate || hasEndDate) {
+    const singleDate = String(filters.startDate || filters.endDate);
+    queryParams.set('startDate', singleDate);
+    queryParams.set('endDate', singleDate);
+  }
 
   const query = queryParams.toString();
   const url = `/business-operations/export/full-workbook${query ? `?${query}` : ''}`;

@@ -1050,6 +1050,10 @@ async function exportFullBackupZip(req, res) {
 async function exportFullWorkbook(req, res) {
   try {
     const includeRawPayload = req.query.includeRawPayload === 'true';
+    const rawStartDate = req.query.startDate ? String(req.query.startDate) : null;
+    const rawEndDate = req.query.endDate ? String(req.query.endDate) : null;
+    const normalizedStartDate = rawStartDate || rawEndDate || null;
+    const normalizedEndDate = rawEndDate || rawStartDate || null;
     const options = {
       payrollFilters: {
         locationId: req.query.locationId ? toInt(req.query.locationId) : null,
@@ -1057,8 +1061,8 @@ async function exportFullWorkbook(req, res) {
       salesFilters: {
         branchCode: req.query.branchCode ? String(req.query.branchCode) : null,
         syncSourceCode: req.query.syncSourceCode ? String(req.query.syncSourceCode) : null,
-        startDate: req.query.startDate ? new Date(req.query.startDate) : null,
-        endDate: req.query.endDate ? new Date(req.query.endDate) : null,
+        startDate: normalizedStartDate ? new Date(normalizedStartDate) : null,
+        endDate: normalizedEndDate ? new Date(normalizedEndDate) : null,
       },
       includeRawPayload,
     };
