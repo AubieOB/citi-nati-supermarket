@@ -8,6 +8,7 @@ const dataSnapshotService = require('./dataSnapshot.service');
 const prisma = new PrismaClient();
 
 const MAX_CELL_CHARS = 30000;
+const MAX_EXCEL_CELL_TEXT = 32767;
 const PAYROLL_JSON_SHEET = '__PAYROLL_SNAPSHOT_JSON';
 const SALES_JSON_SHEET = '__SALES_SNAPSHOT_JSON';
 const DEFAULT_BATCH_SIZE = Math.max(100, Number(process.env.FULL_WORKBOOK_BATCH_SIZE || 1000));
@@ -41,12 +42,19 @@ function logExportProgress(logLabel, message, extra = {}) {
 
 function normalizeWriteValue(value) {
   if (value === null || value === undefined) return value;
-  if (value instanceof Date) return value.toISOString();
-  if (typeof value === 'bigint') return value.toString();
-  if (Array.isArray(value) || typeof value === 'object') {
-    return safeJsonStringify(value);
+  let normalized = value;
+
+  if (normalized instanceof Date) normalized = normalized.toISOString();
+  if (typeof normalized === 'bigint') normalized = normalized.toString();
+  if (Array.isArray(normalized) || typeof normalized === 'object') {
+    normalized = safeJsonStringify(normalized);
   }
-  return value;
+
+  if (typeof normalized === 'string') {
+    return sanitizeExcelString(normalized);
+  }
+
+  return normalized;
 }
 
 function createStreamWorksheet(workbook, title, columns) {
@@ -610,12 +618,27 @@ function normalizeReadCellValue(value) {
 
 function normalizeCellValue(value) {
   if (value === null || value === undefined) return value;
-  if (typeof value === 'bigint') return value.toString();
-  if (value instanceof Date) return value;
-  if (Array.isArray(value) || typeof value === 'object') {
-    return safeJsonStringify(value);
+  let normalized = value;
+
+  if (typeof normalized === 'bigint') normalized = normalized.toString();
+  if (normalized instanceof Date) normalized = normalized.toISOString();
+  if (Array.isArray(normalized) || typeof normalized === 'object') {
+    normalized = safeJsonStringify(normalized);
   }
-  return value;
+
+  if (typeof normalized === 'string') {
+    return sanitizeExcelString(normalized);
+  }
+
+  return normalized;
+}
+
+function sanitizeExcelString(value) {
+  const raw = String(value || '');
+  // Strip XML-invalid control characters that can corrupt XLSX files.
+  const cleaned = raw.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, ' ');
+  if (cleaned.length <= MAX_EXCEL_CELL_TEXT) return cleaned;
+  return cleaned.slice(0, MAX_EXCEL_CELL_TEXT);
 }
 
 function chunkString(value, chunkSize = MAX_CELL_CHARS) {
@@ -786,8 +809,10 @@ function readEmbeddedJsonSheet(workbook, sheetName) {
   const parts = [];
   sheet.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return;
-    const chunkIndex = Number(row.getCell(1).value || 0);
-    const jsonChunk = String(row.getCell(2).value || '');
+    const chunkIndexRaw = normalizeReadCellValue(row.getCell(1).value);
+    const jsonChunkRaw = normalizeReadCellValue(row.getCell(2).value);
+    const chunkIndex = Number(chunkIndexRaw || 0);
+    const jsonChunk = String(jsonChunkRaw || '');
     if (chunkIndex > 0 && jsonChunk) {
       parts.push({ chunkIndex, jsonChunk });
     }
@@ -873,7 +898,32 @@ async function importFullWorkbook(fileBuffer, options = {}) {
   const hasSalesData = salesSnapshot && Object.values(salesSnapshot.data || {}).some((value) => Array.isArray(value) && value.length > 0);
 
   if (!hasPayrollData && !hasSalesData) {
-    throw new Error('Workbook is missing embedded snapshot payload sheets');
+    return {
+      payroll: {
+        imported: {
+          employees: 0,
+          salaryStructures: 0,
+          payrollPeriods: 0,
+          payrollEntries: 0,
+          loans: 0,
+          loanTransactions: 0,
+          terminations: 0,
+          reengagements: 0,
+          taxBrackets: 0,
+          incrementPolicies: 0,
+        },
+        errors: ['No importable payroll rows found in workbook'],
+      },
+      sales: {
+        imported: {
+          syncSources: 0,
+          invoices: 0,
+          invoiceItems: 0,
+          products: 0,
+        },
+        errors: ['No importable sales rows found in workbook'],
+      },
+    };
   }
 
   const importResult = {
