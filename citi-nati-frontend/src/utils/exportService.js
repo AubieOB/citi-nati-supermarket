@@ -74,7 +74,7 @@ export async function downloadFullBusinessWorkbook({ filters = {} } = {}) {
   if (filters.endDate) queryParams.set('endDate', String(filters.endDate));
 
   const query = queryParams.toString();
-  const url = `/business-operations/payroll/export/full-workbook${query ? `?${query}` : ''}`;
+  const url = `/business-operations/export/full-workbook${query ? `?${query}` : ''}`;
 
   let response;
   try {

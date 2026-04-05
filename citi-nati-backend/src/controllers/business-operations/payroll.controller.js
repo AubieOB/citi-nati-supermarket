@@ -1062,16 +1062,22 @@ async function exportFullWorkbook(req, res) {
       },
       includeRawPayload,
     };
-
-    const workbookBuffer = await fullWorkbookService.exportFullWorkbook(options);
-
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="citi-nati-full-workbook-${new Date().toISOString().split('T')[0]}.xlsx"`);
-    res.setHeader('Content-Length', workbookBuffer.length);
-    return res.send(workbookBuffer);
+    await fullWorkbookService.streamFullWorkbook({
+      writable: res,
+      options,
+      requestId: req.headers['x-request-id'] || null,
+    });
+    return;
   } catch (err) {
     console.error('[BO][PAYROLL] exportFullWorkbook error:', err);
-    return res.status(500).json({ success: false, error: err.message || 'Failed to export full workbook' });
+    if (res.headersSent) {
+      res.destroy();
+      return;
+    }
+    const statusCode = err?.statusCode || 500;
+    return res.status(statusCode).json({ success: false, error: err.message || 'Failed to export full workbook' });
   }
 }
 
