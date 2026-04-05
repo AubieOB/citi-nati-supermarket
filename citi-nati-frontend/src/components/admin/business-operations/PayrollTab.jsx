@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../../../utils/api.js';
-import { downloadBusinessReport } from '../../../utils/exportService.js';
+import { downloadBusinessReport, downloadFullBusinessWorkbook, importFullBusinessWorkbook } from '../../../utils/exportService.js';
 import { exportPayrollPdf } from '../../../utils/businessOperationsPdfExports.js';
 import PayrollPeriodsList from './PayrollPeriodsList.jsx';
 import PayrollPeriodFormModal from './PayrollPeriodFormModal.jsx';
@@ -107,6 +107,9 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
   const [entryEmployeeSalary, setEntryEmployeeSalary] = useState(null);
   const [exportingExcel, setExportingExcel] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingFullWorkbook, setExportingFullWorkbook] = useState(false);
+  const [importingFullWorkbook, setImportingFullWorkbook] = useState(false);
+  const fullWorkbookInputRef = useRef(null);
 
   const fetchEmployees = useCallback(async () => {
     try {
@@ -705,6 +708,60 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
     }
   };
 
+  const handleExportFullWorkbook = async () => {
+    setExportingFullWorkbook(true);
+    try {
+      await downloadFullBusinessWorkbook({
+        filters: {
+          locationId: selectedLocationId || undefined,
+        },
+      });
+    } catch (error) {
+      const message = error?.response?.data?.error || error?.message || 'Failed to export full workbook.';
+      window.alert(message);
+    } finally {
+      setExportingFullWorkbook(false);
+    }
+  };
+
+  const handleChooseImportWorkbook = () => {
+    if (importingFullWorkbook) return;
+    fullWorkbookInputRef.current?.click();
+  };
+
+  const handleImportWorkbookFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    const confirmMessage = `Import workbook "${file.name}"? This will re-add/update payroll and sales records.`;
+    if (!window.confirm(confirmMessage)) return;
+
+    setImportingFullWorkbook(true);
+    try {
+      const response = await importFullBusinessWorkbook({
+        file,
+        upsert: true,
+        clearExisting: false,
+        locationId: selectedLocationId || null,
+      });
+
+      const payrollImported = response?.result?.payroll?.imported || {};
+      const salesImported = response?.result?.sales?.imported || {};
+
+      const payrollCount = Object.values(payrollImported).reduce((sum, value) => sum + Number(value || 0), 0);
+      const salesCount = Object.values(salesImported).reduce((sum, value) => sum + Number(value || 0), 0);
+
+      window.alert(`Workbook import complete. Payroll rows: ${payrollCount}. Sales rows: ${salesCount}.`);
+      await refreshAll();
+    } catch (error) {
+      const message = error?.response?.data?.error || error?.message || 'Failed to import full workbook.';
+      window.alert(message);
+    } finally {
+      setImportingFullWorkbook(false);
+    }
+  };
+
   const handleCreateTaxBracket = () => {
     setPolicySaveError('');
     setTaxBracketModal({
@@ -853,6 +910,13 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
                   <p style={{ margin: '0.28rem 0 0', color: '#64748b', fontSize: '0.86rem' }}>Manage payroll periods and process employee salary entries.</p>
                 </div>
                 <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <input
+                    ref={fullWorkbookInputRef}
+                    type="file"
+                    accept=".xlsx,.xls"
+                    style={{ display: 'none' }}
+                    onChange={handleImportWorkbookFileChange}
+                  />
                   <button
                     type="button"
                     onClick={handleCreatePeriod}
@@ -903,17 +967,33 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
                   </button>
                   <button
                     type="button"
+                    onClick={handleExportFullWorkbook}
+                    disabled={exportingFullWorkbook || importingFullWorkbook || exportingExcel || exportingPdf}
+                    style={{ border: '1px solid #86efac', backgroundColor: '#f0fdf4', color: '#166534', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 800, cursor: exportingFullWorkbook || importingFullWorkbook || exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
+                  >
+                    <i className={`fas ${exportingFullWorkbook ? 'fa-spinner fa-spin' : 'fa-file-arrow-down'}`} style={{ marginRight: '0.38rem' }}></i>Export Full Workbook
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleChooseImportWorkbook}
+                    disabled={importingFullWorkbook || exportingFullWorkbook || exportingExcel || exportingPdf}
+                    style={{ border: '1px solid #bfdbfe', backgroundColor: '#eff6ff', color: '#1e3a8a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 800, cursor: importingFullWorkbook || exportingFullWorkbook || exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
+                  >
+                    <i className={`fas ${importingFullWorkbook ? 'fa-spinner fa-spin' : 'fa-file-arrow-up'}`} style={{ marginRight: '0.38rem' }}></i>Import Full Workbook
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => handleExport('pdf')}
-                    disabled={exportingExcel || exportingPdf}
-                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
+                    disabled={exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, cursor: exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
                   >
                     <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.38rem' }}></i>Export PDF
                   </button>
                   <button
                     type="button"
                     onClick={() => handleExport('excel')}
-                    disabled={exportingExcel || exportingPdf}
-                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
+                    disabled={exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, cursor: exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
                   >
                     <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.38rem' }}></i>Export Excel
                   </button>
