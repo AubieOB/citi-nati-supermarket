@@ -5,6 +5,7 @@ const { PassThrough } = require('stream');
 const { finished } = require('stream/promises');
 const { PrismaClient } = require('@prisma/client');
 const dataSnapshotService = require('./dataSnapshot.service');
+const { readWorkbookFromBuffer, getSheetRows } = require('./parsers/commonWorkbook.utils');
 const prisma = new PrismaClient();
 
 const MAX_CELL_CHARS = 30000;
@@ -48,6 +49,20 @@ function logExportProgress(logLabel, message, extra = {}) {
     ...extra,
     memory: memorySnapshot(),
   });
+}
+
+function logImportProgress(message, extra = {}) {
+  console.log('[FULL-WORKBOOK][IMPORT]', {
+    message,
+    ...extra,
+    memory: memorySnapshot(),
+  });
+}
+
+function maybeRunGc() {
+  if (typeof global.gc === 'function') {
+    global.gc();
+  }
 }
 
 function normalizeWriteValue(value) {
@@ -912,6 +927,111 @@ function readEmbeddedJsonSheet(workbook, sheetName) {
   return JSON.parse(fullText);
 }
 
+function readEmbeddedJsonSheetFromBufferWorkbook(workbook, sheetName) {
+  const rows = getSheetRows(workbook, sheetName);
+  if (!rows.length) return null;
+
+  const parts = [];
+  rows.slice(1).forEach((row) => {
+    const chunkIndex = Number(row?.[0] || 0);
+    const jsonChunk = String(row?.[1] || '');
+    if (chunkIndex > 0 && jsonChunk) {
+      parts.push({ chunkIndex, jsonChunk });
+    }
+  });
+
+  if (!parts.length) return null;
+  parts.sort((a, b) => a.chunkIndex - b.chunkIndex);
+  return JSON.parse(parts.map((part) => part.jsonChunk).join(''));
+}
+
+function readTabularSheetFromBufferWorkbook(workbook, title) {
+  const rows = getSheetRows(workbook, safeWorksheetName(title));
+  if (rows.length < 2) return [];
+
+  const headers = (rows[0] || []).map((header) => String(header || '').trim());
+  return rows.slice(1).reduce((items, row) => {
+    const item = {};
+    let hasValue = false;
+
+    headers.forEach((header, index) => {
+      if (!header) return;
+      const value = row?.[index] ?? null;
+      if (value !== null && value !== '') hasValue = true;
+      item[header] = value;
+    });
+
+    if (hasValue) {
+      items.push(item);
+    }
+    return items;
+  }, []);
+}
+
+function buildPayrollSnapshotFromBufferWorkbook(workbook) {
+  const payrollData = {
+    employees: readTabularSheetFromBufferWorkbook(workbook, 'Payroll_Employees'),
+    salaryStructures: readTabularSheetFromBufferWorkbook(workbook, 'Payroll_SalaryStructures'),
+    payrollPeriods: readTabularSheetFromBufferWorkbook(workbook, 'Payroll_Periods'),
+    payrollEntries: readTabularSheetFromBufferWorkbook(workbook, 'Payroll_Entries'),
+    loans: readTabularSheetFromBufferWorkbook(workbook, 'Payroll_Loans'),
+    loanTransactions: readTabularSheetFromBufferWorkbook(workbook, 'Payroll_LoanTx'),
+    terminations: readTabularSheetFromBufferWorkbook(workbook, 'Payroll_Terminations'),
+    reengagements: readTabularSheetFromBufferWorkbook(workbook, 'Payroll_Reengagements'),
+    taxBrackets: readTabularSheetFromBufferWorkbook(workbook, 'Payroll_TaxBrackets'),
+    incrementPolicies: readTabularSheetFromBufferWorkbook(workbook, 'Payroll_IncrementPolicies'),
+  };
+
+  return {
+    version: '1.0.0',
+    type: 'payroll',
+    exportedAt: new Date().toISOString(),
+    filters: {},
+    data: {
+      ...payrollData,
+      metadata: {
+        totalEmployees: payrollData.employees.length,
+        totalPeriods: payrollData.payrollPeriods.length,
+        totalEntries: payrollData.payrollEntries.length,
+        totalLoans: payrollData.loans.length,
+        totalTerminations: payrollData.terminations.length,
+        totalReengagements: payrollData.reengagements.length,
+      },
+    },
+  };
+}
+
+function buildSalesSnapshotFromBufferWorkbook(workbook) {
+  const salesData = {
+    syncSources: readTabularSheetFromBufferWorkbook(workbook, 'Sales_SyncSources'),
+    invoices: readTabularSheetFromBufferWorkbook(workbook, 'Sales_Invoices'),
+    invoiceItems: readTabularSheetFromBufferWorkbook(workbook, 'Sales_InvoiceItems'),
+    products: readTabularSheetFromBufferWorkbook(workbook, 'Sales_Products'),
+  };
+
+  return {
+    version: '1.0.0',
+    type: 'sales',
+    exportedAt: new Date().toISOString(),
+    filters: {},
+    data: {
+      ...salesData,
+      metadata: {
+        totalSyncSources: salesData.syncSources.length,
+        totalInvoices: salesData.invoices.length,
+        totalInvoiceItems: salesData.invoiceItems.length,
+        totalProducts: salesData.products.length,
+      },
+    },
+  };
+}
+
+function snapshotHasImportableRows(snapshot) {
+  return Boolean(
+    snapshot && Object.values(snapshot.data || {}).some((value) => Array.isArray(value) && value.length > 0)
+  );
+}
+
 async function exportFullWorkbook(options = {}) {
   const warnings = [];
 
@@ -1026,25 +1146,16 @@ async function importFullWorkbook(fileBuffer, options = {}) {
 
   assertImportGuards(fileBuffer);
 
-  const workbook = new ExcelJS.Workbook();
+  logImportProgress('loading workbook buffer for full import', {
+    fileBytes: fileBuffer.length,
+    upsert: options.upsert !== false,
+    clearExisting: options.clearExisting === true,
+    locationId: options.locationId || null,
+  });
+
+  let workbook;
   try {
-    await workbook.xlsx.load(fileBuffer, {
-      ignoreNodes: [
-        'sheetViews',
-        'sheetFormatPr',
-        'pageMargins',
-        'pageSetup',
-        'headerFooter',
-        'rowBreaks',
-        'colBreaks',
-        'drawing',
-        'picture',
-        'extLst',
-        'conditionalFormatting',
-        'dataValidations',
-        'hyperlinks',
-      ],
-    });
+    workbook = readWorkbookFromBuffer(fileBuffer);
   } catch (error) {
     const message = String(error?.message || '').toLowerCase();
     if (message.includes('heap out of memory') || message.includes('allocation failed')) {
@@ -1053,18 +1164,17 @@ async function importFullWorkbook(fileBuffer, options = {}) {
     throw error;
   }
 
-  let payrollSnapshot = readEmbeddedJsonSheet(workbook, PAYROLL_JSON_SHEET);
-  let salesSnapshot = readEmbeddedJsonSheet(workbook, SALES_JSON_SHEET);
+  const payrollSnapshot = readEmbeddedJsonSheetFromBufferWorkbook(workbook, PAYROLL_JSON_SHEET)
+    || buildPayrollSnapshotFromBufferWorkbook(workbook);
+  const hasPayrollData = snapshotHasImportableRows(payrollSnapshot);
 
-  // Fallback: reconstruct snapshots from visible tabular sheets.
-  if (!payrollSnapshot && !salesSnapshot) {
-    const rebuilt = buildSnapshotsFromTabularSheets(workbook);
-    payrollSnapshot = rebuilt.payrollSnapshot;
-    salesSnapshot = rebuilt.salesSnapshot;
+  let salesSnapshot = null;
+  let hasSalesData = false;
+  if (!hasPayrollData || workbook.SheetNames.includes(safeWorksheetName('Sales_SyncSources')) || workbook.SheetNames.includes(SALES_JSON_SHEET)) {
+    salesSnapshot = readEmbeddedJsonSheetFromBufferWorkbook(workbook, SALES_JSON_SHEET)
+      || buildSalesSnapshotFromBufferWorkbook(workbook);
+    hasSalesData = snapshotHasImportableRows(salesSnapshot);
   }
-
-  const hasPayrollData = payrollSnapshot && Object.values(payrollSnapshot.data || {}).some((value) => Array.isArray(value) && value.length > 0);
-  const hasSalesData = salesSnapshot && Object.values(salesSnapshot.data || {}).some((value) => Array.isArray(value) && value.length > 0);
 
   if (!hasPayrollData && !hasSalesData) {
     return {
@@ -1101,16 +1211,36 @@ async function importFullWorkbook(fileBuffer, options = {}) {
   };
 
   if (hasPayrollData) {
+    logImportProgress('starting payroll snapshot import', {
+      employees: payrollSnapshot.data?.employees?.length || 0,
+      payrollEntries: payrollSnapshot.data?.payrollEntries?.length || 0,
+    });
     importResult.payroll = await dataSnapshotService.importPayrollSnapshot(payrollSnapshot, {
       upsert: options.upsert !== false,
       clearExisting: options.clearExisting === true,
       locationId: options.locationId || null,
     });
+    logImportProgress('completed payroll snapshot import', {
+      imported: importResult.payroll?.imported || {},
+      errors: importResult.payroll?.errors?.length || 0,
+    });
   }
 
+  workbook = null;
+  maybeRunGc();
+
   if (hasSalesData) {
+    logImportProgress('starting sales snapshot import', {
+      syncSources: salesSnapshot.data?.syncSources?.length || 0,
+      invoices: salesSnapshot.data?.invoices?.length || 0,
+      invoiceItems: salesSnapshot.data?.invoiceItems?.length || 0,
+    });
     importResult.sales = await dataSnapshotService.importSalesSnapshot(salesSnapshot, {
       upsert: options.upsert !== false,
+    });
+    logImportProgress('completed sales snapshot import', {
+      imported: importResult.sales?.imported || {},
+      errors: importResult.sales?.errors?.length || 0,
     });
   }
 
