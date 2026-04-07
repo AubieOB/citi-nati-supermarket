@@ -9,6 +9,7 @@ datasource db {
 
 enum PosCommandType {
   UPDATE_PRICE
+  UPDATE_PRODUCT_NAME
   UPDATE_STOCK
   APPLY_PROMOTION
   REVERT_PROMOTION

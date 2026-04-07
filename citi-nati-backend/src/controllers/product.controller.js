@@ -15,6 +15,7 @@ const MIN_VALID_EXPIRY_DATE = new Date('2000-01-01T00:00:00.000Z');
 const ADMIN_EXPIRY_REQUEST_TIMEOUT_MS = 30000;
 const ADMIN_EXPIRY_CACHE_TTL_MS = 5 * 60 * 1000;
 const ADMIN_EXPIRY_ALERTS_REQUEST_TIMEOUT_MS = Number(process.env.ADMIN_EXPIRY_ALERTS_REQUEST_TIMEOUT_MS || 8000);
+const MAX_PRODUCT_NAME_LENGTH = 120;
 
 const adminExpiryFetchState = {
   rows: [],
@@ -36,6 +37,63 @@ const _allProductsExpiryCache = {
 
 function getAdjustmentActor(req) {
   return String(req.user?.email || req.user?.id || req.user?.userId || 'admin').trim();
+}
+
+function normalizeProductNameInput(value) {
+  const normalized = String(value == null ? '' : value).trim().replace(/\s+/g, ' ');
+  if (!normalized) {
+    return { value: null, error: 'Product name is required' };
+  }
+
+  if (normalized.length > MAX_PRODUCT_NAME_LENGTH) {
+    return { value: null, error: `Product name must be ${MAX_PRODUCT_NAME_LENGTH} characters or fewer` };
+  }
+
+  return { value: normalized, error: null };
+}
+
+async function recordProductNameSyncEvent({
+  status,
+  level,
+  title,
+  message,
+  product,
+  payload,
+  queueResult,
+  req,
+  reason = null,
+}) {
+  try {
+    await recordPosSyncEvent({
+      eventType: 'product-name-writeback',
+      source: 'product.updateProduct',
+      status,
+      level,
+      title,
+      message,
+      reason,
+      suggestion: status === 'failed'
+        ? 'Review the queued command payload and the POS agent logs before retrying the product name write-back.'
+        : 'Monitor the POS command queue to confirm the agent processes the product name update.',
+      entityType: 'Product',
+      entityId: product?.id != null ? String(product.id) : null,
+      metadata: {
+        productId: product?.id ?? null,
+        productCode: payload?.productCode || product?.sourceCode || null,
+        oldName: payload?.oldName || null,
+        newName: payload?.newName || null,
+        updatedBy: payload?.updatedBy || getAdjustmentActor(req),
+        branchCode: payload?.branchCode || null,
+        locationCode: payload?.locationCode || null,
+        commandType: queueResult?.commandType || 'UPDATE_PRODUCT_NAME',
+        commandId: queueResult?.commandId || null,
+        queueSuccess: queueResult?.success ?? null,
+        queueError: queueResult?.error || null,
+      },
+    });
+  } catch (error) {
+    console.error('[PRODUCT NAME SYNC] monitor event record failed:', error.message);
+  }
 }
 
 function decodeExpiryBatchReference(value) {
@@ -981,6 +1039,7 @@ const getProductById = async (req, res) => {
 const updateProduct = async (req, res) => {
   try {
     console.log('[BACKEND PRODUCT EDIT] updateProduct hit');
+    const updatedBy = getAdjustmentActor(req);
 
     // Extract and convert id to integer
     const id = parseInt(req.params.id);
@@ -1008,10 +1067,19 @@ const updateProduct = async (req, res) => {
     let stockChanged = false;
     const oldStock = Number(existingProduct.stock);
     let newStock = oldStock;
+    let normalizedIncomingName = null;
+    let nameChanged = false;
 
-    if (req.body.name !== undefined && req.body.name !== '') {
-      updateData.name = req.body.name;
-      if (req.body.name !== existingProduct.name) {
+    if (req.body.name !== undefined) {
+      const normalizedName = normalizeProductNameInput(req.body.name);
+      if (normalizedName.error) {
+        return res.status(400).json({ error: normalizedName.error });
+      }
+
+      normalizedIncomingName = normalizedName.value;
+      updateData.name = normalizedIncomingName;
+      nameChanged = normalizedIncomingName !== existingProduct.name;
+      if (nameChanged) {
         changedFields.push('name');
       }
     }
@@ -1145,6 +1213,13 @@ const updateProduct = async (req, res) => {
     });
 
     const posCommands = [];
+    let posWritebackSummary = {
+      attempted: false,
+      hasPending: false,
+      hasFailure: false,
+      hasSuccess: false,
+      updatedFields: [...new Set(changedFields)],
+    };
 
     let posCommand = {
       attempted: false,
@@ -1190,6 +1265,84 @@ const updateProduct = async (req, res) => {
       }
 
       posCommands.push({ ...posCommand });
+    }
+
+    if (updatedProduct.sourceCode && normalizedIncomingName && nameChanged) {
+      const namePayload = {
+        productId: String(updatedProduct.id),
+        productCode: updatedProduct.sourceCode,
+        oldName: existingProduct.name,
+        newName: normalizedIncomingName,
+        updatedBy,
+        locationCode: process.env.POS_LOCATION_CODE || 'SH',
+        branchCode: process.env.BRANCH_CODE || 'BLANTYRE',
+      };
+
+      const namePosCommand = {
+        attempted: true,
+        success: null,
+        error: null,
+        payload: namePayload,
+        commandId: null,
+        commandType: 'UPDATE_PRODUCT_NAME',
+      };
+
+      console.log('[POS COMMAND QUEUE] enqueue UPDATE_PRODUCT_NAME start', {
+        productId: updatedProduct.id,
+        productCode: updatedProduct.sourceCode,
+        oldName: existingProduct.name,
+        newName: normalizedIncomingName,
+        updatedBy,
+      });
+
+      try {
+        const queuedNameUpdate = await posCommandQueueService.enqueueCommand('UPDATE_PRODUCT_NAME', namePayload, {
+          source: 'product.updateProduct',
+          relatedEntityType: 'Product',
+          relatedEntityId: updatedProduct.id,
+          createdBy: updatedBy,
+        });
+
+        namePosCommand.success = true;
+        namePosCommand.commandId = queuedNameUpdate.id;
+        namePosCommand.queueStatus = 'PENDING';
+
+        await recordProductNameSyncEvent({
+          status: 'success',
+          level: 'info',
+          title: 'POS product name write-back queued',
+          message: `Product name update for ${updatedProduct.sourceCode} was queued for POS sync.`,
+          product: updatedProduct,
+          payload: namePayload,
+          queueResult: namePosCommand,
+          req,
+        });
+      } catch (queueErr) {
+        namePosCommand.success = false;
+        namePosCommand.error = queueErr.message;
+        namePosCommand.queueStatus = 'QUEUE_FAILED';
+
+        console.error('[POS COMMAND QUEUE ERROR] enqueue UPDATE_PRODUCT_NAME failed:', queueErr.message);
+
+        await recordProductNameSyncEvent({
+          status: 'failed',
+          level: 'error',
+          title: 'POS product name write-back queue failed',
+          message: `Product name update for ${updatedProduct.sourceCode} could not be queued for POS sync.`,
+          product: updatedProduct,
+          payload: namePayload,
+          queueResult: namePosCommand,
+          req,
+          reason: queueErr.message,
+        });
+      }
+
+      posCommands.push(namePosCommand);
+    } else if (normalizedIncomingName && nameChanged && !updatedProduct.sourceCode) {
+      console.log('[BACKEND POS WRITE SKIP] product name change skipped for non-POS product', {
+        productId: updatedProduct.id,
+        productName: updatedProduct.name,
+      });
     }
 
     if (updatedProduct.sourceCode && incomingStockProvided && stockChanged) {
@@ -1279,6 +1432,21 @@ const updateProduct = async (req, res) => {
     // Format product with computed fields
     const formattedProduct = formatProduct(updatedProduct, req, true);
 
+    posWritebackSummary = {
+      attempted: posCommands.some((command) => command.attempted),
+      hasPending: posCommands.some((command) => command.success === true),
+      hasFailure: posCommands.some((command) => command.success === false),
+      hasSuccess: posCommands.some((command) => command.success === true),
+      updatedFields: [...new Set(changedFields)],
+      commands: posCommands.map((command) => ({
+        commandId: command.commandId || null,
+        commandType: command.commandType,
+        success: command.success,
+        queueStatus: command.queueStatus || null,
+        error: command.error || null,
+      })),
+    };
+
     // Emit real-time product updates to all connected clients (name, price, promotion, stock, etc)
     try {
       const { emitProductUpdate } = require('../utils/socket');
@@ -1293,6 +1461,7 @@ const updateProduct = async (req, res) => {
       product: formattedProduct,
       posCommand,
       posCommands,
+      posWritebackSummary,
     });
   } catch (err) {
     console.error('Error updating product:', err);

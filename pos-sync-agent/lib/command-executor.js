@@ -1,5 +1,6 @@
 const sql = require('mssql');
 const priceUpdates = require('./price-updates');
+const productNameUpdates = require('./product-name-updates');
 const stockUpdates = require('./stock-updates');
 const invoiceWriteback = require('./invoice-writeback');
 const { buildConfig } = require('./config');
@@ -53,6 +54,61 @@ async function executeUpdatePrice(pool, payload) {
     } catch (rollbackErr) {
       console.error('[POS COMMAND EXECUTOR ERROR] rollback failed:', rollbackErr.message);
     }
+    throw error;
+  }
+}
+
+async function executeUpdateProductName(pool, payload, commandId) {
+  const productCode = payload.productCode;
+  const newName = String(payload.newName || '').trim();
+
+  console.log('[PRODUCT NAME] UPDATE_PRODUCT_NAME payload:', {
+    commandId,
+    productCode,
+    oldName: payload.oldName || null,
+    newName,
+    branchCode: payload.branchCode || null,
+    locationCode: payload.locationCode || null,
+    updatedBy: payload.updatedBy || null,
+  });
+
+  if (!productCode) {
+    throw new Error('NON_RETRYABLE: UPDATE_PRODUCT_NAME payload missing productCode');
+  }
+
+  if (!newName) {
+    throw new Error('NON_RETRYABLE: UPDATE_PRODUCT_NAME payload missing newName');
+  }
+
+  if (newName.length > 120) {
+    throw new Error('NON_RETRYABLE: UPDATE_PRODUCT_NAME newName exceeds max length 120');
+  }
+
+  const transaction = new sql.Transaction(pool);
+
+  try {
+    await transaction.begin();
+
+    const request = new sql.Request(transaction);
+    const resultSummary = await productNameUpdates.updateProductName(request, payload);
+
+    await transaction.commit();
+
+    return {
+      message: 'Product name write-back executed successfully',
+      ...resultSummary,
+    };
+  } catch (error) {
+    try {
+      await transaction.rollback();
+    } catch (rollbackErr) {
+      console.error('[POS COMMAND EXECUTOR ERROR] rollback failed:', rollbackErr.message);
+    }
+
+    if (String(error.message || '').startsWith('NON_RETRYABLE:')) {
+      throw error;
+    }
+
     throw error;
   }
 }
@@ -387,6 +443,11 @@ async function executeCommand(pool, command) {
         throw new Error('NON_RETRYABLE: UPDATE_PRICE command disabled by ENABLE_PRICE_SYNC=false');
       }
       return executeUpdatePrice(pool, payload);
+    case 'UPDATE_PRODUCT_NAME':
+      if (!features.enableProductNameSync) {
+        throw new Error('NON_RETRYABLE: UPDATE_PRODUCT_NAME command disabled by ENABLE_PRODUCT_NAME_SYNC=false');
+      }
+      return executeUpdateProductName(pool, payload, command.id);
     case 'UPDATE_STOCK':
       if (!features.enableStockWriteback || !features.enableManualStockSync) {
         throw new Error('NON_RETRYABLE: UPDATE_STOCK command disabled by stock/manual feature flags');

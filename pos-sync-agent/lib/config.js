@@ -40,6 +40,7 @@ function buildFeatureFlags() {
     enableStockWriteback: parseBoolean(process.env.ENABLE_STOCK_WRITEBACK, true),
     enablePromotionSync: parseBoolean(process.env.ENABLE_PROMOTION_SYNC, true),
     enablePriceSync: parseBoolean(process.env.ENABLE_PRICE_SYNC, true),
+    enableProductNameSync: parseBoolean(process.env.ENABLE_PRODUCT_NAME_SYNC, true),
     enableManualStockSync: parseBoolean(process.env.ENABLE_MANUAL_STOCK_SYNC, true),
     enableInvoiceWriteback: parseBoolean(process.env.ENABLE_INVOICE_WRITEBACK, true),
   };
@@ -93,11 +94,13 @@ function buildConfig() {
       || features.enableStockWriteback
       || features.enablePromotionSync
       || features.enablePriceSync
+      || features.enableProductNameSync
       || features.enableInvoiceWriteback,
     emergencySalesSync: features.enableOnlineOrderWriteback && features.enableInvoiceWriteback,
     invoiceWriteback: features.enableInvoiceWriteback,
     stockWriteback: features.enableStockWriteback,
     priceSync: features.enablePriceSync,
+    productNameSync: features.enableProductNameSync,
     promotionSync: features.enablePromotionSync,
     manualStockSync: features.enableManualStockSync,
   };

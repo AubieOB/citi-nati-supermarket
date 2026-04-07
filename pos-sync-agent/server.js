@@ -1690,6 +1690,8 @@ function isCommandTypeEnabled(commandType) {
   switch (commandType) {
     case 'UPDATE_PRICE':
       return features.enablePriceSync;
+    case 'UPDATE_PRODUCT_NAME':
+      return features.enableProductNameSync;
     case 'UPDATE_STOCK':
       return features.enableStockWriteback && features.enableManualStockSync;
     case 'APPLY_PROMOTION':

@@ -53,6 +53,8 @@ async function enqueueCommand(commandType, payload, meta = {}) {
       relatedEntityId: command.relatedEntityId,
       payloadSummary: {
         productCode: payload?.productCode,
+        oldName: payload?.oldName,
+        newName: payload?.newName,
         locationCode: payload?.locationCode,
         priceTypeCode: payload?.priceTypeCode,
         promotionalPrice: payload?.promotionalPrice,
@@ -294,6 +296,10 @@ async function markCommandFailed(id, errorMessage, retryable = true, agentId = n
         retryCount: nextRetryCount,
         maxRetries: command.maxRetries,
         nextRetryAt,
+        productCode: command.payload?.productCode || null,
+        oldName: command.payload?.oldName || null,
+        newName: command.payload?.newName || null,
+        locationCode: command.payload?.locationCode || null,
       },
     });
   } catch (error) {

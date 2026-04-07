@@ -26,6 +26,7 @@ import '../../css/admin-responsive-filters.css';
  */
 
 const AdminProducts = () => {
+  const MAX_PRODUCT_NAME_LENGTH = 120;
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -981,6 +982,9 @@ const AdminProducts = () => {
 
   const validateForm = () => {
     if (!formData.name?.trim()) return 'Product name is required';
+    if (formData.name.trim().length > MAX_PRODUCT_NAME_LENGTH) {
+      return `Product name must be ${MAX_PRODUCT_NAME_LENGTH} characters or fewer`;
+    }
     if (!formData.price || isNaN(parseFloat(formData.price)) || parseFloat(formData.price) < 0) 
       return 'Valid price is required';
     if (!formData.stock === undefined || isNaN(parseInt(formData.stock)) || parseInt(formData.stock) < 0) 
@@ -1057,10 +1061,28 @@ const AdminProducts = () => {
 
       if (editingId) {
         console.log('[ADMIN PRODUCTS] ✏️ Updating product:', editingId);
-        await api.put(`/products/${editingId}`, formPayload, {
+        const response = await api.put(`/products/${editingId}`, formPayload, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
-        showSuccess('Success', `Product "${formData.name.trim()}" updated successfully`);
+
+        const summary = response.data?.posWritebackSummary;
+        const nameCommand = Array.isArray(summary?.commands)
+          ? summary.commands.find((command) => command.commandType === 'UPDATE_PRODUCT_NAME')
+          : null;
+
+        if (nameCommand?.success === false) {
+          showSuccess(
+            'Partial Success',
+            `Product "${formData.name.trim()}" was updated on the website, but POS name sync could not be queued: ${nameCommand.error || 'Unknown error'}`
+          );
+        } else if (nameCommand?.success === true) {
+          showSuccess(
+            'Success',
+            `Product "${formData.name.trim()}" updated successfully. POS name sync has been queued${nameCommand.commandId ? ` (command ${nameCommand.commandId})` : ''}.`
+          );
+        } else {
+          showSuccess('Success', `Product "${formData.name.trim()}" updated successfully`);
+        }
       } else {
         console.log('[ADMIN PRODUCTS] ➕ Creating new product');
         await api.post('/products', formPayload, {
@@ -1236,6 +1258,7 @@ const AdminProducts = () => {
                   value={formData.name}
                   onChange={handleFormChange}
                   placeholder="e.g., Organic Apples"
+                  maxLength={MAX_PRODUCT_NAME_LENGTH}
                   style={{
                     width: '100%',
                     padding: '0.75rem',
