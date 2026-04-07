@@ -1023,7 +1023,6 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
                     <i className={`fas ${importingFullWorkbook ? 'fa-spinner fa-spin' : 'fa-file-arrow-up'}`} style={{ marginRight: '0.38rem' }}></i>Import Full Workbook
                   </button>
               </div>
-              </div>
 
               {showPeriodFilters && (
                 <div style={{ marginTop: '0.85rem', display: 'flex', gap: '0.65rem', flexWrap: 'wrap', alignItems: 'center' }}>
