@@ -146,6 +146,44 @@
   border-top: 1px solid #edf2f7;
 }
 
+.bo-tabs-strip {
+  display: flex;
+  gap: 0.45rem;
+  max-width: 100%;
+  overflow-x: auto;
+  padding-bottom: 0.1rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.bo-tab-button {
+  border: none;
+  background: transparent;
+  color: #475569;
+  border-radius: 999px;
+  padding: 0.62rem 0.86rem;
+  font-size: 0.83rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  line-height: 1.1;
+  transition: all 0.2s ease;
+}
+
+.bo-tab-button.active {
+  background: #5b4b8a;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 10px 24px rgba(91, 75, 138, 0.22);
+}
+
+.bo-tab-icon {
+  font-size: 0.82em;
+}
+
 .bo-content-grid {
   display: grid;
   gap: 1rem;
@@ -180,6 +218,27 @@
     min-width: 0;
     flex: 1 1 100%;
     justify-content: flex-start;
+  }
+
+  .bo-tab-button {
+    padding: 0.54rem 0.74rem;
+    font-size: 0.78rem;
+    gap: 0.32rem;
+  }
+}
+
+@media (max-width: 1080px) {
+  .bo-tabs-strip {
+    gap: 0.35rem;
+  }
+
+  .bo-tab-button {
+    padding: 0.48rem 0.66rem;
+    font-size: 0.74rem;
+  }
+
+  .bo-tab-icon {
+    font-size: 0.76em;
   }
 }
 
@@ -285,6 +344,16 @@
   .bo-tabs-row {
     margin-top: 0.6rem;
     padding-top: 0.6rem;
+  }
+
+  .bo-tabs-strip {
+    flex-wrap: nowrap;
+    gap: 0.35rem;
+  }
+
+  .bo-tab-button {
+    padding: 0.45rem 0.62rem;
+    font-size: 0.72rem;
   }
 }
 
