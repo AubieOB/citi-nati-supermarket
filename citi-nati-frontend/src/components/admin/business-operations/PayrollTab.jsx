@@ -906,19 +906,58 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
 
             {/* Fixed modal header */}
             <div style={{ flexShrink: 0, padding: '1rem 1.1rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(15,23,42,0.04)' }}>
+              <input
+                ref={fullWorkbookInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                style={{ display: 'none' }}
+                onChange={handleImportWorkbookFileChange}
+              />
+
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <div>
+                <div style={{ flex: '1 1 320px' }}>
                   <h2 style={{ margin: 0, color: '#0f172a', fontSize: '1.15rem', fontWeight: 800 }}>Payroll Workspace</h2>
                   <p style={{ margin: '0.28rem 0 0', color: '#64748b', fontSize: '0.86rem' }}>Manage payroll periods and process employee salary entries.</p>
                 </div>
                 <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <input
-                    ref={fullWorkbookInputRef}
-                    type="file"
-                    accept=".xlsx,.xls"
-                    style={{ display: 'none' }}
-                    onChange={handleImportWorkbookFileChange}
-                  />
+                  <button
+                    type="button"
+                    onClick={() => handleExport('pdf')}
+                    disabled={exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, cursor: exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
+                  >
+                    <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.38rem' }}></i>Export PDF
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleExport('excel')}
+                    disabled={exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, cursor: exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
+                  >
+                    <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.38rem' }}></i>Export Excel
+                  </button>
+                  <button
+                    type="button"
+                    title={isPayrollWorkspaceMaximized ? 'Restore' : 'Maximize'}
+                    aria-label={isPayrollWorkspaceMaximized ? 'Restore workspace' : 'Maximize workspace'}
+                    onClick={() => setIsPayrollWorkspaceMaximized((prev) => !prev)}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
+                  >
+                    <i className={`fas ${isPayrollWorkspaceMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
+                  </button>
+                  <button
+                    type="button"
+                    title="Close"
+                    aria-label="Close workspace"
+                    onClick={() => { setIsPayrollWorkspaceModalOpen(false); setIsPayrollWorkspaceMaximized(false); }}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
+                  >
+                    <i className="fas fa-times" />
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', alignItems: 'center', marginTop: '0.8rem' }}>
                   <button
                     type="button"
                     onClick={handleCreatePeriod}
@@ -983,41 +1022,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
                   >
                     <i className={`fas ${importingFullWorkbook ? 'fa-spinner fa-spin' : 'fa-file-arrow-up'}`} style={{ marginRight: '0.38rem' }}></i>Import Full Workbook
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleExport('pdf')}
-                    disabled={exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook}
-                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, cursor: exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
-                  >
-                    <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.38rem' }}></i>Export PDF
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleExport('excel')}
-                    disabled={exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook}
-                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, cursor: exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
-                  >
-                    <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.38rem' }}></i>Export Excel
-                  </button>
-                  <button
-                    type="button"
-                    title={isPayrollWorkspaceMaximized ? 'Restore' : 'Maximize'}
-                    aria-label={isPayrollWorkspaceMaximized ? 'Restore workspace' : 'Maximize workspace'}
-                    onClick={() => setIsPayrollWorkspaceMaximized((prev) => !prev)}
-                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
-                  >
-                    <i className={`fas ${isPayrollWorkspaceMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
-                  </button>
-                  <button
-                    type="button"
-                    title="Close"
-                    aria-label="Close workspace"
-                    onClick={() => { setIsPayrollWorkspaceModalOpen(false); setIsPayrollWorkspaceMaximized(false); }}
-                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
-                  >
-                    <i className="fas fa-times" />
-                  </button>
-                </div>
+              </div>
               </div>
 
               {showPeriodFilters && (
