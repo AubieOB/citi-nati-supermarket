@@ -1704,6 +1704,21 @@ function isCommandTypeEnabled(commandType) {
   }
 }
 
+function isLikelyNonRetryableCommandError(message) {
+  const text = String(message || '').toLowerCase();
+  return (
+    text.includes('permission')
+    || text.includes('denied')
+    || text.includes('invalid column')
+    || text.includes('invalid object')
+    || text.includes('schema')
+    || text.includes('does not exist')
+    || text.includes('missing payload')
+    || text.includes('missing productcode')
+    || text.includes('unsupported command type')
+  );
+}
+
 async function pollAndProcessCommands() {
   if (!ENABLE_POS_COMMAND_POLLING) {
     return;
@@ -1759,7 +1774,8 @@ async function pollAndProcessCommands() {
           error: error.message,
         });
 
-        const isNonRetryable = typeof error.message === 'string' && error.message.startsWith('NON_RETRYABLE:');
+        const isPrefixedNonRetryable = typeof error.message === 'string' && error.message.startsWith('NON_RETRYABLE:');
+        const isNonRetryable = isPrefixedNonRetryable || isLikelyNonRetryableCommandError(error.message);
         const errorMessage = isNonRetryable
           ? error.message.replace('NON_RETRYABLE:', '').trim()
           : error.message;

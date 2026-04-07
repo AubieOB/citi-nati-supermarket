@@ -105,12 +105,26 @@ async function executeUpdateProductName(pool, payload, commandId) {
       console.error('[POS COMMAND EXECUTOR ERROR] rollback failed:', rollbackErr.message);
     }
 
-    if (String(error.message || '').startsWith('NON_RETRYABLE:')) {
-      throw error;
+    if (String(error.message || '').startsWith('NON_RETRYABLE:') || isLikelyNonRetryableProductNameError(error.message)) {
+      throw new Error(`NON_RETRYABLE: ${String(error.message || '').replace(/^NON_RETRYABLE:\s*/, '')}`);
     }
 
     throw error;
   }
+}
+
+function isLikelyNonRetryableProductNameError(message) {
+  const text = String(message || '').toLowerCase();
+  return (
+    text.includes('permission')
+    || text.includes('denied')
+    || text.includes('invalid column')
+    || text.includes('invalid object')
+    || text.includes('schema')
+    || text.includes('does not exist')
+    || text.includes('missing productcode')
+    || text.includes('exceeds max length')
+  );
 }
 
 function isLikelyNonRetryableStockError(message) {
