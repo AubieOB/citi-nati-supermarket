@@ -104,6 +104,20 @@ const AdminDashboard = () => {
   }, [theme]);
 
   React.useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const body = document.body;
+    const isDark = theme === 'dark';
+    body.classList.toggle('admin-theme-dark', isDark);
+    body.classList.toggle('admin-theme-light', !isDark);
+
+    return () => {
+      body.classList.remove('admin-theme-dark');
+      body.classList.remove('admin-theme-light');
+    };
+  }, [theme]);
+
+  React.useEffect(() => {
     if (location.pathname === '/admin/emergency-sales' && activeTab !== 'emergency-sales') {
       setActiveTab('emergency-sales');
       return;

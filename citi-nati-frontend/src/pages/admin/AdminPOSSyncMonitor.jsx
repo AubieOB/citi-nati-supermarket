@@ -363,7 +363,7 @@ export default function AdminPOSSyncMonitor() {
   }
 
   return (
-    <div>
+    <div className="admin-pos-sync-monitor">
       {/* ── Sticky Header ── */}
       <div ref={headerRef} style={fixedHeaderStyle}>
         {/* Title row */}

@@ -382,7 +382,7 @@ const AdminPOSManagement = () => {
   const hasActiveFilters = Boolean(searchTerm) || selectedCategory !== 'all';
 
   return (
-    <div style={{ width: '100%' }}>
+    <div className="admin-pos-management" style={{ width: '100%' }}>
       <div style={styles.container}>
         {/* Error Alert */}
         {error && (
