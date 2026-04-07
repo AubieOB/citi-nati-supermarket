@@ -1,11 +1,24 @@
 /* Admin Dashboard Responsive Styles */
 
+.admin-dashboard-root {
+  --admin-scale: 1;
+  --admin-sidebar-width: 250px;
+  --admin-sidebar-collapsed-width: 82px;
+  --admin-content-pad-y: clamp(0.85rem, 1.6vw, 2rem);
+  --admin-content-pad-x: clamp(0.75rem, 1.8vw, 2rem);
+  font-size: calc(16px * var(--admin-scale));
+  min-height: 100vh;
+  display: flex;
+  flex-direction: row;
+  background-color: #f5f5f5;
+}
+
 /* Desktop - Default */
 .admin-sidebar {
   position: fixed;
   left: 0;
   top: 0;
-  width: 250px;
+  width: var(--admin-sidebar-width);
   height: 100vh;
   background-color: #fff;
   border-right: 1px solid #e0e0e0;
@@ -18,27 +31,37 @@
 }
 
 .admin-main-content {
-  margin-left: 250px;
+  margin-left: var(--admin-sidebar-width);
   flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  min-width: 0;
 }
 
 .admin-sidebar.collapsed {
-  width: 82px;
+  width: var(--admin-sidebar-collapsed-width);
 }
 
 .admin-main-content.collapsed {
-  margin-left: 82px;
+  margin-left: var(--admin-sidebar-collapsed-width);
 }
 
 .admin-content-area {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 2rem;
+  min-width: 0;
+  padding: var(--admin-content-pad-y) var(--admin-content-pad-x);
   background-color: #f5f5f5;
+}
+
+.admin-content-area > * {
+  min-width: 0;
+}
+
+.admin-content-area table {
+  max-width: 100%;
 }
 
 .admin-hamburger {
@@ -53,8 +76,119 @@
   display: none;
 }
 
+/* Business Operations shell responsiveness */
+.bo-filter-bar {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1.375rem;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+  padding: 0.55rem 1rem;
+  backdrop-filter: blur(6px);
+}
+
+.bo-filter-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.bo-filter-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: #5b4b8a;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+}
+
+.bo-filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 210px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.bo-location-control {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 192px;
+}
+
+.bo-location-label {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.bo-location-select {
+  padding: 0.48rem 0.6rem;
+  border-radius: 9px;
+  border: 1px solid #cbd5e1;
+  background-color: #fff;
+  color: #0f172a;
+  font-size: 0.82rem;
+  min-width: 192px;
+}
+
+.bo-tabs-row {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #edf2f7;
+}
+
+.bo-content-grid {
+  display: grid;
+  gap: 1rem;
+  margin-top: 0.8rem;
+}
+
+/* Wide desktops */
+@media (min-width: 1800px) {
+  .admin-dashboard-root {
+    --admin-scale: 1.04;
+    --admin-sidebar-width: 270px;
+    --admin-sidebar-collapsed-width: 92px;
+  }
+}
+
+/* Standard laptops */
+@media (max-width: 1440px) {
+  .admin-dashboard-root {
+    --admin-scale: 0.97;
+  }
+}
+
+/* Compact laptops */
+@media (max-width: 1280px) {
+  .admin-dashboard-root {
+    --admin-scale: 0.93;
+    --admin-sidebar-width: 232px;
+    --admin-sidebar-collapsed-width: 76px;
+  }
+
+  .bo-filter-actions {
+    min-width: 0;
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+}
+
 /* Mobile - 768px and below */
 @media (max-width: 768px) {
+  .admin-dashboard-root {
+    --admin-scale: 0.92;
+  }
+
   .admin-hamburger {
     display: flex;
     position: fixed;
@@ -119,14 +253,49 @@
   }
 
   .admin-content-area {
-    padding: 1rem 0.75rem;
+    --admin-content-pad-y: 1rem;
+    --admin-content-pad-x: 0.75rem;
+  }
+
+  .bo-filter-bar {
+    border-radius: 14px;
+    padding: 0.5rem 0.65rem;
+  }
+
+  .bo-filter-header {
+    gap: 0.65rem;
+  }
+
+  .bo-filter-actions {
+    width: 100%;
+    justify-content: space-between;
+    gap: 0.45rem;
+  }
+
+  .bo-location-control {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .bo-location-select {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .bo-tabs-row {
+    margin-top: 0.6rem;
+    padding-top: 0.6rem;
   }
 }
 
 /* Extra small devices - 480px and below */
 @media (max-width: 480px) {
+  .admin-dashboard-root {
+    --admin-scale: 0.9;
+  }
+
   .admin-content-area {
-    padding: 1rem 0.5rem;
+    --admin-content-pad-x: 0.5rem;
   }
 
   .admin-sidebar {

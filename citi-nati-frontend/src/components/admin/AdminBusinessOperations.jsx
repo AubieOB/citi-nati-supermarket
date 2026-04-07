@@ -170,46 +170,33 @@ const AdminBusinessOperations = () => {
   };
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div className="bo-shell" style={{ position: 'relative' }}>
       <div
         ref={filterBarRef}
+        className="bo-filter-bar"
         style={{
           position: 'fixed',
           top: `${filterBarLayout.top}px`,
           left: `${filterBarLayout.left}px`,
           width: `${filterBarLayout.width}px`,
           zIndex: 80,
-          backgroundColor: '#ffffff',
-          border: '1px solid #e2e8f0',
-          borderRadius: '22px',
-          boxShadow: '0 14px 34px rgba(15, 23, 42, 0.08)',
-          padding: '0.55rem 1rem',
-          backdropFilter: 'blur(6px)',
           boxSizing: 'border-box',
         }}
       >
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.55rem', color: '#5B4B8A', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.78rem', letterSpacing: '0.06em' }}>
+          <div className="bo-filter-header">
+            <div className="bo-filter-title">
               <i className="fas fa-briefcase"></i>
               Business Operations
             </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: '210px', justifyContent: 'flex-end' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: '192px' }}>
-                <span style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
+              <div className="bo-filter-actions">
+              <label className="bo-location-control">
+                <span className="bo-location-label">
                   Location Scope
                 </span>
                 <select
                   value={selectedLocationId}
                   onChange={(event) => setSelectedLocationId(event.target.value)}
-                  style={{
-                    padding: '0.48rem 0.6rem',
-                    borderRadius: '9px',
-                    border: '1px solid #cbd5e1',
-                    backgroundColor: '#fff',
-                    color: '#0f172a',
-                    fontSize: '0.82rem',
-                    minWidth: '192px',
-                  }}
+                  className="bo-location-select"
                 >
                   <option value="all">All Locations</option>
                   {locations.map((location) => (
@@ -223,14 +210,14 @@ const AdminBusinessOperations = () => {
             </div>
           </div>
 
-          <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #edf2f7' }}>
+          <div className="bo-tabs-row">
             <BusinessOperationsTabs tabs={TABS} activeTab={activeTab} onChange={handleNavigateTab} />
           </div>
       </div>
 
       <div style={{ height: `${filterBarHeight}px` }}></div>
 
-      <div style={{ display: 'grid', gap: '1rem', marginTop: '0.8rem' }}>
+      <div className="bo-content-grid">
         {contentByTab[activeTab]}
       </div>
 

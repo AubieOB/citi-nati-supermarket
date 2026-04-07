@@ -108,7 +108,7 @@ const AdminDashboard = () => {
   }, [location.pathname, activeTab]);
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'row', backgroundColor: '#f5f5f5' }}>
+    <div className="admin-dashboard-root">
       {/* Hamburger Menu Icon - Mobile Only */}
       <button
         className="admin-hamburger"
