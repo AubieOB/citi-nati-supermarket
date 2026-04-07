@@ -23,8 +23,8 @@ This guide provides step-by-step instructions to verify that multi-branch locati
 2. Look at the header section
 3. **Verify**: Location Scope dropdown appears with options:
    - ✅ "All Locations"
-   - ✅ "Blantyre (BLT)" 
-   - ✅ "Zomba (ZMB)"
+   - ✅ "Blantyre (BT)" 
+   - ✅ "Zomba (ZA)"
 
 ### Test 2: Location Selection Persists
 
@@ -228,8 +228,8 @@ This guide provides step-by-step instructions to verify that multi-branch locati
 {
   "success": true,
   "data": [
-    { "id": 1, "code": "BLT", "name": "Blantyre" },
-    { "id": 2, "code": "ZMB", "name": "Zomba" }
+    { "id": 1, "code": "BT", "name": "Blantyre" },
+    { "id": 2, "code": "ZA", "name": "Zomba" }
   ]
 }
 ```
@@ -318,3 +318,4 @@ If issues found:
 ---
 
 **Last Updated**: After commit d97bfac
+

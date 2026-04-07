@@ -606,7 +606,7 @@ Body:
     "buyerTIN": "",
     "buyerName": "",
     "buyerAuthorizationCode": null,
-    "siteId": "BLT-CN-01",
+    "siteId": "BT-CN-01",
     "globalConfigVersion": 4,
     "taxpayerConfigVersion": 3,
     "terminalConfigVersion": 8,
@@ -687,7 +687,7 @@ Body:
       "versionNo": 8,
       "terminalLabel": "Cashier 1",
       "isActiveTerminal": true,
-      "terminalSite": { "siteId": "BLT-CN-01", "siteName": "Blantyre Main" },
+      "terminalSite": { "siteId": "BT-CN-01", "siteName": "Blantyre Main" },
       "offlineLimit": {
         "maxTransactionAgeInHours": 24,
         "maximumTransactionAmount": 750000
@@ -1198,3 +1198,4 @@ Always enforce:
 - invoice.InvoiceNo = invoicedetails.InvoiceCode
 
 Any violation should fail mapping and trigger data-quality alert before submission to MRA.
+

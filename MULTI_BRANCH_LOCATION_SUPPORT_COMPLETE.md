@@ -47,8 +47,8 @@ The parent component maintains:
 
 **Options**:
 - ✅ All Locations (returns null locationId to backend)
-- ✅ Blantyre (code: BLT, id: 1)
-- ✅ Zomba (code: ZMB, id: 2)
+- ✅ Blantyre (code: BT, id: 1)
+- ✅ Zomba (code: ZA, id: 2)
 - ✅ Extensible via API endpoint `/business-operations/locations`
 
 ---
@@ -238,14 +238,14 @@ The parent component maintains:
 
 **Returns**: Array of available locations with:
 - `id` (numeric)
-- `code` (string, e.g., 'BLT', 'ZMB')
+- `code` (string, e.g., 'BT', 'ZA')
 - `name` (string, e.g., 'Blantyre', 'Zomba')
 
 **Fallback**: If `business_locations` table doesn't exist or is empty:
 ```javascript
 DEFAULT_LOCATIONS = [
-  { id: 1, code: 'BLT', name: 'Blantyre' },
-  { id: 2, code: 'ZMB', name: 'Zomba' },
+  { id: 1, code: 'BT', name: 'Blantyre' },
+  { id: 2, code: 'ZA', name: 'Zomba' },
 ];
 ```
 
@@ -547,8 +547,9 @@ All backend API endpoints already support location filtering:
 
 **Current Supported Locations**:
 - All Locations (no filter)
-- Blantyre (BLT)
-- Zomba (ZMB)
+- Blantyre (BT)
+- Zomba (ZA)
 - Extensible via API
 
 **Last Updated**: Commit d93d493
+

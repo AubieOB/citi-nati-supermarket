@@ -188,7 +188,7 @@ POST /api/sales/import/snapshot
 ```json
 {
   "locationId": 1,
-  "branchCode": "BLT"
+  "branchCode": "BT"
 }
 ```
 - Imports data filtered to specific locations/branches
@@ -365,3 +365,4 @@ SNAPSHOT_VERSION: 1.0.0
 6. **Partial Restore** - Restore specific entities or date ranges
 7. **Cloud Storage** - Direct export to S3, Google Cloud Storage
 8. **Scheduled Delete** - Automatic purge of old exports
+
