@@ -28,6 +28,8 @@ import { getSpeechAlertsEnabled, setSpeechAlertsEnabled } from '../../utils/noti
 import '../../styles/global.css';
 import '../../styles/admin-dashboard.css';
 
+const ADMIN_THEME_KEY = 'adminDashboardTheme';
+
 /**
  * 🛡️ ADMIN DASHBOARD
  * 
@@ -51,6 +53,11 @@ const AdminDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [speechAlertsEnabled, setSpeechAlertsPreference] = useState(() => getSpeechAlertsEnabled());
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === 'undefined') return 'light';
+    return window.localStorage.getItem(ADMIN_THEME_KEY) === 'dark' ? 'dark' : 'light';
+  });
+  const isDarkTheme = theme === 'dark';
   const navigate = useNavigate();
   const tabs = [
     { id: 'inbox', label: 'Inbox', icon: 'fa-inbox' },
@@ -92,6 +99,11 @@ const AdminDashboard = () => {
   useOrderUpdates(handleOrderUpdated, { listenAll: true, role: 'admin' });
 
   React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(ADMIN_THEME_KEY, theme);
+  }, [theme]);
+
+  React.useEffect(() => {
     if (location.pathname === '/admin/emergency-sales' && activeTab !== 'emergency-sales') {
       setActiveTab('emergency-sales');
       return;
@@ -108,7 +120,7 @@ const AdminDashboard = () => {
   }, [location.pathname, activeTab]);
 
   return (
-    <div className="admin-dashboard-root">
+    <div className={`admin-dashboard-root ${isDarkTheme ? 'theme-dark' : 'theme-light'}`} data-admin-theme={theme}>
       {/* Hamburger Menu Icon - Mobile Only */}
       <button
         className="admin-hamburger"
@@ -130,9 +142,9 @@ const AdminDashboard = () => {
         {/* Sidebar Logo/Title */}
         <div style={{
           padding: sidebarCollapsed ? '1rem 0.75rem' : '1rem 1.5rem',
-          borderBottom: '1px solid #e0e0e0',
+          borderBottom: `1px solid ${isDarkTheme ? '#2c3a4f' : '#e0e0e0'}`,
           marginBottom: '1rem',
-          color: '#5B4B8A',
+          color: isDarkTheme ? '#c7baff' : '#5B4B8A',
           fontWeight: '700',
           fontSize: '1rem',
           display: 'flex',
@@ -151,8 +163,8 @@ const AdminDashboard = () => {
             title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             style={{
               border: 'none',
-              backgroundColor: '#f3f0fa',
-              color: '#5B4B8A',
+              backgroundColor: isDarkTheme ? '#24324a' : '#f3f0fa',
+              color: isDarkTheme ? '#d7ccff' : '#5B4B8A',
               borderRadius: '4px',
               width: '28px',
               height: '28px',
@@ -191,8 +203,12 @@ const AdminDashboard = () => {
                 padding: sidebarCollapsed ? '1rem 0.75rem' : '1rem 1.5rem',
                 border: 'none',
                 backgroundColor: 'transparent',
-                borderLeft: activeTab === tab.id ? '4px solid #5B4B8A' : '4px solid transparent',
-                color: activeTab === tab.id ? '#5B4B8A' : '#666',
+                borderLeft: activeTab === tab.id
+                  ? `4px solid ${isDarkTheme ? '#7f74ff' : '#5B4B8A'}`
+                  : '4px solid transparent',
+                color: activeTab === tab.id
+                  ? (isDarkTheme ? '#ddd8ff' : '#5B4B8A')
+                  : (isDarkTheme ? '#a4b2c5' : '#666'),
                 fontWeight: activeTab === tab.id ? '600' : '500',
                 cursor: 'pointer',
                 fontSize: '0.95rem',
@@ -205,12 +221,12 @@ const AdminDashboard = () => {
               }}
               onMouseOver={(e) => {
                 if (activeTab !== tab.id) {
-                  e.currentTarget.style.color = '#5B4B8A';
+                  e.currentTarget.style.color = isDarkTheme ? '#d3ccff' : '#5B4B8A';
                 }
               }}
               onMouseOut={(e) => {
                 if (activeTab !== tab.id) {
-                  e.currentTarget.style.color = '#666';
+                  e.currentTarget.style.color = isDarkTheme ? '#a4b2c5' : '#666';
                 }
               }}
             >
@@ -223,8 +239,8 @@ const AdminDashboard = () => {
         {/* Sidebar Footer - Preferences and Home Button */}
         <div style={{
           padding: sidebarCollapsed ? '1rem 0.75rem' : '1rem 1.5rem',
-          borderTop: '1px solid #e0e0e0',
-          backgroundColor: '#fff',
+          borderTop: `1px solid ${isDarkTheme ? '#2c3a4f' : '#e0e0e0'}`,
+          backgroundColor: isDarkTheme ? '#101926' : '#fff',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'stretch',
@@ -237,8 +253,12 @@ const AdminDashboard = () => {
               width: '100%',
               padding: '0.75rem 1rem',
               border: 'none',
-              backgroundColor: speechAlertsEnabled ? '#e8f7ee' : '#f5f5f5',
-              color: speechAlertsEnabled ? '#1f7a45' : '#666',
+              backgroundColor: speechAlertsEnabled
+                ? (isDarkTheme ? '#19342a' : '#e8f7ee')
+                : (isDarkTheme ? '#1b2738' : '#f5f5f5'),
+              color: speechAlertsEnabled
+                ? (isDarkTheme ? '#8be3b2' : '#1f7a45')
+                : (isDarkTheme ? '#a4b2c5' : '#666'),
               borderRadius: '4px',
               cursor: 'pointer',
               fontSize: '0.9rem',
@@ -254,6 +274,30 @@ const AdminDashboard = () => {
             {!sidebarCollapsed && <span>{speechAlertsEnabled ? 'Spoken Alerts On' : 'Spoken Alerts Off'}</span>}
           </button>
 
+          <button
+            onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+            style={{
+              width: '100%',
+              padding: '0.75rem 1rem',
+              border: 'none',
+              backgroundColor: isDarkTheme ? '#26344b' : '#f3f0fa',
+              color: isDarkTheme ? '#e0d6ff' : '#5B4B8A',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '0.9rem',
+              fontWeight: '500',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: sidebarCollapsed ? '0' : '0.5rem',
+              transition: 'all 0.2s ease'
+            }}
+            title={`Switch to ${isDarkTheme ? 'light' : 'dark'} mode`}
+          >
+            <i className={`fas ${isDarkTheme ? 'fa-sun' : 'fa-moon'}`}></i>
+            {!sidebarCollapsed && <span>{isDarkTheme ? 'Light Mode' : 'Dark Mode'}</span>}
+          </button>
+
           {/* Home Link */}
           <button
             onClick={() => navigate('/')}
@@ -261,8 +305,8 @@ const AdminDashboard = () => {
               flex: 1,
               padding: '0.75rem 1rem',
               border: 'none',
-              backgroundColor: '#f5f5f5',
-              color: '#666',
+              backgroundColor: isDarkTheme ? '#1b2738' : '#f5f5f5',
+              color: isDarkTheme ? '#a4b2c5' : '#666',
               borderRadius: '4px',
               cursor: 'pointer',
               fontSize: '0.9rem',
@@ -274,10 +318,10 @@ const AdminDashboard = () => {
               transition: 'all 0.2s ease'
             }}
             onMouseOver={(e) => {
-              e.target.style.backgroundColor = '#e8e8e8';
+              e.currentTarget.style.backgroundColor = isDarkTheme ? '#24344b' : '#e8e8e8';
             }}
             onMouseOut={(e) => {
-              e.target.style.backgroundColor = '#f5f5f5';
+              e.currentTarget.style.backgroundColor = isDarkTheme ? '#1b2738' : '#f5f5f5';
             }}
           >
             <i className="fas fa-home" style={{ fontSize: '1rem' }}></i>
