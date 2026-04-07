@@ -12,7 +12,7 @@ const CARD_ITEMS = [
 
 const SupplierBalanceCards = ({ summary }) => {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(165px, 1fr))', gap: '0.8rem' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '0.8rem' }}>
       {CARD_ITEMS.map((item) => (
         <div
           key={item.key}
@@ -36,7 +36,7 @@ const SupplierBalanceCards = ({ summary }) => {
           >
             {item.label}
           </span>
-          <strong style={{ color: '#0f172a', fontSize: '1.05rem' }}>{money(summary?.[item.key])}</strong>
+          <strong style={{ color: '#0f172a', fontSize: '0.98rem', lineHeight: 1.1, whiteSpace: 'nowrap' }}>{money(summary?.[item.key])}</strong>
         </div>
       ))}
     </div>

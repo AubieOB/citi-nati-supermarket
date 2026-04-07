@@ -726,14 +726,14 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
 
     return (
       <div style={{ display: 'grid', gap: '1rem' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
           {paymentsState.data.map((row) => (
             <div key={row.payMethod} style={{ ...baseCardStyle, padding: '1rem 1.1rem' }}>
               <div style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Payment Method
               </div>
               <div style={{ marginTop: '0.35rem', fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>{row.payMethod}</div>
-              <div style={{ marginTop: '0.85rem', color: '#334155', fontWeight: 700 }}>{money(row.totalAmount)}</div>
+              <div style={{ marginTop: '0.85rem', color: '#334155', fontWeight: 700, whiteSpace: 'nowrap' }}>{money(row.totalAmount)}</div>
               <div style={{ marginTop: '0.35rem', color: '#64748b', fontSize: '0.88rem' }}>{integer(row.invoiceCount)} invoice occurrences</div>
             </div>
           ))}
@@ -742,11 +742,11 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
           <div style={{ ...baseCardStyle, padding: '1rem 1.1rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'space-between' }}>
             <div>
               <div style={{ color: '#64748b', fontSize: '0.82rem', fontWeight: 700, textTransform: 'uppercase' }}>Total Amount</div>
-              <div style={{ marginTop: '0.35rem', fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>{money(paymentsState.totals.totalAmount)}</div>
+              <div style={{ marginTop: '0.35rem', fontSize: '1.08rem', lineHeight: 1.1, fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap' }}>{money(paymentsState.totals.totalAmount)}</div>
             </div>
             <div>
               <div style={{ color: '#64748b', fontSize: '0.82rem', fontWeight: 700, textTransform: 'uppercase' }}>Invoice Count</div>
-              <div style={{ marginTop: '0.35rem', fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>{integer(paymentsState.totals.invoiceCount)}</div>
+              <div style={{ marginTop: '0.35rem', fontSize: '1.08rem', lineHeight: 1.1, fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap' }}>{integer(paymentsState.totals.invoiceCount)}</div>
             </div>
           </div>
         )}
