@@ -6,7 +6,7 @@ const { PassThrough } = require('stream');
 const { finished } = require('stream/promises');
 const { PrismaClient } = require('@prisma/client');
 const dataSnapshotService = require('./dataSnapshot.service');
-const { getSheetRows } = require('./parsers/commonWorkbook.utils');
+const { readWorkbookFromBuffer, getSheetRows } = require('./parsers/commonWorkbook.utils');
 const prisma = new PrismaClient();
 
 const MAX_CELL_CHARS = 30000;
@@ -1128,6 +1128,23 @@ function toRowValuesArray(row) {
   return [];
 }
 
+const FULL_WORKBOOK_IMPORT_SHEET_MAP = {
+  Payroll_Employees: { domain: 'payroll', key: 'employees' },
+  Payroll_SalaryStructures: { domain: 'payroll', key: 'salaryStructures' },
+  Payroll_Periods: { domain: 'payroll', key: 'payrollPeriods' },
+  Payroll_Entries: { domain: 'payroll', key: 'payrollEntries' },
+  Payroll_Loans: { domain: 'payroll', key: 'loans' },
+  Payroll_LoanTx: { domain: 'payroll', key: 'loanTransactions' },
+  Payroll_Terminations: { domain: 'payroll', key: 'terminations' },
+  Payroll_Reengagements: { domain: 'payroll', key: 'reengagements' },
+  Payroll_TaxBrackets: { domain: 'payroll', key: 'taxBrackets' },
+  Payroll_IncrementPolicies: { domain: 'payroll', key: 'incrementPolicies' },
+  Sales_SyncSources: { domain: 'sales', key: 'syncSources' },
+  Sales_Invoices: { domain: 'sales', key: 'invoices' },
+  Sales_InvoiceItems: { domain: 'sales', key: 'invoiceItems' },
+  Sales_Products: { domain: 'sales', key: 'products' },
+};
+
 async function importSheetBatch({ domain, key, rows, options, shouldClearExisting }) {
   if (!rows.length) return null;
 
@@ -1160,22 +1177,6 @@ async function importSheetBatch({ domain, key, rows, options, shouldClearExistin
 
 async function importWorkbookByStreamingTabularSheets(fileBuffer, options = {}) {
   const result = emptyImportSummary();
-  const sheetMap = {
-    Payroll_Employees: { domain: 'payroll', key: 'employees' },
-    Payroll_SalaryStructures: { domain: 'payroll', key: 'salaryStructures' },
-    Payroll_Periods: { domain: 'payroll', key: 'payrollPeriods' },
-    Payroll_Entries: { domain: 'payroll', key: 'payrollEntries' },
-    Payroll_Loans: { domain: 'payroll', key: 'loans' },
-    Payroll_LoanTx: { domain: 'payroll', key: 'loanTransactions' },
-    Payroll_Terminations: { domain: 'payroll', key: 'terminations' },
-    Payroll_Reengagements: { domain: 'payroll', key: 'reengagements' },
-    Payroll_TaxBrackets: { domain: 'payroll', key: 'taxBrackets' },
-    Payroll_IncrementPolicies: { domain: 'payroll', key: 'incrementPolicies' },
-    Sales_SyncSources: { domain: 'sales', key: 'syncSources' },
-    Sales_Invoices: { domain: 'sales', key: 'invoices' },
-    Sales_InvoiceItems: { domain: 'sales', key: 'invoiceItems' },
-    Sales_Products: { domain: 'sales', key: 'products' },
-  };
 
   // Use a single-chunk stream. Readable.from(buffer) yields per-byte chunks and can break XLSX parsing.
   const workbookReader = new ExcelJS.stream.xlsx.WorkbookReader(Readable.from([fileBuffer]), {
@@ -1193,7 +1194,7 @@ async function importWorkbookByStreamingTabularSheets(fileBuffer, options = {}) 
   for await (const worksheetReader of workbookReader) {
     if (worksheetReader.type !== 'worksheet') continue;
     const sheetTitle = safeWorksheetName(worksheetReader.name || '');
-    const target = sheetMap[sheetTitle];
+    const target = FULL_WORKBOOK_IMPORT_SHEET_MAP[sheetTitle];
     if (!target) {
       continue;
     }
@@ -1255,6 +1256,92 @@ async function importWorkbookByStreamingTabularSheets(fileBuffer, options = {}) 
 
     await flushBatch();
     logImportProgress('completed streaming sheet import', {
+      sheet: sheetTitle,
+      rowsInSheet,
+      importBatchSize: IMPORT_BATCH_SIZE,
+    });
+  }
+
+  if (!sawAnyImportableRows) {
+    throw new ImportGuardError('Workbook was parsed but no importable rows were detected. Ensure this is a full workbook export and not a damaged file.', 400);
+  }
+
+  return result;
+}
+
+async function importWorkbookByBufferedTabularSheets(fileBuffer, options = {}) {
+  const result = emptyImportSummary();
+  let workbook;
+  try {
+    assertImportHeapHeadroom();
+    workbook = readWorkbookFromBuffer(fileBuffer);
+  } catch (error) {
+    const message = String(error?.message || '').toLowerCase();
+    if (message.includes('heap out of memory') || message.includes('allocation failed')) {
+      throw new ImportGuardError('Workbook import exceeded available server memory. Reduce workbook scope (location/date) and retry.', 413);
+    }
+    throw error;
+  }
+
+  let sawAnyImportableRows = false;
+  let totalRows = 0;
+  let payrollCleared = false;
+
+  for (const [sheetTitle, target] of Object.entries(FULL_WORKBOOK_IMPORT_SHEET_MAP)) {
+    const rows = getSheetRows(workbook, safeWorksheetName(sheetTitle));
+    if (!rows || rows.length < 2) continue;
+
+    const headers = (rows[0] || []).map((header) => String(normalizeReadCellValue(header) || '').trim());
+    let rowsInSheet = 0;
+    let batch = [];
+
+    const flushBatch = async () => {
+      if (!batch.length) return;
+      assertImportHeapHeadroom();
+      const imported = await importSheetBatch({
+        domain: target.domain,
+        key: target.key,
+        rows: batch,
+        options,
+        shouldClearExisting: target.domain === 'payroll' && options.clearExisting === true && payrollCleared === false,
+      });
+      if (target.domain === 'payroll' && options.clearExisting === true && payrollCleared === false) {
+        payrollCleared = true;
+      }
+      mergeDomainResult(result[target.domain], imported);
+      batch = [];
+      maybeRunGc();
+    };
+
+    for (let i = 1; i < rows.length; i += 1) {
+      const normalized = normalizeWorksheetRow(headers, rows[i] || []);
+      if (!normalized) continue;
+
+      sawAnyImportableRows = true;
+      rowsInSheet += 1;
+      totalRows += 1;
+
+      if (rowsInSheet > MAX_IMPORT_ROWS_PER_SHEET) {
+        throw new ImportGuardError(
+          `Sheet ${sheetTitle} exceeded safe import row limit (${MAX_IMPORT_ROWS_PER_SHEET}). Split workbook and retry.`,
+          413,
+        );
+      }
+      if (totalRows > MAX_IMPORT_ROWS_TOTAL) {
+        throw new ImportGuardError(
+          `Workbook exceeded safe total import row limit (${MAX_IMPORT_ROWS_TOTAL}). Split workbook and retry.`,
+          413,
+        );
+      }
+
+      batch.push(normalized);
+      if (batch.length >= IMPORT_BATCH_SIZE) {
+        await flushBatch();
+      }
+    }
+
+    await flushBatch();
+    logImportProgress('completed buffered sheet import', {
       sheet: sheetTitle,
       rowsInSheet,
       importBatchSize: IMPORT_BATCH_SIZE,
@@ -1392,6 +1479,11 @@ async function importFullWorkbook(fileBuffer, options = {}) {
   try {
     return await importWorkbookByStreamingTabularSheets(fileBuffer, options);
   } catch (error) {
+    if (error instanceof ImportGuardError && error.statusCode === 400) {
+      logImportProgress('streaming import detected no rows; retrying via buffered parser fallback');
+      return importWorkbookByBufferedTabularSheets(fileBuffer, options);
+    }
+
     const message = String(error?.message || '').toLowerCase();
     if (message.includes('heap out of memory') || message.includes('allocation failed')) {
       throw new ImportGuardError('Workbook import exceeded available server memory. Reduce workbook scope (location/date) and retry.', 413);
