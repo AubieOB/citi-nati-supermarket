@@ -449,6 +449,185 @@ body.admin-theme-dark [style*="background-color: rgb(248,249,250)"] {
   margin-top: 0.8rem;
 }
 
+/* ========== AGGRESSIVE TABLE & BUTTON DARK MODE ENFORCEMENT ========== */
+
+/* Table header backgrounds: #f8fafc → #1a2a3a */
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: '#f8fafc'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: '#f8fafc'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(248, 250, 252)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(248,250,252)"] {
+  background-color: #1a2a3a !important;
+}
+
+/* White backgrounds in tables: #fff → #162235 */
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: '#fff'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="background: '#fff'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: '#ffffff'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="background: '#ffffff'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(255, 255, 255)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(255,255,255)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="background: rgb(255, 255, 255)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="background: rgb(255,255,255)"] {
+  background-color: #162235 !important;
+  background: #162235 !important;
+}
+
+/* Very light blue table rows: #fcfdff → #1d3447 */
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: '#fcfdff'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(252, 253, 255)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(252,253,255)"] {
+  background-color: #1d3447 !important;
+}
+
+/* Light green hover: #f0fdf4 → #1f3a2f */
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: '#f0fdf4'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(240, 253, 244)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(240,253,244)"] {
+  background-color: #1f3a2f !important;
+}
+
+/* Light cyan selected: #ecfeff → #1a3a42 */
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: '#ecfeff'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(236, 254, 255)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(236,254,255)"] {
+  background-color: #1a3a42 !important;
+}
+
+/* Light blue hover: #d1ecf1 → #1f3a42 */
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: '#d1ecf1'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(209, 236, 241)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(209,236,241)"] {
+  background-color: #1f3a42 !important;
+}
+
+/* Very light yellow: #fff3cd, #ffff99, #fffacd → #3a3820 */
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: '#fff3cd'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(255, 243, 205)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(255,243,205)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: '#ffff99'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(255, 255, 153)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(255,255,153)"] {
+  background-color: #3a3820 !important;
+}
+
+/* Light pink/red: #fdecea, #f8d7da → #3a2420 */
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: '#fdecea'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(253, 236, 234)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(253,236,234)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: '#f8d7da'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(248, 215, 218)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(248,215,218)"] {
+  background-color: #3a2420 !important;
+}
+
+/* Light green success: #d4edda, #d4edda → #20332a */
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: '#d4edda'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(212, 237, 218)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(212,237,218)"] {
+  background-color: #20332a !important;
+}
+
+/* Light blue info: #cfe2ff, #e7f3ff → #1a2d42 */
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: '#cfe2ff'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(207, 226, 255)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(207,226,255)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: '#e7f3ff'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(231, 243, 255)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(231,243,255)"] {
+  background-color: #1a2d42 !important;
+}
+
+/* Light gray: #f8f9fa, #f9f9f9, #f5f5f5 → #1a2535 */
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: '#f8f9fa'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(248, 249, 250)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(248,249,250)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: '#f9f9f9'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(249, 249, 249)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(249,249,249)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: '#f5f5f5'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(245, 245, 245)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(245,245,245)"] {
+  background-color: #1a2535 !important;
+}
+
+/* Very light purple: #faf8ff → #25222f */
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: '#faf8ff'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(250, 248, 255)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="backgroundColor: rgb(250,248,255)"] {
+  background-color: #25222f !important;
+}
+
+/* Text color mappings for dark mode */
+
+/* Very dark text: #0f172a → #dce6f6 */
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="color: '#0f172a'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="color: rgb(15, 23, 42)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="color: rgb(15,23,42)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="color: '#000'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="color: '#000000'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="color: rgb(0, 0, 0)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="color: rgb(0,0,0)"] {
+  color: #dce6f6 !important;
+}
+
+/* Medium dark text: #334155, #475569 → #a8bad1 */
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="color: '#334155'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="color: rgb(51, 65, 85)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="color: rgb(51,65,85)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="color: '#475569'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="color: rgb(71, 85, 105)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="color: rgb(71,85,105)"] {
+  color: #a8bad1 !important;
+}
+
+/* Medium gray text: #64748b, #738294 → #9dafc8 */
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="color: '#64748b'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="color: rgb(100, 116, 139)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="color: rgb(100,116,139)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="color: '#738294'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="color: rgb(115, 130, 148)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="color: rgb(115,130,148)"] {
+  color: #9dafc8 !important;
+}
+
+/* Green text: #166534, #2d8659 → #5fc47f */
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="color: '#166534'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="color: rgb(22, 101, 52)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="color: rgb(22,101,52)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="color: '#2d8659'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="color: rgb(45, 134, 89)"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="color: rgb(45,134,89)"] {
+  color: #5fc47f !important;
+}
+
+/* Border color mappings */
+
+/* Light borders: #e2e8f0, #eef2f7, #e0e0e0, #ddd → #324662 */
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="border: 1px solid '#e2e8f0'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="border-bottom: 1px solid '#e2e8f0'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="border-top: 1px solid '#e2e8f0'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="borderBottom: '1px solid #e2e8f0'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="borderBottom: '1px solid #eef2f7'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="border: 1px solid '#ddd'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="border: 1px solid '#e0e0e0'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="borderBottom: '1px solid #eee'"] {
+  border-color: #324662 !important;
+}
+
+/* Specific button and input styling for dark mode */
+
+/* White button backgrounds with light borders */
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) button[style*="backgroundColor: '#fff'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) button[style*="background: '#fff'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) input[style*="backgroundColor: '#fff'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) textarea[style*="backgroundColor: '#fff'"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) select[style*="backgroundColor: '#fff'"] {
+  background-color: #162235 !important;
+  color: #dce6f6 !important;
+}
+
+/* End aggressive enforcement */
+
 /* Wide desktops */
 @media (min-width: 1800px) {
   .admin-dashboard-root {
