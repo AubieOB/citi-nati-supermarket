@@ -24,6 +24,13 @@ const TABS = [
   { id: 'actions', label: 'Actions', icon: 'fa-triangle-exclamation' },
 ];
 
+function normalizeLocationCode(location) {
+  const name = String(location?.name || '').trim().toLowerCase();
+  if (name === 'blantyre') return 'BT';
+  if (name === 'zomba') return 'ZA';
+  return location?.code ? String(location.code).trim().toUpperCase() : null;
+}
+
 const AdminBusinessOperations = () => {
   const [activeTab, setActiveTab] = useState('sales-reports');
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -86,12 +93,15 @@ const AdminBusinessOperations = () => {
         const response = await api.get('/business-operations/locations');
         const locationRows = Array.isArray(response?.data?.data) ? response.data.data : [];
         if (cancelled) return;
-        setLocations(locationRows);
+        setLocations(locationRows.map((location) => ({
+          ...location,
+          code: normalizeLocationCode(location),
+        })));
       } catch (_error) {
         if (cancelled) return;
         setLocations([
-          { id: 1, code: 'BLT', name: 'Blantyre' },
-          { id: 2, code: 'ZMB', name: 'Zomba' },
+          { id: 1, code: 'BT', name: 'Blantyre' },
+          { id: 2, code: 'ZA', name: 'Zomba' },
         ]);
       }
     };
@@ -183,8 +193,8 @@ const AdminBusinessOperations = () => {
               <i className="fas fa-briefcase"></i>
               Business Operations
             </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: '240px', justifyContent: 'flex-end' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: '220px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: '210px', justifyContent: 'flex-end' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: '192px' }}>
                 <span style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
                   Location Scope
                 </span>
@@ -192,13 +202,13 @@ const AdminBusinessOperations = () => {
                   value={selectedLocationId}
                   onChange={(event) => setSelectedLocationId(event.target.value)}
                   style={{
-                    padding: '0.62rem 0.72rem',
-                    borderRadius: '10px',
+                    padding: '0.48rem 0.6rem',
+                    borderRadius: '9px',
                     border: '1px solid #cbd5e1',
                     backgroundColor: '#fff',
                     color: '#0f172a',
-                    fontSize: '0.9rem',
-                    minWidth: '220px',
+                    fontSize: '0.82rem',
+                    minWidth: '192px',
                   }}
                 >
                   <option value="all">All Locations</option>

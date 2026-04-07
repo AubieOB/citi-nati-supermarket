@@ -5,9 +5,16 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 const DEFAULT_LOCATIONS = [
-  { id: 1, code: 'BLT', name: 'Blantyre' },
-  { id: 2, code: 'ZMB', name: 'Zomba' },
+  { id: 1, code: 'BT', name: 'Blantyre' },
+  { id: 2, code: 'ZA', name: 'Zomba' },
 ];
+
+function normalizeLocationCode(name, code) {
+  const normalizedName = String(name || '').trim().toLowerCase();
+  if (normalizedName === 'blantyre') return 'BT';
+  if (normalizedName === 'zomba') return 'ZA';
+  return code ? String(code).trim().toUpperCase() : null;
+}
 
 async function getBusinessLocations() {
   try {
@@ -51,8 +58,8 @@ async function getBusinessLocations() {
 
     return rows.map((row) => ({
       id: Number(row.id),
-      code: row.code ? String(row.code).trim().toUpperCase() : null,
       name: String(row.name || '').trim(),
+      code: normalizeLocationCode(row.name, row.code),
     })).filter((row) => row.name);
   } catch (error) {
     console.warn('[BO][LOCATIONS] Falling back to defaults:', error.message);
