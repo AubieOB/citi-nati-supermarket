@@ -7,6 +7,17 @@ import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
 import '../../css/admin-responsive-filters.css';
 
+const MESSAGE_TYPES = [
+  { value: 'new_user', label: 'New User Registration', icon: 'fa-user-plus', color: '#4CAF50' },
+  { value: 'payment_success', label: 'Payment Confirmation', icon: 'fa-check-circle', color: '#2196F3' },
+  { value: 'order_placed', label: 'New Order', icon: 'fa-shopping-cart', color: '#FF9800' },
+  { value: 'order_completed', label: 'Order Completed', icon: 'fa-check', color: '#8BC34A' },
+  { value: 'payment_failed', label: 'Payment Failed', icon: 'fa-times-circle', color: '#F44336' },
+  { value: 'driver_assigned', label: 'Driver Assigned', icon: 'fa-car', color: '#9C27B0' },
+  { value: 'refund_required', label: 'Refund Required', icon: 'fa-exclamation-triangle', color: '#FF5722' },
+  { value: 'system', label: 'System Alert', icon: 'fa-bell', color: '#607D8B' },
+];
+
 /**
  * 📬 ADMIN INBOX
  * 
@@ -22,8 +33,10 @@ import '../../css/admin-responsive-filters.css';
 
 const AdminInbox = () => {
   const INBOX_PERFORMANCE_WARNING_THRESHOLD = 500;
+  const INBOX_FETCH_LIMIT = 300;
   const [messages, setMessages] = useState([]);
   const [filteredMessages, setFilteredMessages] = useState([]);
+  const [totalMessages, setTotalMessages] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -37,18 +50,6 @@ const AdminInbox = () => {
   const notificationAudioRef = useRef(null);
   const soundedMessagesRef = useRef(new Set());
   const filterBarRef = useRef(null);
-
-  // Message types
-  const messageTypes = [
-    { value: 'new_user', label: 'New User Registration', icon: 'fa-user-plus', color: '#4CAF50' },
-    { value: 'payment_success', label: 'Payment Confirmation', icon: 'fa-check-circle', color: '#2196F3' },
-    { value: 'order_placed', label: 'New Order', icon: 'fa-shopping-cart', color: '#FF9800' },
-    { value: 'order_completed', label: 'Order Completed', icon: 'fa-check', color: '#8BC34A' },
-    { value: 'payment_failed', label: 'Payment Failed', icon: 'fa-times-circle', color: '#F44336' },
-    { value: 'driver_assigned', label: 'Driver Assigned', icon: 'fa-car', color: '#9C27B0' },
-    { value: 'refund_required', label: 'Refund Required', icon: 'fa-exclamation-triangle', color: '#FF5722' },
-    { value: 'system', label: 'System Alert', icon: 'fa-bell', color: '#607D8B' },
-  ];
 
   // Fetch messages on mount
   useEffect(() => {
@@ -76,10 +77,19 @@ const AdminInbox = () => {
         console.log('[AdminInbox] New message received via Socket.io:', newMessage);
         
         // Check if message already exists (prevent duplicates)
-        if (!messages.some(m => m.id === newMessage.id)) {
-          // Add new message to the front of the list
-          setMessages(prevMessages => [newMessage, ...prevMessages]);
+        let wasInserted = false;
+        setMessages(prevMessages => {
+          if (prevMessages.some((m) => m.id === newMessage.id)) {
+            return prevMessages;
+          }
+
+          wasInserted = true;
+          return [newMessage, ...prevMessages].slice(0, INBOX_FETCH_LIMIT);
+        });
           
+        if (wasInserted) {
+          setTotalMessages((prev) => prev + 1);
+
           // Play sound ONLY ONCE per message
           if (!soundedMessagesRef.current.has(newMessage.id)) {
             soundedMessagesRef.current.add(newMessage.id);
@@ -87,7 +97,7 @@ const AdminInbox = () => {
           }
           
           // Get message type info for better display
-          const messageType = messageTypes.find(t => t.value === newMessage.type);
+          const messageType = MESSAGE_TYPES.find(t => t.value === newMessage.type);
           const icon = messageType?.icon || 'fa-bell';
           const color = messageType?.color || '#607D8B';
           
@@ -102,6 +112,33 @@ const AdminInbox = () => {
               icon: <i className={`fas ${icon}`} style={{ color }}></i>,
             }
           );
+        }
+      };
+
+      const handleAdminMessageUpdated = (updatedMessage) => {
+        if (!updatedMessage?.id) return;
+
+        let wasInserted = false;
+        setMessages((prevMessages) => {
+          const existingIndex = prevMessages.findIndex((m) => m.id === updatedMessage.id);
+
+          if (existingIndex === -1) {
+            wasInserted = true;
+            return [updatedMessage, ...prevMessages].slice(0, INBOX_FETCH_LIMIT);
+          }
+
+          const next = [...prevMessages];
+          next[existingIndex] = {
+            ...next[existingIndex],
+            ...updatedMessage,
+          };
+
+          next.sort((a, b) => new Date(b.lastSeenAt || b.createdAt) - new Date(a.lastSeenAt || a.createdAt));
+          return next;
+        });
+
+        if (wasInserted) {
+          setTotalMessages((prev) => prev + 1);
         }
       };
 
@@ -138,18 +175,20 @@ const AdminInbox = () => {
       };
 
       socket.on('newAdminMessage', handleNewAdminMessage);
+      socket.on('adminMessageUpdated', handleAdminMessageUpdated);
       socket.on('newTicket', handleNewTicket);
       console.log('[AdminInbox] Socket.io listeners registered for newAdminMessage and newTicket');
 
       return () => {
         socket.off('newAdminMessage', handleNewAdminMessage);
+        socket.off('adminMessageUpdated', handleAdminMessageUpdated);
         socket.off('newTicket', handleNewTicket);
         console.log('[AdminInbox] Socket.io listeners removed');
       };
     } catch (err) {
       console.error('[AdminInbox] Socket.io setup error:', err);
     }
-  }, [messages, messageTypes]);
+  }, []);
 
   // Apply filters whenever messages, filters change
   useEffect(() => {
@@ -219,8 +258,14 @@ const AdminInbox = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get('/admin/messages');
+      const response = await api.get('/admin/messages', {
+        params: {
+          limit: INBOX_FETCH_LIMIT,
+          offset: 0,
+        },
+      });
       setMessages(response.data.messages || []);
+      setTotalMessages(response.data.total || 0);
     } catch (err) {
       console.error('Error fetching messages:', err);
       setError(err.response?.data?.error || 'Failed to load messages');
@@ -353,6 +398,7 @@ const AdminInbox = () => {
         try {
           await api.delete(`/admin/messages/${messageId}`);
           setMessages(messages.filter(msg => msg.id !== messageId));
+          setTotalMessages((prev) => Math.max(0, prev - 1));
         } catch (err) {
           console.error('Error deleting message:', err);
         }
@@ -368,6 +414,7 @@ const AdminInbox = () => {
         try {
           await api.delete('/admin/messages');
           setMessages([]);
+          setTotalMessages(0);
         } catch (err) {
           console.error('Error deleting all messages:', err);
         }
@@ -390,7 +437,7 @@ const AdminInbox = () => {
   };
 
   const getMessageTypeInfo = (type) => {
-    return messageTypes.find(t => t.value === type) || messageTypes[messageTypes.length - 1];
+    return MESSAGE_TYPES.find(t => t.value === type) || MESSAGE_TYPES[MESSAGE_TYPES.length - 1];
   };
 
   const formatTime = (timestamp) => {
@@ -426,7 +473,7 @@ const AdminInbox = () => {
   };
 
   const unreadCount = messages.filter(m => !m.read).length;
-  const showPerformanceWarning = messages.length >= INBOX_PERFORMANCE_WARNING_THRESHOLD;
+  const showPerformanceWarning = totalMessages >= INBOX_PERFORMANCE_WARNING_THRESHOLD;
   const messagesListHeight = `calc(100vh - ${filterBarLayout.top + filterBarHeight + 16}px)`;
 
   return (
@@ -652,7 +699,7 @@ const AdminInbox = () => {
             }}
           >
             <option value="">All Types</option>
-            {messageTypes.map(type => (
+            {MESSAGE_TYPES.map(type => (
               <option key={type.value} value={type.value}>
                 {type.label}
               </option>
@@ -714,7 +761,7 @@ const AdminInbox = () => {
             minWidth: '100px',
             textAlign: 'right',
           }}>
-            {filteredMessages.length} / {messages.length} messages
+            {filteredMessages.length} / {totalMessages || messages.length} messages
           </div>
         </div>
         <div style={{ height: `${Math.max(filterBarHeight - 8, 0)}px` }}></div>
@@ -819,7 +866,7 @@ const AdminInbox = () => {
 
                   {/* Content */}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
                       <h4 style={{
                         margin: 0,
                         fontSize: '1rem',
@@ -837,6 +884,39 @@ const AdminInbox = () => {
                           backgroundColor: '#2196F3',
                         }}></span>
                       )}
+
+                      {(message.occurrenceCount || 1) > 1 && (
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          padding: '0.2rem 0.5rem',
+                          borderRadius: '999px',
+                          backgroundColor: '#e8f0fe',
+                          color: '#1e40af',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          whiteSpace: 'nowrap',
+                        }}>
+                          {message.occurrenceCount}x recurring
+                        </span>
+                      )}
+
+                      {message.lifecycleState && (
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          padding: '0.2rem 0.45rem',
+                          borderRadius: '999px',
+                          backgroundColor: message.lifecycleState === 'resolved' ? '#dcfce7' : '#f1f5f9',
+                          color: message.lifecycleState === 'resolved' ? '#166534' : '#334155',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          textTransform: 'capitalize',
+                          whiteSpace: 'nowrap',
+                        }}>
+                          {message.lifecycleState}
+                        </span>
+                      )}
                     </div>
                     <p style={{
                       margin: '0 0 0.75rem 0',
@@ -847,13 +927,24 @@ const AdminInbox = () => {
                     }}>
                       {message.message}
                     </p>
-                    <p style={{
-                      margin: 0,
-                      fontSize: '0.85rem',
-                      color: '#999',
-                    }}>
-                      {formatTime(message.createdAt)}
-                    </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                      <p style={{
+                        margin: 0,
+                        fontSize: '0.85rem',
+                        color: '#999',
+                      }}>
+                        Last seen {formatTime(message.lastSeenAt || message.createdAt)}
+                      </p>
+                      {(message.occurrenceCount || 1) > 1 && (
+                        <p style={{
+                          margin: 0,
+                          fontSize: '0.8rem',
+                          color: '#64748b',
+                        }}>
+                          First seen {formatTime(message.firstSeenAt || message.createdAt)}
+                        </p>
+                      )}
+                    </div>
                   </div>
 
                   {/* Actions */}

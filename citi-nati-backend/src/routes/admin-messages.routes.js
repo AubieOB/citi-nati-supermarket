@@ -7,6 +7,7 @@ const {
   markAsRead,
   markAsUnread,
   markAllAsRead,
+  resolveMessage,
   deleteMessage,
   deleteAllMessages,
 } = require('../controllers/admin-messages.controller.js');
@@ -27,6 +28,9 @@ router.patch('/:id/read', verifyTokenMiddleware, verifyAdmin, markAsRead);
 
 // Mark message as unread
 router.patch('/:id/unread', verifyTokenMiddleware, verifyAdmin, markAsUnread);
+
+// Resolve message lifecycle state
+router.patch('/:id/resolve', verifyTokenMiddleware, verifyAdmin, resolveMessage);
 
 // Delete a single message (must be before '/')
 router.delete('/:id', verifyTokenMiddleware, verifyAdmin, deleteMessage);

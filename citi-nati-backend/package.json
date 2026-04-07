@@ -8,7 +8,8 @@
     "start": "prisma migrate deploy && node src/server.js",
     "seed": "node prisma/seed.js",
     "seed:admin": "node scripts/seedAdmin.js",
-    "check:workbook-parser": "node scripts/checkWorkbookParser.js"
+    "check:workbook-parser": "node scripts/checkWorkbookParser.js",
+    "messages:collapse-flood": "node scripts/collapseAdminMessageFlood.js"
   },
   "keywords": [],
   "author": "",

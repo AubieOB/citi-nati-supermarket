@@ -216,13 +216,30 @@ model Promotion {
 }
 
 model AdminMessage {
-  id        Int      @id @default(autoincrement())
-  type      String   // new_user, payment_success, order_placed, order_completed, payment_failed, driver_assigned, system
-  title     String
-  message   String
-  read      Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              Int      @id @default(autoincrement())
+  type            String   // new_user, payment_success, order_placed, order_completed, payment_failed, driver_assigned, system
+  title           String
+  message         String
+  read            Boolean  @default(false)
+  dedupeKey       String?
+  sourceModule    String?  @map("source_module")
+  branchCode      String?  @map("branch_code")
+  entityType      String?  @map("entity_type")
+  entityId        String?  @map("entity_id")
+  errorCode       String?  @map("error_code")
+  lifecycleState  String   @default("active") @map("lifecycle_state")
+  firstSeenAt     DateTime @default(now()) @map("first_seen_at")
+  lastSeenAt      DateTime @default(now()) @map("last_seen_at")
+  acknowledgedAt  DateTime? @map("acknowledged_at")
+  resolvedAt      DateTime? @map("resolved_at")
+  occurrenceCount Int      @default(1) @map("occurrence_count")
+  statusMetadata  Json?    @map("status_metadata")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([type, createdAt])
+  @@index([dedupeKey, lifecycleState, lastSeenAt])
+  @@index([branchCode, type, lastSeenAt])
 }
 
 model PendingUser {

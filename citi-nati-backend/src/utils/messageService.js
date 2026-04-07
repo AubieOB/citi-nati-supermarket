@@ -1,45 +1,6 @@
 const { createMessage } = require('../controllers/admin-messages.controller.js');
 const { enrichProductStock, DEFAULT_LOW_STOCK_THRESHOLD } = require('./stockResolver');
 
-const DEFAULT_LOW_STOCK_ALERT_COOLDOWN_MS = 60 * 60 * 1000;
-const parsedLowStockAlertCooldownMs = Number(
-  process.env.LOW_STOCK_ALERT_COOLDOWN_MS || DEFAULT_LOW_STOCK_ALERT_COOLDOWN_MS
-);
-const LOW_STOCK_ALERT_COOLDOWN_MS = Number.isFinite(parsedLowStockAlertCooldownMs) && parsedLowStockAlertCooldownMs >= 0
-  ? (parsedLowStockAlertCooldownMs === 0
-      ? 0
-      : Math.max(parsedLowStockAlertCooldownMs, DEFAULT_LOW_STOCK_ALERT_COOLDOWN_MS))
-  : DEFAULT_LOW_STOCK_ALERT_COOLDOWN_MS;
-const lowStockAlertCooldownCache = new Map();
-
-function shouldSendStockAlert(stock) {
-  if (LOW_STOCK_ALERT_COOLDOWN_MS === 0) return true;
-
-  const productKey = stock.id || stock.sourceCode || stock.barcode || stock.name;
-  if (!productKey || !stock.stock_status) return true;
-
-  const key = `${productKey}:${stock.stock_status}`;
-  const now = Date.now();
-  const lastSentAt = lowStockAlertCooldownCache.get(key);
-
-  if (lastSentAt && (now - lastSentAt) < LOW_STOCK_ALERT_COOLDOWN_MS) {
-    return false;
-  }
-
-  lowStockAlertCooldownCache.set(key, now);
-
-  // Keep this tiny in-memory cache bounded for long-running processes.
-  if (lowStockAlertCooldownCache.size > 5000) {
-    for (const [cacheKey, timestamp] of lowStockAlertCooldownCache.entries()) {
-      if ((now - timestamp) >= LOW_STOCK_ALERT_COOLDOWN_MS) {
-        lowStockAlertCooldownCache.delete(cacheKey);
-      }
-    }
-  }
-
-  return true;
-}
-
 /**
  * Admin Message Service
  * Creates admin inbox messages for various system events
@@ -152,9 +113,12 @@ const notifyPaymentFailed = async (order, reason) => {
 /**
  * Create system alert message
  */
-const createSystemAlert = async (title, message) => {
+const createSystemAlert = async (title, message, options = {}) => {
   try {
-    await createMessage('system', title, message);
+    await createMessage('system', title, message, {
+      sourceModule: 'system',
+      ...options,
+    });
   } catch (error) {
     console.error('[MESSAGE SERVICE] Error creating system alert:', error);
   }
@@ -168,10 +132,30 @@ const createSystemAlert = async (title, message) => {
 const notifyLowStock = async (product) => {
   try {
     const stock = enrichProductStock(product);
-
-    if (!shouldSendStockAlert(stock)) {
-      return;
-    }
+    const entityId = stock.id || stock.sourceCode || stock.barcode || stock.name;
+    const branchCode = stock.branchCode || stock.locationCode || stock.locationId || null;
+    const sourceModule = stock.sourceCode ? 'pos_inventory' : 'inventory';
+    const commonOptions = {
+      sourceModule,
+      entityType: 'product',
+      entityId: entityId != null ? String(entityId) : null,
+      branchCode: branchCode != null ? String(branchCode) : null,
+      errorCode: stock.stock_status,
+      dedupeKey: [
+        'system',
+        sourceModule,
+        'product',
+        entityId != null ? String(entityId) : '',
+        branchCode != null ? String(branchCode) : '',
+        stock.stock_status || '',
+      ].join('|').toLowerCase(),
+      statusMetadata: {
+        stockStatus: stock.stock_status,
+        effectiveStock: stock.effective_stock,
+        lowStockThreshold: stock.low_stock_threshold,
+        sourceCode: stock.sourceCode || null,
+      },
+    };
 
     // Build message with POS indicator if applicable
     const isPOSProduct = !!stock.sourceCode;
@@ -182,14 +166,16 @@ const notifyLowStock = async (product) => {
       await createMessage(
         'system',
         `Out of Stock Alert${posIndicator}`,
-        `Product "${stock.name}"${posIndicator} is now out of stock.${isPOSProduct ? ` (POS Code: ${stock.sourceCode})` : ''}`
+        `Product "${stock.name}"${posIndicator} is now out of stock.${isPOSProduct ? ` (POS Code: ${stock.sourceCode})` : ''}`,
+        commonOptions
       );
     } else if (stock.stock_status === 'low_stock') {
       // Low stock notification - Works for all products including POS without images
       await createMessage(
         'system',
         `Low Stock Alert${posIndicator}`,
-        `Product "${stock.name}"${posIndicator} stock is running low (${stock.effective_stock} units remaining, threshold ${stock.low_stock_threshold ?? DEFAULT_LOW_STOCK_THRESHOLD}).${isPOSProduct ? ` (POS Code: ${stock.sourceCode})` : ''}`
+        `Product "${stock.name}"${posIndicator} stock is running low (${stock.effective_stock} units remaining, threshold ${stock.low_stock_threshold ?? DEFAULT_LOW_STOCK_THRESHOLD}).${isPOSProduct ? ` (POS Code: ${stock.sourceCode})` : ''}`,
+        commonOptions
       );
     }
   } catch (error) {
@@ -209,7 +195,17 @@ const notifyRefundRequired = async (order, reason) => {
       'refund_required',
       '⚠️ Refund Pending - Manual Processing Required',
       message,
-      order.id // reference_id
+      {
+        sourceModule: 'refunds',
+        entityType: 'order',
+        entityId: order?.id != null ? String(order.id) : null,
+        errorCode: 'refund_required',
+        dedupeKey: `refund_required|refunds|order|${order?.id != null ? String(order.id) : 'unknown'}|refund_required`,
+        statusMetadata: {
+          paymentReference: order?.paymentReference || null,
+          orderTotal: order?.total ?? null,
+        },
+      }
     );
   } catch (error) {
     console.error('[MESSAGE SERVICE] Error notifying refund required:', error);
