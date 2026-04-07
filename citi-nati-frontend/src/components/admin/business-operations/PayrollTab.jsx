@@ -734,7 +734,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
     event.target.value = '';
     if (!file) return;
 
-    const confirmMessage = `Import workbook "${file.name}"? This will re-add/update payroll and sales records.`;
+    const confirmMessage = `Import workbook "${file.name}"? This will re-add/update payroll, sales, and business operations records.`;
     if (!window.confirm(confirmMessage)) return;
 
     setImportingFullWorkbook(true);
@@ -748,11 +748,13 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
 
       const payrollImported = response?.result?.payroll?.imported || {};
       const salesImported = response?.result?.sales?.imported || {};
+      const businessImported = response?.result?.business?.imported || {};
 
       const payrollCount = Object.values(payrollImported).reduce((sum, value) => sum + Number(value || 0), 0);
       const salesCount = Object.values(salesImported).reduce((sum, value) => sum + Number(value || 0), 0);
+      const businessCount = Object.values(businessImported).reduce((sum, value) => sum + Number(value || 0), 0);
 
-      window.alert(`Workbook import complete. Payroll rows: ${payrollCount}. Sales rows: ${salesCount}.`);
+      window.alert(`Workbook import complete. Payroll rows: ${payrollCount}. Sales rows: ${salesCount}. BO rows: ${businessCount}.`);
       await refreshAll();
     } catch (error) {
       const message = error?.response?.data?.error || error?.message || 'Failed to import full workbook.';

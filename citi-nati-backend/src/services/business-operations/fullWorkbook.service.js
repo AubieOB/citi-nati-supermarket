@@ -698,6 +698,101 @@ async function streamFullWorkbook({ writable, options = {}, requestId = null }) 
     logLabel,
   }));
 
+  registerSheet('BO_ExpenseCategories', await streamModelSheet({
+    workbook,
+    title: 'BO_ExpenseCategories',
+    columns: [
+      { header: 'id', key: 'id' }, { header: 'code', key: 'code' }, { header: 'name', key: 'name' },
+      { header: 'description', key: 'description' }, { header: 'isActive', key: 'isActive' },
+    ],
+    model: prisma.expenseCategory,
+    where: undefined,
+    select: { id: true, code: true, name: true, description: true, isActive: true },
+    mapRow: (row) => row,
+    batchSize,
+    maxRows: perSheetLimit,
+    logLabel,
+  }));
+
+  registerSheet('BO_Expenses', await streamModelSheet({
+    workbook,
+    title: 'BO_Expenses',
+    columns: [
+      { header: 'id', key: 'id' }, { header: 'reportingPeriodId', key: 'reportingPeriodId' }, { header: 'expenseCategoryId', key: 'expenseCategoryId' },
+      { header: 'locationId', key: 'locationId' }, { header: 'expenseDate', key: 'expenseDate' }, { header: 'amount', key: 'amount' },
+      { header: 'description', key: 'description' }, { header: 'paymentMethod', key: 'paymentMethod' }, { header: 'referenceNo', key: 'referenceNo' },
+      { header: 'enteredBy', key: 'enteredBy' },
+    ],
+    model: prisma.expense,
+    where: undefined,
+    select: {
+      id: true, reportingPeriodId: true, expenseCategoryId: true, locationId: true,
+      expenseDate: true, amount: true, description: true, paymentMethod: true, referenceNo: true, enteredBy: true,
+    },
+    mapRow: (row) => row,
+    batchSize,
+    maxRows: perSheetLimit,
+    logLabel,
+  }));
+
+  registerSheet('BO_Suppliers', await streamModelSheet({
+    workbook,
+    title: 'BO_Suppliers',
+    columns: [
+      { header: 'id', key: 'id' }, { header: 'supplierCode', key: 'supplierCode' }, { header: 'name', key: 'name' },
+      { header: 'contactPerson', key: 'contactPerson' }, { header: 'phone', key: 'phone' }, { header: 'email', key: 'email' },
+      { header: 'address', key: 'address' }, { header: 'openingBalance', key: 'openingBalance' }, { header: 'status', key: 'status' },
+      { header: 'notes', key: 'notes' },
+    ],
+    model: prisma.supplier,
+    where: undefined,
+    select: {
+      id: true, supplierCode: true, name: true, contactPerson: true, phone: true, email: true,
+      address: true, openingBalance: true, status: true, notes: true,
+    },
+    mapRow: (row) => row,
+    batchSize,
+    maxRows: perSheetLimit,
+    logLabel,
+  }));
+
+  registerSheet('BO_SupplierTransactions', await streamModelSheet({
+    workbook,
+    title: 'BO_SupplierTransactions',
+    columns: [
+      { header: 'id', key: 'id' }, { header: 'supplierId', key: 'supplierId' }, { header: 'reportingPeriodId', key: 'reportingPeriodId' },
+      { header: 'transactionDate', key: 'transactionDate' }, { header: 'transactionType', key: 'transactionType' },
+      { header: 'paymentMethod', key: 'paymentMethod' }, { header: 'amount', key: 'amount' }, { header: 'description', key: 'description' },
+      { header: 'referenceNo', key: 'referenceNo' }, { header: 'enteredBy', key: 'enteredBy' },
+    ],
+    model: prisma.supplierTransaction,
+    where: undefined,
+    select: {
+      id: true, supplierId: true, reportingPeriodId: true, transactionDate: true, transactionType: true,
+      paymentMethod: true, amount: true, description: true, referenceNo: true, enteredBy: true,
+    },
+    mapRow: (row) => row,
+    batchSize,
+    maxRows: perSheetLimit,
+    logLabel,
+  }));
+
+  registerSheet('BO_SupplierBalances', await streamModelSheet({
+    workbook,
+    title: 'BO_SupplierBalances',
+    columns: [
+      { header: 'id', key: 'id' }, { header: 'supplierId', key: 'supplierId' }, { header: 'reportingPeriodId', key: 'reportingPeriodId' },
+      { header: 'totalDebt', key: 'totalDebt' }, { header: 'totalPaid', key: 'totalPaid' }, { header: 'outstandingBalance', key: 'outstandingBalance' },
+    ],
+    model: prisma.supplierBalance,
+    where: undefined,
+    select: { id: true, supplierId: true, reportingPeriodId: true, totalDebt: true, totalPaid: true, outstandingBalance: true },
+    mapRow: (row) => row,
+    batchSize,
+    maxRows: perSheetLimit,
+    logLabel,
+  }));
+
   const statsSheet = createStreamWorksheet(workbook, 'Backup_Stats', [
     { header: 'sheet', key: 'sheet', width: 34 },
     { header: 'rows', key: 'rows', width: 16 },
@@ -1088,6 +1183,17 @@ function emptyImportSummary() {
       skipped: [],
       errors: [],
     },
+    business: {
+      imported: {
+        expenseCategories: 0,
+        expenses: 0,
+        suppliers: 0,
+        supplierTransactions: 0,
+        supplierBalances: 0,
+      },
+      skipped: [],
+      errors: [],
+    },
   };
 }
 
@@ -1157,9 +1263,231 @@ const FULL_WORKBOOK_IMPORT_SHEET_MAP = {
   Sales_Invoices: { domain: 'sales', key: 'invoices' },
   Sales_InvoiceItems: { domain: 'sales', key: 'invoiceItems' },
   Sales_Products: { domain: 'sales', key: 'products' },
+  BO_ExpenseCategories: { domain: 'business', key: 'expenseCategories' },
+  BO_Expenses: { domain: 'business', key: 'expenses' },
+  BO_Suppliers: { domain: 'business', key: 'suppliers' },
+  BO_SupplierTransactions: { domain: 'business', key: 'supplierTransactions' },
+  BO_SupplierBalances: { domain: 'business', key: 'supplierBalances' },
 };
 
-async function importSheetBatch({ domain, key, rows, options, shouldClearExisting }) {
+function parseNumeric(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function parseDateOrNull(value) {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function toBool(value, fallback = false) {
+  if (value === null || value === undefined || value === '') return fallback;
+  if (typeof value === 'boolean') return value;
+  const normalized = String(value).trim().toLowerCase();
+  return normalized === 'true' || normalized === '1' || normalized === 'yes';
+}
+
+async function importBusinessSheetRows(key, rows, context) {
+  const result = { imported: {}, skipped: [], errors: [] };
+
+  try {
+    if (key === 'expenseCategories') {
+      let count = 0;
+      for (const row of rows) {
+        const code = String(row.code || '').trim().toUpperCase();
+        const name = String(row.name || '').trim();
+        if (!code || !name) {
+          result.skipped.push('Skipped expense category row with missing code/name');
+          continue;
+        }
+
+        const existing = await prisma.expenseCategory.findUnique({ where: { code } });
+        let saved;
+        if (existing) {
+          saved = await prisma.expenseCategory.update({
+            where: { id: existing.id },
+            data: {
+              name,
+              description: row.description || null,
+              isActive: toBool(row.isActive, true),
+            },
+          });
+        } else {
+          saved = await prisma.expenseCategory.create({
+            data: {
+              code,
+              name,
+              description: row.description || null,
+              isActive: toBool(row.isActive, true),
+            },
+          });
+        }
+
+        if (row.id !== undefined && row.id !== null && row.id !== '') {
+          context.expenseCategoryIdMap.set(Number(row.id), saved.id);
+        }
+        count += 1;
+      }
+      result.imported.expenseCategories = count;
+      return result;
+    }
+
+    if (key === 'suppliers') {
+      let count = 0;
+      for (const row of rows) {
+        const supplierCode = row.supplierCode ? String(row.supplierCode).trim() : null;
+        const name = String(row.name || '').trim();
+        if (!name) {
+          result.skipped.push('Skipped supplier row with missing name');
+          continue;
+        }
+
+        let existing = null;
+        if (supplierCode) {
+          existing = await prisma.supplier.findUnique({ where: { supplierCode } });
+        }
+        if (!existing) {
+          existing = await prisma.supplier.findFirst({ where: { name } });
+        }
+
+        const payload = {
+          supplierCode,
+          name,
+          contactPerson: row.contactPerson || null,
+          phone: row.phone || null,
+          email: row.email || null,
+          address: row.address || null,
+          openingBalance: parseNumeric(row.openingBalance, 0),
+          status: String(row.status || 'active').toLowerCase(),
+          notes: row.notes || null,
+        };
+
+        let saved;
+        if (existing) {
+          saved = await prisma.supplier.update({ where: { id: existing.id }, data: payload });
+        } else {
+          saved = await prisma.supplier.create({ data: payload });
+        }
+
+        if (row.id !== undefined && row.id !== null && row.id !== '') {
+          context.supplierIdMap.set(Number(row.id), saved.id);
+        }
+        count += 1;
+      }
+      result.imported.suppliers = count;
+      return result;
+    }
+
+    if (key === 'expenses') {
+      let count = 0;
+      for (const row of rows) {
+        const mappedCategoryId = context.expenseCategoryIdMap.get(Number(row.expenseCategoryId));
+        const expenseCategoryId = mappedCategoryId || Number(row.expenseCategoryId || 0);
+        const expenseDate = parseDateOrNull(row.expenseDate);
+        const amount = parseNumeric(row.amount, NaN);
+
+        if (!expenseCategoryId || !expenseDate || !Number.isFinite(amount)) {
+          result.skipped.push('Skipped expense row with invalid category/date/amount');
+          continue;
+        }
+
+        await prisma.expense.create({
+          data: {
+            reportingPeriodId: row.reportingPeriodId ? Number(row.reportingPeriodId) : null,
+            expenseCategoryId,
+            locationId: row.locationId ? Number(row.locationId) : null,
+            expenseDate,
+            amount,
+            description: row.description || null,
+            paymentMethod: row.paymentMethod || null,
+            referenceNo: row.referenceNo || null,
+            enteredBy: row.enteredBy || null,
+          },
+        });
+        count += 1;
+      }
+      result.imported.expenses = count;
+      return result;
+    }
+
+    if (key === 'supplierTransactions') {
+      let count = 0;
+      for (const row of rows) {
+        const mappedSupplierId = context.supplierIdMap.get(Number(row.supplierId));
+        const supplierId = mappedSupplierId || Number(row.supplierId || 0);
+        const transactionDate = parseDateOrNull(row.transactionDate);
+        const amount = parseNumeric(row.amount, NaN);
+
+        if (!supplierId || !transactionDate || !Number.isFinite(amount)) {
+          result.skipped.push('Skipped supplier transaction row with invalid supplier/date/amount');
+          continue;
+        }
+
+        await prisma.supplierTransaction.create({
+          data: {
+            supplierId,
+            reportingPeriodId: row.reportingPeriodId ? Number(row.reportingPeriodId) : null,
+            transactionDate,
+            transactionType: String(row.transactionType || 'payment').toLowerCase(),
+            paymentMethod: row.paymentMethod || null,
+            amount,
+            description: row.description || null,
+            referenceNo: row.referenceNo || null,
+            enteredBy: row.enteredBy || null,
+          },
+        });
+        count += 1;
+      }
+      result.imported.supplierTransactions = count;
+      return result;
+    }
+
+    if (key === 'supplierBalances') {
+      let count = 0;
+      for (const row of rows) {
+        const mappedSupplierId = context.supplierIdMap.get(Number(row.supplierId));
+        const supplierId = mappedSupplierId || Number(row.supplierId || 0);
+        const reportingPeriodId = row.reportingPeriodId ? Number(row.reportingPeriodId) : 0;
+        if (!supplierId || !reportingPeriodId) {
+          result.skipped.push('Skipped supplier balance row with invalid supplier/reporting period');
+          continue;
+        }
+
+        await prisma.supplierBalance.upsert({
+          where: {
+            supplierId_reportingPeriodId: {
+              supplierId,
+              reportingPeriodId,
+            },
+          },
+          update: {
+            totalDebt: parseNumeric(row.totalDebt, 0),
+            totalPaid: parseNumeric(row.totalPaid, 0),
+            outstandingBalance: parseNumeric(row.outstandingBalance, 0),
+          },
+          create: {
+            supplierId,
+            reportingPeriodId,
+            totalDebt: parseNumeric(row.totalDebt, 0),
+            totalPaid: parseNumeric(row.totalPaid, 0),
+            outstandingBalance: parseNumeric(row.outstandingBalance, 0),
+          },
+        });
+        count += 1;
+      }
+      result.imported.supplierBalances = count;
+      return result;
+    }
+
+    return result;
+  } catch (error) {
+    result.errors.push(`Business ${key} import error: ${error.message}`);
+    return result;
+  }
+}
+
+async function importSheetBatch({ domain, key, rows, options, shouldClearExisting, context }) {
   if (!rows.length) return null;
 
   if (domain === 'payroll') {
@@ -1177,6 +1505,10 @@ async function importSheetBatch({ domain, key, rows, options, shouldClearExistin
     );
   }
 
+  if (domain === 'business') {
+    return importBusinessSheetRows(key, rows, context || { expenseCategoryIdMap: new Map(), supplierIdMap: new Map() });
+  }
+
   return dataSnapshotService.importSalesSnapshot(
     {
       data: {
@@ -1191,6 +1523,10 @@ async function importSheetBatch({ domain, key, rows, options, shouldClearExistin
 
 async function importWorkbookByStreamingTabularSheets(fileBuffer, options = {}) {
   const result = emptyImportSummary();
+  const importContext = {
+    expenseCategoryIdMap: new Map(),
+    supplierIdMap: new Map(),
+  };
 
   // Use a single-chunk stream. Readable.from(buffer) yields per-byte chunks and can break XLSX parsing.
   const workbookReader = new ExcelJS.stream.xlsx.WorkbookReader(Readable.from([fileBuffer]), {
@@ -1226,6 +1562,7 @@ async function importWorkbookByStreamingTabularSheets(fileBuffer, options = {}) 
         rows: batch,
         options,
         shouldClearExisting: target.domain === 'payroll' && options.clearExisting === true && payrollCleared === false,
+        context: importContext,
       });
       if (target.domain === 'payroll' && options.clearExisting === true && payrollCleared === false) {
         payrollCleared = true;
@@ -1285,6 +1622,10 @@ async function importWorkbookByStreamingTabularSheets(fileBuffer, options = {}) 
 
 async function importWorkbookByBufferedTabularSheets(fileBuffer, options = {}) {
   const result = emptyImportSummary();
+  const importContext = {
+    expenseCategoryIdMap: new Map(),
+    supplierIdMap: new Map(),
+  };
   let workbook;
   try {
     assertImportHeapHeadroom();
@@ -1319,6 +1660,7 @@ async function importWorkbookByBufferedTabularSheets(fileBuffer, options = {}) {
         rows: batch,
         options,
         shouldClearExisting: target.domain === 'payroll' && options.clearExisting === true && payrollCleared === false,
+        context: importContext,
       });
       if (target.domain === 'payroll' && options.clearExisting === true && payrollCleared === false) {
         payrollCleared = true;
@@ -1476,6 +1818,44 @@ async function exportFullWorkbook(options = {}) {
   addTabularSheet(workbook, 'Sales_Invoices', salesSnapshot.data?.invoices || []);
   addTabularSheet(workbook, 'Sales_InvoiceItems', salesSnapshot.data?.invoiceItems || []);
   addTabularSheet(workbook, 'Sales_Products', salesSnapshot.data?.products || []);
+
+  const [expenseCategories, expenses, suppliers, supplierTransactions, supplierBalances] = await Promise.all([
+    prisma.expenseCategory.findMany({
+      select: { id: true, code: true, name: true, description: true, isActive: true },
+      orderBy: { id: 'asc' },
+    }),
+    prisma.expense.findMany({
+      select: {
+        id: true, reportingPeriodId: true, expenseCategoryId: true, locationId: true,
+        expenseDate: true, amount: true, description: true, paymentMethod: true, referenceNo: true, enteredBy: true,
+      },
+      orderBy: { id: 'asc' },
+    }),
+    prisma.supplier.findMany({
+      select: {
+        id: true, supplierCode: true, name: true, contactPerson: true, phone: true, email: true,
+        address: true, openingBalance: true, status: true, notes: true,
+      },
+      orderBy: { id: 'asc' },
+    }),
+    prisma.supplierTransaction.findMany({
+      select: {
+        id: true, supplierId: true, reportingPeriodId: true, transactionDate: true, transactionType: true,
+        paymentMethod: true, amount: true, description: true, referenceNo: true, enteredBy: true,
+      },
+      orderBy: { id: 'asc' },
+    }),
+    prisma.supplierBalance.findMany({
+      select: { id: true, supplierId: true, reportingPeriodId: true, totalDebt: true, totalPaid: true, outstandingBalance: true },
+      orderBy: { id: 'asc' },
+    }),
+  ]);
+
+  addTabularSheet(workbook, 'BO_ExpenseCategories', expenseCategories);
+  addTabularSheet(workbook, 'BO_Expenses', expenses);
+  addTabularSheet(workbook, 'BO_Suppliers', suppliers);
+  addTabularSheet(workbook, 'BO_SupplierTransactions', supplierTransactions);
+  addTabularSheet(workbook, 'BO_SupplierBalances', supplierBalances);
 
   // Hidden raw payload is optional because it can be very large and cause memory pressure.
   if (options.includeRawPayload === true) {
