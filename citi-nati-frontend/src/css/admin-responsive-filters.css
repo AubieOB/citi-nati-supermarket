@@ -1,0 +1,177 @@
+/* Admin Panel Responsive Filter Inputs and Selects */
+
+/* Base styles for responsive filter inputs and selects */
+.admin-filter-input,
+.admin-filter-select {
+  /* Default (desktop) - padding 0.55rem 0.75rem, font-size 0.85rem, min-width 160px */
+  padding: 0.55rem 0.75rem;
+  font-size: 0.85rem;
+  min-width: 160px;
+  transition: padding 0.2s ease, font-size 0.2s ease, min-width 0.2s ease;
+}
+
+/* 1280px breakpoint */
+@media (max-width: 1280px) {
+  .admin-filter-input,
+  .admin-filter-select {
+    padding: 0.48rem 0.65rem;
+    font-size: 0.8rem;
+    min-width: 140px;
+  }
+}
+
+/* 1080px breakpoint */
+@media (max-width: 1080px) {
+  .admin-filter-input,
+  .admin-filter-select {
+    padding: 0.42rem 0.58rem;
+    font-size: 0.76rem;
+    min-width: 120px;
+  }
+}
+
+/* 768px breakpoint (tablet/mobile) */
+@media (max-width: 768px) {
+  .admin-filter-input,
+  .admin-filter-select {
+    padding: 0.38rem 0.52rem;
+    font-size: 0.72rem;
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+/* 480px breakpoint (small mobile) */
+@media (max-width: 480px) {
+  .admin-filter-input,
+  .admin-filter-select {
+    padding: 0.32rem 0.45rem;
+    font-size: 0.68rem;
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+/* Ensure search inputs are handled differently - they should use flex:1 */
+.admin-filter-search-container {
+  position: relative;
+  flex: 1;
+  min-width: 220px;
+}
+
+.admin-filter-search-container input {
+  /* Base search input */
+  padding: 0.55rem 2.25rem 0.55rem 0.75rem;
+  font-size: 0.85rem;
+  transition: padding 0.2s ease, font-size 0.2s ease;
+}
+
+@media (max-width: 1280px) {
+  .admin-filter-search-container input {
+    padding: 0.48rem 2.1rem 0.48rem 0.65rem;
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 1080px) {
+  .admin-filter-search-container input {
+    padding: 0.42rem 2rem 0.42rem 0.58rem;
+    font-size: 0.76rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-filter-search-container input {
+    padding: 0.38rem 1.9rem 0.38rem 0.52rem;
+    font-size: 0.72rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-filter-search-container input {
+    padding: 0.32rem 1.8rem 0.32rem 0.45rem;
+    font-size: 0.68rem;
+  }
+}
+
+/* Date input styles */
+.admin-filter-date {
+  padding: 0.55rem 0.75rem;
+  font-size: 0.85rem;
+  min-width: 140px;
+}
+
+@media (max-width: 1280px) {
+  .admin-filter-date {
+    padding: 0.48rem 0.65rem;
+    font-size: 0.8rem;
+    min-width: 130px;
+  }
+}
+
+@media (max-width: 1080px) {
+  .admin-filter-date {
+    padding: 0.42rem 0.58rem;
+    font-size: 0.76rem;
+    min-width: 120px;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-filter-date {
+    padding: 0.38rem 0.52rem;
+    font-size: 0.72rem;
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-filter-date {
+    padding: 0.32rem 0.45rem;
+    font-size: 0.68rem;
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+/* Text input styles (for product, cashier filters etc) */
+.admin-filter-text-input {
+  padding: 0.55rem 0.75rem;
+  font-size: 0.85rem;
+  min-width: 200px;
+}
+
+@media (max-width: 1280px) {
+  .admin-filter-text-input {
+    padding: 0.48rem 0.65rem;
+    font-size: 0.8rem;
+    min-width: 180px;
+  }
+}
+
+@media (max-width: 1080px) {
+  .admin-filter-text-input {
+    padding: 0.42rem 0.58rem;
+    font-size: 0.76rem;
+    min-width: 160px;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-filter-text-input {
+    padding: 0.38rem 0.52rem;
+    font-size: 0.72rem;
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-filter-text-input {
+    padding: 0.32rem 0.45rem;
+    font-size: 0.68rem;
+    min-width: 0;
+    width: 100%;
+  }
+}

@@ -9,6 +9,7 @@ import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
 import { notifySuccess, notifyError } from '../../utils/notifications.js';
 import { generateAdminOrdersTablePDF } from '../../utils/pdfReports.js';
+import '../../css/admin-responsive-filters.css';
 
 /**
  * 📋 ADMIN ORDERS MANAGEMENT
@@ -457,12 +458,12 @@ const AdminOrders = () => {
                 placeholder="Search by order #, customer, email, driver, status..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                className="admin-filter-input"
                 style={{
                   width: '100%',
-                  padding: '0.75rem 2.25rem 0.75rem 0.75rem',
+                  padding: '0.55rem 2.25rem 0.55rem 0.75rem',
                   borderRadius: '6px',
                   border: '1px solid #ddd',
-                  fontSize: '0.95rem',
                   backgroundColor: '#fff',
                 }}
               />
@@ -499,12 +500,12 @@ const AdminOrders = () => {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
+              className="admin-filter-select"
               style={{
-                padding: '0.75rem',
+                padding: '0.55rem 0.75rem',
                 borderRadius: '6px',
                 border: '1px solid #ddd',
-                minWidth: '170px',
-                fontSize: '0.95rem',
+                minWidth: '160px',
                 backgroundColor: '#fff',
                 cursor: 'pointer',
               }}
@@ -522,12 +523,12 @@ const AdminOrders = () => {
             <select
               value={priceFilter}
               onChange={(e) => setPriceFilter(e.target.value)}
+              className="admin-filter-select"
               style={{
-                padding: '0.75rem',
+                padding: '0.55rem 0.75rem',
                 borderRadius: '6px',
                 border: '1px solid #ddd',
-                minWidth: '180px',
-                fontSize: '0.95rem',
+                minWidth: '160px',
                 backgroundColor: '#fff',
                 cursor: 'pointer',
               }}
@@ -542,12 +543,16 @@ const AdminOrders = () => {
             <select
               value={driverFilter}
               onChange={(e) => setDriverFilter(e.target.value)}
+              className="admin-filter-select"
               style={{
-                padding: '0.75rem',
+                padding: '0.55rem 0.75rem',
                 borderRadius: '6px',
                 border: '1px solid #ddd',
-                minWidth: '190px',
-                fontSize: '0.95rem',
+                minWidth: '160px',
+                backgroundColor: '#fff',
+                cursor: 'pointer',
+              }}
+            >
                 backgroundColor: '#fff',
                 cursor: 'pointer',
               }}

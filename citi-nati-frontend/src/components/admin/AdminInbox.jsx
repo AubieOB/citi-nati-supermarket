@@ -5,6 +5,7 @@ import { getSocket } from '../../utils/socket.js';
 import { playNotificationSound } from '../../utils/notifications.js';
 import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
+import '../../css/admin-responsive-filters.css';
 
 /**
  * 📬 ADMIN INBOX
@@ -579,12 +580,12 @@ const AdminInbox = () => {
               placeholder="Search messages..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              className="admin-filter-input"
               style={{
                 width: '100%',
-                padding: '0.75rem 2.25rem 0.75rem 0.75rem',
+                padding: '0.55rem 2.25rem 0.55rem 0.75rem',
                 border: 'none',
                 borderRadius: '4px',
-                fontSize: '1rem',
                 backgroundColor: '#f5f5f5',
                 transition: 'box-shadow 0.3s ease, background-color 0.3s ease'
               }}
@@ -631,12 +632,12 @@ const AdminInbox = () => {
           <select
             value={selectedType}
             onChange={(e) => setSelectedType(e.target.value)}
+            className="admin-filter-select"
             style={{
-              padding: '0.75rem',
+              padding: '0.55rem 0.75rem',
               border: 'none',
               borderRadius: '4px',
-              fontSize: '1rem',
-              minWidth: '180px',
+              minWidth: '160px',
               backgroundColor: '#f5f5f5',
               transition: 'box-shadow 0.3s ease, background-color 0.3s ease',
               cursor: 'pointer'
@@ -663,11 +664,11 @@ const AdminInbox = () => {
             type="date"
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
+            className="admin-filter-date"
             style={{
-              padding: '0.75rem',
+              padding: '0.55rem 0.75rem',
               border: 'none',
               borderRadius: '4px',
-              fontSize: '1rem',
               backgroundColor: '#f5f5f5',
               transition: 'box-shadow 0.3s ease, background-color 0.3s ease'
             }}

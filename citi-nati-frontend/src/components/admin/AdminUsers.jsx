@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
 import { generateAdminUsersTablePDF } from '../../utils/pdfReports.js';
+import '../../css/admin-responsive-filters.css';
 
 /**
  * 👥 ADMIN USERS MANAGEMENT
@@ -306,12 +307,12 @@ const AdminUsers = () => {
             placeholder="Search users by name, email or role..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            className="admin-filter-input"
             style={{
               width: '100%',
-              padding: '0.75rem 2.25rem 0.75rem 0.75rem',
+              padding: '0.55rem 2.25rem 0.55rem 0.75rem',
               borderRadius: '6px',
               border: '1px solid #ddd',
-              fontSize: '0.95rem',
               backgroundColor: '#fff',
             }}
           />
@@ -348,11 +349,12 @@ const AdminUsers = () => {
         <select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value)}
+          className="admin-filter-select"
           style={{
-            padding: '0.75rem',
+            padding: '0.55rem 0.75rem',
             borderRadius: '6px',
             border: '1px solid #ddd',
-            fontSize: '0.95rem',
+            fontSize: '0.85rem',
             minWidth: '160px',
             backgroundColor: '#fff',
             cursor: 'pointer',
@@ -368,12 +370,13 @@ const AdminUsers = () => {
         <select
           value={verificationFilter}
           onChange={(e) => setVerificationFilter(e.target.value)}
+          className="admin-filter-select"
           style={{
-            padding: '0.75rem',
+            padding: '0.55rem 0.75rem',
             borderRadius: '6px',
             border: '1px solid #ddd',
-            fontSize: '0.95rem',
-            minWidth: '180px',
+            fontSize: '0.85rem',
+            minWidth: '160px',
             backgroundColor: '#fff',
             cursor: 'pointer',
           }}

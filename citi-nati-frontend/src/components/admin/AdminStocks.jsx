@@ -13,6 +13,7 @@ import {
   resolveLowStockThreshold,
   resolveStockStatus,
 } from '../../utils/stockResolver.js';
+import '../../css/admin-responsive-filters.css';
 
 /**
  * 📊 ADMIN STOCKS MANAGEMENT
@@ -629,12 +630,12 @@ const AdminStocks = () => {
                 placeholder="Search by product name or code..."
                 value={searchTerm}
                 onChange={handleSearchChange}
+                className="admin-filter-input"
                 style={{
                   width: '100%',
-                  padding: '0.75rem 2.25rem 0.75rem 0.75rem',
+                  padding: '0.55rem 2.25rem 0.55rem 0.75rem',
                   borderRadius: '4px',
                   border: '1px solid #ddd',
-                  fontSize: '1rem',
                 }}
               />
               {searchTerm && (
@@ -683,12 +684,12 @@ const AdminStocks = () => {
             <select
               value={filterCategory}
               onChange={(e) => handleCategoryChange(e.target.value)}
+              className="admin-filter-select"
               style={{
                 width: '100%',
-                padding: '0.75rem',
+                padding: '0.55rem 0.75rem',
                 borderRadius: '4px',
                 border: '1px solid #ddd',
-                fontSize: '1rem',
                 cursor: 'pointer',
               }}
             >
@@ -747,12 +748,12 @@ const AdminStocks = () => {
                 setStockStatusFilter(e.target.value);
                 setCurrentPage(1);
               }}
+              className="admin-filter-select"
               style={{
                 width: '100%',
-                padding: '0.75rem',
+                padding: '0.55rem 0.75rem',
                 borderRadius: '4px',
                 border: '1px solid #ddd',
-                fontSize: '1rem',
                 cursor: 'pointer',
               }}
             >

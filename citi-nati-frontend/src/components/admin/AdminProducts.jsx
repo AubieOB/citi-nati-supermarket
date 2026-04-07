@@ -12,6 +12,7 @@ import {
   resolveEffectiveStock,
   resolveStockStatus,
 } from '../../utils/stockResolver.js';
+import '../../css/admin-responsive-filters.css';
 
 /**
  * 📦 ADMIN PRODUCTS MANAGEMENT - ENHANCED
@@ -1701,12 +1702,12 @@ const AdminProducts = () => {
               placeholder="Search by name, category or product code..."
               value={searchTerm}
               onChange={handleSearchChange}
+              className="admin-filter-input"
               style={{
                 width: '100%',
-                padding: '0.75rem 2.25rem 0.75rem 0.75rem',
+                padding: '0.55rem 2.25rem 0.55rem 0.75rem',
                 border: 'none',
                 borderRadius: '4px',
-                fontSize: '1rem',
                 backgroundColor: '#f5f5f5',
                 transition: 'box-shadow 0.3s ease, background-color 0.3s ease'
               }}
@@ -1774,11 +1775,11 @@ const AdminProducts = () => {
           <select
             value={selectedCategory}
             onChange={(e) => handleCategoryChange(e.target.value)}
+            className="admin-filter-select"
             style={{
-              padding: '0.75rem',
+              padding: '0.55rem 0.75rem',
               border: 'none',
               borderRadius: '4px',
-              fontSize: '1rem',
               minWidth: '150px',
               backgroundColor: '#fff',
             }}
@@ -1865,12 +1866,12 @@ const AdminProducts = () => {
           <select
             value={expiryAlertCategory}
             onChange={(e) => setExpiryAlertCategory(e.target.value)}
+            className="admin-filter-select"
             style={{
-              padding: '0.75rem',
+              padding: '0.55rem 0.75rem',
               border: 'none',
               borderRadius: '4px',
-              fontSize: '1rem',
-              minWidth: '180px',
+              minWidth: '160px',
               backgroundColor: '#fff',
             }}
           >

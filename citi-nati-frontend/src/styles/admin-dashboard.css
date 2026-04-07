@@ -840,3 +840,115 @@
     font-size: 0.68rem;
   }
 }
+
+/* ========================================
+   Table and content responsive scaling
+   ======================================== */
+
+/* Table heading text sizing */
+.admin-table-header {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* Table cell text sizing */
+.admin-table-cell {
+  font-size: 0.81rem;
+  line-height: 1.4;
+}
+
+/* Small status/metadata text */
+.admin-text-small {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+/* Form label sizing */
+.admin-form-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 0.35rem;
+}
+
+/* Common modal/section titles */
+.admin-section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 0.8rem;
+  margin-top: 0;
+}
+
+@media (max-width: 1280px) {
+  .admin-table-header {
+    font-size: 0.78rem;
+  }
+
+  .admin-table-cell {
+    font-size: 0.77rem;
+  }
+
+  .admin-section-title {
+    font-size: 1.02rem;
+  }
+}
+
+@media (max-width: 1080px) {
+  .admin-table-header {
+    font-size: 0.75rem;
+  }
+
+  .admin-table-cell {
+    font-size: 0.74rem;
+  }
+
+  .admin-section-title {
+    font-size: 0.95rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-table-header {
+    font-size: 0.72rem;
+    letter-spacing: 0.01em;
+  }
+
+  .admin-table-cell {
+    font-size: 0.71rem;
+  }
+
+  .admin-form-label {
+    font-size: 0.78rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .admin-section-title {
+    font-size: 0.9rem;
+    margin-bottom: 0.65rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-table-header {
+    font-size: 0.68rem;
+  }
+
+  .admin-table-cell {
+    font-size: 0.67rem;
+  }
+
+  .admin-form-label {
+    font-size: 0.74rem;
+  }
+
+  .admin-section-title {
+    font-size: 0.85rem;
+    margin-bottom: 0.55rem;
+  }
+
+  .admin-text-small {
+    font-size: 0.65rem;
+  }
+}
