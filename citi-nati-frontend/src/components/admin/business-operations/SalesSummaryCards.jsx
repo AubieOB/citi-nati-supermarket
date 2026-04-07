@@ -27,7 +27,7 @@ const SalesSummaryCards = ({ summary, loading }) => {
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
         gap: '1rem',
       }}
     >
@@ -52,7 +52,7 @@ const SalesSummaryCards = ({ summary, loading }) => {
               <i className={`fas ${card.icon}`}></i>
             </span>
           </div>
-          <div style={{ marginTop: '1rem', fontSize: '1.25rem', lineHeight: 1.1, fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap' }}>
+          <div style={{ marginTop: '1rem', fontSize: '1.12rem', lineHeight: 1.1, letterSpacing: '-0.01em', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap' }}>
             {loading ? 'Loading...' : card.format(summary?.[card.key])}
           </div>
         </div>
