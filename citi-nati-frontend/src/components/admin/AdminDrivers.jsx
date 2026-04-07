@@ -249,7 +249,7 @@ const AdminDrivers = () => {
           <Button
             variant="primary"
             onClick={() => setShowForm(!showForm)}
-            style={{ fontSize: '0.9rem', padding: '0.6rem 1rem' }}
+            style={{ fontSize: '0.85rem', padding: '0.55rem 0.9rem', whiteSpace: 'nowrap' }}
           >
             {showForm ? '✕ Cancel' : '+ Create New Driver'}
           </Button>
@@ -472,13 +472,14 @@ const AdminDrivers = () => {
                           <button
                             onClick={() => handleSavePhone(driver.id)}
                             style={{
-                              padding: '0.5rem 1rem',
+                              padding: '0.35rem 0.6rem',
                               backgroundColor: '#28a745',
                               color: '#fff',
                               border: 'none',
                               borderRadius: '4px',
                               cursor: 'pointer',
-                              fontSize: '0.85rem',
+                              fontSize: '0.82rem',
+                              whiteSpace: 'nowrap',
                             }}
                           >
                             Save
@@ -495,13 +496,14 @@ const AdminDrivers = () => {
                           <button
                             onClick={() => handleEditPhoneClick(driver.id, driver.phone)}
                             style={{
-                              padding: '0.25rem 0.75rem',
+                              padding: '0.35rem 0.6rem',
                               backgroundColor: '#007bff',
                               color: '#fff',
                               border: 'none',
                               borderRadius: '4px',
                               cursor: 'pointer',
-                              fontSize: '0.85rem',
+                              fontSize: '0.82rem',
+                              whiteSpace: 'nowrap',
                             }}
                           >
                             Edit
@@ -514,13 +516,14 @@ const AdminDrivers = () => {
                       <button
                         onClick={() => handleDelete(driver.id)}
                         style={{
-                          padding: '0.5rem 1rem',
+                          padding: '0.35rem 0.6rem',
                           backgroundColor: '#dc3545',
                           color: '#fff',
                           border: 'none',
                           borderRadius: '4px',
                           cursor: 'pointer',
-                          fontSize: '0.9rem',
+                          fontSize: '0.82rem',
+                          whiteSpace: 'nowrap',
                         }}
                       >
                         Delete

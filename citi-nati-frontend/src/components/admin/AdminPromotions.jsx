@@ -633,22 +633,9 @@ const AdminPromotions = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: '0.6rem 1rem',
-                border: activeTab === tab.id ? 'none' : '1px solid #d1d5db',
-                borderRadius: '8px',
-                backgroundColor: activeTab === tab.id ? '#5B4B8A' : '#fff',
-                color: activeTab === tab.id ? '#fff' : '#4b5563',
-                fontWeight: activeTab === tab.id ? '700' : '600',
-                cursor: 'pointer',
-                fontSize: '0.9rem',
-                transition: 'all 0.2s ease',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-              }}
+              className={`admin-tab-button${activeTab === tab.id ? ' active' : ''}`}
             >
-              <i className={`fas ${tab.icon}`}></i>
+              <i className={`fas ${tab.icon} admin-tab-icon`}></i>
               {tab.label}
             </button>
           ))}

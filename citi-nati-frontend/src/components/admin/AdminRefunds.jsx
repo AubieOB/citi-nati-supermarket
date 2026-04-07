@@ -161,13 +161,13 @@ const AdminRefunds = () => {
           <button
             onClick={() => window.open('https://dashboard.paychangu.com', '_blank')}
             style={{
-              padding: '0.6rem 1rem',
+              padding: '0.55rem 0.9rem',
               backgroundColor: '#5B4B8A',
               color: 'white',
               border: 'none',
               borderRadius: '6px',
               cursor: 'pointer',
-              fontSize: '0.9rem',
+              fontSize: '0.85rem',
               fontWeight: '600',
               display: 'inline-flex',
               alignItems: 'center',
@@ -426,7 +426,7 @@ const AdminRefunds = () => {
                 <Button
                   variant="primary"
                   onClick={() => handleApproveRefund(refund.id)}
-                  style={{ flex: 1 }}
+                  style={{ flex: 1, fontSize: '0.85rem', padding: '0.55rem 0.9rem', whiteSpace: 'nowrap' }}
                 >
                   <i className="fas fa-check-circle" style={{ marginRight: '0.5rem' }}></i>
                   Mark as Refunded

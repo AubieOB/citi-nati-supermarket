@@ -572,13 +572,15 @@ const AdminOrders = () => {
                   setDriverFilter('all');
                 }}
                 style={{
-                  padding: '0.75rem 1rem',
+                  padding: '0.55rem 0.9rem',
                   border: 'none',
                   borderRadius: '6px',
                   backgroundColor: '#dc3545',
                   color: '#fff',
                   cursor: 'pointer',
                   fontWeight: '600',
+                  fontSize: '0.85rem',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 Clear Filters
@@ -589,16 +591,18 @@ const AdminOrders = () => {
               type="button"
               onClick={downloadOrdersPDF}
               style={{
-                padding: '0.75rem 1rem',
+                padding: '0.55rem 0.9rem',
                 border: 'none',
                 borderRadius: '6px',
                 backgroundColor: '#5B4B8A',
                 color: '#fff',
                 cursor: 'pointer',
                 fontWeight: '600',
+                fontSize: '0.85rem',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '0.5rem',
+                whiteSpace: 'nowrap',
               }}
               title="Download filtered orders as PDF"
             >

@@ -224,7 +224,7 @@ const AdminCashiers = () => {
           <Button
             variant="primary"
             onClick={() => { resetForm(); setShowForm(!showForm); }}
-            style={{ fontSize: '0.9rem', padding: '0.6rem 1rem' }}
+            style={{ fontSize: '0.85rem', padding: '0.55rem 0.9rem', whiteSpace: 'nowrap' }}
           >
             {showForm && !editingCashier ? '✕ Cancel' : '+ Create New Cashier'}
           </Button>
@@ -404,13 +404,14 @@ const AdminCashiers = () => {
                         <button
                           onClick={() => handleEditClick(cashier)}
                           style={{
-                            padding: '0.4rem 0.9rem',
+                            padding: '0.35rem 0.6rem',
                             backgroundColor: '#007bff',
                             color: '#fff',
                             border: 'none',
                             borderRadius: '4px',
                             cursor: 'pointer',
-                            fontSize: '0.85rem',
+                            fontSize: '0.82rem',
+                            whiteSpace: 'nowrap',
                           }}
                         >
                           <i className="fas fa-edit" style={{ marginRight: '0.3rem' }}></i>
@@ -419,13 +420,14 @@ const AdminCashiers = () => {
                         <button
                           onClick={() => handleDelete(cashier.id, cashier.name)}
                           style={{
-                            padding: '0.4rem 0.9rem',
+                            padding: '0.35rem 0.6rem',
                             backgroundColor: '#dc3545',
                             color: '#fff',
                             border: 'none',
                             borderRadius: '4px',
                             cursor: 'pointer',
-                            fontSize: '0.85rem',
+                            fontSize: '0.82rem',
+                            whiteSpace: 'nowrap',
                           }}
                         >
                           <i className="fas fa-trash" style={{ marginRight: '0.3rem' }}></i>

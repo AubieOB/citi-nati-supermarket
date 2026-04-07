@@ -517,15 +517,16 @@ const AdminInbox = () => {
                 <button
                   onClick={handleMarkAllAsRead}
                   style={{
-                    padding: '0.5rem 1rem',
+                    padding: '0.35rem 0.6rem',
                     backgroundColor: '#4CAF50',
                     border: 'none',
                     borderRadius: '4px',
                     cursor: 'pointer',
-                    fontSize: '0.9rem',
+                    fontSize: '0.82rem',
                     color: '#fff',
                     fontWeight: '600',
                     transition: 'all 0.2s',
+                    whiteSpace: 'nowrap',
                   }}
                   onMouseOver={(e) => {
                     e.target.style.backgroundColor = '#45a049';
@@ -542,14 +543,15 @@ const AdminInbox = () => {
               <button
                 onClick={handleDeleteAll}
                 style={{
-                  padding: '0.5rem 1rem',
+                  padding: '0.35rem 0.6rem',
                   backgroundColor: '#f8f9fa',
                   border: 'none',
                   borderRadius: '4px',
                   cursor: 'pointer',
-                  fontSize: '0.9rem',
+                  fontSize: '0.82rem',
                   color: '#666',
                   transition: 'all 0.2s',
+                  whiteSpace: 'nowrap',
                 }}
                 onMouseOver={(e) => {
                   e.target.style.backgroundColor = '#eee';
@@ -688,13 +690,14 @@ const AdminInbox = () => {
                 setDateFilter('');
               }}
               style={{
-                padding: '0.75rem 1rem',
+                padding: '0.55rem 0.9rem',
                 backgroundColor: '#f44336',
                 color: '#fff',
                 border: 'none',
                 borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: '0.9rem',
+                fontSize: '0.85rem',
+                whiteSpace: 'nowrap',
               }}
             >
               <i className="fas fa-redo" style={{ marginRight: '0.5rem' }}></i>

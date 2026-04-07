@@ -516,21 +516,13 @@ const AdminEmergencySalesReports = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
+              className={`admin-tab-button${activeTab === tab.id ? ' active' : ''}`}
               style={{
-                padding: '0.6rem 0.9rem',
-                border: activeTab === tab.id ? 'none' : '1px solid #d1d5db',
-                borderRadius: '8px',
                 backgroundColor: activeTab === tab.id ? '#1f3a8a' : '#fff',
                 color: activeTab === tab.id ? '#fff' : '#334155',
-                fontWeight: 700,
-                fontSize: '0.87rem',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.45rem',
               }}
             >
-              <i className={`fas ${tab.icon}`}></i>
+              <i className={`fas ${tab.icon} admin-tab-icon`}></i>
               {tab.label}
             </button>
           ))}

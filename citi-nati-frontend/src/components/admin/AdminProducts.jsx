@@ -1619,39 +1619,47 @@ const AdminProducts = () => {
           overflow: 'hidden',
         }}>
           {/* Sub-tab row */}
-          <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid #eee' }}>
+          <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid #eee', flexWrap: 'wrap' }}>
             <button
               onClick={() => setActiveSubTab('products')}
               style={{
-                padding: '0.6rem 1.25rem',
+                padding: '0.62rem 1rem',
                 border: 'none',
                 backgroundColor: activeSubTab === 'products' ? '#5B4B8A' : 'transparent',
                 color: activeSubTab === 'products' ? '#fff' : '#666',
                 fontWeight: activeSubTab === 'products' ? '600' : '500',
                 cursor: 'pointer',
-                fontSize: '0.9rem',
+                fontSize: '0.85rem',
                 borderBottom: activeSubTab === 'products' ? '3px solid #2D8659' : '3px solid transparent',
                 marginBottom: '-2px',
+                whiteSpace: 'nowrap',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
               }}
             >
-              <i className="fas fa-box" style={{ marginRight: '0.5rem' }}></i>Products
+              <i className="fas fa-box"></i>Products
             </button>
             <button
               onClick={() => setActiveSubTab('expiry-alerts')}
               style={{
-                padding: '0.6rem 1.25rem',
+                padding: '0.62rem 1rem',
                 border: 'none',
                 backgroundColor: activeSubTab === 'expiry-alerts' ? '#5B4B8A' : 'transparent',
                 color: activeSubTab === 'expiry-alerts' ? '#fff' : '#666',
                 fontWeight: activeSubTab === 'expiry-alerts' ? '600' : '500',
                 cursor: 'pointer',
-                fontSize: '0.9rem',
+                fontSize: '0.85rem',
                 borderBottom: activeSubTab === 'expiry-alerts' ? '3px solid #2D8659' : '3px solid transparent',
                 marginBottom: '-2px',
                 position: 'relative',
+                whiteSpace: 'nowrap',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
               }}
             >
-              <i className="fas fa-exclamation-triangle" style={{ marginRight: '0.5rem' }}></i>Expiry Alerts
+              <i className="fas fa-exclamation-triangle"></i>Expiry Alerts
               {expiryAlertCount > 0 && (
                 <span style={{
                   position: 'absolute',

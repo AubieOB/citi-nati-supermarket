@@ -979,17 +979,18 @@ const AdminStocks = () => {
                           onClick={() => openOverrideModal(product)}
                           title="Set Website Stock Override"
                           style={{
-                            padding: '0.5rem 0.75rem',
+                            padding: '0.35rem 0.6rem',
                             borderRadius: '4px',
                             border: hasOverride ? '2px solid #5B4B8A' : '1px solid #5B4B8A',
                             backgroundColor: hasOverride ? '#5B4B8A' : '#fff',
                             color: hasOverride ? '#fff' : '#5B4B8A',
                             cursor: 'pointer',
                             fontWeight: '600',
-                            fontSize: '0.85rem',
+                            fontSize: '0.82rem',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '0.5rem',
+                            whiteSpace: 'nowrap',
                           }}
                         >
                           <i className="fas fa-sliders-h"></i>
