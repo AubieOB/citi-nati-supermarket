@@ -18,8 +18,9 @@ const MAX_ROWS_PER_SHEET = Math.max(1000, Number(process.env.FULL_WORKBOOK_MAX_R
 const MAX_ROWS_TOTAL = Math.max(5000, Number(process.env.FULL_WORKBOOK_MAX_ROWS_TOTAL || 700000));
 const MAX_SALES_RANGE_DAYS = Math.max(1, Number(process.env.FULL_WORKBOOK_MAX_SALES_RANGE_DAYS || 370));
 const MAX_IMPORT_WORKBOOK_FILE_BYTES = Math.max(1 * 1024 * 1024, Number(process.env.FULL_WORKBOOK_IMPORT_MAX_FILE_BYTES || 20 * 1024 * 1024));
-const MAX_IMPORT_HEAP_USED_MB = Math.max(128, Number(process.env.FULL_WORKBOOK_IMPORT_MAX_HEAP_MB || 220));
-const IMPORT_BATCH_SIZE = Math.max(50, Number(process.env.FULL_WORKBOOK_IMPORT_BATCH_SIZE || 400));
+const MAX_IMPORT_HEAP_SOFT_MB = Math.max(128, Number(process.env.FULL_WORKBOOK_IMPORT_MAX_HEAP_MB || 220));
+const MAX_IMPORT_HEAP_HARD_MB = Math.max(MAX_IMPORT_HEAP_SOFT_MB + 10, Number(process.env.FULL_WORKBOOK_IMPORT_HARD_HEAP_MB || 245));
+const IMPORT_BATCH_SIZE = Math.max(25, Number(process.env.FULL_WORKBOOK_IMPORT_BATCH_SIZE || 100));
 const MAX_IMPORT_ROWS_PER_SHEET = Math.max(1000, Number(process.env.FULL_WORKBOOK_IMPORT_MAX_ROWS_PER_SHEET || 250000));
 const MAX_IMPORT_ROWS_TOTAL = Math.max(5000, Number(process.env.FULL_WORKBOOK_IMPORT_MAX_ROWS_TOTAL || 700000));
 
@@ -168,7 +169,7 @@ function assertImportGuards(fileBuffer) {
   }
 
   const heapUsedMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
-  if (heapUsedMB >= MAX_IMPORT_HEAP_USED_MB) {
+  if (heapUsedMB >= MAX_IMPORT_HEAP_SOFT_MB) {
     throw new ImportGuardError(
       `Server memory is currently constrained (${heapUsedMB}MB heap in use). Retry shortly or reduce workbook size.`,
       503,
@@ -177,12 +178,25 @@ function assertImportGuards(fileBuffer) {
 }
 
 function assertImportHeapHeadroom() {
-  const heapUsedMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
-  if (heapUsedMB >= MAX_IMPORT_HEAP_USED_MB) {
+  const beforeGcMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+  if (beforeGcMB < MAX_IMPORT_HEAP_SOFT_MB) return;
+
+  maybeRunGc();
+  const afterGcMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+
+  if (afterGcMB >= MAX_IMPORT_HEAP_HARD_MB) {
     throw new ImportGuardError(
-      `Server memory is currently constrained (${heapUsedMB}MB heap in use). Retry shortly or reduce workbook size.`,
+      `Server memory is critically constrained (${afterGcMB}MB heap in use). Retry shortly or reduce workbook size.`,
       503,
     );
+  }
+
+  if (afterGcMB >= MAX_IMPORT_HEAP_SOFT_MB) {
+    logImportProgress('continuing import under memory pressure', {
+      heapUsedMB: afterGcMB,
+      softLimitMB: MAX_IMPORT_HEAP_SOFT_MB,
+      hardLimitMB: MAX_IMPORT_HEAP_HARD_MB,
+    });
   }
 }
 
@@ -1288,7 +1302,8 @@ async function importWorkbookByBufferedTabularSheets(fileBuffer, options = {}) {
   let payrollCleared = false;
 
   for (const [sheetTitle, target] of Object.entries(FULL_WORKBOOK_IMPORT_SHEET_MAP)) {
-    const rows = getSheetRows(workbook, safeWorksheetName(sheetTitle));
+    const normalizedSheetName = safeWorksheetName(sheetTitle);
+    const rows = getSheetRows(workbook, normalizedSheetName);
     if (!rows || rows.length < 2) continue;
 
     const headers = (rows[0] || []).map((header) => String(normalizeReadCellValue(header) || '').trim());
@@ -1346,6 +1361,15 @@ async function importWorkbookByBufferedTabularSheets(fileBuffer, options = {}) {
       rowsInSheet,
       importBatchSize: IMPORT_BATCH_SIZE,
     });
+
+    // Free processed sheet memory before moving to the next heavy sheet.
+    if (workbook?.Sheets?.[normalizedSheetName]) {
+      delete workbook.Sheets[normalizedSheetName];
+    }
+    if (Array.isArray(workbook?.SheetNames)) {
+      workbook.SheetNames = workbook.SheetNames.filter((name) => name !== normalizedSheetName);
+    }
+    maybeRunGc();
   }
 
   if (!sawAnyImportableRows) {
