@@ -957,71 +957,76 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', alignItems: 'center', marginTop: '0.8rem' }}>
+              <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.8rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
                   <button
                     type="button"
                     onClick={handleCreatePeriod}
-                    style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+                    style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.46rem 0.72rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
                   >
-                    <i className="fas fa-plus" style={{ marginRight: '0.42rem' }}></i>
+                    <i className="fas fa-plus" style={{ marginRight: '0.34rem' }}></i>
                     Create Payroll Period
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowPeriodFilters((prev) => !prev)}
-                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.46rem 0.72rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
                   >
-                    <i className="fas fa-sliders" style={{ marginRight: '0.42rem' }}></i>
+                    <i className="fas fa-sliders" style={{ marginRight: '0.34rem' }}></i>
                     {showPeriodFilters ? 'Hide Filters' : 'Show Filters'}
                   </button>
                   <button
                     type="button"
                     onClick={refreshAll}
-                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.46rem 0.72rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
                   >
-                    <i className="fas fa-rotate-right" style={{ marginRight: '0.42rem' }}></i>
+                    <i className="fas fa-rotate-right" style={{ marginRight: '0.34rem' }}></i>
                     Refresh
                   </button>
                   <button
                     type="button"
                     onClick={handleCreateTaxBracket}
-                    style={{ border: '1px solid #d6d3d1', backgroundColor: '#fff', color: '#44403c', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+                    style={{ border: '1px solid #d6d3d1', backgroundColor: '#fff', color: '#44403c', borderRadius: '10px', padding: '0.46rem 0.72rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
                   >
-                    <i className="fas fa-percent" style={{ marginRight: '0.42rem' }}></i>
+                    <i className="fas fa-percent" style={{ marginRight: '0.34rem' }}></i>
                     New Tax Bracket
                   </button>
                   <button
                     type="button"
                     onClick={handleCreateIncrementPolicy}
-                    style={{ border: '1px solid #bbf7d0', backgroundColor: '#fff', color: '#166534', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+                    style={{ border: '1px solid #bbf7d0', backgroundColor: '#fff', color: '#166534', borderRadius: '10px', padding: '0.46rem 0.72rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
                   >
-                    <i className="fas fa-chart-line" style={{ marginRight: '0.42rem' }}></i>
+                    <i className="fas fa-chart-line" style={{ marginRight: '0.34rem' }}></i>
                     New Increment Policy
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowPolicyPanel((prev) => !prev)}
-                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.46rem 0.72rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
                   >
-                    <i className="fas fa-briefcase" style={{ marginRight: '0.42rem' }}></i>
+                    <i className="fas fa-briefcase" style={{ marginRight: '0.34rem' }}></i>
                     {showPolicyPanel ? 'Hide Policies' : 'Show Policies'}
                   </button>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'nowrap' }}>
                   <button
                     type="button"
                     onClick={handleExportFullWorkbook}
                     disabled={exportingFullWorkbook || importingFullWorkbook || exportingExcel || exportingPdf}
-                    style={{ border: '1px solid #86efac', backgroundColor: '#f0fdf4', color: '#166534', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 800, cursor: exportingFullWorkbook || importingFullWorkbook || exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
+                    style={{ border: '1px solid #86efac', backgroundColor: '#f0fdf4', color: '#166534', borderRadius: '10px', padding: '0.46rem 0.72rem', fontWeight: 800, cursor: exportingFullWorkbook || importingFullWorkbook || exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.8rem' }}
                   >
-                    <i className={`fas ${exportingFullWorkbook ? 'fa-spinner fa-spin' : 'fa-file-arrow-down'}`} style={{ marginRight: '0.38rem' }}></i>Export Full Workbook
+                    <i className={`fas ${exportingFullWorkbook ? 'fa-spinner fa-spin' : 'fa-file-arrow-down'}`} style={{ marginRight: '0.32rem' }}></i>Export Full Workbook
                   </button>
                   <button
                     type="button"
                     onClick={handleChooseImportWorkbook}
                     disabled={importingFullWorkbook || exportingFullWorkbook || exportingExcel || exportingPdf}
-                    style={{ border: '1px solid #bfdbfe', backgroundColor: '#eff6ff', color: '#1e3a8a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 800, cursor: importingFullWorkbook || exportingFullWorkbook || exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
+                    style={{ border: '1px solid #bfdbfe', backgroundColor: '#eff6ff', color: '#1e3a8a', borderRadius: '10px', padding: '0.46rem 0.72rem', fontWeight: 800, cursor: importingFullWorkbook || exportingFullWorkbook || exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.8rem' }}
                   >
-                    <i className={`fas ${importingFullWorkbook ? 'fa-spinner fa-spin' : 'fa-file-arrow-up'}`} style={{ marginRight: '0.38rem' }}></i>Import Full Workbook
+                    <i className={`fas ${importingFullWorkbook ? 'fa-spinner fa-spin' : 'fa-file-arrow-up'}`} style={{ marginRight: '0.32rem' }}></i>Import Full Workbook
                   </button>
+                </div>
               </div>
 
               {showPeriodFilters && (
