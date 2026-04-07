@@ -179,11 +179,11 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, onNavigat
             Refresh
           </button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.9rem', marginTop: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.9rem', marginTop: '1rem' }}>
           {snapshotCards.map((item) => (
             <div key={item.label} style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
               <div style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>{item.label}</div>
-              <div style={{ marginTop: '0.35rem', fontSize: '1.65rem', fontWeight: 800, color: '#0f172a' }}>{item.value}</div>
+              <div style={{ marginTop: '0.35rem', fontSize: '1.36rem', lineHeight: 1.1, letterSpacing: '-0.01em', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap' }}>{item.value}</div>
               <div style={{ marginTop: '0.3rem', color: '#64748b', fontSize: '0.84rem' }}>{item.note}</div>
             </div>
           ))}
