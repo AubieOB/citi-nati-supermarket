@@ -18,7 +18,7 @@ const ExpenseSummaryCards = ({ summary, categoryCount = 0 }) => (
       <span style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>
         Expense Count
       </span>
-      <strong style={{ fontSize: '1.6rem', color: '#0f172a' }}>
+      <strong style={{ fontSize: '1.42rem', lineHeight: 1.1, color: '#0f172a', whiteSpace: 'nowrap' }}>
         {(summary?.totals?.totalExpenses || 0).toLocaleString('en-US')}
       </strong>
       <span style={{ color: '#64748b', fontSize: '0.84rem' }}>Rows matching active filters.</span>
@@ -27,21 +27,21 @@ const ExpenseSummaryCards = ({ summary, categoryCount = 0 }) => (
       <span style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>
         Total Amount
       </span>
-      <strong style={{ fontSize: '1.6rem', color: '#0f172a' }}>{money(summary?.totals?.totalAmount)}</strong>
+      <strong style={{ fontSize: '1.42rem', lineHeight: 1.1, color: '#0f172a', whiteSpace: 'nowrap' }}>{money(summary?.totals?.totalAmount)}</strong>
       <span style={{ color: '#64748b', fontSize: '0.84rem' }}>Aggregate spend for the date range.</span>
     </div>
     <div style={cardStyle}>
       <span style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>
         Average Expense
       </span>
-      <strong style={{ fontSize: '1.6rem', color: '#0f172a' }}>{money(summary?.totals?.averageAmount)}</strong>
+      <strong style={{ fontSize: '1.42rem', lineHeight: 1.1, color: '#0f172a', whiteSpace: 'nowrap' }}>{money(summary?.totals?.averageAmount)}</strong>
       <span style={{ color: '#64748b', fontSize: '0.84rem' }}>Average per expense row.</span>
     </div>
     <div style={cardStyle}>
       <span style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>
         Active Categories
       </span>
-      <strong style={{ fontSize: '1.6rem', color: '#0f172a' }}>{categoryCount.toLocaleString('en-US')}</strong>
+      <strong style={{ fontSize: '1.42rem', lineHeight: 1.1, color: '#0f172a', whiteSpace: 'nowrap' }}>{categoryCount.toLocaleString('en-US')}</strong>
       <span style={{ color: '#64748b', fontSize: '0.84rem' }}>Categories available for expense entry.</span>
     </div>
   </div>

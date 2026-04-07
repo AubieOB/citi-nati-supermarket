@@ -24,7 +24,7 @@ const EmployeeSummaryCards = ({ totalEmployees = 0, activeCount = 0, inactiveCou
         <span style={{ color: '#64748b', fontSize: '0.74rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>
           {item.label}
         </span>
-        <strong style={{ fontSize: '1.52rem', color: item.color, lineHeight: 1.2 }}>{Number(item.value || 0).toLocaleString('en-US')}</strong>
+        <strong style={{ fontSize: '1.4rem', color: item.color, lineHeight: 1.1, whiteSpace: 'nowrap' }}>{Number(item.value || 0).toLocaleString('en-US')}</strong>
         <span style={{ color: '#64748b', fontSize: '0.82rem' }}>{item.note}</span>
       </div>
     ))}

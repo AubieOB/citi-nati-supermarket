@@ -362,19 +362,19 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.9rem' }}>
           <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
             <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Total Suppliers</div>
-            <div style={{ marginTop: '0.35rem', fontSize: '1.6rem', fontWeight: 800, color: '#0f172a' }}>{totals.totalSuppliers.toLocaleString('en-US')}</div>
+            <div style={{ marginTop: '0.35rem', fontSize: '1.46rem', lineHeight: 1.1, fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap' }}>{totals.totalSuppliers.toLocaleString('en-US')}</div>
           </div>
           <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
             <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Active On Page</div>
-            <div style={{ marginTop: '0.35rem', fontSize: '1.6rem', fontWeight: 800, color: '#0f172a' }}>{totals.activeSuppliers.toLocaleString('en-US')}</div>
+            <div style={{ marginTop: '0.35rem', fontSize: '1.46rem', lineHeight: 1.1, fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap' }}>{totals.activeSuppliers.toLocaleString('en-US')}</div>
           </div>
           <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
             <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>{pageBalanceMeta.label}</div>
-            <div style={{ marginTop: '0.35rem', fontSize: '1.6rem', fontWeight: 800, color: pageBalanceMeta.color }}>{pageBalanceMeta.amount}</div>
+            <div style={{ marginTop: '0.35rem', fontSize: '1.32rem', lineHeight: 1.1, fontWeight: 800, color: pageBalanceMeta.color, whiteSpace: 'nowrap' }}>{pageBalanceMeta.amount}</div>
           </div>
           <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
             <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>{selectedBalanceMeta.label}</div>
-            <div style={{ marginTop: '0.35rem', fontSize: '1.6rem', fontWeight: 800, color: selectedBalanceMeta.color }}>{selectedBalanceMeta.amount}</div>
+            <div style={{ marginTop: '0.35rem', fontSize: '1.32rem', lineHeight: 1.1, fontWeight: 800, color: selectedBalanceMeta.color, whiteSpace: 'nowrap' }}>{selectedBalanceMeta.amount}</div>
           </div>
         </div>
       </div>

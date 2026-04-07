@@ -33,7 +33,7 @@ const PayrollSummaryCards = ({ summary }) => {
           <span style={{ color: '#64748b', fontSize: '0.74rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
             {card.label}
           </span>
-          <strong style={{ color: '#0f172a', fontSize: '1.18rem' }}>{card.value}</strong>
+          <strong style={{ color: '#0f172a', fontSize: '1.1rem', lineHeight: 1.1, whiteSpace: 'nowrap' }}>{card.value}</strong>
           <span style={{ color: card.tone, fontSize: '0.84rem', fontWeight: 700 }}>
             <i className={`fas ${card.icon}`} style={{ marginRight: '0.35rem' }}></i>
             Live period total

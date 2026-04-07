@@ -52,7 +52,7 @@ const SalesSummaryCards = ({ summary, loading }) => {
               <i className={`fas ${card.icon}`}></i>
             </span>
           </div>
-          <div style={{ marginTop: '1rem', fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>
+          <div style={{ marginTop: '1rem', fontSize: '1.25rem', lineHeight: 1.1, fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap' }}>
             {loading ? 'Loading...' : card.format(summary?.[card.key])}
           </div>
         </div>
