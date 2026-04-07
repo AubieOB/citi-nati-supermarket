@@ -1098,6 +1098,20 @@ async function importFullWorkbook(req, res) {
     };
 
     const result = await fullWorkbookService.importFullWorkbook(req.file.buffer, options);
+
+    const payrollImported = result?.payroll?.imported || {};
+    const salesImported = result?.sales?.imported || {};
+    const payrollCount = Object.values(payrollImported).reduce((sum, value) => sum + Number(value || 0), 0);
+    const salesCount = Object.values(salesImported).reduce((sum, value) => sum + Number(value || 0), 0);
+
+    if (payrollCount === 0 && salesCount === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Workbook import detected zero rows. Verify the workbook is a valid full export and try again.',
+        result,
+      });
+    }
+
     return res.json({
       success: true,
       message: 'Full workbook imported successfully',

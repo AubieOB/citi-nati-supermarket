@@ -1103,6 +1103,31 @@ function normalizeWorksheetRow(headers, values) {
   return hasValue ? item : null;
 }
 
+function toRowValuesArray(row) {
+  if (!row || row.values == null) return [];
+  if (Array.isArray(row.values)) {
+    return row.values.slice(1);
+  }
+
+  // Streaming reader can expose sparse/object row values depending on source.
+  if (typeof row.values === 'object') {
+    const numericKeys = Object.keys(row.values)
+      .map((key) => Number(key))
+      .filter((value) => Number.isInteger(value) && value > 0)
+      .sort((a, b) => a - b);
+
+    if (!numericKeys.length) return [];
+    const maxKey = numericKeys[numericKeys.length - 1];
+    const values = [];
+    for (let index = 1; index <= maxKey; index += 1) {
+      values.push(row.values[index]);
+    }
+    return values;
+  }
+
+  return [];
+}
+
 async function importSheetBatch({ domain, key, rows, options, shouldClearExisting }) {
   if (!rows.length) return null;
 
@@ -1152,7 +1177,8 @@ async function importWorkbookByStreamingTabularSheets(fileBuffer, options = {}) 
     Sales_Products: { domain: 'sales', key: 'products' },
   };
 
-  const workbookReader = new ExcelJS.stream.xlsx.WorkbookReader(Readable.from(fileBuffer), {
+  // Use a single-chunk stream. Readable.from(buffer) yields per-byte chunks and can break XLSX parsing.
+  const workbookReader = new ExcelJS.stream.xlsx.WorkbookReader(Readable.from([fileBuffer]), {
     entries: 'emit',
     worksheets: 'emit',
     sharedStrings: 'cache',
@@ -1195,7 +1221,7 @@ async function importWorkbookByStreamingTabularSheets(fileBuffer, options = {}) 
     };
 
     for await (const row of worksheetReader) {
-      const rawValues = Array.isArray(row.values) ? row.values.slice(1) : [];
+      const rawValues = toRowValuesArray(row);
       if (!headers) {
         headers = rawValues.map((header) => String(normalizeReadCellValue(header) || '').trim());
         continue;
@@ -1236,8 +1262,7 @@ async function importWorkbookByStreamingTabularSheets(fileBuffer, options = {}) 
   }
 
   if (!sawAnyImportableRows) {
-    result.payroll.errors.push('No importable payroll rows found in workbook');
-    result.sales.errors.push('No importable sales rows found in workbook');
+    throw new ImportGuardError('Workbook was parsed but no importable rows were detected. Ensure this is a full workbook export and not a damaged file.', 400);
   }
 
   return result;
