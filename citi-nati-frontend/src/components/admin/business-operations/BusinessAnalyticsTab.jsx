@@ -762,126 +762,123 @@ const BusinessAnalyticsTab = ({
 
           {activeView === 'trends' && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '0.8rem' }}>
-            <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
-              <strong style={{ color: '#0f172a' }}>Daily Trend</strong>
-              <p style={{ margin: '0.32rem 0 0.6rem', color: '#64748b', fontSize: '0.84rem' }}>Sales and invoice cadence over the selected period.</p>
-              <div style={{ maxHeight: '260px', overflowY: 'auto', display: 'grid', gap: '0.4rem' }}>
-                {analytics.trends.daily.length === 0 ? (
-                  <div style={{ color: '#94a3b8', fontSize: '0.86rem' }}>No daily trend data in this range.</div>
-                ) : analytics.trends.daily.map((row) => (
-                  <div key={row.day} style={{ display: 'grid', gridTemplateColumns: '120px 1fr auto auto', alignItems: 'center', gap: '0.6rem', border: '1px solid #edf2f7', borderRadius: '10px', padding: '0.45rem 0.55rem' }}>
-                    <div style={{ color: '#334155', fontWeight: 700, fontSize: '0.82rem' }}>{row.day}</div>
-                    <div style={{ height: '8px', backgroundColor: '#e2e8f0', borderRadius: '99px', overflow: 'hidden' }}>
-                      <div style={{ width: `${Math.min(100, analytics.kpis.totalSales > 0 ? (row.sales / analytics.kpis.totalSales) * 100 : 0)}%`, height: '100%', backgroundColor: '#2563eb' }}></div>
+              <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
+                <strong style={{ color: '#0f172a' }}>Daily Trend</strong>
+                <p style={{ margin: '0.32rem 0 0.6rem', color: '#64748b', fontSize: '0.84rem' }}>Sales and invoice cadence over the selected period.</p>
+                <div style={{ maxHeight: '260px', overflowY: 'auto', display: 'grid', gap: '0.4rem' }}>
+                  {analytics.trends.daily.length === 0 ? (
+                    <div style={{ color: '#94a3b8', fontSize: '0.86rem' }}>No daily trend data in this range.</div>
+                  ) : analytics.trends.daily.map((row) => (
+                    <div key={row.day} style={{ display: 'grid', gridTemplateColumns: '120px 1fr auto auto', alignItems: 'center', gap: '0.6rem', border: '1px solid #edf2f7', borderRadius: '10px', padding: '0.45rem 0.55rem' }}>
+                      <div style={{ color: '#334155', fontWeight: 700, fontSize: '0.82rem' }}>{row.day}</div>
+                      <div style={{ height: '8px', backgroundColor: '#e2e8f0', borderRadius: '99px', overflow: 'hidden' }}>
+                        <div style={{ width: `${Math.min(100, analytics.kpis.totalSales > 0 ? (row.sales / analytics.kpis.totalSales) * 100 : 0)}%`, height: '100%', backgroundColor: '#2563eb' }}></div>
+                      </div>
+                      <div style={{ color: '#0f172a', fontSize: '0.8rem', fontWeight: 700 }}>{money(row.sales)}</div>
+                      <div style={{ color: '#64748b', fontSize: '0.78rem' }}>{intFmt(row.invoices)} inv</div>
                     </div>
-                    <div style={{ color: '#0f172a', fontSize: '0.8rem', fontWeight: 700 }}>{money(row.sales)}</div>
-                    <div style={{ color: '#64748b', fontSize: '0.78rem' }}>{intFmt(row.invoices)} inv</div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
 
-            <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
-              <strong style={{ color: '#0f172a' }}>Monthly + Rolling Trend (12M)</strong>
-              <p style={{ margin: '0.32rem 0 0.6rem', color: '#64748b', fontSize: '0.84rem' }}>Month-on-month sales with rolling 3-month smoothing.</p>
-              <div style={{ maxHeight: '260px', overflowY: 'auto', display: 'grid', gap: '0.4rem' }}>
-                {analytics.trends.monthly.length === 0 ? (
-                  <div style={{ color: '#94a3b8', fontSize: '0.86rem' }}>No monthly trend data available.</div>
-                ) : analytics.trends.monthly.map((row) => (
-                  <div key={row.key} style={{ display: 'grid', gridTemplateColumns: '120px auto auto auto', gap: '0.6rem', alignItems: 'center', border: '1px solid #edf2f7', borderRadius: '10px', padding: '0.45rem 0.55rem' }}>
-                    <div style={{ color: '#334155', fontWeight: 700, fontSize: '0.82rem' }}>{row.label}</div>
-                    <div style={{ color: '#0f172a', fontSize: '0.8rem', fontWeight: 700 }}>{money(row.sales)}</div>
-                    <div style={{ color: '#64748b', fontSize: '0.78rem' }}>{intFmt(row.invoices)} inv</div>
-                    <div style={{ color: '#1d4ed8', fontSize: '0.78rem', fontWeight: 700 }}>Rolling: {money(row.rolling3MonthSales)}</div>
-                  </div>
-                ))}
+              <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
+                <strong style={{ color: '#0f172a' }}>Monthly + Rolling Trend (12M)</strong>
+                <p style={{ margin: '0.32rem 0 0.6rem', color: '#64748b', fontSize: '0.84rem' }}>Month-on-month sales with rolling 3-month smoothing.</p>
+                <div style={{ maxHeight: '260px', overflowY: 'auto', display: 'grid', gap: '0.4rem' }}>
+                  {analytics.trends.monthly.length === 0 ? (
+                    <div style={{ color: '#94a3b8', fontSize: '0.86rem' }}>No monthly trend data available.</div>
+                  ) : analytics.trends.monthly.map((row) => (
+                    <div key={row.key} style={{ display: 'grid', gridTemplateColumns: '120px auto auto auto', gap: '0.6rem', alignItems: 'center', border: '1px solid #edf2f7', borderRadius: '10px', padding: '0.45rem 0.55rem' }}>
+                      <div style={{ color: '#334155', fontWeight: 700, fontSize: '0.82rem' }}>{row.label}</div>
+                      <div style={{ color: '#0f172a', fontSize: '0.8rem', fontWeight: 700 }}>{money(row.sales)}</div>
+                      <div style={{ color: '#64748b', fontSize: '0.78rem' }}>{intFmt(row.invoices)} inv</div>
+                      <div style={{ color: '#1d4ed8', fontSize: '0.78rem', fontWeight: 700 }}>Rolling: {money(row.rolling3MonthSales)}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          </div>
             </div>
           )}
 
           {activeView === 'trends' && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '0.8rem' }}>
-            <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
-              <strong style={{ color: '#0f172a' }}>Yearly Comparison</strong>
-              <div style={{ marginTop: '0.6rem', display: 'grid', gap: '0.42rem' }}>
-                {analytics.trends.yearly.map((row) => (
-                  <div key={row.year} style={{ display: 'grid', gridTemplateColumns: '72px 1fr auto auto', gap: '0.5rem', alignItems: 'center', border: '1px solid #edf2f7', borderRadius: '10px', padding: '0.42rem 0.52rem' }}>
-                    <div style={{ color: '#334155', fontWeight: 700, fontSize: '0.82rem' }}>{row.year}</div>
-                    <div style={{ height: '8px', backgroundColor: '#e2e8f0', borderRadius: '99px', overflow: 'hidden' }}>
-                      <div style={{ width: `${Math.min(100, analytics.kpis.totalSales > 0 ? (row.sales / analytics.kpis.totalSales) * 100 : 0)}%`, height: '100%', backgroundColor: '#0ea5e9' }}></div>
+              <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
+                <strong style={{ color: '#0f172a' }}>Yearly Comparison</strong>
+                <div style={{ marginTop: '0.6rem', display: 'grid', gap: '0.42rem' }}>
+                  {analytics.trends.yearly.map((row) => (
+                    <div key={row.year} style={{ display: 'grid', gridTemplateColumns: '72px 1fr auto auto', gap: '0.5rem', alignItems: 'center', border: '1px solid #edf2f7', borderRadius: '10px', padding: '0.42rem 0.52rem' }}>
+                      <div style={{ color: '#334155', fontWeight: 700, fontSize: '0.82rem' }}>{row.year}</div>
+                      <div style={{ height: '8px', backgroundColor: '#e2e8f0', borderRadius: '99px', overflow: 'hidden' }}>
+                        <div style={{ width: `${Math.min(100, analytics.kpis.totalSales > 0 ? (row.sales / analytics.kpis.totalSales) * 100 : 0)}%`, height: '100%', backgroundColor: '#0ea5e9' }}></div>
+                      </div>
+                      <div style={{ color: '#0f172a', fontSize: '0.8rem', fontWeight: 700 }}>{money(row.sales)}</div>
+                      <div style={{ color: '#64748b', fontSize: '0.78rem' }}>{intFmt(row.invoices)} inv</div>
                     </div>
-                    <div style={{ color: '#0f172a', fontSize: '0.8rem', fontWeight: 700 }}>{money(row.sales)}</div>
-                    <div style={{ color: '#64748b', fontSize: '0.78rem' }}>{intFmt(row.invoices)} inv</div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
 
-            <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
-              <strong style={{ color: '#0f172a' }}>Quarterly Summary ({new Date().getFullYear()})</strong>
-              <div style={{ marginTop: '0.6rem', display: 'grid', gap: '0.42rem' }}>
-                {analytics.trends.quarterly.map((row) => (
-                  <div key={row.quarter} style={{ display: 'grid', gridTemplateColumns: '52px auto auto', gap: '0.6rem', alignItems: 'center', border: '1px solid #edf2f7', borderRadius: '10px', padding: '0.45rem 0.55rem' }}>
-                    <div style={{ color: '#334155', fontWeight: 700, fontSize: '0.82rem' }}>{row.quarter}</div>
-                    <div style={{ color: '#0f172a', fontSize: '0.8rem', fontWeight: 700 }}>{money(row.sales)}</div>
-                    <div style={{ color: '#64748b', fontSize: '0.78rem' }}>{intFmt(row.invoices)} inv</div>
-                  </div>
-                ))}
+              <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
+                <strong style={{ color: '#0f172a' }}>Quarterly Summary ({new Date().getFullYear()})</strong>
+                <div style={{ marginTop: '0.6rem', display: 'grid', gap: '0.42rem' }}>
+                  {analytics.trends.quarterly.map((row) => (
+                    <div key={row.quarter} style={{ display: 'grid', gridTemplateColumns: '52px auto auto', gap: '0.6rem', alignItems: 'center', border: '1px solid #edf2f7', borderRadius: '10px', padding: '0.45rem 0.55rem' }}>
+                      <div style={{ color: '#334155', fontWeight: 700, fontSize: '0.82rem' }}>{row.quarter}</div>
+                      <div style={{ color: '#0f172a', fontSize: '0.8rem', fontWeight: 700 }}>{money(row.sales)}</div>
+                      <div style={{ color: '#64748b', fontSize: '0.78rem' }}>{intFmt(row.invoices)} inv</div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          </div>
             </div>
           )}
 
           {activeView === 'rankings' && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.8rem' }}>
-            <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
-              <strong style={{ color: '#0f172a' }}>Top Products</strong>
-              <div style={{ marginTop: '0.6rem', display: 'grid', gap: '0.45rem' }}>
-                {analytics.rankings.topProducts.length === 0 ? (
-                  <div style={{ color: '#94a3b8', fontSize: '0.86rem' }}>No product contribution data available.</div>
-                ) : analytics.rankings.topProducts.map((row, index) => (
-                  <div key={`${row.productCode}-${index}`} style={{ border: '1px solid #edf2f7', borderRadius: '10px', padding: '0.45rem 0.55rem' }}>
-                    <div style={{ color: '#0f172a', fontSize: '0.82rem', fontWeight: 700 }}>{index + 1}. {row.productName}</div>
-                    <div style={{ marginTop: '0.2rem', color: '#64748b', fontSize: '0.78rem' }}>{row.productCode} • {intFmt(row.totalQuantity)} qty</div>
-                    <div style={{ marginTop: '0.18rem', color: '#1e293b', fontSize: '0.8rem', fontWeight: 700 }}>{money(row.totalSales)} • {row.contributionShare.toFixed(1)}%</div>
-                  </div>
-                ))}
+              <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
+                <strong style={{ color: '#0f172a' }}>Top Products</strong>
+                <div style={{ marginTop: '0.6rem', display: 'grid', gap: '0.45rem' }}>
+                  {analytics.rankings.topProducts.length === 0 ? (
+                    <div style={{ color: '#94a3b8', fontSize: '0.86rem' }}>No product contribution data available.</div>
+                  ) : analytics.rankings.topProducts.map((row, index) => (
+                    <div key={`${row.productCode}-${index}`} style={{ border: '1px solid #edf2f7', borderRadius: '10px', padding: '0.45rem 0.55rem' }}>
+                      <div style={{ color: '#0f172a', fontSize: '0.82rem', fontWeight: 700 }}>{index + 1}. {row.productName}</div>
+                      <div style={{ marginTop: '0.2rem', color: '#64748b', fontSize: '0.78rem' }}>{row.productCode} • {intFmt(row.totalQuantity)} qty</div>
+                      <div style={{ marginTop: '0.18rem', color: '#1e293b', fontSize: '0.8rem', fontWeight: 700 }}>{money(row.totalSales)} • {row.contributionShare.toFixed(1)}%</div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
-              <strong style={{ color: '#0f172a' }}>Top Categories</strong>
-              <div style={{ marginTop: '0.6rem', display: 'grid', gap: '0.45rem' }}>
-                {analytics.rankings.topCategories.length === 0 ? (
-                  <div style={{ color: '#94a3b8', fontSize: '0.86rem' }}>No category aggregation found.</div>
-                ) : analytics.rankings.topCategories.map((row, index) => (
-                  <div key={`${row.category}-${index}`} style={{ border: '1px solid #edf2f7', borderRadius: '10px', padding: '0.45rem 0.55rem' }}>
-                    <div style={{ color: '#0f172a', fontSize: '0.82rem', fontWeight: 700 }}>{index + 1}. {row.category}</div>
-                    <div style={{ marginTop: '0.2rem', color: '#64748b', fontSize: '0.78rem' }}>{intFmt(row.quantity)} qty</div>
-                    <div style={{ marginTop: '0.18rem', color: '#1e293b', fontSize: '0.8rem', fontWeight: 700 }}>{money(row.sales)} • {row.contributionShare.toFixed(1)}%</div>
-                  </div>
-                ))}
+              <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
+                <strong style={{ color: '#0f172a' }}>Top Categories</strong>
+                <div style={{ marginTop: '0.6rem', display: 'grid', gap: '0.45rem' }}>
+                  {analytics.rankings.topCategories.length === 0 ? (
+                    <div style={{ color: '#94a3b8', fontSize: '0.86rem' }}>No category aggregation found.</div>
+                  ) : analytics.rankings.topCategories.map((row, index) => (
+                    <div key={`${row.category}-${index}`} style={{ border: '1px solid #edf2f7', borderRadius: '10px', padding: '0.45rem 0.55rem' }}>
+                      <div style={{ color: '#0f172a', fontSize: '0.82rem', fontWeight: 700 }}>{index + 1}. {row.category}</div>
+                      <div style={{ marginTop: '0.2rem', color: '#64748b', fontSize: '0.78rem' }}>{intFmt(row.quantity)} qty</div>
+                      <div style={{ marginTop: '0.18rem', color: '#1e293b', fontSize: '0.8rem', fontWeight: 700 }}>{money(row.sales)} • {row.contributionShare.toFixed(1)}%</div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
-              <strong style={{ color: '#0f172a' }}>Branch Performance</strong>
-              <div style={{ marginTop: '0.6rem', display: 'grid', gap: '0.45rem' }}>
-                {analytics.rankings.branchPerformance.length === 0 ? (
-                  <div style={{ color: '#94a3b8', fontSize: '0.86rem' }}>No branch/location sales rows in this period.</div>
-                ) : analytics.rankings.branchPerformance.map((row, index) => (
-                  <div key={`${row.code}-${index}`} style={{ border: '1px solid #edf2f7', borderRadius: '10px', padding: '0.45rem 0.55rem' }}>
-                    <div style={{ color: '#0f172a', fontSize: '0.82rem', fontWeight: 700 }}>{row.code}</div>
-                    <div style={{ marginTop: '0.2rem', color: '#64748b', fontSize: '0.78rem' }}>{intFmt(row.invoices)} inv • Avg Basket {money(row.averageBasket)}</div>
-                    <div style={{ marginTop: '0.18rem', color: '#1e293b', fontSize: '0.8rem', fontWeight: 700 }}>{money(row.sales)} • {row.contributionShare.toFixed(1)}% share</div>
-                  </div>
-                ))}
+              <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
+                <strong style={{ color: '#0f172a' }}>Branch Performance</strong>
+                <div style={{ marginTop: '0.6rem', display: 'grid', gap: '0.45rem' }}>
+                  {analytics.rankings.branchPerformance.length === 0 ? (
+                    <div style={{ color: '#94a3b8', fontSize: '0.86rem' }}>No branch/location sales rows in this period.</div>
+                  ) : analytics.rankings.branchPerformance.map((row, index) => (
+                    <div key={`${row.code}-${index}`} style={{ border: '1px solid #edf2f7', borderRadius: '10px', padding: '0.45rem 0.55rem' }}>
+                      <div style={{ color: '#0f172a', fontSize: '0.82rem', fontWeight: 700 }}>{row.code}</div>
+                      <div style={{ marginTop: '0.2rem', color: '#64748b', fontSize: '0.78rem' }}>{intFmt(row.invoices)} inv • Avg Basket {money(row.averageBasket)}</div>
+                      <div style={{ marginTop: '0.18rem', color: '#1e293b', fontSize: '0.8rem', fontWeight: 700 }}>{money(row.sales)} • {row.contributionShare.toFixed(1)}% share</div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          </div>
             </div>
           )}
 

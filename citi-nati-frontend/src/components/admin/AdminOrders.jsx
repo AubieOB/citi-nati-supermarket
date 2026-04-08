@@ -553,10 +553,6 @@ const AdminOrders = () => {
                 cursor: 'pointer',
               }}
             >
-                backgroundColor: '#fff',
-                cursor: 'pointer',
-              }}
-            >
               <option value="all">All Driver States</option>
               <option value="assigned">Assigned Driver</option>
               <option value="unassigned">Unassigned</option>
