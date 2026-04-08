@@ -849,86 +849,143 @@ const BusinessAnalyticsTab = ({
             </div>
           )}
 
-          {activeView === 'rankings' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.8rem' }}>
-              <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
-                <strong style={{ color: '#0f172a' }}>Top Products</strong>
-                <div style={{ marginTop: '0.6rem', display: 'grid', gap: '0.45rem' }}>
-                  {analytics.rankings.topProducts.length === 0 ? (
-                    <div style={{ color: '#94a3b8', fontSize: '0.86rem' }}>No product contribution data available.</div>
-                  ) : analytics.rankings.topProducts.map((row, index) => (
-                    <div key={`${row.productCode}-${index}`} style={{ border: '1px solid #edf2f7', borderRadius: '10px', padding: '0.45rem 0.55rem' }}>
-                      <div style={{ color: '#0f172a', fontSize: '0.82rem', fontWeight: 700 }}>{index + 1}. {row.productName}</div>
-                      <div style={{ marginTop: '0.2rem', color: '#64748b', fontSize: '0.78rem' }}>{row.productCode} • {intFmt(row.totalQuantity)} qty</div>
-                      <div style={{ marginTop: '0.18rem', color: '#1e293b', fontSize: '0.8rem', fontWeight: 700 }}>{money(row.totalSales)} • {row.contributionShare.toFixed(1)}%</div>
-                    </div>
-                  ))}
+          {activeView === 'rankings' && (() => {
+            const thStyle = { textAlign: 'left', padding: '0.42rem 0.6rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontSize: '0.74rem', fontWeight: 700, whiteSpace: 'nowrap' };
+            const tdStyle = { padding: '0.38rem 0.6rem', borderBottom: '1px solid #f1f5f9', fontSize: '0.8rem', color: '#334155', whiteSpace: 'nowrap' };
+            const tdBold = { ...tdStyle, color: '#0f172a', fontWeight: 700 };
+            const tableStyle = { width: '100%', borderCollapse: 'collapse', tableLayout: 'auto' };
+            const sectionHead = { color: '#0f172a', fontSize: '0.82rem', fontWeight: 800, marginBottom: '0.4rem' };
+            const emptyStyle = { color: '#94a3b8', fontSize: '0.82rem', padding: '0.4rem 0' };
+
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '0.8rem' }}>
+                {/* Top Products */}
+                <div style={{ ...cardStyle, padding: '0.85rem 0.95rem' }}>
+                  <div style={sectionHead}>Top Products</div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={tableStyle}>
+                      <thead>
+                        <tr>
+                          <th style={thStyle}>#</th>
+                          <th style={{ ...thStyle, width: '100%' }}>Product</th>
+                          <th style={thStyle}>Qty</th>
+                          <th style={thStyle}>Sales</th>
+                          <th style={thStyle}>Share</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {analytics.rankings.topProducts.length === 0 ? (
+                          <tr><td colSpan={5} style={emptyStyle}>No data.</td></tr>
+                        ) : analytics.rankings.topProducts.map((row, i) => (
+                          <tr key={`${row.productCode}-${i}`}>
+                            <td style={{ ...tdStyle, color: '#94a3b8' }}>{i + 1}</td>
+                            <td style={tdBold}>
+                              {row.productName}
+                              <span style={{ display: 'block', color: '#94a3b8', fontSize: '0.72rem', fontWeight: 400 }}>{row.productCode}</span>
+                            </td>
+                            <td style={tdStyle}>{intFmt(row.totalQuantity)}</td>
+                            <td style={tdBold}>{money(row.totalSales)}</td>
+                            <td style={{ ...tdStyle, color: '#2563eb', fontWeight: 700 }}>{row.contributionShare.toFixed(1)}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Top Categories */}
+                <div style={{ ...cardStyle, padding: '0.85rem 0.95rem' }}>
+                  <div style={sectionHead}>Top Categories</div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={tableStyle}>
+                      <thead>
+                        <tr>
+                          <th style={thStyle}>#</th>
+                          <th style={{ ...thStyle, width: '100%' }}>Category</th>
+                          <th style={thStyle}>Qty</th>
+                          <th style={thStyle}>Sales</th>
+                          <th style={thStyle}>Share</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {analytics.rankings.topCategories.length === 0 ? (
+                          <tr><td colSpan={5} style={emptyStyle}>No data.</td></tr>
+                        ) : analytics.rankings.topCategories.map((row, i) => (
+                          <tr key={`${row.category}-${i}`}>
+                            <td style={{ ...tdStyle, color: '#94a3b8' }}>{i + 1}</td>
+                            <td style={tdBold}>{row.category}</td>
+                            <td style={tdStyle}>{intFmt(row.quantity)}</td>
+                            <td style={tdBold}>{money(row.sales)}</td>
+                            <td style={{ ...tdStyle, color: '#2563eb', fontWeight: 700 }}>{row.contributionShare.toFixed(1)}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Cashiers */}
+                <div style={{ ...cardStyle, padding: '0.85rem 0.95rem' }}>
+                  <div style={sectionHead}>Cashier Performance</div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={tableStyle}>
+                      <thead>
+                        <tr>
+                          <th style={{ ...thStyle, width: '100%' }}>User</th>
+                          <th style={thStyle}>Inv</th>
+                          <th style={thStyle}>Sales</th>
+                          <th style={thStyle}>Avg</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {analytics.rankings.topUsers.length === 0 ? (
+                          <tr><td colSpan={4} style={emptyStyle}>No data.</td></tr>
+                        ) : analytics.rankings.topUsers.map((row, i) => (
+                          <tr key={`${row.userName}-${i}`}>
+                            <td style={tdBold}>{row.userName}</td>
+                            <td style={tdStyle}>{intFmt(row.totalInvoices)}</td>
+                            <td style={tdBold}>{money(row.totalSales)}</td>
+                            <td style={tdStyle}>{money(row.averageInvoiceValue)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Branch Performance */}
+                <div style={{ ...cardStyle, padding: '0.85rem 0.95rem' }}>
+                  <div style={sectionHead}>Branch Performance</div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={tableStyle}>
+                      <thead>
+                        <tr>
+                          <th style={thStyle}>Branch</th>
+                          <th style={thStyle}>Inv</th>
+                          <th style={thStyle}>Sales</th>
+                          <th style={thStyle}>Avg Basket</th>
+                          <th style={thStyle}>Share</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {analytics.rankings.branchPerformance.length === 0 ? (
+                          <tr><td colSpan={5} style={emptyStyle}>No branch data in this period.</td></tr>
+                        ) : analytics.rankings.branchPerformance.map((row, i) => (
+                          <tr key={`${row.code}-${i}`}>
+                            <td style={tdBold}>{row.code}</td>
+                            <td style={tdStyle}>{intFmt(row.invoices)}</td>
+                            <td style={tdBold}>{money(row.sales)}</td>
+                            <td style={tdStyle}>{money(row.averageBasket)}</td>
+                            <td style={{ ...tdStyle, color: '#2563eb', fontWeight: 700 }}>{row.contributionShare.toFixed(1)}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
-
-              <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
-                <strong style={{ color: '#0f172a' }}>Top Categories</strong>
-                <div style={{ marginTop: '0.6rem', display: 'grid', gap: '0.45rem' }}>
-                  {analytics.rankings.topCategories.length === 0 ? (
-                    <div style={{ color: '#94a3b8', fontSize: '0.86rem' }}>No category aggregation found.</div>
-                  ) : analytics.rankings.topCategories.map((row, index) => (
-                    <div key={`${row.category}-${index}`} style={{ border: '1px solid #edf2f7', borderRadius: '10px', padding: '0.45rem 0.55rem' }}>
-                      <div style={{ color: '#0f172a', fontSize: '0.82rem', fontWeight: 700 }}>{index + 1}. {row.category}</div>
-                      <div style={{ marginTop: '0.2rem', color: '#64748b', fontSize: '0.78rem' }}>{intFmt(row.quantity)} qty</div>
-                      <div style={{ marginTop: '0.18rem', color: '#1e293b', fontSize: '0.8rem', fontWeight: 700 }}>{money(row.sales)} • {row.contributionShare.toFixed(1)}%</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
-                <strong style={{ color: '#0f172a' }}>Branch Performance</strong>
-                <div style={{ marginTop: '0.6rem', display: 'grid', gap: '0.45rem' }}>
-                  {analytics.rankings.branchPerformance.length === 0 ? (
-                    <div style={{ color: '#94a3b8', fontSize: '0.86rem' }}>No branch/location sales rows in this period.</div>
-                  ) : analytics.rankings.branchPerformance.map((row, index) => (
-                    <div key={`${row.code}-${index}`} style={{ border: '1px solid #edf2f7', borderRadius: '10px', padding: '0.45rem 0.55rem' }}>
-                      <div style={{ color: '#0f172a', fontSize: '0.82rem', fontWeight: 700 }}>{row.code}</div>
-                      <div style={{ marginTop: '0.2rem', color: '#64748b', fontSize: '0.78rem' }}>{intFmt(row.invoices)} inv • Avg Basket {money(row.averageBasket)}</div>
-                      <div style={{ marginTop: '0.18rem', color: '#1e293b', fontSize: '0.8rem', fontWeight: 700 }}>{money(row.sales)} • {row.contributionShare.toFixed(1)}% share</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeView === 'rankings' && (
-            <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
-            <strong style={{ color: '#0f172a' }}>Cashier/User Performance</strong>
-            <div style={{ marginTop: '0.6rem', overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: 'left', padding: '0.7rem', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.78rem' }}>User</th>
-                    <th style={{ textAlign: 'left', padding: '0.7rem', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.78rem' }}>Invoices</th>
-                    <th style={{ textAlign: 'left', padding: '0.7rem', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.78rem' }}>Total Sales</th>
-                    <th style={{ textAlign: 'left', padding: '0.7rem', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.78rem' }}>Avg Invoice</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {analytics.rankings.topUsers.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} style={{ padding: '0.8rem', color: '#94a3b8' }}>No user performance rows available.</td>
-                    </tr>
-                  ) : analytics.rankings.topUsers.map((row, index) => (
-                    <tr key={`${row.userName}-${index}`}>
-                      <td style={{ padding: '0.7rem', borderBottom: '1px solid #eef2f7', color: '#0f172a', fontWeight: 700 }}>{row.userName}</td>
-                      <td style={{ padding: '0.7rem', borderBottom: '1px solid #eef2f7', color: '#334155' }}>{intFmt(row.totalInvoices)}</td>
-                      <td style={{ padding: '0.7rem', borderBottom: '1px solid #eef2f7', color: '#334155' }}>{money(row.totalSales)}</td>
-                      <td style={{ padding: '0.7rem', borderBottom: '1px solid #eef2f7', color: '#334155' }}>{money(row.averageInvoiceValue)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            </div>
-          )}
+            );
+          })()}
         </>
       )}
 
