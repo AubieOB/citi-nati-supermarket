@@ -238,6 +238,7 @@ const BusinessAnalyticsTab = ({
   const [error, setError] = useState('');
   const [analytics, setAnalytics] = useState(null);
   const [activeView, setActiveView] = useState('overview');
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   const refreshIntervalRef = useRef(null);
   const refreshTimeoutRef = useRef(null);
@@ -561,80 +562,93 @@ const BusinessAnalyticsTab = ({
           </div>
         </div>
 
-        <div style={{ marginTop: '0.85rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.7rem' }}>
-          <label style={{ display: 'grid', gap: '0.35rem' }}>
-            <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Period Type</span>
-            <select value={filters.periodType} onChange={(event) => setFilters((prev) => ({ ...prev, periodType: event.target.value }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem', backgroundColor: '#fff', color: '#0f172a' }}>
-              <option value="month">Month</option>
-              <option value="quarter">Quarter</option>
-              <option value="year">Year</option>
-              <option value="custom">Custom Range</option>
-            </select>
-          </label>
-
-          {(filters.periodType === 'month' || filters.periodType === 'quarter') && (
-            <label style={{ display: 'grid', gap: '0.35rem' }}>
-              <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Year</span>
-              <input type="number" value={filters.year} onChange={(event) => setFilters((prev) => ({ ...prev, year: Number(event.target.value || new Date().getFullYear()) }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }} />
-            </label>
-          )}
-
-          {filters.periodType === 'month' && (
-            <label style={{ display: 'grid', gap: '0.35rem' }}>
-              <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Month</span>
-              <select value={filters.month} onChange={(event) => setFilters((prev) => ({ ...prev, month: Number(event.target.value) }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }}>
-                {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
-                  <option key={month} value={month}>{new Date(2026, month - 1, 1).toLocaleDateString('en-GB', { month: 'long' })}</option>
-                ))}
-              </select>
-            </label>
-          )}
-
-          {filters.periodType === 'quarter' && (
-            <label style={{ display: 'grid', gap: '0.35rem' }}>
-              <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Quarter</span>
-              <select value={filters.quarter} onChange={(event) => setFilters((prev) => ({ ...prev, quarter: Number(event.target.value) }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }}>
-                <option value={1}>Q1</option>
-                <option value={2}>Q2</option>
-                <option value={3}>Q3</option>
-                <option value={4}>Q4</option>
-              </select>
-            </label>
-          )}
-
-          {filters.periodType === 'custom' && (
-            <>
-              <label style={{ display: 'grid', gap: '0.35rem' }}>
-                <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Start Date</span>
-                <input type="date" value={filters.startDate} onChange={(event) => setFilters((prev) => ({ ...prev, startDate: event.target.value }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }} />
-              </label>
-              <label style={{ display: 'grid', gap: '0.35rem' }}>
-                <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>End Date</span>
-                <input type="date" value={filters.endDate} onChange={(event) => setFilters((prev) => ({ ...prev, endDate: event.target.value }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }} />
-              </label>
-            </>
-          )}
-
-          <label style={{ display: 'grid', gap: '0.35rem' }}>
-            <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Branch Scope</span>
-            <select value={scope} onChange={(event) => setScope(event.target.value)} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }}>
-              <option value="inherit">Inherit BO Scope</option>
-              <option value="all">All Branches</option>
-              {locationOptions.map((row) => (
-                <option key={row.id} value={row.id}>{row.label}</option>
-              ))}
-            </select>
-          </label>
+        <div style={{ marginTop: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.7rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => setFiltersExpanded((prev) => !prev)}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '999px', padding: '0.42rem 0.72rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
+          >
+            <i className={`fas ${filtersExpanded ? 'fa-chevron-up' : 'fa-sliders'}`} style={{ marginRight: '0.38rem' }}></i>
+            {filtersExpanded ? 'Hide Filters' : 'Show Filters'}
+          </button>
 
           <button
             type="button"
             onClick={computeAnalytics}
-            style={{ alignSelf: 'end', border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '9px', padding: '0.55rem 0.78rem', fontWeight: 700, cursor: 'pointer' }}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '9px', padding: '0.55rem 0.78rem', fontWeight: 700, cursor: 'pointer' }}
           >
             <i className={`fas ${refreshing ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`} style={{ marginRight: '0.4rem' }}></i>
             Refresh Analytics
           </button>
         </div>
+
+        {filtersExpanded && (
+          <div style={{ marginTop: '0.75rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.7rem' }}>
+            <label style={{ display: 'grid', gap: '0.35rem' }}>
+              <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Period Type</span>
+              <select value={filters.periodType} onChange={(event) => setFilters((prev) => ({ ...prev, periodType: event.target.value }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem', backgroundColor: '#fff', color: '#0f172a' }}>
+                <option value="month">Month</option>
+                <option value="quarter">Quarter</option>
+                <option value="year">Year</option>
+                <option value="custom">Custom Range</option>
+              </select>
+            </label>
+
+            {(filters.periodType === 'month' || filters.periodType === 'quarter') && (
+              <label style={{ display: 'grid', gap: '0.35rem' }}>
+                <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Year</span>
+                <input type="number" value={filters.year} onChange={(event) => setFilters((prev) => ({ ...prev, year: Number(event.target.value || new Date().getFullYear()) }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }} />
+              </label>
+            )}
+
+            {filters.periodType === 'month' && (
+              <label style={{ display: 'grid', gap: '0.35rem' }}>
+                <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Month</span>
+                <select value={filters.month} onChange={(event) => setFilters((prev) => ({ ...prev, month: Number(event.target.value) }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }}>
+                  {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
+                    <option key={month} value={month}>{new Date(2026, month - 1, 1).toLocaleDateString('en-GB', { month: 'long' })}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+
+            {filters.periodType === 'quarter' && (
+              <label style={{ display: 'grid', gap: '0.35rem' }}>
+                <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Quarter</span>
+                <select value={filters.quarter} onChange={(event) => setFilters((prev) => ({ ...prev, quarter: Number(event.target.value) }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }}>
+                  <option value={1}>Q1</option>
+                  <option value={2}>Q2</option>
+                  <option value={3}>Q3</option>
+                  <option value={4}>Q4</option>
+                </select>
+              </label>
+            )}
+
+            {filters.periodType === 'custom' && (
+              <>
+                <label style={{ display: 'grid', gap: '0.35rem' }}>
+                  <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Start Date</span>
+                  <input type="date" value={filters.startDate} onChange={(event) => setFilters((prev) => ({ ...prev, startDate: event.target.value }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }} />
+                </label>
+                <label style={{ display: 'grid', gap: '0.35rem' }}>
+                  <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>End Date</span>
+                  <input type="date" value={filters.endDate} onChange={(event) => setFilters((prev) => ({ ...prev, endDate: event.target.value }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }} />
+                </label>
+              </>
+            )}
+
+            <label style={{ display: 'grid', gap: '0.35rem' }}>
+              <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Branch Scope</span>
+              <select value={scope} onChange={(event) => setScope(event.target.value)} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }}>
+                <option value="inherit">Inherit BO Scope</option>
+                <option value="all">All Branches</option>
+                {locationOptions.map((row) => (
+                  <option key={row.id} value={row.id}>{row.label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -676,88 +690,90 @@ const BusinessAnalyticsTab = ({
             </div>
           </div>
 
-          <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
-              <strong style={{ color: '#0f172a' }}>Growth Overview</strong>
-              <span style={{ color: '#64748b', fontSize: '0.84rem' }}>{analytics.periodLabel} • {analytics.scopeLabel}</span>
-            </div>
-
-            <div style={{ marginTop: '0.85rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
-              {[
-                { label: 'Period Sales Growth', value: analytics.growth.selected.sales, format: money },
-                { label: 'Period Invoice Growth', value: analytics.growth.selected.invoices, format: intFmt },
-                { label: 'Period Basket Growth', value: analytics.growth.selected.basket, format: money },
-                { label: 'Month vs Previous', value: analytics.growth.monthVsPrevious, format: money },
-                { label: 'Year vs Previous', value: analytics.growth.yearVsPrevious, format: money },
-              ].map((item) => {
-                const tone = growthTone(item.value);
-                return (
-                  <div key={item.label} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.8rem 0.9rem', backgroundColor: '#fff' }}>
-                    <div style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>{item.label}</div>
-                    <div style={{ marginTop: '0.35rem', color: '#0f172a', fontWeight: 800, fontSize: '1rem' }}>
-                      {item.format(item.value.current)}
-                    </div>
-                    <div style={{ marginTop: '0.25rem', color: '#64748b', fontSize: '0.82rem' }}>
-                      Previous: {item.format(item.value.previous)}
-                    </div>
-                    <span style={{ marginTop: '0.45rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.25rem 0.5rem', borderRadius: '999px', backgroundColor: tone.bg, color: tone.color, fontSize: '0.78rem', fontWeight: 800 }}>
-                      <i className={`fas ${tone.icon}`}></i>
-                      {item.value.percent.toFixed(1)}% • {item.value.absolute >= 0 ? '+' : ''}{item.format(item.value.absolute)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
-            {[
-              { label: 'Total Sales', value: money(analytics.kpis.totalSales), note: 'Net sales in selected scope.' },
-              { label: 'Invoice Count', value: intFmt(analytics.kpis.invoiceCount), note: 'Invoices in selected period.' },
-              { label: 'Avg Basket Value', value: money(analytics.kpis.averageBasketValue), note: 'Average order/invoice value.' },
-              { label: 'Tracked Top Products', value: intFmt(analytics.kpis.topProductsCount), note: 'Products ranked by sales.' },
-            ].map((kpi) => (
-              <div key={kpi.label} style={{ ...cardStyle, padding: '0.9rem 1rem' }}>
-                <div style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>{kpi.label}</div>
-                <div style={{ marginTop: '0.32rem', color: '#0f172a', fontWeight: 900, fontSize: '1.2rem' }}>{kpi.value}</div>
-                <div style={{ marginTop: '0.26rem', color: '#64748b', fontSize: '0.8rem' }}>{kpi.note}</div>
-              </div>
-            ))}
-          </div>
-
           {activeView === 'overview' && (
-            <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
-              <strong style={{ color: '#0f172a' }}>Quick Health Summary</strong>
-              <p style={{ margin: '0.32rem 0 0.7rem', color: '#64748b', fontSize: '0.84rem' }}>
-                Compact snapshot of growth and current period performance.
-              </p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.6rem' }}>
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.55rem 0.65rem' }}>
-                  <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700 }}>Period Sales Change</div>
-                  <div style={{ color: '#0f172a', fontSize: '0.92rem', fontWeight: 800, marginTop: '0.15rem' }}>
-                    {analytics.growth.selected.sales.percent.toFixed(1)}% ({money(analytics.growth.selected.sales.absolute)})
-                  </div>
+            <>
+              <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
+                  <strong style={{ color: '#0f172a' }}>Growth Overview</strong>
+                  <span style={{ color: '#64748b', fontSize: '0.84rem' }}>{analytics.periodLabel} • {analytics.scopeLabel}</span>
                 </div>
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.55rem 0.65rem' }}>
-                  <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700 }}>Period Invoice Change</div>
-                  <div style={{ color: '#0f172a', fontSize: '0.92rem', fontWeight: 800, marginTop: '0.15rem' }}>
-                    {analytics.growth.selected.invoices.percent.toFixed(1)}% ({intFmt(analytics.growth.selected.invoices.absolute)})
-                  </div>
+
+                <div style={{ marginTop: '0.85rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
+                  {[
+                    { label: 'Period Sales Growth', value: analytics.growth.selected.sales, format: money },
+                    { label: 'Period Invoice Growth', value: analytics.growth.selected.invoices, format: intFmt },
+                    { label: 'Period Basket Growth', value: analytics.growth.selected.basket, format: money },
+                    { label: 'Month vs Previous', value: analytics.growth.monthVsPrevious, format: money },
+                    { label: 'Year vs Previous', value: analytics.growth.yearVsPrevious, format: money },
+                  ].map((item) => {
+                    const tone = growthTone(item.value);
+                    return (
+                      <div key={item.label} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.8rem 0.9rem', backgroundColor: '#fff' }}>
+                        <div style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>{item.label}</div>
+                        <div style={{ marginTop: '0.35rem', color: '#0f172a', fontWeight: 800, fontSize: '1rem' }}>
+                          {item.format(item.value.current)}
+                        </div>
+                        <div style={{ marginTop: '0.25rem', color: '#64748b', fontSize: '0.82rem' }}>
+                          Previous: {item.format(item.value.previous)}
+                        </div>
+                        <span style={{ marginTop: '0.45rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.25rem 0.5rem', borderRadius: '999px', backgroundColor: tone.bg, color: tone.color, fontSize: '0.78rem', fontWeight: 800 }}>
+                          <i className={`fas ${tone.icon}`}></i>
+                          {item.value.percent.toFixed(1)}% • {item.value.absolute >= 0 ? '+' : ''}{item.format(item.value.absolute)}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.55rem 0.65rem' }}>
-                  <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700 }}>Month vs Previous</div>
-                  <div style={{ color: '#0f172a', fontSize: '0.92rem', fontWeight: 800, marginTop: '0.15rem' }}>
-                    {analytics.growth.monthVsPrevious.percent.toFixed(1)}% ({money(analytics.growth.monthVsPrevious.absolute)})
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
+                {[
+                  { label: 'Total Sales', value: money(analytics.kpis.totalSales), note: 'Net sales in selected scope.' },
+                  { label: 'Invoice Count', value: intFmt(analytics.kpis.invoiceCount), note: 'Invoices in selected period.' },
+                  { label: 'Avg Basket Value', value: money(analytics.kpis.averageBasketValue), note: 'Average order/invoice value.' },
+                  { label: 'Tracked Top Products', value: intFmt(analytics.kpis.topProductsCount), note: 'Products ranked by sales.' },
+                ].map((kpi) => (
+                  <div key={kpi.label} style={{ ...cardStyle, padding: '0.9rem 1rem' }}>
+                    <div style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>{kpi.label}</div>
+                    <div style={{ marginTop: '0.32rem', color: '#0f172a', fontWeight: 900, fontSize: '1.2rem' }}>{kpi.value}</div>
+                    <div style={{ marginTop: '0.26rem', color: '#64748b', fontSize: '0.8rem' }}>{kpi.note}</div>
                   </div>
-                </div>
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.55rem 0.65rem' }}>
-                  <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700 }}>Year vs Previous</div>
-                  <div style={{ color: '#0f172a', fontSize: '0.92rem', fontWeight: 800, marginTop: '0.15rem' }}>
-                    {analytics.growth.yearVsPrevious.percent.toFixed(1)}% ({money(analytics.growth.yearVsPrevious.absolute)})
+                ))}
+              </div>
+
+              <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
+                <strong style={{ color: '#0f172a' }}>Quick Health Summary</strong>
+                <p style={{ margin: '0.32rem 0 0.7rem', color: '#64748b', fontSize: '0.84rem' }}>
+                  Compact snapshot of growth and current period performance.
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.6rem' }}>
+                  <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.55rem 0.65rem' }}>
+                    <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700 }}>Period Sales Change</div>
+                    <div style={{ color: '#0f172a', fontSize: '0.92rem', fontWeight: 800, marginTop: '0.15rem' }}>
+                      {analytics.growth.selected.sales.percent.toFixed(1)}% ({money(analytics.growth.selected.sales.absolute)})
+                    </div>
+                  </div>
+                  <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.55rem 0.65rem' }}>
+                    <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700 }}>Period Invoice Change</div>
+                    <div style={{ color: '#0f172a', fontSize: '0.92rem', fontWeight: 800, marginTop: '0.15rem' }}>
+                      {analytics.growth.selected.invoices.percent.toFixed(1)}% ({intFmt(analytics.growth.selected.invoices.absolute)})
+                    </div>
+                  </div>
+                  <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.55rem 0.65rem' }}>
+                    <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700 }}>Month vs Previous</div>
+                    <div style={{ color: '#0f172a', fontSize: '0.92rem', fontWeight: 800, marginTop: '0.15rem' }}>
+                      {analytics.growth.monthVsPrevious.percent.toFixed(1)}% ({money(analytics.growth.monthVsPrevious.absolute)})
+                    </div>
+                  </div>
+                  <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.55rem 0.65rem' }}>
+                    <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700 }}>Year vs Previous</div>
+                    <div style={{ color: '#0f172a', fontSize: '0.92rem', fontWeight: 800, marginTop: '0.15rem' }}>
+                      {analytics.growth.yearVsPrevious.percent.toFixed(1)}% ({money(analytics.growth.yearVsPrevious.absolute)})
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            </>
           )}
 
           {activeView === 'trends' && (
