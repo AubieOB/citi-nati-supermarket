@@ -116,6 +116,12 @@ body.admin-theme-dark {
   background: #1e1e1e !important;
 }
 
+/* Neutralize legacy blue-tinted full-screen overlays when dark mode is active. */
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="position: fixed"][style*="inset: 0"][style*="background-color: rgba(15, 23, 42,"],
+:is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="position: fixed"][style*="inset: 0"][style*="background-color: rgba(15,23,42,"] {
+  background-color: rgba(0, 0, 0, 0.58) !important;
+}
+
 .admin-dashboard-root.theme-dark [style*="background-color: rgb(245, 245, 245)"],
 .admin-dashboard-root.theme-dark [style*="background-color: rgb(245,245,245)"],
 body.admin-theme-dark [style*="background-color: rgb(245, 245, 245)"],
