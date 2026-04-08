@@ -9,6 +9,7 @@ import PayrollTab from './business-operations/PayrollTab.jsx';
 import SuppliersTab from './business-operations/SuppliersTab.jsx';
 import ReportHistoryTab from './business-operations/ReportHistoryTab.jsx';
 import BusinessOperationsActionsTab from './business-operations/BusinessOperationsActionsTab.jsx';
+import BusinessAnalyticsTab from './business-operations/BusinessAnalyticsTab.jsx';
 import BusinessOperationsImportButton from './business-operations/BusinessOperationsImportButton.jsx';
 import BusinessOperationsImportModal from './business-operations/BusinessOperationsImportModal.jsx';
 import Modal from '../common/Modal.jsx';
@@ -24,6 +25,7 @@ const TABS = [
   { id: 'employees', label: 'Employees', icon: 'fa-id-badge' },
   { id: 'payroll', label: 'Payroll', icon: 'fa-money-check-dollar' },
   { id: 'report-history', label: 'Report History', icon: 'fa-clock-rotate-left' },
+  { id: 'analytics-performance', label: 'Analytics', icon: 'fa-chart-line' },
   { id: 'actions', label: 'Actions', icon: 'fa-triangle-exclamation' },
 ];
 
@@ -189,6 +191,7 @@ const AdminBusinessOperations = () => {
     employees: <EmployeesTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} locations={locations} />,
     payroll: <PayrollTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} locations={locations} />,
     'report-history': <ReportHistoryTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} onNavigateTab={handleNavigateTab} />,
+    'analytics-performance': <BusinessAnalyticsTab selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} locations={locations} />,
     actions: <BusinessOperationsActionsTab />,
   };
 
