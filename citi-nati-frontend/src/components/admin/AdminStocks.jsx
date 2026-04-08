@@ -53,6 +53,7 @@ const AdminStocks = () => {
   const pageSize = 20;
   const searchTimeoutRef = useRef(null);
   const filterBarRef = useRef(null);
+  const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
 
   useEffect(() => {
     fetchProducts();
@@ -892,24 +893,53 @@ const AdminStocks = () => {
                 const productCode = product.productCode || product.sourceCode || product.code;
                 const hasOverride = product.overrideActive && product.overrideStock != null;
                 const threshold = resolveLowStockThreshold(product);
+                const rowTheme = (() => {
+                  if (!isAdminDarkTheme) {
+                    return {
+                      backgroundColor:
+                        status.label === 'Out of Stock'
+                          ? '#ffebee'
+                          : status.label === 'Low Stock'
+                            ? '#fff3e0'
+                            : '#fff',
+                      textColor: '#111827',
+                      mutedTextColor: '#666',
+                      codeBackground: '#f5f5f5',
+                    };
+                  }
+
+                  return {
+                    backgroundColor:
+                      status.label === 'Out of Stock'
+                        ? '#2b1518'
+                        : status.label === 'Low Stock'
+                          ? '#2b2317'
+                          : '#12233c',
+                    textColor: '#f8fafc',
+                    mutedTextColor: '#cbd5e1',
+                    codeBackground: '#1e293b',
+                  };
+                })();
                 return (
                   <tr
                     key={product.id}
                     style={{
                       borderBottom: '1px solid #eee',
-                      backgroundColor: status.label === 'Out of Stock' ? '#ffebee' : status.label === 'Low Stock' ? '#fff3e0' : '#fff',
+                      backgroundColor: rowTheme.backgroundColor,
+                      color: rowTheme.textColor,
                     }}
                   >
                     <td style={{ padding: '1rem' }}>
-                      <strong>{product.name}</strong>
+                      <strong style={{ color: rowTheme.textColor }}>{product.name}</strong>
                       {hasOverride && (
                         <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', padding: '0.15rem 0.4rem', borderRadius: '10px', backgroundColor: '#e8d5ff', color: '#5B4B8A', fontWeight: '700', verticalAlign: 'middle' }}>OVERRIDE</span>
                       )}
                     </td>
-                    <td style={{ padding: '1rem', textAlign: 'center', color: '#666', fontSize: '0.9rem' }}>
+                    <td style={{ padding: '1rem', textAlign: 'center', color: rowTheme.mutedTextColor, fontSize: '0.9rem' }}>
                       {productCode ? (
                         <span style={{
-                          backgroundColor: '#f5f5f5',
+                          backgroundColor: rowTheme.codeBackground,
+                          color: rowTheme.mutedTextColor,
                           borderRadius: '4px',
                           padding: '0.2rem 0.4rem',
                           fontFamily: 'monospace',
@@ -921,7 +951,7 @@ const AdminStocks = () => {
                         '-'
                       )}
                     </td>
-                    <td style={{ padding: '1rem', textAlign: 'center', color: '#666', fontSize: '0.9rem' }}>
+                    <td style={{ padding: '1rem', textAlign: 'center', color: rowTheme.mutedTextColor, fontSize: '0.9rem' }}>
                       {product.category}
                     </td>
                     <td style={{
@@ -929,7 +959,7 @@ const AdminStocks = () => {
                       textAlign: 'center',
                       fontWeight: '600',
                       fontSize: '1rem',
-                      color: '#888',
+                      color: rowTheme.mutedTextColor,
                     }}>
                       {posStockVal}
                     </td>
@@ -938,7 +968,7 @@ const AdminStocks = () => {
                       textAlign: 'center',
                       fontWeight: '700',
                       fontSize: '1.1rem',
-                      color: hasOverride ? '#5B4B8A' : '#333',
+                      color: hasOverride ? '#5B4B8A' : rowTheme.textColor,
                     }}>
                       {effStock}
                       {hasOverride && (
@@ -965,7 +995,7 @@ const AdminStocks = () => {
                         }`}></i>
                         {status.label}
                       </span>
-                      <div style={{ fontSize: '0.72rem', color: '#666', marginTop: '0.35rem' }}>
+                      <div style={{ fontSize: '0.72rem', color: rowTheme.mutedTextColor, marginTop: '0.35rem' }}>
                         Threshold: {threshold}
                       </div>
                     </td>
