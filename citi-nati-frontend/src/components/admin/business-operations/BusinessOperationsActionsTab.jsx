@@ -23,6 +23,7 @@ const subTabStyle = (active) => ({
 });
 
 const BusinessOperationsActionsTab = () => {
+  const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
   const [activeSubtab, setActiveSubtab] = useState('create');
   const [isWipeModalOpen, setIsWipeModalOpen] = useState(false);
   const [wipeSecurityKey, setWipeSecurityKey] = useState('');
@@ -73,16 +74,16 @@ const BusinessOperationsActionsTab = () => {
       </div>
 
       {activeSubtab === 'create' && (
-        <div style={{ ...baseCardStyle, borderColor: '#fecaca', backgroundColor: '#fff7f7' }}>
+        <div style={{ ...baseCardStyle, borderColor: isAdminDarkTheme ? '#5b2f36' : '#fecaca', backgroundColor: isAdminDarkTheme ? '#23171b' : '#fff7f7' }}>
           <div style={{ padding: '1rem 1.1rem', display: 'grid', gap: '0.75rem' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', color: '#b91c1c', fontWeight: 900, textTransform: 'uppercase', fontSize: '0.78rem', letterSpacing: '0.05em' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', color: isAdminDarkTheme ? '#ff8d99' : '#b91c1c', fontWeight: 900, textTransform: 'uppercase', fontSize: '0.78rem', letterSpacing: '0.05em' }}>
               <i className="fas fa-triangle-exclamation"></i>
               Danger Zone
             </div>
-            <div style={{ color: '#7f1d1d', fontSize: '0.9rem', lineHeight: 1.5 }}>
+            <div style={{ color: isAdminDarkTheme ? '#f1b4bb' : '#7f1d1d', fontSize: '0.9rem', lineHeight: 1.5 }}>
               This permanently wipes Business Operations data: Suppliers, Expenses, Employees, Payroll, and related records.
             </div>
-            <div style={{ color: '#991b1b', fontSize: '0.84rem', lineHeight: 1.45, fontWeight: 700 }}>
+            <div style={{ color: isAdminDarkTheme ? '#ff9faa' : '#991b1b', fontSize: '0.84rem', lineHeight: 1.45, fontWeight: 700 }}>
               Sales Reports data synced from POS is NOT deleted.
             </div>
             <button
@@ -100,29 +101,29 @@ const BusinessOperationsActionsTab = () => {
 
       {isWipeModalOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.55)', zIndex: 260, display: 'grid', placeItems: 'center', padding: '1rem' }}>
-          <div style={{ ...baseCardStyle, width: 'min(540px, 96vw)', border: '1px solid #fecaca', backgroundColor: '#fff' }}>
-            <div style={{ padding: '1rem 1rem 0.85rem', borderBottom: '1px solid #fee2e2', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
-              <div style={{ color: '#991b1b', fontWeight: 900, fontSize: '1.03rem' }}>
+          <div style={{ ...baseCardStyle, width: 'min(540px, 96vw)', border: isAdminDarkTheme ? '1px solid #5b2f36' : '1px solid #fecaca', backgroundColor: isAdminDarkTheme ? '#1b1720' : '#fff' }}>
+            <div style={{ padding: '1rem 1rem 0.85rem', borderBottom: isAdminDarkTheme ? '1px solid #5b2f36' : '1px solid #fee2e2', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ color: isAdminDarkTheme ? '#ff9faa' : '#991b1b', fontWeight: 900, fontSize: '1.03rem' }}>
                 <i className="fas fa-triangle-exclamation" style={{ marginRight: '0.45rem' }}></i>
                 Confirm Destructive Wipe
               </div>
-              <button type="button" onClick={closeWipeModal} style={{ border: '1px solid #fecaca', backgroundColor: '#fff', color: '#991b1b', borderRadius: '8px', cursor: wipingData ? 'not-allowed' : 'pointer', padding: '0.34rem 0.5rem' }}>
+              <button type="button" onClick={closeWipeModal} style={{ border: isAdminDarkTheme ? '1px solid #5b2f36' : '1px solid #fecaca', backgroundColor: isAdminDarkTheme ? '#221820' : '#fff', color: isAdminDarkTheme ? '#ff9faa' : '#991b1b', borderRadius: '8px', cursor: wipingData ? 'not-allowed' : 'pointer', padding: '0.34rem 0.5rem' }}>
                 <i className="fas fa-times"></i>
               </button>
             </div>
             <div style={{ padding: '1rem', display: 'grid', gap: '0.8rem' }}>
-              <div style={{ color: '#7f1d1d', fontSize: '0.9rem', lineHeight: 1.45 }}>
+              <div style={{ color: isAdminDarkTheme ? '#f1b4bb' : '#7f1d1d', fontSize: '0.9rem', lineHeight: 1.45 }}>
                 This action cannot be undone. To continue, manually type your Admin Security Key.
               </div>
               <label style={{ display: 'grid', gap: '0.4rem' }}>
-                <span style={{ color: '#7f1d1d', fontSize: '0.84rem', fontWeight: 800 }}>Admin Security Key</span>
+                <span style={{ color: isAdminDarkTheme ? '#f1b4bb' : '#7f1d1d', fontSize: '0.84rem', fontWeight: 800 }}>Admin Security Key</span>
                 <input
                   type="password"
                   value={wipeSecurityKey}
                   onChange={(event) => setWipeSecurityKey(event.target.value)}
                   placeholder="Enter admin security key"
                   autoFocus
-                  style={{ border: '1px solid #fca5a5', borderRadius: '10px', padding: '0.62rem 0.7rem', fontSize: '0.92rem' }}
+                  style={{ border: isAdminDarkTheme ? '1px solid #5b2f36' : '1px solid #fca5a5', borderRadius: '10px', padding: '0.62rem 0.7rem', fontSize: '0.92rem', backgroundColor: isAdminDarkTheme ? '#221820' : '#fff', color: isAdminDarkTheme ? '#fce7ea' : '#0f172a' }}
                 />
               </label>
 
@@ -131,7 +132,7 @@ const BusinessOperationsActionsTab = () => {
                   type="button"
                   onClick={closeWipeModal}
                   disabled={wipingData}
-                  style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.55rem 0.85rem', fontWeight: 700, cursor: wipingData ? 'not-allowed' : 'pointer' }}
+                  style={{ border: isAdminDarkTheme ? '1px solid #324662' : '1px solid #cbd5e1', backgroundColor: isAdminDarkTheme ? '#162235' : '#fff', color: isAdminDarkTheme ? '#b2c3d9' : '#334155', borderRadius: '9px', padding: '0.55rem 0.85rem', fontWeight: 700, cursor: wipingData ? 'not-allowed' : 'pointer' }}
                 >
                   Cancel
                 </button>
