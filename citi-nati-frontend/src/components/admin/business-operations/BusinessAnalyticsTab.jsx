@@ -3,7 +3,7 @@ import api from '../../../utils/api.js';
 
 const AUTO_REFRESH_MS = 300000; // 5 minutes
 const AUTO_REFRESH_DEBOUNCE_MS = 350;
-const MAX_INVOICE_PAGES = 30;
+
 
 const cardStyle = {
   backgroundColor: '#fff',
@@ -277,20 +277,6 @@ const BusinessAnalyticsTab = ({
 
   const selectedDateRange = useMemo(() => dateRangeFromPeriod(selectedPeriod), [selectedPeriod]);
 
-  const fetchInvoicesAllPages = useCallback(async (params) => {
-    const merged = [];
-    for (let page = 1; page <= MAX_INVOICE_PAGES; page += 1) {
-      const response = await api.get('/business-operations/reports/sales/invoices', {
-        params: { ...params, page, pageSize: 200, sortBy: 'invoiceDate', sortOrder: 'desc' },
-      });
-      const rows = Array.isArray(response?.data?.data) ? response.data.data : [];
-      merged.push(...rows);
-      const totalPages = Number(response?.data?.pagination?.totalPages || 1);
-      if (page >= totalPages || rows.length === 0) break;
-    }
-    return merged;
-  }, []);
-
   const computeAnalytics = useCallback(async () => {
     if (refreshInFlightRef.current) return;
     refreshInFlightRef.current = true;
@@ -302,61 +288,87 @@ const BusinessAnalyticsTab = ({
     if (shouldShowLoading) setLoading(true);
 
     try {
+      const now = new Date();
+      const thisYear = now.getFullYear();
+
       const periodParams = withScope(buildParamsForPeriod(selectedPeriod), effectiveScope, locations);
-      const previousParams = withScope(buildParamsForPeriod(previousPeriod(selectedPeriod)), effectiveScope, locations);
+      const prevPeriodParams = withScope(buildParamsForPeriod(previousPeriod(selectedPeriod)), effectiveScope, locations);
       const monthParams = withScope(buildParamsForPeriod(getCurrentMonthPeriod()), effectiveScope, locations);
-      const previousMonthParams = withScope(buildParamsForPeriod(previousPeriod(getCurrentMonthPeriod())), effectiveScope, locations);
+      const prevMonthParams = withScope(buildParamsForPeriod(previousPeriod(getCurrentMonthPeriod())), effectiveScope, locations);
       const yearParams = withScope(buildParamsForPeriod(getCurrentYearPeriod()), effectiveScope, locations);
-      const previousYearParams = withScope(buildParamsForPeriod(previousPeriod(getCurrentYearPeriod())), effectiveScope, locations);
+      const prevYearParams = withScope(buildParamsForPeriod(previousPeriod(getCurrentYearPeriod())), effectiveScope, locations);
 
-      const rollingStart = new Date();
-      rollingStart.setMonth(rollingStart.getMonth() - 17);
-      const rollingEnd = new Date();
+      // Last 12 months for monthly trend
+      const last12Months = Array.from({ length: 12 }, (_, i) => {
+        const d = new Date(thisYear, now.getMonth() - (11 - i), 1);
+        return { periodType: 'month', month: d.getMonth() + 1, year: d.getFullYear() };
+      });
 
-      const rollingRangeParams = withScope({
-        periodType: 'custom',
-        startDate: formatDateInput(rollingStart),
-        endDate: formatDateInput(rollingEnd),
-      }, effectiveScope, locations);
+      // Last 5 years for yearly trend
+      const last5Years = Array.from({ length: 5 }, (_, i) => ({ periodType: 'year', year: thisYear - (4 - i) }));
 
-      const [
-        currentSummaryResponse,
-        previousSummaryResponse,
-        currentMonthSummaryResponse,
-        previousMonthSummaryResponse,
-        currentYearSummaryResponse,
-        previousYearSummaryResponse,
-        productsResponse,
-        usersResponse,
-        currentPeriodInvoices,
-        rollingInvoices,
-      ] = await Promise.all([
+      // Q1-Q4 for quarterly trend
+      const quarters = [1, 2, 3, 4].map((q) => ({ periodType: 'quarter', quarter: q, year: thisYear }));
+
+      // Daily trend: only for spans ≤ 62 days (month/short custom)
+      const selRange = dateRangeFromPeriod(selectedPeriod);
+      const spanDays = Math.round((new Date(selRange.endDate) - new Date(selRange.startDate)) / 86400000) + 1;
+      const dailyPeriods = spanDays <= 62
+        ? Array.from({ length: spanDays }, (_, i) => {
+            const d = new Date(`${selRange.startDate}T00:00:00`);
+            d.setDate(d.getDate() + i);
+            const ds = formatDateInput(d);
+            return { periodType: 'custom', startDate: ds, endDate: ds };
+          })
+        : [];
+
+      // Branch summaries (BT + ZA)
+      const branchCodes = ['BT', 'ZA'];
+
+      // Slot indices in the flat allResponses array
+      const FIXED = 8; // 6 summaries + products + users
+      const MONTHLY_SLICE = [FIXED, FIXED + 12];
+      const YEARLY_SLICE = [FIXED + 12, FIXED + 17];
+      const QUARTERLY_SLICE = [FIXED + 17, FIXED + 21];
+      const DAILY_SLICE = [FIXED + 21, FIXED + 21 + dailyPeriods.length];
+      const BRANCH_SLICE = [FIXED + 21 + dailyPeriods.length, FIXED + 21 + dailyPeriods.length + branchCodes.length];
+
+      const allResponses = await Promise.all([
+        // 0-5: fixed period summaries
         api.get('/business-operations/reports/sales/summary', { params: periodParams }),
-        api.get('/business-operations/reports/sales/summary', { params: previousParams }),
+        api.get('/business-operations/reports/sales/summary', { params: prevPeriodParams }),
         api.get('/business-operations/reports/sales/summary', { params: monthParams }),
-        api.get('/business-operations/reports/sales/summary', { params: previousMonthParams }),
+        api.get('/business-operations/reports/sales/summary', { params: prevMonthParams }),
         api.get('/business-operations/reports/sales/summary', { params: yearParams }),
-        api.get('/business-operations/reports/sales/summary', { params: previousYearParams }),
+        api.get('/business-operations/reports/sales/summary', { params: prevYearParams }),
+        // 6: products
         api.get('/business-operations/reports/sales/products', { params: { ...periodParams, page: 1, pageSize: 12, sortBy: 'totalSales', sortOrder: 'desc' } }),
+        // 7: users
         api.get('/business-operations/reports/sales/users', { params: { ...periodParams, page: 1, pageSize: 10, sortBy: 'totalSales', sortOrder: 'desc' } }),
-        fetchInvoicesAllPages(periodParams),
-        fetchInvoicesAllPages(rollingRangeParams),
+        // 8..19: monthly trend (12 summary calls)
+        ...last12Months.map((p) => api.get('/business-operations/reports/sales/summary', { params: withScope(buildParamsForPeriod(p), effectiveScope, locations) })),
+        // 20..24: yearly trend (5 summary calls)
+        ...last5Years.map((p) => api.get('/business-operations/reports/sales/summary', { params: withScope(buildParamsForPeriod(p), effectiveScope, locations) })),
+        // 25..28: quarterly trend (4 summary calls)
+        ...quarters.map((p) => api.get('/business-operations/reports/sales/summary', { params: withScope(buildParamsForPeriod(p), effectiveScope, locations) })),
+        // 29..29+N: daily trend (0-62 summary calls, only for short periods)
+        ...dailyPeriods.map((p) => api.get('/business-operations/reports/sales/summary', { params: withScope(buildParamsForPeriod(p), effectiveScope, locations) })),
+        // last 2: branch summaries (BT, ZA)
+        ...branchCodes.map((code) => api.get('/business-operations/reports/sales/summary', { params: withScope({ ...periodParams }, `code:${code}`, locations) })),
       ]);
 
-      const currentSummary = currentSummaryResponse?.data?.data || {};
-      const previousSummary = previousSummaryResponse?.data?.data || {};
-      const currentMonthSummary = currentMonthSummaryResponse?.data?.data || {};
-      const previousMonthSummary = previousMonthSummaryResponse?.data?.data || {};
-      const currentYearSummary = currentYearSummaryResponse?.data?.data || {};
-      const previousYearSummary = previousYearSummaryResponse?.data?.data || {};
-
-      const productRows = Array.isArray(productsResponse?.data?.data) ? productsResponse.data.data : [];
-      const userRows = Array.isArray(usersResponse?.data?.data) ? usersResponse.data.data : [];
+      const currentSummary = allResponses[0]?.data?.data || {};
+      const previousSummary = allResponses[1]?.data?.data || {};
+      const currentMonthSummary = allResponses[2]?.data?.data || {};
+      const previousMonthSummary = allResponses[3]?.data?.data || {};
+      const currentYearSummary = allResponses[4]?.data?.data || {};
+      const previousYearSummary = allResponses[5]?.data?.data || {};
+      const productRows = Array.isArray(allResponses[6]?.data?.data) ? allResponses[6].data.data : [];
+      const userRows = Array.isArray(allResponses[7]?.data?.data) ? allResponses[7].data.data : [];
 
       const totalSales = Number(currentSummary.netSales || 0);
       const invoiceCount = Number(currentSummary.totalInvoices || 0);
       const averageBasketValue = invoiceCount > 0 ? totalSales / invoiceCount : 0;
-
       const prevSales = Number(previousSummary.netSales || 0);
       const prevInvoices = Number(previousSummary.totalInvoices || 0);
       const prevAvgBasket = prevInvoices > 0 ? prevSales / prevInvoices : 0;
@@ -366,99 +378,62 @@ const BusinessAnalyticsTab = ({
         invoices: computeGrowth(invoiceCount, prevInvoices),
         basket: computeGrowth(averageBasketValue, prevAvgBasket),
       };
-
       const monthGrowth = computeGrowth(Number(currentMonthSummary.netSales || 0), Number(previousMonthSummary.netSales || 0));
       const yearGrowth = computeGrowth(Number(currentYearSummary.netSales || 0), Number(previousYearSummary.netSales || 0));
 
-      const dailyMap = currentPeriodInvoices.reduce((acc, invoice) => {
-        const invoiceDate = parseInvoiceDate(invoice);
-        if (!invoiceDate) return acc;
-        const key = invoiceDate.toISOString().slice(0, 10);
-        const entry = acc.get(key) || { day: key, sales: 0, invoices: 0 };
-        entry.sales += Number(invoice.netSale || 0);
-        entry.invoices += 1;
-        acc.set(key, entry);
-        return acc;
-      }, new Map());
-
-      const dailyTrend = Array.from(dailyMap.values()).sort((a, b) => a.day.localeCompare(b.day));
-
-      const monthlyMap = rollingInvoices.reduce((acc, invoice) => {
-        const invoiceDate = parseInvoiceDate(invoice);
-        if (!invoiceDate) return acc;
-        const key = `${invoiceDate.getFullYear()}-${String(invoiceDate.getMonth() + 1).padStart(2, '0')}`;
-        const entry = acc.get(key) || { key, label: invoiceDate.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }), sales: 0, invoices: 0 };
-        entry.sales += Number(invoice.netSale || 0);
-        entry.invoices += 1;
-        acc.set(key, entry);
-        return acc;
-      }, new Map());
-
-      const monthlyTrend = Array.from(monthlyMap.values())
-        .sort((a, b) => a.key.localeCompare(b.key))
-        .slice(-12)
-        .map((row) => ({
-          ...row,
-          rolling3MonthSales: null,
-        }));
-
-      for (let index = 0; index < monthlyTrend.length; index += 1) {
-        const from = Math.max(0, index - 2);
-        const chunk = monthlyTrend.slice(from, index + 1);
-        const avg = chunk.reduce((sum, item) => sum + Number(item.sales || 0), 0) / chunk.length;
-        monthlyTrend[index].rolling3MonthSales = avg;
+      // Monthly trend from summary slices
+      const monthlyTrend = last12Months.map((p, i) => {
+        const s = allResponses[MONTHLY_SLICE[0] + i]?.data?.data || {};
+        const d = new Date(p.year, p.month - 1, 1);
+        return {
+          key: `${p.year}-${String(p.month).padStart(2, '0')}`,
+          label: d.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }),
+          sales: Number(s.netSales || 0),
+          invoices: Number(s.totalInvoices || 0),
+          rolling3MonthSales: 0,
+        };
+      });
+      for (let idx = 0; idx < monthlyTrend.length; idx += 1) {
+        const from = Math.max(0, idx - 2);
+        const chunk = monthlyTrend.slice(from, idx + 1);
+        monthlyTrend[idx].rolling3MonthSales = chunk.reduce((sum, r) => sum + r.sales, 0) / chunk.length;
       }
 
-      const yearlyMap = rollingInvoices.reduce((acc, invoice) => {
-        const invoiceDate = parseInvoiceDate(invoice);
-        if (!invoiceDate) return acc;
-        const key = String(invoiceDate.getFullYear());
-        const entry = acc.get(key) || { year: key, sales: 0, invoices: 0 };
-        entry.sales += Number(invoice.netSale || 0);
-        entry.invoices += 1;
-        acc.set(key, entry);
-        return acc;
-      }, new Map());
-
-      const yearlyComparison = Array.from(yearlyMap.values())
-        .sort((a, b) => Number(a.year) - Number(b.year))
-        .slice(-5);
-
-      const quarterlyMap = rollingInvoices
-        .filter((invoice) => withinRange(parseInvoiceDate(invoice), `${new Date().getFullYear()}-01-01`, `${new Date().getFullYear()}-12-31`))
-        .reduce((acc, invoice) => {
-          const invoiceDate = parseInvoiceDate(invoice);
-          if (!invoiceDate) return acc;
-          const quarter = Math.floor(invoiceDate.getMonth() / 3) + 1;
-          const key = `Q${quarter}`;
-          const entry = acc.get(key) || { quarter: key, sales: 0, invoices: 0 };
-          entry.sales += Number(invoice.netSale || 0);
-          entry.invoices += 1;
-          acc.set(key, entry);
-          return acc;
-        }, new Map());
-
-      const quarterlySummary = ['Q1', 'Q2', 'Q3', 'Q4'].map((quarterKey) => {
-        return quarterlyMap.get(quarterKey) || { quarter: quarterKey, sales: 0, invoices: 0 };
+      // Yearly trend
+      const yearlyComparison = last5Years.map((p, i) => {
+        const s = allResponses[YEARLY_SLICE[0] + i]?.data?.data || {};
+        return { year: String(p.year), sales: Number(s.netSales || 0), invoices: Number(s.totalInvoices || 0) };
       });
 
-      const totalByBranches = currentPeriodInvoices.reduce((acc, invoice) => {
-        const code = String(invoice.locationCode || invoice.branchCode || 'UNASSIGNED').trim().toUpperCase();
-        const entry = acc.get(code) || { code, sales: 0, invoices: 0 };
-        entry.sales += Number(invoice.netSale || 0);
-        entry.invoices += 1;
-        acc.set(code, entry);
-        return acc;
-      }, new Map());
+      // Quarterly trend
+      const quarterlySummary = quarters.map((p, i) => {
+        const s = allResponses[QUARTERLY_SLICE[0] + i]?.data?.data || {};
+        return { quarter: `Q${p.quarter}`, sales: Number(s.netSales || 0), invoices: Number(s.totalInvoices || 0) };
+      });
 
-      const branchPerformance = Array.from(totalByBranches.values())
-        .map((branch) => ({
-          ...branch,
-          averageBasket: branch.invoices > 0 ? branch.sales / branch.invoices : 0,
-          contributionShare: totalSales > 0 ? (branch.sales / totalSales) * 100 : 0,
-        }))
-        .sort((a, b) => b.sales - a.sales);
+      // Daily trend (only populated for short spans)
+      const dailyTrend = dailyPeriods.map((p, i) => {
+        const s = allResponses[DAILY_SLICE[0] + i]?.data?.data || {};
+        return { day: p.startDate, sales: Number(s.netSales || 0), invoices: Number(s.totalInvoices || 0) };
+      });
 
+      // Branch performance from location-scoped summaries
+      const branchPerformance = branchCodes
+        .map((code, i) => {
+          const s = allResponses[BRANCH_SLICE[0] + i]?.data?.data || {};
+          const bSales = Number(s.netSales || 0);
+          const bInvoices = Number(s.totalInvoices || 0);
+          return {
+            code,
+            sales: bSales,
+            invoices: bInvoices,
+            averageBasket: bInvoices > 0 ? bSales / bInvoices : 0,
+            contributionShare: totalSales > 0 ? (bSales / totalSales) * 100 : 0,
+          };
+        })
+        .filter((b) => b.sales > 0);
+
+      // Rankings from product/user API responses
       const categoryMap = productRows.reduce((acc, row) => {
         const key = String(row.category || row.categoryName || row.productCategory || 'Uncategorized').trim() || 'Uncategorized';
         const entry = acc.get(key) || { category: key, sales: 0, quantity: 0 };
@@ -469,10 +444,7 @@ const BusinessAnalyticsTab = ({
       }, new Map());
 
       const topCategories = Array.from(categoryMap.values())
-        .map((row) => ({
-          ...row,
-          contributionShare: totalSales > 0 ? (row.sales / totalSales) * 100 : 0,
-        }))
+        .map((row) => ({ ...row, contributionShare: totalSales > 0 ? (row.sales / totalSales) * 100 : 0 }))
         .sort((a, b) => b.sales - a.sales)
         .slice(0, 8);
 
@@ -500,29 +472,10 @@ const BusinessAnalyticsTab = ({
       setAnalytics({
         periodLabel: selectedDateRange.label,
         scopeLabel,
-        kpis: {
-          totalSales,
-          invoiceCount,
-          averageBasketValue,
-          topProductsCount: topProducts.length,
-        },
-        growth: {
-          selected: selectedPeriodGrowth,
-          monthVsPrevious: monthGrowth,
-          yearVsPrevious: yearGrowth,
-        },
-        trends: {
-          daily: dailyTrend,
-          monthly: monthlyTrend,
-          yearly: yearlyComparison,
-          quarterly: quarterlySummary,
-        },
-        rankings: {
-          topProducts,
-          topCategories,
-          topUsers,
-          branchPerformance,
-        },
+        kpis: { totalSales, invoiceCount, averageBasketValue, topProductsCount: topProducts.length },
+        growth: { selected: selectedPeriodGrowth, monthVsPrevious: monthGrowth, yearVsPrevious: yearGrowth },
+        trends: { daily: dailyTrend, monthly: monthlyTrend, yearly: yearlyComparison, quarterly: quarterlySummary },
+        rankings: { topProducts, topCategories, topUsers, branchPerformance },
       });
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Failed to load analytics.');
@@ -532,7 +485,7 @@ const BusinessAnalyticsTab = ({
       hasLoadedOnceRef.current = true;
       refreshInFlightRef.current = false;
     }
-  }, [effectiveScope, fetchInvoicesAllPages, locations, scopeLabel, selectedDateRange.label, selectedPeriod]);
+  }, [effectiveScope, locations, scopeLabel, selectedDateRange.label, selectedPeriod]);
 
   useEffect(() => {
     computeAnalytics();
