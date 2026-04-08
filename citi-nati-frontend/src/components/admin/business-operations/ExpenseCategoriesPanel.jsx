@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import ExpensesEmptyState from './ExpensesEmptyState.jsx';
+import { boConfirm } from '../../../utils/boDialogBus.js';
 
 const thStyle = {
   textAlign: 'left',
@@ -130,8 +131,14 @@ const ExpenseCategoriesPanel = ({ categories, loading, error, onAddCategory, onE
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          if (window.confirm(`Delete category "${cat.name}"? This cannot be undone.`)) {
+                        onClick={async () => {
+                          const confirmed = await boConfirm({
+                            title: 'Delete Expense Category',
+                            message: `Delete category "${cat.name}"? This cannot be undone.`,
+                            confirmText: 'Delete',
+                            cancelText: 'Cancel',
+                          });
+                          if (confirmed) {
                             onDeleteCategory(cat);
                           }
                         }}

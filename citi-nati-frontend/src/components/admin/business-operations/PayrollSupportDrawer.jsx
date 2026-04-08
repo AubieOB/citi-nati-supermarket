@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import PayrollEmptyState from './PayrollEmptyState.jsx';
+import { boConfirm } from '../../../utils/boDialogBus.js';
 
 const formatDate = (value) => {
   if (!value) return 'Not set';
@@ -112,7 +113,7 @@ const PayrollSupportDrawer = ({
                       <button type="button" onClick={() => onAddLoanTransaction(loan)} style={{ border: '1px solid #bae6fd', backgroundColor: '#f0f9ff', color: '#075985', borderRadius: '8px', padding: '0.35rem 0.55rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.76rem' }}>
                         <i className="fas fa-plus" style={{ marginRight: '0.28rem' }}></i>Payment
                       </button>
-                      <button type="button" onClick={() => { if (window.confirm(`Delete loan "${loan.loanReference || `Loan #${loan.id}`}"? This cannot be undone.`)) onDeleteLoan(loan); }} style={{ border: '1px solid #fca5a5', backgroundColor: '#fff', color: '#b91c1c', borderRadius: '8px', padding: '0.35rem 0.55rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.76rem' }}>
+                      <button type="button" onClick={async () => { const confirmed = await boConfirm({ title: 'Delete Loan', message: `Delete loan "${loan.loanReference || `Loan #${loan.id}`}"? This cannot be undone.`, confirmText: 'Delete', cancelText: 'Cancel' }); if (confirmed) onDeleteLoan(loan); }} style={{ border: '1px solid #fca5a5', backgroundColor: '#fff', color: '#b91c1c', borderRadius: '8px', padding: '0.35rem 0.55rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.76rem' }}>
                         <i className="fas fa-trash" style={{ marginRight: '0.28rem' }}></i>Delete
                       </button>
                     </div>
@@ -139,7 +140,7 @@ const PayrollSupportDrawer = ({
                       <button type="button" onClick={() => onEditTermination(term)} style={{ border: '1px solid #fecaca', backgroundColor: '#fef2f2', color: '#991b1b', borderRadius: '8px', padding: '0.35rem 0.55rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.76rem' }}>
                         <i className="fas fa-pen" style={{ marginRight: '0.28rem' }}></i>Edit
                       </button>
-                      <button type="button" onClick={() => { if (window.confirm(`Delete termination record from ${formatDate(term.terminationDate)}? This cannot be undone.`)) onDeleteTermination(term); }} style={{ border: '1px solid #fca5a5', backgroundColor: '#fff', color: '#b91c1c', borderRadius: '8px', padding: '0.35rem 0.55rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.76rem' }}>
+                      <button type="button" onClick={async () => { const confirmed = await boConfirm({ title: 'Delete Termination', message: `Delete termination record from ${formatDate(term.terminationDate)}? This cannot be undone.`, confirmText: 'Delete', cancelText: 'Cancel' }); if (confirmed) onDeleteTermination(term); }} style={{ border: '1px solid #fca5a5', backgroundColor: '#fff', color: '#b91c1c', borderRadius: '8px', padding: '0.35rem 0.55rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.76rem' }}>
                         <i className="fas fa-trash" style={{ marginRight: '0.28rem' }}></i>Delete
                       </button>
                     </div>
@@ -166,7 +167,7 @@ const PayrollSupportDrawer = ({
                       <button type="button" onClick={() => onEditReengagement(item)} style={{ border: '1px solid #ddd6fe', backgroundColor: '#f5f3ff', color: '#5b21b6', borderRadius: '8px', padding: '0.35rem 0.55rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.76rem' }}>
                         <i className="fas fa-pen" style={{ marginRight: '0.28rem' }}></i>Edit
                       </button>
-                      <button type="button" onClick={() => { if (window.confirm(`Delete reengagement record from ${formatDate(item.effectiveDate)}? This cannot be undone.`)) onDeleteReengagement(item); }} style={{ border: '1px solid #fca5a5', backgroundColor: '#fff', color: '#b91c1c', borderRadius: '8px', padding: '0.35rem 0.55rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.76rem' }}>
+                      <button type="button" onClick={async () => { const confirmed = await boConfirm({ title: 'Delete Reengagement', message: `Delete reengagement record from ${formatDate(item.effectiveDate)}? This cannot be undone.`, confirmText: 'Delete', cancelText: 'Cancel' }); if (confirmed) onDeleteReengagement(item); }} style={{ border: '1px solid #fca5a5', backgroundColor: '#fff', color: '#b91c1c', borderRadius: '8px', padding: '0.35rem 0.55rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.76rem' }}>
                         <i className="fas fa-trash" style={{ marginRight: '0.28rem' }}></i>Delete
                       </button>
                     </div>

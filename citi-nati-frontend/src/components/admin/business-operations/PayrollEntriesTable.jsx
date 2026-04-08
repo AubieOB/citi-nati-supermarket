@@ -1,5 +1,6 @@
 import React from 'react';
 import PayrollEmptyState from './PayrollEmptyState.jsx';
+import { boConfirm } from '../../../utils/boDialogBus.js';
 
 const thStyle = {
   textAlign: 'left',
@@ -112,9 +113,15 @@ const PayrollEntriesTable = ({
                       </button>
                       <button
                         type="button"
-                        onClick={(event) => {
+                        onClick={async (event) => {
                           event.stopPropagation();
-                          if (window.confirm(`Delete payroll entry for ${fullName(entry.employee)}?`)) {
+                          const confirmed = await boConfirm({
+                            title: 'Delete Payroll Entry',
+                            message: `Delete payroll entry for ${fullName(entry.employee)}?`,
+                            confirmText: 'Delete',
+                            cancelText: 'Cancel',
+                          });
+                          if (confirmed) {
                             onDeleteEntry(entry);
                           }
                         }}

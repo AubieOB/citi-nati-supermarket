@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../../../utils/api.js';
 import { downloadBusinessReport } from '../../../utils/exportService.js';
 import { exportSuppliersPdf } from '../../../utils/businessOperationsPdfExports.js';
+import { boAlert } from '../../../utils/boDialogBus.js';
 import SuppliersList from './SuppliersList.jsx';
 import SupplierDetailPanel from './SupplierDetailPanel.jsx';
 import SupplierFormModal from './SupplierFormModal.jsx';
@@ -293,7 +294,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
       if (selectedSupplierId === supplier.id) setSelectedSupplierId(null);
       await refreshData({ selectedId: null, nextTransactionPage: 1 });
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to delete supplier');
+      await boAlert({ title: 'Delete Failed', message: err.response?.data?.error || 'Failed to delete supplier', type: 'error' });
     }
   };
 
@@ -302,7 +303,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
       await api.delete(`/business-operations/suppliers/transactions/${transaction.id}`);
       await refreshData({ selectedId: selectedSupplierId, nextTransactionPage: 1 });
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to delete transaction');
+      await boAlert({ title: 'Delete Failed', message: err.response?.data?.error || 'Failed to delete transaction', type: 'error' });
     }
   };
 
@@ -342,7 +343,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
       });
     } catch (error) {
       const message = error?.response?.data?.error || `Failed to export ${format.toUpperCase()} report.`;
-      window.alert(message);
+      await boAlert({ title: 'Export Failed', message, type: 'warning' });
     } finally {
       if (format === 'excel') setExportingExcel(false);
       if (format === 'pdf') setExportingPdf(false);

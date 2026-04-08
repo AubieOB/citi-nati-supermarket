@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import api from '../../../utils/api.js';
+import { boAlert } from '../../../utils/boDialogBus.js';
 
 const baseCardStyle = {
   backgroundColor: '#fff',
@@ -40,7 +41,11 @@ const BusinessOperationsActionsTab = () => {
   const handleWipeAllBoData = useCallback(async () => {
     const keyValue = String(wipeSecurityKey || '').trim();
     if (!keyValue) {
-      window.alert('Enter admin security key before wiping data.');
+      await boAlert({
+        title: 'Security Key Required',
+        message: 'Enter admin security key before wiping data.',
+        type: 'warning',
+      });
       return;
     }
 
@@ -53,12 +58,16 @@ const BusinessOperationsActionsTab = () => {
       const deletedCounts = response?.data?.result?.deletedCounts || {};
       const deletedTotal = Object.values(deletedCounts).reduce((sum, value) => sum + Number(value || 0), 0);
 
-      window.alert(`Business Operations wipe completed. Deleted rows: ${deletedTotal}. Sales report sync data was preserved.`);
+      await boAlert({
+        title: 'Wipe Completed',
+        message: `Business Operations wipe completed. Deleted rows: ${deletedTotal}. Sales report sync data was preserved.`,
+        type: 'success',
+      });
       setIsWipeModalOpen(false);
       setWipeSecurityKey('');
     } catch (error) {
       const message = error?.response?.data?.message || error?.response?.data?.error || error?.message || 'Failed to wipe Business Operations data.';
-      window.alert(message);
+      await boAlert({ title: 'Wipe Failed', message, type: 'error' });
     } finally {
       setWipingData(false);
     }

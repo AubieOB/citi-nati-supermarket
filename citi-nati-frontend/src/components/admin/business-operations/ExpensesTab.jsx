@@ -2,6 +2,7 @@
 import api from '../../../utils/api.js';
 import { downloadBusinessReport } from '../../../utils/exportService.js';
 import { exportExpensesPdf } from '../../../utils/businessOperationsPdfExports.js';
+import { boAlert } from '../../../utils/boDialogBus.js';
 import ExpensesList from './ExpensesList.jsx';
 import ExpenseDetailPanel from './ExpenseDetailPanel.jsx';
 import ExpenseFormModal from './ExpenseFormModal.jsx';
@@ -226,7 +227,7 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
       if (selectedExpense?.id === expense.id) setSelectedExpense(null);
       await refreshAll();
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to delete expense');
+      await boAlert({ title: 'Delete Failed', message: err.response?.data?.error || 'Failed to delete expense', type: 'error' });
     }
   };
 
@@ -235,7 +236,7 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
       await api.delete(`/business-operations/expenses/categories/${cat.id}`);
       await fetchCategories();
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to delete category');
+      await boAlert({ title: 'Delete Failed', message: err.response?.data?.error || 'Failed to delete category', type: 'error' });
     }
   };
 
@@ -273,7 +274,7 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
       });
     } catch (error) {
       const message = error?.response?.data?.error || `Failed to export ${format.toUpperCase()} report.`;
-      window.alert(message);
+      await boAlert({ title: 'Export Failed', message, type: 'warning' });
     } finally {
       if (format === 'excel') setExportingExcel(false);
       if (format === 'pdf') setExportingPdf(false);

@@ -1,5 +1,6 @@
 import React from 'react';
 import SupplierEmptyState from './SupplierEmptyState.jsx';
+import { boConfirm } from '../../../utils/boDialogBus.js';
 
 const money = (value) => `MWK ${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -99,8 +100,14 @@ const SupplierTransactionTable = ({ transactions, loading, error, onEditTransact
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (window.confirm(`Delete this ${transaction.transactionType || 'transaction'} of MWK ${Number(transaction.amount || 0).toLocaleString('en-US')}? This cannot be undone.`)) {
+                    onClick={async () => {
+                      const confirmed = await boConfirm({
+                        title: 'Delete Supplier Transaction',
+                        message: `Delete this ${transaction.transactionType || 'transaction'} of MWK ${Number(transaction.amount || 0).toLocaleString('en-US')}? This cannot be undone.`,
+                        confirmText: 'Delete',
+                        cancelText: 'Cancel',
+                      });
+                      if (confirmed) {
                         onDeleteTransaction(transaction);
                       }
                     }}

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import api from '../../../utils/api.js';
 import { downloadBusinessReport, downloadFullBusinessWorkbook, importFullBusinessWorkbook } from '../../../utils/exportService.js';
 import { exportPayrollPdf } from '../../../utils/businessOperationsPdfExports.js';
+import { boAlert, boConfirm } from '../../../utils/boDialogBus.js';
 import PayrollPeriodsList from './PayrollPeriodsList.jsx';
 import PayrollPeriodFormModal from './PayrollPeriodFormModal.jsx';
 import PayrollPeriodDetailPanel from './PayrollPeriodDetailPanel.jsx';
@@ -399,7 +400,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
       if (selectedPeriodId === period.id) setSelectedPeriodId(null);
       await fetchPayrollPeriods(periodPage);
     } catch (err) {
-      alert(getApiError(err, 'Failed to delete payroll period.'));
+      await boAlert({ title: 'Delete Failed', message: getApiError(err, 'Failed to delete payroll period.'), type: 'error' });
     }
   };
 
@@ -452,7 +453,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
       await fetchPayrollEntries(selectedPeriodId, entriesPage);
       await fetchPayrollPeriods(periodPage);
     } catch (err) {
-      alert(getApiError(err, 'Failed to delete payroll entry.'));
+      await boAlert({ title: 'Delete Failed', message: getApiError(err, 'Failed to delete payroll entry.'), type: 'error' });
     }
   };
 
@@ -636,7 +637,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
       const selectedEntry = entries.find((entry) => entry.id === selectedEntryId);
       if (selectedEntry) await openSupportDrawerForEntry(selectedEntry);
     } catch (err) {
-      alert(getApiError(err, 'Failed to delete loan.'));
+      await boAlert({ title: 'Delete Failed', message: getApiError(err, 'Failed to delete loan.'), type: 'error' });
     }
   };
 
@@ -646,7 +647,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
       const selectedEntry = entries.find((entry) => entry.id === selectedEntryId);
       if (selectedEntry) await openSupportDrawerForEntry(selectedEntry);
     } catch (err) {
-      alert(getApiError(err, 'Failed to delete loan transaction.'));
+      await boAlert({ title: 'Delete Failed', message: getApiError(err, 'Failed to delete loan transaction.'), type: 'error' });
     }
   };
 
@@ -656,7 +657,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
       const selectedEntry = entries.find((entry) => entry.id === selectedEntryId);
       if (selectedEntry) await openSupportDrawerForEntry(selectedEntry);
     } catch (err) {
-      alert(getApiError(err, 'Failed to delete termination.'));
+      await boAlert({ title: 'Delete Failed', message: getApiError(err, 'Failed to delete termination.'), type: 'error' });
     }
   };
 
@@ -666,7 +667,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
       const selectedEntry = entries.find((entry) => entry.id === selectedEntryId);
       if (selectedEntry) await openSupportDrawerForEntry(selectedEntry);
     } catch (err) {
-      alert(getApiError(err, 'Failed to delete reengagement.'));
+      await boAlert({ title: 'Delete Failed', message: getApiError(err, 'Failed to delete reengagement.'), type: 'error' });
     }
   };
 
@@ -701,7 +702,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
       });
     } catch (error) {
       const message = error?.response?.data?.error || `Failed to export ${format.toUpperCase()} report.`;
-      window.alert(message);
+      await boAlert({ title: 'Export Failed', message, type: 'warning' });
     } finally {
       if (format === 'excel') setExportingExcel(false);
       if (format === 'pdf') setExportingPdf(false);
@@ -718,7 +719,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
       });
     } catch (error) {
       const message = error?.response?.data?.error || error?.message || 'Failed to export full workbook.';
-      window.alert(message);
+      await boAlert({ title: 'Export Failed', message, type: 'warning' });
     } finally {
       setExportingFullWorkbook(false);
     }
@@ -735,7 +736,13 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
     if (!file) return;
 
     const confirmMessage = `Import workbook "${file.name}"? This will re-add/update payroll, sales, and business operations records.`;
-    if (!window.confirm(confirmMessage)) return;
+    const confirmed = await boConfirm({
+      title: 'Import Workbook',
+      message: confirmMessage,
+      confirmText: 'Import',
+      cancelText: 'Cancel',
+    });
+    if (!confirmed) return;
 
     setImportingFullWorkbook(true);
     try {
@@ -754,11 +761,15 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
       const salesCount = Object.values(salesImported).reduce((sum, value) => sum + Number(value || 0), 0);
       const businessCount = Object.values(businessImported).reduce((sum, value) => sum + Number(value || 0), 0);
 
-      window.alert(`Workbook import complete. Payroll rows: ${payrollCount}. Sales rows: ${salesCount}. BO rows: ${businessCount}.`);
+      await boAlert({
+        title: 'Import Complete',
+        message: `Workbook import complete. Payroll rows: ${payrollCount}. Sales rows: ${salesCount}. BO rows: ${businessCount}.`,
+        type: 'success',
+      });
       await refreshAll();
     } catch (error) {
       const message = error?.response?.data?.error || error?.message || 'Failed to import full workbook.';
-      window.alert(message);
+      await boAlert({ title: 'Import Failed', message, type: 'warning' });
     } finally {
       setImportingFullWorkbook(false);
     }
@@ -783,7 +794,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
       await api.delete(`/business-operations/payroll/tax-brackets/${item.id}`);
       await fetchPolicies();
     } catch (err) {
-      alert(getApiError(err, 'Failed to delete tax bracket.'));
+      await boAlert({ title: 'Delete Failed', message: getApiError(err, 'Failed to delete tax bracket.'), type: 'error' });
     }
   };
 
@@ -828,7 +839,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
       await api.delete(`/business-operations/payroll/increment-policies/${item.id}`);
       await fetchPolicies();
     } catch (err) {
-      alert(getApiError(err, 'Failed to delete increment policy.'));
+      await boAlert({ title: 'Delete Failed', message: getApiError(err, 'Failed to delete increment policy.'), type: 'error' });
     }
   };
 
@@ -1099,7 +1110,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
                               <button type="button" onClick={() => handleEditTaxBracket(item)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '8px', padding: '0.3rem 0.5rem', fontSize: '0.74rem', cursor: 'pointer', fontWeight: 700 }}>
                                 <i className="fas fa-pen" style={{ marginRight: '0.28rem' }}></i>Edit
                               </button>
-                              <button type="button" onClick={() => { if (window.confirm(`Delete tax bracket MWK ${Number(item.minIncome || 0).toLocaleString('en-US')} - MWK ${Number(item.maxIncome || 0).toLocaleString('en-US')}? This cannot be undone.`)) handleDeleteTaxBracket(item); }} style={{ border: '1px solid #fca5a5', backgroundColor: '#fff', color: '#b91c1c', borderRadius: '8px', padding: '0.3rem 0.5rem', fontSize: '0.74rem', cursor: 'pointer', fontWeight: 700 }}>
+                              <button type="button" onClick={async () => { const confirmed = await boConfirm({ title: 'Delete Tax Bracket', message: `Delete tax bracket MWK ${Number(item.minIncome || 0).toLocaleString('en-US')} - MWK ${Number(item.maxIncome || 0).toLocaleString('en-US')}? This cannot be undone.`, confirmText: 'Delete', cancelText: 'Cancel' }); if (confirmed) handleDeleteTaxBracket(item); }} style={{ border: '1px solid #fca5a5', backgroundColor: '#fff', color: '#b91c1c', borderRadius: '8px', padding: '0.3rem 0.5rem', fontSize: '0.74rem', cursor: 'pointer', fontWeight: 700 }}>
                                 <i className="fas fa-trash" style={{ marginRight: '0.28rem' }}></i>Delete
                               </button>
                             </div>
@@ -1122,7 +1133,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
                               <button type="button" onClick={() => handleEditIncrementPolicy(item)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '8px', padding: '0.3rem 0.5rem', fontSize: '0.74rem', cursor: 'pointer', fontWeight: 700 }}>
                                 <i className="fas fa-pen" style={{ marginRight: '0.28rem' }}></i>Edit
                               </button>
-                              <button type="button" onClick={() => { if (window.confirm(`Delete increment policy for ${item.minServiceMonths} - ${item.maxServiceMonths || '∞'} months? This cannot be undone.`)) handleDeleteIncrementPolicy(item); }} style={{ border: '1px solid #fca5a5', backgroundColor: '#fff', color: '#b91c1c', borderRadius: '8px', padding: '0.3rem 0.5rem', fontSize: '0.74rem', cursor: 'pointer', fontWeight: 700 }}>
+                              <button type="button" onClick={async () => { const confirmed = await boConfirm({ title: 'Delete Increment Policy', message: `Delete increment policy for ${item.minServiceMonths} - ${item.maxServiceMonths || '∞'} months? This cannot be undone.`, confirmText: 'Delete', cancelText: 'Cancel' }); if (confirmed) handleDeleteIncrementPolicy(item); }} style={{ border: '1px solid #fca5a5', backgroundColor: '#fff', color: '#b91c1c', borderRadius: '8px', padding: '0.3rem 0.5rem', fontSize: '0.74rem', cursor: 'pointer', fontWeight: 700 }}>
                                 <i className="fas fa-trash" style={{ marginRight: '0.28rem' }}></i>Delete
                               </button>
                             </div>

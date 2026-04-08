@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../../../utils/api.js';
 import { downloadBusinessReport } from '../../../utils/exportService.js';
 import { exportMonthlySummaryPdf } from '../../../utils/businessOperationsPdfExports.js';
+import { boAlert } from '../../../utils/boDialogBus.js';
 import SummaryFiltersBar from './monthly-summary/SummaryFiltersBar.jsx';
 import SummaryCards from './monthly-summary/SummaryCards.jsx';
 import SalesSummarySection from './monthly-summary/SalesSummarySection.jsx';
@@ -367,7 +368,7 @@ const MonthlySummaryTab = ({
       });
     } catch (error) {
       const message = error?.response?.data?.error || `Failed to export ${format.toUpperCase()} report.`;
-      window.alert(message);
+      await boAlert({ title: 'Export Failed', message, type: 'warning' });
     } finally {
       if (format === 'excel') setExportingExcel(false);
       if (format === 'pdf') setExportingPdf(false);

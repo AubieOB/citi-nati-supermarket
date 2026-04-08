@@ -1,5 +1,6 @@
 import React from 'react';
 import SupplierEmptyState from './SupplierEmptyState.jsx';
+import { boConfirm } from '../../../utils/boDialogBus.js';
 
 const money = (value) => `MWK ${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -143,9 +144,15 @@ const SuppliersList = ({
                       </button>
                       <button
                         type="button"
-                        onClick={(event) => {
+                        onClick={async (event) => {
                           event.stopPropagation();
-                          if (window.confirm(`Delete supplier "${supplier.name}"? This cannot be undone.`)) {
+                          const confirmed = await boConfirm({
+                            title: 'Delete Supplier',
+                            message: `Delete supplier "${supplier.name}"? This cannot be undone.`,
+                            confirmText: 'Delete',
+                            cancelText: 'Cancel',
+                          });
+                          if (confirmed) {
                             onDeleteSupplier(supplier);
                           }
                         }}

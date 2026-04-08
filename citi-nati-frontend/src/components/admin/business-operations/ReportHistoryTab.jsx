@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../../../utils/api.js';
 import { downloadBusinessReport } from '../../../utils/exportService.js';
+import { boAlert } from '../../../utils/boDialogBus.js';
 
 const cardStyle = {
   backgroundColor: '#fff',
@@ -153,7 +154,7 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, onNavigat
       });
     } catch (error) {
       const message = error?.response?.data?.error || `Failed to export ${module} ${format.toUpperCase()} report.`;
-      window.alert(message);
+      await boAlert({ title: 'Export Failed', message, type: 'warning' });
     } finally {
       setExporting((current) => ({ ...current, [key]: false }));
     }

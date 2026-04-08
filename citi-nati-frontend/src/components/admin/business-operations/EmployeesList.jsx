@@ -1,5 +1,6 @@
 import React from 'react';
 import EmployeesEmptyState from './EmployeesEmptyState.jsx';
+import { boConfirm } from '../../../utils/boDialogBus.js';
 
 const buildFullName = (e) =>
   [e?.firstName, e?.middleName, e?.surname].filter(Boolean).join(' ') || 'Unknown';
@@ -166,9 +167,15 @@ const EmployeesList = ({
                       </button>
                       <button
                         type="button"
-                        onClick={(e) => {
+                        onClick={async (e) => {
                           e.stopPropagation();
-                          if (window.confirm(`Delete employee "${buildFullName(emp)}"? This cannot be undone.`)) {
+                          const confirmed = await boConfirm({
+                            title: 'Delete Employee',
+                            message: `Delete employee "${buildFullName(emp)}"? This cannot be undone.`,
+                            confirmText: 'Delete',
+                            cancelText: 'Cancel',
+                          });
+                          if (confirmed) {
                             onDeleteEmployee(emp);
                           }
                         }}

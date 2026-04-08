@@ -1,5 +1,6 @@
 import React from 'react';
 import PayrollEmptyState from './PayrollEmptyState.jsx';
+import { boConfirm } from '../../../utils/boDialogBus.js';
 
 const cardStyle = {
   backgroundColor: '#fff',
@@ -144,9 +145,15 @@ const PayrollPeriodsList = ({
                           </button>
                           <button
                             type="button"
-                            onClick={(event) => {
+                            onClick={async (event) => {
                               event.stopPropagation();
-                              if (window.confirm(`Delete period "${period.description || `Period #${period.id}`}"? All entries in this period will also be deleted.`)) {
+                              const confirmed = await boConfirm({
+                                title: 'Delete Payroll Period',
+                                message: `Delete period "${period.description || `Period #${period.id}`}"? All entries in this period will also be deleted.`,
+                                confirmText: 'Delete',
+                                cancelText: 'Cancel',
+                              });
+                              if (confirmed) {
                                 onDeletePeriod(period);
                               }
                             }}

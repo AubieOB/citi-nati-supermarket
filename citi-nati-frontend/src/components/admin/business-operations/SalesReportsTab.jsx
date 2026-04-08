@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import api from '../../../utils/api.js';
 import { downloadBusinessReport, downloadFullBusinessWorkbook, importFullBusinessWorkbook } from '../../../utils/exportService.js';
 import { exportActiveSalesReportPdf } from '../../../utils/salesReportsPdfExport.js';
+import { boAlert, boConfirm } from '../../../utils/boDialogBus.js';
 import SalesReportFilters from './SalesReportFilters.jsx';
 import SalesSummaryCards from './SalesSummaryCards.jsx';
 
@@ -441,7 +442,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
       });
     } catch (error) {
       const message = error?.response?.data?.error || `Failed to export ${format.toUpperCase()} report.`;
-      window.alert(message);
+      await boAlert({ title: 'Export Failed', message, type: 'warning' });
     } finally {
       if (format === 'excel') setExportingExcel(false);
       if (format === 'pdf') setExportingPdf(false);
@@ -462,7 +463,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
       });
     } catch (error) {
       const message = error?.response?.data?.error || error?.message || 'Failed to export full workbook.';
-      window.alert(message);
+      await boAlert({ title: 'Export Failed', message, type: 'warning' });
     } finally {
       setExportingFullWorkbook(false);
     }
@@ -478,7 +479,12 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
     event.target.value = '';
     if (!file) return;
 
-    const confirmed = window.confirm(`Import workbook "${file.name}"? This will re-add/update payroll, sales, and business operations records.`);
+    const confirmed = await boConfirm({
+      title: 'Import Workbook',
+      message: `Import workbook "${file.name}"? This will re-add/update payroll, sales, and business operations records.`,
+      confirmText: 'Import',
+      cancelText: 'Cancel',
+    });
     if (!confirmed) return;
 
     setImportingFullWorkbook(true);
@@ -497,7 +503,11 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
       const salesCount = Object.values(salesImported).reduce((sum, value) => sum + Number(value || 0), 0);
       const businessCount = Object.values(businessImported).reduce((sum, value) => sum + Number(value || 0), 0);
 
-      window.alert(`Workbook import complete. Payroll rows: ${payrollCount}. Sales rows: ${salesCount}. BO rows: ${businessCount}.`);
+      await boAlert({
+        title: 'Import Complete',
+        message: `Workbook import complete. Payroll rows: ${payrollCount}. Sales rows: ${salesCount}. BO rows: ${businessCount}.`,
+        type: 'success',
+      });
       await fetchSummary();
       if (activeView === 'invoices') await fetchInvoices();
       if (activeView === 'products') await fetchProducts();
@@ -505,7 +515,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
       if (activeView === 'payments') await fetchPayments();
     } catch (error) {
       const message = error?.response?.data?.error || error?.message || 'Failed to import full workbook.';
-      window.alert(message);
+      await boAlert({ title: 'Import Failed', message, type: 'warning' });
     } finally {
       setImportingFullWorkbook(false);
     }

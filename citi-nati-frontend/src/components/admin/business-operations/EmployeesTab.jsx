@@ -2,6 +2,7 @@
 import api from '../../../utils/api.js';
 import { downloadBusinessReport } from '../../../utils/exportService.js';
 import { exportEmployeesPdf } from '../../../utils/businessOperationsPdfExports.js';
+import { boAlert } from '../../../utils/boDialogBus.js';
 import EmployeesEmptyState from './EmployeesEmptyState.jsx';
 import EmployeeSummaryCards from './EmployeeSummaryCards.jsx';
 import EmployeesList from './EmployeesList.jsx';
@@ -184,7 +185,7 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
       if (selectedEmployeeId === emp.id) setSelectedEmployeeId(null);
       await refreshData(page);
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to delete employee');
+      await boAlert({ title: 'Delete Failed', message: err.response?.data?.error || 'Failed to delete employee', type: 'error' });
     }
   };
 
@@ -282,7 +283,7 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
       });
     } catch (error) {
       const message = error?.response?.data?.error || `Failed to export ${format.toUpperCase()} report.`;
-      window.alert(message);
+      await boAlert({ title: 'Export Failed', message, type: 'warning' });
     } finally {
       if (format === 'excel') setExportingExcel(false);
       if (format === 'pdf') setExportingPdf(false);

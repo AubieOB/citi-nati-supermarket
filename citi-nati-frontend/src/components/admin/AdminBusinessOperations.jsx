@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useMemo, useState } from 'react';
+import React, { useEffect, useRef, useMemo, useState, useCallback } from 'react';
 import BusinessOperationsTabs from './business-operations/BusinessOperationsTabs.jsx';
 import SalesReportsTab from './business-operations/SalesReportsTab.jsx';
 import ComingSoonTabPanel from './business-operations/ComingSoonTabPanel.jsx';
@@ -11,6 +11,9 @@ import ReportHistoryTab from './business-operations/ReportHistoryTab.jsx';
 import BusinessOperationsActionsTab from './business-operations/BusinessOperationsActionsTab.jsx';
 import BusinessOperationsImportButton from './business-operations/BusinessOperationsImportButton.jsx';
 import BusinessOperationsImportModal from './business-operations/BusinessOperationsImportModal.jsx';
+import Modal from '../common/Modal.jsx';
+import { useModal } from '../../hooks/useModal.js';
+import { registerBoDialogHandler } from '../../utils/boDialogBus.js';
 import api from '../../utils/api.js';
 
 const TABS = [
@@ -32,6 +35,7 @@ function normalizeLocationCode(location) {
 }
 
 const AdminBusinessOperations = () => {
+  const { modal, showModal, closeModal } = useModal();
   const [activeTab, setActiveTab] = useState('sales-reports');
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
@@ -158,6 +162,25 @@ const AdminBusinessOperations = () => {
     setActiveTab(tabId);
   };
 
+  const handleBoDialog = useCallback((config) => {
+    showModal({
+      ...config,
+      onConfirm: () => {
+        config.onConfirm?.();
+        closeModal();
+      },
+      onCancel: () => {
+        config.onCancel?.();
+        closeModal();
+      },
+    });
+  }, [closeModal, showModal]);
+
+  useEffect(() => {
+    const unregister = registerBoDialogHandler(handleBoDialog);
+    return unregister;
+  }, [handleBoDialog]);
+
   const contentByTab = {
     'sales-reports': <SalesReportsTab drilldownRequest={drilldownRequests['sales-reports']} selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} />,
     suppliers: <SuppliersTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} locations={locations} />,
@@ -227,6 +250,21 @@ const AdminBusinessOperations = () => {
         onImportSuccess={handleImportSuccess}
         onViewImportedData={handleViewImportedData}
       />
+
+      <Modal
+        isOpen={modal.isOpen}
+        title={modal.title}
+        message={modal.message}
+        type={modal.type}
+        onConfirm={modal.onConfirm}
+        onCancel={modal.onCancel}
+        confirmText={modal.confirmText}
+        cancelText={modal.cancelText}
+        showCancelButton={modal.showCancelButton}
+        confirmButtonColor={modal.confirmButtonColor}
+      >
+        {modal.children}
+      </Modal>
     </div>
   );
 };

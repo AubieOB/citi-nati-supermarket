@@ -1,5 +1,6 @@
 import React from 'react';
 import ExpensesEmptyState from './ExpensesEmptyState.jsx';
+import { boConfirm } from '../../../utils/boDialogBus.js';
 
 const money = (value) =>
   `MWK ${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -149,9 +150,15 @@ const ExpensesList = ({
                       </button>
                       <button
                         type="button"
-                        onClick={(e) => {
+                        onClick={async (e) => {
                           e.stopPropagation();
-                          if (window.confirm(`Delete this expense of ${money(expense.amount)}? This cannot be undone.`)) {
+                          const confirmed = await boConfirm({
+                            title: 'Delete Expense',
+                            message: `Delete this expense of ${money(expense.amount)}? This cannot be undone.`,
+                            confirmText: 'Delete',
+                            cancelText: 'Cancel',
+                          });
+                          if (confirmed) {
                             onDeleteExpense(expense);
                           }
                         }}
