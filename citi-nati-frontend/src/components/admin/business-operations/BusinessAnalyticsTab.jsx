@@ -1497,14 +1497,14 @@ const BusinessAnalyticsTab = ({
                             {activeToolConfig.fields.map((fieldKey) => {
                               const fieldDef = ANALYSIS_FIELDS[fieldKey] || { label: fieldKey, step: '0.01' };
                               return (
-                                <label key={fieldKey} style={{ display: 'grid', gap: '0.28rem', border: '1px solid #dbeafe', borderRadius: '12px', padding: '0.45rem 0.5rem', backgroundColor: '#f8fbff' }}>
+                                <label key={fieldKey} style={{ display: 'grid', gap: '0.28rem', border: '1px solid #dbeafe', borderRadius: '12px', padding: '0.45rem 0.5rem', backgroundColor: '#f8fbff', minWidth: 0, overflow: 'hidden' }}>
                                   <span style={{ color: '#475569', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.03em' }}>{fieldDef.label}</span>
                                   <input
                                     type="number"
                                     step={fieldDef.step}
                                     value={analysisInputs[fieldKey]}
                                     onChange={(event) => updateAnalysisInput(fieldKey, event.target.value)}
-                                    style={{ border: '1px solid #93c5fd', borderRadius: '10px', padding: '0.58rem 0.62rem', color: '#0f172a', backgroundColor: '#fff', fontFamily: 'Consolas, Menlo, Monaco, monospace', fontWeight: 800, fontSize: '0.95rem', boxShadow: 'inset 0 1px 3px rgba(15, 23, 42, 0.08)' }}
+                                    style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', border: '1px solid #93c5fd', borderRadius: '10px', padding: '0.58rem 0.62rem', color: '#0f172a', backgroundColor: '#fff', fontFamily: 'Consolas, Menlo, Monaco, monospace', fontWeight: 800, fontSize: '0.95rem', boxShadow: 'inset 0 1px 3px rgba(15, 23, 42, 0.08)' }}
                                   />
                                 </label>
                               );
