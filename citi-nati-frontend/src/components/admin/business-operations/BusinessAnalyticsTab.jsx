@@ -520,6 +520,7 @@ const BusinessAnalyticsTab = ({
   const [activeView, setActiveView] = useState('overview');
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [activeTool, setActiveTool] = useState('growth');
+  const [isToolModalOpen, setIsToolModalOpen] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisInputs, setAnalysisInputs] = useState({
     previousValue: 0,
@@ -919,6 +920,25 @@ const BusinessAnalyticsTab = ({
     if (status === 'negative') return { bg: '#fee2e2', color: '#b91c1c', label: 'Negative' };
     return { bg: '#fef3c7', color: '#92400e', label: 'Warning' };
   };
+
+  const openToolModal = (toolId) => {
+    setActiveTool(toolId);
+    setAnalysisResult(null);
+    setIsToolModalOpen(true);
+  };
+
+  useEffect(() => {
+    if (!isToolModalOpen || typeof window === 'undefined') return undefined;
+
+    const onEsc = (event) => {
+      if (event.key === 'Escape') {
+        setIsToolModalOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', onEsc);
+    return () => window.removeEventListener('keydown', onEsc);
+  }, [isToolModalOpen]);
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
@@ -1386,10 +1406,7 @@ const BusinessAnalyticsTab = ({
                         <button
                           key={tool.id}
                           type="button"
-                          onClick={() => {
-                            setActiveTool(tool.id);
-                            setAnalysisResult(null);
-                          }}
+                          onClick={() => openToolModal(tool.id)}
                           style={{
                             textAlign: 'left',
                             border: isActive ? '1px solid #1d4ed8' : '1px solid #cbd5e1',
@@ -1401,109 +1418,165 @@ const BusinessAnalyticsTab = ({
                         >
                           <div style={{ color: isActive ? '#1d4ed8' : '#0f172a', fontWeight: 800, fontSize: '0.82rem' }}>{tool.title}</div>
                           <div style={{ marginTop: '0.2rem', color: '#64748b', fontSize: '0.76rem', lineHeight: 1.35 }}>{tool.description}</div>
+                          <div style={{ marginTop: '0.32rem', color: '#2563eb', fontSize: '0.74rem', fontWeight: 800 }}>Open calculator</div>
                         </button>
                       );
                     })}
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '0.8rem' }}>
-                  <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <strong style={{ color: '#0f172a' }}>{activeToolConfig.title}</strong>
-                      <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>Manual + System Assisted</span>
-                    </div>
-                    <p style={{ margin: '0.28rem 0 0.7rem', color: '#64748b', fontSize: '0.82rem' }}>{activeToolConfig.description}</p>
-
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.42rem', marginBottom: '0.75rem' }}>
-                      <button type="button" onClick={() => applyAnalysisPreset('selected-vs-previous')} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '999px', padding: '0.3rem 0.58rem', fontSize: '0.74rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>Use Selected vs Previous</button>
-                      <button type="button" onClick={() => applyAnalysisPreset('month-vs-previous')} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '999px', padding: '0.3rem 0.58rem', fontSize: '0.74rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>Use Month vs Previous</button>
-                      <button type="button" onClick={() => applyAnalysisPreset('year-vs-previous')} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '999px', padding: '0.3rem 0.58rem', fontSize: '0.74rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>Use Year vs Previous</button>
-                      <button type="button" onClick={() => applyAnalysisPreset('kpi-base')} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '999px', padding: '0.3rem 0.58rem', fontSize: '0.74rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>Use KPI Snapshot</button>
-                      <button type="button" onClick={() => applyAnalysisPreset('branch-compare')} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '999px', padding: '0.3rem 0.58rem', fontSize: '0.74rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>Use BT vs ZA Sales</button>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.6rem' }}>
-                      {activeToolConfig.fields.map((fieldKey) => {
-                        const fieldDef = ANALYSIS_FIELDS[fieldKey] || { label: fieldKey, step: '0.01' };
-                        return (
-                          <label key={fieldKey} style={{ display: 'grid', gap: '0.28rem' }}>
-                            <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>{fieldDef.label}</span>
-                            <input
-                              type="number"
-                              step={fieldDef.step}
-                              value={analysisInputs[fieldKey]}
-                              onChange={(event) => updateAnalysisInput(fieldKey, event.target.value)}
-                              style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.58rem', color: '#0f172a' }}
-                            />
-                          </label>
-                        );
-                      })}
-                    </div>
-
-                    <div style={{ marginTop: '0.72rem', display: 'flex', gap: '0.52rem', flexWrap: 'wrap' }}>
-                      <button type="button" onClick={runAnalysis} style={{ border: '1px solid #1d4ed8', backgroundColor: '#1d4ed8', color: '#fff', borderRadius: '9px', padding: '0.5rem 0.8rem', fontWeight: 800, cursor: 'pointer' }}>
-                        Run Calculation
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const resetValues = { ...analysisInputs };
-                          Object.keys(resetValues).forEach((key) => {
-                            resetValues[key] = key === 'projectedGrowthPct' ? 10 : 0;
-                          });
-                          setAnalysisInputs(resetValues);
-                          setAnalysisResult(null);
-                        }}
-                        style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.5rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}
-                      >
-                        Reset Inputs
-                      </button>
-                    </div>
-                  </div>
-
-                  <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
-                    <strong style={{ color: '#0f172a' }}>Results Panel</strong>
-                    {!analysisResult ? (
-                      <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.82rem' }}>
-                        Run a calculator to view final result, formula basis, interpretation, and performance signal.
-                      </p>
-                    ) : (
-                      <>
-                        <div style={{ marginTop: '0.62rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.55rem', flexWrap: 'wrap' }}>
-                          <span style={{ color: '#334155', fontSize: '0.8rem', fontWeight: 700 }}>{analysisResult.title}</span>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', borderRadius: '999px', padding: '0.24rem 0.54rem', backgroundColor: status.bg, color: status.color, fontSize: '0.74rem', fontWeight: 800 }}>
-                            {status.label}
-                          </span>
-                        </div>
-
-                        <div style={{ marginTop: '0.62rem', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.75rem 0.78rem', backgroundColor: '#f8fafc' }}>
-                          <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700 }}>{analysisResult.mainLabel}</div>
-                          <div style={{ marginTop: '0.2rem', color: '#0f172a', fontWeight: 900, fontSize: '1.32rem' }}>{analysisResult.mainValue}</div>
-                          <div style={{ marginTop: '0.2rem', color: '#475569', fontSize: '0.8rem', fontWeight: 700 }}>{analysisResult.subValue}</div>
-                        </div>
-
-                        <div style={{ marginTop: '0.62rem', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.58rem 0.62rem' }}>
-                          <div style={{ color: '#64748b', fontSize: '0.74rem', fontWeight: 800 }}>Formula Used</div>
-                          <div style={{ marginTop: '0.2rem', color: '#0f172a', fontSize: '0.8rem', fontWeight: 700 }}>{analysisResult.formula}</div>
-                          <div style={{ marginTop: '0.34rem', color: '#475569', fontSize: '0.79rem' }}>{analysisResult.interpretation}</div>
-                        </div>
-
-                        <div style={{ marginTop: '0.62rem' }}>
-                          <div style={{ color: '#64748b', fontSize: '0.74rem', fontWeight: 800, marginBottom: '0.28rem' }}>Values Used</div>
-                          <div style={{ display: 'grid', gap: '0.3rem' }}>
-                            {analysisResult.usedValues.map((row) => (
-                              <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.52rem', border: '1px solid #edf2f7', borderRadius: '8px', padding: '0.34rem 0.48rem' }}>
-                                <span style={{ color: '#64748b', fontSize: '0.76rem', fontWeight: 700 }}>{row.label}</span>
-                                <span style={{ color: '#0f172a', fontSize: '0.78rem', fontWeight: 800 }}>{row.value}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </>
-                    )}
+                <div style={{ ...cardStyle, padding: '0.8rem 0.95rem', borderStyle: 'dashed' }}>
+                  <div style={{ color: '#334155', fontSize: '0.82rem', fontWeight: 700 }}>Click any calculator card to open a dedicated modal workspace.</div>
+                  <div style={{ color: '#64748b', fontSize: '0.78rem', marginTop: '0.2rem' }}>
+                    The modal includes calculator inputs and results side by side for focused analysis.
                   </div>
                 </div>
+
+                {isToolModalOpen && (
+                  <div
+                    role="dialog"
+                    aria-modal="true"
+                    onClick={() => setIsToolModalOpen(false)}
+                    style={{
+                      position: 'fixed',
+                      inset: 0,
+                      backgroundColor: 'rgba(15, 23, 42, 0.58)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '1rem',
+                      zIndex: 1400,
+                    }}
+                  >
+                    <div
+                      onClick={(event) => event.stopPropagation()}
+                      style={{
+                        width: 'min(1240px, 98vw)',
+                        maxHeight: '92vh',
+                        overflowY: 'auto',
+                        backgroundColor: '#f8fafc',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '18px',
+                        boxShadow: '0 28px 54px rgba(15, 23, 42, 0.32)',
+                        padding: '1rem',
+                        display: 'grid',
+                        gap: '0.78rem',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.7rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                        <div>
+                          <strong style={{ color: '#0f172a' }}>{activeToolConfig.title}</strong>
+                          <p style={{ margin: '0.26rem 0 0', color: '#64748b', fontSize: '0.82rem' }}>{activeToolConfig.description}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsToolModalOpen(false)}
+                          style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '9px', color: '#334155', padding: '0.42rem 0.7rem', fontWeight: 800, cursor: 'pointer' }}
+                        >
+                          <i className="fas fa-xmark" style={{ marginRight: '0.35rem' }}></i>
+                          Close
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '0.8rem' }}>
+                        <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                            <strong style={{ color: '#0f172a' }}>Calculator Panel</strong>
+                            <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>Manual + System Assisted</span>
+                          </div>
+
+                          <div style={{ marginTop: '0.62rem', display: 'flex', flexWrap: 'wrap', gap: '0.42rem', marginBottom: '0.75rem' }}>
+                            <button type="button" onClick={() => applyAnalysisPreset('selected-vs-previous')} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '999px', padding: '0.3rem 0.58rem', fontSize: '0.74rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>Use Selected vs Previous</button>
+                            <button type="button" onClick={() => applyAnalysisPreset('month-vs-previous')} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '999px', padding: '0.3rem 0.58rem', fontSize: '0.74rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>Use Month vs Previous</button>
+                            <button type="button" onClick={() => applyAnalysisPreset('year-vs-previous')} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '999px', padding: '0.3rem 0.58rem', fontSize: '0.74rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>Use Year vs Previous</button>
+                            <button type="button" onClick={() => applyAnalysisPreset('kpi-base')} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '999px', padding: '0.3rem 0.58rem', fontSize: '0.74rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>Use KPI Snapshot</button>
+                            <button type="button" onClick={() => applyAnalysisPreset('branch-compare')} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '999px', padding: '0.3rem 0.58rem', fontSize: '0.74rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>Use BT vs ZA Sales</button>
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.6rem' }}>
+                            {activeToolConfig.fields.map((fieldKey) => {
+                              const fieldDef = ANALYSIS_FIELDS[fieldKey] || { label: fieldKey, step: '0.01' };
+                              return (
+                                <label key={fieldKey} style={{ display: 'grid', gap: '0.28rem' }}>
+                                  <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>{fieldDef.label}</span>
+                                  <input
+                                    type="number"
+                                    step={fieldDef.step}
+                                    value={analysisInputs[fieldKey]}
+                                    onChange={(event) => updateAnalysisInput(fieldKey, event.target.value)}
+                                    style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.58rem', color: '#0f172a' }}
+                                  />
+                                </label>
+                              );
+                            })}
+                          </div>
+
+                          <div style={{ marginTop: '0.72rem', display: 'flex', gap: '0.52rem', flexWrap: 'wrap' }}>
+                            <button type="button" onClick={runAnalysis} style={{ border: '1px solid #1d4ed8', backgroundColor: '#1d4ed8', color: '#fff', borderRadius: '9px', padding: '0.5rem 0.8rem', fontWeight: 800, cursor: 'pointer' }}>
+                              Run Calculation
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const resetValues = { ...analysisInputs };
+                                Object.keys(resetValues).forEach((key) => {
+                                  resetValues[key] = key === 'projectedGrowthPct' ? 10 : 0;
+                                });
+                                setAnalysisInputs(resetValues);
+                                setAnalysisResult(null);
+                              }}
+                              style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.5rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                            >
+                              Reset Inputs
+                            </button>
+                          </div>
+                        </div>
+
+                        <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
+                          <strong style={{ color: '#0f172a' }}>Results Panel</strong>
+                          {!analysisResult ? (
+                            <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.82rem' }}>
+                              Run a calculator to view final result, formula basis, interpretation, and performance signal.
+                            </p>
+                          ) : (
+                            <>
+                              <div style={{ marginTop: '0.62rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.55rem', flexWrap: 'wrap' }}>
+                                <span style={{ color: '#334155', fontSize: '0.8rem', fontWeight: 700 }}>{analysisResult.title}</span>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', borderRadius: '999px', padding: '0.24rem 0.54rem', backgroundColor: status.bg, color: status.color, fontSize: '0.74rem', fontWeight: 800 }}>
+                                  {status.label}
+                                </span>
+                              </div>
+
+                              <div style={{ marginTop: '0.62rem', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.75rem 0.78rem', backgroundColor: '#f8fafc' }}>
+                                <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700 }}>{analysisResult.mainLabel}</div>
+                                <div style={{ marginTop: '0.2rem', color: '#0f172a', fontWeight: 900, fontSize: '1.32rem' }}>{analysisResult.mainValue}</div>
+                                <div style={{ marginTop: '0.2rem', color: '#475569', fontSize: '0.8rem', fontWeight: 700 }}>{analysisResult.subValue}</div>
+                              </div>
+
+                              <div style={{ marginTop: '0.62rem', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.58rem 0.62rem' }}>
+                                <div style={{ color: '#64748b', fontSize: '0.74rem', fontWeight: 800 }}>Formula Used</div>
+                                <div style={{ marginTop: '0.2rem', color: '#0f172a', fontSize: '0.8rem', fontWeight: 700 }}>{analysisResult.formula}</div>
+                                <div style={{ marginTop: '0.34rem', color: '#475569', fontSize: '0.79rem' }}>{analysisResult.interpretation}</div>
+                              </div>
+
+                              <div style={{ marginTop: '0.62rem' }}>
+                                <div style={{ color: '#64748b', fontSize: '0.74rem', fontWeight: 800, marginBottom: '0.28rem' }}>Values Used</div>
+                                <div style={{ display: 'grid', gap: '0.3rem' }}>
+                                  {analysisResult.usedValues.map((row) => (
+                                    <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.52rem', border: '1px solid #edf2f7', borderRadius: '8px', padding: '0.34rem 0.48rem' }}>
+                                      <span style={{ color: '#64748b', fontSize: '0.76rem', fontWeight: 700 }}>{row.label}</span>
+                                      <span style={{ color: '#0f172a', fontSize: '0.78rem', fontWeight: 800 }}>{row.value}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })()}
