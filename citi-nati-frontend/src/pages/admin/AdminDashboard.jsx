@@ -30,6 +30,117 @@ import '../../styles/admin-dashboard.css';
 
 const ADMIN_THEME_KEY = 'adminDashboardTheme';
 
+const ADMIN_DARK_BG = '#162235';
+const ADMIN_DARK_BORDER = '#324662';
+const ADMIN_DARK_TEXT = '#dbe7f8';
+
+const parseRgbColor = (value) => {
+  if (!value || typeof value !== 'string') return null;
+  const match = value.match(/rgba?\(([^)]+)\)/i);
+  if (!match) return null;
+  const parts = match[1].split(',').map((part) => Number(part.trim()));
+  if (parts.length < 3 || parts.some((part, index) => index < 3 && Number.isNaN(part))) return null;
+  return { r: parts[0], g: parts[1], b: parts[2] };
+};
+
+const getRelativeLuminance = ({ r, g, b }) => {
+  const normalize = (channel) => {
+    const value = channel / 255;
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  };
+  const rr = normalize(r);
+  const gg = normalize(g);
+  const bb = normalize(b);
+  return 0.2126 * rr + 0.7152 * gg + 0.0722 * bb;
+};
+
+const getSaturation = ({ r, g, b }) => {
+  const rr = r / 255;
+  const gg = g / 255;
+  const bb = b / 255;
+  const max = Math.max(rr, gg, bb);
+  const min = Math.min(rr, gg, bb);
+  if (max === min) return 0;
+  const lightness = (max + min) / 2;
+  return lightness > 0.5 ? (max - min) / (2 - max - min) : (max - min) / (max + min);
+};
+
+const isLightNeutralTone = (rgb) => {
+  if (!rgb) return false;
+  const luminance = getRelativeLuminance(rgb);
+  const saturation = getSaturation(rgb);
+  return luminance >= 0.72 && saturation <= 0.32;
+};
+
+const isDarkNeutralTone = (rgb) => {
+  if (!rgb) return false;
+  const luminance = getRelativeLuminance(rgb);
+  const saturation = getSaturation(rgb);
+  return luminance <= 0.32 && saturation <= 0.38;
+};
+
+const rememberOriginalStyle = (element, key, value) => {
+  const attr = `data-admin-dark-${key}-original`;
+  if (!element.hasAttribute(attr)) {
+    element.setAttribute(attr, value || '__none__');
+  }
+};
+
+const restoreInlineDarkOverrides = (root) => {
+  if (!root) return;
+  const nodes = root.querySelectorAll('[data-admin-dark-bg-original], [data-admin-dark-border-original], [data-admin-dark-color-original]');
+  nodes.forEach((element) => {
+    const originalBg = element.getAttribute('data-admin-dark-bg-original');
+    if (originalBg !== null) {
+      element.style.backgroundColor = originalBg === '__none__' ? '' : originalBg;
+      element.removeAttribute('data-admin-dark-bg-original');
+    }
+
+    const originalBorder = element.getAttribute('data-admin-dark-border-original');
+    if (originalBorder !== null) {
+      element.style.borderColor = originalBorder === '__none__' ? '' : originalBorder;
+      element.removeAttribute('data-admin-dark-border-original');
+    }
+
+    const originalColor = element.getAttribute('data-admin-dark-color-original');
+    if (originalColor !== null) {
+      element.style.color = originalColor === '__none__' ? '' : originalColor;
+      element.removeAttribute('data-admin-dark-color-original');
+    }
+  });
+};
+
+const applyInlineDarkOverrides = (element) => {
+  if (!(element instanceof HTMLElement)) return;
+  if (!element.hasAttribute('style')) return;
+
+  const inlineBg = element.style.backgroundColor;
+  const inlineBorder = element.style.borderColor;
+  const inlineText = element.style.color;
+
+  if (inlineBg) {
+    const bgRgb = parseRgbColor(inlineBg);
+    if (isLightNeutralTone(bgRgb)) {
+      rememberOriginalStyle(element, 'bg', inlineBg);
+      element.style.backgroundColor = ADMIN_DARK_BG;
+
+      const textRgb = parseRgbColor(inlineText);
+      if (inlineText && isDarkNeutralTone(textRgb)) {
+        rememberOriginalStyle(element, 'color', inlineText);
+        element.style.color = ADMIN_DARK_TEXT;
+      }
+    }
+  }
+
+  if (inlineBorder) {
+    const borderRgb = parseRgbColor(inlineBorder);
+    if (isLightNeutralTone(borderRgb)) {
+      rememberOriginalStyle(element, 'border', inlineBorder);
+      element.style.borderColor = ADMIN_DARK_BORDER;
+    }
+  }
+};
+
 /**
  * 🛡️ ADMIN DASHBOARD
  * 
@@ -116,6 +227,55 @@ const AdminDashboard = () => {
       body.classList.remove('admin-theme-light');
     };
   }, [theme]);
+
+  React.useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const root = document.querySelector('.admin-dashboard-root');
+    if (!root) return;
+
+    if (theme !== 'dark') {
+      restoreInlineDarkOverrides(root);
+      return;
+    }
+
+    const scanAndApply = (node) => {
+      if (!(node instanceof HTMLElement)) return;
+      applyInlineDarkOverrides(node);
+      node.querySelectorAll('[style]').forEach((child) => applyInlineDarkOverrides(child));
+    };
+
+    scanAndApply(root);
+
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.target instanceof HTMLElement) {
+          applyInlineDarkOverrides(mutation.target);
+          return;
+        }
+
+        mutation.addedNodes.forEach((addedNode) => {
+          if (addedNode instanceof HTMLElement) {
+            scanAndApply(addedNode);
+          }
+        });
+      });
+    });
+
+    observer.observe(root, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ['style'],
+    });
+
+    return () => {
+      observer.disconnect();
+      if (theme !== 'dark') {
+        restoreInlineDarkOverrides(root);
+      }
+    };
+  }, [theme, activeTab]);
 
   React.useEffect(() => {
     if (location.pathname === '/admin/emergency-sales' && activeTab !== 'emergency-sales') {
