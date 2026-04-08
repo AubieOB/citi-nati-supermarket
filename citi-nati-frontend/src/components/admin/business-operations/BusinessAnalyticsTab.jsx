@@ -241,6 +241,7 @@ const BusinessAnalyticsTab = ({
   const refreshIntervalRef = useRef(null);
   const refreshTimeoutRef = useRef(null);
   const refreshInFlightRef = useRef(false);
+  const hasLoadedOnceRef = useRef(false);
 
   const effectiveScope = useMemo(() => {
     if (scope === 'inherit') {
@@ -297,7 +298,7 @@ const BusinessAnalyticsTab = ({
     setError('');
     setRefreshing(true);
 
-    const shouldShowLoading = !analytics;
+    const shouldShowLoading = !hasLoadedOnceRef.current;
     if (shouldShowLoading) setLoading(true);
 
     try {
@@ -528,9 +529,10 @@ const BusinessAnalyticsTab = ({
     } finally {
       setRefreshing(false);
       setLoading(false);
+      hasLoadedOnceRef.current = true;
       refreshInFlightRef.current = false;
     }
-  }, [analytics, effectiveScope, fetchInvoicesAllPages, locations, scopeLabel, selectedDateRange.label, selectedPeriod]);
+  }, [effectiveScope, fetchInvoicesAllPages, locations, scopeLabel, selectedDateRange.label, selectedPeriod]);
 
   useEffect(() => {
     computeAnalytics();
