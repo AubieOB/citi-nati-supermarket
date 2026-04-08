@@ -26,6 +26,8 @@ import '../../css/admin-responsive-filters.css';
  */
 
 const AdminProducts = () => {
+  const AUTO_REFRESH_MS = 30000;
+  const AUTO_REFRESH_DEBOUNCE_MS = 350;
   const MAX_PRODUCT_NAME_LENGTH = 120;
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -66,6 +68,7 @@ const AdminProducts = () => {
   const [expandedBatchRows, setExpandedBatchRows] = useState({});
   const [expiryAlertCategory, setExpiryAlertCategory] = useState('');
   const [expiryAlertStockFilter, setExpiryAlertStockFilter] = useState('all');
+  const [autoRefreshing, setAutoRefreshing] = useState(false);
   const pageSize = 20;
   const expiryAlertsPageSize = 12;
   const POS_ALERTS_CLIENT_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -74,6 +77,9 @@ const AdminProducts = () => {
   const voiceEnabledRef = useRef(false);
   const posExpiryFetchedAtRef = useRef(0);
   const posExpiryInFlightRef = useRef(false);
+  const autoRefreshIntervalRef = useRef(null);
+  const autoRefreshTimeoutRef = useRef(null);
+  const autoRefreshInFlightRef = useRef(false);
   const filterBarRef = useRef(null);
   const { modal, closeModal, showConfirm, showError, showSuccess } = useModal();
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
@@ -417,6 +423,67 @@ const AdminProducts = () => {
       }
     }
   }, [activeSubTab, posExpiryItems.length]);
+
+  useEffect(() => {
+    const runAutoRefresh = async () => {
+      if (autoRefreshInFlightRef.current) return;
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+
+      autoRefreshInFlightRef.current = true;
+      setAutoRefreshing(true);
+      try {
+        if (activeSubTab === 'expiry-alerts') {
+          await fetchPosExpiryAlerts();
+        } else {
+          await fetchProducts();
+        }
+      } finally {
+        autoRefreshInFlightRef.current = false;
+        setAutoRefreshing(false);
+      }
+    };
+
+    const scheduleRefresh = () => {
+      if (autoRefreshTimeoutRef.current) {
+        clearTimeout(autoRefreshTimeoutRef.current);
+      }
+      autoRefreshTimeoutRef.current = setTimeout(() => {
+        runAutoRefresh();
+      }, AUTO_REFRESH_DEBOUNCE_MS);
+    };
+
+    const onVisibilityChange = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        scheduleRefresh();
+      }
+    };
+
+    autoRefreshIntervalRef.current = setInterval(() => {
+      runAutoRefresh();
+    }, AUTO_REFRESH_MS);
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', scheduleRefresh);
+    }
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibilityChange);
+    }
+
+    return () => {
+      if (autoRefreshIntervalRef.current) {
+        clearInterval(autoRefreshIntervalRef.current);
+      }
+      if (autoRefreshTimeoutRef.current) {
+        clearTimeout(autoRefreshTimeoutRef.current);
+      }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', scheduleRefresh);
+      }
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+      }
+    };
+  }, [activeSubTab]);
 
   useEffect(() => {
     voiceEnabledRef.current = isVoiceSearchEnabled;
@@ -1876,7 +1943,15 @@ const AdminProducts = () => {
 
           {/* Results Count */}
           <div style={{
-            marginLeft: 'auto',
+            fontSize: '0.82rem',
+            color: autoRefreshing ? '#2563eb' : textSecondary,
+            fontWeight: autoRefreshing ? '700' : '600',
+            minWidth: '180px',
+            textAlign: 'right',
+          }}>
+            {autoRefreshing ? 'Auto-refreshing...' : 'Auto-refresh: every 30s'}
+          </div>
+          <div style={{
             fontSize: '0.9rem',
             color: textSecondary,
             minWidth: '100px',
@@ -1940,6 +2015,16 @@ const AdminProducts = () => {
             <i className={`fas ${isExportingExpiryPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`}></i>
             {isExportingExpiryPdf ? 'Generating PDF...' : 'Download Alerts PDF'}
           </button>
+
+          <div style={{
+            fontSize: '0.82rem',
+            color: autoRefreshing ? '#2563eb' : textSecondary,
+            fontWeight: autoRefreshing ? '700' : '600',
+            minWidth: '180px',
+            textAlign: 'right',
+          }}>
+            {autoRefreshing ? 'Auto-refreshing...' : 'Auto-refresh: every 30s'}
+          </div>
 
           <div style={{
             marginLeft: 'auto',
