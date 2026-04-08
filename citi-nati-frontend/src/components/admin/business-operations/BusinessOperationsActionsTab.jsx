@@ -132,7 +132,7 @@ const BusinessOperationsActionsTab = () => {
                   type="button"
                   onClick={closeWipeModal}
                   disabled={wipingData}
-                  style={{ border: isAdminDarkTheme ? '1px solid #324662' : '1px solid #cbd5e1', backgroundColor: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: isAdminDarkTheme ? '#b2c3d9' : '#334155', borderRadius: '9px', padding: '0.55rem 0.85rem', fontWeight: 700, cursor: wipingData ? 'not-allowed' : 'pointer' }}
+                  style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #cbd5e1', backgroundColor: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: isAdminDarkTheme ? '#b2c3d9' : '#334155', borderRadius: '9px', padding: '0.55rem 0.85rem', fontWeight: 700, cursor: wipingData ? 'not-allowed' : 'pointer' }}
                 >
                   Cancel
                 </button>

@@ -27,8 +27,8 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
   const themedCardStyle = isAdminDarkTheme
     ? {
       ...cardStyle,
-      backgroundColor: '#162235',
-      border: '1px solid #324662',
+      backgroundColor: '#1e1e1e',
+      border: '1px solid #333333',
       boxShadow: '0 16px 34px rgba(0, 0, 0, 0.35)',
     }
     : cardStyle;
@@ -358,8 +358,8 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
 
       {isEmployeesWorkspaceModalOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: isEmployeesWorkspaceMaximized ? '0.35rem' : '1rem' }}>
-          <div style={{ ...themedCardStyle, width: isEmployeesWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1320px, 98vw)', height: isEmployeesWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', overflow: 'hidden', padding: '1rem', borderRadius: isEmployeesWorkspaceMaximized ? '10px' : '18px', background: isAdminDarkTheme ? 'linear-gradient(180deg, #162235 0%, #101c2d 32%)' : 'linear-gradient(180deg, #f8fafc 0%, #ffffff 30%)', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ backgroundColor: isAdminDarkTheme ? '#101c2d' : '#fff', margin: '-1rem -1rem 0.85rem', padding: '1rem 1rem 0.9rem', borderBottom: isAdminDarkTheme ? '1px solid #324662' : '1px solid #e2e8f0', boxShadow: isAdminDarkTheme ? '0 14px 26px rgba(0, 0, 0, 0.28)' : '0 10px 24px rgba(15, 23, 42, 0.05)' }}>
+          <div style={{ ...themedCardStyle, width: isEmployeesWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1320px, 98vw)', height: isEmployeesWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', overflow: 'hidden', padding: '1rem', borderRadius: isEmployeesWorkspaceMaximized ? '10px' : '18px', background: isAdminDarkTheme ? 'linear-gradient(180deg, #1e1e1e 0%, #181818 32%)' : 'linear-gradient(180deg, #f8fafc 0%, #ffffff 30%)', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ backgroundColor: isAdminDarkTheme ? '#181818' : '#fff', margin: '-1rem -1rem 0.85rem', padding: '1rem 1rem 0.9rem', borderBottom: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', boxShadow: isAdminDarkTheme ? '0 14px 26px rgba(0, 0, 0, 0.28)' : '0 10px 24px rgba(15, 23, 42, 0.05)' }}>
               <div style={{ display: 'grid', gap: '0.85rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <div>

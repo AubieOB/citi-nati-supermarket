@@ -30,8 +30,8 @@ import '../../styles/admin-dashboard.css';
 
 const ADMIN_THEME_KEY = 'adminDashboardTheme';
 
-const ADMIN_DARK_BG = '#162235';
-const ADMIN_DARK_BORDER = '#324662';
+const ADMIN_DARK_BG = '#1e1e1e';
+const ADMIN_DARK_BORDER = '#333333';
 const ADMIN_DARK_TEXT = '#dbe7f8';
 
 const extractColorToken = (value) => {

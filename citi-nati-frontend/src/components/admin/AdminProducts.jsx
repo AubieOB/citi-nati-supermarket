@@ -2036,7 +2036,7 @@ const AdminProducts = () => {
                       {productCode ? (
                         <span style={{
                           fontFamily: 'monospace',
-                          backgroundColor: isAdminDarkTheme ? '#1e293b' : '#f3f4f6',
+                          backgroundColor: isAdminDarkTheme ? '#252525' : '#f3f4f6',
                           padding: '0.2rem 0.45rem',
                           borderRadius: '4px',
                           color: isAdminDarkTheme ? '#e2e8f0' : '#374151',
