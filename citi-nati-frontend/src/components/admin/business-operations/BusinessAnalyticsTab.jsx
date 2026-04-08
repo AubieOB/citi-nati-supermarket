@@ -237,6 +237,7 @@ const BusinessAnalyticsTab = ({
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [analytics, setAnalytics] = useState(null);
+  const [activeView, setActiveView] = useState('overview');
 
   const refreshIntervalRef = useRef(null);
   const refreshTimeoutRef = useRef(null);
@@ -644,6 +645,37 @@ const BusinessAnalyticsTab = ({
 
       {!loading && analytics && (
         <>
+          <div style={{ ...cardStyle, padding: '0.7rem 0.8rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {[
+                { id: 'overview', label: 'Overview' },
+                { id: 'trends', label: 'Trends' },
+                { id: 'rankings', label: 'Rankings' },
+              ].map((view) => {
+                const isActive = activeView === view.id;
+                return (
+                  <button
+                    key={view.id}
+                    type="button"
+                    onClick={() => setActiveView(view.id)}
+                    style={{
+                      border: isActive ? '1px solid #1d4ed8' : '1px solid #cbd5e1',
+                      backgroundColor: isActive ? '#dbeafe' : '#fff',
+                      color: isActive ? '#1d4ed8' : '#334155',
+                      borderRadius: '999px',
+                      padding: '0.34rem 0.7rem',
+                      fontWeight: 800,
+                      fontSize: '0.78rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {view.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
               <strong style={{ color: '#0f172a' }}>Growth Overview</strong>
@@ -693,7 +725,43 @@ const BusinessAnalyticsTab = ({
             ))}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '0.8rem' }}>
+          {activeView === 'overview' && (
+            <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
+              <strong style={{ color: '#0f172a' }}>Quick Health Summary</strong>
+              <p style={{ margin: '0.32rem 0 0.7rem', color: '#64748b', fontSize: '0.84rem' }}>
+                Compact snapshot of growth and current period performance.
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.6rem' }}>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.55rem 0.65rem' }}>
+                  <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700 }}>Period Sales Change</div>
+                  <div style={{ color: '#0f172a', fontSize: '0.92rem', fontWeight: 800, marginTop: '0.15rem' }}>
+                    {analytics.growth.selected.sales.percent.toFixed(1)}% ({money(analytics.growth.selected.sales.absolute)})
+                  </div>
+                </div>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.55rem 0.65rem' }}>
+                  <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700 }}>Period Invoice Change</div>
+                  <div style={{ color: '#0f172a', fontSize: '0.92rem', fontWeight: 800, marginTop: '0.15rem' }}>
+                    {analytics.growth.selected.invoices.percent.toFixed(1)}% ({intFmt(analytics.growth.selected.invoices.absolute)})
+                  </div>
+                </div>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.55rem 0.65rem' }}>
+                  <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700 }}>Month vs Previous</div>
+                  <div style={{ color: '#0f172a', fontSize: '0.92rem', fontWeight: 800, marginTop: '0.15rem' }}>
+                    {analytics.growth.monthVsPrevious.percent.toFixed(1)}% ({money(analytics.growth.monthVsPrevious.absolute)})
+                  </div>
+                </div>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.55rem 0.65rem' }}>
+                  <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700 }}>Year vs Previous</div>
+                  <div style={{ color: '#0f172a', fontSize: '0.92rem', fontWeight: 800, marginTop: '0.15rem' }}>
+                    {analytics.growth.yearVsPrevious.percent.toFixed(1)}% ({money(analytics.growth.yearVsPrevious.absolute)})
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeView === 'trends' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '0.8rem' }}>
             <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
               <strong style={{ color: '#0f172a' }}>Daily Trend</strong>
               <p style={{ margin: '0.32rem 0 0.6rem', color: '#64748b', fontSize: '0.84rem' }}>Sales and invoice cadence over the selected period.</p>
@@ -730,8 +798,11 @@ const BusinessAnalyticsTab = ({
               </div>
             </div>
           </div>
+            </div>
+          )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '0.8rem' }}>
+          {activeView === 'trends' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '0.8rem' }}>
             <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
               <strong style={{ color: '#0f172a' }}>Yearly Comparison</strong>
               <div style={{ marginTop: '0.6rem', display: 'grid', gap: '0.42rem' }}>
@@ -761,8 +832,11 @@ const BusinessAnalyticsTab = ({
               </div>
             </div>
           </div>
+            </div>
+          )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.8rem' }}>
+          {activeView === 'rankings' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.8rem' }}>
             <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
               <strong style={{ color: '#0f172a' }}>Top Products</strong>
               <div style={{ marginTop: '0.6rem', display: 'grid', gap: '0.45rem' }}>
@@ -808,8 +882,11 @@ const BusinessAnalyticsTab = ({
               </div>
             </div>
           </div>
+            </div>
+          )}
 
-          <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
+          {activeView === 'rankings' && (
+            <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
             <strong style={{ color: '#0f172a' }}>Cashier/User Performance</strong>
             <div style={{ marginTop: '0.6rem', overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -837,7 +914,8 @@ const BusinessAnalyticsTab = ({
                 </tbody>
               </table>
             </div>
-          </div>
+            </div>
+          )}
         </>
       )}
 
