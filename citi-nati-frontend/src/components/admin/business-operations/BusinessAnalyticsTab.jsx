@@ -594,7 +594,7 @@ const BusinessAnalyticsTab = ({
               </select>
             </label>
 
-            {(filters.periodType === 'month' || filters.periodType === 'quarter') && (
+            {(filters.periodType === 'month' || filters.periodType === 'quarter' || filters.periodType === 'year') && (
               <label style={{ display: 'grid', gap: '0.35rem' }}>
                 <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Year</span>
                 <input type="number" value={filters.year} onChange={(event) => setFilters((prev) => ({ ...prev, year: Number(event.target.value || new Date().getFullYear()) }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }} />
