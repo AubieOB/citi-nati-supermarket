@@ -1454,10 +1454,10 @@ const BusinessAnalyticsTab = ({
                         width: 'min(1240px, 98vw)',
                         maxHeight: '92vh',
                         overflowY: 'auto',
-                        backgroundColor: '#f8fafc',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '18px',
-                        boxShadow: '0 28px 54px rgba(15, 23, 42, 0.32)',
+                        background: 'linear-gradient(145deg, #f8fafc 0%, #eef4ff 52%, #f8fafc 100%)',
+                        border: '1px solid #bfdbfe',
+                        borderRadius: '20px',
+                        boxShadow: '0 30px 60px rgba(15, 23, 42, 0.35)',
                         padding: '1rem',
                         display: 'grid',
                         gap: '0.78rem',
@@ -1479,32 +1479,32 @@ const BusinessAnalyticsTab = ({
                       </div>
 
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '0.8rem' }}>
-                        <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
+                        <div style={{ ...cardStyle, padding: '0.95rem 1rem', background: 'linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)', borderColor: '#bfdbfe' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                             <strong style={{ color: '#0f172a' }}>Calculator Panel</strong>
                             <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>Manual + System Assisted</span>
                           </div>
 
                           <div style={{ marginTop: '0.62rem', display: 'flex', flexWrap: 'wrap', gap: '0.42rem', marginBottom: '0.75rem' }}>
-                            <button type="button" onClick={() => applyAnalysisPreset('selected-vs-previous')} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '999px', padding: '0.3rem 0.58rem', fontSize: '0.74rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>Use Selected vs Previous</button>
-                            <button type="button" onClick={() => applyAnalysisPreset('month-vs-previous')} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '999px', padding: '0.3rem 0.58rem', fontSize: '0.74rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>Use Month vs Previous</button>
-                            <button type="button" onClick={() => applyAnalysisPreset('year-vs-previous')} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '999px', padding: '0.3rem 0.58rem', fontSize: '0.74rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>Use Year vs Previous</button>
-                            <button type="button" onClick={() => applyAnalysisPreset('kpi-base')} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '999px', padding: '0.3rem 0.58rem', fontSize: '0.74rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>Use KPI Snapshot</button>
-                            <button type="button" onClick={() => applyAnalysisPreset('branch-compare')} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '999px', padding: '0.3rem 0.58rem', fontSize: '0.74rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>Use BT vs ZA Sales</button>
+                            <button type="button" onClick={() => applyAnalysisPreset('selected-vs-previous')} style={{ border: '1px solid #bfdbfe', backgroundColor: '#eff6ff', borderRadius: '999px', padding: '0.34rem 0.6rem', fontSize: '0.74rem', fontWeight: 800, color: '#1e3a8a', cursor: 'pointer' }}>Use Selected vs Previous</button>
+                            <button type="button" onClick={() => applyAnalysisPreset('month-vs-previous')} style={{ border: '1px solid #bfdbfe', backgroundColor: '#eff6ff', borderRadius: '999px', padding: '0.34rem 0.6rem', fontSize: '0.74rem', fontWeight: 800, color: '#1e3a8a', cursor: 'pointer' }}>Use Month vs Previous</button>
+                            <button type="button" onClick={() => applyAnalysisPreset('year-vs-previous')} style={{ border: '1px solid #bfdbfe', backgroundColor: '#eff6ff', borderRadius: '999px', padding: '0.34rem 0.6rem', fontSize: '0.74rem', fontWeight: 800, color: '#1e3a8a', cursor: 'pointer' }}>Use Year vs Previous</button>
+                            <button type="button" onClick={() => applyAnalysisPreset('kpi-base')} style={{ border: '1px solid #bfdbfe', backgroundColor: '#eff6ff', borderRadius: '999px', padding: '0.34rem 0.6rem', fontSize: '0.74rem', fontWeight: 800, color: '#1e3a8a', cursor: 'pointer' }}>Use KPI Snapshot</button>
+                            <button type="button" onClick={() => applyAnalysisPreset('branch-compare')} style={{ border: '1px solid #bfdbfe', backgroundColor: '#eff6ff', borderRadius: '999px', padding: '0.34rem 0.6rem', fontSize: '0.74rem', fontWeight: 800, color: '#1e3a8a', cursor: 'pointer' }}>Use BT vs ZA Sales</button>
                           </div>
 
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.6rem' }}>
                             {activeToolConfig.fields.map((fieldKey) => {
                               const fieldDef = ANALYSIS_FIELDS[fieldKey] || { label: fieldKey, step: '0.01' };
                               return (
-                                <label key={fieldKey} style={{ display: 'grid', gap: '0.28rem' }}>
-                                  <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>{fieldDef.label}</span>
+                                <label key={fieldKey} style={{ display: 'grid', gap: '0.28rem', border: '1px solid #dbeafe', borderRadius: '12px', padding: '0.45rem 0.5rem', backgroundColor: '#f8fbff' }}>
+                                  <span style={{ color: '#475569', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.03em' }}>{fieldDef.label}</span>
                                   <input
                                     type="number"
                                     step={fieldDef.step}
                                     value={analysisInputs[fieldKey]}
                                     onChange={(event) => updateAnalysisInput(fieldKey, event.target.value)}
-                                    style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.58rem', color: '#0f172a' }}
+                                    style={{ border: '1px solid #93c5fd', borderRadius: '10px', padding: '0.58rem 0.62rem', color: '#0f172a', backgroundColor: '#fff', fontFamily: 'Consolas, Menlo, Monaco, monospace', fontWeight: 800, fontSize: '0.95rem', boxShadow: 'inset 0 1px 3px rgba(15, 23, 42, 0.08)' }}
                                   />
                                 </label>
                               );
@@ -1512,7 +1512,8 @@ const BusinessAnalyticsTab = ({
                           </div>
 
                           <div style={{ marginTop: '0.72rem', display: 'flex', gap: '0.52rem', flexWrap: 'wrap' }}>
-                            <button type="button" onClick={runAnalysis} style={{ border: '1px solid #1d4ed8', backgroundColor: '#1d4ed8', color: '#fff', borderRadius: '9px', padding: '0.5rem 0.8rem', fontWeight: 800, cursor: 'pointer' }}>
+                            <button type="button" onClick={runAnalysis} style={{ border: '1px solid #1d4ed8', background: 'linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%)', color: '#fff', borderRadius: '10px', padding: '0.54rem 0.86rem', fontWeight: 900, letterSpacing: '0.02em', cursor: 'pointer', boxShadow: '0 10px 20px rgba(37, 99, 235, 0.28)' }}>
+                              <i className="fas fa-play" style={{ marginRight: '0.34rem', fontSize: '0.72rem' }}></i>
                               Run Calculation
                             </button>
                             <button
@@ -1525,14 +1526,15 @@ const BusinessAnalyticsTab = ({
                                 setAnalysisInputs(resetValues);
                                 setAnalysisResult(null);
                               }}
-                              style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.5rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                              style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.5rem 0.8rem', fontWeight: 800, cursor: 'pointer' }}
                             >
+                              <i className="fas fa-rotate-left" style={{ marginRight: '0.34rem', fontSize: '0.72rem' }}></i>
                               Reset Inputs
                             </button>
                           </div>
                         </div>
 
-                        <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
+                        <div style={{ ...cardStyle, padding: '0.95rem 1rem', background: 'linear-gradient(180deg, #ffffff 0%, #f0f9ff 100%)', borderColor: '#bae6fd' }}>
                           <strong style={{ color: '#0f172a' }}>Results Panel</strong>
                           {!analysisResult ? (
                             <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.82rem' }}>
@@ -1547,25 +1549,25 @@ const BusinessAnalyticsTab = ({
                                 </span>
                               </div>
 
-                              <div style={{ marginTop: '0.62rem', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.75rem 0.78rem', backgroundColor: '#f8fafc' }}>
-                                <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700 }}>{analysisResult.mainLabel}</div>
-                                <div style={{ marginTop: '0.2rem', color: '#0f172a', fontWeight: 900, fontSize: '1.32rem' }}>{analysisResult.mainValue}</div>
-                                <div style={{ marginTop: '0.2rem', color: '#475569', fontSize: '0.8rem', fontWeight: 700 }}>{analysisResult.subValue}</div>
+                              <div style={{ marginTop: '0.62rem', border: '1px solid #93c5fd', borderRadius: '14px', padding: '0.82rem 0.84rem', background: 'linear-gradient(145deg, #eff6ff 0%, #dbeafe 100%)' }}>
+                                <div style={{ color: '#1e3a8a', fontSize: '0.74rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{analysisResult.mainLabel}</div>
+                                <div style={{ marginTop: '0.24rem', color: '#0f172a', fontWeight: 900, fontSize: '1.48rem', fontFamily: 'Consolas, Menlo, Monaco, monospace' }}>{analysisResult.mainValue}</div>
+                                <div style={{ marginTop: '0.24rem', color: '#1e40af', fontSize: '0.82rem', fontWeight: 800 }}>{analysisResult.subValue}</div>
                               </div>
 
-                              <div style={{ marginTop: '0.62rem', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.58rem 0.62rem' }}>
-                                <div style={{ color: '#64748b', fontSize: '0.74rem', fontWeight: 800 }}>Formula Used</div>
-                                <div style={{ marginTop: '0.2rem', color: '#0f172a', fontSize: '0.8rem', fontWeight: 700 }}>{analysisResult.formula}</div>
-                                <div style={{ marginTop: '0.34rem', color: '#475569', fontSize: '0.79rem' }}>{analysisResult.interpretation}</div>
+                              <div style={{ marginTop: '0.62rem', border: '1px solid #dbeafe', borderRadius: '10px', padding: '0.62rem 0.68rem', backgroundColor: '#ffffff' }}>
+                                <div style={{ color: '#475569', fontSize: '0.74rem', fontWeight: 800 }}>Formula Used</div>
+                                <div style={{ marginTop: '0.2rem', color: '#0f172a', fontSize: '0.8rem', fontWeight: 700, fontFamily: 'Consolas, Menlo, Monaco, monospace' }}>{analysisResult.formula}</div>
+                                <div style={{ marginTop: '0.34rem', color: '#334155', fontSize: '0.8rem', lineHeight: 1.5 }}>{analysisResult.interpretation}</div>
                               </div>
 
                               <div style={{ marginTop: '0.62rem' }}>
                                 <div style={{ color: '#64748b', fontSize: '0.74rem', fontWeight: 800, marginBottom: '0.28rem' }}>Values Used</div>
                                 <div style={{ display: 'grid', gap: '0.3rem' }}>
                                   {analysisResult.usedValues.map((row) => (
-                                    <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.52rem', border: '1px solid #edf2f7', borderRadius: '8px', padding: '0.34rem 0.48rem' }}>
+                                    <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.52rem', border: '1px solid #e2e8f0', borderRadius: '9px', padding: '0.36rem 0.5rem', backgroundColor: '#fff' }}>
                                       <span style={{ color: '#64748b', fontSize: '0.76rem', fontWeight: 700 }}>{row.label}</span>
-                                      <span style={{ color: '#0f172a', fontSize: '0.78rem', fontWeight: 800 }}>{row.value}</span>
+                                      <span style={{ color: '#0f172a', fontSize: '0.8rem', fontWeight: 900, fontFamily: 'Consolas, Menlo, Monaco, monospace' }}>{row.value}</span>
                                     </div>
                                   ))}
                                 </div>
