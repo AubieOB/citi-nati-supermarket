@@ -76,6 +76,10 @@ const AdminProducts = () => {
   const posExpiryInFlightRef = useRef(false);
   const filterBarRef = useRef(null);
   const { modal, closeModal, showConfirm, showError, showSuccess } = useModal();
+  const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
+  const textPrimary = isAdminDarkTheme ? '#f8fafc' : '#111827';
+  const textSecondary = isAdminDarkTheme ? '#cbd5e1' : '#666';
+  const textMuted = isAdminDarkTheme ? '#94a3b8' : '#999';
 
   const voiceDigitMap = {
     zero: '0',
@@ -1870,7 +1874,7 @@ const AdminProducts = () => {
           <div style={{
             marginLeft: 'auto',
             fontSize: '0.9rem',
-            color: '#666',
+            color: textSecondary,
             minWidth: '100px',
             textAlign: 'right',
           }}>
@@ -1936,7 +1940,7 @@ const AdminProducts = () => {
           <div style={{
             marginLeft: 'auto',
             fontSize: '0.9rem',
-            color: '#666',
+            color: textSecondary,
             minWidth: '140px',
             textAlign: 'right',
           }}>
@@ -1956,7 +1960,7 @@ const AdminProducts = () => {
             padding: '2rem',
             borderRadius: '8px',
             textAlign: 'center',
-            color: '#666',
+            color: textSecondary,
           }}>
             No products yet. Create your first product!
           </div>
@@ -1966,7 +1970,7 @@ const AdminProducts = () => {
             padding: '2rem',
             borderRadius: '8px',
             textAlign: 'center',
-            color: '#666',
+            color: textSecondary,
           }}>
             No products match your search or filter criteria.
           </div>
@@ -1975,21 +1979,21 @@ const AdminProducts = () => {
             <table style={{
               width: '100%',
               borderCollapse: 'collapse',
-              backgroundColor: '#fff',
+              backgroundColor: isAdminDarkTheme ? '#12233c' : '#fff',
               borderRadius: '8px',
               overflow: 'hidden',
               boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
             }}>
-              <thead style={{ backgroundColor: '#f8f9fa', borderBottom: '2px solid #ddd' }}>
+              <thead style={{ backgroundColor: isAdminDarkTheme ? '#0f1f35' : '#f8f9fa', borderBottom: isAdminDarkTheme ? '1px solid #2b3c54' : '2px solid #ddd' }}>
                 <tr>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem' }}>ID</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem' }}>Name</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem' }}>Product Code</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem' }}>Category</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem' }}>Pricing</th>
-                  <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', fontSize: '0.9rem' }}>Stock</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem' }}>Expiry Status</th>
-                  <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', fontSize: '0.9rem' }}>Actions</th>
+                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem', color: textPrimary }}>ID</th>
+                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem', color: textPrimary }}>Name</th>
+                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem', color: textPrimary }}>Product Code</th>
+                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem', color: textPrimary }}>Category</th>
+                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem', color: textPrimary }}>Pricing</th>
+                  <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', fontSize: '0.9rem', color: textPrimary }}>Stock</th>
+                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem', color: textPrimary }}>Expiry Status</th>
+                  <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', fontSize: '0.9rem', color: textPrimary }}>Actions</th>
                 </tr>
               </thead>
             <tbody>
@@ -2014,31 +2018,36 @@ const AdminProducts = () => {
                     key={product.id} 
                     style={{ 
                       borderBottom: '1px solid #eee',
-                      backgroundColor: product.expiryStatus?.status === 'expired' ? '#ffebee' : ['expiring_soon', '1_week_warning', '2_weeks_warning'].includes(product.expiryStatus?.status) ? '#fff3e0' : 'transparent'
+                      backgroundColor: product.expiryStatus?.status === 'expired'
+                        ? (isAdminDarkTheme ? '#2b1518' : '#ffebee')
+                        : ['expiring_soon', '1_week_warning', '2_weeks_warning'].includes(product.expiryStatus?.status)
+                          ? (isAdminDarkTheme ? '#2b2317' : '#fff3e0')
+                          : (isAdminDarkTheme ? '#12233c' : 'transparent'),
+                      color: textPrimary,
                     }}
                   >
-                    <td style={{ padding: '1rem', fontSize: '0.9rem' }}>#{product.id}</td>
-                    <td style={{ padding: '1rem', fontWeight: '500' }}>{product.name}</td>
+                    <td style={{ padding: '1rem', fontSize: '0.9rem', color: textPrimary }}>#{product.id}</td>
+                    <td style={{ padding: '1rem', fontWeight: '500', color: textPrimary }}>{product.name}</td>
                     <td style={{ padding: '1rem', fontSize: '0.85rem' }}>
                       {productCode ? (
                         <span style={{
                           fontFamily: 'monospace',
-                          backgroundColor: '#f3f4f6',
+                          backgroundColor: isAdminDarkTheme ? '#1e293b' : '#f3f4f6',
                           padding: '0.2rem 0.45rem',
                           borderRadius: '4px',
-                          color: '#374151',
+                          color: isAdminDarkTheme ? '#e2e8f0' : '#374151',
                         }}>
                           {productCode}
                         </span>
                       ) : (
-                        <span style={{ color: '#999' }}>—</span>
+                        <span style={{ color: textMuted }}>—</span>
                       )}
                     </td>
-                    <td style={{ padding: '1rem', fontSize: '0.9rem', color: '#666' }}>{product.category}</td>
+                    <td style={{ padding: '1rem', fontSize: '0.9rem', color: textSecondary }}>{product.category}</td>
                     <td style={{ padding: '1rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                         {product.isOnSale && product.discountPrice && product.originalPrice && hasValidDiscount && (
-                          <span style={{ textDecoration: 'line-through', color: '#666', fontWeight: '500', fontSize: '0.8rem' }}>
+                          <span style={{ textDecoration: 'line-through', color: textSecondary, fontWeight: '500', fontSize: '0.8rem' }}>
                             {formatMWK(product.originalPrice)}
                           </span>
                         )}
@@ -2087,7 +2096,7 @@ const AdminProducts = () => {
                               style={{
                                 border: 'none',
                                 background: 'transparent',
-                                color: '#374151',
+                                color: textSecondary,
                                 cursor: 'pointer',
                                 padding: 0,
                                 display: 'inline-flex',
@@ -2118,21 +2127,21 @@ const AdminProducts = () => {
                               <div style={{
                                 padding: '0.65rem 0.75rem',
                                 borderRadius: '8px',
-                                backgroundColor: '#f8fafc',
-                                border: '1px solid #e5e7eb',
+                                backgroundColor: isAdminDarkTheme ? '#0f1f35' : '#f8fafc',
+                                border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #e5e7eb',
                               }}>
-                                <div style={{ fontSize: '0.82rem', color: '#4b5563', marginBottom: '0.25rem' }}>
+                                <div style={{ fontSize: '0.82rem', color: textSecondary, marginBottom: '0.25rem' }}>
                                   Default visible batch
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                                  <div style={{ color: '#111827', fontWeight: '700' }}>
+                                  <div style={{ color: textPrimary, fontWeight: '700' }}>
                                     Expires: {formatExpiryDate(defaultBatch.expiryDate)}
                                   </div>
-                                  <div style={{ fontSize: '0.8rem', color: '#4b5563' }}>
+                                  <div style={{ fontSize: '0.8rem', color: textSecondary }}>
                                     {formatBatchIdentity(defaultBatch, defaultBatchIndex)}
                                   </div>
                                   {defaultBatch.receivedQty != null && (
-                                    <div style={{ fontSize: '0.8rem', color: '#4b5563' }}>
+                                    <div style={{ fontSize: '0.8rem', color: textSecondary }}>
                                       Received Qty {defaultBatch.receivedQty}
                                     </div>
                                   )}
@@ -2166,19 +2175,19 @@ const AdminProducts = () => {
                                       alignItems: 'center',
                                       padding: '0.6rem 0.75rem',
                                       borderRadius: '8px',
-                                      backgroundColor: '#ffffff',
-                                      border: '1px solid #e5e7eb',
+                                      backgroundColor: isAdminDarkTheme ? '#0f1f35' : '#ffffff',
+                                      border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #e5e7eb',
                                     }}
                                   >
                                     <div>
-                                      <div style={{ fontSize: '0.82rem', fontWeight: '700', color: '#111827' }}>
+                                      <div style={{ fontSize: '0.82rem', fontWeight: '700', color: textPrimary }}>
                                         {formatBatchIdentity(batch, batchIndex)}
                                       </div>
-                                      <div style={{ fontSize: '0.8rem', color: '#4b5563' }}>
+                                      <div style={{ fontSize: '0.8rem', color: textSecondary }}>
                                         Expiry Date {formatExpiryDate(batch.expiryDate)}
                                       </div>
                                       {batch.receivedQty != null && (
-                                        <div style={{ fontSize: '0.8rem', color: '#4b5563' }}>
+                                        <div style={{ fontSize: '0.8rem', color: textSecondary }}>
                                           Received Qty {batch.receivedQty}
                                         </div>
                                       )}
@@ -2224,11 +2233,11 @@ const AdminProducts = () => {
                           <><i className={expiryBadge.icon}></i> {expiryBadge.label}</>
                         </span>
                       ) : product.expiryDate ? (
-                        <span style={{ color: '#4b5563' }}>
+                        <span style={{ color: textSecondary }}>
                           {new Date(product.expiryDate).toLocaleDateString()}
                         </span>
                       ) : (
-                        <span style={{ color: '#999' }}>—</span>
+                        <span style={{ color: textMuted }}>—</span>
                       )}
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'center', minWidth: '160px' }}>
