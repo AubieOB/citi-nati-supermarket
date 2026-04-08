@@ -25,6 +25,16 @@ const SupportDashboard = () => {
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useAuth();
   const socket = useRef(getSocket());
+  const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
+
+  const panelBg = isAdminDarkTheme ? '#1e1e1e' : '#fff';
+  const panelSoft = isAdminDarkTheme ? '#181818' : '#f8f9fa';
+  const panelAlt = isAdminDarkTheme ? '#202020' : '#f0f8ff';
+  const borderColor = isAdminDarkTheme ? '#333333' : '#e0e0e0';
+  const textPrimary = isAdminDarkTheme ? '#f1f5f9' : '#333';
+  const textSecondary = isAdminDarkTheme ? '#c4c4c4' : '#666';
+  const textMuted = isAdminDarkTheme ? '#9a9a9a' : '#999';
+  const inputBg = isAdminDarkTheme ? '#161616' : '#fff';
 
   // Filter state
   const [filterStatus, setFilterStatus] = useState('');
@@ -465,8 +475,8 @@ const SupportDashboard = () => {
           left: `${filterBarLayout.left}px`,
           width: `${filterBarLayout.width}px`,
           zIndex: 80,
-          backgroundColor: '#fff',
-          border: '1px solid #eee',
+          backgroundColor: panelBg,
+          border: `1px solid ${borderColor}`,
           borderRadius: '8px',
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
           boxSizing: 'border-box',
@@ -480,9 +490,9 @@ const SupportDashboard = () => {
           gap: '0.6rem',
         }}>
           <i className="fas fa-life-ring" style={{ fontSize: '1.2rem', color: '#5B4B8A' }}></i>
-          <h1 style={{ margin: 0, color: '#333', fontSize: '1.15rem' }}>Support Tickets</h1>
+          <h1 style={{ margin: 0, color: textPrimary, fontSize: '1.15rem' }}>Support Tickets</h1>
         </div>
-        <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600', marginTop: '0.5rem' }}>
+        <div style={{ color: textSecondary, fontSize: '0.85rem', fontWeight: '600', marginTop: '0.5rem' }}>
           Total: {tickets.length} | Open: {tickets.filter(t => t.status === 'OPEN').length} {unattendedCount > 0 && ` | ⚠️ ${unattendedCount} Unattended`}
         </div>
       </div>
@@ -532,17 +542,18 @@ const SupportDashboard = () => {
               <div style={{
                 marginBottom: '1.5rem',
                 padding: '1rem',
-                backgroundColor: '#f8f9fa',
+                backgroundColor: panelSoft,
+                border: `1px solid ${borderColor}`,
                 borderRadius: '8px'
               }}>
-                <h4 style={{ margin: '0 0 1rem 0', color: '#333' }}>Filters</h4>
+                <h4 style={{ margin: '0 0 1rem 0', color: textPrimary }}>Filters</h4>
 
                 <div style={{ marginBottom: '1rem' }}>
                   <label style={{
                     display: 'block',
                     marginBottom: '0.5rem',
                     fontSize: '0.9rem',
-                    color: '#666',
+                    color: textSecondary,
                     fontWeight: '500'
                   }}>
                     Status
@@ -553,9 +564,11 @@ const SupportDashboard = () => {
                     style={{
                       width: '100%',
                       padding: '0.5rem',
-                      border: '1px solid #ddd',
+                      border: `1px solid ${borderColor}`,
                       borderRadius: '4px',
-                      fontSize: '0.9rem'
+                      fontSize: '0.9rem',
+                      backgroundColor: inputBg,
+                      color: textPrimary,
                     }}
                   >
                     <option value="">All Status</option>
@@ -570,7 +583,7 @@ const SupportDashboard = () => {
                     display: 'block',
                     marginBottom: '0.5rem',
                     fontSize: '0.9rem',
-                    color: '#666',
+                    color: textSecondary,
                     fontWeight: '500'
                   }}>
                     Priority
@@ -581,9 +594,11 @@ const SupportDashboard = () => {
                     style={{
                       width: '100%',
                       padding: '0.5rem',
-                      border: '1px solid #ddd',
+                      border: `1px solid ${borderColor}`,
                       borderRadius: '4px',
-                      fontSize: '0.9rem'
+                      fontSize: '0.9rem',
+                      backgroundColor: inputBg,
+                      color: textPrimary,
                     }}
                   >
                     <option value="">All Priority</option>
@@ -600,11 +615,12 @@ const SupportDashboard = () => {
                 <div style={{
                   textAlign: 'center',
                   padding: '2rem',
-                  backgroundColor: '#f8f9fa',
+                  backgroundColor: panelSoft,
+                  border: `1px solid ${borderColor}`,
                   borderRadius: '8px'
                 }}>
                   <i className="fas fa-inbox" style={{ fontSize: '2rem', color: '#ccc', marginBottom: '0.5rem' }}></i>
-                  <p style={{ color: '#666', margin: 0 }}>No tickets matching filters</p>
+                  <p style={{ color: textSecondary, margin: 0 }}>No tickets matching filters</p>
                 </div>
               ) : (
                 <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
@@ -615,16 +631,16 @@ const SupportDashboard = () => {
                       style={{
                         padding: '1rem',
                         marginBottom: '0.75rem',
-                        border: '1px solid #e0e0e0',
+                        border: `1px solid ${borderColor}`,
                         borderRadius: '4px',
                         cursor: 'pointer',
-                        backgroundColor: selectedTicket?.id === ticket.id ? '#f0f8ff' : 'white',
+                        backgroundColor: selectedTicket?.id === ticket.id ? panelAlt : panelBg,
                         borderLeft: `4px solid ${statusColor(ticket.status)}`,
                         transition: 'all 0.2s'
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '0.5rem' }}>
-                        <span style={{ fontWeight: '500', color: '#333' }}>#{ticket.id}</span>
+                        <span style={{ fontWeight: '500', color: textPrimary }}>#{ticket.id}</span>
                         <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
                           <span style={{
                             fontSize: '0.7rem',
@@ -667,10 +683,10 @@ const SupportDashboard = () => {
                           </button>
                         </div>
                       </div>
-                      <p style={{ margin: '0.25rem 0', color: '#333', fontSize: '0.9rem', fontWeight: '500' }}>
+                      <p style={{ margin: '0.25rem 0', color: textPrimary, fontSize: '0.9rem', fontWeight: '500' }}>
                         {ticket.subject.substring(0, 30)}...
                       </p>
-                      <div style={{ fontSize: '0.8rem', color: '#999' }}>
+                      <div style={{ fontSize: '0.8rem', color: textMuted }}>
                         {ticket.user?.name} • {new Date(ticket.createdAt).toLocaleDateString()}
                       </div>
                     </div>
@@ -683,17 +699,17 @@ const SupportDashboard = () => {
             {selectedTicket ? (
               <div style={{
                 padding: '1.5rem',
-                backgroundColor: '#f8f9fa',
+                backgroundColor: panelSoft,
                 borderRadius: '8px',
-                border: '1px solid #e0e0e0'
+                border: `1px solid ${borderColor}`
               }}>
-                <div style={{ marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid #e0e0e0' }}>
+                <div style={{ marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: `1px solid ${borderColor}` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1rem' }}>
                     <div>
-                      <h3 style={{ margin: '0 0 0.5rem 0', color: '#333' }}>
+                      <h3 style={{ margin: '0 0 0.5rem 0', color: textPrimary }}>
                         Ticket #{selectedTicket.id}
                       </h3>
-                      <p style={{ margin: '0', color: '#666' }}>
+                      <p style={{ margin: '0', color: textSecondary }}>
                         {selectedTicket.subject}
                       </p>
                     </div>
@@ -720,7 +736,7 @@ const SupportDashboard = () => {
                           border: 'none',
                           fontSize: '1.5rem',
                           cursor: 'pointer',
-                          color: '#999'
+                          color: textMuted
                         }}
                       >
                         ✕
@@ -730,17 +746,19 @@ const SupportDashboard = () => {
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                     <div>
-                      <label style={{ fontSize: '0.85rem', color: '#666', fontWeight: '500' }}>Status</label>
+                      <label style={{ fontSize: '0.85rem', color: textSecondary, fontWeight: '500' }}>Status</label>
                       <select
                         value={selectedTicket.status}
                         onChange={(e) => handleStatusChange(selectedTicket.id, e.target.value)}
                         style={{
                           width: '100%',
                           padding: '0.5rem',
-                          border: '1px solid #ddd',
+                          border: `1px solid ${borderColor}`,
                           borderRadius: '4px',
                           fontSize: '0.9rem',
-                          marginTop: '0.25rem'
+                          marginTop: '0.25rem',
+                          backgroundColor: inputBg,
+                          color: textPrimary,
                         }}
                       >
                         <option value="OPEN">Open</option>
@@ -750,17 +768,19 @@ const SupportDashboard = () => {
                     </div>
 
                     <div>
-                      <label style={{ fontSize: '0.85rem', color: '#666', fontWeight: '500' }}>Priority</label>
+                      <label style={{ fontSize: '0.85rem', color: textSecondary, fontWeight: '500' }}>Priority</label>
                       <select
                         value={selectedTicket.priority}
                         onChange={(e) => handlePriorityChange(selectedTicket.id, e.target.value)}
                         style={{
                           width: '100%',
                           padding: '0.5rem',
-                          border: '1px solid #ddd',
+                          border: `1px solid ${borderColor}`,
                           borderRadius: '4px',
                           fontSize: '0.9rem',
-                          marginTop: '0.25rem'
+                          marginTop: '0.25rem',
+                          backgroundColor: inputBg,
+                          color: textPrimary,
                         }}
                       >
                         <option value="LOW">Low</option>
@@ -771,7 +791,7 @@ const SupportDashboard = () => {
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.85rem', color: '#666' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.85rem', color: textSecondary }}>
                     <div>
                       <strong>Customer:</strong> {selectedTicket.user?.name}
                       <br />
@@ -789,12 +809,12 @@ const SupportDashboard = () => {
                 <div style={{
                   marginBottom: '1.5rem',
                   padding: '1rem',
-                  backgroundColor: 'white',
+                  backgroundColor: panelBg,
                   borderRadius: '4px',
-                  border: '1px solid #e0e0e0'
+                  border: `1px solid ${borderColor}`
                 }}>
-                  <h4 style={{ margin: '0 0 0.5rem 0', color: '#333' }}>Original Message</h4>
-                  <p style={{ margin: 0, color: '#666', lineHeight: '1.6' }}>
+                  <h4 style={{ margin: '0 0 0.5rem 0', color: textPrimary }}>Original Message</h4>
+                  <p style={{ margin: 0, color: textSecondary, lineHeight: '1.6' }}>
                     {selectedTicket.message}
                   </p>
                 </div>
@@ -805,11 +825,11 @@ const SupportDashboard = () => {
                   maxHeight: '300px',
                   overflowY: 'auto'
                 }}>
-                  <h4 style={{ margin: '0 0 1rem 0', color: '#333' }}>
+                  <h4 style={{ margin: '0 0 1rem 0', color: textPrimary }}>
                     Replies ({selectedTicket.replies.length})
                   </h4>
                   {selectedTicket.replies.length === 0 ? (
-                    <p style={{ color: '#999', fontStyle: 'italic' }}>No replies yet</p>
+                    <p style={{ color: textMuted, fontStyle: 'italic' }}>No replies yet</p>
                   ) : (
                     selectedTicket.replies.map(reply => (
                       <div
@@ -817,21 +837,21 @@ const SupportDashboard = () => {
                         style={{
                           marginBottom: '1rem',
                           padding: '0.75rem',
-                          backgroundColor: 'white',
+                          backgroundColor: panelBg,
                           borderRadius: '4px',
-                          border: '1px solid #e0e0e0'
+                          border: `1px solid ${borderColor}`
                         }}
                       >
-                        <div style={{ fontSize: '0.8rem', color: '#999', marginBottom: '0.25rem' }}>
+                        <div style={{ fontSize: '0.8rem', color: textMuted, marginBottom: '0.25rem' }}>
                           {new Date(reply.createdAt).toLocaleString()}
                         </div>
-                        <p style={{ margin: '0.25rem 0', color: '#333', fontSize: '0.9rem' }}>
+                        <p style={{ margin: '0.25rem 0', color: textPrimary, fontSize: '0.9rem' }}>
                           {reply.message}
                         </p>
                         {/* Display Attachments */}
                         {reply.attachments && reply.attachments.length > 0 && (
                           <div style={{ marginTop: '0.75rem' }}>
-                            <div style={{ fontSize: '0.75rem', color: '#666', marginBottom: '0.5rem' }}>
+                            <div style={{ fontSize: '0.75rem', color: textSecondary, marginBottom: '0.5rem' }}>
                               <i className="fas fa-paperclip"></i> Attachments:
                             </div>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -846,7 +866,7 @@ const SupportDashboard = () => {
                                   download={attachment.fileName}
                                   style={{
                                     padding: '0.35rem 0.5rem',
-                                    backgroundColor: '#f0f8ff',
+                                    backgroundColor: isAdminDarkTheme ? '#222222' : '#f0f8ff',
                                     color: '#2D8659',
                                     textDecoration: 'none',
                                     borderRadius: '3px',
@@ -873,7 +893,7 @@ const SupportDashboard = () => {
                   <div style={{
                     marginBottom: '1rem',
                     padding: '0.75rem',
-                    backgroundColor: '#f0f8ff',
+                    backgroundColor: isAdminDarkTheme ? '#222222' : '#f0f8ff',
                     borderRadius: '4px',
                     fontStyle: 'italic',
                     color: '#2D8659',
@@ -890,7 +910,7 @@ const SupportDashboard = () => {
                       display: 'block',
                       marginBottom: '0.5rem',
                       fontWeight: '500',
-                      color: '#333',
+                      color: textPrimary,
                       fontSize: '0.9rem'
                     }}>
                       Send Reply
@@ -901,11 +921,11 @@ const SupportDashboard = () => {
                       <div style={{
                         marginBottom: '0.75rem',
                         padding: '0.75rem',
-                        backgroundColor: '#f0f8ff',
+                        backgroundColor: isAdminDarkTheme ? '#222222' : '#f0f8ff',
                         borderRadius: '4px',
                         border: '1px solid #2D8659'
                       }}>
-                        <h5 style={{ margin: '0 0 0.5rem 0', color: '#333', fontSize: '0.85rem' }}>
+                        <h5 style={{ margin: '0 0 0.5rem 0', color: textPrimary, fontSize: '0.85rem' }}>
                           <i className="fas fa-paperclip"></i> Attachments ({attachedFiles.length})
                         </h5>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -917,10 +937,11 @@ const SupportDashboard = () => {
                                 alignItems: 'center',
                                 gap: '0.5rem',
                                 padding: '0.35rem 0.5rem',
-                                backgroundColor: 'white',
+                                backgroundColor: panelBg,
                                 borderRadius: '3px',
                                 fontSize: '0.8rem',
-                                color: '#333'
+                                color: textPrimary,
+                                border: `1px solid ${borderColor}`,
                               }}
                             >
                               <i className="fas fa-file"></i>
@@ -969,12 +990,14 @@ const SupportDashboard = () => {
                       style={{
                         width: '100%',
                         padding: '0.75rem',
-                        border: '1px solid #ddd',
+                        border: `1px solid ${borderColor}`,
                         borderRadius: '4px',
                         fontSize: '0.9rem',
                         fontFamily: 'inherit',
                         marginBottom: '0.75rem',
-                        resize: 'vertical'
+                        resize: 'vertical',
+                        backgroundColor: inputBg,
+                        color: textPrimary,
                       }}
                     />
 
@@ -1041,9 +1064,10 @@ const SupportDashboard = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 height: '400px',
-                backgroundColor: '#f8f9fa',
+                backgroundColor: panelSoft,
                 borderRadius: '8px',
-                color: '#999',
+                color: textMuted,
+                border: `1px solid ${borderColor}`,
                 textAlign: 'center'
               }}>
                 <div>
