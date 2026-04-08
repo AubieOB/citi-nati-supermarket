@@ -34,13 +34,44 @@ const ADMIN_DARK_BG = '#162235';
 const ADMIN_DARK_BORDER = '#324662';
 const ADMIN_DARK_TEXT = '#dbe7f8';
 
-const parseRgbColor = (value) => {
+const extractColorToken = (value) => {
   if (!value || typeof value !== 'string') return null;
-  const match = value.match(/rgba?\(([^)]+)\)/i);
-  if (!match) return null;
-  const parts = match[1].split(',').map((part) => Number(part.trim()));
-  if (parts.length < 3 || parts.some((part, index) => index < 3 && Number.isNaN(part))) return null;
-  return { r: parts[0], g: parts[1], b: parts[2] };
+  const rgbMatch = value.match(/rgba?\([^)]*\)/i);
+  if (rgbMatch) return rgbMatch[0];
+  const hexMatch = value.match(/#([0-9a-f]{3}|[0-9a-f]{6})\b/i);
+  if (hexMatch) return hexMatch[0];
+  return null;
+};
+
+const parseColor = (value) => {
+  if (!value || typeof value !== 'string') return null;
+  const token = extractColorToken(value) || value.trim();
+
+  const rgbMatch = token.match(/rgba?\(([^)]+)\)/i);
+  if (rgbMatch) {
+    const parts = rgbMatch[1].split(',').map((part) => Number(part.trim()));
+    if (parts.length < 3 || parts.some((part, index) => index < 3 && Number.isNaN(part))) return null;
+    return { r: parts[0], g: parts[1], b: parts[2] };
+  }
+
+  const hexMatch = token.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (hexMatch) {
+    const hex = hexMatch[1];
+    if (hex.length === 3) {
+      return {
+        r: Number.parseInt(`${hex[0]}${hex[0]}`, 16),
+        g: Number.parseInt(`${hex[1]}${hex[1]}`, 16),
+        b: Number.parseInt(`${hex[2]}${hex[2]}`, 16),
+      };
+    }
+    return {
+      r: Number.parseInt(hex.slice(0, 2), 16),
+      g: Number.parseInt(hex.slice(2, 4), 16),
+      b: Number.parseInt(hex.slice(4, 6), 16),
+    };
+  }
+
+  return null;
 };
 
 const getRelativeLuminance = ({ r, g, b }) => {
@@ -69,7 +100,7 @@ const isLightNeutralTone = (rgb) => {
   if (!rgb) return false;
   const luminance = getRelativeLuminance(rgb);
   const saturation = getSaturation(rgb);
-  return luminance >= 0.72 && saturation <= 0.32;
+  return luminance >= 0.66 && saturation <= 0.62;
 };
 
 const isDarkNeutralTone = (rgb) => {
@@ -114,17 +145,17 @@ const applyInlineDarkOverrides = (element) => {
   if (!(element instanceof HTMLElement)) return;
   if (!element.hasAttribute('style')) return;
 
-  const inlineBg = element.style.backgroundColor;
-  const inlineBorder = element.style.borderColor;
+  const inlineBg = element.style.backgroundColor || element.style.background;
+  const inlineBorder = element.style.borderColor || element.style.border;
   const inlineText = element.style.color;
 
   if (inlineBg) {
-    const bgRgb = parseRgbColor(inlineBg);
+    const bgRgb = parseColor(inlineBg);
     if (isLightNeutralTone(bgRgb)) {
-      rememberOriginalStyle(element, 'bg', inlineBg);
+      rememberOriginalStyle(element, 'bg', element.style.backgroundColor);
       element.style.backgroundColor = ADMIN_DARK_BG;
 
-      const textRgb = parseRgbColor(inlineText);
+      const textRgb = parseColor(inlineText);
       if (inlineText && isDarkNeutralTone(textRgb)) {
         rememberOriginalStyle(element, 'color', inlineText);
         element.style.color = ADMIN_DARK_TEXT;
@@ -133,9 +164,9 @@ const applyInlineDarkOverrides = (element) => {
   }
 
   if (inlineBorder) {
-    const borderRgb = parseRgbColor(inlineBorder);
+    const borderRgb = parseColor(inlineBorder);
     if (isLightNeutralTone(borderRgb)) {
-      rememberOriginalStyle(element, 'border', inlineBorder);
+      rememberOriginalStyle(element, 'border', element.style.borderColor);
       element.style.borderColor = ADMIN_DARK_BORDER;
     }
   }
