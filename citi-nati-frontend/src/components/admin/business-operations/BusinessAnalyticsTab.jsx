@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../../../utils/api.js';
 
-const AUTO_REFRESH_MS = 30000;
+const AUTO_REFRESH_MS = 300000; // 5 minutes
 const AUTO_REFRESH_DEBOUNCE_MS = 350;
 const MAX_INVOICE_PAGES = 30;
 
@@ -603,7 +603,7 @@ const BusinessAnalyticsTab = ({
             </p>
           </div>
           <div style={{ color: refreshing ? '#2563eb' : '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
-            {refreshing ? 'Auto-refreshing...' : 'Auto-refresh every 30s'}
+            {refreshing ? 'Auto-refreshing...' : 'Auto-refresh every 5 min'}
           </div>
         </div>
 
