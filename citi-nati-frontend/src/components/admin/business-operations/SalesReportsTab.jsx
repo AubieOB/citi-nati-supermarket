@@ -104,6 +104,9 @@ const DEFAULT_VIEW_STATE = {
   users: { page: 1, pageSize: 20, sortBy: 'totalInvoices', sortOrder: 'desc' },
 };
 
+const AUTO_REFRESH_MS = 30000;
+const AUTO_REFRESH_DEBOUNCE_MS = 350;
+
 const money = (value) => `MWK ${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const integer = (value) => Number(value || 0).toLocaleString('en-US');
 
@@ -204,7 +207,10 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingFullWorkbook, setExportingFullWorkbook] = useState(false);
   const [importingFullWorkbook, setImportingFullWorkbook] = useState(false);
+  const [autoRefreshing, setAutoRefreshing] = useState(false);
   const fullWorkbookInputRef = useRef(null);
+  const autoRefreshIntervalRef = useRef(null);
+  const autoRefreshTimeoutRef = useRef(null);
 
   const queryKey = useMemo(() => JSON.stringify(filters), [filters]);
 
@@ -388,6 +394,78 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
     if (activeView === 'users') fetchUsers();
     if (activeView === 'payments') fetchPayments();
   }, [activeView, fetchInvoices, fetchProducts, fetchUsers, fetchPayments, queryKey]);
+
+  const runAutoRefresh = useCallback(async () => {
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+
+    setAutoRefreshing(true);
+    try {
+      await fetchSummary();
+
+      if (activeSection === 'sales-by' && isReportModalOpen && activeView === 'invoices') {
+        await fetchInvoices();
+      }
+      if (activeSection === 'sales-by' && isReportModalOpen && activeView === 'products') {
+        await fetchProducts();
+      }
+      if (activeSection === 'sales-by' && isReportModalOpen && activeView === 'users') {
+        await fetchUsers();
+      }
+      if (activeSection === 'sales-by' && isReportModalOpen && activeView === 'payments') {
+        await fetchPayments();
+      }
+    } finally {
+      setAutoRefreshing(false);
+    }
+  }, [activeSection, activeView, fetchInvoices, fetchPayments, fetchProducts, fetchSummary, fetchUsers, isReportModalOpen]);
+
+  useEffect(() => {
+    autoRefreshIntervalRef.current = setInterval(() => {
+      runAutoRefresh();
+    }, AUTO_REFRESH_MS);
+
+    return () => {
+      if (autoRefreshIntervalRef.current) {
+        clearInterval(autoRefreshIntervalRef.current);
+      }
+    };
+  }, [runAutoRefresh]);
+
+  useEffect(() => {
+    const scheduleRefresh = () => {
+      if (autoRefreshTimeoutRef.current) {
+        clearTimeout(autoRefreshTimeoutRef.current);
+      }
+      autoRefreshTimeoutRef.current = setTimeout(() => {
+        runAutoRefresh();
+      }, AUTO_REFRESH_DEBOUNCE_MS);
+    };
+
+    const onVisibilityChange = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        scheduleRefresh();
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', scheduleRefresh);
+    }
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibilityChange);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', scheduleRefresh);
+      }
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+      }
+      if (autoRefreshTimeoutRef.current) {
+        clearTimeout(autoRefreshTimeoutRef.current);
+      }
+    };
+  }, [runAutoRefresh]);
 
   const summaryMetaLine = useMemo(() => {
     const chips = [];
@@ -889,6 +967,12 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
               <div style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
                 {showSummaryFilters ? 'Summary filters are visible.' : `Summary filters hidden${activeFilterCount > 0 ? ` • ${activeFilterCount} active` : ''}.`}
               </div>
+              {autoRefreshing && (
+                <span style={{ color: '#2563eb', fontSize: '0.82rem', fontWeight: 700 }}>
+                  <i className="fas fa-rotate-right fa-spin" style={{ marginRight: '0.35rem' }}></i>
+                  Auto-refreshing...
+                </span>
+              )}
               <button
                 type="button"
                 onClick={() => handleExport('pdf')}

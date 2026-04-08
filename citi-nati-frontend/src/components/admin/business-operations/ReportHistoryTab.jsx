@@ -1,7 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../../../utils/api.js';
 import { downloadBusinessReport } from '../../../utils/exportService.js';
 import { boAlert } from '../../../utils/boDialogBus.js';
+
+const AUTO_REFRESH_MS = 30000;
+const AUTO_REFRESH_DEBOUNCE_MS = 350;
 
 const cardStyle = {
   backgroundColor: '#fff',
@@ -77,6 +80,9 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, onNavigat
   const [exporting, setExporting] = useState({});
   const [activeActivity, setActiveActivity] = useState('sales');
   const [showQuickExports, setShowQuickExports] = useState(false);
+  const [autoRefreshing, setAutoRefreshing] = useState(false);
+  const autoRefreshIntervalRef = useRef(null);
+  const autoRefreshTimeoutRef = useRef(null);
 
   const fetchActivity = useCallback(async () => {
     setState((current) => ({ ...current, loading: true, error: '' }));
@@ -116,6 +122,65 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, onNavigat
   useEffect(() => {
     fetchActivity();
   }, [fetchActivity, refreshKey]);
+
+  const runAutoRefresh = useCallback(async () => {
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+
+    setAutoRefreshing(true);
+    try {
+      await fetchActivity();
+    } finally {
+      setAutoRefreshing(false);
+    }
+  }, [fetchActivity]);
+
+  useEffect(() => {
+    autoRefreshIntervalRef.current = setInterval(() => {
+      runAutoRefresh();
+    }, AUTO_REFRESH_MS);
+
+    return () => {
+      if (autoRefreshIntervalRef.current) {
+        clearInterval(autoRefreshIntervalRef.current);
+      }
+    };
+  }, [runAutoRefresh]);
+
+  useEffect(() => {
+    const scheduleRefresh = () => {
+      if (autoRefreshTimeoutRef.current) {
+        clearTimeout(autoRefreshTimeoutRef.current);
+      }
+      autoRefreshTimeoutRef.current = setTimeout(() => {
+        runAutoRefresh();
+      }, AUTO_REFRESH_DEBOUNCE_MS);
+    };
+
+    const onVisibilityChange = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        scheduleRefresh();
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', scheduleRefresh);
+    }
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibilityChange);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', scheduleRefresh);
+      }
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+      }
+      if (autoRefreshTimeoutRef.current) {
+        clearTimeout(autoRefreshTimeoutRef.current);
+      }
+    };
+  }, [runAutoRefresh]);
 
   const snapshotCards = useMemo(() => ([
     { label: 'Net Sales This Month', value: money(state.salesSummary?.netSales), note: 'Latest monthly reporting snapshot.' },
@@ -169,15 +234,18 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, onNavigat
             <p style={{ margin: '0.45rem 0 0', color: '#64748b', lineHeight: 1.6, maxWidth: '860px' }}>
               Monitor recent operational reporting activity across sales, expenses, suppliers, payroll, and run instant exports from one unified workspace.
             </p>
+            <p style={{ margin: '0.25rem 0 0', color: '#475569', lineHeight: 1.5, fontSize: '0.82rem', fontWeight: 700 }}>
+              Auto-refresh runs every 30 seconds while this tab is visible.
+            </p>
           </div>
           <button
             type="button"
             onClick={fetchActivity}
-            disabled={state.loading}
-            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.7rem 1rem', fontWeight: 700, cursor: state.loading ? 'not-allowed' : 'pointer' }}
+            disabled={state.loading || autoRefreshing}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.7rem 1rem', fontWeight: 700, cursor: state.loading || autoRefreshing ? 'not-allowed' : 'pointer' }}
           >
-            <i className={`fas ${state.loading ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`} style={{ marginRight: '0.45rem' }}></i>
-            Refresh
+            <i className={`fas ${state.loading || autoRefreshing ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`} style={{ marginRight: '0.45rem' }}></i>
+            {autoRefreshing ? 'Auto-refreshing...' : 'Refresh'}
           </button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.9rem', marginTop: '1rem' }}>
