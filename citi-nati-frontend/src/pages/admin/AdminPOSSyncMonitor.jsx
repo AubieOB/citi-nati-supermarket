@@ -198,6 +198,7 @@ function FailureBar({ items = [] }) {
 }
 
 export default function AdminPOSSyncMonitor() {
+  const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
   const [activeTab, setActiveTab] = useState('overview');
   const [monitor, setMonitor] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -522,17 +523,55 @@ export default function AdminPOSSyncMonitor() {
               <p style={S.sectionSub}>Live health rules translated into specific actionable issues.</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {(summary.issues || []).length === 0 ? (
-                  <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '0.9rem 1rem', color: '#166534', fontSize: '0.9rem' }}>
+                  <div
+                    style={{
+                      backgroundColor: isAdminDarkTheme ? '#1b2620' : '#f0fdf4',
+                      border: isAdminDarkTheme ? '1px solid #2f4a3d' : '1px solid #bbf7d0',
+                      borderRadius: '10px',
+                      padding: '0.9rem 1rem',
+                      color: isAdminDarkTheme ? '#9fe0be' : '#166534',
+                      fontSize: '0.9rem',
+                    }}
+                  >
                     No active flaws detected from the current monitoring rules.
                   </div>
                 ) : (
                   summary.issues.map((issue) => (
-                    <div key={`${issue.title}-${issue.detail}`} style={S.issueRow(issue.severity)}>
+                    <div
+                      key={`${issue.title}-${issue.detail}`}
+                      style={{
+                        ...S.issueRow(issue.severity),
+                        border: isAdminDarkTheme
+                          ? `1px solid ${issue.severity === 'critical' ? '#6b2b33' : '#6b5530'}`
+                          : S.issueRow(issue.severity).border,
+                        backgroundColor: isAdminDarkTheme
+                          ? issue.severity === 'critical'
+                            ? '#2a1b1f'
+                            : '#2b2415'
+                          : S.issueRow(issue.severity).backgroundColor,
+                      }}
+                    >
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center' }}>
-                        <strong style={{ color: '#0f172a', fontSize: '0.9rem' }}>{issue.title}</strong>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: issue.severity === 'critical' ? '#b91c1c' : '#b45309', flexShrink: 0 }}>{issue.severity}</span>
+                        <strong style={{ color: isAdminDarkTheme ? '#ecf2fd' : '#0f172a', fontSize: '0.9rem' }}>{issue.title}</strong>
+                        <span
+                          style={{
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            color: isAdminDarkTheme
+                              ? issue.severity === 'critical'
+                                ? '#f4a7b3'
+                                : '#f0c884'
+                              : issue.severity === 'critical'
+                                ? '#b91c1c'
+                                : '#b45309',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {issue.severity}
+                        </span>
                       </div>
-                      <div style={{ marginTop: '0.3rem', color: '#475569', lineHeight: 1.45, fontSize: '0.85rem' }}>{issue.detail}</div>
+                      <div style={{ marginTop: '0.3rem', color: isAdminDarkTheme ? '#bdc8da' : '#475569', lineHeight: 1.45, fontSize: '0.85rem' }}>{issue.detail}</div>
                     </div>
                   ))
                 )}
@@ -544,10 +583,21 @@ export default function AdminPOSSyncMonitor() {
               <p style={S.sectionSub}>Recommended next steps derived from live failures, backlog, and health scores.</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                 {(summary.recommendations || []).length === 0 ? (
-                  <div style={{ color: '#64748b', fontSize: '0.88rem' }}>No active recommendations at the moment.</div>
+                  <div style={{ color: isAdminDarkTheme ? '#93a0b5' : '#64748b', fontSize: '0.88rem' }}>No active recommendations at the moment.</div>
                 ) : (
                   summary.recommendations.map((item) => (
-                    <div key={item} style={{ borderRadius: '10px', padding: '0.8rem 1rem', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', color: '#1e3a8a', fontSize: '0.88rem', lineHeight: 1.5 }}>
+                    <div
+                      key={item}
+                      style={{
+                        borderRadius: '10px',
+                        padding: '0.8rem 1rem',
+                        backgroundColor: isAdminDarkTheme ? '#1a202d' : '#eff6ff',
+                        border: isAdminDarkTheme ? '1px solid #31415f' : '1px solid #bfdbfe',
+                        color: isAdminDarkTheme ? '#b6c8f1' : '#1e3a8a',
+                        fontSize: '0.88rem',
+                        lineHeight: 1.5,
+                      }}
+                    >
                       <i className="fas fa-lightbulb" style={{ marginRight: '0.5rem', opacity: 0.8 }} />
                       {item}
                     </div>
