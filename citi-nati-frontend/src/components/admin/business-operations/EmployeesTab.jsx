@@ -23,6 +23,16 @@ const getApiError = (err, fallback) =>
   err?.response?.data?.error || err?.response?.data?.message || err?.message || fallback;
 
 const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] }) => {
+  const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
+  const themedCardStyle = isAdminDarkTheme
+    ? {
+      ...cardStyle,
+      backgroundColor: '#162235',
+      border: '1px solid #324662',
+      boxShadow: '0 16px 34px rgba(0, 0, 0, 0.35)',
+    }
+    : cardStyle;
+
   const [showFilters, setShowFilters] = useState(false);
   const [isEmployeesWorkspaceModalOpen, setIsEmployeesWorkspaceModalOpen] = useState(false);
   const [isEmployeesWorkspaceMaximized, setIsEmployeesWorkspaceMaximized] = useState(false);
@@ -348,8 +358,8 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
 
       {isEmployeesWorkspaceModalOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: isEmployeesWorkspaceMaximized ? '0.35rem' : '1rem' }}>
-          <div style={{ ...cardStyle, width: isEmployeesWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1320px, 98vw)', height: isEmployeesWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', overflow: 'hidden', padding: '1rem', borderRadius: isEmployeesWorkspaceMaximized ? '10px' : '18px', background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 30%)', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ backgroundColor: '#fff', margin: '-1rem -1rem 0.85rem', padding: '1rem 1rem 0.9rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)' }}>
+          <div style={{ ...themedCardStyle, width: isEmployeesWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1320px, 98vw)', height: isEmployeesWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', overflow: 'hidden', padding: '1rem', borderRadius: isEmployeesWorkspaceMaximized ? '10px' : '18px', background: isAdminDarkTheme ? 'linear-gradient(180deg, #162235 0%, #101c2d 32%)' : 'linear-gradient(180deg, #f8fafc 0%, #ffffff 30%)', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ backgroundColor: isAdminDarkTheme ? '#101c2d' : '#fff', margin: '-1rem -1rem 0.85rem', padding: '1rem 1rem 0.9rem', borderBottom: isAdminDarkTheme ? '1px solid #324662' : '1px solid #e2e8f0', boxShadow: isAdminDarkTheme ? '0 14px 26px rgba(0, 0, 0, 0.28)' : '0 10px 24px rgba(15, 23, 42, 0.05)' }}>
               <div style={{ display: 'grid', gap: '0.85rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <div>
@@ -446,7 +456,7 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(460px, 1fr))', gap: '1rem', alignItems: 'stretch', minHeight: 0, flex: 1, overflow: 'hidden' }}>
-              <div style={{ ...cardStyle, overflow: 'hidden', borderRadius: '16px', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <div style={{ ...themedCardStyle, overflow: 'hidden', borderRadius: '16px', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                 <div style={{ padding: '0.88rem 1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
                   <strong style={{ color: '#0f172a' }}>Employee Register</strong>
                   <p style={{ margin: '0.26rem 0 0', color: '#64748b', fontSize: '0.84rem' }}>Select any row to inspect full profile and salary history.</p>
@@ -473,7 +483,7 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
                 </div>
               </div>
 
-              <div style={{ ...cardStyle, overflow: 'hidden', borderRadius: '16px', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <div style={{ ...themedCardStyle, overflow: 'hidden', borderRadius: '16px', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                 <div style={{ padding: '0.88rem 1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
                   <strong style={{ color: '#0f172a' }}>Employee Insight Panel</strong>
                   <p style={{ margin: '0.26rem 0 0', color: '#64748b', fontSize: '0.84rem' }}>View profile details, employment fields, and salary structures.</p>
