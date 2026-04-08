@@ -15,6 +15,286 @@ const cardStyle = {
 const money = (value) => `MWK ${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const intFmt = (value) => Number(value || 0).toLocaleString('en-US');
 
+const ANALYSIS_FIELDS = {
+  previousValue: { label: 'Previous Value', step: '0.01' },
+  currentValue: { label: 'Current Value', step: '0.01' },
+  revenue: { label: 'Revenue', step: '0.01' },
+  expenses: { label: 'Expenses', step: '0.01' },
+  payrollTotal: { label: 'Payroll Total', step: '0.01' },
+  productCost: { label: 'Product / COGS Cost', step: '0.01' },
+  targetValue: { label: 'Target Value', step: '0.01' },
+  actualValue: { label: 'Actual Value', step: '0.01' },
+  periodAValue: { label: 'Comparison A Value', step: '0.01' },
+  periodBValue: { label: 'Comparison B Value', step: '0.01' },
+  outputValue: { label: 'Output Value', step: '0.01' },
+  inputValue: { label: 'Input / Cost Value', step: '0.01' },
+  baseSales: { label: 'Base Sales', step: '0.01' },
+  projectedGrowthPct: { label: 'Sales Growth % (Scenario)', step: '0.1' },
+  basePayroll: { label: 'Base Payroll', step: '0.01' },
+  payrollIncreaseAmount: { label: 'Payroll Increase Amount', step: '0.01' },
+  baseExpenses: { label: 'Base Expenses', step: '0.01' },
+  expenseDropPct: { label: 'Expense Reduction %', step: '0.1' },
+  avgBasketValue: { label: 'Average Basket Value', step: '0.01' },
+  basketImprovementPct: { label: 'Basket Improvement %', step: '0.1' },
+};
+
+const ANALYSIS_TOOLS = [
+  { id: 'growth', title: 'Growth Calculator', description: 'Previous vs current growth percentage.', fields: ['previousValue', 'currentValue'] },
+  { id: 'net-profit', title: 'Net Profit Calculator', description: 'Revenue minus expenses and payroll.', fields: ['revenue', 'expenses', 'payrollTotal'] },
+  { id: 'gross-profit', title: 'Gross Profit Calculator', description: 'Revenue minus direct product/COGS cost.', fields: ['revenue', 'productCost'] },
+  { id: 'profit-margin', title: 'Profit Margin Calculator', description: 'Net profit margin based on revenue and costs.', fields: ['revenue', 'productCost', 'expenses', 'payrollTotal'] },
+  { id: 'expense-ratio', title: 'Expense vs Revenue Calculator', description: 'Expense ratio as a percentage of revenue.', fields: ['revenue', 'expenses'] },
+  { id: 'payroll-ratio', title: 'Payroll vs Sales Ratio Calculator', description: 'Payroll burden relative to sales.', fields: ['revenue', 'payrollTotal'] },
+  { id: 'yoy-growth', title: 'Year-on-Year Growth', description: 'Compare current year value against previous year value.', fields: ['previousValue', 'currentValue'] },
+  { id: 'mom-growth', title: 'Month-on-Month Growth', description: 'Compare current month value against previous month value.', fields: ['previousValue', 'currentValue'] },
+  { id: 'target-actual', title: 'Target vs Actual', description: 'Track attainment and variance versus target.', fields: ['targetValue', 'actualValue'] },
+  { id: 'percent-change', title: 'Custom Percentage Change', description: 'Generic percent change calculator for any metric.', fields: ['periodAValue', 'periodBValue'] },
+  { id: 'efficiency', title: 'Business Efficiency Calculator', description: 'Measures output value per unit of input/cost.', fields: ['outputValue', 'inputValue', 'targetValue'] },
+  { id: 'projection', title: 'Projection / Forecast Calculator', description: 'What-if scenario using growth, payroll, and expense assumptions.', fields: ['baseSales', 'projectedGrowthPct', 'basePayroll', 'payrollIncreaseAmount', 'baseExpenses', 'expenseDropPct', 'avgBasketValue', 'basketImprovementPct'] },
+];
+
+function toNumberSafe(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function computePercentChange(current, previous) {
+  const curr = toNumberSafe(current);
+  const prev = toNumberSafe(previous);
+  if (prev === 0) return curr === 0 ? 0 : 100;
+  return ((curr - prev) / prev) * 100;
+}
+
+function statusFromDirection(value, inverse = false) {
+  if (value === 0) return 'warning';
+  if (!inverse) return value > 0 ? 'positive' : 'negative';
+  return value < 0 ? 'positive' : 'negative';
+}
+
+function buildAnalysisResult(toolId, rawInputs) {
+  const n = (key) => toNumberSafe(rawInputs[key]);
+
+  if (toolId === 'growth' || toolId === 'yoy-growth' || toolId === 'mom-growth') {
+    const previous = n('previousValue');
+    const current = n('currentValue');
+    const delta = current - previous;
+    const pct = computePercentChange(current, previous);
+    const title = toolId === 'yoy-growth' ? 'Year-on-Year Growth Result' : toolId === 'mom-growth' ? 'Month-on-Month Growth Result' : 'Growth Result';
+    return {
+      title,
+      status: statusFromDirection(delta),
+      mainLabel: 'Growth Percentage',
+      mainValue: `${pct.toFixed(2)}%`,
+      subValue: `${delta >= 0 ? '+' : ''}${money(delta)} change`,
+      formula: '(Current - Previous) / Previous x 100',
+      interpretation: delta >= 0 ? 'Performance improved compared to the baseline period.' : 'Performance declined compared to the baseline period.',
+      usedValues: [
+        { label: 'Previous', value: money(previous) },
+        { label: 'Current', value: money(current) },
+        { label: 'Difference', value: `${delta >= 0 ? '+' : ''}${money(delta)}` },
+      ],
+    };
+  }
+
+  if (toolId === 'net-profit') {
+    const revenue = n('revenue');
+    const expenses = n('expenses');
+    const payroll = n('payrollTotal');
+    const netProfit = revenue - expenses - payroll;
+    const margin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
+    return {
+      title: 'Net Profit Result',
+      status: statusFromDirection(netProfit),
+      mainLabel: 'Net Profit',
+      mainValue: money(netProfit),
+      subValue: `Margin: ${margin.toFixed(2)}%`,
+      formula: 'Net Profit = Revenue - Expenses - Payroll',
+      interpretation: netProfit >= 0 ? 'Net business position is positive after operating and payroll costs.' : 'Business is operating at a net loss for these inputs.',
+      usedValues: [
+        { label: 'Revenue', value: money(revenue) },
+        { label: 'Expenses', value: money(expenses) },
+        { label: 'Payroll', value: money(payroll) },
+      ],
+    };
+  }
+
+  if (toolId === 'gross-profit') {
+    const revenue = n('revenue');
+    const cost = n('productCost');
+    const gross = revenue - cost;
+    const margin = revenue > 0 ? (gross / revenue) * 100 : 0;
+    return {
+      title: 'Gross Profit Result',
+      status: statusFromDirection(gross),
+      mainLabel: 'Gross Profit',
+      mainValue: money(gross),
+      subValue: `Gross Margin: ${margin.toFixed(2)}%`,
+      formula: 'Gross Profit = Revenue - Product/COGS Cost',
+      interpretation: gross >= 0 ? 'Core product profitability is healthy before operating overhead.' : 'Direct costs are higher than revenue for this scenario.',
+      usedValues: [
+        { label: 'Revenue', value: money(revenue) },
+        { label: 'Product / COGS Cost', value: money(cost) },
+      ],
+    };
+  }
+
+  if (toolId === 'profit-margin') {
+    const revenue = n('revenue');
+    const productCost = n('productCost');
+    const expenses = n('expenses');
+    const payroll = n('payrollTotal');
+    const net = revenue - productCost - expenses - payroll;
+    const margin = revenue > 0 ? (net / revenue) * 100 : 0;
+    return {
+      title: 'Profit Margin Result',
+      status: statusFromDirection(margin),
+      mainLabel: 'Profit Margin',
+      mainValue: `${margin.toFixed(2)}%`,
+      subValue: `Net Profit: ${money(net)}`,
+      formula: 'Profit Margin % = (Revenue - Product Cost - Expenses - Payroll) / Revenue x 100',
+      interpretation: margin >= 0 ? 'Margin is positive and indicates retained value after all major costs.' : 'Margin is negative; costs currently exceed revenue.',
+      usedValues: [
+        { label: 'Revenue', value: money(revenue) },
+        { label: 'Total Costs', value: money(productCost + expenses + payroll) },
+        { label: 'Net Profit', value: money(net) },
+      ],
+    };
+  }
+
+  if (toolId === 'expense-ratio') {
+    const revenue = n('revenue');
+    const expenses = n('expenses');
+    const ratio = revenue > 0 ? (expenses / revenue) * 100 : 0;
+    return {
+      title: 'Expense Ratio Result',
+      status: ratio <= 30 ? 'positive' : ratio <= 45 ? 'warning' : 'negative',
+      mainLabel: 'Expense Ratio',
+      mainValue: `${ratio.toFixed(2)}%`,
+      subValue: `${money(expenses)} out of ${money(revenue)} revenue`,
+      formula: 'Expense Ratio % = Expenses / Revenue x 100',
+      interpretation: ratio <= 30 ? 'Expense load is efficient relative to revenue.' : ratio <= 45 ? 'Expense load is moderate and should be monitored.' : 'Expense load is high and may pressure profitability.',
+      usedValues: [
+        { label: 'Revenue', value: money(revenue) },
+        { label: 'Expenses', value: money(expenses) },
+      ],
+    };
+  }
+
+  if (toolId === 'payroll-ratio') {
+    const revenue = n('revenue');
+    const payroll = n('payrollTotal');
+    const ratio = revenue > 0 ? (payroll / revenue) * 100 : 0;
+    return {
+      title: 'Payroll-to-Sales Ratio Result',
+      status: ratio <= 20 ? 'positive' : ratio <= 30 ? 'warning' : 'negative',
+      mainLabel: 'Payroll Burden',
+      mainValue: `${ratio.toFixed(2)}%`,
+      subValue: `${money(payroll)} payroll against ${money(revenue)} sales`,
+      formula: 'Payroll Ratio % = Payroll / Sales x 100',
+      interpretation: ratio <= 20 ? 'Payroll burden is healthy versus sales.' : ratio <= 30 ? 'Payroll burden is acceptable but should be watched.' : 'Payroll burden is high compared with sales output.',
+      usedValues: [
+        { label: 'Sales', value: money(revenue) },
+        { label: 'Payroll', value: money(payroll) },
+      ],
+    };
+  }
+
+  if (toolId === 'target-actual') {
+    const target = n('targetValue');
+    const actual = n('actualValue');
+    const variance = actual - target;
+    const attainment = target > 0 ? (actual / target) * 100 : 0;
+    return {
+      title: 'Target vs Actual Result',
+      status: statusFromDirection(variance),
+      mainLabel: 'Target Attainment',
+      mainValue: `${attainment.toFixed(2)}%`,
+      subValue: `Variance: ${variance >= 0 ? '+' : ''}${money(variance)}`,
+      formula: 'Attainment % = Actual / Target x 100',
+      interpretation: variance >= 0 ? 'Target achieved or exceeded.' : 'Actual performance is below target.',
+      usedValues: [
+        { label: 'Target', value: money(target) },
+        { label: 'Actual', value: money(actual) },
+      ],
+    };
+  }
+
+  if (toolId === 'percent-change') {
+    const a = n('periodAValue');
+    const b = n('periodBValue');
+    const delta = b - a;
+    const pct = computePercentChange(b, a);
+    return {
+      title: 'Custom Percentage Change Result',
+      status: statusFromDirection(delta),
+      mainLabel: 'Percentage Change',
+      mainValue: `${pct.toFixed(2)}%`,
+      subValue: `Difference: ${delta >= 0 ? '+' : ''}${money(delta)}`,
+      formula: '(Comparison B - Comparison A) / Comparison A x 100',
+      interpretation: delta >= 0 ? 'Comparison B improved versus Comparison A.' : 'Comparison B declined versus Comparison A.',
+      usedValues: [
+        { label: 'Comparison A', value: money(a) },
+        { label: 'Comparison B', value: money(b) },
+      ],
+    };
+  }
+
+  if (toolId === 'efficiency') {
+    const output = n('outputValue');
+    const input = n('inputValue');
+    const target = n('targetValue');
+    const efficiency = input > 0 ? output / input : 0;
+    const attainment = target > 0 ? (output / target) * 100 : 0;
+    return {
+      title: 'Business Efficiency Result',
+      status: efficiency >= 1 ? 'positive' : efficiency >= 0.8 ? 'warning' : 'negative',
+      mainLabel: 'Efficiency Score',
+      mainValue: `${efficiency.toFixed(2)}x`,
+      subValue: `Target Attainment: ${attainment.toFixed(2)}%`,
+      formula: 'Efficiency = Output / Input (cost or effort)',
+      interpretation: efficiency >= 1 ? 'Output is meeting or exceeding input value.' : 'Output is trailing input value; efficiency improvements are needed.',
+      usedValues: [
+        { label: 'Output', value: money(output) },
+        { label: 'Input', value: money(input) },
+        { label: 'Target Output', value: money(target) },
+      ],
+    };
+  }
+
+  const baseSales = n('baseSales');
+  const growthPct = n('projectedGrowthPct');
+  const basePayroll = n('basePayroll');
+  const payrollIncrease = n('payrollIncreaseAmount');
+  const baseExpenses = n('baseExpenses');
+  const expenseDropPct = n('expenseDropPct');
+  const avgBasket = n('avgBasketValue');
+  const basketImprovePct = n('basketImprovementPct');
+
+  const projectedSales = baseSales * (1 + (growthPct / 100));
+  const projectedPayroll = basePayroll + payrollIncrease;
+  const projectedExpenses = baseExpenses * (1 - (expenseDropPct / 100));
+  const projectedBasket = avgBasket * (1 + (basketImprovePct / 100));
+  const projectedNet = projectedSales - projectedPayroll - projectedExpenses;
+  const baselineNet = baseSales - basePayroll - baseExpenses;
+  const projectedDelta = projectedNet - baselineNet;
+
+  return {
+    title: 'Projection / Forecast Result',
+    status: statusFromDirection(projectedDelta),
+    mainLabel: 'Projected Net Position',
+    mainValue: money(projectedNet),
+    subValue: `Projected change: ${projectedDelta >= 0 ? '+' : ''}${money(projectedDelta)}`,
+    formula: 'Projected Net = (Base Sales x (1 + Growth%)) - (Base Payroll + Increase) - (Base Expenses x (1 - Expense Drop%))',
+    interpretation: projectedDelta >= 0 ? 'Scenario indicates improved profitability versus baseline.' : 'Scenario indicates profitability decline versus baseline.',
+    usedValues: [
+      { label: 'Projected Sales', value: money(projectedSales) },
+      { label: 'Projected Payroll', value: money(projectedPayroll) },
+      { label: 'Projected Expenses', value: money(projectedExpenses) },
+      { label: 'Projected Avg Basket', value: money(projectedBasket) },
+    ],
+  };
+}
+
 function startOfMonth(year, monthIndex) {
   return new Date(year, monthIndex, 1);
 }
@@ -239,6 +519,30 @@ const BusinessAnalyticsTab = ({
   const [analytics, setAnalytics] = useState(null);
   const [activeView, setActiveView] = useState('overview');
   const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [activeTool, setActiveTool] = useState('growth');
+  const [analysisResult, setAnalysisResult] = useState(null);
+  const [analysisInputs, setAnalysisInputs] = useState({
+    previousValue: 0,
+    currentValue: 0,
+    revenue: 0,
+    expenses: 0,
+    payrollTotal: 0,
+    productCost: 0,
+    targetValue: 0,
+    actualValue: 0,
+    periodAValue: 0,
+    periodBValue: 0,
+    outputValue: 0,
+    inputValue: 0,
+    baseSales: 0,
+    projectedGrowthPct: 10,
+    basePayroll: 0,
+    payrollIncreaseAmount: 0,
+    baseExpenses: 0,
+    expenseDropPct: 0,
+    avgBasketValue: 0,
+    basketImprovementPct: 0,
+  });
 
   const refreshIntervalRef = useRef(null);
   const refreshTimeoutRef = useRef(null);
@@ -547,6 +851,75 @@ const BusinessAnalyticsTab = ({
     return rows;
   }, [locations]);
 
+  const activeToolConfig = useMemo(
+    () => ANALYSIS_TOOLS.find((tool) => tool.id === activeTool) || ANALYSIS_TOOLS[0],
+    [activeTool],
+  );
+
+  const updateAnalysisInput = (fieldKey, rawValue) => {
+    setAnalysisInputs((prev) => ({
+      ...prev,
+      [fieldKey]: rawValue === '' ? '' : Number(rawValue),
+    }));
+  };
+
+  const runAnalysis = () => {
+    setAnalysisResult(buildAnalysisResult(activeTool, analysisInputs));
+  };
+
+  const applyAnalysisPreset = (preset) => {
+    if (!analytics) return;
+
+    setAnalysisInputs((prev) => {
+      const next = { ...prev };
+
+      if (preset === 'selected-vs-previous') {
+        next.previousValue = analytics.growth.selected.sales.previous;
+        next.currentValue = analytics.growth.selected.sales.current;
+        next.periodAValue = analytics.growth.selected.sales.previous;
+        next.periodBValue = analytics.growth.selected.sales.current;
+        next.revenue = analytics.kpis.totalSales;
+      }
+
+      if (preset === 'month-vs-previous') {
+        next.previousValue = analytics.growth.monthVsPrevious.previous;
+        next.currentValue = analytics.growth.monthVsPrevious.current;
+        next.periodAValue = analytics.growth.monthVsPrevious.previous;
+        next.periodBValue = analytics.growth.monthVsPrevious.current;
+      }
+
+      if (preset === 'year-vs-previous') {
+        next.previousValue = analytics.growth.yearVsPrevious.previous;
+        next.currentValue = analytics.growth.yearVsPrevious.current;
+      }
+
+      if (preset === 'kpi-base') {
+        next.revenue = analytics.kpis.totalSales;
+        next.baseSales = analytics.kpis.totalSales;
+        next.avgBasketValue = analytics.kpis.averageBasketValue;
+        next.targetValue = analytics.kpis.totalSales * 1.1;
+        next.actualValue = analytics.kpis.totalSales;
+      }
+
+      if (preset === 'branch-compare') {
+        const bt = analytics.rankings.branchPerformance.find((row) => row.code === 'BT');
+        const za = analytics.rankings.branchPerformance.find((row) => row.code === 'ZA');
+        next.periodAValue = bt?.sales || 0;
+        next.periodBValue = za?.sales || 0;
+      }
+
+      return next;
+    });
+
+    setAnalysisResult(null);
+  };
+
+  const analysisStatusStyle = (status) => {
+    if (status === 'positive') return { bg: '#dcfce7', color: '#166534', label: 'Positive' };
+    if (status === 'negative') return { bg: '#fee2e2', color: '#b91c1c', label: 'Negative' };
+    return { bg: '#fef3c7', color: '#92400e', label: 'Warning' };
+  };
+
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
       <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
@@ -665,6 +1038,7 @@ const BusinessAnalyticsTab = ({
                 { id: 'overview', label: 'Overview' },
                 { id: 'trends', label: 'Trends' },
                 { id: 'rankings', label: 'Rankings' },
+                { id: 'analysis', label: 'Action Center' },
               ].map((view) => {
                 const isActive = activeView === view.id;
                 return (
@@ -981,6 +1355,153 @@ const BusinessAnalyticsTab = ({
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {activeView === 'analysis' && (() => {
+            const status = analysisResult ? analysisStatusStyle(analysisResult.status) : null;
+
+            return (
+              <div style={{ display: 'grid', gap: '0.85rem' }}>
+                <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.7rem', flexWrap: 'wrap' }}>
+                    <div>
+                      <strong style={{ color: '#0f172a' }}>Analytics Action Center</strong>
+                      <p style={{ margin: '0.28rem 0 0', color: '#64748b', fontSize: '0.84rem' }}>
+                        Run practical business calculators, comparison analysis, and scenario forecasting using manual or live system values.
+                      </p>
+                    </div>
+                    <div style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>
+                      Scope: {analytics.scopeLabel}
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: '0.75rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '0.55rem' }}>
+                    {ANALYSIS_TOOLS.map((tool) => {
+                      const isActive = activeTool === tool.id;
+                      return (
+                        <button
+                          key={tool.id}
+                          type="button"
+                          onClick={() => {
+                            setActiveTool(tool.id);
+                            setAnalysisResult(null);
+                          }}
+                          style={{
+                            textAlign: 'left',
+                            border: isActive ? '1px solid #1d4ed8' : '1px solid #cbd5e1',
+                            backgroundColor: isActive ? '#dbeafe' : '#fff',
+                            borderRadius: '12px',
+                            padding: '0.62rem 0.7rem',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <div style={{ color: isActive ? '#1d4ed8' : '#0f172a', fontWeight: 800, fontSize: '0.82rem' }}>{tool.title}</div>
+                          <div style={{ marginTop: '0.2rem', color: '#64748b', fontSize: '0.76rem', lineHeight: 1.35 }}>{tool.description}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '0.8rem' }}>
+                  <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <strong style={{ color: '#0f172a' }}>{activeToolConfig.title}</strong>
+                      <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>Manual + System Assisted</span>
+                    </div>
+                    <p style={{ margin: '0.28rem 0 0.7rem', color: '#64748b', fontSize: '0.82rem' }}>{activeToolConfig.description}</p>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.42rem', marginBottom: '0.75rem' }}>
+                      <button type="button" onClick={() => applyAnalysisPreset('selected-vs-previous')} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '999px', padding: '0.3rem 0.58rem', fontSize: '0.74rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>Use Selected vs Previous</button>
+                      <button type="button" onClick={() => applyAnalysisPreset('month-vs-previous')} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '999px', padding: '0.3rem 0.58rem', fontSize: '0.74rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>Use Month vs Previous</button>
+                      <button type="button" onClick={() => applyAnalysisPreset('year-vs-previous')} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '999px', padding: '0.3rem 0.58rem', fontSize: '0.74rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>Use Year vs Previous</button>
+                      <button type="button" onClick={() => applyAnalysisPreset('kpi-base')} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '999px', padding: '0.3rem 0.58rem', fontSize: '0.74rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>Use KPI Snapshot</button>
+                      <button type="button" onClick={() => applyAnalysisPreset('branch-compare')} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '999px', padding: '0.3rem 0.58rem', fontSize: '0.74rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>Use BT vs ZA Sales</button>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.6rem' }}>
+                      {activeToolConfig.fields.map((fieldKey) => {
+                        const fieldDef = ANALYSIS_FIELDS[fieldKey] || { label: fieldKey, step: '0.01' };
+                        return (
+                          <label key={fieldKey} style={{ display: 'grid', gap: '0.28rem' }}>
+                            <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>{fieldDef.label}</span>
+                            <input
+                              type="number"
+                              step={fieldDef.step}
+                              value={analysisInputs[fieldKey]}
+                              onChange={(event) => updateAnalysisInput(fieldKey, event.target.value)}
+                              style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.58rem', color: '#0f172a' }}
+                            />
+                          </label>
+                        );
+                      })}
+                    </div>
+
+                    <div style={{ marginTop: '0.72rem', display: 'flex', gap: '0.52rem', flexWrap: 'wrap' }}>
+                      <button type="button" onClick={runAnalysis} style={{ border: '1px solid #1d4ed8', backgroundColor: '#1d4ed8', color: '#fff', borderRadius: '9px', padding: '0.5rem 0.8rem', fontWeight: 800, cursor: 'pointer' }}>
+                        Run Calculation
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const resetValues = { ...analysisInputs };
+                          Object.keys(resetValues).forEach((key) => {
+                            resetValues[key] = key === 'projectedGrowthPct' ? 10 : 0;
+                          });
+                          setAnalysisInputs(resetValues);
+                          setAnalysisResult(null);
+                        }}
+                        style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.5rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        Reset Inputs
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
+                    <strong style={{ color: '#0f172a' }}>Results Panel</strong>
+                    {!analysisResult ? (
+                      <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.82rem' }}>
+                        Run a calculator to view final result, formula basis, interpretation, and performance signal.
+                      </p>
+                    ) : (
+                      <>
+                        <div style={{ marginTop: '0.62rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.55rem', flexWrap: 'wrap' }}>
+                          <span style={{ color: '#334155', fontSize: '0.8rem', fontWeight: 700 }}>{analysisResult.title}</span>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', borderRadius: '999px', padding: '0.24rem 0.54rem', backgroundColor: status.bg, color: status.color, fontSize: '0.74rem', fontWeight: 800 }}>
+                            {status.label}
+                          </span>
+                        </div>
+
+                        <div style={{ marginTop: '0.62rem', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.75rem 0.78rem', backgroundColor: '#f8fafc' }}>
+                          <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700 }}>{analysisResult.mainLabel}</div>
+                          <div style={{ marginTop: '0.2rem', color: '#0f172a', fontWeight: 900, fontSize: '1.32rem' }}>{analysisResult.mainValue}</div>
+                          <div style={{ marginTop: '0.2rem', color: '#475569', fontSize: '0.8rem', fontWeight: 700 }}>{analysisResult.subValue}</div>
+                        </div>
+
+                        <div style={{ marginTop: '0.62rem', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.58rem 0.62rem' }}>
+                          <div style={{ color: '#64748b', fontSize: '0.74rem', fontWeight: 800 }}>Formula Used</div>
+                          <div style={{ marginTop: '0.2rem', color: '#0f172a', fontSize: '0.8rem', fontWeight: 700 }}>{analysisResult.formula}</div>
+                          <div style={{ marginTop: '0.34rem', color: '#475569', fontSize: '0.79rem' }}>{analysisResult.interpretation}</div>
+                        </div>
+
+                        <div style={{ marginTop: '0.62rem' }}>
+                          <div style={{ color: '#64748b', fontSize: '0.74rem', fontWeight: 800, marginBottom: '0.28rem' }}>Values Used</div>
+                          <div style={{ display: 'grid', gap: '0.3rem' }}>
+                            {analysisResult.usedValues.map((row) => (
+                              <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.52rem', border: '1px solid #edf2f7', borderRadius: '8px', padding: '0.34rem 0.48rem' }}>
+                                <span style={{ color: '#64748b', fontSize: '0.76rem', fontWeight: 700 }}>{row.label}</span>
+                                <span style={{ color: '#0f172a', fontSize: '0.78rem', fontWeight: 800 }}>{row.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
