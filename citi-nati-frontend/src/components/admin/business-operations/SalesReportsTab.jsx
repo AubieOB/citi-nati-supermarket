@@ -135,7 +135,7 @@ const navigationTabStyle = (active, isDark) => ({
   border: isDark ? '1px solid #324662' : '1px solid #d5deeb',
   background: active
     ? (isDark ? 'linear-gradient(135deg, #1e3a5f 0%, #26558a 100%)' : 'linear-gradient(135deg, #1e3a5f 0%, #2f67a8 100%)')
-    : (isDark ? '#162235' : '#e2e8f0'),
+    : (isDark ? '#1e1e1e' : '#e2e8f0'),
   color: active ? '#eef6ff' : (isDark ? '#9db2cc' : '#334155'),
   borderRadius: '999px',
   padding: '0.65rem 0.95rem',
@@ -910,7 +910,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
                 type="button"
                 onClick={handleChooseImportWorkbook}
                 disabled={summaryLoading || importingFullWorkbook || exportingFullWorkbook || exportingExcel || exportingPdf}
-                style={{ border: isAdminDarkTheme ? '1px solid #3a5b8e' : '1px solid #bfdbfe', background: isAdminDarkTheme ? '#1a2d47' : '#eff6ff', color: isAdminDarkTheme ? '#9bc2ff' : '#1e3a8a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 800, cursor: summaryLoading || importingFullWorkbook || exportingFullWorkbook || exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}
+                style={{ border: isAdminDarkTheme ? '1px solid #2e4a7a' : '1px solid #bfdbfe', background: isAdminDarkTheme ? '#1c2a3a' : '#eff6ff', color: isAdminDarkTheme ? '#9bc2ff' : '#1e3a8a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 800, cursor: summaryLoading || importingFullWorkbook || exportingFullWorkbook || exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}
               >
                 <i className={`fas ${importingFullWorkbook ? 'fa-spinner fa-spin' : 'fa-file-arrow-up'}`} style={{ marginRight: '0.42rem' }}></i>
                 Import Full Workbook
@@ -972,7 +972,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
                     type="button"
                     onClick={handleChooseImportWorkbook}
                     disabled={summaryLoading || importingFullWorkbook || exportingFullWorkbook || exportingExcel || exportingPdf}
-                    style={{ border: isAdminDarkTheme ? '1px solid #3a5b8e' : '1px solid #bfdbfe', background: isAdminDarkTheme ? '#1a2d47' : '#eff6ff', color: isAdminDarkTheme ? '#9bc2ff' : '#1e3a8a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 800, cursor: summaryLoading || importingFullWorkbook || exportingFullWorkbook || exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}
+                    style={{ border: isAdminDarkTheme ? '1px solid #2e4a7a' : '1px solid #bfdbfe', background: isAdminDarkTheme ? '#1c2a3a' : '#eff6ff', color: isAdminDarkTheme ? '#9bc2ff' : '#1e3a8a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 800, cursor: summaryLoading || importingFullWorkbook || exportingFullWorkbook || exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}
                   >
                     <i className={`fas ${importingFullWorkbook ? 'fa-spinner fa-spin' : 'fa-file-arrow-up'}`} style={{ marginRight: '0.42rem' }}></i>
                     Import Full Workbook

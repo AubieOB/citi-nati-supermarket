@@ -911,13 +911,13 @@ const AdminStocks = () => {
                   return {
                     backgroundColor:
                       status.label === 'Out of Stock'
-                        ? '#2b1518'
+                        ? '#271818'
                         : status.label === 'Low Stock'
-                          ? '#2b2317'
-                          : '#12233c',
+                          ? '#272218'
+                          : '#1e1e1e',
                     textColor: '#f8fafc',
                     mutedTextColor: '#cbd5e1',
-                    codeBackground: '#1e293b',
+                    codeBackground: '#252525',
                   };
                 })();
                 return (

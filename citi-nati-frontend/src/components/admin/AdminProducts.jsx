@@ -1460,7 +1460,7 @@ const AdminProducts = () => {
       {activeSubTab === 'expiry-alerts' && (
         posExpiryLoading ? (
           <div style={{
-            backgroundColor: isAdminDarkTheme ? '#12233c' : '#f8f9fa',
+            backgroundColor: isAdminDarkTheme ? '#1e1e1e' : '#f8f9fa',
             padding: '2rem',
             borderRadius: '8px',
             textAlign: 'center',
@@ -1471,7 +1471,7 @@ const AdminProducts = () => {
           </div>
         ) : filteredExpiryAlertCards.length > 0 ? (
           <div style={{
-            backgroundColor: isAdminDarkTheme ? '#2b2317' : '#fff3cd',
+            backgroundColor: isAdminDarkTheme ? '#272218' : '#fff3cd',
             border: `2px solid ${isAdminDarkTheme ? '#a16207' : '#ffc107'}`,
             borderRadius: '8px',
             padding: '1.5rem',
@@ -1482,7 +1482,7 @@ const AdminProducts = () => {
             </h3>
             {posExpiryError && (
               <div style={{
-                backgroundColor: isAdminDarkTheme ? '#3a2f17' : '#fff8e1',
+                backgroundColor: isAdminDarkTheme ? '#2e2816' : '#fff8e1',
                 color: isAdminDarkTheme ? '#fde68a' : '#8a6d3b',
                 border: `1px solid ${isAdminDarkTheme ? '#b45309' : '#ffe08a'}`,
                 borderRadius: '6px',
@@ -1501,11 +1501,11 @@ const AdminProducts = () => {
                     padding: '1rem',
                     borderRadius: '10px',
                     backgroundColor: card.isExpired
-                      ? (isAdminDarkTheme ? '#31181d' : '#f8d7da')
+                      ? (isAdminDarkTheme ? '#2a1919' : '#f8d7da')
                       : card.isUrgent
-                        ? (isAdminDarkTheme ? '#332813' : '#fff4db')
-                        : (isAdminDarkTheme ? '#12233c' : '#fff'),
-                    border: `2px solid ${card.isExpired ? (isAdminDarkTheme ? '#b91c1c' : '#f5c6cb') : card.isUrgent ? (isAdminDarkTheme ? '#d97706' : '#ffc107') : (isAdminDarkTheme ? '#334155' : '#ddd')}`,
+                        ? (isAdminDarkTheme ? '#2a2215' : '#fff4db')
+                        : (isAdminDarkTheme ? '#1e1e1e' : '#fff'),
+                    border: `2px solid ${card.isExpired ? (isAdminDarkTheme ? '#b91c1c' : '#f5c6cb') : card.isUrgent ? (isAdminDarkTheme ? '#d97706' : '#ffc107') : (isAdminDarkTheme ? '#3a3a3a' : '#ddd')}`,
                     boxShadow: '0 4px 14px rgba(0, 0, 0, 0.06)',
                   }}
                 >
@@ -1542,7 +1542,7 @@ const AdminProducts = () => {
                             alignItems: 'center',
                             padding: '0.75rem',
                             borderRadius: '8px',
-                            backgroundColor: isAdminDarkTheme ? '#0f1f35' : '#fff',
+                            backgroundColor: isAdminDarkTheme ? '#181818' : '#fff',
                             border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #e5e7eb',
                           }}
                         >
@@ -1621,7 +1621,7 @@ const AdminProducts = () => {
           </div>
         ) : (
           <div style={{
-            backgroundColor: isAdminDarkTheme ? '#12233c' : '#f8f9fa',
+            backgroundColor: isAdminDarkTheme ? '#1e1e1e' : '#f8f9fa',
             padding: '2rem',
             borderRadius: '8px',
             textAlign: 'center',
@@ -1983,12 +1983,12 @@ const AdminProducts = () => {
             <table style={{
               width: '100%',
               borderCollapse: 'collapse',
-              backgroundColor: isAdminDarkTheme ? '#12233c' : '#fff',
+              backgroundColor: isAdminDarkTheme ? '#1e1e1e' : '#fff',
               borderRadius: '8px',
               overflow: 'hidden',
               boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
             }}>
-              <thead style={{ backgroundColor: isAdminDarkTheme ? '#0f1f35' : '#f8f9fa', borderBottom: isAdminDarkTheme ? '1px solid #2b3c54' : '2px solid #ddd' }}>
+              <thead style={{ backgroundColor: isAdminDarkTheme ? '#181818' : '#f8f9fa', borderBottom: isAdminDarkTheme ? '1px solid #2b3c54' : '2px solid #ddd' }}>
                 <tr>
                   <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem', color: textPrimary }}>ID</th>
                   <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.9rem', color: textPrimary }}>Name</th>
@@ -2023,10 +2023,10 @@ const AdminProducts = () => {
                     style={{ 
                       borderBottom: '1px solid #eee',
                       backgroundColor: product.expiryStatus?.status === 'expired'
-                        ? (isAdminDarkTheme ? '#2b1518' : '#ffebee')
+                        ? (isAdminDarkTheme ? '#271818' : '#ffebee')
                         : ['expiring_soon', '1_week_warning', '2_weeks_warning'].includes(product.expiryStatus?.status)
-                          ? (isAdminDarkTheme ? '#2b2317' : '#fff3e0')
-                          : (isAdminDarkTheme ? '#12233c' : 'transparent'),
+                          ? (isAdminDarkTheme ? '#272218' : '#fff3e0')
+                          : (isAdminDarkTheme ? '#1e1e1e' : 'transparent'),
                       color: textPrimary,
                     }}
                   >
@@ -2131,7 +2131,7 @@ const AdminProducts = () => {
                               <div style={{
                                 padding: '0.65rem 0.75rem',
                                 borderRadius: '8px',
-                                backgroundColor: isAdminDarkTheme ? '#0f1f35' : '#f8fafc',
+                                backgroundColor: isAdminDarkTheme ? '#181818' : '#f8fafc',
                                 border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #e5e7eb',
                               }}>
                                 <div style={{ fontSize: '0.82rem', color: textSecondary, marginBottom: '0.25rem' }}>
@@ -2179,7 +2179,7 @@ const AdminProducts = () => {
                                       alignItems: 'center',
                                       padding: '0.6rem 0.75rem',
                                       borderRadius: '8px',
-                                      backgroundColor: isAdminDarkTheme ? '#0f1f35' : '#ffffff',
+                                      backgroundColor: isAdminDarkTheme ? '#181818' : '#ffffff',
                                       border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #e5e7eb',
                                     }}
                                   >

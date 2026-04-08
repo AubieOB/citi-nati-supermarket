@@ -347,7 +347,7 @@ const AdminDashboard = () => {
         {/* Sidebar Logo/Title */}
         <div style={{
           padding: sidebarCollapsed ? '1rem 0.75rem' : '1rem 1.5rem',
-          borderBottom: `1px solid ${isDarkTheme ? '#2c3a4f' : '#e0e0e0'}`,
+          borderBottom: `1px solid ${isDarkTheme ? '#2e2e2e' : '#e0e0e0'}`,
           marginBottom: '1rem',
           color: isDarkTheme ? '#c7baff' : '#5B4B8A',
           fontWeight: '700',
@@ -368,7 +368,7 @@ const AdminDashboard = () => {
             title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             style={{
               border: 'none',
-              backgroundColor: isDarkTheme ? '#24324a' : '#f3f0fa',
+              backgroundColor: isDarkTheme ? '#252525' : '#f3f0fa',
               color: isDarkTheme ? '#d7ccff' : '#5B4B8A',
               borderRadius: '4px',
               width: '28px',
@@ -409,7 +409,7 @@ const AdminDashboard = () => {
                 border: 'none',
                 backgroundColor: 'transparent',
                 borderLeft: activeTab === tab.id
-                  ? `4px solid ${isDarkTheme ? '#7f74ff' : '#5B4B8A'}`
+                  ? `4px solid ${isDarkTheme ? '#7c71f5' : '#5B4B8A'}`
                   : '4px solid transparent',
                 color: activeTab === tab.id
                   ? (isDarkTheme ? '#ddd8ff' : '#5B4B8A')
@@ -444,8 +444,8 @@ const AdminDashboard = () => {
         {/* Sidebar Footer - Preferences and Home Button */}
         <div style={{
           padding: sidebarCollapsed ? '1rem 0.75rem' : '1rem 1.5rem',
-          borderTop: `1px solid ${isDarkTheme ? '#2c3a4f' : '#e0e0e0'}`,
-          backgroundColor: isDarkTheme ? '#101926' : '#fff',
+          borderTop: `1px solid ${isDarkTheme ? '#2e2e2e' : '#e0e0e0'}`,
+          backgroundColor: isDarkTheme ? '#181818' : '#fff',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'stretch',
@@ -460,7 +460,7 @@ const AdminDashboard = () => {
               border: 'none',
               backgroundColor: speechAlertsEnabled
                 ? (isDarkTheme ? '#19342a' : '#e8f7ee')
-                : (isDarkTheme ? '#1b2738' : '#f5f5f5'),
+                : (isDarkTheme ? '#222222' : '#f5f5f5'),
               color: speechAlertsEnabled
                 ? (isDarkTheme ? '#8be3b2' : '#1f7a45')
                 : (isDarkTheme ? '#a4b2c5' : '#666'),
@@ -485,7 +485,7 @@ const AdminDashboard = () => {
               width: '100%',
               padding: '0.75rem 1rem',
               border: 'none',
-              backgroundColor: isDarkTheme ? '#26344b' : '#f3f0fa',
+              backgroundColor: isDarkTheme ? '#282828' : '#f3f0fa',
               color: isDarkTheme ? '#e0d6ff' : '#5B4B8A',
               borderRadius: '4px',
               cursor: 'pointer',
@@ -510,7 +510,7 @@ const AdminDashboard = () => {
               flex: 1,
               padding: '0.75rem 1rem',
               border: 'none',
-              backgroundColor: isDarkTheme ? '#1b2738' : '#f5f5f5',
+              backgroundColor: isDarkTheme ? '#222222' : '#f5f5f5',
               color: isDarkTheme ? '#a4b2c5' : '#666',
               borderRadius: '4px',
               cursor: 'pointer',
@@ -526,7 +526,7 @@ const AdminDashboard = () => {
               e.currentTarget.style.backgroundColor = isDarkTheme ? '#24344b' : '#e8e8e8';
             }}
             onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = isDarkTheme ? '#1b2738' : '#f5f5f5';
+              e.currentTarget.style.backgroundColor = isDarkTheme ? '#222222' : '#f5f5f5';
             }}
           >
             <i className="fas fa-home" style={{ fontSize: '1rem' }}></i>

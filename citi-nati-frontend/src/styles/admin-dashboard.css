@@ -22,9 +22,9 @@
 }
 
 .admin-dashboard-root.theme-dark {
-  --admin-bg: #0b1220;
-  --admin-bg-soft: #101926;
-  --admin-border: #2c3a4f;
+  --admin-bg: #111111;
+  --admin-bg-soft: #181818;
+  --admin-border: #2e2e2e;
   --admin-text: #dce6f6;
   --admin-text-muted: #9dafc8;
   --admin-accent: #9388ff;
@@ -93,7 +93,7 @@
 }
 
 body.admin-theme-dark {
-  background-color: #0b1220;
+  background-color: #111111;
   color: #dce6f6;
 }
 
@@ -112,22 +112,22 @@ body.admin-theme-dark {
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="background: #fff"],
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="background:#fff"],
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="background: #ffffff"] {
-  background-color: #162235 !important;
-  background: #162235 !important;
+  background-color: #1e1e1e !important;
+  background: #1e1e1e !important;
 }
 
 .admin-dashboard-root.theme-dark [style*="background-color: rgb(245, 245, 245)"],
 .admin-dashboard-root.theme-dark [style*="background-color: rgb(245,245,245)"],
 body.admin-theme-dark [style*="background-color: rgb(245, 245, 245)"],
 body.admin-theme-dark [style*="background-color: rgb(245,245,245)"] {
-  background-color: #131e2f !important;
+  background-color: #1a1a1a !important;
 }
 
 .admin-dashboard-root.theme-dark [style*="background-color: rgb(248, 249, 250)"],
 .admin-dashboard-root.theme-dark [style*="background-color: rgb(248,249,250)"],
 body.admin-theme-dark [style*="background-color: rgb(248, 249, 250)"],
 body.admin-theme-dark [style*="background-color: rgb(248,249,250)"] {
-  background-color: #1a273a !important;
+  background-color: #1f1f1f !important;
 }
 
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="background: rgb(248, 249, 250)"],
@@ -136,7 +136,7 @@ body.admin-theme-dark [style*="background-color: rgb(248,249,250)"] {
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="background: rgb(250,248,255)"],
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="background: rgb(245, 243, 255)"],
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="background: rgb(245,243,255)"] {
-  background: #162235 !important;
+  background: #1e1e1e !important;
 }
 
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="background-color: rgb(240, 248, 255)"],
@@ -175,7 +175,7 @@ body.admin-theme-dark [style*="background-color: rgb(248,249,250)"] {
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="background-color: rgb(212,237,218)"],
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="background-color: rgb(248, 215, 218)"],
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="background-color: rgb(248,215,218)"] {
-  background-color: #1a273a !important;
+  background-color: #1f1f1f !important;
 }
 
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="border: 1px solid rgb(224, 224, 224)"],
@@ -184,7 +184,7 @@ body.admin-theme-dark [style*="background-color: rgb(248,249,250)"] {
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="border-bottom: 1px solid rgb(233,236,239)"],
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="border-top: 1px solid rgb(233, 236, 239)"],
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="border-top: 1px solid rgb(233,236,239)"] {
-  border-color: #324662 !important;
+  border-color: #333333 !important;
 }
 
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="border: 2px solid rgb(224, 224, 224)"],
@@ -203,7 +203,7 @@ body.admin-theme-dark [style*="background-color: rgb(248,249,250)"] {
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="border-bottom: 2px solid rgb(221,221,221)"],
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="border-bottom: 1px solid rgb(226, 232, 240)"],
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="border-bottom: 1px solid rgb(226,232,240)"] {
-  border-color: #324662 !important;
+  border-color: #333333 !important;
 }
 
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="color: rgb(51, 51, 51)"],
@@ -257,17 +257,17 @@ body.admin-theme-dark [style*="background-color: rgb(248,249,250)"] {
 
 .admin-dashboard-root.theme-dark .bo-filter-bar,
 .admin-dashboard-root.theme-dark .admin-panel-filter-bar {
-  background-color: #101c2c;
-  border-color: #324662;
+  background-color: #181818;
+  border-color: #333333;
   box-shadow: 0 16px 34px rgba(0, 0, 0, 0.3);
 }
 
 .admin-dashboard-root.theme-dark .bo-tab-button.active,
 .admin-dashboard-root.theme-dark .admin-tab-button.active,
 .admin-dashboard-root.theme-dark .admin-action-button.primary {
-  background: #7f74ff;
+  background: #7c71f5;
   color: #f4f5ff;
-  border-color: #7f74ff;
+  border-color: #7c71f5;
 }
 
 .admin-dashboard-root.theme-dark .bo-filter-title,
@@ -295,7 +295,7 @@ body.admin-theme-dark .bo-filter-title i {
 .admin-dashboard-root.theme-dark .admin-action-button:hover,
 .admin-dashboard-root.theme-dark .admin-table-action-button:hover,
 .admin-dashboard-root.theme-dark .bo-tab-button:hover {
-  background-color: #1f2f47;
+  background-color: #252525;
   color: #dbe7f8;
 }
 
@@ -305,15 +305,15 @@ body.admin-theme-dark .bo-filter-title i {
 .admin-dashboard-root.theme-dark input,
 .admin-dashboard-root.theme-dark select,
 .admin-dashboard-root.theme-dark textarea {
-  background-color: #101b2a;
-  border-color: #324662;
+  background-color: #161616;
+  border-color: #333333;
   color: #dbe7f8;
 }
 
 .admin-dashboard-root.theme-dark table,
 .admin-dashboard-root.theme-dark th,
 .admin-dashboard-root.theme-dark td {
-  border-color: #324662 !important;
+  border-color: #333333 !important;
 }
 
 .admin-dashboard-root.theme-dark .admin-content-area a {
@@ -322,7 +322,7 @@ body.admin-theme-dark .bo-filter-title i {
 
 .admin-dashboard-root.theme-dark .admin-pos-management code,
 .admin-dashboard-root.theme-dark .admin-pos-sync-monitor code {
-  background-color: #1f2f44 !important;
+  background-color: #252525 !important;
   color: #c5d6eb !important;
 }
 
@@ -330,8 +330,8 @@ body.admin-theme-dark .bo-filter-title i {
 .admin-dashboard-root.theme-dark .admin-pos-management select,
 .admin-dashboard-root.theme-dark .admin-pos-sync-monitor input,
 .admin-dashboard-root.theme-dark .admin-pos-sync-monitor select {
-  background-color: #101b2a !important;
-  border-color: #324662 !important;
+  background-color: #161616 !important;
+  border-color: #333333 !important;
   color: #dbe7f8 !important;
 }
 
@@ -483,8 +483,8 @@ body.admin-theme-dark .bo-filter-title i {
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="background-color: rgb(252,253,255)"],
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="background-color: rgb(249, 249, 249)"],
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="background-color: rgb(249,249,249)"] {
-  background-color: #162235 !important;
-  background: #162235 !important;
+  background-color: #1e1e1e !important;
+  background: #1e1e1e !important;
 }
 
 /* Light accent cards (warnings/errors/info) */
@@ -504,7 +504,7 @@ body.admin-theme-dark .bo-filter-title i {
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="background-color: rgb(212,237,218)"],
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="background-color: rgb(209, 236, 241)"],
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="background-color: rgb(209,236,241)"] {
-  background-color: #1a273a !important;
+  background-color: #1f1f1f !important;
 }
 
 /* Light borders still leaking on cards */
@@ -518,20 +518,20 @@ body.admin-theme-dark .bo-filter-title i {
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="border-bottom: 1px solid rgb(226,232,240)"],
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="border-bottom: 2px solid rgb(221, 221, 221)"],
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) [style*="border-bottom: 2px solid rgb(221,221,221)"] {
-  border-color: #324662 !important;
+  border-color: #333333 !important;
 }
 
 /* Darken form surfaces globally in admin dark theme */
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) input,
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) textarea,
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) select {
-  background-color: #162235 !important;
+  background-color: #1e1e1e !important;
   color: #dce6f6 !important;
-  border-color: #324662 !important;
+  border-color: #333333 !important;
 }
 
 :is(.admin-dashboard-root.theme-dark, body.admin-theme-dark) select option {
-  background-color: #162235;
+  background-color: #1e1e1e;
   color: #dce6f6;
 }
 
