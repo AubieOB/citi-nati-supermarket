@@ -1460,31 +1460,31 @@ const AdminProducts = () => {
       {activeSubTab === 'expiry-alerts' && (
         posExpiryLoading ? (
           <div style={{
-            backgroundColor: '#f8f9fa',
+            backgroundColor: isAdminDarkTheme ? '#12233c' : '#f8f9fa',
             padding: '2rem',
             borderRadius: '8px',
             textAlign: 'center',
-            color: '#666',
+            color: textSecondary,
             marginBottom: '2rem',
           }}>
             Loading POS expiry alerts...
           </div>
         ) : filteredExpiryAlertCards.length > 0 ? (
           <div style={{
-            backgroundColor: '#fff3cd',
-            border: '2px solid #ffc107',
+            backgroundColor: isAdminDarkTheme ? '#2b2317' : '#fff3cd',
+            border: `2px solid ${isAdminDarkTheme ? '#a16207' : '#ffc107'}`,
             borderRadius: '8px',
             padding: '1.5rem',
             marginBottom: '2rem',
           }}>
-            <h3 style={{ color: '#856404', marginTop: 0, marginBottom: '1rem' }}>
+            <h3 style={{ color: isAdminDarkTheme ? '#fde68a' : '#856404', marginTop: 0, marginBottom: '1rem' }}>
               <i className="fas fa-exclamation-triangle" style={{marginRight: '0.5rem'}}></i>Expiry Alerts ({filteredExpiryAlertCards.length})
             </h3>
             {posExpiryError && (
               <div style={{
-                backgroundColor: '#fff8e1',
-                color: '#8a6d3b',
-                border: '1px solid #ffe08a',
+                backgroundColor: isAdminDarkTheme ? '#3a2f17' : '#fff8e1',
+                color: isAdminDarkTheme ? '#fde68a' : '#8a6d3b',
+                border: `1px solid ${isAdminDarkTheme ? '#b45309' : '#ffe08a'}`,
                 borderRadius: '6px',
                 padding: '0.75rem',
                 marginBottom: '1rem',
@@ -1500,25 +1500,29 @@ const AdminProducts = () => {
                   style={{
                     padding: '1rem',
                     borderRadius: '10px',
-                    backgroundColor: card.isExpired ? '#f8d7da' : card.isUrgent ? '#fff4db' : '#fff',
-                    border: `2px solid ${card.isExpired ? '#f5c6cb' : card.isUrgent ? '#ffc107' : '#ddd'}`,
+                    backgroundColor: card.isExpired
+                      ? (isAdminDarkTheme ? '#31181d' : '#f8d7da')
+                      : card.isUrgent
+                        ? (isAdminDarkTheme ? '#332813' : '#fff4db')
+                        : (isAdminDarkTheme ? '#12233c' : '#fff'),
+                    border: `2px solid ${card.isExpired ? (isAdminDarkTheme ? '#b91c1c' : '#f5c6cb') : card.isUrgent ? (isAdminDarkTheme ? '#d97706' : '#ffc107') : (isAdminDarkTheme ? '#334155' : '#ddd')}`,
                     boxShadow: '0 4px 14px rgba(0, 0, 0, 0.06)',
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
                     <div>
-                      <div style={{ fontWeight: '700', marginBottom: '0.35rem', color: '#1f2937' }}>
+                      <div style={{ fontWeight: '700', marginBottom: '0.35rem', color: textPrimary }}>
                         {card.name}
                       </div>
-                      <div style={{ fontSize: '0.82rem', color: '#6b7280' }}>
+                      <div style={{ fontSize: '0.82rem', color: textSecondary }}>
                         Code: {card.productCode || 'N/A'}
                       </div>
-                      <div style={{ fontSize: '0.82rem', color: '#6b7280' }}>
+                      <div style={{ fontSize: '0.82rem', color: textSecondary }}>
                         Category: {card.category || 'Uncategorized'}
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '0.82rem', color: '#374151', fontWeight: '700' }}>
+                      <div style={{ fontSize: '0.82rem', color: textPrimary, fontWeight: '700' }}>
                         {card.batches.length} batch{card.batches.length === 1 ? '' : 'es'}
                       </div>
                     </div>
@@ -1538,12 +1542,12 @@ const AdminProducts = () => {
                             alignItems: 'center',
                             padding: '0.75rem',
                             borderRadius: '8px',
-                            backgroundColor: '#fff',
-                            border: '1px solid #e5e7eb',
+                            backgroundColor: isAdminDarkTheme ? '#0f1f35' : '#fff',
+                            border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #e5e7eb',
                           }}
                         >
                           <div>
-                            <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#111827' }}>
+                            <div style={{ fontSize: '0.85rem', fontWeight: '700', color: textPrimary }}>
                               {batch.grnNo && batch.stockDetailId
                                 ? `GRN ${batch.grnNo} / SD ${batch.stockDetailId}`
                                 : batch.grnNo
@@ -1552,11 +1556,11 @@ const AdminProducts = () => {
                                     ? `Stock Detail ${batch.stockDetailId}`
                                     : `Batch ${index + 1}${batch.batchNo ? ` (${batch.batchNo})` : ''}`}
                             </div>
-                            <div style={{ fontSize: '0.82rem', color: '#4b5563' }}>
+                            <div style={{ fontSize: '0.82rem', color: textSecondary }}>
                               Expiry {formatExpiryDate(batch.expiryDate)}
                             </div>
                             {batch.receivedQty != null && (
-                              <div style={{ fontSize: '0.82rem', color: '#4b5563' }}>
+                              <div style={{ fontSize: '0.82rem', color: textSecondary }}>
                                 Received Qty {batch.receivedQty}
                               </div>
                             )}
@@ -1597,7 +1601,7 @@ const AdminProducts = () => {
                       {card.isExpired ? 'Review Product' : 'Open Product'}
                     </button>
                   ) : (
-                    <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.9rem' }}>
+                    <div style={{ fontSize: '0.8rem', color: textSecondary, marginTop: '0.9rem' }}>
                       POS item (manage from POS sync tools)
                     </div>
                   )}
@@ -1617,11 +1621,11 @@ const AdminProducts = () => {
           </div>
         ) : (
           <div style={{
-            backgroundColor: '#f8f9fa',
+            backgroundColor: isAdminDarkTheme ? '#12233c' : '#f8f9fa',
             padding: '2rem',
             borderRadius: '8px',
             textAlign: 'center',
-            color: '#999',
+            color: textMuted,
           }}>
             <i className="fas fa-check-circle" style={{ fontSize: '2rem', marginBottom: '1rem', display: 'block', color: '#4caf50' }}></i>
             <p style={{ fontSize: '1rem', margin: 0 }}>No expiry alerts match the current filters.</p>
