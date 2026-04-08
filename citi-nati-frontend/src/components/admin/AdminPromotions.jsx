@@ -29,6 +29,9 @@ const AdminPromotions = () => {
   const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
   const [filterBarHeight, setFilterBarHeight] = useState(0);
   const filterBarRef = useRef(null);
+  const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
+  const textPrimary = isAdminDarkTheme ? '#f8fafc' : '#333';
+  const textSecondary = isAdminDarkTheme ? '#cbd5e1' : '#666';
 
   const clearSearch = () => {
     setSearchTerm('');
@@ -299,11 +302,11 @@ const AdminPromotions = () => {
           marginBottom: '1rem',
         }}>
           <div>
-            <h3 style={{ margin: '0 0 0.5rem 0', color: '#333', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <h3 style={{ margin: '0 0 0.5rem 0', color: textPrimary, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <i className={`fas ${icon}`} style={{ color: '#5B4B8A' }}></i>
               {label}
             </h3>
-            <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
+            <p style={{ margin: 0, color: textSecondary, fontSize: '0.9rem' }}>
               {description}
             </p>
           </div>
@@ -337,7 +340,7 @@ const AdminPromotions = () => {
             display: 'block',
             marginBottom: '0.5rem',
             fontWeight: '600',
-            color: '#333',
+            color: textPrimary,
           }}>
             <i className="fas fa-percent" style={{ marginRight: '0.5rem', color: '#5B4B8A' }}></i>
             Discount Percentage
@@ -404,7 +407,7 @@ const AdminPromotions = () => {
               display: 'block',
               marginBottom: '0.5rem',
               fontWeight: '600',
-              color: '#333',
+              color: textPrimary,
             }}>
               <i className="fas fa-folder" style={{ marginRight: '0.5rem', color: '#5B4B8A' }}></i>
               Select Category
@@ -443,7 +446,7 @@ const AdminPromotions = () => {
               display: 'block',
               marginBottom: '0.5rem',
               fontWeight: '600',
-              color: '#333',
+              color: textPrimary,
             }}>
               <i className="fas fa-search" style={{ marginRight: '0.5rem', color: '#5B4B8A' }}></i>
               Search & Select Products ({selectedCount} selected)
@@ -528,10 +531,10 @@ const AdminPromotions = () => {
                     )}
                     <div style={{ flex: 1 }}>
                       <strong>{product.name}</strong>
-                      <div style={{ fontSize: '0.8rem', color: '#666' }}>
+                      <div style={{ fontSize: '0.8rem', color: textSecondary }}>
                         {product.productCode || product.sourceCode || 'No Code'}
                       </div>
-                      <div style={{ fontSize: '0.85rem', color: '#666' }}>
+                      <div style={{ fontSize: '0.85rem', color: textSecondary }}>
                         {formatMWK(product.price)} → {formatMWK(product.price - (product.price * promo.percentage) / 100)}
                       </div>
                     </div>
@@ -621,9 +624,9 @@ const AdminPromotions = () => {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <i className="fas fa-tags" style={{ fontSize: '1.2rem', color: '#5B4B8A' }}></i>
-            <h1 style={{ margin: 0, color: '#333', fontSize: '1.15rem' }}>Promotions Management</h1>
+            <h1 style={{ margin: 0, color: textPrimary, fontSize: '1.15rem' }}>Promotions Management</h1>
           </div>
-          <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600' }}>
+          <div style={{ color: textSecondary, fontSize: '0.85rem', fontWeight: '600' }}>
             Catalog: {allProducts.length} products | {categories.length} categories
           </div>
         </div>
@@ -720,7 +723,7 @@ const AdminPromotions = () => {
               alignItems: 'center',
               marginBottom: '1.5rem',
             }}>
-              <h2 style={{ margin: 0, color: '#333' }}>Preview Products</h2>
+              <h2 style={{ margin: 0, color: textPrimary }}>Preview Products</h2>
               <button
                 onClick={() => setShowPreview(false)}
                 style={{
@@ -728,7 +731,7 @@ const AdminPromotions = () => {
                   border: 'none',
                   fontSize: '1.5rem',
                   cursor: 'pointer',
-                  color: '#666',
+                  color: textSecondary,
                 }}
               >
                 ✕
@@ -760,7 +763,7 @@ const AdminPromotions = () => {
                       alignItems: 'center',
                       justifyContent: 'center',
                       marginBottom: '0.75rem',
-                      color: '#666',
+                      color: textSecondary,
                       fontSize: '0.9rem',
                     }}>
                       {product.image ? (
@@ -773,8 +776,8 @@ const AdminPromotions = () => {
                         'No Image'
                       )}
                     </div>
-                    <h4 style={{ margin: '0.5rem 0', color: '#333' }}>{product.name}</h4>
-                    <p style={{ margin: '0.25rem 0', color: '#666', fontSize: '0.9rem' }}>
+                    <h4 style={{ margin: '0.5rem 0', color: textPrimary }}>{product.name}</h4>
+                    <p style={{ margin: '0.25rem 0', color: textSecondary, fontSize: '0.9rem' }}>
                       {product.category}
                     </p>
                     <div style={{
@@ -801,7 +804,7 @@ const AdminPromotions = () => {
                 ))}
               </div>
             ) : (
-              <p style={{ textAlign: 'center', color: '#666' }}>
+              <p style={{ textAlign: 'center', color: textSecondary }}>
                 No products match the current promotion criteria
               </p>
             )}

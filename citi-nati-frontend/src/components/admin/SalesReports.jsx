@@ -25,6 +25,10 @@ const SalesReports = ({ refreshTrigger }) => {
   const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
   const [filterBarHeight, setFilterBarHeight] = useState(0);
   const filterBarRef = useRef(null);
+  const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
+  const textPrimary = isAdminDarkTheme ? '#f8fafc' : '#1f2937';
+  const textSecondary = isAdminDarkTheme ? '#cbd5e1' : '#4b5563';
+  const textMuted = isAdminDarkTheme ? '#94a3b8' : '#6b7280';
 
   useEffect(() => {
     let resizeObserver;
@@ -285,8 +289,8 @@ const SalesReports = ({ refreshTrigger }) => {
 
   return (
     <div style={{ position: 'relative' }}>
-      <h2 style={{ marginTop: 0, marginBottom: '0.75rem', color: '#1f2937' }}>Reports & Downloads</h2>
-      <p style={{ marginTop: 0, marginBottom: '1rem', color: '#6b7280', fontSize: '0.92rem' }}>
+      <h2 style={{ marginTop: 0, marginBottom: '0.75rem', color: textPrimary }}>Reports & Downloads</h2>
+      <p style={{ marginTop: 0, marginBottom: '1rem', color: textMuted, fontSize: '0.92rem' }}>
         Generate polished sales reports with date filtering and export options.
       </p>
 
@@ -307,7 +311,7 @@ const SalesReports = ({ refreshTrigger }) => {
         }}
       >
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ fontSize: '0.88rem', color: '#4b5563', fontWeight: '700', minWidth: '110px' }}>
+          <div style={{ fontSize: '0.88rem', color: textSecondary, fontWeight: '700', minWidth: '110px' }}>
             <i className="fas fa-sliders-h" style={{ marginRight: '0.45rem' }}></i>
             Report Filters
           </div>
@@ -322,7 +326,7 @@ const SalesReports = ({ refreshTrigger }) => {
               fontSize: '0.92rem',
               minWidth: '220px',
               backgroundColor: '#fff',
-              color: '#374151',
+              color: textPrimary,
             }}
           >
             <option value="byProduct">Sales by Product</option>
@@ -331,7 +335,7 @@ const SalesReports = ({ refreshTrigger }) => {
           </select>
 
           <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#4b5563' }}>From</label>
+            <label style={{ fontSize: '0.82rem', fontWeight: '700', color: textSecondary }}>From</label>
             <input
               type="date"
               value={fromDate}
@@ -344,7 +348,7 @@ const SalesReports = ({ refreshTrigger }) => {
                 boxSizing: 'border-box',
               }}
             />
-            <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#4b5563' }}>To</label>
+            <label style={{ fontSize: '0.82rem', fontWeight: '700', color: textSecondary }}>To</label>
             <input
               type="date"
               value={toDate}
@@ -367,7 +371,7 @@ const SalesReports = ({ refreshTrigger }) => {
             style={{
               padding: '0.65rem 0.95rem',
               backgroundColor: '#f3f4f6',
-              color: '#374151',
+              color: textPrimary,
               border: '1px solid #d1d5db',
               borderRadius: '6px',
               cursor: 'pointer',
@@ -391,10 +395,10 @@ const SalesReports = ({ refreshTrigger }) => {
         {activeReport === 'totalSales' && (
           <div style={{ backgroundColor: '#fff', padding: '2rem', borderRadius: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h3 style={{ margin: 0, color: '#333' }}>
+              <h3 style={{ margin: 0, color: textPrimary }}>
                 Total Sales Summary
                 {filteredSalesDays.length > 0 && (
-                  <span style={{ fontSize: '0.85rem', color: '#666', marginLeft: '1rem' }}>
+                  <span style={{ fontSize: '0.85rem', color: textMuted, marginLeft: '1rem' }}>
                     ({filteredSalesDays.length} days)
                   </span>
                 )}
@@ -423,10 +427,10 @@ const SalesReports = ({ refreshTrigger }) => {
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#f9f9f9', borderBottom: '2px solid #ddd' }}>
-                      <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#333' }}>Date</th>
-                      <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', color: '#333' }}>Orders</th>
-                      <th style={{ padding: '1rem', textAlign: 'right', fontWeight: '600', color: '#333' }}>Revenue</th>
-                      <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', color: '#333' }}>Duration</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: textPrimary }}>Date</th>
+                      <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', color: textPrimary }}>Orders</th>
+                      <th style={{ padding: '1rem', textAlign: 'right', fontWeight: '600', color: textPrimary }}>Revenue</th>
+                      <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', color: textPrimary }}>Duration</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -437,18 +441,18 @@ const SalesReports = ({ refreshTrigger }) => {
 
                       return (
                         <tr key={day.id} style={{ borderBottom: '1px solid #eee', backgroundColor: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
-                          <td style={{ padding: '1rem', color: '#333' }}>{opened.toLocaleDateString()}</td>
-                          <td style={{ padding: '1rem', textAlign: 'center', color: '#333', fontWeight: '600' }}>{day.totalOrders || 0}</td>
+                          <td style={{ padding: '1rem', color: textPrimary }}>{opened.toLocaleDateString()}</td>
+                          <td style={{ padding: '1rem', textAlign: 'center', color: textPrimary, fontWeight: '600' }}>{day.totalOrders || 0}</td>
                           <td style={{ padding: '1rem', textAlign: 'right', color: '#2D8659', fontWeight: '600' }}>
                             MWK {(day.totalSales || 0).toFixed(2)}
                           </td>
-                          <td style={{ padding: '1rem', textAlign: 'center', color: '#666', fontSize: '0.85rem' }}>{duration}m</td>
+                          <td style={{ padding: '1rem', textAlign: 'center', color: textMuted, fontSize: '0.85rem' }}>{duration}m</td>
                         </tr>
                       );
                     })}
                     <tr style={{ backgroundColor: '#f0f9f6', fontWeight: '700', borderTop: '2px solid #ddd' }}>
-                      <td style={{ padding: '1rem', color: '#333' }}>TOTAL</td>
-                      <td style={{ padding: '1rem', textAlign: 'center', color: '#333' }}>
+                      <td style={{ padding: '1rem', color: textPrimary }}>TOTAL</td>
+                      <td style={{ padding: '1rem', textAlign: 'center', color: textPrimary }}>
                         {filteredSalesDays.reduce((sum, day) => sum + (day.totalOrders || 0), 0)}
                       </td>
                       <td style={{ padding: '1rem', textAlign: 'right', color: '#2D8659' }}>
@@ -460,7 +464,7 @@ const SalesReports = ({ refreshTrigger }) => {
                 </table>
               </div>
             ) : (
-              <div style={{ backgroundColor: '#f5f5f5', padding: '2rem', textAlign: 'center', borderRadius: '4px', color: '#666' }}>
+              <div style={{ backgroundColor: '#f5f5f5', padding: '2rem', textAlign: 'center', borderRadius: '4px', color: textMuted }}>
                 No closed sales days available. Start and close a sales day to generate reports.
               </div>
             )}
@@ -470,10 +474,10 @@ const SalesReports = ({ refreshTrigger }) => {
         {activeReport === 'byProduct' && (
           <div style={{ backgroundColor: '#fff', padding: '2rem', borderRadius: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h3 style={{ margin: 0, color: '#333' }}>
+              <h3 style={{ margin: 0, color: textPrimary }}>
                 Sales by Product
                 {visibleProductSales.length > 0 && (
-                  <span style={{ fontSize: '0.85rem', color: '#666', marginLeft: '1rem' }}>
+                  <span style={{ fontSize: '0.85rem', color: textMuted, marginLeft: '1rem' }}>
                     ({visibleProductSales.length} product{visibleProductSales.length === 1 ? '' : 's'})
                   </span>
                 )}
@@ -505,7 +509,7 @@ const SalesReports = ({ refreshTrigger }) => {
               backgroundColor: '#f9fafb',
             }}>
               <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
-                <div style={{ fontWeight: '700', color: '#374151', fontSize: '0.9rem' }}>
+                <div style={{ fontWeight: '700', color: textPrimary, fontSize: '0.9rem' }}>
                   Product Filter
                 </div>
                 <input
@@ -530,7 +534,7 @@ const SalesReports = ({ refreshTrigger }) => {
                     border: '1px solid #d1d5db',
                     borderRadius: '6px',
                     backgroundColor: '#fff',
-                    color: '#374151',
+                    color: textPrimary,
                     cursor: 'pointer',
                     fontWeight: '600',
                     fontSize: '0.82rem',
@@ -549,7 +553,7 @@ const SalesReports = ({ refreshTrigger }) => {
                 padding: '0.35rem',
               }}>
                 {filteredProductOptions.length === 0 ? (
-                  <div style={{ padding: '0.6rem', color: '#6b7280', fontSize: '0.85rem' }}>
+                  <div style={{ padding: '0.6rem', color: textMuted, fontSize: '0.85rem' }}>
                     No products match your search.
                   </div>
                 ) : (
@@ -581,10 +585,10 @@ const SalesReports = ({ refreshTrigger }) => {
                             }
                           }}
                         />
-                        <span style={{ fontSize: '0.86rem', color: '#111827', flex: 1 }}>
+                        <span style={{ fontSize: '0.86rem', color: textPrimary, flex: 1 }}>
                           {productName}
                         </span>
-                        <span style={{ fontSize: '0.8rem', color: '#6b7280', fontWeight: '600' }}>
+                        <span style={{ fontSize: '0.8rem', color: textMuted, fontWeight: '600' }}>
                           Qty {metrics?.quantity ?? 0}
                         </span>
                       </label>
@@ -593,7 +597,7 @@ const SalesReports = ({ refreshTrigger }) => {
                 )}
               </div>
 
-              <div style={{ marginTop: '0.6rem', fontSize: '0.82rem', color: '#4b5563' }}>
+              <div style={{ marginTop: '0.6rem', fontSize: '0.82rem', color: textSecondary }}>
                 {selectedProducts.length > 0
                   ? `${selectedProducts.length} product${selectedProducts.length === 1 ? '' : 's'} selected`
                   : 'No products selected (showing all products)'}
@@ -605,24 +609,24 @@ const SalesReports = ({ refreshTrigger }) => {
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#f9f9f9', borderBottom: '2px solid #ddd' }}>
-                      <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#333' }}>Product</th>
-                      <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', color: '#333' }}>Quantity Sold</th>
-                      <th style={{ padding: '1rem', textAlign: 'right', fontWeight: '600', color: '#333' }}>Total Revenue</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: textPrimary }}>Product</th>
+                      <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', color: textPrimary }}>Quantity Sold</th>
+                      <th style={{ padding: '1rem', textAlign: 'right', fontWeight: '600', color: textPrimary }}>Total Revenue</th>
                     </tr>
                   </thead>
                   <tbody>
                     {visibleProductSales.map((product, idx) => (
                       <tr key={`${product.name}-${idx}`} style={{ borderBottom: '1px solid #eee', backgroundColor: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
-                        <td style={{ padding: '1rem', color: '#333', fontWeight: '500' }}>{product.name}</td>
-                        <td style={{ padding: '1rem', textAlign: 'center', color: '#333', fontWeight: '600' }}>{product.quantity}</td>
+                        <td style={{ padding: '1rem', color: textPrimary, fontWeight: '500' }}>{product.name}</td>
+                        <td style={{ padding: '1rem', textAlign: 'center', color: textPrimary, fontWeight: '600' }}>{product.quantity}</td>
                         <td style={{ padding: '1rem', textAlign: 'right', color: '#2D8659', fontWeight: '600' }}>
                           MWK {product.totalRevenue.toFixed(2)}
                         </td>
                       </tr>
                     ))}
                     <tr style={{ backgroundColor: '#f0f9f6', fontWeight: '700', borderTop: '2px solid #ddd' }}>
-                      <td style={{ padding: '1rem', color: '#333' }}>TOTAL</td>
-                      <td style={{ padding: '1rem', textAlign: 'center', color: '#333' }}>
+                      <td style={{ padding: '1rem', color: textPrimary }}>TOTAL</td>
+                      <td style={{ padding: '1rem', textAlign: 'center', color: textPrimary }}>
                         {visibleProductSales.reduce((sum, p) => sum + p.quantity, 0)}
                       </td>
                       <td style={{ padding: '1rem', textAlign: 'right', color: '#2D8659' }}>
@@ -633,7 +637,7 @@ const SalesReports = ({ refreshTrigger }) => {
                 </table>
               </div>
             ) : (
-              <div style={{ backgroundColor: '#f5f5f5', padding: '2rem', textAlign: 'center', borderRadius: '4px', color: '#666' }}>
+              <div style={{ backgroundColor: '#f5f5f5', padding: '2rem', textAlign: 'center', borderRadius: '4px', color: textMuted }}>
                 No product sales data available for the selected period and product filter.
               </div>
             )}
@@ -643,10 +647,10 @@ const SalesReports = ({ refreshTrigger }) => {
         {activeReport === 'byDriver' && (
           <div style={{ backgroundColor: '#fff', padding: '2rem', borderRadius: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h3 style={{ margin: 0, color: '#333' }}>
+              <h3 style={{ margin: 0, color: textPrimary }}>
                 Sales by Driver
                 {driverSales.length > 0 && (
-                  <span style={{ fontSize: '0.85rem', color: '#666', marginLeft: '1rem' }}>
+                  <span style={{ fontSize: '0.85rem', color: textMuted, marginLeft: '1rem' }}>
                     ({driverSales.length} drivers)
                   </span>
                 )}
@@ -675,18 +679,18 @@ const SalesReports = ({ refreshTrigger }) => {
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#f9f9f9', borderBottom: '2px solid #ddd' }}>
-                      <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#333' }}>Driver</th>
-                      <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#333' }}>Email</th>
-                      <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', color: '#333' }}>Deliveries</th>
-                      <th style={{ padding: '1rem', textAlign: 'right', fontWeight: '600', color: '#333' }}>Total Earnings</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: textPrimary }}>Driver</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: textPrimary }}>Email</th>
+                      <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', color: textPrimary }}>Deliveries</th>
+                      <th style={{ padding: '1rem', textAlign: 'right', fontWeight: '600', color: textPrimary }}>Total Earnings</th>
                     </tr>
                   </thead>
                   <tbody>
                     {driverSales.map((driver, idx) => (
                       <tr key={driver.id} style={{ borderBottom: '1px solid #eee', backgroundColor: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
-                        <td style={{ padding: '1rem', color: '#333', fontWeight: '500' }}>{driver.name || 'N/A'}</td>
-                        <td style={{ padding: '1rem', color: '#666', fontSize: '0.9rem' }}>{driver.email || 'N/A'}</td>
-                        <td style={{ padding: '1rem', textAlign: 'center', color: '#333', fontWeight: '600' }}>
+                        <td style={{ padding: '1rem', color: textPrimary, fontWeight: '500' }}>{driver.name || 'N/A'}</td>
+                        <td style={{ padding: '1rem', color: textMuted, fontSize: '0.9rem' }}>{driver.email || 'N/A'}</td>
+                        <td style={{ padding: '1rem', textAlign: 'center', color: textPrimary, fontWeight: '600' }}>
                           {driver.totalDeliveries || 0}
                         </td>
                         <td style={{ padding: '1rem', textAlign: 'right', color: '#5B4B8A', fontWeight: '600' }}>
@@ -695,8 +699,8 @@ const SalesReports = ({ refreshTrigger }) => {
                       </tr>
                     ))}
                     <tr style={{ backgroundColor: '#f4f0f7', fontWeight: '700', borderTop: '2px solid #ddd' }}>
-                      <td colSpan="2" style={{ padding: '1rem', color: '#333' }}>TOTAL</td>
-                      <td style={{ padding: '1rem', textAlign: 'center', color: '#333' }}>
+                      <td colSpan="2" style={{ padding: '1rem', color: textPrimary }}>TOTAL</td>
+                      <td style={{ padding: '1rem', textAlign: 'center', color: textPrimary }}>
                         {driverSales.reduce((sum, d) => sum + (d.totalDeliveries || 0), 0)}
                       </td>
                       <td style={{ padding: '1rem', textAlign: 'right', color: '#5B4B8A' }}>
@@ -707,7 +711,7 @@ const SalesReports = ({ refreshTrigger }) => {
                 </table>
               </div>
             ) : (
-              <div style={{ backgroundColor: '#f5f5f5', padding: '2rem', textAlign: 'center', borderRadius: '4px', color: '#666' }}>
+              <div style={{ backgroundColor: '#f5f5f5', padding: '2rem', textAlign: 'center', borderRadius: '4px', color: textMuted }}>
                 No driver data available for the selected period.
               </div>
             )}

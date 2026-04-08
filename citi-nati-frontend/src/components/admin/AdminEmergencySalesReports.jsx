@@ -104,6 +104,10 @@ const AdminEmergencySalesReports = () => {
   const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
   const [filterBarHeight, setFilterBarHeight] = useState(0);
   const filterBarRef = useRef(null);
+  const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
+  const textPrimary = isAdminDarkTheme ? '#f8fafc' : '#0f172a';
+  const textSecondary = isAdminDarkTheme ? '#cbd5e1' : '#475569';
+  const textMuted = isAdminDarkTheme ? '#94a3b8' : '#64748b';
 
   const fetchReportSales = useCallback(async (nextFilters) => {
     setLoading(true);
@@ -519,7 +523,7 @@ const AdminEmergencySalesReports = () => {
               className={`admin-tab-button${activeTab === tab.id ? ' active' : ''}`}
               style={{
                 backgroundColor: activeTab === tab.id ? '#1f3a8a' : '#fff',
-                color: activeTab === tab.id ? '#fff' : '#334155',
+                color: activeTab === tab.id ? '#fff' : textSecondary,
               }}
             >
               <i className={`fas ${tab.icon} admin-tab-icon`}></i>
@@ -531,23 +535,23 @@ const AdminEmergencySalesReports = () => {
         <div style={{ padding: '0.75rem 1rem', display: 'flex', gap: '0.65rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <button
             onClick={() => applyPreset('today')}
-            style={{ padding: '0.45rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '999px', backgroundColor: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem', color: '#1e293b' }}
+            style={{ padding: '0.45rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '999px', backgroundColor: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem', color: textPrimary }}
           >Today</button>
           <button
             onClick={() => applyPreset('last7')}
-            style={{ padding: '0.45rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '999px', backgroundColor: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem', color: '#1e293b' }}
+            style={{ padding: '0.45rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '999px', backgroundColor: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem', color: textPrimary }}
           >Last 7 Days</button>
           <button
             onClick={() => applyPreset('last30')}
-            style={{ padding: '0.45rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '999px', backgroundColor: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem', color: '#1e293b' }}
+            style={{ padding: '0.45rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '999px', backgroundColor: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem', color: textPrimary }}
           >Last 30 Days</button>
           <button
             onClick={() => applyPreset('thisMonth')}
-            style={{ padding: '0.45rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '999px', backgroundColor: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem', color: '#1e293b' }}
+            style={{ padding: '0.45rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '999px', backgroundColor: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem', color: textPrimary }}
           >This Month</button>
           <button
             onClick={() => applyPreset('lastMonth')}
-            style={{ padding: '0.45rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '999px', backgroundColor: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem', color: '#1e293b' }}
+            style={{ padding: '0.45rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '999px', backgroundColor: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem', color: textPrimary }}
           >Last Month</button>
 
           <input
@@ -615,7 +619,7 @@ const AdminEmergencySalesReports = () => {
               border: '1px solid #d1d5db',
               borderRadius: '6px',
               backgroundColor: '#fff',
-              color: '#334155',
+              color: textSecondary,
               fontWeight: 700,
               cursor: 'pointer',
             }}
@@ -628,42 +632,42 @@ const AdminEmergencySalesReports = () => {
       <div style={{ height: `${reportFilterSpacerHeight}px` }}></div>
 
       <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '1rem' }}>
-        <div style={{ marginBottom: '0.8rem', fontSize: '0.85rem', color: '#475569', fontWeight: 600 }}>
+        <div style={{ marginBottom: '0.8rem', fontSize: '0.85rem', color: textSecondary, fontWeight: 600 }}>
           {appliedFiltersText}
         </div>
 
         {loading ? (
-          <div style={{ padding: '2rem 0', textAlign: 'center', color: '#64748b' }}>Loading emergency sales reports...</div>
+          <div style={{ padding: '2rem 0', textAlign: 'center', color: textMuted }}>Loading emergency sales reports...</div>
         ) : (
           <>
             {activeTab === 'overview' && (
-              <div>
+              <div style={{ color: textPrimary }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
                   <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem' }}>
-                    <div style={{ color: '#64748b', fontSize: '0.82rem' }}>Emergency Sales</div>
-                    <div style={{ color: '#0f172a', fontSize: '1.35rem', fontWeight: 800 }}>{totals.salesCount}</div>
+                    <div style={{ color: textMuted, fontSize: '0.82rem' }}>Emergency Sales</div>
+                    <div style={{ color: textPrimary, fontSize: '1.35rem', fontWeight: 800 }}>{totals.salesCount}</div>
                   </div>
 
                   <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem' }}>
-                    <div style={{ color: '#64748b', fontSize: '0.82rem' }}>Gross Total</div>
-                    <div style={{ color: '#0f172a', fontSize: '1.35rem', fontWeight: 800 }}>{formatMoney(totals.grossTotal)}</div>
+                    <div style={{ color: textMuted, fontSize: '0.82rem' }}>Gross Total</div>
+                    <div style={{ color: textPrimary, fontSize: '1.35rem', fontWeight: 800 }}>{formatMoney(totals.grossTotal)}</div>
                   </div>
 
                   <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem' }}>
-                    <div style={{ color: '#64748b', fontSize: '0.82rem' }}>Average Sale</div>
-                    <div style={{ color: '#0f172a', fontSize: '1.35rem', fontWeight: 800 }}>{formatMoney(totals.avgSale)}</div>
+                    <div style={{ color: textMuted, fontSize: '0.82rem' }}>Average Sale</div>
+                    <div style={{ color: textPrimary, fontSize: '1.35rem', fontWeight: 800 }}>{formatMoney(totals.avgSale)}</div>
                   </div>
 
                   <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem' }}>
-                    <div style={{ color: '#64748b', fontSize: '0.82rem' }}>Items Sold</div>
-                    <div style={{ color: '#0f172a', fontSize: '1.35rem', fontWeight: 800 }}>{totals.itemCount}</div>
+                    <div style={{ color: textMuted, fontSize: '0.82rem' }}>Items Sold</div>
+                    <div style={{ color: textPrimary, fontSize: '1.35rem', fontWeight: 800 }}>{totals.itemCount}</div>
                   </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.75rem' }}>
                   {Object.entries(summary).map(([status, count]) => (
                     <div key={status} style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem' }}>
-                      <div style={{ color: '#64748b', fontSize: '0.82rem' }}>{STATUS_LABELS[status] || status}</div>
+                      <div style={{ color: textMuted, fontSize: '0.82rem' }}>{STATUS_LABELS[status] || status}</div>
                       <div style={{ color: statusColor(status), fontSize: '1.25rem', fontWeight: 800 }}>{count}</div>
                     </div>
                   ))}
@@ -672,7 +676,7 @@ const AdminEmergencySalesReports = () => {
             )}
 
             {activeTab === 'sales' && (
-              <div>
+              <div style={{ color: textPrimary }}>
                 <div style={{ marginBottom: '0.7rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <button
                     onClick={handleDownloadSalesCsv}
@@ -722,7 +726,7 @@ const AdminEmergencySalesReports = () => {
                     <tbody>
                       {sales.length === 0 && (
                         <tr>
-                          <td colSpan={6} style={{ textAlign: 'center', padding: '1rem', color: '#94a3b8' }}>
+                          <td colSpan={6} style={{ textAlign: 'center', padding: '1rem', color: textMuted }}>
                             No emergency sales found for these filters.
                           </td>
                         </tr>
@@ -764,7 +768,7 @@ const AdminEmergencySalesReports = () => {
             )}
 
             {activeTab === 'products' && (
-              <div>
+              <div style={{ color: textPrimary }}>
                 <div style={{ marginBottom: '0.7rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <button
                     onClick={handleDownloadProductCsv}
@@ -812,7 +816,7 @@ const AdminEmergencySalesReports = () => {
                     <tbody>
                       {productStats.length === 0 && (
                         <tr>
-                          <td colSpan={4} style={{ textAlign: 'center', padding: '1rem', color: '#94a3b8' }}>
+                          <td colSpan={4} style={{ textAlign: 'center', padding: '1rem', color: textMuted }}>
                             No product data for these filters.
                           </td>
                         </tr>
@@ -844,7 +848,7 @@ const AdminEmergencySalesReports = () => {
             )}
 
             {activeTab === 'cashiers' && (
-              <div>
+              <div style={{ color: textPrimary }}>
                 <div style={{ marginBottom: '0.7rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <button
                     onClick={handleDownloadCashierCsv}
@@ -894,7 +898,7 @@ const AdminEmergencySalesReports = () => {
                     <tbody>
                       {cashierStats.length === 0 && (
                         <tr>
-                          <td colSpan={6} style={{ textAlign: 'center', padding: '1rem', color: '#94a3b8' }}>
+                          <td colSpan={6} style={{ textAlign: 'center', padding: '1rem', color: textMuted }}>
                             No cashier data for these filters.
                           </td>
                         </tr>
