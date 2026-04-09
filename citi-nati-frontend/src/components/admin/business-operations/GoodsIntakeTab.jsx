@@ -12,6 +12,7 @@ const cardStyle = {
 
 const tableInputStyle = {
   width: '100%',
+  minWidth: 0,
   border: '1px solid #cbd5e1',
   borderRadius: '8px',
   padding: '0.45rem 0.5rem',
@@ -461,8 +462,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
   };
 
   return (
-    <div style={{ display: 'grid', gap: '1rem' }}>
-      <section style={{ ...cardStyle, padding: '1rem' }}>
+    <div style={{ display: 'grid', gap: '1rem', width: '100%', minWidth: 0 }}>
+      <section style={{ ...cardStyle, padding: '1rem', width: '100%', minWidth: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ margin: 0, color: '#111827' }}>Goods Intake</h2>
@@ -488,8 +489,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
           </div>
         </div>
 
-        <div style={{ marginTop: '1rem', display: 'grid', gap: '0.8rem', gridTemplateColumns: 'repeat(6, minmax(120px, 1fr))' }}>
-          <div style={{ gridColumn: 'span 2' }}>
+        <div style={{ marginTop: '1rem', display: 'grid', gap: '0.8rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', width: '100%', minWidth: 0 }}>
+          <div style={{ minWidth: 0 }}>
             <label style={{ display: 'block', fontSize: '0.78rem', color: '#64748b', marginBottom: '0.25rem' }}>Supplier (existing)</label>
             <select
               value={form.supplierId}
@@ -503,7 +504,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
             </select>
           </div>
 
-          <div style={{ gridColumn: 'span 2' }}>
+          <div style={{ minWidth: 0 }}>
             <label style={{ display: 'block', fontSize: '0.78rem', color: '#64748b', marginBottom: '0.25rem' }}>Manual Supplier Name</label>
             <input value={form.manualSupplierName} onChange={(event) => setForm((prev) => ({ ...prev, manualSupplierName: event.target.value }))} style={tableInputStyle} placeholder="Use when supplier is not in list" />
           </div>
@@ -562,7 +563,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
             />
           </div>
 
-          <div style={{ gridColumn: 'span 6' }}>
+          <div style={{ gridColumn: '1 / -1', minWidth: 0 }}>
             <label style={{ display: 'block', fontSize: '0.78rem', color: '#64748b', marginBottom: '0.25rem' }}>Overall Notes / Comments</label>
             <textarea rows={2} value={form.overallNotes} onChange={(event) => setForm((prev) => ({ ...prev, overallNotes: event.target.value }))} style={{ ...tableInputStyle, resize: 'vertical' }} />
           </div>
@@ -575,8 +576,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
           <span style={{ fontSize: '0.78rem', color: missingExpiryCount ? '#b45309' : '#64748b' }}>Missing expiry: {missingExpiryCount}</span>
         </div>
 
-        <div style={{ marginTop: '0.8rem', overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 0.45rem', minWidth: '1400px' }}>
+        <div style={{ marginTop: '0.8rem', width: '100%', maxWidth: '100%', overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 0.45rem', minWidth: '1220px' }}>
             <thead>
               <tr>
                 {['#', 'Barcode', 'Product Name', 'Qty', 'Unit Cost', 'Total Cost', 'Selling Price', 'Margin %', 'Est. Profit', 'Expiry Date', 'Batch/Lot', 'Comments', 'Actions'].map((label) => (
@@ -643,7 +644,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
           </table>
         </div>
 
-        <div style={{ marginTop: '0.8rem', display: 'grid', gridTemplateColumns: 'repeat(4, minmax(140px, 1fr))', gap: '0.55rem' }}>
+        <div style={{ marginTop: '0.8rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.55rem', width: '100%', minWidth: 0 }}>
           <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.65rem', background: '#f8fafc' }}>
             <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>TOTAL LINES</div>
             <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#1e293b' }}>{totals.totalItems}</div>
@@ -663,7 +664,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
         </div>
       </section>
 
-      <section style={{ ...cardStyle, padding: '1rem' }}>
+      <section style={{ ...cardStyle, padding: '1rem', width: '100%', minWidth: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <h3 style={{ margin: 0, color: '#111827' }}>Purchase Intake History</h3>
           <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
@@ -680,7 +681,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
 
         {listError && <div style={{ marginTop: '0.8rem', fontSize: '0.86rem', color: '#b91c1c' }}>{listError}</div>}
 
-        <div style={{ marginTop: '0.8rem', overflowX: 'auto' }}>
+        <div style={{ marginTop: '0.8rem', width: '100%', maxWidth: '100%', overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '980px' }}>
             <thead>
               <tr>
