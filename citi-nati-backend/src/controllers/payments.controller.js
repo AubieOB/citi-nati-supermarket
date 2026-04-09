@@ -7,6 +7,7 @@ const { notifyPaymentSuccess, notifyOrderPlaced, notifyRefundRequired } = requir
 const { sendOrderConfirmationEmail, sendPaymentConfirmationEmail, sendRefundNotificationEmail } = require('../utils/emailService');
 const { cacheWebhookEvent } = require('../utils/webhookCache');
 const posCommandQueueService = require('../services/posCommandQueue.service');
+const { calculateTotalsWithVat, getVatRatePercent, roundMoney } = require('../utils/vat');
 
 const prisma = new PrismaClient();
 
@@ -51,7 +52,8 @@ function buildWriteInvoicePayload(order, paymentReference) {
       continue;
     }
 
-    const amount = Number((qty * unitPrice).toFixed(2));
+    const amount = roundMoney(qty * unitPrice);
+    const taxAmount = calculateTotalsWithVat(amount).vatAmount;
 
     posItems.push({
       productCode: sourceCode,
@@ -60,8 +62,8 @@ function buildWriteInvoicePayload(order, paymentReference) {
       unitPrice,
       discount: 0,
       amount,
-      taxRate: 0,
-      taxAmount: 0,
+      taxRate: getVatRatePercent(),
+      taxAmount,
       fPrice: unitPrice,
       locationCode,
       costPrice: 0,
@@ -73,7 +75,8 @@ function buildWriteInvoicePayload(order, paymentReference) {
     return null;
   }
 
-  const grossSale = Number(posItems.reduce((sum, item) => sum + Number(item.amount), 0).toFixed(2));
+  const netSale = roundMoney(posItems.reduce((sum, item) => sum + Number(item.amount), 0));
+  const invoiceTotals = calculateTotalsWithVat(netSale);
 
   return {
     orderId: String(order.id),
@@ -82,12 +85,12 @@ function buildWriteInvoicePayload(order, paymentReference) {
     customerCode: 'CASH',
     invoiceDate: formatInvoiceDate(new Date()),
     invoiceTime: formatInvoiceTime(new Date()),
-    grossSale,
-    vat: 0,
+    grossSale: invoiceTotals.gross,
+    vat: invoiceTotals.vatAmount,
     discount: 0,
-    netSale: grossSale,
+    netSale: invoiceTotals.net,
     payMethod1: 'CARD',
-    tenAmt1: grossSale,
+    tenAmt1: invoiceTotals.gross,
     payMethod2: '',
     tenAmt2: 0,
     userName: 'ONLINE',

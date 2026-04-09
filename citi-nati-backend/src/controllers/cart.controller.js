@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const { calculateTotalsWithVat } = require('../utils/vat');
 
 const prisma = new PrismaClient();
 
@@ -130,13 +131,17 @@ const getCart = async (req, res) => {
         : null,
     }));
 
-    // Calculate total by summing all subtotals
-    const total = formattedItems.reduce((sum, item) => sum + item.subtotal, 0);
+    // Calculate VAT-aware totals so online checkout aligns with POS tax configuration.
+    const subtotal = formattedItems.reduce((sum, item) => sum + item.subtotal, 0);
+    const totalsWithVat = calculateTotalsWithVat(subtotal);
 
     return res.status(200).json({
       cartId: cart.id,
       items: formattedItems,
-      total,
+      subtotal: totalsWithVat.net,
+      vat: totalsWithVat.vatAmount,
+      vatRatePercent: totalsWithVat.vatRatePercent,
+      total: totalsWithVat.gross,
     });
   } catch (err) {
     console.error('Error fetching cart:', err);

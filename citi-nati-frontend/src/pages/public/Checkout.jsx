@@ -68,7 +68,7 @@ const CheckoutContent = () => {
       } catch (err) {
         console.error('Error fetching cart:', err);
         setCartError(err.response?.data?.error || 'Failed to load cart');
-        setCart({ items: [], total: 0, cartId: null });
+        setCart({ items: [], subtotal: 0, vat: 0, vatRatePercent: 0, total: 0, cartId: null });
       } finally {
         setCartLoading(false);
       }
@@ -631,6 +631,30 @@ const CheckoutContent = () => {
                 </div>
 
                 {/* Total */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '0.55rem',
+                  color: '#475569',
+                  fontWeight: 600,
+                }}>
+                  <span>Subtotal:</span>
+                  <span>{formatMWK(cart.subtotal ?? cart.total ?? 0)}</span>
+                </div>
+
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '0.8rem',
+                  color: '#475569',
+                  fontWeight: 600,
+                }}>
+                  <span>VAT ({Number(cart.vatRatePercent || 0).toFixed(1)}%):</span>
+                  <span>{formatMWK(cart.vat ?? 0)}</span>
+                </div>
+
                 <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',

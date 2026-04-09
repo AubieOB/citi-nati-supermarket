@@ -147,12 +147,17 @@ const Cart = () => {
       }).filter(item => item !== null); // Remove deleted items
 
       // Calculate optimistic total
-      const optimisticTotal = optimisticItems.reduce((sum, item) => sum + (item.subtotal || 0), 0);
+      const optimisticSubtotal = optimisticItems.reduce((sum, item) => sum + (item.subtotal || 0), 0);
+      const vatRatePercent = Number(cart?.vatRatePercent || 0);
+      const optimisticVat = Number(((optimisticSubtotal * vatRatePercent) / 100).toFixed(2));
+      const optimisticTotal = Number((optimisticSubtotal + optimisticVat).toFixed(2));
 
       // Update UI immediately (optimistic)
       setCart({
         ...cart,
         items: optimisticItems,
+        subtotal: optimisticSubtotal,
+        vat: optimisticVat,
         total: optimisticTotal
       });
 
@@ -386,6 +391,16 @@ const Cart = () => {
               boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
             }}>
               <h3 style={{ marginBottom: '1rem' }}>Order Summary</h3>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.55rem', color: '#475569', fontSize: '0.95rem' }}>
+                <span>Subtotal:</span>
+                <span>{formatMWK(cart.subtotal ?? cart.total ?? 0)}</span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.55rem', color: '#475569', fontSize: '0.95rem' }}>
+                <span>VAT ({Number(cart.vatRatePercent || 0).toFixed(1)}%):</span>
+                <span>{formatMWK(cart.vat ?? 0)}</span>
+              </div>
 
               {/* FIELD: total (from backend - source of truth) */}
               {/* ✅ This comes from cart.total, calculated entirely by backend */}

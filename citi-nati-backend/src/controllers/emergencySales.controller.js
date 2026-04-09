@@ -3,6 +3,7 @@ const { PrismaClient } = require('@prisma/client');
 const { resolveEffectiveStock, enrichProductStock } = require('../utils/stockResolver');
 const { notifyLowStock } = require('../utils/messageService');
 const { recordPosSyncEvent } = require('../services/posSyncMonitor.service');
+const { calculateTotalsWithVat, getVatRatePercent } = require('../utils/vat');
 
 const prisma = new PrismaClient();
 const EMERGENCY_SALE_MAX_RETRIES = Number.parseInt(process.env.EMERGENCY_SALE_MAX_RETRIES || '10', 10);
@@ -147,13 +148,16 @@ function buildPosWriteInvoicePayload(emergencySale) {
     unitPrice: Number(item.unitPrice),
     discount: 0,
     amount: Number(item.lineTotal),
-    taxRate: 0,
-    taxAmount: 0,
+    taxRate: getVatRatePercent(),
+    taxAmount: calculateTotalsWithVat(Number(item.lineTotal)).vatAmount,
     fPrice: Number(item.unitPrice),
     locationCode,
     costPrice: 0,
     priceTypeCode,
   }));
+
+  const subtotalAfterDiscount = Number(emergencySale.subtotal || 0) - Number(emergencySale.discount || 0);
+  const invoiceTotals = calculateTotalsWithVat(subtotalAfterDiscount);
 
   return {
     orderId: `EMERGENCY-${emergencySale.id}`,
@@ -162,12 +166,12 @@ function buildPosWriteInvoicePayload(emergencySale) {
     customerCode: 'CASH',
     invoiceDate: new Date(emergencySale.createdAt || new Date()).toISOString().slice(0, 10),
     invoiceTime: new Date(emergencySale.createdAt || new Date()).toTimeString().slice(0, 8),
-    grossSale: Number(emergencySale.total),
-    vat: 0,
+    grossSale: invoiceTotals.gross,
+    vat: invoiceTotals.vatAmount,
     discount: Number(emergencySale.discount || 0),
-    netSale: Number(emergencySale.total),
+    netSale: invoiceTotals.net,
     payMethod1: normalizePaymentMethod(emergencySale.paymentMethod),
-    tenAmt1: Number(emergencySale.tenderedAmount || emergencySale.total),
+    tenAmt1: Number(emergencySale.tenderedAmount || invoiceTotals.gross),
     payMethod2: '',
     tenAmt2: 0,
     userName: String(emergencySale.cashierName || 'EMERGENCY').slice(0, 20),
@@ -183,6 +187,7 @@ function buildPosWriteInvoicePayload(emergencySale) {
 function formatEmergencySale(sale) {
   const subtotal = Number(sale.subtotal || 0);
   const discount = Number(sale.discount || 0);
+  const vat = calculateTotalsWithVat(subtotal - discount).vatAmount;
   const total = Number(sale.total || 0);
   const tenderedAmount = Number(sale.tenderedAmount || 0);
   const changeAmount = Number(sale.changeAmount || 0);
@@ -192,6 +197,7 @@ function formatEmergencySale(sale) {
     ...sale,
     subtotal,
     discount,
+    vat,
     total,
     tenderedAmount,
     tendered_amount: tenderedAmount,
@@ -377,7 +383,8 @@ async function createEmergencySale(req, res) {
       }
 
       const discount = Math.max(0, Math.min(requestedDiscount, subtotal));
-      const total = toMoney(subtotal - discount);
+      const vatTotals = calculateTotalsWithVat(subtotal - discount);
+      const total = toMoney(vatTotals.gross);
       const tenderedAmountRaw = req.body?.tendered_amount ?? req.body?.tenderedAmount;
       const tenderedAmount = tenderedAmountRaw == null || tenderedAmountRaw === '' ? total : Math.max(0, toMoney(tenderedAmountRaw));
       const changeAmount = tenderedAmount > total ? toMoney(tenderedAmount - total) : 0;
@@ -413,6 +420,7 @@ async function createEmergencySale(req, res) {
             })),
             subtotal,
             discount,
+            vat: vatTotals.vatAmount,
             total,
             tendered_amount: tenderedAmount,
             change_amount: changeAmount,
@@ -497,6 +505,7 @@ async function createEmergencySale(req, res) {
         })),
         subtotal: formattedSale.subtotal,
         discount: formattedSale.discount,
+        vat: formattedSale.vat,
         total: formattedSale.total,
         tendered_amount: formattedSale.tendered_amount,
         change_amount: formattedSale.change_amount,
