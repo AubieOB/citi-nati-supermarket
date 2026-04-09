@@ -15,10 +15,18 @@ const STATUS_COLORS = {
   sync_failed: '#c62828',
 };
 
+const VAT_RATE_PERCENT = Number(import.meta.env.VITE_POS_VAT_RATE || 16.5);
+
 function toMoney(value) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return 0;
   return Number(parsed.toFixed(2));
+}
+
+function inclusiveVatFromTotal(totalAmount) {
+  const total = toMoney(totalAmount);
+  if (VAT_RATE_PERCENT <= 0 || total <= 0) return 0;
+  return toMoney((total * VAT_RATE_PERCENT) / (100 + VAT_RATE_PERCENT));
 }
 
 function formatMoney(value) {
@@ -38,14 +46,17 @@ function formatDateTime(value) {
 function buildReceiptFromSale(sale) {
   if (!sale) return null;
 
+  const total = Number(sale.total || 0);
+
   return {
     sale_ref: sale.sale_ref || sale.saleRef,
     created_at: sale.createdAt || sale.created_at,
     cashier_name: sale.cashier_name || sale.cashierName || '-',
     payment_method: sale.payment_method || sale.paymentMethod || 'CASH',
     subtotal: Number(sale.subtotal || 0),
+    vat: Number(sale.vat ?? inclusiveVatFromTotal(total)),
     discount: Number(sale.discount || 0),
-    total: Number(sale.total || 0),
+    total,
     tendered_amount: Number(sale.tendered_amount ?? sale.tenderedAmount ?? sale.total ?? 0),
     change_amount: Number(sale.change_amount ?? sale.changeAmount ?? 0),
     balance_due: Number(sale.balance_due ?? sale.balanceDue ?? 0),
@@ -132,6 +143,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
   }, [discount, subtotal]);
 
   const total = useMemo(() => toMoney(Math.max(0, subtotal - discountValue)), [subtotal, discountValue]);
+  const vatValue = useMemo(() => inclusiveVatFromTotal(total), [total]);
 
   const tendered = useMemo(() => {
     if (tenderedAmount === '') return total;
@@ -446,6 +458,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
         <tbody>${itemsHtml}</tbody>
       </table>
       <div class="row"><span>Subtotal</span><span>${formatMoney(receipt.subtotal)}</span></div>
+      <div class="row"><span>VAT (${VAT_RATE_PERCENT.toFixed(1)}%, included)</span><span>${formatMoney(receipt.vat)}</span></div>
       <div class="row"><span>Discount</span><span>${formatMoney(receipt.discount)}</span></div>
       <div class="row"><span>Total</span><span>${formatMoney(receipt.total)}</span></div>
       <div class="row"><span>Tendered</span><span>${formatMoney(receipt.tendered_amount)}</span></div>
@@ -524,6 +537,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
         <tbody>${itemsHtml}</tbody>
       </table>
       <div class="row"><span>Subtotal</span><span>${formatMoney(receipt.subtotal)}</span></div>
+      <div class="row"><span>VAT (${VAT_RATE_PERCENT.toFixed(1)}%, included)</span><span>${formatMoney(receipt.vat)}</span></div>
       <div class="row"><span>Discount</span><span>${formatMoney(receipt.discount)}</span></div>
       <div class="row"><span>Total</span><span>${formatMoney(receipt.total)}</span></div>
       <div class="row"><span>Tendered</span><span>${formatMoney(receipt.tendered_amount)}</span></div>
@@ -568,6 +582,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
       itemsText,
       '',
       `Subtotal: ${formatMoney(receipt.subtotal)}`,
+      `VAT (${VAT_RATE_PERCENT.toFixed(1)}%, included): ${formatMoney(receipt.vat)}`,
       `Discount: ${formatMoney(receipt.discount)}`,
       `Total: ${formatMoney(receipt.total)}`,
       `Tendered: ${formatMoney(receipt.tendered_amount)}`,
@@ -927,7 +942,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
         }}>
           <div style={{
             display: 'grid',
-            gridTemplateColumns: '1fr 0.7fr 0.7fr',
+            gridTemplateColumns: '1.1fr 0.8fr 0.8fr 0.6fr',
             gap: '0.5rem',
             marginBottom: '0.4rem',
           }}>
@@ -935,6 +950,12 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
               <div style={{ color: '#ff4f4f', fontWeight: 700, fontSize: '0.78rem' }}>TOTAL DUE</div>
               <div style={{ color: '#00ff66', fontFamily: 'Consolas, monospace', fontWeight: 800, fontSize: '2rem', textAlign: 'right', lineHeight: 1.1 }}>
                 {formatMoney(total)}
+              </div>
+            </div>
+            <div style={{ backgroundColor: '#000', borderRadius: '4px', padding: '0.45rem 0.55rem' }}>
+              <div style={{ color: '#ff4f4f', fontWeight: 700, fontSize: '0.78rem' }}>VAT INCL.</div>
+              <div style={{ color: '#00ff66', fontFamily: 'Consolas, monospace', fontWeight: 800, fontSize: '1.2rem', textAlign: 'right', lineHeight: 1.1 }}>
+                {formatMoney(vatValue)}
               </div>
             </div>
             <div style={{ backgroundColor: '#000', borderRadius: '4px', padding: '0.45rem 0.55rem' }}>
@@ -1041,6 +1062,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
             <div style={{ display: 'grid', gap: '0.3rem', fontSize: '0.9rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Cashier</span><strong>{user?.name || user?.email || 'Admin'}</strong></div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Subtotal</span><strong>{formatMoney(subtotal)}</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>VAT ({VAT_RATE_PERCENT.toFixed(1)}%, included)</span><strong>{formatMoney(vatValue)}</strong></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>Discount</span>
                 <input
