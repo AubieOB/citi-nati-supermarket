@@ -5,7 +5,7 @@ const { emitNewOrder, emitOrderAssigned, emitOrderStatusUpdated, emitOrderUpdate
 const { notifyDriverAssigned, notifyOrderCompleted } = require('../utils/messageService');
 const { sendDriverAssignedEmail, sendDeliveryStatusEmail, sendRefundNotificationEmail } = require('../utils/emailService');
 const { isPaymentConfirmedInCache } = require('../utils/webhookCache');
-const { calculateTotalsWithVat } = require('../utils/vat');
+const { splitInclusiveVat } = require('../utils/vat');
 
 const prisma = new PrismaClient();
 
@@ -86,7 +86,7 @@ const createOrder = async (req, res) => {
         subtotal += cartItem.quantity * cartItem.price;
       }
 
-      const totalsWithVat = calculateTotalsWithVat(subtotal);
+      const totalsWithVat = splitInclusiveVat(subtotal);
 
       // Create Order with salesDayId
       const order = await tx.order.create({

@@ -7,7 +7,7 @@ const { notifyPaymentSuccess, notifyOrderPlaced, notifyRefundRequired } = requir
 const { sendOrderConfirmationEmail, sendPaymentConfirmationEmail, sendRefundNotificationEmail } = require('../utils/emailService');
 const { cacheWebhookEvent } = require('../utils/webhookCache');
 const posCommandQueueService = require('../services/posCommandQueue.service');
-const { calculateTotalsWithVat, getVatRatePercent, roundMoney } = require('../utils/vat');
+const { splitInclusiveVat, getVatRatePercent, roundMoney } = require('../utils/vat');
 
 const prisma = new PrismaClient();
 
@@ -53,7 +53,7 @@ function buildWriteInvoicePayload(order, paymentReference) {
     }
 
     const amount = roundMoney(qty * unitPrice);
-    const taxAmount = calculateTotalsWithVat(amount).vatAmount;
+    const taxAmount = splitInclusiveVat(amount).vatAmount;
 
     posItems.push({
       productCode: sourceCode,
@@ -76,7 +76,7 @@ function buildWriteInvoicePayload(order, paymentReference) {
   }
 
   const netSale = roundMoney(posItems.reduce((sum, item) => sum + Number(item.amount), 0));
-  const invoiceTotals = calculateTotalsWithVat(netSale);
+  const invoiceTotals = splitInclusiveVat(netSale);
 
   return {
     orderId: String(order.id),

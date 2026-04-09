@@ -3,7 +3,7 @@ const { PrismaClient } = require('@prisma/client');
 const { resolveEffectiveStock, enrichProductStock } = require('../utils/stockResolver');
 const { notifyLowStock } = require('../utils/messageService');
 const { recordPosSyncEvent } = require('../services/posSyncMonitor.service');
-const { calculateTotalsWithVat, getVatRatePercent } = require('../utils/vat');
+const { splitInclusiveVat, getVatRatePercent } = require('../utils/vat');
 
 const prisma = new PrismaClient();
 const EMERGENCY_SALE_MAX_RETRIES = Number.parseInt(process.env.EMERGENCY_SALE_MAX_RETRIES || '10', 10);
@@ -149,7 +149,7 @@ function buildPosWriteInvoicePayload(emergencySale) {
     discount: 0,
     amount: Number(item.lineTotal),
     taxRate: getVatRatePercent(),
-    taxAmount: calculateTotalsWithVat(Number(item.lineTotal)).vatAmount,
+    taxAmount: splitInclusiveVat(Number(item.lineTotal)).vatAmount,
     fPrice: Number(item.unitPrice),
     locationCode,
     costPrice: 0,
@@ -157,7 +157,7 @@ function buildPosWriteInvoicePayload(emergencySale) {
   }));
 
   const subtotalAfterDiscount = Number(emergencySale.subtotal || 0) - Number(emergencySale.discount || 0);
-  const invoiceTotals = calculateTotalsWithVat(subtotalAfterDiscount);
+  const invoiceTotals = splitInclusiveVat(subtotalAfterDiscount);
 
   return {
     orderId: `EMERGENCY-${emergencySale.id}`,
@@ -187,8 +187,8 @@ function buildPosWriteInvoicePayload(emergencySale) {
 function formatEmergencySale(sale) {
   const subtotal = Number(sale.subtotal || 0);
   const discount = Number(sale.discount || 0);
-  const vat = calculateTotalsWithVat(subtotal - discount).vatAmount;
   const total = Number(sale.total || 0);
+  const vat = splitInclusiveVat(total).vatAmount;
   const tenderedAmount = Number(sale.tenderedAmount || 0);
   const changeAmount = Number(sale.changeAmount || 0);
   const balanceDue = Math.max(0, Number((total - tenderedAmount).toFixed(2)));
@@ -383,7 +383,7 @@ async function createEmergencySale(req, res) {
       }
 
       const discount = Math.max(0, Math.min(requestedDiscount, subtotal));
-      const vatTotals = calculateTotalsWithVat(subtotal - discount);
+      const vatTotals = splitInclusiveVat(subtotal - discount);
       const total = toMoney(vatTotals.gross);
       const tenderedAmountRaw = req.body?.tendered_amount ?? req.body?.tenderedAmount;
       const tenderedAmount = tenderedAmountRaw == null || tenderedAmountRaw === '' ? total : Math.max(0, toMoney(tenderedAmountRaw));

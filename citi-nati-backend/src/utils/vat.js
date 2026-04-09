@@ -32,9 +32,34 @@ function calculateTotalsWithVat(netAmount) {
   };
 }
 
+function splitInclusiveVat(totalAmount) {
+  const gross = roundMoney(totalAmount);
+  const ratePercent = getVatRatePercent();
+
+  if (ratePercent <= 0) {
+    return {
+      net: gross,
+      vatAmount: 0,
+      gross,
+      vatRatePercent: ratePercent,
+    };
+  }
+
+  const net = roundMoney((gross * 100) / (100 + ratePercent));
+  const vatAmount = roundMoney(gross - net);
+
+  return {
+    net,
+    vatAmount,
+    gross,
+    vatRatePercent: ratePercent,
+  };
+}
+
 module.exports = {
   roundMoney,
   getVatRatePercent,
   calculateVatAmount,
   calculateTotalsWithVat,
+  splitInclusiveVat,
 };

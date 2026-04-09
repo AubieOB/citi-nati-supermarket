@@ -149,8 +149,10 @@ const Cart = () => {
       // Calculate optimistic total
       const optimisticSubtotal = optimisticItems.reduce((sum, item) => sum + (item.subtotal || 0), 0);
       const vatRatePercent = Number(cart?.vatRatePercent || 0);
-      const optimisticVat = Number(((optimisticSubtotal * vatRatePercent) / 100).toFixed(2));
-      const optimisticTotal = Number((optimisticSubtotal + optimisticVat).toFixed(2));
+      const optimisticVat = vatRatePercent > 0
+        ? Number(((optimisticSubtotal * vatRatePercent) / (100 + vatRatePercent)).toFixed(2))
+        : 0;
+      const optimisticTotal = Number(optimisticSubtotal.toFixed(2));
 
       // Update UI immediately (optimistic)
       setCart({
