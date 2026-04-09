@@ -86,13 +86,16 @@ const createOrder = async (req, res) => {
         subtotal += cartItem.quantity * cartItem.price;
       }
 
-      const totalsWithVat = splitInclusiveVat(subtotal);
+      const totalsWithVat = await splitInclusiveVat(subtotal);
 
       // Create Order with salesDayId
       const order = await tx.order.create({
         data: {
           userId,
           total: totalsWithVat.gross,
+          vatEnabled: totalsWithVat.vatEnabled,
+          vatRatePercent: totalsWithVat.vatRatePercent,
+          vatAmount: totalsWithVat.vatAmount,
           deliveryAddress,
           houseNumber,
           phone,

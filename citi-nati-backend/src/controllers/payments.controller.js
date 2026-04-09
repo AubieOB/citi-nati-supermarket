@@ -7,7 +7,7 @@ const { notifyPaymentSuccess, notifyOrderPlaced, notifyRefundRequired } = requir
 const { sendOrderConfirmationEmail, sendPaymentConfirmationEmail, sendRefundNotificationEmail } = require('../utils/emailService');
 const { cacheWebhookEvent } = require('../utils/webhookCache');
 const posCommandQueueService = require('../services/posCommandQueue.service');
-const { splitInclusiveVat, getVatRatePercent, roundMoney } = require('../utils/vat');
+const { splitInclusiveVatAtRate, getVatRatePercent, normalizeVatRatePercent, roundMoney } = require('../utils/vat');
 
 const prisma = new PrismaClient();
 
@@ -19,9 +19,12 @@ function formatInvoiceTime(date = new Date()) {
   return date.toTimeString().slice(0, 8);
 }
 
-function buildWriteInvoicePayload(order, paymentReference) {
+async function buildWriteInvoicePayload(order, paymentReference) {
   const locationCode = process.env.POS_LOCATION_CODE || 'SH';
   const priceTypeCode = process.env.POS_PRICE_TYPE_CODE || 'RT';
+  const persistedVatRate = normalizeVatRatePercent(order?.vatRatePercent, NaN);
+  const fallbackVatRate = await getVatRatePercent();
+  const appliedVatRate = Number.isFinite(persistedVatRate) ? persistedVatRate : fallbackVatRate;
 
   const posItems = [];
 
@@ -53,7 +56,7 @@ function buildWriteInvoicePayload(order, paymentReference) {
     }
 
     const amount = roundMoney(qty * unitPrice);
-    const taxAmount = splitInclusiveVat(amount).vatAmount;
+    const taxAmount = splitInclusiveVatAtRate(amount, appliedVatRate).vatAmount;
 
     posItems.push({
       productCode: sourceCode,
@@ -62,7 +65,7 @@ function buildWriteInvoicePayload(order, paymentReference) {
       unitPrice,
       discount: 0,
       amount,
-      taxRate: getVatRatePercent(),
+      taxRate: appliedVatRate,
       taxAmount,
       fPrice: unitPrice,
       locationCode,
@@ -76,7 +79,7 @@ function buildWriteInvoicePayload(order, paymentReference) {
   }
 
   const netSale = roundMoney(posItems.reduce((sum, item) => sum + Number(item.amount), 0));
-  const invoiceTotals = splitInclusiveVat(netSale);
+  const invoiceTotals = splitInclusiveVatAtRate(netSale, appliedVatRate);
 
   return {
     orderId: String(order.id),
@@ -731,7 +734,7 @@ const handleWebhook = async (req, res) => {
     });
 
     try {
-      const writeInvoicePayload = buildWriteInvoicePayload(result, reference);
+      const writeInvoicePayload = await buildWriteInvoicePayload(result, reference);
 
       if (!writeInvoicePayload) {
         console.log('[BACKEND POS WRITE SKIP] no POS-linked items, WRITE_INVOICE not queued:', {

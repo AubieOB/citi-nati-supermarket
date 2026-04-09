@@ -148,9 +148,11 @@ const Cart = () => {
 
       // Calculate optimistic total
       const optimisticSubtotal = optimisticItems.reduce((sum, item) => sum + (item.subtotal || 0), 0);
-      const vatRatePercent = Number(cart?.vatRatePercent || 0);
-      const optimisticVat = vatRatePercent > 0
-        ? Number(((optimisticSubtotal * vatRatePercent) / (100 + vatRatePercent)).toFixed(2))
+      const configuredVatRatePercent = Number(cart?.configuredVatRatePercent ?? cart?.vatRatePercent ?? 0);
+      const vatEnabled = cart?.vatEnabled !== false;
+      const appliedVatRatePercent = vatEnabled ? configuredVatRatePercent : 0;
+      const optimisticVat = appliedVatRatePercent > 0
+        ? Number(((optimisticSubtotal * appliedVatRatePercent) / (100 + appliedVatRatePercent)).toFixed(2))
         : 0;
       const optimisticTotal = Number(optimisticSubtotal.toFixed(2));
 
@@ -160,6 +162,8 @@ const Cart = () => {
         items: optimisticItems,
         subtotal: optimisticSubtotal,
         vat: optimisticVat,
+        vatEnabled,
+        configuredVatRatePercent,
         total: optimisticTotal
       });
 
@@ -303,6 +307,10 @@ const Cart = () => {
   }
 
   // 1️⃣1️⃣ RENDER: Cart with items (backend-authoritative)
+  const vatLabel = cart?.vatEnabled === false
+    ? 'VAT (disabled):'
+    : `VAT (${Number(cart?.configuredVatRatePercent ?? cart?.vatRatePercent ?? 0).toFixed(1)}%):`;
+
   return (
     <div className="page cart-page">
       <Container>
@@ -400,7 +408,7 @@ const Cart = () => {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.55rem', color: '#475569', fontSize: '0.95rem' }}>
-                <span>VAT ({Number(cart.vatRatePercent || 0).toFixed(1)}%):</span>
+                <span>{vatLabel}</span>
                 <span>{formatMWK(cart.vat ?? 0)}</span>
               </div>
 

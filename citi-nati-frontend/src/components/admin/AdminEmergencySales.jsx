@@ -15,7 +15,7 @@ const STATUS_COLORS = {
   sync_failed: '#c62828',
 };
 
-const VAT_RATE_PERCENT = Number(import.meta.env.VITE_POS_VAT_RATE || 16.5);
+const DEFAULT_VAT_RATE_PERCENT = 16.5;
 
 function toMoney(value) {
   const parsed = Number(value);
@@ -23,10 +23,11 @@ function toMoney(value) {
   return Number(parsed.toFixed(2));
 }
 
-function inclusiveVatFromTotal(totalAmount) {
+function inclusiveVatFromTotal(totalAmount, configuredRatePercent, vatEnabled = true) {
   const total = toMoney(totalAmount);
-  if (VAT_RATE_PERCENT <= 0 || total <= 0) return 0;
-  return toMoney((total * VAT_RATE_PERCENT) / (100 + VAT_RATE_PERCENT));
+  const ratePercent = vatEnabled ? Number(configuredRatePercent || 0) : 0;
+  if (ratePercent <= 0 || total <= 0) return 0;
+  return toMoney((total * ratePercent) / (100 + ratePercent));
 }
 
 function formatMoney(value) {
@@ -43,10 +44,14 @@ function formatDateTime(value) {
   return date.toLocaleString();
 }
 
-function buildReceiptFromSale(sale) {
+function buildReceiptFromSale(sale, fallbackVatSettings) {
   if (!sale) return null;
 
   const total = Number(sale.total || 0);
+  const vatEnabled = sale.vatEnabled ?? fallbackVatSettings.enabled;
+  const configuredVatRatePercent = Number(
+    sale.configuredVatRatePercent ?? sale.vatRatePercent ?? fallbackVatSettings.configuredRatePercent ?? DEFAULT_VAT_RATE_PERCENT
+  );
 
   return {
     sale_ref: sale.sale_ref || sale.saleRef,
@@ -54,7 +59,9 @@ function buildReceiptFromSale(sale) {
     cashier_name: sale.cashier_name || sale.cashierName || '-',
     payment_method: sale.payment_method || sale.paymentMethod || 'CASH',
     subtotal: Number(sale.subtotal || 0),
-    vat: Number(sale.vat ?? inclusiveVatFromTotal(total)),
+    vatEnabled,
+    configuredVatRatePercent,
+    vat: Number(sale.vat ?? inclusiveVatFromTotal(total, configuredVatRatePercent, vatEnabled)),
     discount: Number(sale.discount || 0),
     total,
     tendered_amount: Number(sale.tendered_amount ?? sale.tenderedAmount ?? sale.total ?? 0),
@@ -117,6 +124,11 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
   const [tenderedAmount, setTenderedAmount] = useState('');
   const [discount, setDiscount] = useState('0');
   const [isSubmittingSale, setIsSubmittingSale] = useState(false);
+  const [vatSettings, setVatSettings] = useState({
+    enabled: true,
+    ratePercent: DEFAULT_VAT_RATE_PERCENT,
+    configuredRatePercent: DEFAULT_VAT_RATE_PERCENT,
+  });
 
   const [sales, setSales] = useState([]);
   const [salesSummary, setSalesSummary] = useState({
@@ -143,7 +155,15 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
   }, [discount, subtotal]);
 
   const total = useMemo(() => toMoney(Math.max(0, subtotal - discountValue)), [subtotal, discountValue]);
-  const vatValue = useMemo(() => inclusiveVatFromTotal(total), [total]);
+  const vatValue = useMemo(
+    () => inclusiveVatFromTotal(total, vatSettings.configuredRatePercent, vatSettings.enabled),
+    [total, vatSettings]
+  );
+  const vatSummaryLabel = useMemo(() => (
+    vatSettings.enabled
+      ? `VAT (${Number(vatSettings.configuredRatePercent || 0).toFixed(1)}%, included)`
+      : 'VAT (disabled)'
+  ), [vatSettings]);
 
   const tendered = useMemo(() => {
     if (tenderedAmount === '') return total;
@@ -187,6 +207,23 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
     fetchEmergencySales();
     focusCaptureInput();
   }, [fetchEmergencySales, focusCaptureInput]);
+
+  useEffect(() => {
+    const loadVatSettings = async () => {
+      try {
+        const response = await api.get('/system/status');
+        setVatSettings({
+          enabled: response.data?.vatEnabled !== false,
+          ratePercent: Number(response.data?.vatRatePercent || 0),
+          configuredRatePercent: Number(response.data?.configuredVatRatePercent || response.data?.vatRatePercent || DEFAULT_VAT_RATE_PERCENT),
+        });
+      } catch (error) {
+        notifyError(`Failed to load VAT settings: ${error.response?.data?.error || error.message}`, 2500);
+      }
+    };
+
+    loadVatSettings();
+  }, []);
 
   useEffect(() => {
     const draftRaw = localStorage.getItem(draftStorageKey);
@@ -401,7 +438,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
   }, [selectedRowId]);
 
   const printReceipt = useCallback((receiptData) => {
-    const receipt = buildReceiptFromSale(receiptData);
+    const receipt = buildReceiptFromSale(receiptData, vatSettings);
     if (!receipt) {
       notifyInfo('No receipt available to print', 1800);
       return;
@@ -458,7 +495,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
         <tbody>${itemsHtml}</tbody>
       </table>
       <div class="row"><span>Subtotal</span><span>${formatMoney(receipt.subtotal)}</span></div>
-      <div class="row"><span>VAT (${VAT_RATE_PERCENT.toFixed(1)}%, included)</span><span>${formatMoney(receipt.vat)}</span></div>
+      <div class="row"><span>${receipt.vatEnabled ? `VAT (${receipt.configuredVatRatePercent.toFixed(1)}%, included)` : 'VAT (disabled)'}</span><span>${formatMoney(receipt.vat)}</span></div>
       <div class="row"><span>Discount</span><span>${formatMoney(receipt.discount)}</span></div>
       <div class="row"><span>Total</span><span>${formatMoney(receipt.total)}</span></div>
       <div class="row"><span>Tendered</span><span>${formatMoney(receipt.tendered_amount)}</span></div>
@@ -481,7 +518,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
   }, []);
 
   const viewReceipt = useCallback((sale) => {
-    const receipt = buildReceiptFromSale(sale);
+    const receipt = buildReceiptFromSale(sale, vatSettings);
     if (!receipt) {
       notifyError('Receipt data not available', 2200);
       return;
@@ -537,7 +574,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
         <tbody>${itemsHtml}</tbody>
       </table>
       <div class="row"><span>Subtotal</span><span>${formatMoney(receipt.subtotal)}</span></div>
-      <div class="row"><span>VAT (${VAT_RATE_PERCENT.toFixed(1)}%, included)</span><span>${formatMoney(receipt.vat)}</span></div>
+      <div class="row"><span>${receipt.vatEnabled ? `VAT (${receipt.configuredVatRatePercent.toFixed(1)}%, included)` : 'VAT (disabled)'}</span><span>${formatMoney(receipt.vat)}</span></div>
       <div class="row"><span>Discount</span><span>${formatMoney(receipt.discount)}</span></div>
       <div class="row"><span>Total</span><span>${formatMoney(receipt.total)}</span></div>
       <div class="row"><span>Tendered</span><span>${formatMoney(receipt.tendered_amount)}</span></div>
@@ -559,7 +596,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
   }, []);
 
   const downloadReceipt = useCallback((sale) => {
-    const receipt = buildReceiptFromSale(sale);
+    const receipt = buildReceiptFromSale(sale, vatSettings);
     if (!receipt) {
       notifyError('Receipt data not available', 2200);
       return;
@@ -582,7 +619,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
       itemsText,
       '',
       `Subtotal: ${formatMoney(receipt.subtotal)}`,
-      `VAT (${VAT_RATE_PERCENT.toFixed(1)}%, included): ${formatMoney(receipt.vat)}`,
+      `${receipt.vatEnabled ? `VAT (${receipt.configuredVatRatePercent.toFixed(1)}%, included)` : 'VAT (disabled)'}: ${formatMoney(receipt.vat)}`,
       `Discount: ${formatMoney(receipt.discount)}`,
       `Total: ${formatMoney(receipt.total)}`,
       `Tendered: ${formatMoney(receipt.tendered_amount)}`,
@@ -953,7 +990,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
               </div>
             </div>
             <div style={{ backgroundColor: '#000', borderRadius: '4px', padding: '0.45rem 0.55rem' }}>
-              <div style={{ color: '#ff4f4f', fontWeight: 700, fontSize: '0.78rem' }}>VAT INCL.</div>
+              <div style={{ color: '#ff4f4f', fontWeight: 700, fontSize: '0.78rem' }}>{vatSettings.enabled ? 'VAT INCL.' : 'VAT OFF'}</div>
               <div style={{ color: '#00ff66', fontFamily: 'Consolas, monospace', fontWeight: 800, fontSize: '1.2rem', textAlign: 'right', lineHeight: 1.1 }}>
                 {formatMoney(vatValue)}
               </div>
@@ -1062,7 +1099,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
             <div style={{ display: 'grid', gap: '0.3rem', fontSize: '0.9rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Cashier</span><strong>{user?.name || user?.email || 'Admin'}</strong></div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Subtotal</span><strong>{formatMoney(subtotal)}</strong></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>VAT ({VAT_RATE_PERCENT.toFixed(1)}%, included)</span><strong>{formatMoney(vatValue)}</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>{vatSummaryLabel}</span><strong>{formatMoney(vatValue)}</strong></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>Discount</span>
                 <input

@@ -257,6 +257,9 @@ const CheckoutContent = () => {
     !cart || 
     cart.items.length === 0 ||
     orderCreated !== null;
+  const vatLabel = cart?.vatEnabled === false
+    ? 'VAT (disabled):'
+    : `VAT (${Number(cart?.configuredVatRatePercent ?? cart?.vatRatePercent ?? 0).toFixed(1)}%):`;
 
   return (
     <div className="page checkout-page">
@@ -651,7 +654,7 @@ const CheckoutContent = () => {
                   color: '#475569',
                   fontWeight: 600,
                 }}>
-                  <span>VAT ({Number(cart.vatRatePercent || 0).toFixed(1)}%):</span>
+                  <span>{vatLabel}</span>
                   <span>{formatMWK(cart.vat ?? 0)}</span>
                 </div>
 

@@ -4,12 +4,15 @@ import { useModal } from '../../hooks/useModal.js';
 import Modal from '../common/Modal.jsx';
 
 const DEFAULT_MESSAGE = 'We are currently carrying out maintenance to improve your experience. We apologize for the inconvenience.';
+const DEFAULT_VAT_RATE = 16.5;
 
 const AdminSystem = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState(DEFAULT_MESSAGE);
+  const [vatEnabled, setVatEnabled] = useState(true);
+  const [configuredVatRatePercent, setConfiguredVatRatePercent] = useState(DEFAULT_VAT_RATE);
   const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
   const [filterBarHeight, setFilterBarHeight] = useState(0);
   const { modal, showError, showSuccess, closeModal } = useModal();
@@ -22,6 +25,8 @@ const AdminSystem = () => {
         const settings = response.data?.settings || {};
         setMaintenanceMode(Boolean(settings.maintenanceMode));
         setMaintenanceMessage(settings.maintenanceMessage || DEFAULT_MESSAGE);
+        setVatEnabled(settings.vatEnabled !== false);
+        setConfiguredVatRatePercent(Number(settings.configuredVatRatePercent || settings.vatRatePercent || DEFAULT_VAT_RATE));
       } catch (err) {
         showError('System settings', err.response?.data?.error || 'Failed to load system settings');
       } finally {
@@ -81,7 +86,11 @@ const AdminSystem = () => {
       const response = await api.put('/admin/system/maintenance', {
         maintenanceMode,
         maintenanceMessage,
+        vatEnabled,
       });
+      const settings = response.data?.settings || {};
+      setVatEnabled(settings.vatEnabled !== false);
+      setConfiguredVatRatePercent(Number(settings.configuredVatRatePercent || settings.vatRatePercent || DEFAULT_VAT_RATE));
       showSuccess('Success', response.data?.message || 'System settings saved');
     } catch (err) {
       showError('Save failed', err.response?.data?.error || 'Failed to save system settings');
@@ -125,6 +134,9 @@ const AdminSystem = () => {
         </div>
         <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600', marginTop: '0.5rem' }}>
           Maintenance: {maintenanceMode ? 'ENABLED' : 'DISABLED'}
+        </div>
+        <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600', marginTop: '0.2rem' }}>
+          VAT: {vatEnabled ? `ENABLED (${configuredVatRatePercent.toFixed(1)}%)` : 'DISABLED'}
         </div>
       </div>
 
@@ -171,6 +183,32 @@ const AdminSystem = () => {
             />
           </label>
 
+          <label style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '1rem',
+            border: '1px solid #e5e7eb',
+            borderRadius: '8px',
+            padding: '1rem',
+            backgroundColor: vatEnabled ? '#effcf6' : '#f9fafb'
+          }}>
+            <div>
+              <div style={{ fontWeight: 700, color: '#333', marginBottom: '0.25rem' }}>VAT on Online and Emergency Sales</div>
+              <div style={{ color: '#666', fontSize: '0.92rem' }}>
+                {vatEnabled
+                  ? `Apply VAT at ${configuredVatRatePercent.toFixed(1)}% to website checkout and emergency sales.`
+                  : 'Do not apply VAT to website checkout and emergency sales.'}
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={vatEnabled}
+              onChange={(event) => setVatEnabled(event.target.checked)}
+              style={{ width: '22px', height: '22px', cursor: 'pointer' }}
+            />
+          </label>
+
           <div>
             <label style={{ display: 'block', marginBottom: '0.45rem', fontWeight: 600, color: '#333' }}>
               Maintenance Message
@@ -182,6 +220,10 @@ const AdminSystem = () => {
               style={{ width: '100%', padding: '0.85rem', borderRadius: '8px', border: '1px solid #ddd', resize: 'vertical' }}
               placeholder={DEFAULT_MESSAGE}
             />
+          </div>
+
+          <div style={{ color: '#64748b', fontSize: '0.85rem' }}>
+            VAT rate is fixed at {configuredVatRatePercent.toFixed(1)}%. This toggle only turns that rate on or off.
           </div>
 
           <button

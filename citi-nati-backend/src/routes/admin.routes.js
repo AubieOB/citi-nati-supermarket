@@ -30,6 +30,7 @@ const {
 } = require('../controllers/posSyncMonitor.controller');
 const { getExpiryBatchAlerts, setStockOverride } = require('../controllers/product.controller');
 const { emitProductUpdate } = require('../utils/socket');
+const { VAT_ENABLED_KEY, clearVatSettingsCache, getVatSettings } = require('../utils/vat');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -84,9 +85,10 @@ router.get('/dashboard', verifyTokenMiddleware, verifyAdmin, async (req, res) =>
 
 router.get('/system/settings', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
   try {
-    const [maintenanceEnabled, maintenanceMessage] = await Promise.all([
+    const [maintenanceEnabled, maintenanceMessage, vatSettings] = await Promise.all([
       getSettingValue(MAINTENANCE_MODE_KEY, 'false'),
       getSettingValue(MAINTENANCE_MESSAGE_KEY, DEFAULT_MAINTENANCE_MESSAGE),
+      getVatSettings(),
     ]);
 
     return res.json({
@@ -94,6 +96,9 @@ router.get('/system/settings', verifyTokenMiddleware, verifyAdmin, async (req, r
       settings: {
         maintenanceMode: maintenanceEnabled === 'true',
         maintenanceMessage,
+        vatEnabled: vatSettings.enabled,
+        vatRatePercent: vatSettings.ratePercent,
+        configuredVatRatePercent: vatSettings.configuredRatePercent,
       },
     });
   } catch (err) {
@@ -105,6 +110,7 @@ router.get('/system/settings', verifyTokenMiddleware, verifyAdmin, async (req, r
 router.put('/system/maintenance', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
   try {
     const { maintenanceMode, maintenanceMessage } = req.body;
+    const vatEnabled = req.body?.vatEnabled !== undefined ? Boolean(req.body.vatEnabled) : true;
 
     const messageToSave = (maintenanceMessage || DEFAULT_MAINTENANCE_MESSAGE).trim();
 
@@ -119,14 +125,25 @@ router.put('/system/maintenance', verifyTokenMiddleware, verifyAdmin, async (req
         update: { value: messageToSave },
         create: { key: MAINTENANCE_MESSAGE_KEY, value: messageToSave },
       }),
+      prisma.siteSetting.upsert({
+        where: { key: VAT_ENABLED_KEY },
+        update: { value: vatEnabled ? 'true' : 'false' },
+        create: { key: VAT_ENABLED_KEY, value: vatEnabled ? 'true' : 'false' },
+      }),
     ]);
+
+    clearVatSettingsCache();
+    const vatSettings = await getVatSettings(true);
 
     return res.json({
       success: true,
-      message: `Maintenance mode ${maintenanceMode ? 'enabled' : 'disabled'} successfully`,
+      message: 'System settings saved successfully',
       settings: {
         maintenanceMode: Boolean(maintenanceMode),
         maintenanceMessage: messageToSave,
+        vatEnabled: vatSettings.enabled,
+        vatRatePercent: vatSettings.ratePercent,
+        configuredVatRatePercent: vatSettings.configuredRatePercent,
       },
     });
   } catch (err) {

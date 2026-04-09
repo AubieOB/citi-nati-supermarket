@@ -3,7 +3,7 @@ const { PrismaClient } = require('@prisma/client');
 const { resolveEffectiveStock, enrichProductStock } = require('../utils/stockResolver');
 const { notifyLowStock } = require('../utils/messageService');
 const { recordPosSyncEvent } = require('../services/posSyncMonitor.service');
-const { splitInclusiveVat, getVatRatePercent } = require('../utils/vat');
+const { getConfiguredVatRatePercent, getVatSettings, normalizeVatRatePercent, splitInclusiveVatAtRate } = require('../utils/vat');
 
 const prisma = new PrismaClient();
 const EMERGENCY_SALE_MAX_RETRIES = Number.parseInt(process.env.EMERGENCY_SALE_MAX_RETRIES || '10', 10);
@@ -137,9 +137,29 @@ function normalizePaymentMethod(rawMethod) {
   return method.slice(0, 20);
 }
 
+function getSaleVatContext(sale) {
+  const snapshot = sale?.cartSnapshot && typeof sale.cartSnapshot === 'object' ? sale.cartSnapshot : null;
+  const snapshotEnabled = snapshot?.vat_enabled ?? snapshot?.vatEnabled;
+  const vatEnabled = typeof snapshotEnabled === 'boolean' ? snapshotEnabled : true;
+  const configuredRatePercent = normalizeVatRatePercent(
+    snapshot?.configured_vat_rate_percent ?? snapshot?.configuredVatRatePercent ?? snapshot?.vat_rate_percent ?? snapshot?.vatRatePercent,
+    getConfiguredVatRatePercent()
+  );
+  const appliedRatePercent = vatEnabled ? configuredRatePercent : 0;
+  const snapshotVat = Number(snapshot?.vat);
+
+  return {
+    vatEnabled,
+    configuredRatePercent,
+    ratePercent: appliedRatePercent,
+    vatAmount: Number.isFinite(snapshotVat) ? toMoney(snapshotVat) : null,
+  };
+}
+
 function buildPosWriteInvoicePayload(emergencySale) {
   const locationCode = process.env.POS_LOCATION_CODE || 'SH';
   const priceTypeCode = process.env.POS_PRICE_TYPE_CODE || 'RT';
+  const vatContext = getSaleVatContext(emergencySale);
 
   const items = (emergencySale.items || []).map((item) => ({
     productCode: String(item.productCode || '').trim(),
@@ -148,8 +168,8 @@ function buildPosWriteInvoicePayload(emergencySale) {
     unitPrice: Number(item.unitPrice),
     discount: 0,
     amount: Number(item.lineTotal),
-    taxRate: getVatRatePercent(),
-    taxAmount: splitInclusiveVat(Number(item.lineTotal)).vatAmount,
+    taxRate: vatContext.ratePercent,
+    taxAmount: splitInclusiveVatAtRate(Number(item.lineTotal), vatContext.ratePercent).vatAmount,
     fPrice: Number(item.unitPrice),
     locationCode,
     costPrice: 0,
@@ -157,7 +177,7 @@ function buildPosWriteInvoicePayload(emergencySale) {
   }));
 
   const subtotalAfterDiscount = Number(emergencySale.subtotal || 0) - Number(emergencySale.discount || 0);
-  const invoiceTotals = splitInclusiveVat(subtotalAfterDiscount);
+  const invoiceTotals = splitInclusiveVatAtRate(subtotalAfterDiscount, vatContext.ratePercent);
 
   return {
     orderId: `EMERGENCY-${emergencySale.id}`,
@@ -188,7 +208,8 @@ function formatEmergencySale(sale) {
   const subtotal = Number(sale.subtotal || 0);
   const discount = Number(sale.discount || 0);
   const total = Number(sale.total || 0);
-  const vat = splitInclusiveVat(total).vatAmount;
+  const vatContext = getSaleVatContext(sale);
+  const vat = vatContext.vatAmount ?? splitInclusiveVatAtRate(total, vatContext.ratePercent).vatAmount;
   const tenderedAmount = Number(sale.tenderedAmount || 0);
   const changeAmount = Number(sale.changeAmount || 0);
   const balanceDue = Math.max(0, Number((total - tenderedAmount).toFixed(2)));
@@ -198,6 +219,9 @@ function formatEmergencySale(sale) {
     subtotal,
     discount,
     vat,
+    vatEnabled: vatContext.vatEnabled,
+    vatRatePercent: vatContext.ratePercent,
+    configuredVatRatePercent: vatContext.configuredRatePercent,
     total,
     tenderedAmount,
     tendered_amount: tenderedAmount,
@@ -325,6 +349,7 @@ async function createEmergencySale(req, res) {
     const { cashierId, cashierName } = await getCashierIdentity(req);
     const requestedDiscount = toMoney(req.body?.discount ?? req.body?.discount_amount ?? 0);
     const paymentMethod = normalizePaymentMethod(req.body?.payment_method ?? req.body?.paymentMethod ?? 'CASH');
+    const vatSettings = await getVatSettings();
 
     const created = await prisma.$transaction(async (tx) => {
       const products = await tx.product.findMany({
@@ -383,7 +408,10 @@ async function createEmergencySale(req, res) {
       }
 
       const discount = Math.max(0, Math.min(requestedDiscount, subtotal));
-      const vatTotals = splitInclusiveVat(subtotal - discount);
+      const vatTotals = splitInclusiveVatAtRate(subtotal - discount, vatSettings.ratePercent, {
+        vatEnabled: vatSettings.enabled,
+        configuredVatRatePercent: vatSettings.configuredRatePercent,
+      });
       const total = toMoney(vatTotals.gross);
       const tenderedAmountRaw = req.body?.tendered_amount ?? req.body?.tenderedAmount;
       const tenderedAmount = tenderedAmountRaw == null || tenderedAmountRaw === '' ? total : Math.max(0, toMoney(tenderedAmountRaw));
@@ -421,6 +449,9 @@ async function createEmergencySale(req, res) {
             subtotal,
             discount,
             vat: vatTotals.vatAmount,
+            vat_enabled: vatSettings.enabled,
+            vat_rate_percent: vatSettings.configuredRatePercent,
+            configured_vat_rate_percent: vatSettings.configuredRatePercent,
             total,
             tendered_amount: tenderedAmount,
             change_amount: changeAmount,

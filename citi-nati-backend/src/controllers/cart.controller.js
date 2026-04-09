@@ -133,14 +133,16 @@ const getCart = async (req, res) => {
 
     // Calculate VAT-aware totals so online checkout aligns with POS tax configuration.
     const subtotal = formattedItems.reduce((sum, item) => sum + item.subtotal, 0);
-    const totalsWithVat = splitInclusiveVat(subtotal);
+    const totalsWithVat = await splitInclusiveVat(subtotal);
 
     return res.status(200).json({
       cartId: cart.id,
       items: formattedItems,
       subtotal: totalsWithVat.net,
       vat: totalsWithVat.vatAmount,
+      vatEnabled: totalsWithVat.vatEnabled,
       vatRatePercent: totalsWithVat.vatRatePercent,
+      configuredVatRatePercent: totalsWithVat.configuredVatRatePercent,
       total: totalsWithVat.gross,
     });
   } catch (err) {
