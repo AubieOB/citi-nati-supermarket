@@ -182,6 +182,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
   const [form, setForm] = useState(() => buildNewForm(selectedLocation));
   const [saving, setSaving] = useState(false);
   const [activeLookupRow, setActiveLookupRow] = useState(-1);
+  const [isIntakeWorkspaceOpen, setIsIntakeWorkspaceOpen] = useState(false);
+  const [isIntakeWorkspaceMaximized, setIsIntakeWorkspaceMaximized] = useState(false);
 
   useEffect(() => {
     if (form.id) return;
@@ -212,6 +214,13 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
     () => calculatedItems.filter((item) => item.productName && !item.expiryDate).length,
     [calculatedItems]
   );
+
+  const selectedSupplierName = useMemo(() => {
+    const supplier = suppliers.find((entry) => String(entry.id) === String(form.supplierId || ''));
+    if (supplier?.name) return supplier.name;
+    if (String(form.manualSupplierName || '').trim()) return String(form.manualSupplierName).trim();
+    return 'Supplier Name';
+  }, [form.manualSupplierName, form.supplierId, suppliers]);
 
   const fetchRecords = useCallback(async () => {
     setListLoading(true);
@@ -276,6 +285,18 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
     setPage(1);
   }, [search, statusFilter, startDate, endDate, selectedLocationId]);
 
+  useEffect(() => {
+    if (!isIntakeWorkspaceOpen) return;
+    const handler = (event) => {
+      if (event.key === 'Escape') {
+        setIsIntakeWorkspaceOpen(false);
+        setIsIntakeWorkspaceMaximized(false);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isIntakeWorkspaceOpen]);
+
   const setLineValue = (index, key, value) => {
     setForm((prev) => ({
       ...prev,
@@ -314,6 +335,14 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
 
   const clearForm = () => {
     setForm(buildNewForm(selectedLocation));
+  };
+
+  const openWorkspace = ({ reset = false } = {}) => {
+    if (reset) {
+      setForm(buildNewForm(selectedLocation));
+    }
+    setIsIntakeWorkspaceMaximized(false);
+    setIsIntakeWorkspaceOpen(true);
   };
 
   const validateBeforeSave = () => {
@@ -384,7 +413,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
       const data = response.data?.data;
       if (!data) return;
       setForm(toFormFromRecord(data));
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setIsIntakeWorkspaceOpen(true);
     } catch (error) {
       await boAlert({ title: 'Load Failed', message: error.response?.data?.error || 'Failed to load record.', type: 'error' });
     }
@@ -461,9 +490,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
     }
   };
 
-  return (
-    <div style={{ display: 'grid', gap: '1rem', width: '100%', minWidth: 0 }}>
-      <section style={{ ...cardStyle, padding: '1rem', width: '100%', minWidth: 0 }}>
+  const workspaceContent = (
+    <section style={{ ...cardStyle, padding: '1rem', width: '100%', minWidth: 0, boxShadow: 'none', border: 'none', background: 'transparent' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ margin: 0, color: '#111827' }}>Goods Intake</h2>
@@ -472,7 +500,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <button type="button" onClick={clearForm} style={{ border: '1px solid #cbd5e1', background: '#fff', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 600, cursor: 'pointer' }}>
+            <button type="button" onClick={() => clearForm()} style={{ border: '1px solid #cbd5e1', background: '#fff', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 600, cursor: 'pointer' }}>
               New Record
             </button>
             {form.id && (
@@ -663,6 +691,71 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
           </div>
         </div>
       </section>
+  );
+
+  return (
+    <div style={{ display: 'grid', gap: '1rem', width: '100%', minWidth: 0 }}>
+      <section style={{ ...cardStyle, padding: '1rem', width: '100%', minWidth: 0 }}>
+        <div style={{ display: 'grid', gap: '0.9rem', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
+          <button
+            type="button"
+            onClick={() => openWorkspace()}
+            style={{
+              textAlign: 'left',
+              border: '1px solid #d8b4fe',
+              background: 'linear-gradient(135deg, #f8f5ff 0%, #ffffff 60%)',
+              borderRadius: '20px',
+              padding: '1.1rem',
+              cursor: 'pointer',
+              boxShadow: '0 16px 35px rgba(91, 75, 138, 0.10)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'start' }}>
+              <div>
+                <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6d28d9', fontWeight: 800 }}>Purchase Register</div>
+                <div style={{ marginTop: '0.4rem', fontSize: '1.2rem', fontWeight: 800, color: '#1f2937', lineHeight: 1.25 }}>
+                  Register Intake For "{selectedSupplierName}"
+                </div>
+                <div style={{ marginTop: '0.45rem', fontSize: '0.86rem', color: '#64748b', maxWidth: '34rem' }}>
+                  Open the full intake workspace in a modal to capture supplier receipt lines, expiry dates, costs, and selling prices without squeezing the table into the main page.
+                </div>
+              </div>
+              <div style={{ width: '42px', height: '42px', borderRadius: '14px', background: '#5b4b8a', color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                <i className="fas fa-arrow-up-right-from-square" />
+              </div>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => openWorkspace({ reset: true })}
+            style={{
+              textAlign: 'left',
+              border: '1px solid #bfdbfe',
+              background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 60%)',
+              borderRadius: '20px',
+              padding: '1.1rem',
+              cursor: 'pointer',
+              boxShadow: '0 14px 30px rgba(37, 99, 235, 0.08)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'start' }}>
+              <div>
+                <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1d4ed8', fontWeight: 800 }}>Quick Start</div>
+                <div style={{ marginTop: '0.4rem', fontSize: '1.2rem', fontWeight: 800, color: '#1f2937', lineHeight: 1.25 }}>
+                  Start A Fresh Goods Intake
+                </div>
+                <div style={{ marginTop: '0.45rem', fontSize: '0.86rem', color: '#64748b' }}>
+                  Reset the current draft and open a clean modal workspace for a new supplier receipt.
+                </div>
+              </div>
+              <div style={{ width: '42px', height: '42px', borderRadius: '14px', background: '#2563eb', color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                <i className="fas fa-plus" />
+              </div>
+            </div>
+          </button>
+        </div>
+      </section>
 
       <section style={{ ...cardStyle, padding: '1rem', width: '100%', minWidth: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -741,6 +834,41 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
           </div>
         )}
       </section>
+
+      {isIntakeWorkspaceOpen && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: isIntakeWorkspaceMaximized ? '0.35rem' : '1rem' }}>
+          <div style={{ ...cardStyle, width: isIntakeWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1480px, 98vw)', height: isIntakeWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isIntakeWorkspaceMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column', padding: '0.95rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <div>
+                <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b7280', fontWeight: 800 }}>Goods Intake Workspace</div>
+                <div style={{ fontSize: '1.12rem', fontWeight: 800, color: '#111827' }}>Register Intake For "{selectedSupplierName}"</div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <button
+                  type="button"
+                  title={isIntakeWorkspaceMaximized ? 'Restore' : 'Maximize'}
+                  aria-label={isIntakeWorkspaceMaximized ? 'Restore workspace' : 'Maximize workspace'}
+                  onClick={() => setIsIntakeWorkspaceMaximized((prev) => !prev)}
+                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', color: '#334155', cursor: 'pointer' }}
+                >
+                  <i className={`fas ${isIntakeWorkspaceMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsIntakeWorkspaceOpen(false); setIsIntakeWorkspaceMaximized(false); }}
+                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}
+                >
+                  <i className="fas fa-times" />
+                </button>
+              </div>
+            </div>
+
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingRight: '0.2rem' }}>
+              {workspaceContent}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
