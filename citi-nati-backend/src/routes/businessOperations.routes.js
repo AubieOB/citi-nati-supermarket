@@ -49,6 +49,7 @@ const employeesRoutes = require('./business-operations/employees.routes');
 const payrollRoutes = require('./business-operations/payroll.routes');
 const importsRoutes = require('./business-operations/imports.routes');
 const exportRoutes = require('./business-operations/export.routes');
+const goodsIntakeRoutes = require('./business-operations/goodsIntake.routes');
 
 const router = express.Router();
 
@@ -74,5 +75,6 @@ router.use('/employees', employeesRoutes);
 router.use('/payroll', payrollRoutes);
 router.use('/imports', importsRoutes);
 router.use('/export', exportRoutes);
+router.use('/goods-intake', goodsIntakeRoutes);
 
 module.exports = router;

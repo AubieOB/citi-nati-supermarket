@@ -7,6 +7,7 @@ import ExpensesTab from './business-operations/ExpensesTab.jsx';
 import MonthlySummaryTab from './business-operations/MonthlySummaryTab.jsx';
 import PayrollTab from './business-operations/PayrollTab.jsx';
 import SuppliersTab from './business-operations/SuppliersTab.jsx';
+import GoodsIntakeTab from './business-operations/GoodsIntakeTab.jsx';
 import ReportHistoryTab from './business-operations/ReportHistoryTab.jsx';
 import BusinessOperationsActionsTab from './business-operations/BusinessOperationsActionsTab.jsx';
 import BusinessAnalyticsTab from './business-operations/BusinessAnalyticsTab.jsx';
@@ -20,6 +21,7 @@ import api from '../../utils/api.js';
 const TABS = [
   { id: 'sales-reports', label: 'Sales Reports', icon: 'fa-chart-column' },
   { id: 'suppliers', label: 'Suppliers', icon: 'fa-truck-field' },
+  { id: 'goods-intake', label: 'Goods Intake', icon: 'fa-boxes-stacked' },
   { id: 'expenses', label: 'Expenses', icon: 'fa-file-invoice-dollar' },
   { id: 'monthly-summary', label: 'Monthly Summary', icon: 'fa-calendar-days' },
   { id: 'employees', label: 'Employees', icon: 'fa-id-badge' },
@@ -186,6 +188,7 @@ const AdminBusinessOperations = () => {
   const contentByTab = {
     'sales-reports': <SalesReportsTab drilldownRequest={drilldownRequests['sales-reports']} selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} />,
     suppliers: <SuppliersTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} locations={locations} />,
+    'goods-intake': <GoodsIntakeTab selectedLocationId={selectedLocationIdNumber} locations={locations} />,
     expenses: <ExpensesTab refreshKey={locationRefreshKey} drilldownRequest={drilldownRequests.expenses} selectedLocationId={selectedLocationIdNumber} locations={locations} />,
     'monthly-summary': <MonthlySummaryTab refreshKey={locationRefreshKey} onNavigateTab={handleNavigateTab} selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} selectedLocationName={selectedLocation?.name || ''} />,
     employees: <EmployeesTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} locations={locations} />,

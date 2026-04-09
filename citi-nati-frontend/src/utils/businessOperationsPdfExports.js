@@ -567,3 +567,114 @@ export function exportMonthlySummaryPdf({
     fileName: `monthly_summary_${dateLabel}.pdf`,
   });
 }
+
+export function exportGoodsIntakeRecordPdf({ record, companyName = 'Citi-Nati Supermarket' }) {
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const generatedText = formatGeneratedTimestamp();
+  const purchaseDate = toDate(record?.purchaseDate);
+  const supplierName = record?.supplier?.name || record?.manualSupplierName || '-';
+  const locationName = record?.locationName || record?.locationCode || '-';
+  const intakeRef = record?.intakeRef || `GI-${new Date().toISOString().slice(0, 10)}`;
+  const receiptReference = record?.receiptReference || '-';
+  const supplierStoreRef = record?.supplierStoreRef || '-';
+  const status = String(record?.status || 'draft').toUpperCase();
+  const notes = record?.overallNotes || '-';
+  const totalItems = Number(record?.totalItems || record?._count?.items || (record?.items || []).length || 0);
+  const totalQty = Number(record?.totalQuantity || 0);
+  const totalCost = Number(record?.totalCost || 0);
+  const totalProfit = Number(record?.totalEstimatedProfit || 0);
+
+  const headerContext = {
+    reportTitle: 'Goods Intake Record',
+    viewLabel: 'Purchase Intake Register',
+    periodText: purchaseDate,
+    generatedText,
+  };
+
+  drawHeader(doc, headerContext);
+  const summaryCards = [
+    { label: 'Intake Ref', value: intakeRef, color: BRAND_PURPLE },
+    { label: 'Status', value: status, color: status === 'FINALIZED' ? BRAND_GREEN : '#1d4ed8' },
+    { label: 'Total Cost', value: fmtCurrency(totalCost), color: '#0f766e' },
+    { label: 'Est. Profit', value: fmtCurrency(totalProfit), color: totalProfit >= 0 ? '#166534' : '#b91c1c' },
+  ];
+
+  let y = 33;
+  y = drawSummaryCards(doc, summaryCards, y);
+  drawSectionTitle(doc, 'Intake Header', y);
+  y += 3.2;
+
+  const metadataRows = [
+    ['Company', companyName],
+    ['Supplier', supplierName],
+    ['Supplier/Store Ref', supplierStoreRef],
+    ['Purchase Date', purchaseDate],
+    ['Receipt Reference', receiptReference],
+    ['Branch/Location', locationName],
+    ['Entered By', record?.enteredBy || '-'],
+    ['Receipt Total (Optional)', record?.receiptTotalAmount == null ? '-' : fmtCurrency(record.receiptTotalAmount)],
+    ['Total Lines', fmtCount(totalItems)],
+    ['Total Quantity', fmtCount(totalQty)],
+    ['Overall Notes', notes],
+  ];
+
+  y = drawMetadataTable(doc, metadataRows, y);
+  drawSectionTitle(doc, 'Purchased Items', y);
+  y += 3.2;
+
+  const rows = (record?.items || []).map((item, index) => [
+    String(index + 1),
+    item?.barcode || '-',
+    item?.productName || '-',
+    fmtCount(item?.quantity || 0),
+    fmtCurrency(item?.unitCost || 0),
+    fmtCurrency(item?.totalCost || 0),
+    item?.sellingPrice == null ? '-' : fmtCurrency(item.sellingPrice),
+    item?.marginPercent == null ? '-' : `${Number(item.marginPercent).toFixed(2)}%`,
+    fmtCurrency(item?.estimatedProfit || 0),
+    toDate(item?.expiryDate),
+    item?.batchRef || '-',
+    item?.lineNotes || '-',
+  ]);
+
+  drawMainDataTable(doc, {
+    headers: ['#', 'Barcode', 'Product Name', 'Qty', 'Unit Cost', 'Total Cost', 'Sell Price', 'Margin', 'Est. Profit', 'Expiry', 'Batch', 'Notes'],
+    rows,
+    columnStyles: {
+      0: { cellWidth: 9, halign: 'center' },
+      1: { cellWidth: 24 },
+      2: { cellWidth: 54 },
+      3: { cellWidth: 16, halign: 'right' },
+      4: { cellWidth: 20, halign: 'right' },
+      5: { cellWidth: 22, halign: 'right' },
+      6: { cellWidth: 22, halign: 'right' },
+      7: { cellWidth: 16, halign: 'right' },
+      8: { cellWidth: 24, halign: 'right' },
+      9: { cellWidth: 22 },
+      10: { cellWidth: 22 },
+      11: { cellWidth: 36 },
+    },
+  }, y, headerContext);
+
+  const finalY = doc.lastAutoTable?.finalY || y;
+  const { left, right } = getContentBounds(doc);
+  const signatureY = Math.min(finalY + 16, doc.internal.pageSize.getHeight() - 24);
+
+  doc.setDrawColor(...COLOR_BORDER);
+  doc.line(left, signatureY, left + 70, signatureY);
+  doc.line(right - 70, signatureY, right, signatureY);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...COLOR_MUTED);
+  doc.text('Prepared By', left, signatureY + 4);
+  doc.text('Verified By', right - 70, signatureY + 4);
+
+  const totalPages = doc.getNumberOfPages();
+  for (let page = 1; page <= totalPages; page += 1) {
+    doc.setPage(page);
+    drawFooter(doc, page, totalPages);
+  }
+
+  const safeRef = String(intakeRef).replace(/[^A-Za-z0-9_-]/g, '_');
+  doc.save(`goods_intake_${safeRef}.pdf`);
+}

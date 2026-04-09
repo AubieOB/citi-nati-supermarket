@@ -15,6 +15,8 @@ const PRESERVED_TABLES = [
 ];
 
 const TARGET_TABLES = [
+  { key: 'goodsIntakeItems', model: 'goodsIntakeItem' },
+  { key: 'goodsIntakes', model: 'goodsIntake' },
   { key: 'supplierTransactions', model: 'supplierTransaction' },
   { key: 'supplierBalances', model: 'supplierBalance' },
   { key: 'suppliers', model: 'supplier' },
@@ -30,6 +32,8 @@ const TARGET_TABLES = [
 ];
 
 const WIPE_TARGET_TABLES = [
+  { key: 'goodsIntakeItems', model: 'goodsIntakeItem' },
+  { key: 'goodsIntakes', model: 'goodsIntake' },
   { key: 'supplierTransactions', model: 'supplierTransaction' },
   { key: 'supplierBalances', model: 'supplierBalance' },
   { key: 'suppliers', model: 'supplier' },
