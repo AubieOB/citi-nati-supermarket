@@ -16,6 +16,7 @@ const MobileBottomNav = ({ onCartClick, onAccountClick }) => {
     if (!user) return null;
     if (user.role === 'admin') return '/admin';
     if (user.role === 'driver') return '/driver';
+    if (user.role === 'cashier') return '/cashier';
     return null;
   };
 
@@ -80,8 +81,20 @@ const MobileBottomNav = ({ onCartClick, onAccountClick }) => {
             <Link 
               to={dashboardPath} 
               className={`mobile-bottom-nav__item ${isActive(dashboardPath) ? 'mobile-bottom-nav__item--active' : ''}`}
-              aria-label={user?.role === 'admin' ? 'Admin Dashboard' : 'Driver Dashboard'}
-              title={user?.role === 'admin' ? 'Admin Dashboard' : 'Driver Dashboard'}
+              aria-label={
+                user?.role === 'admin'
+                  ? 'Admin Dashboard'
+                  : user?.role === 'driver'
+                    ? 'Driver Dashboard'
+                    : 'Cashier Dashboard'
+              }
+              title={
+                user?.role === 'admin'
+                  ? 'Admin Dashboard'
+                  : user?.role === 'driver'
+                    ? 'Driver Dashboard'
+                    : 'Cashier Dashboard'
+              }
             >
               <i className="fas fa-tachometer-alt"></i>
               <span className="mobile-bottom-nav__label">Dashboard</span>

@@ -17,6 +17,7 @@ const DesktopNavbar = ({ onCartClick, onAccountClick, navigate }) => {
     if (!user) return null;
     if (user.role === 'admin') return '/admin';
     if (user.role === 'driver') return '/driver';
+    if (user.role === 'cashier') return '/cashier';
     return null;
   };
 
@@ -92,8 +93,20 @@ const DesktopNavbar = ({ onCartClick, onAccountClick, navigate }) => {
               <Link 
                 to={dashboardPath} 
                 className={`desktop-navbar__item desktop-navbar__item--icon ${isActive(dashboardPath) ? 'desktop-navbar__item--active' : ''}`}
-                aria-label={user?.role === 'admin' ? 'Admin Dashboard' : 'Driver Dashboard'}
-                title={user?.role === 'admin' ? 'Admin Dashboard' : 'Driver Dashboard'}
+                aria-label={
+                  user?.role === 'admin'
+                    ? 'Admin Dashboard'
+                    : user?.role === 'driver'
+                      ? 'Driver Dashboard'
+                      : 'Cashier Dashboard'
+                }
+                title={
+                  user?.role === 'admin'
+                    ? 'Admin Dashboard'
+                    : user?.role === 'driver'
+                      ? 'Driver Dashboard'
+                      : 'Cashier Dashboard'
+                }
               >
                 <i className="fas fa-tachometer-alt"></i>
               </Link>

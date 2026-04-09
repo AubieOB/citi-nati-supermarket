@@ -17,6 +17,7 @@ const DesktopFilterNav = ({ onCartClick, onAccountClick }) => {
     if (!user) return null;
     if (user.role === 'admin') return '/admin';
     if (user.role === 'driver') return '/driver';
+    if (user.role === 'cashier') return '/cashier';
     return null;
   };
 
@@ -75,10 +76,22 @@ const DesktopFilterNav = ({ onCartClick, onAccountClick }) => {
             <Link 
               to={dashboardPath} 
               className={`desktop-filter-nav__item ${isActive(dashboardPath) ? 'desktop-filter-nav__item--active' : ''}`}
-              aria-label={user?.role === 'admin' ? 'Admin Dashboard' : 'Driver Dashboard'}
-              title={user?.role === 'admin' ? 'Admin Dashboard' : 'Driver Dashboard'}
+              aria-label={
+                user?.role === 'admin'
+                  ? 'Admin Dashboard'
+                  : user?.role === 'driver'
+                    ? 'Driver Dashboard'
+                    : 'Cashier Dashboard'
+              }
+              title={
+                user?.role === 'admin'
+                  ? 'Admin Dashboard'
+                  : user?.role === 'driver'
+                    ? 'Driver Dashboard'
+                    : 'Cashier Dashboard'
+              }
             >
-              <span className="desktop-filter-nav__label">{user?.role === 'admin' ? 'Admin' : 'Driver'}</span>
+              <span className="desktop-filter-nav__label">{user?.role === 'admin' ? 'Admin' : user?.role === 'driver' ? 'Driver' : 'Cashier'}</span>
             </Link>
           ) : null}
         </>
