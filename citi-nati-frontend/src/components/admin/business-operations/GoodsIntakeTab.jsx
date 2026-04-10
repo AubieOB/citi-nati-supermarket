@@ -169,6 +169,34 @@ function toFormFromRecord(record) {
 }
 
 const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
+  const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
+
+  const themedCardStyle = useMemo(() => ({
+    ...cardStyle,
+    backgroundColor: isAdminDarkTheme ? '#111827' : '#fff',
+    border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #e2e8f0',
+    boxShadow: isAdminDarkTheme ? '0 12px 28px rgba(0, 0, 0, 0.45)' : cardStyle.boxShadow,
+  }), [isAdminDarkTheme]);
+
+  const themedInputStyle = useMemo(() => ({
+    ...tableInputStyle,
+    border: isAdminDarkTheme ? '1px solid #334155' : tableInputStyle.border,
+    backgroundColor: isAdminDarkTheme ? '#0f172a' : '#fff',
+    color: isAdminDarkTheme ? '#e2e8f0' : '#0f172a',
+  }), [isAdminDarkTheme]);
+
+  const colors = useMemo(() => ({
+    text: isAdminDarkTheme ? '#f8fafc' : '#111827',
+    strongText: isAdminDarkTheme ? '#f1f5f9' : '#1f2937',
+    mutedText: isAdminDarkTheme ? '#cbd5e1' : '#64748b',
+    subtleText: isAdminDarkTheme ? '#94a3b8' : '#64748b',
+    tableBorder: isAdminDarkTheme ? '#243244' : '#f1f5f9',
+    launchCardOneBorder: isAdminDarkTheme ? '#5b4b8a' : '#d8b4fe',
+    launchCardOneBg: isAdminDarkTheme ? 'linear-gradient(135deg, #231b38 0%, #151a28 65%)' : 'linear-gradient(135deg, #f8f5ff 0%, #ffffff 60%)',
+    launchCardTwoBorder: isAdminDarkTheme ? '#365f98' : '#bfdbfe',
+    launchCardTwoBg: isAdminDarkTheme ? 'linear-gradient(135deg, #18273f 0%, #151a28 65%)' : 'linear-gradient(135deg, #eff6ff 0%, #ffffff 60%)',
+  }), [isAdminDarkTheme]);
+
   const [records, setRecords] = useState([]);
   const [pagination, setPagination] = useState(null);
   const [listLoading, setListLoading] = useState(true);
@@ -503,21 +531,21 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
     <section style={{ ...cardStyle, padding: '1rem', width: '100%', minWidth: 0, boxShadow: 'none', border: 'none', background: 'transparent' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <div>
-            <h2 style={{ margin: 0, color: '#111827' }}>Goods Intake</h2>
-            <div style={{ fontSize: '0.86rem', color: '#64748b', marginTop: '0.2rem' }}>
+            <h2 style={{ margin: 0, color: colors.text }}>Goods Intake</h2>
+            <div style={{ fontSize: '0.86rem', color: colors.mutedText, marginTop: '0.2rem' }}>
               Digital Purchase Intake Register for supplier receipt entry and printable filing.
             </div>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <button type="button" onClick={() => clearForm()} style={{ border: '1px solid #cbd5e1', background: '#fff', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 600, cursor: 'pointer' }}>
+            <button type="button" onClick={() => clearForm()} style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #cbd5e1', background: isAdminDarkTheme ? '#0f172a' : '#fff', color: isAdminDarkTheme ? '#e2e8f0' : '#0f172a', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}>
               New Record
             </button>
             {form.id && (
-              <button type="button" onClick={() => handleExportRecord(form.id)} style={{ border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}>
+              <button type="button" onClick={() => handleExportRecord(form.id)} style={{ border: isAdminDarkTheme ? '1px solid #2f7f58' : '1px solid #bbf7d0', background: isAdminDarkTheme ? '#153828' : '#f0fdf4', color: isAdminDarkTheme ? '#91e0b4' : '#166534', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}>
                 Export PDF
               </button>
             )}
-            <button type="button" onClick={() => saveRecord('draft')} disabled={saving} style={{ border: '1px solid #dbeafe', background: '#eff6ff', color: '#1d4ed8', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}>
+            <button type="button" onClick={() => saveRecord('draft')} disabled={saving} style={{ border: isAdminDarkTheme ? '1px solid #365f98' : '1px solid #dbeafe', background: isAdminDarkTheme ? '#18273f' : '#eff6ff', color: isAdminDarkTheme ? '#b9d7ff' : '#1d4ed8', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}>
               {saving ? 'Saving...' : 'Save Draft'}
             </button>
             <button type="button" onClick={() => saveRecord('finalized')} disabled={saving} style={{ border: 'none', background: '#0f766e', color: '#fff', borderRadius: '8px', padding: '0.45rem 0.9rem', fontWeight: 700, cursor: 'pointer' }}>
@@ -543,27 +571,27 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
 
           <div style={{ minWidth: 0 }}>
             <label style={{ display: 'block', fontSize: '0.78rem', color: '#64748b', marginBottom: '0.25rem' }}>Manual Supplier Name</label>
-            <input value={form.manualSupplierName} onFocus={selectInputText} onChange={(event) => setForm((prev) => ({ ...prev, manualSupplierName: event.target.value }))} style={tableInputStyle} placeholder="Use when supplier is not in list" />
+            <input value={form.manualSupplierName} onFocus={selectInputText} onChange={(event) => setForm((prev) => ({ ...prev, manualSupplierName: event.target.value }))} style={themedInputStyle} placeholder="Use when supplier is not in list" />
           </div>
 
           <div>
             <label style={{ display: 'block', fontSize: '0.78rem', color: '#64748b', marginBottom: '0.25rem' }}>Purchase Date</label>
-            <input type="date" value={form.purchaseDate} onFocus={selectInputText} onChange={(event) => setForm((prev) => ({ ...prev, purchaseDate: event.target.value }))} style={tableInputStyle} />
+            <input type="date" value={form.purchaseDate} onFocus={selectInputText} onChange={(event) => setForm((prev) => ({ ...prev, purchaseDate: event.target.value }))} style={themedInputStyle} />
           </div>
 
           <div>
             <label style={{ display: 'block', fontSize: '0.78rem', color: '#64748b', marginBottom: '0.25rem' }}>Status</label>
-            <input value={String(form.status || 'draft').toUpperCase()} disabled style={{ ...tableInputStyle, backgroundColor: '#f8fafc', color: '#334155' }} />
+            <input value={String(form.status || 'draft').toUpperCase()} disabled style={{ ...themedInputStyle, backgroundColor: isAdminDarkTheme ? '#111827' : '#f8fafc', color: isAdminDarkTheme ? '#cbd5e1' : '#334155' }} />
           </div>
 
           <div>
             <label style={{ display: 'block', fontSize: '0.78rem', color: '#64748b', marginBottom: '0.25rem' }}>Supplier/Store Ref</label>
-            <input value={form.supplierStoreRef} onFocus={selectInputText} onChange={(event) => setForm((prev) => ({ ...prev, supplierStoreRef: event.target.value }))} style={tableInputStyle} />
+            <input value={form.supplierStoreRef} onFocus={selectInputText} onChange={(event) => setForm((prev) => ({ ...prev, supplierStoreRef: event.target.value }))} style={themedInputStyle} />
           </div>
 
           <div>
             <label style={{ display: 'block', fontSize: '0.78rem', color: '#64748b', marginBottom: '0.25rem' }}>Receipt Ref</label>
-            <input value={form.receiptReference} onFocus={selectInputText} onChange={(event) => setForm((prev) => ({ ...prev, receiptReference: event.target.value }))} style={tableInputStyle} />
+            <input value={form.receiptReference} onFocus={selectInputText} onChange={(event) => setForm((prev) => ({ ...prev, receiptReference: event.target.value }))} style={themedInputStyle} />
           </div>
 
           <div>
@@ -579,7 +607,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
                   locationName: location?.name || '',
                 }));
               }}
-              style={tableInputStyle}
+              style={themedInputStyle}
             >
               <option value="">Select location</option>
               {locations.map((location) => (
@@ -597,13 +625,13 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
               value={form.receiptTotalAmount}
               onFocus={selectInputText}
               onChange={(event) => setForm((prev) => ({ ...prev, receiptTotalAmount: event.target.value }))}
-              style={tableInputStyle}
+              style={themedInputStyle}
             />
           </div>
 
           <div style={{ gridColumn: '1 / -1', minWidth: 0 }}>
             <label style={{ display: 'block', fontSize: '0.78rem', color: '#64748b', marginBottom: '0.25rem' }}>Overall Notes / Comments</label>
-            <textarea rows={2} value={form.overallNotes} onFocus={selectInputText} onChange={(event) => setForm((prev) => ({ ...prev, overallNotes: event.target.value }))} style={{ ...tableInputStyle, resize: 'vertical' }} />
+            <textarea rows={2} value={form.overallNotes} onFocus={selectInputText} onChange={(event) => setForm((prev) => ({ ...prev, overallNotes: event.target.value }))} style={{ ...themedInputStyle, resize: 'vertical' }} />
           </div>
         </div>
 
@@ -707,32 +735,32 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
 
   return (
     <div style={{ display: 'grid', gap: '1rem', width: '100%', minWidth: 0 }}>
-      <section style={{ ...cardStyle, padding: '1rem', width: '100%', minWidth: 0 }}>
+      <section style={{ ...themedCardStyle, padding: '1rem', width: '100%', minWidth: 0 }}>
         <div style={{ display: 'grid', gap: '0.9rem', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
           <button
             type="button"
             onClick={() => openWorkspace()}
             style={{
               textAlign: 'left',
-              border: '1px solid #d8b4fe',
-              background: 'linear-gradient(135deg, #f8f5ff 0%, #ffffff 60%)',
+              border: `1px solid ${colors.launchCardOneBorder}`,
+              background: colors.launchCardOneBg,
               borderRadius: '20px',
               padding: '1.1rem',
               cursor: 'pointer',
-              boxShadow: '0 16px 35px rgba(91, 75, 138, 0.10)',
+              boxShadow: isAdminDarkTheme ? '0 14px 30px rgba(0, 0, 0, 0.45)' : '0 16px 35px rgba(91, 75, 138, 0.10)',
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'start' }}>
               <div>
-                <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6d28d9', fontWeight: 800 }}>Purchase Register</div>
-                <div style={{ marginTop: '0.4rem', fontSize: '1.2rem', fontWeight: 800, color: '#1f2937', lineHeight: 1.25 }}>
+                <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: isAdminDarkTheme ? '#c4b5fd' : '#6d28d9', fontWeight: 800 }}>Purchase Register</div>
+                <div style={{ marginTop: '0.4rem', fontSize: '1.2rem', fontWeight: 800, color: colors.strongText, lineHeight: 1.25 }}>
                   Register Intake For "{selectedSupplierName}"
                 </div>
-                <div style={{ marginTop: '0.45rem', fontSize: '0.86rem', color: '#64748b', maxWidth: '34rem' }}>
+                <div style={{ marginTop: '0.45rem', fontSize: '0.86rem', color: colors.mutedText, maxWidth: '34rem' }}>
                   Open the full intake workspace in a modal to capture supplier receipt lines, expiry dates, costs, and selling prices without squeezing the table into the main page.
                 </div>
               </div>
-              <div style={{ width: '42px', height: '42px', borderRadius: '14px', background: '#5b4b8a', color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+              <div style={{ width: '42px', height: '42px', borderRadius: '14px', background: isAdminDarkTheme ? '#7c6cb0' : '#5b4b8a', color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
                 <i className="fas fa-arrow-up-right-from-square" />
               </div>
             </div>
@@ -743,25 +771,25 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
             onClick={() => openWorkspace({ reset: true })}
             style={{
               textAlign: 'left',
-              border: '1px solid #bfdbfe',
-              background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 60%)',
+              border: `1px solid ${colors.launchCardTwoBorder}`,
+              background: colors.launchCardTwoBg,
               borderRadius: '20px',
               padding: '1.1rem',
               cursor: 'pointer',
-              boxShadow: '0 14px 30px rgba(37, 99, 235, 0.08)',
+              boxShadow: isAdminDarkTheme ? '0 14px 30px rgba(0, 0, 0, 0.45)' : '0 14px 30px rgba(37, 99, 235, 0.08)',
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'start' }}>
               <div>
-                <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1d4ed8', fontWeight: 800 }}>Quick Start</div>
-                <div style={{ marginTop: '0.4rem', fontSize: '1.2rem', fontWeight: 800, color: '#1f2937', lineHeight: 1.25 }}>
+                <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: isAdminDarkTheme ? '#93c5fd' : '#1d4ed8', fontWeight: 800 }}>Quick Start</div>
+                <div style={{ marginTop: '0.4rem', fontSize: '1.2rem', fontWeight: 800, color: colors.strongText, lineHeight: 1.25 }}>
                   Start A Fresh Goods Intake
                 </div>
-                <div style={{ marginTop: '0.45rem', fontSize: '0.86rem', color: '#64748b' }}>
+                <div style={{ marginTop: '0.45rem', fontSize: '0.86rem', color: colors.mutedText }}>
                   Reset the current draft and open a clean modal workspace for a new supplier receipt.
                 </div>
               </div>
-              <div style={{ width: '42px', height: '42px', borderRadius: '14px', background: '#2563eb', color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+              <div style={{ width: '42px', height: '42px', borderRadius: '14px', background: isAdminDarkTheme ? '#3b82f6' : '#2563eb', color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
                 <i className="fas fa-plus" />
               </div>
             </div>
@@ -769,18 +797,18 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
         </div>
       </section>
 
-      <section style={{ ...cardStyle, padding: '1rem', width: '100%', minWidth: 0 }}>
+      <section style={{ ...themedCardStyle, padding: '1rem', width: '100%', minWidth: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <h3 style={{ margin: 0, color: '#111827' }}>Purchase Intake History</h3>
+          <h3 style={{ margin: 0, color: colors.text }}>Purchase Intake History</h3>
           <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
-            <input placeholder="Search ref/supplier/product" value={search} onFocus={selectInputText} onChange={(event) => setSearch(event.target.value)} style={{ ...tableInputStyle, width: '220px' }} />
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} style={{ ...tableInputStyle, width: '130px' }}>
+            <input placeholder="Search ref/supplier/product" value={search} onFocus={selectInputText} onChange={(event) => setSearch(event.target.value)} style={{ ...themedInputStyle, width: '220px' }} />
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} style={{ ...themedInputStyle, width: '130px' }}>
               <option value="all">All Status</option>
               <option value="draft">Draft</option>
               <option value="finalized">Finalized</option>
             </select>
-            <input type="date" value={startDate} onFocus={selectInputText} onChange={(event) => setStartDate(event.target.value)} style={{ ...tableInputStyle, width: '140px' }} />
-            <input type="date" value={endDate} onFocus={selectInputText} onChange={(event) => setEndDate(event.target.value)} style={{ ...tableInputStyle, width: '140px' }} />
+            <input type="date" value={startDate} onFocus={selectInputText} onChange={(event) => setStartDate(event.target.value)} style={{ ...themedInputStyle, width: '140px' }} />
+            <input type="date" value={endDate} onFocus={selectInputText} onChange={(event) => setEndDate(event.target.value)} style={{ ...themedInputStyle, width: '140px' }} />
           </div>
         </div>
 
@@ -791,22 +819,22 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
             <thead>
               <tr>
                 {['Ref', 'Purchase Date', 'Supplier', 'Location', 'Status', 'Items', 'Total Cost', 'Actions'].map((label) => (
-                  <th key={label} style={{ textAlign: 'left', padding: '0.55rem 0.45rem', fontSize: '0.76rem', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>{label}</th>
+                  <th key={label} style={{ textAlign: 'left', padding: '0.55rem 0.45rem', fontSize: '0.76rem', color: colors.mutedText, borderBottom: `1px solid ${isAdminDarkTheme ? '#334155' : '#e2e8f0'}` }}>{label}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {listLoading ? (
-                <tr><td colSpan={8} style={{ padding: '1rem', color: '#64748b' }}>Loading records...</td></tr>
+                <tr><td colSpan={8} style={{ padding: '1rem', color: colors.mutedText }}>Loading records...</td></tr>
               ) : records.length === 0 ? (
-                <tr><td colSpan={8} style={{ padding: '1rem', color: '#64748b' }}>No records found for current filters.</td></tr>
+                <tr><td colSpan={8} style={{ padding: '1rem', color: colors.mutedText }}>No records found for current filters.</td></tr>
               ) : records.map((record) => (
                 <tr key={record.id}>
-                  <td style={{ padding: '0.6rem 0.45rem', borderBottom: '1px solid #f1f5f9', fontWeight: 700, color: '#1f2937' }}>{record.intakeRef}</td>
-                  <td style={{ padding: '0.6rem 0.45rem', borderBottom: '1px solid #f1f5f9' }}>{dateInputValue(record.purchaseDate)}</td>
-                  <td style={{ padding: '0.6rem 0.45rem', borderBottom: '1px solid #f1f5f9' }}>{record.supplier?.name || record.manualSupplierName || '-'}</td>
-                  <td style={{ padding: '0.6rem 0.45rem', borderBottom: '1px solid #f1f5f9' }}>{record.locationName || record.locationCode || '-'}</td>
-                  <td style={{ padding: '0.6rem 0.45rem', borderBottom: '1px solid #f1f5f9' }}>
+                  <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, fontWeight: 700, color: colors.strongText }}>{record.intakeRef}</td>
+                  <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{dateInputValue(record.purchaseDate)}</td>
+                  <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{record.supplier?.name || record.manualSupplierName || '-'}</td>
+                  <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{record.locationName || record.locationCode || '-'}</td>
+                  <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}` }}>
                     <span style={{
                       padding: '0.2rem 0.5rem',
                       borderRadius: '999px',
@@ -819,11 +847,11 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
                       {String(record.status || 'draft').toUpperCase()}
                     </span>
                   </td>
-                  <td style={{ padding: '0.6rem 0.45rem', borderBottom: '1px solid #f1f5f9' }}>{record.totalItems || record._count?.items || 0}</td>
-                  <td style={{ padding: '0.6rem 0.45rem', borderBottom: '1px solid #f1f5f9', fontWeight: 700 }}>{money(record.totalCost)}</td>
-                  <td style={{ padding: '0.6rem 0.45rem', borderBottom: '1px solid #f1f5f9' }}>
+                  <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{record.totalItems || record._count?.items || 0}</td>
+                  <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, fontWeight: 700, color: colors.strongText }}>{money(record.totalCost)}</td>
+                  <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}` }}>
                     <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                      <button type="button" onClick={() => handleEditRecord(record.id)} style={{ border: '1px solid #cbd5e1', background: '#fff', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 600, cursor: 'pointer' }}>Edit</button>
+                      <button type="button" onClick={() => handleEditRecord(record.id)} style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #cbd5e1', background: isAdminDarkTheme ? '#0f172a' : '#fff', color: isAdminDarkTheme ? '#e2e8f0' : '#0f172a', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>Edit</button>
                       <button type="button" onClick={() => handleExportRecord(record.id)} style={{ border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>PDF</button>
                       <button type="button" onClick={() => handleDeleteRecord(record)} style={{ border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 600, cursor: 'pointer' }}>Delete</button>
                     </div>
@@ -836,12 +864,12 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
 
         {pagination && pagination.totalPages > 1 && (
           <div style={{ marginTop: '0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+            <div style={{ fontSize: '0.8rem', color: colors.mutedText }}>
               Page {pagination.page} of {pagination.totalPages} ({pagination.total} records)
             </div>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button type="button" onClick={() => setPage((prev) => Math.max(1, prev - 1))} disabled={pagination.page <= 1} style={{ border: '1px solid #cbd5e1', borderRadius: '7px', background: '#fff', padding: '0.3rem 0.65rem', cursor: 'pointer' }}>Prev</button>
-              <button type="button" onClick={() => setPage((prev) => Math.min(pagination.totalPages, prev + 1))} disabled={pagination.page >= pagination.totalPages} style={{ border: '1px solid #cbd5e1', borderRadius: '7px', background: '#fff', padding: '0.3rem 0.65rem', cursor: 'pointer' }}>Next</button>
+              <button type="button" onClick={() => setPage((prev) => Math.max(1, prev - 1))} disabled={pagination.page <= 1} style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #cbd5e1', borderRadius: '7px', background: isAdminDarkTheme ? '#0f172a' : '#fff', color: isAdminDarkTheme ? '#e2e8f0' : '#0f172a', padding: '0.3rem 0.65rem', cursor: 'pointer' }}>Prev</button>
+              <button type="button" onClick={() => setPage((prev) => Math.min(pagination.totalPages, prev + 1))} disabled={pagination.page >= pagination.totalPages} style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #cbd5e1', borderRadius: '7px', background: isAdminDarkTheme ? '#0f172a' : '#fff', color: isAdminDarkTheme ? '#e2e8f0' : '#0f172a', padding: '0.3rem 0.65rem', cursor: 'pointer' }}>Next</button>
             </div>
           </div>
         )}
@@ -849,7 +877,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
 
       {isIntakeWorkspaceOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: isIntakeWorkspaceMaximized ? '0.35rem' : '1rem' }}>
-          <div style={{ ...cardStyle, width: isIntakeWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1480px, 98vw)', height: isIntakeWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isIntakeWorkspaceMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column', padding: '0.95rem' }}>
+          <div style={{ ...themedCardStyle, width: isIntakeWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1480px, 98vw)', height: isIntakeWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isIntakeWorkspaceMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column', padding: '0.95rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
               <div>
                 <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b7280', fontWeight: 800 }}>Goods Intake Workspace</div>
