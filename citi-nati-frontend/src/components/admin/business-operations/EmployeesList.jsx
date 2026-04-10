@@ -38,15 +38,23 @@ const tdStyle = {
   verticalAlign: 'top',
 };
 
-const statusBadge = (status) => ({
+const statusBadge = (status, isAdminDarkTheme = false) => ({
   display: 'inline-flex',
   borderRadius: '999px',
   padding: '0.3rem 0.65rem',
   fontSize: '0.76rem',
   fontWeight: 800,
   textTransform: 'capitalize',
-  backgroundColor: status === 'active' ? '#dcfce7' : status === 'terminated' ? '#fee2e2' : '#f1f5f9',
-  color: status === 'active' ? '#166534' : status === 'terminated' ? '#b91c1c' : '#475569',
+  backgroundColor: status === 'active'
+    ? (isAdminDarkTheme ? '#153828' : '#dcfce7')
+    : status === 'terminated'
+      ? (isAdminDarkTheme ? '#3b1618' : '#fee2e2')
+      : (isAdminDarkTheme ? '#1e293b' : '#f1f5f9'),
+  color: status === 'active'
+    ? (isAdminDarkTheme ? '#91e0b4' : '#166534')
+    : status === 'terminated'
+      ? (isAdminDarkTheme ? '#fca5a5' : '#b91c1c')
+      : (isAdminDarkTheme ? '#cbd5e1' : '#475569'),
 });
 
 const locationLabel = (item) => {
@@ -68,6 +76,39 @@ const EmployeesList = ({
   onEditEmployee,
   onDeleteEmployee,
 }) => {
+  const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
+  const colors = {
+    panelBg: isAdminDarkTheme ? '#111827' : '#fff',
+    headBg: isAdminDarkTheme ? '#0f172a' : '#f8fafc',
+    headText: isAdminDarkTheme ? '#cbd5e1' : '#475569',
+    headBorder: isAdminDarkTheme ? '#334155' : '#e2e8f0',
+    rowEven: isAdminDarkTheme ? '#111827' : '#fff',
+    rowOdd: isAdminDarkTheme ? '#0f172a' : '#fcfdff',
+    rowHover: isAdminDarkTheme ? '#1e293b' : '#f8fafc',
+    rowSelected: isAdminDarkTheme ? '#334155' : '#ede9fe',
+    cellText: isAdminDarkTheme ? '#e2e8f0' : '#0f172a',
+    cellMuted: isAdminDarkTheme ? '#94a3b8' : '#64748b',
+    cellSubtle: isAdminDarkTheme ? '#7c8ea5' : '#94a3b8',
+    cellBorder: isAdminDarkTheme ? '#243244' : '#eef2f7',
+    buttonBg: isAdminDarkTheme ? '#0f172a' : '#fff',
+    buttonBorder: isAdminDarkTheme ? '#334155' : '#dbe2ea',
+    buttonText: isAdminDarkTheme ? '#e2e8f0' : '#334155',
+    pagerBorder: isAdminDarkTheme ? '#334155' : '#e2e8f0',
+  };
+
+  const headerStyle = {
+    ...thStyle,
+    color: colors.headText,
+    borderBottom: `1px solid ${colors.headBorder}`,
+    backgroundColor: colors.headBg,
+  };
+
+  const cellStyle = {
+    ...tdStyle,
+    borderBottom: `1px solid ${colors.cellBorder}`,
+    color: colors.cellText,
+  };
+
   if (error) return <div style={{ padding: '1rem', color: '#b91c1c', fontSize: '0.9rem' }}>{error}</div>;
 
   if (loading) {
@@ -92,16 +133,16 @@ const EmployeesList = ({
 
   return (
     <>
-      <div style={{ overflowX: 'auto', maxHeight: '560px', overflowY: 'auto', backgroundColor: '#fff' }}>
+      <div style={{ overflowX: 'auto', maxHeight: '560px', overflowY: 'auto', backgroundColor: colors.panelBg }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
           <thead>
             <tr>
-              <th style={thStyle}>Employee</th>
-              <th style={thStyle}>Dept / Position</th>
-              <th style={thStyle}>Status</th>
-              <th style={thStyle}>Contact</th>
-              <th style={thStyle}>Current Salary</th>
-              <th style={thStyle}>Action</th>
+              <th style={headerStyle}>Employee</th>
+              <th style={headerStyle}>Dept / Position</th>
+              <th style={headerStyle}>Status</th>
+              <th style={headerStyle}>Contact</th>
+              <th style={headerStyle}>Current Salary</th>
+              <th style={headerStyle}>Action</th>
             </tr>
           </thead>
           <tbody>
@@ -115,47 +156,47 @@ const EmployeesList = ({
                   key={emp.id}
                   onClick={() => onSelectEmployee(emp)}
                   onMouseEnter={(event) => {
-                    if (!selected) event.currentTarget.style.backgroundColor = '#f8fafc';
+                    if (!selected) event.currentTarget.style.backgroundColor = colors.rowHover;
                   }}
                   onMouseLeave={(event) => {
-                    if (!selected) event.currentTarget.style.backgroundColor = index % 2 === 0 ? '#fff' : '#fcfdff';
+                    if (!selected) event.currentTarget.style.backgroundColor = index % 2 === 0 ? colors.rowEven : colors.rowOdd;
                   }}
-                  style={{ backgroundColor: selected ? '#ede9fe' : (index % 2 === 0 ? '#fff' : '#fcfdff'), cursor: 'pointer', transition: 'background-color 0.15s ease' }}
+                  style={{ backgroundColor: selected ? colors.rowSelected : (index % 2 === 0 ? colors.rowEven : colors.rowOdd), cursor: 'pointer', transition: 'background-color 0.15s ease' }}
                 >
-                  <td style={tdStyle}>
+                  <td style={cellStyle}>
                     <div style={{ display: 'grid', gap: '0.2rem' }}>
                       <strong>{buildFullName(emp)}</strong>
-                      <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>{emp.employeeNo || 'No number'}</span>
+                      <span style={{ color: colors.cellSubtle, fontSize: '0.8rem' }}>{emp.employeeNo || 'No number'}</span>
                     </div>
                   </td>
-                  <td style={tdStyle}>
+                  <td style={cellStyle}>
                     <div style={{ display: 'grid', gap: '0.2rem' }}>
                       <span>{emp.department || '—'}</span>
-                      <span style={{ color: '#64748b', fontSize: '0.83rem' }}>{emp.position || '—'}</span>
-                      {locationLabel(emp) && <span style={{ color: '#94a3b8', fontSize: '0.79rem' }}>{locationLabel(emp)}</span>}
+                      <span style={{ color: colors.cellMuted, fontSize: '0.83rem' }}>{emp.position || '—'}</span>
+                      {locationLabel(emp) && <span style={{ color: colors.cellSubtle, fontSize: '0.79rem' }}>{locationLabel(emp)}</span>}
                     </div>
                   </td>
-                  <td style={tdStyle}>
-                    <span style={statusBadge(normalStatus)}>{emp.status || 'unknown'}</span>
+                  <td style={cellStyle}>
+                    <span style={statusBadge(normalStatus, isAdminDarkTheme)}>{emp.status || 'unknown'}</span>
                   </td>
-                  <td style={tdStyle}>{emp.contactNumber || '—'}</td>
-                  <td style={tdStyle}>
+                  <td style={cellStyle}>{emp.contactNumber || '—'}</td>
+                  <td style={cellStyle}>
                     <div style={{ display: 'grid', gap: '0.2rem' }}>
                       <strong>{latestSalary ? money(latestSalary.agreedSalaryPerMonth, latestSalary.currency) : '—'}</strong>
                       {latestSalary && (
-                        <span style={{ color: '#94a3b8', fontSize: '0.79rem' }}>From {formatDate(latestSalary.effectiveFrom)}</span>
+                        <span style={{ color: colors.cellSubtle, fontSize: '0.79rem' }}>From {formatDate(latestSalary.effectiveFrom)}</span>
                       )}
                     </div>
                   </td>
-                  <td style={tdStyle}>
+                  <td style={cellStyle}>
                     <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); onEditEmployee(emp); }}
                         style={{
-                          border: '1px solid #dbe2ea',
-                          backgroundColor: '#fff',
-                          color: '#334155',
+                          border: `1px solid ${colors.buttonBorder}`,
+                          backgroundColor: colors.buttonBg,
+                          color: colors.buttonText,
                           borderRadius: '8px',
                           padding: '0.42rem 0.75rem',
                           fontSize: '0.79rem',
@@ -206,10 +247,10 @@ const EmployeesList = ({
           justifyContent: 'space-between',
           gap: '0.75rem',
           padding: '0.95rem 1rem',
-          borderTop: '1px solid #e2e8f0',
+          borderTop: `1px solid ${colors.pagerBorder}`,
           flexWrap: 'wrap',
         }}>
-          <span style={{ color: '#64748b', fontSize: '0.86rem' }}>
+          <span style={{ color: colors.cellMuted, fontSize: '0.86rem' }}>
             Page {pagination.page || page} of {pagination.totalPages || 1} — {(pagination.total || 0).toLocaleString('en-US')} employees
           </span>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -217,7 +258,7 @@ const EmployeesList = ({
               type="button"
               onClick={() => onPageChange(Math.max(1, page - 1))}
               disabled={(pagination.page || page) <= 1}
-              style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#475569', borderRadius: '8px', padding: '0.45rem 0.85rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
+              style={{ border: `1px solid ${colors.buttonBorder}`, backgroundColor: colors.buttonBg, color: colors.buttonText, borderRadius: '8px', padding: '0.45rem 0.85rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
             >
               Previous
             </button>
@@ -225,7 +266,7 @@ const EmployeesList = ({
               type="button"
               onClick={() => onPageChange(page + 1)}
               disabled={(pagination.page || page) >= (pagination.totalPages || 1)}
-              style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#475569', borderRadius: '8px', padding: '0.45rem 0.85rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
+              style={{ border: `1px solid ${colors.buttonBorder}`, backgroundColor: colors.buttonBg, color: colors.buttonText, borderRadius: '8px', padding: '0.45rem 0.85rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
             >
               Next
             </button>
