@@ -177,14 +177,16 @@ const drawMainDataTable = (doc, config, startY, headerContext) => {
       lineWidth: 0.2,
       overflow: 'linebreak',
       valign: 'middle',
+      ...(config.styles || {}),
     },
     headStyles: {
       fillColor: toRgb(BRAND_GREEN),
       textColor: [255, 255, 255],
       fontStyle: 'bold',
       minCellHeight: 7.5,
+      ...(config.headStyles || {}),
     },
-    alternateRowStyles: { fillColor: COLOR_ALT_ROW },
+    alternateRowStyles: { fillColor: COLOR_ALT_ROW, ...(config.alternateRowStyles || {}) },
     columnStyles: config.columnStyles,
     didDrawPage: (data) => {
       if (data.pageNumber > 1) {
@@ -632,27 +634,34 @@ export function exportGoodsIntakeRecordPdf({ record, companyName = 'Citi-Nati Su
     item?.sellingPrice == null ? '-' : fmtCurrency(item.sellingPrice),
     item?.marginPercent == null ? '-' : `${Number(item.marginPercent).toFixed(2)}%`,
     fmtCurrency(item?.estimatedProfit || 0),
-    toDate(item?.expiryDate),
-    item?.batchRef || '-',
+    `${toDate(item?.expiryDate)}${item?.batchRef ? ` | ${item.batchRef}` : ''}`,
     item?.lineNotes || '-',
   ]);
 
   drawMainDataTable(doc, {
-    headers: ['#', 'Barcode', 'Product Name', 'Qty', 'Unit Cost', 'Total Cost', 'Sell Price', 'Margin', 'Est. Profit', 'Expiry', 'Batch', 'Notes'],
+    headers: ['#', 'Barcode', 'Product Name', 'Qty', 'Unit Cost', 'Total Cost', 'Sell Price', 'Margin', 'Est. Profit', 'Expiry / Batch', 'Notes'],
     rows,
+    styles: {
+      fontSize: 7.6,
+      cellPadding: 1.8,
+      overflow: 'linebreak',
+    },
+    headStyles: {
+      fontSize: 7.4,
+      minCellHeight: 6.8,
+    },
     columnStyles: {
-      0: { cellWidth: 9, halign: 'center' },
+      0: { cellWidth: 8, halign: 'center' },
       1: { cellWidth: 24 },
-      2: { cellWidth: 54 },
-      3: { cellWidth: 16, halign: 'right' },
-      4: { cellWidth: 20, halign: 'right' },
+      2: { cellWidth: 48 },
+      3: { cellWidth: 12, halign: 'right' },
+      4: { cellWidth: 22, halign: 'right' },
       5: { cellWidth: 22, halign: 'right' },
       6: { cellWidth: 22, halign: 'right' },
-      7: { cellWidth: 16, halign: 'right' },
-      8: { cellWidth: 24, halign: 'right' },
-      9: { cellWidth: 22 },
-      10: { cellWidth: 22 },
-      11: { cellWidth: 36 },
+      7: { cellWidth: 14, halign: 'right' },
+      8: { cellWidth: 22, halign: 'right' },
+      9: { cellWidth: 24 },
+      10: { cellWidth: 38 },
     },
   }, y, headerContext);
 
