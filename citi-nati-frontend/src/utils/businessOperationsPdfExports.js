@@ -206,6 +206,39 @@ const drawFooter = (doc, pageNumber, totalPages) => {
   doc.text(`Page ${pageNumber} of ${totalPages}`, right, pageHeight - 5, { align: 'right' });
 };
 
+const drawSignatureBlock = (doc, startY, headerContext) => {
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const { left, right, width } = getContentBounds(doc);
+  const footerTop = pageHeight - 10;
+  const sectionHeight = 18;
+  let y = startY;
+
+  if (y + sectionHeight > footerTop) {
+    doc.addPage();
+    drawHeader(doc, { ...headerContext, showCompact: true });
+    y = 22;
+  }
+
+  const gap = 18;
+  const blockWidth = (width - gap) / 2;
+  const leftX = left;
+  const rightX = left + blockWidth + gap;
+  const lineY = y + 8;
+
+  doc.setDrawColor(...COLOR_BORDER);
+  doc.setLineWidth(0.35);
+  doc.line(leftX, lineY, leftX + blockWidth, lineY);
+  doc.line(rightX, lineY, rightX + blockWidth, lineY);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...COLOR_MUTED);
+  doc.text('Prepared By', leftX + (blockWidth / 2), lineY + 4.5, { align: 'center' });
+  doc.text('Verified By', rightX + (blockWidth / 2), lineY + 4.5, { align: 'center' });
+
+  return lineY + 6;
+};
+
 const exportWithLayout = ({ reportTitle, viewLabel, periodText, summaryCards, metadataRows, dataTable, fileName }) => {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const generatedText = formatGeneratedTimestamp();
@@ -666,17 +699,7 @@ export function exportGoodsIntakeRecordPdf({ record, companyName = 'Citi-Nati Su
   }, y, headerContext);
 
   const finalY = doc.lastAutoTable?.finalY || y;
-  const { left, right } = getContentBounds(doc);
-  const signatureY = Math.min(finalY + 16, doc.internal.pageSize.getHeight() - 24);
-
-  doc.setDrawColor(...COLOR_BORDER);
-  doc.line(left, signatureY, left + 70, signatureY);
-  doc.line(right - 70, signatureY, right, signatureY);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(...COLOR_MUTED);
-  doc.text('Prepared By', left, signatureY + 4);
-  doc.text('Verified By', right - 70, signatureY + 4);
+  drawSignatureBlock(doc, finalY + 10, headerContext);
 
   const totalPages = doc.getNumberOfPages();
   for (let page = 1; page <= totalPages; page += 1) {
