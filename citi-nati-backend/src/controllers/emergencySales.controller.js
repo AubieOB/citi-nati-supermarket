@@ -189,7 +189,8 @@ function buildPosWriteInvoicePayload(emergencySale) {
     grossSale: invoiceTotals.gross,
     vat: invoiceTotals.vatAmount,
     discount: Number(emergencySale.discount || 0),
-    netSale: invoiceTotals.net,
+    // POS intake for emergency sales expects the VAT-inclusive sell amount.
+    netSale: invoiceTotals.gross,
     payMethod1: normalizePaymentMethod(emergencySale.paymentMethod),
     tenAmt1: Number(emergencySale.tenderedAmount || invoiceTotals.gross),
     payMethod2: '',
