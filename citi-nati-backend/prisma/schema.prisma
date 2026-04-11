@@ -569,6 +569,7 @@ model Supplier {
   id                Int                   @id @default(autoincrement())
   supplierCode      String?               @unique @map("supplier_code")
   name              String
+  locationId        Int?                  @map("location_id")
   contactPerson     String?               @map("contact_person")
   phone             String?
   email             String?
@@ -583,6 +584,7 @@ model Supplier {
   goodsIntakes      GoodsIntake[]
 
   @@index([name])
+  @@index([locationId])
   @@index([status])
   @@map("suppliers")
 }
@@ -591,6 +593,7 @@ model SupplierTransaction {
   id                Int       @id @default(autoincrement())
   supplierId        Int       @map("supplier_id")
   supplier          Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  locationId        Int?      @map("location_id")
   reportingPeriodId Int?      @map("reporting_period_id")
   transactionDate   DateTime  @map("transaction_date")
   transactionType   String    @map("transaction_type")
@@ -603,6 +606,7 @@ model SupplierTransaction {
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
   @@index([supplierId, transactionDate])
+  @@index([locationId])
   @@index([reportingPeriodId])
   @@index([transactionType])
   @@map("supplier_transactions")
