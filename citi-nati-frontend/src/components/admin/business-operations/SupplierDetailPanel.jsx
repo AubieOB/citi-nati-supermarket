@@ -31,6 +31,14 @@ const statusBadgeStyle = (status) => ({
 const detailRowStyle = {
   display: 'grid',
   gap: '0.2rem',
+  minWidth: 0,
+};
+
+const detailValueStyle = {
+  color: '#0f172a',
+  overflowWrap: 'anywhere',
+  wordBreak: 'break-word',
+  lineHeight: 1.35,
 };
 
 const formatLocation = (item) => {
@@ -108,27 +116,27 @@ const SupplierDetailPanel = ({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.85rem', marginTop: '1rem' }}>
           <div style={detailRowStyle}>
             <span style={{ color: '#64748b', fontSize: '0.8rem' }}>Contact Person</span>
-            <strong style={{ color: '#0f172a' }}>{supplier?.contactPerson || 'Not set'}</strong>
+            <strong style={detailValueStyle}>{supplier?.contactPerson || 'Not set'}</strong>
           </div>
           <div style={detailRowStyle}>
             <span style={{ color: '#64748b', fontSize: '0.8rem' }}>Location</span>
-            <strong style={{ color: '#0f172a' }}>{formatLocation(supplier)}</strong>
+            <strong style={detailValueStyle}>{formatLocation(supplier)}</strong>
           </div>
           <div style={detailRowStyle}>
             <span style={{ color: '#64748b', fontSize: '0.8rem' }}>Phone</span>
-            <strong style={{ color: '#0f172a' }}>{supplier?.phone || 'Not set'}</strong>
+            <strong style={detailValueStyle}>{supplier?.phone || 'Not set'}</strong>
           </div>
           <div style={detailRowStyle}>
             <span style={{ color: '#64748b', fontSize: '0.8rem' }}>Email</span>
-            <strong style={{ color: '#0f172a' }}>{supplier?.email || 'Not set'}</strong>
+            <strong style={detailValueStyle}>{supplier?.email || 'Not set'}</strong>
           </div>
           <div style={detailRowStyle}>
             <span style={{ color: '#64748b', fontSize: '0.8rem' }}>Created</span>
-            <strong style={{ color: '#0f172a' }}>{formatDateTime(supplier?.createdAt)}</strong>
+            <strong style={detailValueStyle}>{formatDateTime(supplier?.createdAt)}</strong>
           </div>
           <div style={detailRowStyle}>
             <span style={{ color: '#64748b', fontSize: '0.8rem' }}>Updated</span>
-            <strong style={{ color: '#0f172a' }}>{formatDateTime(supplier?.updatedAt)}</strong>
+            <strong style={detailValueStyle}>{formatDateTime(supplier?.updatedAt)}</strong>
           </div>
         </div>
 
