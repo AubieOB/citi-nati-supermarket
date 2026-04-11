@@ -249,6 +249,12 @@ async function syncProductsFromPOS() {
             emitProductUpdate(updatedProduct);
           }
 
+          // Ensure mapping reattachment also runs on updates (covers legacy null-image rows).
+          const reattached = await productImageMappingService.reattachImageByProductCode(posProduct.ProductCode);
+          if (reattached) {
+            console.log(`[POS Sync] Image restored for ${posProduct.ProductCode}: ${reattached}`);
+          }
+
           console.log(`[POS Sync] Updated: ${productData.name} (${posProduct.ProductCode})`);
         } else {
           // Create new product

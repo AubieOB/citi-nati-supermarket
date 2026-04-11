@@ -1863,6 +1863,13 @@ const syncProductsFromPOSAgent = async (req, res) => {
           }
         );
 
+        // Reattach persistent image mapping after upsert so images survive wipe+resync flows.
+        try {
+          await productImageMappingService.reattachImageByProductCode(sourceCode);
+        } catch (imgErr) {
+          console.warn(`[POS AGENT PUSH] Image reattach skipped for ${sourceCode}:`, imgErr.message);
+        }
+
         await prisma.productExpiryBatch.deleteMany({
           where: {
             productCode: sourceCode,
