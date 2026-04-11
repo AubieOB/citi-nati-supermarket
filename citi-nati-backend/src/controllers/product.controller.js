@@ -2319,4 +2319,5 @@ module.exports = {
   syncProductsFromPOSAgent,
   permanentDeleteProductImage,
   reconcileProductImages,
+  getExpiryBatchAlerts,
 };
