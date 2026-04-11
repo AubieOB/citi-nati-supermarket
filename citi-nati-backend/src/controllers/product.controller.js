@@ -2320,4 +2320,7 @@ module.exports = {
   permanentDeleteProductImage,
   reconcileProductImages,
   getExpiryBatchAlerts,
+  getCategories,
+  toggleProductVisibility,
+  deletePOSProducts,
 };
