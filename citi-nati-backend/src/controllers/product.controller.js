@@ -12,6 +12,8 @@ const {
 
 const prisma = new PrismaClient();
 const MIN_VALID_EXPIRY_DATE = new Date('2000-01-01T00:00:00.000Z');
+
+const productImageMappingService = require('../services/productImageMapping.service');
 const ADMIN_EXPIRY_REQUEST_TIMEOUT_MS = 30000;
 const ADMIN_EXPIRY_CACHE_TTL_MS = 5 * 60 * 1000;
 const ADMIN_EXPIRY_ALERTS_REQUEST_TIMEOUT_MS = Number(process.env.ADMIN_EXPIRY_ALERTS_REQUEST_TIMEOUT_MS || 8000);
@@ -821,6 +823,22 @@ const createProduct = async (req, res) => {
       isPOSProduct: !!product.sourceCode
     });
 
+    // Save image mapping by productCode / sourceCode so image survives future resyncs
+    const createProductCode = String(req.body?.sourceCode || '').trim() || String(req.body?.barcode || '').trim() || null;
+    if (req.file && createProductCode) {
+      try {
+        await productImageMappingService.saveImageMapping({
+          productCode: createProductCode,
+          cloudinaryPublicId: req.file.public_id,
+          secureUrl: req.file.secure_url,
+          originalFilename: req.file.originalname || null,
+          uploadedBy: String(req.user?.email || req.user?.id || 'admin'),
+        });
+      } catch (imgErr) {
+        console.warn('[PRODUCT CREATE] Image mapping save failed (non-fatal):', imgErr.message);
+      }
+    }
+
     // Notify if stock is low (10 or below) or out of stock
     // ✅ This works for all products including POS products without images
     await notifyLowStock(product);
@@ -1211,6 +1229,21 @@ const updateProduct = async (req, res) => {
       where: { id },
       data: updateData,
     });
+
+    // Persist updated image mapping by productCode / sourceCode when image was changed
+    if (req.file && updatedProduct.sourceCode) {
+      try {
+        await productImageMappingService.saveImageMapping({
+          productCode: updatedProduct.sourceCode,
+          cloudinaryPublicId: req.file.public_id,
+          secureUrl: req.file.secure_url,
+          originalFilename: req.file.originalname || null,
+          uploadedBy: String(req.user?.email || req.user?.id || 'admin'),
+        });
+      } catch (imgErr) {
+        console.warn('[PRODUCT UPDATE] Image mapping save failed (non-fatal):', imgErr.message);
+      }
+    }
 
     const posCommands = [];
     let posWritebackSummary = {
@@ -1659,7 +1692,7 @@ const deleteProduct = async (req, res) => {
     return res.status(200).json({
       message: 'Product deleted successfully',
     });
-  } catch (err) {
+  } catch (err) {  
     console.error('Error deleting product:', err);
     return res.status(500).json({
       error: 'Server error while deleting product',
@@ -2215,18 +2248,75 @@ const getExpiryBatchAlerts = async (req, res) => {
   }
 };
 
-module.exports = { 
-  createProduct, 
-  getProducts, 
-  getProductById, 
+/**
+ * DELETE /api/products/:id/image
+ * Permanently delete a product's image mapping AND its Cloudinary asset.
+ * This is separate from deleting the product row itself.
+ * The product row loses its image field; the mapping is also erased.
+ */
+const permanentDeleteProductImage = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ error: 'Invalid product id' });
+    }
+
+    const product = await prisma.product.findUnique({ where: { id } });
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    if (!product.sourceCode) {
+      return res.status(400).json({ error: 'This product has no POS ProductCode; cannot delete persistent image mapping' });
+    }
+
+    const result = await productImageMappingService.permanentlyDeleteImageMapping(product.sourceCode);
+    if (!result.success) {
+      return res.status(404).json({ error: result.error || 'Image mapping not found' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Product image permanently deleted from Cloudinary and mapping removed.',
+      cloudinaryResult: result.cloudinaryResult,
+    });
+  } catch (err) {
+    console.error('[PERMANENT DELETE IMAGE] Error:', err.message);
+    return res.status(500).json({ error: 'Server error while deleting product image' });
+  }
+};
+
+/**
+ * POST /api/products/images/reconcile
+ * Scan all POS products without images and reattach any available mappings.
+ * Useful after a bulk POS rebuild.
+ */
+const reconcileProductImages = async (req, res) => {
+  try {
+    const result = await productImageMappingService.reconcileAllProductImages();
+    return res.status(200).json({
+      success: true,
+      message: `Image reconciliation complete.`,
+      processed: result.processed,
+      matched: result.matched,
+      unmatched: result.unmatched,
+    });
+  } catch (err) {
+    console.error('[RECONCILE IMAGES] Error:', err.message);
+    return res.status(500).json({ error: 'Server error during image reconciliation' });
+  }
+};
+
+module.exports = {
+  createProduct,
+  getProducts,
+  getProductById,
   updateProductStockThreshold,
-  updateProduct, 
+  updateProduct,
   setStockOverride,
-  deleteProduct, 
+  deleteProduct,
   syncFromPOS,
   syncProductsFromPOSAgent,
-  getExpiryBatchAlerts,
-  deletePOSProducts,
-  getCategories,
-  toggleProductVisibility
+  permanentDeleteProductImage,
+  reconcileProductImages,
 };

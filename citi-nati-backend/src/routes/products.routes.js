@@ -1,5 +1,5 @@
 const express = require('express');
-const { createProduct, getProducts, getProductById, updateProduct, updateProductStockThreshold, deleteProduct, syncFromPOS, syncProductsFromPOSAgent, deletePOSProducts, getCategories, toggleProductVisibility } = require('../controllers/product.controller');
+const { createProduct, getProducts, getProductById, updateProduct, updateProductStockThreshold, deleteProduct, syncFromPOS, syncProductsFromPOSAgent, deletePOSProducts, getCategories, toggleProductVisibility, permanentDeleteProductImage, reconcileProductImages } = require('../controllers/product.controller');
 const { verifyTokenMiddleware } = require('../middleware/auth.middleware');
 const { verifyAdmin } = require('../middleware/admin.middleware');
 const uploadProductImage = require('../middlewares/uploadProductImageCloudinary');
@@ -76,6 +76,22 @@ router.delete(
   verifyTokenMiddleware,
   verifyAdmin,
   deletePOSProducts
+);
+
+// POST /api/products/images/reconcile - Reattach images for all POS products missing one (ADMIN only)
+router.post(
+  '/images/reconcile',
+  verifyTokenMiddleware,
+  verifyAdmin,
+  reconcileProductImages
+);
+
+// DELETE /api/products/:id/image - Permanently delete a product's Cloudinary image + mapping (ADMIN only)
+router.delete(
+  '/:id/image',
+  verifyTokenMiddleware,
+  verifyAdmin,
+  permanentDeleteProductImage
 );
 
 module.exports = router;

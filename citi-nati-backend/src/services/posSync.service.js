@@ -15,6 +15,7 @@ const { PrismaClient } = require('@prisma/client');
 const { notifyLowStock } = require('../utils/messageService');
 const { enrichProductStock } = require('../utils/stockResolver');
 const { emitProductUpdate } = require('../utils/socket');
+const productImageMappingService = require('./productImageMapping.service');
 
 const prisma = new PrismaClient();
 
@@ -265,6 +266,12 @@ async function syncProductsFromPOS() {
           }
 
           console.log(`[POS Sync] Created: ${productData.name} (${posProduct.ProductCode})`);
+
+          // Restore image from persistent mapping if one exists for this ProductCode
+          const reattached = await productImageMappingService.reattachImageByProductCode(posProduct.ProductCode);
+          if (reattached) {
+            console.log(`[POS Sync] Image restored for ${posProduct.ProductCode}: ${reattached}`);
+          }
         }
 
         synced++;

@@ -81,6 +81,26 @@ model Product {
   @@index([name])
 }
 
+// Persistent product image mappings keyed by POS ProductCode.
+// These survive product row deletion and POS rebuilds.
+model ProductImageMapping {
+  id                Int      @id @default(autoincrement())
+  productCode       String   @unique @map("product_code")
+  cloudinaryPublicId String  @map("cloudinary_public_id")
+  imageUrl          String   @map("image_url")
+  secureUrl         String   @map("secure_url")
+  originalFilename  String?  @map("original_filename")
+  isPrimary         Boolean  @default(true) @map("is_primary")
+  displayOrder      Int      @default(0) @map("display_order")
+  altText           String?  @map("alt_text")
+  uploadedBy        String?  @map("uploaded_by")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([productCode])
+  @@map("product_image_mappings")
+}
+
 model Cart {
   id        Int      @id @default(autoincrement())
   userId    String   @unique
