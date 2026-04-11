@@ -26,8 +26,6 @@ import '../../css/admin-responsive-filters.css';
  */
 
 const AdminProducts = () => {
-  const AUTO_REFRESH_MS = 30000;
-  const AUTO_REFRESH_DEBOUNCE_MS = 350;
   const MAX_PRODUCT_NAME_LENGTH = 120;
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +66,7 @@ const AdminProducts = () => {
   const [expandedBatchRows, setExpandedBatchRows] = useState({});
   const [expiryAlertCategory, setExpiryAlertCategory] = useState('');
   const [expiryAlertStockFilter, setExpiryAlertStockFilter] = useState('all');
-  const [autoRefreshing, setAutoRefreshing] = useState(false);
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const pageSize = 20;
   const expiryAlertsPageSize = 12;
   const POS_ALERTS_CLIENT_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -77,9 +75,6 @@ const AdminProducts = () => {
   const voiceEnabledRef = useRef(false);
   const posExpiryFetchedAtRef = useRef(0);
   const posExpiryInFlightRef = useRef(false);
-  const autoRefreshIntervalRef = useRef(null);
-  const autoRefreshTimeoutRef = useRef(null);
-  const autoRefreshInFlightRef = useRef(false);
   const filterBarRef = useRef(null);
   const { modal, closeModal, showConfirm, showError, showSuccess } = useModal();
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
@@ -407,6 +402,21 @@ const AdminProducts = () => {
     }
   };
 
+  const handleManualRefresh = async () => {
+    if (isManualRefreshing) return;
+
+    setIsManualRefreshing(true);
+    try {
+      if (activeSubTab === 'expiry-alerts') {
+        await fetchPosExpiryAlerts();
+      } else {
+        await fetchProducts();
+      }
+    } finally {
+      setIsManualRefreshing(false);
+    }
+  };
+
   // Fetch products on mount
   useEffect(() => {
     fetchProducts();
@@ -423,67 +433,6 @@ const AdminProducts = () => {
       }
     }
   }, [activeSubTab, posExpiryItems.length]);
-
-  useEffect(() => {
-    const runAutoRefresh = async () => {
-      if (autoRefreshInFlightRef.current) return;
-      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
-
-      autoRefreshInFlightRef.current = true;
-      setAutoRefreshing(true);
-      try {
-        if (activeSubTab === 'expiry-alerts') {
-          await fetchPosExpiryAlerts();
-        } else {
-          await fetchProducts();
-        }
-      } finally {
-        autoRefreshInFlightRef.current = false;
-        setAutoRefreshing(false);
-      }
-    };
-
-    const scheduleRefresh = () => {
-      if (autoRefreshTimeoutRef.current) {
-        clearTimeout(autoRefreshTimeoutRef.current);
-      }
-      autoRefreshTimeoutRef.current = setTimeout(() => {
-        runAutoRefresh();
-      }, AUTO_REFRESH_DEBOUNCE_MS);
-    };
-
-    const onVisibilityChange = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        scheduleRefresh();
-      }
-    };
-
-    autoRefreshIntervalRef.current = setInterval(() => {
-      runAutoRefresh();
-    }, AUTO_REFRESH_MS);
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener('focus', scheduleRefresh);
-    }
-    if (typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', onVisibilityChange);
-    }
-
-    return () => {
-      if (autoRefreshIntervalRef.current) {
-        clearInterval(autoRefreshIntervalRef.current);
-      }
-      if (autoRefreshTimeoutRef.current) {
-        clearTimeout(autoRefreshTimeoutRef.current);
-      }
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('focus', scheduleRefresh);
-      }
-      if (typeof document !== 'undefined') {
-        document.removeEventListener('visibilitychange', onVisibilityChange);
-      }
-    };
-  }, [activeSubTab]);
 
   useEffect(() => {
     voiceEnabledRef.current = isVoiceSearchEnabled;
@@ -1930,6 +1879,28 @@ const AdminProducts = () => {
             {isExportingPdf ? 'Generating PDF...' : 'Download PDF'}
           </button>
 
+          <button
+            onClick={handleManualRefresh}
+            disabled={isManualRefreshing}
+            style={{
+              padding: '0.6rem 1rem',
+              border: 'none',
+              borderRadius: '6px',
+              backgroundColor: isManualRefreshing ? '#6c757d' : '#2563eb',
+              color: '#fff',
+              fontSize: '0.9rem',
+              fontWeight: '600',
+              cursor: isManualRefreshing ? 'not-allowed' : 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}
+            title="Refresh products"
+          >
+            <i className={`fas ${isManualRefreshing ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`}></i>
+            {isManualRefreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
+
           {/* Create Product Button */}
           {!showForm && (
             <Button
@@ -1944,12 +1915,12 @@ const AdminProducts = () => {
           {/* Results Count */}
           <div style={{
             fontSize: '0.82rem',
-            color: autoRefreshing ? '#2563eb' : textSecondary,
-            fontWeight: autoRefreshing ? '700' : '600',
+            color: textSecondary,
+            fontWeight: '600',
             minWidth: '180px',
             textAlign: 'right',
           }}>
-            {autoRefreshing ? 'Auto-refreshing...' : 'Auto-refresh: every 30s'}
+            Manual refresh only
           </div>
           <div style={{
             fontSize: '0.9rem',
@@ -2016,14 +1987,36 @@ const AdminProducts = () => {
             {isExportingExpiryPdf ? 'Generating PDF...' : 'Download Alerts PDF'}
           </button>
 
+          <button
+            onClick={handleManualRefresh}
+            disabled={isManualRefreshing}
+            style={{
+              padding: '0.6rem 1rem',
+              border: 'none',
+              borderRadius: '6px',
+              backgroundColor: isManualRefreshing ? '#6c757d' : '#2563eb',
+              color: '#fff',
+              fontSize: '0.9rem',
+              fontWeight: '600',
+              cursor: isManualRefreshing ? 'not-allowed' : 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}
+            title="Refresh expiry alerts"
+          >
+            <i className={`fas ${isManualRefreshing ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`}></i>
+            {isManualRefreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
+
           <div style={{
             fontSize: '0.82rem',
-            color: autoRefreshing ? '#2563eb' : textSecondary,
-            fontWeight: autoRefreshing ? '700' : '600',
+            color: textSecondary,
+            fontWeight: '600',
             minWidth: '180px',
             textAlign: 'right',
           }}>
-            {autoRefreshing ? 'Auto-refreshing...' : 'Auto-refresh: every 30s'}
+            Manual refresh only
           </div>
 
           <div style={{
