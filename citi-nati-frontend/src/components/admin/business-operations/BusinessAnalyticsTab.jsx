@@ -962,6 +962,8 @@ const BusinessAnalyticsTab = ({
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [activeTool, setActiveTool] = useState('growth');
   const [isToolModalOpen, setIsToolModalOpen] = useState(false);
+  const [activeWorkspaceModal, setActiveWorkspaceModal] = useState('');
+  const [isWorkspaceMaximized, setIsWorkspaceMaximized] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisInputs, setAnalysisInputs] = useState({
     previousValue: 0,
@@ -1370,18 +1372,285 @@ const BusinessAnalyticsTab = ({
     setIsToolModalOpen(true);
   };
 
+  const openWorkspaceModal = (modalId) => {
+    setActiveWorkspaceModal(modalId);
+    setIsWorkspaceMaximized(false);
+  };
+
+  const closeWorkspaceModal = () => {
+    setActiveWorkspaceModal('');
+    setIsWorkspaceMaximized(false);
+  };
+
   useEffect(() => {
-    if (!isToolModalOpen || typeof window === 'undefined') return undefined;
+    if ((!isToolModalOpen && !activeWorkspaceModal) || typeof window === 'undefined') return undefined;
 
     const onEsc = (event) => {
       if (event.key === 'Escape') {
         setIsToolModalOpen(false);
+        closeWorkspaceModal();
       }
     };
 
     window.addEventListener('keydown', onEsc);
     return () => window.removeEventListener('keydown', onEsc);
-  }, [isToolModalOpen]);
+  }, [activeWorkspaceModal, isToolModalOpen]);
+
+  const overviewWorkspaceContent = analytics ? (
+    <>
+      <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
+          <strong style={{ color: '#0f172a' }}>Growth Overview</strong>
+          <span style={{ color: '#64748b', fontSize: '0.84rem' }}>{analytics.periodLabel} • {analytics.scopeLabel}</span>
+        </div>
+
+        <div style={{ marginTop: '0.85rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
+          {[
+            { label: 'Period Sales Growth', value: analytics.growth.selected.sales, format: money },
+            { label: 'Period Invoice Growth', value: analytics.growth.selected.invoices, format: intFmt },
+            { label: 'Period Basket Growth', value: analytics.growth.selected.basket, format: money },
+            { label: 'Month vs Previous', value: analytics.growth.monthVsPrevious, format: money },
+            { label: 'Year vs Previous', value: analytics.growth.yearVsPrevious, format: money },
+          ].map((item) => {
+            const tone = growthTone(item.value);
+            return (
+              <div key={item.label} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.8rem 0.9rem', backgroundColor: '#fff' }}>
+                <div style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>{item.label}</div>
+                <div style={{ marginTop: '0.35rem', color: '#0f172a', fontWeight: 800, fontSize: '1rem' }}>
+                  {item.format(item.value.current)}
+                </div>
+                <div style={{ marginTop: '0.25rem', color: '#64748b', fontSize: '0.82rem' }}>
+                  Previous: {item.format(item.value.previous)}
+                </div>
+                <span style={{ marginTop: '0.45rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.25rem 0.5rem', borderRadius: '999px', backgroundColor: tone.bg, color: tone.color, fontSize: '0.78rem', fontWeight: 800 }}>
+                  <i className={`fas ${tone.icon}`}></i>
+                  {item.value.percent.toFixed(1)}% • {item.value.absolute >= 0 ? '+' : ''}{item.format(item.value.absolute)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
+        {[
+          { label: 'Total Sales', value: money(analytics.kpis.totalSales), note: 'Net sales in selected scope.' },
+          { label: 'Invoice Count', value: intFmt(analytics.kpis.invoiceCount), note: 'Invoices in selected period.' },
+          { label: 'Avg Basket Value', value: money(analytics.kpis.averageBasketValue), note: 'Average order/invoice value.' },
+          { label: 'Tracked Top Products', value: intFmt(analytics.kpis.topProductsCount), note: 'Products ranked by sales.' },
+        ].map((kpi) => (
+          <div key={kpi.label} style={{ ...cardStyle, padding: '0.9rem 1rem' }}>
+            <div style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>{kpi.label}</div>
+            <div style={{ marginTop: '0.32rem', color: '#0f172a', fontWeight: 900, fontSize: '1.2rem' }}>{kpi.value}</div>
+            <div style={{ marginTop: '0.26rem', color: '#64748b', fontSize: '0.8rem' }}>{kpi.note}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
+        <strong style={{ color: '#0f172a' }}>Quick Health Summary</strong>
+        <p style={{ margin: '0.32rem 0 0.7rem', color: '#64748b', fontSize: '0.84rem' }}>
+          Compact snapshot of growth and current period performance.
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.6rem' }}>
+          <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.55rem 0.65rem' }}>
+            <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700 }}>Period Sales Change</div>
+            <div style={{ color: '#0f172a', fontSize: '0.92rem', fontWeight: 800, marginTop: '0.15rem' }}>
+              {analytics.growth.selected.sales.percent.toFixed(1)}% ({money(analytics.growth.selected.sales.absolute)})
+            </div>
+          </div>
+          <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.55rem 0.65rem' }}>
+            <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700 }}>Period Invoice Change</div>
+            <div style={{ color: '#0f172a', fontSize: '0.92rem', fontWeight: 800, marginTop: '0.15rem' }}>
+              {analytics.growth.selected.invoices.percent.toFixed(1)}% ({intFmt(analytics.growth.selected.invoices.absolute)})
+            </div>
+          </div>
+          <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.55rem 0.65rem' }}>
+            <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700 }}>Month vs Previous</div>
+            <div style={{ color: '#0f172a', fontSize: '0.92rem', fontWeight: 800, marginTop: '0.15rem' }}>
+              {analytics.growth.monthVsPrevious.percent.toFixed(1)}% ({money(analytics.growth.monthVsPrevious.absolute)})
+            </div>
+          </div>
+          <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.55rem 0.65rem' }}>
+            <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700 }}>Year vs Previous</div>
+            <div style={{ color: '#0f172a', fontSize: '0.92rem', fontWeight: 800, marginTop: '0.15rem' }}>
+              {analytics.growth.yearVsPrevious.percent.toFixed(1)}% ({money(analytics.growth.yearVsPrevious.absolute)})
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  ) : null;
+
+  const trendsWorkspaceContent = analytics ? (
+    <>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '0.8rem' }}>
+        <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
+          <strong style={{ color: '#0f172a' }}>Daily Trend</strong>
+          <p style={{ margin: '0.32rem 0 0.6rem', color: '#64748b', fontSize: '0.84rem' }}>Sales and invoice cadence over the selected period.</p>
+          <div style={{ maxHeight: '260px', overflowY: 'auto', display: 'grid', gap: '0.4rem' }}>
+            {analytics.trends.daily.length === 0 ? (
+              <div style={{ color: '#94a3b8', fontSize: '0.86rem' }}>No daily trend data in this range.</div>
+            ) : analytics.trends.daily.map((row) => (
+              <div key={row.day} style={{ display: 'grid', gridTemplateColumns: '120px 1fr auto auto', alignItems: 'center', gap: '0.6rem', border: '1px solid #edf2f7', borderRadius: '10px', padding: '0.45rem 0.55rem' }}>
+                <div style={{ color: '#334155', fontWeight: 700, fontSize: '0.82rem' }}>{row.day}</div>
+                <div style={{ height: '8px', backgroundColor: '#e2e8f0', borderRadius: '99px', overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.min(100, analytics.kpis.totalSales > 0 ? (row.sales / analytics.kpis.totalSales) * 100 : 0)}%`, height: '100%', backgroundColor: '#2563eb' }}></div>
+                </div>
+                <div style={{ color: '#0f172a', fontSize: '0.8rem', fontWeight: 700 }}>{money(row.sales)}</div>
+                <div style={{ color: '#64748b', fontSize: '0.78rem' }}>{intFmt(row.invoices)} inv</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
+          <strong style={{ color: '#0f172a' }}>Monthly + Rolling Trend (12M)</strong>
+          <p style={{ margin: '0.32rem 0 0.6rem', color: '#64748b', fontSize: '0.84rem' }}>Month-on-month sales with rolling 3-month smoothing.</p>
+          <div style={{ maxHeight: '260px', overflowY: 'auto', display: 'grid', gap: '0.4rem' }}>
+            {analytics.trends.monthly.length === 0 ? (
+              <div style={{ color: '#94a3b8', fontSize: '0.86rem' }}>No monthly trend data available.</div>
+            ) : analytics.trends.monthly.map((row) => (
+              <div key={row.key} style={{ display: 'grid', gridTemplateColumns: '120px auto auto auto', gap: '0.6rem', alignItems: 'center', border: '1px solid #edf2f7', borderRadius: '10px', padding: '0.45rem 0.55rem' }}>
+                <div style={{ color: '#334155', fontWeight: 700, fontSize: '0.82rem' }}>{row.label}</div>
+                <div style={{ color: '#0f172a', fontSize: '0.8rem', fontWeight: 700 }}>{money(row.sales)}</div>
+                <div style={{ color: '#64748b', fontSize: '0.78rem' }}>{intFmt(row.invoices)} inv</div>
+                <div style={{ color: '#1d4ed8', fontSize: '0.78rem', fontWeight: 700 }}>Rolling: {money(row.rolling3MonthSales)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '0.8rem' }}>
+        <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
+          <strong style={{ color: '#0f172a' }}>Yearly Comparison</strong>
+          <div style={{ marginTop: '0.6rem', display: 'grid', gap: '0.42rem' }}>
+            {analytics.trends.yearly.map((row) => (
+              <div key={row.year} style={{ display: 'grid', gridTemplateColumns: '72px 1fr auto auto', gap: '0.5rem', alignItems: 'center', border: '1px solid #edf2f7', borderRadius: '10px', padding: '0.42rem 0.52rem' }}>
+                <div style={{ color: '#334155', fontWeight: 700, fontSize: '0.82rem' }}>{row.year}</div>
+                <div style={{ height: '8px', backgroundColor: '#e2e8f0', borderRadius: '99px', overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.min(100, analytics.kpis.totalSales > 0 ? (row.sales / analytics.kpis.totalSales) * 100 : 0)}%`, height: '100%', backgroundColor: '#0ea5e9' }}></div>
+                </div>
+                <div style={{ color: '#0f172a', fontSize: '0.8rem', fontWeight: 700 }}>{money(row.sales)}</div>
+                <div style={{ color: '#64748b', fontSize: '0.78rem' }}>{intFmt(row.invoices)} inv</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
+          <strong style={{ color: '#0f172a' }}>Quarterly Summary ({new Date().getFullYear()})</strong>
+          <div style={{ marginTop: '0.6rem', display: 'grid', gap: '0.42rem' }}>
+            {analytics.trends.quarterly.map((row) => (
+              <div key={row.quarter} style={{ display: 'grid', gridTemplateColumns: '52px auto auto', gap: '0.6rem', alignItems: 'center', border: '1px solid #edf2f7', borderRadius: '10px', padding: '0.45rem 0.55rem' }}>
+                <div style={{ color: '#334155', fontWeight: 700, fontSize: '0.82rem' }}>{row.quarter}</div>
+                <div style={{ color: '#0f172a', fontSize: '0.8rem', fontWeight: 700 }}>{money(row.sales)}</div>
+                <div style={{ color: '#64748b', fontSize: '0.78rem' }}>{intFmt(row.invoices)} inv</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </>
+  ) : null;
+
+  const rankingsWorkspaceContent = analytics ? (() => {
+    const thStyle = { textAlign: 'left', padding: '0.42rem 0.6rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontSize: '0.74rem', fontWeight: 700, whiteSpace: 'nowrap' };
+    const tdStyle = { padding: '0.38rem 0.6rem', borderBottom: '1px solid #f1f5f9', fontSize: '0.8rem', color: '#334155', whiteSpace: 'nowrap' };
+    const tdBold = { ...tdStyle, color: '#0f172a', fontWeight: 700 };
+    const tableStyle = { width: '100%', borderCollapse: 'collapse', tableLayout: 'auto' };
+    const sectionHead = { color: '#0f172a', fontSize: '0.82rem', fontWeight: 800, marginBottom: '0.4rem' };
+    const emptyStyle = { color: '#94a3b8', fontSize: '0.82rem', padding: '0.4rem 0' };
+
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '0.8rem' }}>
+        <div style={{ ...cardStyle, padding: '0.85rem 0.95rem' }}>
+          <div style={sectionHead}>Top Products</div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={tableStyle}>
+              <thead>
+                <tr>
+                  <th style={thStyle}>#</th>
+                  <th style={{ ...thStyle, width: '100%' }}>Product</th>
+                  <th style={thStyle}>Qty</th>
+                  <th style={thStyle}>Sales</th>
+                  <th style={thStyle}>Share</th>
+                </tr>
+              </thead>
+              <tbody>
+                {analytics.rankings.topProducts.length === 0 ? (
+                  <tr><td colSpan={5} style={emptyStyle}>No data.</td></tr>
+                ) : analytics.rankings.topProducts.map((row, i) => (
+                  <tr key={`${row.productCode}-${i}`}>
+                    <td style={{ ...tdStyle, color: '#94a3b8' }}>{i + 1}</td>
+                    <td style={tdBold}>{row.productName}<span style={{ display: 'block', color: '#94a3b8', fontSize: '0.72rem', fontWeight: 400 }}>{row.productCode}</span></td>
+                    <td style={tdStyle}>{intFmt(row.totalQuantity)}</td>
+                    <td style={tdBold}>{money(row.totalSales)}</td>
+                    <td style={{ ...tdStyle, color: '#2563eb', fontWeight: 700 }}>{row.contributionShare.toFixed(1)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style={{ ...cardStyle, padding: '0.85rem 0.95rem' }}>
+          <div style={sectionHead}>Top Categories</div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={tableStyle}>
+              <thead><tr><th style={thStyle}>#</th><th style={{ ...thStyle, width: '100%' }}>Category</th><th style={thStyle}>Qty</th><th style={thStyle}>Sales</th><th style={thStyle}>Share</th></tr></thead>
+              <tbody>
+                {analytics.rankings.topCategories.length === 0 ? (
+                  <tr><td colSpan={5} style={emptyStyle}>No data.</td></tr>
+                ) : analytics.rankings.topCategories.map((row, i) => (
+                  <tr key={`${row.category}-${i}`}>
+                    <td style={{ ...tdStyle, color: '#94a3b8' }}>{i + 1}</td>
+                    <td style={tdBold}>{row.category}</td>
+                    <td style={tdStyle}>{intFmt(row.quantity)}</td>
+                    <td style={tdBold}>{money(row.sales)}</td>
+                    <td style={{ ...tdStyle, color: '#2563eb', fontWeight: 700 }}>{row.contributionShare.toFixed(1)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style={{ ...cardStyle, padding: '0.85rem 0.95rem' }}>
+          <div style={sectionHead}>Cashier Performance</div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={tableStyle}>
+              <thead><tr><th style={{ ...thStyle, width: '100%' }}>User</th><th style={thStyle}>Inv</th><th style={thStyle}>Sales</th><th style={thStyle}>Avg</th></tr></thead>
+              <tbody>
+                {analytics.rankings.topUsers.length === 0 ? (
+                  <tr><td colSpan={4} style={emptyStyle}>No data.</td></tr>
+                ) : analytics.rankings.topUsers.map((row, i) => (
+                  <tr key={`${row.userName}-${i}`}><td style={tdBold}>{row.userName}</td><td style={tdStyle}>{intFmt(row.totalInvoices)}</td><td style={tdBold}>{money(row.totalSales)}</td><td style={tdStyle}>{money(row.averageInvoiceValue)}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style={{ ...cardStyle, padding: '0.85rem 0.95rem' }}>
+          <div style={sectionHead}>Branch Performance</div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={tableStyle}>
+              <thead><tr><th style={thStyle}>Branch</th><th style={thStyle}>Inv</th><th style={thStyle}>Sales</th><th style={thStyle}>Avg Basket</th><th style={thStyle}>Share</th></tr></thead>
+              <tbody>
+                {analytics.rankings.branchPerformance.length === 0 ? (
+                  <tr><td colSpan={5} style={emptyStyle}>No branch data in this period.</td></tr>
+                ) : analytics.rankings.branchPerformance.map((row, i) => (
+                  <tr key={`${row.code}-${i}`}><td style={tdBold}>{row.code}</td><td style={tdStyle}>{intFmt(row.invoices)}</td><td style={tdBold}>{money(row.sales)}</td><td style={tdStyle}>{money(row.averageBasket)}</td><td style={{ ...tdStyle, color: '#2563eb', fontWeight: 700 }}>{row.contributionShare.toFixed(1)}%</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  })() : null;
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
@@ -1544,6 +1813,104 @@ const BusinessAnalyticsTab = ({
           )}
 
           {activeView === 'overview' && (
+            <button
+              type="button"
+              onClick={() => openWorkspaceModal('overview')}
+              style={{
+                ...cardStyle,
+                textAlign: 'left',
+                border: '1px solid #bfdbfe',
+                background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 60%)',
+                borderRadius: '20px',
+                padding: '1.1rem',
+                cursor: 'pointer',
+              }}
+            >
+              <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1d4ed8', fontWeight: 800 }}>Overview Workspace</div>
+              <div style={{ marginTop: '0.35rem', fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>Open Growth & KPI Overview</div>
+              <div style={{ marginTop: '0.4rem', color: '#64748b', fontSize: '0.84rem' }}>View growth deltas, KPI snapshots, and quick health summary in a focused modal.</div>
+            </button>
+          )}
+
+          {activeView === 'trends' && (
+            <button
+              type="button"
+              onClick={() => openWorkspaceModal('trends')}
+              style={{
+                ...cardStyle,
+                textAlign: 'left',
+                border: '1px solid #99f6e4',
+                background: 'linear-gradient(135deg, #f0fdfa 0%, #ffffff 60%)',
+                borderRadius: '20px',
+                padding: '1.1rem',
+                cursor: 'pointer',
+              }}
+            >
+              <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0f766e', fontWeight: 800 }}>Trends Workspace</div>
+              <div style={{ marginTop: '0.35rem', fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>Open Daily, Monthly, Yearly Trends</div>
+              <div style={{ marginTop: '0.4rem', color: '#64748b', fontSize: '0.84rem' }}>Inspect sales cadence and invoice patterns without long page scrolling.</div>
+            </button>
+          )}
+
+          {activeView === 'rankings' && (
+            <button
+              type="button"
+              onClick={() => openWorkspaceModal('rankings')}
+              style={{
+                ...cardStyle,
+                textAlign: 'left',
+                border: '1px solid #d8b4fe',
+                background: 'linear-gradient(135deg, #f8f5ff 0%, #ffffff 60%)',
+                borderRadius: '20px',
+                padding: '1.1rem',
+                cursor: 'pointer',
+              }}
+            >
+              <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6d28d9', fontWeight: 800 }}>Rankings Workspace</div>
+              <div style={{ marginTop: '0.35rem', fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>Open Product, Category, User, Branch Rankings</div>
+              <div style={{ marginTop: '0.4rem', color: '#64748b', fontSize: '0.84rem' }}>Browse all ranking tables in one modal workspace.</div>
+            </button>
+          )}
+
+          {activeWorkspaceModal && ['overview', 'trends', 'rankings'].includes(activeWorkspaceModal) && (
+            <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 220, display: 'grid', placeItems: 'center', padding: isWorkspaceMaximized ? '0.35rem' : '1rem' }}>
+              <div style={{ ...cardStyle, width: isWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1320px, 98vw)', height: isWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', display: 'flex', flexDirection: 'column', borderRadius: isWorkspaceMaximized ? '10px' : '18px', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.1rem', borderBottom: '1px solid #e2e8f0' }}>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#475569', fontWeight: 800 }}>Analytics Workspace</div>
+                    <div style={{ marginTop: '0.2rem', fontWeight: 800, fontSize: '1.05rem', color: '#0f172a' }}>
+                      {activeWorkspaceModal === 'overview' ? 'Overview' : activeWorkspaceModal === 'trends' ? 'Trends' : 'Rankings'}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <button
+                      type="button"
+                      title={isWorkspaceMaximized ? 'Restore' : 'Maximize'}
+                      aria-label={isWorkspaceMaximized ? 'Restore workspace' : 'Maximize workspace'}
+                      onClick={() => setIsWorkspaceMaximized((prev) => !prev)}
+                      style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', color: '#334155', cursor: 'pointer' }}
+                    >
+                      <i className={`fas ${isWorkspaceMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeWorkspaceModal}
+                      style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}
+                    >
+                      <i className="fas fa-times" />
+                    </button>
+                  </div>
+                </div>
+                <div style={{ flex: 1, overflow: 'auto', padding: '1rem', display: 'grid', gap: '0.8rem' }}>
+                  {activeWorkspaceModal === 'overview' && overviewWorkspaceContent}
+                  {activeWorkspaceModal === 'trends' && trendsWorkspaceContent}
+                  {activeWorkspaceModal === 'rankings' && rankingsWorkspaceContent}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {false && activeView === 'overview' && (
             <>
               <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
@@ -1629,7 +1996,7 @@ const BusinessAnalyticsTab = ({
             </>
           )}
 
-          {activeView === 'trends' && (
+          {false && activeView === 'trends' && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '0.8rem' }}>
               <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
                 <strong style={{ color: '#0f172a' }}>Daily Trend</strong>
@@ -1669,7 +2036,7 @@ const BusinessAnalyticsTab = ({
             </div>
           )}
 
-          {activeView === 'trends' && (
+          {false && activeView === 'trends' && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '0.8rem' }}>
               <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
                 <strong style={{ color: '#0f172a' }}>Yearly Comparison</strong>
@@ -1702,7 +2069,7 @@ const BusinessAnalyticsTab = ({
             </div>
           )}
 
-          {activeView === 'rankings' && (() => {
+          {false && activeView === 'rankings' && (() => {
             const thStyle = { textAlign: 'left', padding: '0.42rem 0.6rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontSize: '0.74rem', fontWeight: 700, whiteSpace: 'nowrap' };
             const tdStyle = { padding: '0.38rem 0.6rem', borderBottom: '1px solid #f1f5f9', fontSize: '0.8rem', color: '#334155', whiteSpace: 'nowrap' };
             const tdBold = { ...tdStyle, color: '#0f172a', fontWeight: 700 };
