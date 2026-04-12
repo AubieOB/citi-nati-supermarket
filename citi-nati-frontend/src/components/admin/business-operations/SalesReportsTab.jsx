@@ -229,6 +229,16 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
   const fullWorkbookInputRef = useRef(null);
   const autoRefreshIntervalRef = useRef(null);
   const autoRefreshTimeoutRef = useRef(null);
+  const summaryRef = useRef(null);
+  const profitSummaryRef = useRef(null);
+
+  useEffect(() => {
+    summaryRef.current = summary;
+  }, [summary]);
+
+  useEffect(() => {
+    profitSummaryRef.current = profitSummary;
+  }, [profitSummary]);
 
   const queryKey = useMemo(() => JSON.stringify(filters), [filters]);
 
@@ -318,7 +328,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
   }, []);
 
   const fetchSummary = useCallback(async ({ background = false } = {}) => {
-    if (!background || !summary) {
+    if (!background || !summaryRef.current) {
       setSummaryLoading(true);
     }
     if (!background) {
@@ -334,17 +344,17 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
         dateRange: response.data?.dateRange || null,
       });
     } catch (error) {
-      if (!background || !summary) {
+      if (!background || !summaryRef.current) {
         setSummaryError(error.response?.data?.error || 'Failed to load sales summary');
         setSummary(null);
       }
     } finally {
       setSummaryLoading(false);
     }
-  }, [filters, summary]);
+  }, [filters]);
 
   const fetchProfitSummary = useCallback(async ({ background = false } = {}) => {
-    if (!background || !profitSummary) {
+    if (!background || !profitSummaryRef.current) {
       setProfitSummaryLoading(true);
     }
     try {
@@ -353,13 +363,13 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
       });
       setProfitSummary(response.data?.data?.summary || null);
     } catch {
-      if (!background || !profitSummary) {
+      if (!background || !profitSummaryRef.current) {
         setProfitSummary(null);
       }
     } finally {
       setProfitSummaryLoading(false);
     }
-  }, [filters, profitSummary]);
+  }, [filters]);
 
   const fetchInvoices = useCallback(async ({ background = false } = {}) => {
     setInvoicesState((prev) => ({
