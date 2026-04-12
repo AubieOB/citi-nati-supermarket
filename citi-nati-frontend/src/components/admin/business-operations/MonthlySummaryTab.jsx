@@ -21,14 +21,21 @@ const cardStyle = {
   boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)',
 };
 
+const localDateKey = (dateValue) => {
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return '';
+  const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+  return local.toISOString().slice(0, 10);
+};
+
 const money = (value) => `MWK ${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const monthRange = (year, month) => {
   const start = new Date(year, month - 1, 1);
   const end = new Date(year, month, 0);
   return {
-    startDate: start.toISOString().slice(0, 10),
-    endDate: end.toISOString().slice(0, 10),
+    startDate: localDateKey(start),
+    endDate: localDateKey(end),
     label: `${start.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`,
   };
 };

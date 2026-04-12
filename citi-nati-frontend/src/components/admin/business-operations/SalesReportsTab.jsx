@@ -79,9 +79,16 @@ const tdStyle = {
   verticalAlign: 'top',
 };
 
+const localDateKey = (dateValue = new Date()) => {
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return '';
+  const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+  return local.toISOString().slice(0, 10);
+};
+
 const DEFAULT_FILTERS = {
   periodType: 'month',
-  date: new Date().toISOString().slice(0, 10),
+  date: localDateKey(new Date()),
   month: String(new Date().getMonth() + 1),
   year: String(new Date().getFullYear()),
   quarter: String(Math.floor(new Date().getMonth() / 3) + 1),

@@ -3,48 +3,55 @@
 const VALID_PERIOD_TYPES = ['day', 'week', 'month', 'quarter', 'year', 'custom'];
 
 /**
- * Parse a YYYY-MM-DD string as midnight UTC.
+ * Parse a YYYY-MM-DD string as midnight in server local time.
  * Returns null if the string is absent or invalid.
  */
 function parseDateString(str) {
   if (!str || typeof str !== 'string') return null;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(str)) return null;
-  const d = new Date(`${str}T00:00:00.000Z`);
+  const d = new Date(`${str}T00:00:00`);
   if (isNaN(d.getTime())) return null;
   return d;
 }
 
-function startOfDayUTC(date) {
+function formatLocalDate(dateValue) {
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return null;
+  const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+  return local.toISOString().slice(0, 10);
+}
+
+function startOfDay(date) {
   const d = new Date(date);
-  d.setUTCHours(0, 0, 0, 0);
+  d.setHours(0, 0, 0, 0);
   return d;
 }
 
-function endOfDayUTC(date) {
+function endOfDay(date) {
   const d = new Date(date);
-  d.setUTCHours(23, 59, 59, 999);
+  d.setHours(23, 59, 59, 999);
   return d;
 }
 
-/** Returns the Monday of the ISO week containing the given date (UTC). */
+/** Returns the Monday of the ISO week containing the given date (local time). */
 function getISOWeekStart(date) {
   const d = new Date(date);
-  const dayOfWeek = d.getUTCDay(); // 0=Sun, 1=Mon, …
+  const dayOfWeek = d.getDay(); // 0=Sun, 1=Mon, …
   const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-  d.setUTCDate(d.getUTCDate() + daysToMonday);
-  d.setUTCHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + daysToMonday);
+  d.setHours(0, 0, 0, 0);
   return d;
 }
 
 function getISOWeekEnd(weekStart) {
   const d = new Date(weekStart);
-  d.setUTCDate(d.getUTCDate() + 6);
-  d.setUTCHours(23, 59, 59, 999);
+  d.setDate(d.getDate() + 6);
+  d.setHours(23, 59, 59, 999);
   return d;
 }
 
 /**
- * Resolve a period type + supporting params into a concrete UTC date range.
+ * Resolve a period type + supporting params into a concrete local date range.
  *
  * Returns { startDate: Date, endDate: Date, label: string } on success.
  * Returns { error: string } when params are incomplete or invalid.
@@ -80,7 +87,7 @@ function resolvePeriod(params) {
     };
   }
 
-  const currentYear = new Date().getUTCFullYear();
+  const currentYear = new Date().getFullYear();
 
   switch (periodType) {
     case 'day': {
@@ -90,8 +97,8 @@ function resolvePeriod(params) {
       const d = parseDateString(date);
       if (!d) return { error: `Invalid date '${date}'. Use YYYY-MM-DD format` };
       return {
-        startDate: startOfDayUTC(d),
-        endDate: endOfDayUTC(d),
+        startDate: startOfDay(d),
+        endDate: endOfDay(d),
         label: date,
       };
     }
@@ -108,7 +115,7 @@ function resolvePeriod(params) {
       return {
         startDate: weekStart,
         endDate: getISOWeekEnd(weekStart),
-        label: `Week of ${weekStart.toISOString().slice(0, 10)}`,
+        label: `Week of ${formatLocalDate(weekStart)}`,
       };
     }
 
@@ -119,8 +126,8 @@ function resolvePeriod(params) {
         return { error: 'month (1–12) is required for periodType=month' };
       }
       return {
-        startDate: new Date(Date.UTC(y, m - 1, 1, 0, 0, 0, 0)),
-        endDate: new Date(Date.UTC(y, m, 0, 23, 59, 59, 999)), // UTC last day = day 0 of next month
+        startDate: new Date(y, m - 1, 1, 0, 0, 0, 0),
+        endDate: new Date(y, m, 0, 23, 59, 59, 999),
         label: `${y}-${String(m).padStart(2, '0')}`,
       };
     }
@@ -133,8 +140,8 @@ function resolvePeriod(params) {
       }
       const startMonth = (q - 1) * 3; // 0-based month index
       return {
-        startDate: new Date(Date.UTC(y, startMonth, 1, 0, 0, 0, 0)),
-        endDate: new Date(Date.UTC(y, startMonth + 3, 0, 23, 59, 59, 999)),
+        startDate: new Date(y, startMonth, 1, 0, 0, 0, 0),
+        endDate: new Date(y, startMonth + 3, 0, 23, 59, 59, 999),
         label: `Q${q} ${y}`,
       };
     }
@@ -145,8 +152,8 @@ function resolvePeriod(params) {
         return { error: 'year (YYYY) is required for periodType=year' };
       }
       return {
-        startDate: new Date(Date.UTC(y, 0, 1, 0, 0, 0, 0)),
-        endDate: new Date(Date.UTC(y, 11, 31, 23, 59, 59, 999)),
+        startDate: new Date(y, 0, 1, 0, 0, 0, 0),
+        endDate: new Date(y, 11, 31, 23, 59, 59, 999),
         label: String(y),
       };
     }
@@ -161,8 +168,8 @@ function resolvePeriod(params) {
       const e = parseDateString(customEnd);
       if (!s) return { error: `Invalid startDate '${customStart}'. Use YYYY-MM-DD format` };
       if (!e) return { error: `Invalid endDate '${customEnd}'. Use YYYY-MM-DD format` };
-      const start = startOfDayUTC(s);
-      const end = endOfDayUTC(e);
+      const start = startOfDay(s);
+      const end = endOfDay(e);
       if (start > end) return { error: 'startDate must be on or before endDate' };
       return {
         startDate: start,
@@ -181,8 +188,8 @@ function resolvePeriod(params) {
  */
 function formatDateRange(startDate, endDate) {
   return {
-    startDate: startDate.toISOString().slice(0, 10),
-    endDate: endDate.toISOString().slice(0, 10),
+    startDate: formatLocalDate(startDate),
+    endDate: formatLocalDate(endDate),
   };
 }
 

@@ -43,7 +43,8 @@ function toDateString(value) {
   if (!value) return '';
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return '';
-  return date.toISOString().slice(0, 10);
+  const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+  return local.toISOString().slice(0, 10);
 }
 
 function titleCase(value) {
@@ -125,8 +126,8 @@ function resolveMonthlyRange(filters = {}) {
 
   const year = Number(filters.year || now.getFullYear());
   const month = Number(filters.month || now.getMonth() + 1);
-  const startDate = new Date(year, month - 1, 1).toISOString().slice(0, 10);
-  const endDate = new Date(year, month, 0).toISOString().slice(0, 10);
+  const startDate = toDateString(new Date(year, month - 1, 1));
+  const endDate = toDateString(new Date(year, month, 0));
   return {
     periodType: 'month',
     month,

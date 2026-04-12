@@ -32,11 +32,18 @@ function money(value) {
   return `MWK ${toMoney(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function localDateKey(dateValue) {
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return '';
+  const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+  return local.toISOString().slice(0, 10);
+}
+
 function dateInputValue(value) {
   if (!value) return '';
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '';
-  return d.toISOString().slice(0, 10);
+  return localDateKey(d);
 }
 
 function createEmptyLine() {
@@ -117,7 +124,7 @@ function buildNewForm(selectedLocation) {
     supplierId: '',
     manualSupplierName: '',
     supplierStoreRef: '',
-    purchaseDate: new Date().toISOString().slice(0, 10),
+    purchaseDate: localDateKey(new Date()),
     receiptReference: '',
     locationId: selectedLocation ? String(selectedLocation.id) : '',
     locationCode: selectedLocation?.code || normalizeLocationCode(selectedLocation),

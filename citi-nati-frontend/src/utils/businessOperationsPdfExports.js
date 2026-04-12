@@ -50,6 +50,13 @@ const formatGeneratedTimestamp = () => {
   return `${now.toLocaleDateString('en-GB')} ${now.toLocaleTimeString('en-GB')}`;
 };
 
+const localDateKey = (dateValue = new Date()) => {
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return '';
+  const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+  return local.toISOString().slice(0, 10);
+};
+
 const drawHeader = (doc, { reportTitle, viewLabel, periodText, generatedText, showCompact = false }) => {
   const { left, right } = getContentBounds(doc);
 
@@ -337,7 +344,7 @@ export function exportExpensesPdf({
       },
     };
 
-  const dateLabel = new Date().toISOString().slice(0, 10);
+  const dateLabel = localDateKey(new Date());
   exportWithLayout({
     reportTitle: 'Business Operations Export',
     viewLabel: `Expenses - ${isCategories ? 'Categories' : 'List'}`,
@@ -389,7 +396,7 @@ export function exportEmployeesPdf({ employees, pagination, search, statusFilter
     },
   };
 
-  const dateLabel = new Date().toISOString().slice(0, 10);
+  const dateLabel = localDateKey(new Date());
   exportWithLayout({
     reportTitle: 'Business Operations Export',
     viewLabel: 'Employees',
@@ -469,7 +476,7 @@ export function exportPayrollPdf({
       },
     };
 
-  const dateLabel = new Date().toISOString().slice(0, 10);
+  const dateLabel = localDateKey(new Date());
   exportWithLayout({
     reportTitle: 'Business Operations Export',
     viewLabel: exportingEntries ? 'Payroll Entries' : 'Payroll Periods',
@@ -526,7 +533,7 @@ export function exportSuppliersPdf({
     },
   };
 
-  const dateLabel = new Date().toISOString().slice(0, 10);
+  const dateLabel = localDateKey(new Date());
   exportWithLayout({
     reportTitle: 'Business Operations Export',
     viewLabel: 'Suppliers',
@@ -591,7 +598,7 @@ export function exportMonthlySummaryPdf({
     },
   };
 
-  const dateLabel = new Date().toISOString().slice(0, 10);
+  const dateLabel = localDateKey(new Date());
   exportWithLayout({
     reportTitle: 'Business Operations Export',
     viewLabel: 'Monthly Summary',
@@ -609,7 +616,7 @@ export function exportGoodsIntakeRecordPdf({ record, companyName = 'Citi-Nati Su
   const purchaseDate = toDate(record?.purchaseDate);
   const supplierName = record?.supplier?.name || record?.manualSupplierName || '-';
   const locationName = record?.locationName || record?.locationCode || '-';
-  const intakeRef = record?.intakeRef || `GI-${new Date().toISOString().slice(0, 10)}`;
+  const intakeRef = record?.intakeRef || `GI-${localDateKey(new Date())}`;
   const receiptReference = record?.receiptReference || '-';
   const supplierStoreRef = record?.supplierStoreRef || '-';
   const status = String(record?.status || 'draft').toUpperCase();

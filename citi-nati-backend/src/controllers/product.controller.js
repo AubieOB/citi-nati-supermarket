@@ -37,6 +37,13 @@ const _allProductsExpiryCache = {
   refreshing: false,
 };
 
+function formatLocalDateKey(dateValue) {
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return null;
+  const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+  return local.toISOString().slice(0, 10);
+}
+
 function getAdjustmentActor(req) {
   return String(req.user?.email || req.user?.id || req.user?.userId || 'admin').trim();
 }
@@ -431,7 +438,7 @@ function normalizeExpiryDate(value) {
     return null;
   }
 
-  const isoDate = date.toISOString().slice(0, 10);
+  const isoDate = formatLocalDateKey(date);
   if (isoDate === '1900-01-01') {
     return null;
   }
@@ -1804,7 +1811,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
                 const stockDetailId = batch?.stockDetailId ? String(batch.stockDetailId).trim() : null;
                 const grnNo = batch?.grnNo ? String(batch.grnNo).trim() : null;
                 if (!expiryDate || Number.isNaN(expiryDate.getTime())) return null;
-                if (expiryDate.toISOString().slice(0, 10) === '1900-01-01') return null;
+                if (formatLocalDateKey(expiryDate) === '1900-01-01') return null;
                 if (expiryDate < MIN_VALID_EXPIRY_DATE) return null;
                 if (!Number.isFinite(remainingQty) || remainingQty <= 0) return null;
 

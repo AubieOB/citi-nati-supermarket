@@ -43,6 +43,13 @@ function toTime(value) {
   return date.toLocaleTimeString('en-GB');
 }
 
+function localDateKey(dateValue = new Date()) {
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return '';
+  const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+  return local.toISOString().slice(0, 10);
+}
+
 function getPeriodText(filters = {}, resolvedDateRange = null) {
   if (resolvedDateRange?.startDate && resolvedDateRange?.endDate) {
     return `${resolvedDateRange.startDate} to ${resolvedDateRange.endDate}`;
@@ -513,6 +520,6 @@ export function exportActiveSalesReportPdf({
     drawFooter(doc, page, totalPages);
   }
 
-  const fileDate = today.toISOString().slice(0, 10);
+  const fileDate = localDateKey(today);
   doc.save(`sales_${String(activeView || 'summary').toLowerCase()}_${fileDate}.pdf`);
 }

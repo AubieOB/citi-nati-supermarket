@@ -35,7 +35,9 @@ const toDateValue = (value) => {
   const s = String(value);
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
   const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+  if (Number.isNaN(d.getTime())) return '';
+  const local = new Date(d.getTime() - (d.getTimezoneOffset() * 60000));
+  return local.toISOString().slice(0, 10);
 };
 
 const tryNum = (v) => {

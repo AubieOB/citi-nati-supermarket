@@ -137,6 +137,13 @@ function normalizePaymentMethod(rawMethod) {
   return method.slice(0, 20);
 }
 
+function formatLocalDateKey(dateValue) {
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return '';
+  const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+  return local.toISOString().slice(0, 10);
+}
+
 function getSaleVatContext(sale) {
   const snapshot = sale?.cartSnapshot && typeof sale.cartSnapshot === 'object' ? sale.cartSnapshot : null;
   const snapshotEnabled = snapshot?.vat_enabled ?? snapshot?.vatEnabled;
@@ -184,7 +191,7 @@ function buildPosWriteInvoicePayload(emergencySale) {
     reference: emergencySale.saleRef,
     locationCode,
     customerCode: 'CASH',
-    invoiceDate: new Date(emergencySale.createdAt || new Date()).toISOString().slice(0, 10),
+    invoiceDate: formatLocalDateKey(emergencySale.createdAt || new Date()),
     invoiceTime: new Date(emergencySale.createdAt || new Date()).toTimeString().slice(0, 8),
     grossSale: invoiceTotals.gross,
     vat: invoiceTotals.vatAmount,

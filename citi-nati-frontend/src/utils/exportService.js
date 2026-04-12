@@ -26,6 +26,13 @@ function triggerDownload(blob, fileName) {
   window.URL.revokeObjectURL(url);
 }
 
+function localDateKey(dateValue = new Date()) {
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return '';
+  const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+  return local.toISOString().slice(0, 10);
+}
+
 async function readBlobError(blob) {
   if (!(blob instanceof Blob)) return null;
 
@@ -97,7 +104,7 @@ export async function downloadFullBusinessWorkbook({ filters = {} } = {}) {
     throw error;
   }
 
-  const fallbackName = `citi-nati-full-workbook-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  const fallbackName = `citi-nati-full-workbook-${localDateKey(new Date())}.xlsx`;
   const fileName = parseFileName(response.headers?.['content-disposition'], fallbackName);
   triggerDownload(response.data, fileName);
 }

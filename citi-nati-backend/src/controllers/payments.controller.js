@@ -11,8 +11,15 @@ const { splitInclusiveVatAtRate, getVatRatePercent, normalizeVatRatePercent, rou
 
 const prisma = new PrismaClient();
 
+function formatLocalDateKey(dateValue) {
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return '';
+  const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+  return local.toISOString().slice(0, 10);
+}
+
 function formatInvoiceDate(date = new Date()) {
-  return date.toISOString().slice(0, 10);
+  return formatLocalDateKey(date);
 }
 
 function formatInvoiceTime(date = new Date()) {

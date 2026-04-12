@@ -304,7 +304,8 @@ function endOfMonth(year, monthIndex) {
 }
 
 function formatDateInput(dateValue) {
-  return dateValue.toISOString().slice(0, 10);
+  const local = new Date(dateValue.getTime() - (dateValue.getTimezoneOffset() * 60000));
+  return local.toISOString().slice(0, 10);
 }
 
 function toDateSafe(value) {
@@ -461,7 +462,7 @@ function previousPeriod(period) {
 
 function dateRangeFromPeriod(period) {
   if (period.periodType === 'day') {
-    const d = period.date || new Date().toISOString().slice(0, 10);
+    const d = period.date || formatDateInput(new Date());
     return { startDate: d, endDate: d, label: d };
   }
 
@@ -954,7 +955,7 @@ const BusinessAnalyticsTab = ({
   const [scope, setScope] = useState('inherit');
   const [filters, setFilters] = useState({
     periodType: 'month',
-    date: now.toISOString().slice(0, 10),
+    date: formatDateInput(now),
     month: now.getMonth() + 1,
     year: now.getFullYear(),
     quarter: Math.floor(now.getMonth() / 3) + 1,
@@ -1732,7 +1733,7 @@ const BusinessAnalyticsTab = ({
                 <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Month</span>
                 <select value={filters.month} onChange={(event) => setFilters((prev) => ({ ...prev, month: Number(event.target.value) }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }}>
                   {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
-                    <option key={month} value={month}>{new Date(2026, month - 1, 1).toLocaleDateString('en-GB', { month: 'long' })}</option>
+                    <option key={month} value={month}>{new Date(Number(filters.year || new Date().getFullYear()), month - 1, 1).toLocaleDateString('en-GB', { month: 'long' })}</option>
                   ))}
                 </select>
               </label>

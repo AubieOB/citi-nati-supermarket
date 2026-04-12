@@ -354,11 +354,16 @@ function categoryLabel(value) {
   return normalized || null;
 }
 
-function dayKeyFromDate(value) {
+function formatLocalDateKey(value) {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString().slice(0, 10);
+  const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+  return local.toISOString().slice(0, 10);
+}
+
+function dayKeyFromDate(value) {
+  return formatLocalDateKey(value);
 }
 
 async function queryLatestCostProfitAnalytics(itemWhere, filters = {}) {
