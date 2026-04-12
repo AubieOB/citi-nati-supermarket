@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../../../utils/api.js';
 import { boAlert, boConfirm } from '../../../utils/boDialogBus.js';
 import { exportGoodsIntakeRecordPdf } from '../../../utils/businessOperationsPdfExports.js';
@@ -91,6 +91,25 @@ function selectInputText(event) {
   }
 }
 
+function focusNextWorkspaceField(container, currentField) {
+  if (!container || !currentField) return;
+
+  const focusableFields = Array.from(
+    container.querySelectorAll('input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])')
+  ).filter((field) => !field.readOnly && field.tabIndex !== -1 && field.offsetParent !== null);
+
+  const currentIndex = focusableFields.indexOf(currentField);
+  if (currentIndex === -1) return;
+
+  const nextField = focusableFields[currentIndex + 1];
+  if (!nextField) return;
+
+  nextField.focus();
+  if (typeof nextField.select === 'function' && nextField.tagName !== 'SELECT') {
+    nextField.select();
+  }
+}
+
 function buildNewForm(selectedLocation) {
   return {
     id: null,
@@ -169,6 +188,7 @@ function toFormFromRecord(record) {
 }
 
 const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
+  const workspaceRef = useRef(null);
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
 
   const themedCardStyle = useMemo(() => ({
@@ -527,8 +547,21 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
     }
   };
 
+  const handleEntryFieldEnter = useCallback((event, options = {}) => {
+    if (event.key !== 'Enter') return;
+
+    const { lookupRowIndex = null } = options;
+    event.preventDefault();
+
+    if (lookupRowIndex != null) {
+      handleLookup(lookupRowIndex);
+    }
+
+    focusNextWorkspaceField(workspaceRef.current, event.currentTarget);
+  }, [handleLookup]);
+
   const workspaceContent = (
-    <section style={{ ...cardStyle, padding: '1rem', width: '100%', minWidth: 0, boxShadow: 'none', border: 'none', background: 'transparent' }}>
+    <section ref={workspaceRef} style={{ ...cardStyle, padding: '1rem', width: '100%', minWidth: 0, boxShadow: 'none', border: 'none', background: 'transparent' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ margin: 0, color: colors.text }}>Goods Intake</h2>
@@ -560,6 +593,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
             <select
               value={form.supplierId}
               onChange={(event) => setForm((prev) => ({ ...prev, supplierId: event.target.value }))}
+              onKeyDown={handleEntryFieldEnter}
               style={{ ...tableInputStyle, backgroundColor: supplierLoading ? '#f8fafc' : '#fff' }}
             >
               <option value="">Select supplier</option>
@@ -571,12 +605,12 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
 
           <div style={{ minWidth: 0 }}>
             <label style={{ display: 'block', fontSize: '0.78rem', color: '#64748b', marginBottom: '0.25rem' }}>Manual Supplier Name</label>
-            <input value={form.manualSupplierName} onFocus={selectInputText} onChange={(event) => setForm((prev) => ({ ...prev, manualSupplierName: event.target.value }))} style={themedInputStyle} placeholder="Use when supplier is not in list" />
+            <input value={form.manualSupplierName} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setForm((prev) => ({ ...prev, manualSupplierName: event.target.value }))} style={themedInputStyle} placeholder="Use when supplier is not in list" />
           </div>
 
           <div>
             <label style={{ display: 'block', fontSize: '0.78rem', color: '#64748b', marginBottom: '0.25rem' }}>Purchase Date</label>
-            <input type="date" value={form.purchaseDate} onFocus={selectInputText} onChange={(event) => setForm((prev) => ({ ...prev, purchaseDate: event.target.value }))} style={themedInputStyle} />
+            <input type="date" value={form.purchaseDate} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setForm((prev) => ({ ...prev, purchaseDate: event.target.value }))} style={themedInputStyle} />
           </div>
 
           <div>
@@ -586,12 +620,12 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
 
           <div>
             <label style={{ display: 'block', fontSize: '0.78rem', color: '#64748b', marginBottom: '0.25rem' }}>Supplier/Store Ref</label>
-            <input value={form.supplierStoreRef} onFocus={selectInputText} onChange={(event) => setForm((prev) => ({ ...prev, supplierStoreRef: event.target.value }))} style={themedInputStyle} />
+            <input value={form.supplierStoreRef} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setForm((prev) => ({ ...prev, supplierStoreRef: event.target.value }))} style={themedInputStyle} />
           </div>
 
           <div>
             <label style={{ display: 'block', fontSize: '0.78rem', color: '#64748b', marginBottom: '0.25rem' }}>Receipt Ref</label>
-            <input value={form.receiptReference} onFocus={selectInputText} onChange={(event) => setForm((prev) => ({ ...prev, receiptReference: event.target.value }))} style={themedInputStyle} />
+            <input value={form.receiptReference} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setForm((prev) => ({ ...prev, receiptReference: event.target.value }))} style={themedInputStyle} />
           </div>
 
           <div>
@@ -607,6 +641,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
                   locationName: location?.name || '',
                 }));
               }}
+              onKeyDown={handleEntryFieldEnter}
               style={themedInputStyle}
             >
               <option value="">Select location</option>
@@ -624,6 +659,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
               step="0.01"
               value={form.receiptTotalAmount}
               onFocus={selectInputText}
+              onKeyDown={handleEntryFieldEnter}
               onChange={(event) => setForm((prev) => ({ ...prev, receiptTotalAmount: event.target.value }))}
               style={themedInputStyle}
             />
@@ -661,6 +697,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
                       <input
                         value={line.barcode || ''}
                         onFocus={selectInputText}
+                        onKeyDown={(event) => handleEntryFieldEnter(event, { lookupRowIndex: index })}
                         onChange={(event) => setLineValue(index, 'barcode', event.target.value)}
                         onBlur={() => handleLookup(index)}
                         style={{ ...tableInputStyle, backgroundColor: line.productName && !line.barcode ? '#fff7ed' : '#fff' }}
@@ -671,6 +708,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
                       <input
                         value={line.productName || ''}
                         onFocus={selectInputText}
+                        onKeyDown={(event) => handleEntryFieldEnter(event, { lookupRowIndex: index })}
                         onChange={(event) => setLineValue(index, 'productName', event.target.value)}
                         onBlur={() => { if (!line.productName) return; handleLookup(index); }}
                         style={tableInputStyle}
@@ -678,25 +716,25 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
                       />
                     </td>
                     <td style={{ minWidth: '70px', padding: '0 0.35rem' }}>
-                      <input type="number" min="0" step="1" value={line.quantity} onFocus={selectInputText} onChange={(event) => setLineValue(index, 'quantity', event.target.value)} style={tableInputStyle} />
+                      <input type="number" min="0" step="1" value={line.quantity} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'quantity', event.target.value)} style={tableInputStyle} />
                     </td>
                     <td style={{ minWidth: '110px', padding: '0 0.35rem' }}>
-                      <input type="number" min="0" step="0.01" value={line.unitCost} onFocus={selectInputText} onChange={(event) => setLineValue(index, 'unitCost', event.target.value)} style={tableInputStyle} />
+                      <input type="number" min="0" step="0.01" value={line.unitCost} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'unitCost', event.target.value)} style={tableInputStyle} />
                     </td>
                     <td style={{ minWidth: '115px', color: '#0f172a', fontWeight: 700, fontSize: '0.85rem', padding: '0 0.35rem' }}>{money(line.totalCost)}</td>
                     <td style={{ minWidth: '120px', padding: '0 0.35rem' }}>
-                      <input type="number" min="0" step="0.01" value={line.sellingPrice == null ? '' : line.sellingPrice} onFocus={selectInputText} onChange={(event) => setLineValue(index, 'sellingPrice', event.target.value)} style={{ ...tableInputStyle, borderColor: belowCost ? '#f59e0b' : '#cbd5e1', backgroundColor: belowCost ? '#fffbeb' : '#fff' }} />
+                      <input type="number" min="0" step="0.01" value={line.sellingPrice == null ? '' : line.sellingPrice} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'sellingPrice', event.target.value)} style={{ ...tableInputStyle, borderColor: belowCost ? '#f59e0b' : '#cbd5e1', backgroundColor: belowCost ? '#fffbeb' : '#fff' }} />
                     </td>
                     <td style={{ minWidth: '92px', fontWeight: 700, color: '#334155', fontSize: '0.84rem', padding: '0 0.35rem' }}>{line.marginPercent == null ? '-' : `${line.marginPercent.toFixed(2)}%`}</td>
                     <td style={{ minWidth: '110px', fontWeight: 700, color: line.estimatedProfit >= 0 ? '#166534' : '#b91c1c', fontSize: '0.84rem', padding: '0 0.35rem' }}>{money(line.estimatedProfit)}</td>
                     <td style={{ minWidth: '132px', padding: '0 0.35rem' }}>
-                      <input type="date" value={line.expiryDate || ''} onFocus={selectInputText} onChange={(event) => setLineValue(index, 'expiryDate', event.target.value)} style={{ ...tableInputStyle, backgroundColor: line.productName && !line.expiryDate ? '#fff7ed' : '#fff' }} />
+                      <input type="date" value={line.expiryDate || ''} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'expiryDate', event.target.value)} style={{ ...tableInputStyle, backgroundColor: line.productName && !line.expiryDate ? '#fff7ed' : '#fff' }} />
                     </td>
                     <td style={{ minWidth: '120px', padding: '0 0.35rem' }}>
-                      <input value={line.batchRef || ''} onFocus={selectInputText} onChange={(event) => setLineValue(index, 'batchRef', event.target.value)} style={tableInputStyle} />
+                      <input value={line.batchRef || ''} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'batchRef', event.target.value)} style={tableInputStyle} />
                     </td>
                     <td style={{ minWidth: '180px', padding: '0 0.35rem' }}>
-                      <input value={line.lineNotes || ''} onFocus={selectInputText} onChange={(event) => setLineValue(index, 'lineNotes', event.target.value)} style={tableInputStyle} />
+                      <input value={line.lineNotes || ''} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'lineNotes', event.target.value)} style={tableInputStyle} />
                     </td>
                     <td style={{ minWidth: '130px', padding: '0 0.35rem' }}>
                       <div style={{ display: 'flex', gap: '0.35rem' }}>
