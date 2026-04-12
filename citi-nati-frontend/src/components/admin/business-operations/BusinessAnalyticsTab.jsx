@@ -1060,23 +1060,29 @@ const BusinessAnalyticsTab = ({
       const yearParams = withScope(buildParamsForPeriod(getCurrentYearPeriod()), effectiveScope, locations);
       const prevYearParams = withScope(buildParamsForPeriod(previousPeriod(getCurrentYearPeriod())), effectiveScope, locations);
 
-      // Last 12 months for monthly trend
-      const last12Months = Array.from({ length: 12 }, (_, i) => {
-        const d = new Date(thisYear, now.getMonth() - (11 - i), 1);
+      const MAX_MONTH_POINTS = 6;
+      const MAX_YEAR_POINTS = 3;
+      const MAX_DAILY_POINTS = 14;
+
+      // Last N months for monthly trend (capped for faster first load)
+      const recentMonths = Array.from({ length: MAX_MONTH_POINTS }, (_, i) => {
+        const d = new Date(thisYear, now.getMonth() - ((MAX_MONTH_POINTS - 1) - i), 1);
         return { periodType: 'month', month: d.getMonth() + 1, year: d.getFullYear() };
       });
 
-      // Last 5 years for yearly trend
-      const last5Years = Array.from({ length: 5 }, (_, i) => ({ periodType: 'year', year: thisYear - (4 - i) }));
+      // Last N years for yearly trend (capped for faster first load)
+      const recentYears = Array.from({ length: MAX_YEAR_POINTS }, (_, i) => ({ periodType: 'year', year: thisYear - ((MAX_YEAR_POINTS - 1) - i) }));
 
       // Q1-Q4 for quarterly trend
       const quarters = [1, 2, 3, 4].map((q) => ({ periodType: 'quarter', quarter: q, year: thisYear }));
 
-      // Daily trend: only for spans ≤ 62 days (month/short custom)
+      // Daily trend: sample to a fixed cap so short custom ranges stay responsive.
       const selRange = dateRangeFromPeriod(selectedPeriod);
       const spanDays = Math.round((new Date(selRange.endDate) - new Date(selRange.startDate)) / 86400000) + 1;
+      const dailyStep = spanDays > 0 ? Math.max(1, Math.ceil(spanDays / MAX_DAILY_POINTS)) : 1;
       const dailyPeriods = spanDays <= 62
-        ? Array.from({ length: spanDays }, (_, i) => {
+        ? Array.from({ length: Math.ceil(spanDays / dailyStep) }, (_, idx) => {
+            const i = idx * dailyStep;
             const d = new Date(`${selRange.startDate}T00:00:00`);
             d.setDate(d.getDate() + i);
             const ds = formatDateInput(d);
@@ -1089,11 +1095,11 @@ const BusinessAnalyticsTab = ({
 
       // Slot indices in the flat allResponses array
       const FIXED = 8; // 6 summaries + products + users
-      const MONTHLY_SLICE = [FIXED, FIXED + 12];
-      const YEARLY_SLICE = [FIXED + 12, FIXED + 17];
-      const QUARTERLY_SLICE = [FIXED + 17, FIXED + 21];
-      const DAILY_SLICE = [FIXED + 21, FIXED + 21 + dailyPeriods.length];
-      const BRANCH_SLICE = [FIXED + 21 + dailyPeriods.length, FIXED + 21 + dailyPeriods.length + branchCodes.length];
+      const MONTHLY_SLICE = [FIXED, FIXED + recentMonths.length];
+      const YEARLY_SLICE = [MONTHLY_SLICE[1], MONTHLY_SLICE[1] + recentYears.length];
+      const QUARTERLY_SLICE = [YEARLY_SLICE[1], YEARLY_SLICE[1] + quarters.length];
+      const DAILY_SLICE = [QUARTERLY_SLICE[1], QUARTERLY_SLICE[1] + dailyPeriods.length];
+      const BRANCH_SLICE = [DAILY_SLICE[1], DAILY_SLICE[1] + branchCodes.length];
 
       const allResponses = await Promise.all([
         // 0-5: fixed period summaries
@@ -1107,13 +1113,11 @@ const BusinessAnalyticsTab = ({
         api.get('/business-operations/reports/sales/products', { params: { ...periodParams, page: 1, pageSize: 12, sortBy: 'totalSales', sortOrder: 'desc' } }),
         // 7: users
         api.get('/business-operations/reports/sales/users', { params: { ...periodParams, page: 1, pageSize: 10, sortBy: 'totalSales', sortOrder: 'desc' } }),
-        // 8..19: monthly trend (12 summary calls)
-        ...last12Months.map((p) => api.get('/business-operations/reports/sales/summary', { params: withScope(buildParamsForPeriod(p), effectiveScope, locations) })),
-        // 20..24: yearly trend (5 summary calls)
-        ...last5Years.map((p) => api.get('/business-operations/reports/sales/summary', { params: withScope(buildParamsForPeriod(p), effectiveScope, locations) })),
-        // 25..28: quarterly trend (4 summary calls)
+        // Trend summaries (capped to keep initial render fast)
+        ...recentMonths.map((p) => api.get('/business-operations/reports/sales/summary', { params: withScope(buildParamsForPeriod(p), effectiveScope, locations) })),
+        ...recentYears.map((p) => api.get('/business-operations/reports/sales/summary', { params: withScope(buildParamsForPeriod(p), effectiveScope, locations) })),
         ...quarters.map((p) => api.get('/business-operations/reports/sales/summary', { params: withScope(buildParamsForPeriod(p), effectiveScope, locations) })),
-        // 29..29+N: daily trend (0-62 summary calls, only for short periods)
+        // Daily trend (sampled points for short ranges)
         ...dailyPeriods.map((p) => api.get('/business-operations/reports/sales/summary', { params: withScope(buildParamsForPeriod(p), effectiveScope, locations) })),
         // last 2: branch summaries (BT, ZA)
         ...branchCodes.map((code) => api.get('/business-operations/reports/sales/summary', { params: withScope({ ...periodParams }, `code:${code}`, locations) })),
@@ -1144,7 +1148,7 @@ const BusinessAnalyticsTab = ({
       const yearGrowth = computeGrowth(Number(currentYearSummary.netSales || 0), Number(previousYearSummary.netSales || 0));
 
       // Monthly trend from summary slices
-      const monthlyTrend = last12Months.map((p, i) => {
+      const monthlyTrend = recentMonths.map((p, i) => {
         const s = allResponses[MONTHLY_SLICE[0] + i]?.data?.data || {};
         const d = new Date(p.year, p.month - 1, 1);
         return {
@@ -1162,7 +1166,7 @@ const BusinessAnalyticsTab = ({
       }
 
       // Yearly trend
-      const yearlyComparison = last5Years.map((p, i) => {
+      const yearlyComparison = recentYears.map((p, i) => {
         const s = allResponses[YEARLY_SLICE[0] + i]?.data?.data || {};
         return { year: String(p.year), sales: Number(s.netSales || 0), invoices: Number(s.totalInvoices || 0) };
       });
