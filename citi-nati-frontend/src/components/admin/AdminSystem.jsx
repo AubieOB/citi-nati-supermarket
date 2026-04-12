@@ -6,6 +6,26 @@ import Modal from '../common/Modal.jsx';
 const DEFAULT_MESSAGE = 'We are currently carrying out maintenance to improve your experience. We apologize for the inconvenience.';
 const DEFAULT_VAT_RATE = 16.5;
 
+const DEFAULT_BUSINESS_TIME = {
+  timezoneName: 'UTC+02:00',
+  offsetMinutes: 120,
+  offsetLabel: 'UTC+02:00',
+  now: '',
+};
+
+const pad2 = (value) => String(value).padStart(2, '0');
+
+const formatBusinessNow = (offsetMinutes = 120) => {
+  const shifted = new Date(Date.now() + (Number(offsetMinutes || 0) * 60000));
+  const yyyy = shifted.getUTCFullYear();
+  const mm = pad2(shifted.getUTCMonth() + 1);
+  const dd = pad2(shifted.getUTCDate());
+  const hh = pad2(shifted.getUTCHours());
+  const min = pad2(shifted.getUTCMinutes());
+  const sec = pad2(shifted.getUTCSeconds());
+  return `${dd}/${mm}/${yyyy} ${hh}:${min}:${sec}`;
+};
+
 const AdminSystem = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -13,6 +33,8 @@ const AdminSystem = () => {
   const [maintenanceMessage, setMaintenanceMessage] = useState(DEFAULT_MESSAGE);
   const [vatEnabled, setVatEnabled] = useState(true);
   const [configuredVatRatePercent, setConfiguredVatRatePercent] = useState(DEFAULT_VAT_RATE);
+  const [businessTime, setBusinessTime] = useState(DEFAULT_BUSINESS_TIME);
+  const [businessNowDisplay, setBusinessNowDisplay] = useState('');
   const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
   const [filterBarHeight, setFilterBarHeight] = useState(0);
   const { modal, showError, showSuccess, closeModal } = useModal();
@@ -27,6 +49,9 @@ const AdminSystem = () => {
         setMaintenanceMessage(settings.maintenanceMessage || DEFAULT_MESSAGE);
         setVatEnabled(settings.vatEnabled !== false);
         setConfiguredVatRatePercent(Number(settings.configuredVatRatePercent || settings.vatRatePercent || DEFAULT_VAT_RATE));
+        const businessTimeSettings = settings.businessTime || DEFAULT_BUSINESS_TIME;
+        setBusinessTime(businessTimeSettings);
+        setBusinessNowDisplay(formatBusinessNow(Number(businessTimeSettings.offsetMinutes || 120)));
       } catch (err) {
         showError('System settings', err.response?.data?.error || 'Failed to load system settings');
       } finally {
@@ -80,6 +105,17 @@ const AdminSystem = () => {
     }
   });
 
+  useEffect(() => {
+    const offset = Number(businessTime?.offsetMinutes || 120);
+    setBusinessNowDisplay(formatBusinessNow(offset));
+
+    const id = setInterval(() => {
+      setBusinessNowDisplay(formatBusinessNow(offset));
+    }, 1000);
+
+    return () => clearInterval(id);
+  }, [businessTime]);
+
   const handleSave = async () => {
     try {
       setSaving(true);
@@ -91,6 +127,9 @@ const AdminSystem = () => {
       const settings = response.data?.settings || {};
       setVatEnabled(settings.vatEnabled !== false);
       setConfiguredVatRatePercent(Number(settings.configuredVatRatePercent || settings.vatRatePercent || DEFAULT_VAT_RATE));
+      const businessTimeSettings = settings.businessTime || DEFAULT_BUSINESS_TIME;
+      setBusinessTime(businessTimeSettings);
+      setBusinessNowDisplay(formatBusinessNow(Number(businessTimeSettings.offsetMinutes || 120)));
       showSuccess('Success', response.data?.message || 'System settings saved');
     } catch (err) {
       showError('Save failed', err.response?.data?.error || 'Failed to save system settings');
@@ -137,6 +176,12 @@ const AdminSystem = () => {
         </div>
         <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600', marginTop: '0.2rem' }}>
           VAT: {vatEnabled ? `ENABLED (${configuredVatRatePercent.toFixed(1)}%)` : 'DISABLED'}
+        </div>
+        <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600', marginTop: '0.2rem' }}>
+          Business Timezone: {businessTime.timezoneName} ({businessTime.offsetLabel})
+        </div>
+        <div style={{ color: '#334155', fontSize: '0.9rem', fontWeight: 700, marginTop: '0.2rem' }}>
+          Current Business Time: {businessNowDisplay || formatBusinessNow(Number(businessTime.offsetMinutes || 120)) || 'N/A'}
         </div>
       </div>
 
@@ -224,6 +269,10 @@ const AdminSystem = () => {
 
           <div style={{ color: '#64748b', fontSize: '0.85rem' }}>
             VAT rate is fixed at {configuredVatRatePercent.toFixed(1)}%. This toggle only turns that rate on or off.
+          </div>
+
+          <div style={{ color: '#475569', fontSize: '0.9rem', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', borderRadius: '8px', padding: '0.75rem 0.85rem' }}>
+            Business clock source: <strong>{businessTime.timezoneName}</strong> ({businessTime.offsetLabel}) | Live: <strong>{businessNowDisplay || formatBusinessNow(Number(businessTime.offsetMinutes || 120)) || 'N/A'}</strong>
           </div>
 
           <button

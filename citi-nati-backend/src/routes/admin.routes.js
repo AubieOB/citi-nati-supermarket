@@ -31,6 +31,12 @@ const {
 const { getExpiryBatchAlerts, setStockOverride } = require('../controllers/product.controller');
 const { emitProductUpdate } = require('../utils/socket');
 const { VAT_ENABLED_KEY, clearVatSettingsCache, getVatSettings } = require('../utils/vat');
+const {
+  getBusinessOffsetMinutes,
+  formatUtcOffsetLabel,
+  getBusinessTimezoneName,
+  formatBusinessDateTimeLabel,
+} = require('../utils/businessTime');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -91,6 +97,14 @@ router.get('/system/settings', verifyTokenMiddleware, verifyAdmin, async (req, r
       getVatSettings(),
     ]);
 
+    const businessOffsetMinutes = getBusinessOffsetMinutes();
+    const businessTime = {
+      timezoneName: getBusinessTimezoneName(),
+      offsetMinutes: businessOffsetMinutes,
+      offsetLabel: formatUtcOffsetLabel(businessOffsetMinutes),
+      now: formatBusinessDateTimeLabel(new Date()),
+    };
+
     return res.json({
       success: true,
       settings: {
@@ -99,6 +113,7 @@ router.get('/system/settings', verifyTokenMiddleware, verifyAdmin, async (req, r
         vatEnabled: vatSettings.enabled,
         vatRatePercent: vatSettings.ratePercent,
         configuredVatRatePercent: vatSettings.configuredRatePercent,
+        businessTime,
       },
     });
   } catch (err) {
@@ -134,6 +149,13 @@ router.put('/system/maintenance', verifyTokenMiddleware, verifyAdmin, async (req
 
     clearVatSettingsCache();
     const vatSettings = await getVatSettings(true);
+    const businessOffsetMinutes = getBusinessOffsetMinutes();
+    const businessTime = {
+      timezoneName: getBusinessTimezoneName(),
+      offsetMinutes: businessOffsetMinutes,
+      offsetLabel: formatUtcOffsetLabel(businessOffsetMinutes),
+      now: formatBusinessDateTimeLabel(new Date()),
+    };
 
     return res.json({
       success: true,
@@ -144,6 +166,7 @@ router.put('/system/maintenance', verifyTokenMiddleware, verifyAdmin, async (req
         vatEnabled: vatSettings.enabled,
         vatRatePercent: vatSettings.ratePercent,
         configuredVatRatePercent: vatSettings.configuredRatePercent,
+        businessTime,
       },
     });
   } catch (err) {

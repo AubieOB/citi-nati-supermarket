@@ -11,6 +11,21 @@ function getBusinessOffsetMinutes() {
   return Number.isFinite(raw) ? raw : DEFAULT_BUSINESS_TZ_OFFSET_MINUTES;
 }
 
+function formatUtcOffsetLabel(offsetMinutes = 0) {
+  const total = Number(offsetMinutes || 0);
+  const sign = total >= 0 ? '+' : '-';
+  const abs = Math.abs(total);
+  const hh = Math.floor(abs / 60);
+  const mm = abs % 60;
+  return `UTC${sign}${pad2(hh)}:${pad2(mm)}`;
+}
+
+function getBusinessTimezoneName() {
+  const configured = String(process.env.BUSINESS_TIMEZONE_NAME || '').trim();
+  if (configured) return configured;
+  return formatUtcOffsetLabel(getBusinessOffsetMinutes());
+}
+
 function toBusinessShiftedDate(dateValue) {
   const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
   if (Number.isNaN(date.getTime())) return null;
@@ -119,6 +134,8 @@ function formatBusinessDateTimeLabel(dateValue = new Date()) {
 
 module.exports = {
   getBusinessOffsetMinutes,
+  formatUtcOffsetLabel,
+  getBusinessTimezoneName,
   formatBusinessDateKey,
   formatBusinessTimeKey,
   parseDateKey,
