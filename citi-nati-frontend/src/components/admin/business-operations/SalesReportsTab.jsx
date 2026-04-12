@@ -317,9 +317,13 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
     }));
   }, []);
 
-  const fetchSummary = useCallback(async () => {
-    setSummaryLoading(true);
-    setSummaryError('');
+  const fetchSummary = useCallback(async ({ background = false } = {}) => {
+    if (!background || !summary) {
+      setSummaryLoading(true);
+    }
+    if (!background) {
+      setSummaryError('');
+    }
     try {
       const response = await api.get('/business-operations/reports/sales/summary', {
         params: buildReportParams(filters),
@@ -330,29 +334,39 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
         dateRange: response.data?.dateRange || null,
       });
     } catch (error) {
-      setSummaryError(error.response?.data?.error || 'Failed to load sales summary');
-      setSummary(null);
+      if (!background || !summary) {
+        setSummaryError(error.response?.data?.error || 'Failed to load sales summary');
+        setSummary(null);
+      }
     } finally {
       setSummaryLoading(false);
     }
-  }, [filters]);
+  }, [filters, summary]);
 
-  const fetchProfitSummary = useCallback(async () => {
-    setProfitSummaryLoading(true);
+  const fetchProfitSummary = useCallback(async ({ background = false } = {}) => {
+    if (!background || !profitSummary) {
+      setProfitSummaryLoading(true);
+    }
     try {
       const response = await api.get('/business-operations/reports/sales/profit-latest-cost', {
         params: buildReportParams(filters),
       });
       setProfitSummary(response.data?.data?.summary || null);
     } catch {
-      setProfitSummary(null);
+      if (!background || !profitSummary) {
+        setProfitSummary(null);
+      }
     } finally {
       setProfitSummaryLoading(false);
     }
-  }, [filters]);
+  }, [filters, profitSummary]);
 
-  const fetchInvoices = useCallback(async () => {
-    setInvoicesState((prev) => ({ ...prev, loading: true, error: '' }));
+  const fetchInvoices = useCallback(async ({ background = false } = {}) => {
+    setInvoicesState((prev) => ({
+      ...prev,
+      loading: !background || prev.data.length === 0,
+      error: background ? prev.error : '',
+    }));
     try {
       const params = buildReportParams(filters, viewState.invoices);
       const response = await api.get('/business-operations/reports/sales/invoices', { params });
@@ -363,12 +377,22 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
         error: '',
       });
     } catch (error) {
-      setInvoicesState({ data: [], pagination: null, loading: false, error: error.response?.data?.error || 'Failed to load invoice report' });
+      const nextError = error.response?.data?.error || 'Failed to load invoice report';
+      setInvoicesState((prev) => {
+        if (background && prev.data.length > 0) {
+          return { ...prev, loading: false };
+        }
+        return { data: [], pagination: null, loading: false, error: nextError };
+      });
     }
   }, [filters, viewState.invoices]);
 
-  const fetchProducts = useCallback(async () => {
-    setProductsState((prev) => ({ ...prev, loading: true, error: '' }));
+  const fetchProducts = useCallback(async ({ background = false } = {}) => {
+    setProductsState((prev) => ({
+      ...prev,
+      loading: !background || prev.data.length === 0,
+      error: background ? prev.error : '',
+    }));
     try {
       const params = buildReportParams(filters, viewState.products);
       const response = await api.get('/business-operations/reports/sales/products', { params });
@@ -379,12 +403,22 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
         error: '',
       });
     } catch (error) {
-      setProductsState({ data: [], pagination: null, loading: false, error: error.response?.data?.error || 'Failed to load product report' });
+      const nextError = error.response?.data?.error || 'Failed to load product report';
+      setProductsState((prev) => {
+        if (background && prev.data.length > 0) {
+          return { ...prev, loading: false };
+        }
+        return { data: [], pagination: null, loading: false, error: nextError };
+      });
     }
   }, [filters, viewState.products]);
 
-  const fetchUsers = useCallback(async () => {
-    setUsersState((prev) => ({ ...prev, loading: true, error: '' }));
+  const fetchUsers = useCallback(async ({ background = false } = {}) => {
+    setUsersState((prev) => ({
+      ...prev,
+      loading: !background || prev.data.length === 0,
+      error: background ? prev.error : '',
+    }));
     try {
       const params = buildReportParams(filters, viewState.users);
       const response = await api.get('/business-operations/reports/sales/users', { params });
@@ -395,12 +429,22 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
         error: '',
       });
     } catch (error) {
-      setUsersState({ data: [], pagination: null, loading: false, error: error.response?.data?.error || 'Failed to load user report' });
+      const nextError = error.response?.data?.error || 'Failed to load user report';
+      setUsersState((prev) => {
+        if (background && prev.data.length > 0) {
+          return { ...prev, loading: false };
+        }
+        return { data: [], pagination: null, loading: false, error: nextError };
+      });
     }
   }, [filters, viewState.users]);
 
-  const fetchPayments = useCallback(async () => {
-    setPaymentsState((prev) => ({ ...prev, loading: true, error: '' }));
+  const fetchPayments = useCallback(async ({ background = false } = {}) => {
+    setPaymentsState((prev) => ({
+      ...prev,
+      loading: !background || prev.data.length === 0,
+      error: background ? prev.error : '',
+    }));
     try {
       const response = await api.get('/business-operations/reports/sales/payments', {
         params: buildReportParams(filters),
@@ -412,7 +456,13 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
         error: '',
       });
     } catch (error) {
-      setPaymentsState({ data: [], totals: null, loading: false, error: error.response?.data?.error || 'Failed to load payment summary' });
+      const nextError = error.response?.data?.error || 'Failed to load payment summary';
+      setPaymentsState((prev) => {
+        if (background && prev.data.length > 0) {
+          return { ...prev, loading: false };
+        }
+        return { data: [], totals: null, loading: false, error: nextError };
+      });
     }
   }, [filters]);
 
@@ -433,24 +483,24 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
 
     setAutoRefreshing(true);
     try {
-      await fetchSummary();
+      await Promise.all([fetchSummary({ background: true }), fetchProfitSummary({ background: true })]);
 
       if (activeSection === 'sales-by' && isReportModalOpen && activeView === 'invoices') {
-        await fetchInvoices();
+        await fetchInvoices({ background: true });
       }
       if (activeSection === 'sales-by' && isReportModalOpen && activeView === 'products') {
-        await fetchProducts();
+        await fetchProducts({ background: true });
       }
       if (activeSection === 'sales-by' && isReportModalOpen && activeView === 'users') {
-        await fetchUsers();
+        await fetchUsers({ background: true });
       }
       if (activeSection === 'sales-by' && isReportModalOpen && activeView === 'payments') {
-        await fetchPayments();
+        await fetchPayments({ background: true });
       }
     } finally {
       setAutoRefreshing(false);
     }
-  }, [activeSection, activeView, fetchInvoices, fetchPayments, fetchProducts, fetchSummary, fetchUsers, isReportModalOpen]);
+  }, [activeSection, activeView, fetchInvoices, fetchPayments, fetchProducts, fetchProfitSummary, fetchSummary, fetchUsers, isReportModalOpen]);
 
   useEffect(() => {
     autoRefreshIntervalRef.current = setInterval(() => {
@@ -706,7 +756,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
 
   const renderInvoicesView = () => {
     if (invoicesState.error) return <ErrorState message={invoicesState.error} />;
-    if (invoicesState.loading) return <EmptyState message="Loading invoice report..." />;
+    if (invoicesState.loading && !invoicesState.data.length) return <EmptyState message="Loading invoice report..." />;
     if (!invoicesState.data.length) return <EmptyState message={statusMessage('invoices')} />;
 
     return (
@@ -766,7 +816,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
 
   const renderProductsView = () => {
     if (productsState.error) return <ErrorState message={productsState.error} />;
-    if (productsState.loading) return <EmptyState message="Loading product report..." />;
+    if (productsState.loading && !productsState.data.length) return <EmptyState message="Loading product report..." />;
     if (!productsState.data.length) return <EmptyState message={statusMessage('products')} />;
 
     return (
@@ -808,7 +858,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
 
   const renderUsersView = () => {
     if (usersState.error) return <ErrorState message={usersState.error} />;
-    if (usersState.loading) return <EmptyState message="Loading user report..." />;
+    if (usersState.loading && !usersState.data.length) return <EmptyState message="Loading user report..." />;
     if (!usersState.data.length) return <EmptyState message={statusMessage('users')} />;
 
     return (
@@ -846,7 +896,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
 
   const renderPaymentsView = () => {
     if (paymentsState.error) return <ErrorState message={paymentsState.error} />;
-    if (paymentsState.loading) return <EmptyState message="Loading payment summary..." />;
+    if (paymentsState.loading && !paymentsState.data.length) return <EmptyState message="Loading payment summary..." />;
     if (!paymentsState.data.length) return <EmptyState message={statusMessage('payments')} />;
 
     return (

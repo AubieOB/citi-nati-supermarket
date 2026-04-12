@@ -84,8 +84,22 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, onNavigat
   const autoRefreshIntervalRef = useRef(null);
   const autoRefreshTimeoutRef = useRef(null);
 
-  const fetchActivity = useCallback(async () => {
-    setState((current) => ({ ...current, loading: true, error: '' }));
+  const fetchActivity = useCallback(async ({ background = false } = {}) => {
+    setState((current) => {
+      const hasData = Boolean(
+        current.salesSummary
+        || current.invoices.length
+        || current.expenses.length
+        || current.supplierTransactions.length
+        || current.payrollPeriods.length,
+      );
+
+      return {
+        ...current,
+        loading: !background || !hasData,
+        error: background ? current.error : '',
+      };
+    });
     const monthParams = { ...getCurrentMonthParams(), ...(selectedLocationId && { locationId: selectedLocationId }) };
 
     try {
@@ -107,14 +121,29 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, onNavigat
         payrollPeriods: payrollPeriodsResponse.data?.data || [],
       });
     } catch (requestError) {
-      setState({
-        loading: false,
-        error: requestError.response?.data?.error || 'Failed to load report history activity',
-        salesSummary: null,
-        invoices: [],
-        expenses: [],
-        supplierTransactions: [],
-        payrollPeriods: [],
+      const nextError = requestError.response?.data?.error || 'Failed to load report history activity';
+      setState((current) => {
+        const hasData = Boolean(
+          current.salesSummary
+          || current.invoices.length
+          || current.expenses.length
+          || current.supplierTransactions.length
+          || current.payrollPeriods.length,
+        );
+
+        if (background && hasData) {
+          return { ...current, loading: false };
+        }
+
+        return {
+          loading: false,
+          error: nextError,
+          salesSummary: null,
+          invoices: [],
+          expenses: [],
+          supplierTransactions: [],
+          payrollPeriods: [],
+        };
       });
     }
   }, [selectedLocationId]);
@@ -128,7 +157,7 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, onNavigat
 
     setAutoRefreshing(true);
     try {
-      await fetchActivity();
+      await fetchActivity({ background: true });
     } finally {
       setAutoRefreshing(false);
     }

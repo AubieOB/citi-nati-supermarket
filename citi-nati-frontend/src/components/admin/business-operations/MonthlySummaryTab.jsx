@@ -142,8 +142,12 @@ const MonthlySummaryTab = ({
     });
   }, [now]);
 
-  const fetchSales = useCallback(async () => {
-    setSalesState((prev) => ({ ...prev, loading: true, error: '' }));
+  const fetchSales = useCallback(async ({ background = false } = {}) => {
+    setSalesState((prev) => ({
+      ...prev,
+      loading: !background || (!prev.summary && prev.payments.length === 0),
+      error: background ? prev.error : '',
+    }));
 
     const params = filters.periodType === 'month'
       ? { periodType: 'month', month: String(filters.month), year: String(filters.year) }
@@ -168,12 +172,22 @@ const MonthlySummaryTab = ({
         payments: Array.isArray(paymentsResponse?.data?.data) ? paymentsResponse.data.data : [],
       });
     } catch (error) {
-      setSalesState({ loading: false, error: parseError(error, 'Failed to load sales summary.'), summary: null, payments: [] });
+      const nextError = parseError(error, 'Failed to load sales summary.');
+      setSalesState((prev) => {
+        if (background && (prev.summary || prev.payments.length > 0)) {
+          return { ...prev, loading: false };
+        }
+        return { loading: false, error: nextError, summary: null, payments: [] };
+      });
     }
   }, [activeRange.endDate, activeRange.startDate, filters.month, filters.periodType, filters.year, selectedLocationCode, selectedLocationId]);
 
-  const fetchExpenses = useCallback(async () => {
-    setExpensesState((prev) => ({ ...prev, loading: true, error: '' }));
+  const fetchExpenses = useCallback(async ({ background = false } = {}) => {
+    setExpensesState((prev) => ({
+      ...prev,
+      loading: !background || !prev.summary,
+      error: background ? prev.error : '',
+    }));
 
     const params = {
       startDate: activeRange.startDate,
@@ -186,12 +200,22 @@ const MonthlySummaryTab = ({
       const response = await api.get('/business-operations/expenses/summary/overview', { params });
       setExpensesState({ loading: false, error: '', summary: response?.data?.data || null });
     } catch (error) {
-      setExpensesState({ loading: false, error: parseError(error, 'Failed to load expense summary.'), summary: null });
+      const nextError = parseError(error, 'Failed to load expense summary.');
+      setExpensesState((prev) => {
+        if (background && prev.summary) {
+          return { ...prev, loading: false };
+        }
+        return { loading: false, error: nextError, summary: null };
+      });
     }
   }, [activeRange.endDate, activeRange.startDate, selectedLocationId]);
 
-  const fetchPayroll = useCallback(async () => {
-    setPayrollState((prev) => ({ ...prev, loading: true, error: '' }));
+  const fetchPayroll = useCallback(async ({ background = false } = {}) => {
+    setPayrollState((prev) => ({
+      ...prev,
+      loading: !background || !prev.data,
+      error: background ? prev.error : '',
+    }));
 
     try {
       const periods = await fetchAllPages('/business-operations/payroll/periods', {
@@ -249,12 +273,22 @@ const MonthlySummaryTab = ({
         },
       });
     } catch (error) {
-      setPayrollState({ loading: false, error: parseError(error, 'Failed to load payroll summary.'), data: null });
+      const nextError = parseError(error, 'Failed to load payroll summary.');
+      setPayrollState((prev) => {
+        if (background && prev.data) {
+          return { ...prev, loading: false };
+        }
+        return { loading: false, error: nextError, data: null };
+      });
     }
   }, [activeRange.endDate, activeRange.startDate, selectedLocationId]);
 
-  const fetchSuppliers = useCallback(async () => {
-    setSupplierState((prev) => ({ ...prev, loading: true, error: '' }));
+  const fetchSuppliers = useCallback(async ({ background = false } = {}) => {
+    setSupplierState((prev) => ({
+      ...prev,
+      loading: !background || !prev.data,
+      error: background ? prev.error : '',
+    }));
 
     try {
       const [suppliers, payments] = await Promise.all([
@@ -305,7 +339,13 @@ const MonthlySummaryTab = ({
         },
       });
     } catch (error) {
-      setSupplierState({ loading: false, error: parseError(error, 'Failed to load supplier summary.'), data: null });
+      const nextError = parseError(error, 'Failed to load supplier summary.');
+      setSupplierState((prev) => {
+        if (background && prev.data) {
+          return { ...prev, loading: false };
+        }
+        return { loading: false, error: nextError, data: null };
+      });
     }
   }, [activeRange.endDate, activeRange.startDate, selectedLocationId]);
 
@@ -323,7 +363,12 @@ const MonthlySummaryTab = ({
 
     setAutoRefreshing(true);
     try {
-      await Promise.all([fetchSales(), fetchExpenses(), fetchPayroll(), fetchSuppliers()]);
+      await Promise.all([
+        fetchSales({ background: true }),
+        fetchExpenses({ background: true }),
+        fetchPayroll({ background: true }),
+        fetchSuppliers({ background: true }),
+      ]);
     } finally {
       setAutoRefreshing(false);
     }
