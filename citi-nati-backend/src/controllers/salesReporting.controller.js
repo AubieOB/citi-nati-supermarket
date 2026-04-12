@@ -18,6 +18,7 @@ const {
   queryProductReport,
   queryUserReport,
   queryPaymentReport,
+  queryLatestCostProfitAnalytics,
 } = require('../services/salesReporting.service');
 
 // ---------------------------------------------------------------------------
@@ -251,6 +252,36 @@ async function getSalesPayments(req, res) {
 }
 
 // ---------------------------------------------------------------------------
+// 6. GET /reports/sales/profit-latest-cost
+// ---------------------------------------------------------------------------
+
+/**
+ * Return latest-GRN-cost profit analytics for the selected period + filters.
+ * Preserves existing reporting endpoints and provides a dedicated analytics view.
+ */
+async function getSalesProfitLatestCost(req, res) {
+  try {
+    const period = resolvePeriodOrRespond(req, res);
+    if (!period) return;
+
+    const filters = extractFilters(req.query);
+    const dateRange = formatDateRange(period.startDate, period.endDate);
+    const itemWhere = buildItemWhere(period, filters);
+    const data = await queryLatestCostProfitAnalytics(itemWhere, filters);
+
+    return res.json({
+      success: true,
+      filters: buildResponseFilters(req.query, period),
+      dateRange,
+      data,
+    });
+  } catch (err) {
+    console.error('[REPORTING] getSalesProfitLatestCost error:', err);
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 
@@ -260,4 +291,5 @@ module.exports = {
   getSalesProducts,
   getSalesUsers,
   getSalesPayments,
+  getSalesProfitLatestCost,
 };

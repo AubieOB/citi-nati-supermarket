@@ -496,6 +496,258 @@ function dateRangeFromPeriod(period) {
   };
 }
 
+function formatDateTimeLabel(value) {
+  if (!value) return 'N/A';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'N/A';
+  return parsed.toLocaleString('en-GB', {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function moneyOrDash(value) {
+  return value == null ? 'N/A' : money(value);
+}
+
+const LatestCostProfitSubview = ({ active, selectedPeriod, effectiveScope, locations, scopeLabel, periodLabel, refreshTick }) => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [profitData, setProfitData] = useState(null);
+
+  const fetchProfitAnalytics = useCallback(async () => {
+    if (!active) return;
+
+    setLoading(true);
+    setError('');
+    try {
+      const params = withScope(buildParamsForPeriod(selectedPeriod), effectiveScope, locations);
+      const response = await api.get('/business-operations/reports/sales/profit-latest-cost', { params });
+      setProfitData(response?.data?.data || null);
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Failed to load latest-cost profit analytics.');
+    } finally {
+      setLoading(false);
+    }
+  }, [active, effectiveScope, locations, selectedPeriod]);
+
+  useEffect(() => {
+    fetchProfitAnalytics();
+  }, [fetchProfitAnalytics, refreshTick]);
+
+  if (!active) return null;
+
+  const summary = profitData?.summary || null;
+  const profitabilitySummary = profitData?.profitabilitySummary || null;
+  const categoryTotals = Array.isArray(profitData?.categoryTotals) ? profitData.categoryTotals : [];
+  const dailyTotals = Array.isArray(profitData?.dailyTotals) ? profitData.dailyTotals : [];
+  const products = Array.isArray(profitData?.products) ? profitData.products : [];
+  const incompleteProducts = products.filter((row) => row.isIncomplete);
+  const completeProducts = products.filter((row) => !row.isIncomplete);
+
+  return (
+    <div style={{ display: 'grid', gap: '0.85rem' }}>
+      <div style={{ ...cardStyle, padding: '1rem 1.05rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div>
+            <strong style={{ color: '#0f172a' }}>Latest-Cost Profit Analytics</strong>
+            <p style={{ margin: '0.3rem 0 0', color: '#64748b', fontSize: '0.84rem', lineHeight: 1.5 }}>
+              Profit is calculated from sold revenue minus COGS using each product&apos;s latest unit cost from its most recent finalized GRN / stock addition.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={fetchProfitAnalytics}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '9px', padding: '0.55rem 0.78rem', fontWeight: 700, cursor: 'pointer' }}
+          >
+            <i className={`fas ${loading ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`} style={{ marginRight: '0.4rem' }}></i>
+            Refresh Profit Analytics
+          </button>
+        </div>
+
+        <div style={{ marginTop: '0.7rem', display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', padding: '0.28rem 0.6rem', borderRadius: '999px', backgroundColor: '#eff6ff', color: '#1d4ed8', fontSize: '0.76rem', fontWeight: 800 }}>
+            Period: {periodLabel}
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', padding: '0.28rem 0.6rem', borderRadius: '999px', backgroundColor: '#f8fafc', color: '#334155', fontSize: '0.76rem', fontWeight: 800 }}>
+            Scope: {scopeLabel}
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', padding: '0.28rem 0.6rem', borderRadius: '999px', backgroundColor: '#ecfeff', color: '#155e75', fontSize: '0.76rem', fontWeight: 800 }}>
+            Basis: Latest finalized GRN unit cost
+          </span>
+        </div>
+      </div>
+
+      {error && (
+        <div style={{ ...cardStyle, padding: '0.9rem 1rem', borderColor: '#fecaca', backgroundColor: '#fff1f2', color: '#b91c1c' }}>
+          {error}
+        </div>
+      )}
+
+      {loading && !profitData && (
+        <div style={{ ...cardStyle, padding: '1rem 1.1rem', color: '#64748b' }}>
+          <i className="fas fa-spinner fa-spin" style={{ marginRight: '0.45rem' }}></i>
+          Loading latest-cost profit analytics...
+        </div>
+      )}
+
+      {!loading && summary && (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
+            {[
+              { label: 'Total Revenue', value: money(summary.totalRevenue), note: 'All sold revenue in the selected period.' },
+              { label: 'Revenue With Cost Basis', value: money(summary.completeRevenue), note: `Coverage ${Number(summary.coveragePct || 0).toFixed(1)}%` },
+              { label: 'COGS From Latest Cost', value: money(summary.totalCostOfGoodsSold), note: 'Latest unit cost multiplied by sold quantity.' },
+              { label: 'Gross Profit', value: money(summary.totalGrossProfit), note: summary.grossMarginPct == null ? 'Margin unavailable' : `Margin ${Number(summary.grossMarginPct).toFixed(1)}%` },
+              { label: 'Excluded Revenue', value: money(summary.excludedRevenue), note: `${intFmt(summary.incompleteProducts)} incomplete product(s)` },
+              { label: 'Daily / Period Ready', value: intFmt(summary.completeProducts), note: `${intFmt(summary.totalProducts)} tracked products total` },
+            ].map((kpi) => (
+              <div key={kpi.label} style={{ ...cardStyle, padding: '0.9rem 1rem' }}>
+                <div style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>{kpi.label}</div>
+                <div style={{ marginTop: '0.32rem', color: '#0f172a', fontWeight: 900, fontSize: '1.15rem' }}>{kpi.value}</div>
+                <div style={{ marginTop: '0.26rem', color: '#64748b', fontSize: '0.8rem' }}>{kpi.note}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem' }}>
+            <div style={{ ...cardStyle, padding: '0.9rem 1rem' }}>
+              <strong style={{ color: '#0f172a' }}>Cost Basis Rule</strong>
+              <p style={{ margin: '0.3rem 0 0', color: '#64748b', fontSize: '0.82rem', lineHeight: 1.5 }}>
+                {summary.costBasisLabel}. Products without a valid latest unit cost are flagged and excluded from gross profit totals.
+              </p>
+            </div>
+            <div style={{ ...cardStyle, padding: '0.9rem 1rem' }}>
+              <strong style={{ color: '#0f172a' }}>Profitability Mix</strong>
+              <p style={{ margin: '0.3rem 0 0', color: '#64748b', fontSize: '0.82rem', lineHeight: 1.5 }}>
+                Profitable: {intFmt(profitabilitySummary?.profitableProducts || 0)} | Loss-making: {intFmt(profitabilitySummary?.lossMakingProducts || 0)} | Break-even: {intFmt(profitabilitySummary?.breakEvenProducts || 0)}
+              </p>
+            </div>
+          </div>
+
+          {summary.incompleteProducts > 0 && (
+            <div style={{ ...cardStyle, padding: '0.95rem 1rem', borderColor: '#fcd34d', backgroundColor: '#fffbeb' }}>
+              <strong style={{ color: '#92400e' }}>Incomplete Profit Coverage</strong>
+              <p style={{ margin: '0.28rem 0 0', color: '#92400e', fontSize: '0.82rem', lineHeight: 1.5 }}>
+                {intFmt(summary.incompleteProducts)} product(s) do not have a valid latest GRN cost in the current scope. Their revenue is shown, but it is excluded from gross profit so the system does not invent profit numbers.
+              </p>
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '0.8rem' }}>
+            <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
+              <strong style={{ color: '#0f172a' }}>Daily Profit Totals</strong>
+              <p style={{ margin: '0.32rem 0 0.6rem', color: '#64748b', fontSize: '0.84rem' }}>Daily revenue, excluded revenue, COGS, and gross profit using latest cost basis.</p>
+              <div style={{ maxHeight: '320px', overflowY: 'auto', display: 'grid', gap: '0.42rem' }}>
+                {dailyTotals.length === 0 ? (
+                  <div style={{ color: '#94a3b8', fontSize: '0.84rem' }}>No daily profit data for this period.</div>
+                ) : dailyTotals.map((row) => (
+                  <div key={row.day} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.55rem 0.65rem', backgroundColor: '#fff' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <strong style={{ color: '#0f172a', fontSize: '0.84rem' }}>{row.day}</strong>
+                      <span style={{ color: '#1d4ed8', fontWeight: 800, fontSize: '0.8rem' }}>{money(row.grossProfit)}</span>
+                    </div>
+                    <div style={{ marginTop: '0.28rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.35rem' }}>
+                      <div style={{ color: '#64748b', fontSize: '0.76rem' }}>Revenue: <span style={{ color: '#0f172a', fontWeight: 700 }}>{money(row.revenue)}</span></div>
+                      <div style={{ color: '#64748b', fontSize: '0.76rem' }}>COGS: <span style={{ color: '#0f172a', fontWeight: 700 }}>{money(row.costOfGoodsSold)}</span></div>
+                      <div style={{ color: '#64748b', fontSize: '0.76rem' }}>Excluded: <span style={{ color: '#b45309', fontWeight: 700 }}>{money(row.excludedRevenue)}</span></div>
+                      <div style={{ color: '#64748b', fontSize: '0.76rem' }}>Margin: <span style={{ color: '#0f172a', fontWeight: 700 }}>{row.grossMarginPct == null ? 'N/A' : `${Number(row.grossMarginPct).toFixed(1)}%`}</span></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
+              <strong style={{ color: '#0f172a' }}>Category Profit Totals</strong>
+              <p style={{ margin: '0.32rem 0 0.6rem', color: '#64748b', fontSize: '0.84rem' }}>Category profit totals when product-category mapping is available.</p>
+              <div style={{ maxHeight: '320px', overflowY: 'auto', display: 'grid', gap: '0.42rem' }}>
+                {categoryTotals.length === 0 ? (
+                  <div style={{ color: '#94a3b8', fontSize: '0.84rem' }}>No category profit totals available.</div>
+                ) : categoryTotals.map((row) => (
+                  <div key={row.category} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.55rem 0.65rem', backgroundColor: '#fff' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <strong style={{ color: '#0f172a', fontSize: '0.84rem' }}>{row.category}</strong>
+                      <span style={{ color: '#1d4ed8', fontWeight: 800, fontSize: '0.8rem' }}>{money(row.totalGrossProfit)}</span>
+                    </div>
+                    <div style={{ marginTop: '0.28rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.35rem' }}>
+                      <div style={{ color: '#64748b', fontSize: '0.76rem' }}>Revenue: <span style={{ color: '#0f172a', fontWeight: 700 }}>{money(row.totalRevenue)}</span></div>
+                      <div style={{ color: '#64748b', fontSize: '0.76rem' }}>COGS: <span style={{ color: '#0f172a', fontWeight: 700 }}>{money(row.totalCostOfGoodsSold)}</span></div>
+                      <div style={{ color: '#64748b', fontSize: '0.76rem' }}>Margin: <span style={{ color: '#0f172a', fontWeight: 700 }}>{row.grossMarginPct == null ? 'N/A' : `${Number(row.grossMarginPct).toFixed(1)}%`}</span></div>
+                      <div style={{ color: '#64748b', fontSize: '0.76rem' }}>Incomplete: <span style={{ color: '#b45309', fontWeight: 700 }}>{intFmt(row.incompleteProducts)}</span></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '0.8rem' }}>
+            <div style={{ ...cardStyle, padding: '0.9rem 0.95rem' }}>
+              <strong style={{ color: '#0f172a' }}>Products Missing Latest Cost</strong>
+              <p style={{ margin: '0.3rem 0 0.6rem', color: '#64748b', fontSize: '0.82rem' }}>These products are flagged and excluded from profit totals until a valid latest GRN cost exists.</p>
+              <div style={{ maxHeight: '360px', overflowY: 'auto', display: 'grid', gap: '0.42rem' }}>
+                {incompleteProducts.length === 0 ? (
+                  <div style={{ color: '#166534', fontSize: '0.84rem', fontWeight: 700 }}>All tracked products have a valid latest cost basis.</div>
+                ) : incompleteProducts.map((row) => (
+                  <div key={`${row.productCode || row.productName}-missing`} style={{ border: '1px solid #fed7aa', borderRadius: '12px', padding: '0.55rem 0.65rem', backgroundColor: '#fff7ed' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <strong style={{ color: '#9a3412', fontSize: '0.84rem' }}>{row.productName}</strong>
+                      <span style={{ color: '#9a3412', fontWeight: 800, fontSize: '0.76rem' }}>{row.productCode || 'No product code'}</span>
+                    </div>
+                    <div style={{ marginTop: '0.28rem', color: '#7c2d12', fontSize: '0.78rem', lineHeight: 1.45 }}>{row.incompleteReason}</div>
+                    <div style={{ marginTop: '0.28rem', color: '#9a3412', fontSize: '0.76rem' }}>Revenue: <strong>{money(row.revenue)}</strong> | Qty: <strong>{intFmt(row.quantitySold)}</strong></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ ...cardStyle, padding: '0.9rem 0.95rem' }}>
+              <strong style={{ color: '#0f172a' }}>Per-Product Profit</strong>
+              <p style={{ margin: '0.3rem 0 0.6rem', color: '#64748b', fontSize: '0.82rem' }}>Revenue, latest unit cost basis, COGS, gross profit, and margin by product.</p>
+              <div style={{ maxHeight: '360px', overflowY: 'auto', display: 'grid', gap: '0.42rem' }}>
+                {completeProducts.length === 0 ? (
+                  <div style={{ color: '#94a3b8', fontSize: '0.84rem' }}>No complete product profit rows available.</div>
+                ) : completeProducts.map((row) => (
+                  <div key={`${row.productCode || row.productName}-profit`} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.6rem 0.7rem', backgroundColor: '#fff' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                      <div>
+                        <strong style={{ color: '#0f172a', fontSize: '0.84rem' }}>{row.productName}</strong>
+                        <div style={{ marginTop: '0.16rem', color: '#64748b', fontSize: '0.76rem' }}>{row.productCode || 'No product code'} {row.category ? `• ${row.category}` : ''}</div>
+                      </div>
+                      <div style={{ color: '#1d4ed8', fontWeight: 900, fontSize: '0.86rem' }}>{money(row.grossProfit)}</div>
+                    </div>
+
+                    <div style={{ marginTop: '0.34rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.35rem' }}>
+                      <div style={{ color: '#64748b', fontSize: '0.76rem' }}>Revenue: <span style={{ color: '#0f172a', fontWeight: 700 }}>{money(row.revenue)}</span></div>
+                      <div style={{ color: '#64748b', fontSize: '0.76rem' }}>Qty: <span style={{ color: '#0f172a', fontWeight: 700 }}>{intFmt(row.quantitySold)}</span></div>
+                      <div style={{ color: '#64748b', fontSize: '0.76rem' }}>Latest Unit Cost: <span style={{ color: '#0f172a', fontWeight: 700 }}>{moneyOrDash(row.latestCostBasis?.latestUnitCost)}</span></div>
+                      <div style={{ color: '#64748b', fontSize: '0.76rem' }}>COGS: <span style={{ color: '#0f172a', fontWeight: 700 }}>{moneyOrDash(row.costOfGoodsSold)}</span></div>
+                      <div style={{ color: '#64748b', fontSize: '0.76rem' }}>Margin: <span style={{ color: '#0f172a', fontWeight: 700 }}>{row.grossMarginPct == null ? 'N/A' : `${Number(row.grossMarginPct).toFixed(1)}%`}</span></div>
+                    </div>
+
+                    <div style={{ marginTop: '0.34rem', padding: '0.45rem 0.5rem', borderRadius: '10px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                      <div style={{ color: '#475569', fontSize: '0.74rem', fontWeight: 800 }}>Latest Cost Basis</div>
+                      <div style={{ marginTop: '0.18rem', color: '#334155', fontSize: '0.76rem', lineHeight: 1.45 }}>
+                        Reference: <strong>{row.latestCostBasis?.latestGrnReference || row.latestCostBasis?.intakeRef || 'N/A'}</strong><br />
+                        Stock addition date: <strong>{formatDateTimeLabel(row.latestCostBasis?.latestStockAdditionDate)}</strong><br />
+                        Recorded at: <strong>{formatDateTimeLabel(row.latestCostBasis?.latestRecordedAt)}</strong>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 const BusinessAnalyticsTab = ({
   selectedLocationId = null,
   selectedLocationCode = '',
@@ -515,6 +767,7 @@ const BusinessAnalyticsTab = ({
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [profitRefreshTick, setProfitRefreshTick] = useState(0);
   const [error, setError] = useState('');
   const [analytics, setAnalytics] = useState(null);
   const [activeView, setActiveView] = useState('overview');
@@ -801,6 +1054,7 @@ const BusinessAnalyticsTab = ({
   useEffect(() => {
     refreshIntervalRef.current = setInterval(() => {
       computeAnalytics();
+      setProfitRefreshTick((prev) => prev + 1);
     }, AUTO_REFRESH_MS);
 
     const scheduleRefresh = () => {
@@ -809,6 +1063,7 @@ const BusinessAnalyticsTab = ({
       }
       refreshTimeoutRef.current = setTimeout(() => {
         computeAnalytics();
+        setProfitRefreshTick((prev) => prev + 1);
       }, AUTO_REFRESH_DEBOUNCE_MS);
     };
 
@@ -967,7 +1222,10 @@ const BusinessAnalyticsTab = ({
 
           <button
             type="button"
-            onClick={computeAnalytics}
+            onClick={() => {
+              computeAnalytics();
+              setProfitRefreshTick((prev) => prev + 1);
+            }}
             style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '9px', padding: '0.55rem 0.78rem', fontWeight: 700, cursor: 'pointer' }}
           >
             <i className={`fas ${refreshing ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`} style={{ marginRight: '0.4rem' }}></i>
@@ -1058,6 +1316,7 @@ const BusinessAnalyticsTab = ({
                 { id: 'overview', label: 'Overview' },
                 { id: 'trends', label: 'Trends' },
                 { id: 'rankings', label: 'Rankings' },
+                { id: 'latest-profit', label: 'Latest Cost Profit' },
                 { id: 'analysis', label: 'Action Center' },
               ].map((view) => {
                 const isActive = activeView === view.id;
@@ -1083,6 +1342,18 @@ const BusinessAnalyticsTab = ({
               })}
             </div>
           </div>
+
+          {activeView === 'latest-profit' && (
+            <LatestCostProfitSubview
+              active={activeView === 'latest-profit'}
+              selectedPeriod={selectedPeriod}
+              effectiveScope={effectiveScope}
+              locations={locations}
+              scopeLabel={scopeLabel}
+              periodLabel={selectedDateRange.label}
+              refreshTick={profitRefreshTick}
+            />
+          )}
 
           {activeView === 'overview' && (
             <>

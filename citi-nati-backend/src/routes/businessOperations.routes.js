@@ -13,6 +13,7 @@
  *   GET /reports/sales/products  – product-level aggregations
  *   GET /reports/sales/users     – cashier/user aggregations
  *   GET /reports/sales/payments  – payment-method summary
+ *   GET /reports/sales/profit-latest-cost – profit analytics using latest finalized GRN cost per product
  *
  * Common query params (all endpoints):
  *   periodType = day | week | month | quarter | year | custom  (required)
@@ -40,6 +41,7 @@ const {
   getSalesProducts,
   getSalesUsers,
   getSalesPayments,
+  getSalesProfitLatestCost,
 } = require('../controllers/salesReporting.controller');
 const { listBusinessLocations } = require('../controllers/business-operations/locations.controller');
 const { resetImportedData, wipeAllData } = require('../controllers/business-operations/adminReset.controller');
@@ -63,6 +65,7 @@ router.get('/reports/sales/invoices', getSalesInvoices);
 router.get('/reports/sales/products', getSalesProducts);
 router.get('/reports/sales/users', getSalesUsers);
 router.get('/reports/sales/payments', getSalesPayments);
+router.get('/reports/sales/profit-latest-cost', getSalesProfitLatestCost);
 
 // Admin safety endpoint for workbook-import cleanup.
 router.post('/admin/reset-imported-data', resetImportedData);

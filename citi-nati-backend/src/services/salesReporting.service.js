@@ -1,6 +1,10 @@
 'use strict';
 
 const { PrismaClient } = require('@prisma/client');
+const {
+  normalizeProductCode,
+  resolveLatestProductCosts,
+} = require('./business-operations/latestProductCost.service');
 
 const prisma = new PrismaClient();
 
@@ -18,6 +22,12 @@ function toNum(val, decimals = 2) {
 /** Convert a BigInt id from Prisma to a string safe for JSON serialisation. */
 function serializeBigInt(val) {
   return val != null ? String(val) : null;
+}
+
+function roundMoney(val, decimals = 2) {
+  const n = Number(val);
+  if (!Number.isFinite(n)) return 0;
+  return Number(n.toFixed(decimals));
 }
 
 // ---------------------------------------------------------------------------
@@ -335,6 +345,301 @@ async function queryPaymentReport(invoiceWhere) {
 }
 
 // ---------------------------------------------------------------------------
+// 6. Latest-cost profit analytics
+// ---------------------------------------------------------------------------
+
+function categoryLabel(value) {
+  const normalized = String(value || '').trim();
+  return normalized || null;
+}
+
+function dayKeyFromDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 10);
+}
+
+async function queryLatestCostProfitAnalytics(itemWhere, filters = {}) {
+  const [groupedProducts, salesItems] = await Promise.all([
+    prisma.salesInvoiceItem.groupBy({
+      by: ['productCode', 'productName'],
+      where: itemWhere,
+      _sum: {
+        qty: true,
+        amount: true,
+        taxAmount: true,
+        discountAmount: true,
+      },
+      _avg: {
+        unitPrice: true,
+      },
+      _count: {
+        id: true,
+      },
+    }),
+    prisma.salesInvoiceItem.findMany({
+      where: itemWhere,
+      select: {
+        productCode: true,
+        productName: true,
+        qty: true,
+        amount: true,
+        salesInvoice: {
+          select: {
+            invoiceDate: true,
+          },
+        },
+      },
+    }),
+  ]);
+
+  const productCodes = Array.from(new Set(
+    groupedProducts
+      .map((row) => normalizeProductCode(row.productCode))
+      .filter(Boolean),
+  ));
+
+  const [latestCostMap, productDetails] = await Promise.all([
+    resolveLatestProductCosts({ productCodes, filters }),
+    productCodes.length > 0
+      ? prisma.product.findMany({
+          where: {
+            sourceCode: { in: productCodes },
+          },
+          select: {
+            sourceCode: true,
+            name: true,
+            category: true,
+          },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const productDetailsMap = new Map(
+    productDetails.map((row) => [normalizeProductCode(row.sourceCode), row]),
+  );
+
+  const products = groupedProducts
+    .map((group) => {
+      const productCode = normalizeProductCode(group.productCode);
+      const detail = productCode ? productDetailsMap.get(productCode) : null;
+      const costBasis = productCode ? latestCostMap.get(productCode) : null;
+      const revenue = toNum(group._sum.amount);
+      const quantitySold = toNum(group._sum.qty, 4);
+      const hasValidLatestCost = !!costBasis?.hasValidCost;
+      const costOfGoodsSold = hasValidLatestCost
+        ? roundMoney(costBasis.latestUnitCost * quantitySold)
+        : null;
+      const grossProfit = hasValidLatestCost
+        ? roundMoney(revenue - costOfGoodsSold)
+        : null;
+      const grossMarginPct = hasValidLatestCost && revenue > 0
+        ? roundMoney((grossProfit / revenue) * 100)
+        : null;
+
+      let incompleteReason = null;
+      if (!productCode) {
+        incompleteReason = 'Sold item has no product code, so no latest GRN cost can be matched safely.';
+      } else if (!costBasis) {
+        incompleteReason = 'No finalized GRN / stock addition record found for this product in the selected scope.';
+      } else if (!costBasis.hasValidCost) {
+        incompleteReason = 'Latest GRN / stock addition record has no valid positive unit cost.';
+      }
+
+      return {
+        productCode,
+        productName: group.productName || detail?.name || costBasis?.productNameAtCostBasis || 'Unnamed product',
+        category: categoryLabel(detail?.category),
+        quantitySold,
+        revenue,
+        totalTax: toNum(group._sum.taxAmount),
+        totalDiscount: toNum(group._sum.discountAmount),
+        averageUnitPrice: toNum(group._avg.unitPrice),
+        linesSold: group._count.id || 0,
+        hasValidLatestCost,
+        isIncomplete: !hasValidLatestCost,
+        incompleteReason,
+        costOfGoodsSold,
+        grossProfit,
+        grossMarginPct,
+        latestCostBasis: costBasis
+          ? {
+              latestUnitCost: roundMoney(costBasis.latestUnitCost, 4),
+              latestGrnReference: costBasis.latestGrnReference,
+              intakeRef: costBasis.intakeRef,
+              receiptReference: costBasis.receiptReference,
+              latestStockAdditionDate: costBasis.latestStockAdditionDate,
+              latestRecordedAt: costBasis.latestRecordedAt,
+              locationCode: costBasis.locationCode,
+              locationId: costBasis.locationId,
+            }
+          : null,
+      };
+    })
+    .sort((a, b) => {
+      if (a.isIncomplete !== b.isIncomplete) return a.isIncomplete ? -1 : 1;
+      return (b.grossProfit ?? Number.NEGATIVE_INFINITY) - (a.grossProfit ?? Number.NEGATIVE_INFINITY)
+        || b.revenue - a.revenue;
+    });
+
+  const summary = products.reduce((acc, row) => {
+    acc.totalProducts += 1;
+    acc.totalRevenue += row.revenue;
+    acc.totalQuantitySold += row.quantitySold;
+
+    if (row.hasValidLatestCost) {
+      acc.completeProducts += 1;
+      acc.completeRevenue += row.revenue;
+      acc.totalCostOfGoodsSold += row.costOfGoodsSold || 0;
+      acc.totalGrossProfit += row.grossProfit || 0;
+      if ((row.grossProfit || 0) > 0) acc.profitableProducts += 1;
+      if ((row.grossProfit || 0) < 0) acc.lossMakingProducts += 1;
+    } else {
+      acc.incompleteProducts += 1;
+      acc.excludedRevenue += row.revenue;
+    }
+
+    return acc;
+  }, {
+    totalProducts: 0,
+    completeProducts: 0,
+    incompleteProducts: 0,
+    totalRevenue: 0,
+    completeRevenue: 0,
+    excludedRevenue: 0,
+    totalQuantitySold: 0,
+    totalCostOfGoodsSold: 0,
+    totalGrossProfit: 0,
+    profitableProducts: 0,
+    lossMakingProducts: 0,
+  });
+
+  summary.totalRevenue = roundMoney(summary.totalRevenue);
+  summary.completeRevenue = roundMoney(summary.completeRevenue);
+  summary.excludedRevenue = roundMoney(summary.excludedRevenue);
+  summary.totalQuantitySold = roundMoney(summary.totalQuantitySold, 4);
+  summary.totalCostOfGoodsSold = roundMoney(summary.totalCostOfGoodsSold);
+  summary.totalGrossProfit = roundMoney(summary.totalGrossProfit);
+  summary.grossMarginPct = summary.completeRevenue > 0
+    ? roundMoney((summary.totalGrossProfit / summary.completeRevenue) * 100)
+    : null;
+  summary.coveragePct = summary.totalRevenue > 0
+    ? roundMoney((summary.completeRevenue / summary.totalRevenue) * 100)
+    : 0;
+  summary.costBasisLabel = 'Latest unit cost from the most recent finalized GRN / stock addition per product';
+
+  const categoryMap = new Map();
+  for (const row of products) {
+    const key = categoryLabel(row.category) || 'Uncategorized';
+    const entry = categoryMap.get(key) || {
+      category: key,
+      totalProducts: 0,
+      completeProducts: 0,
+      incompleteProducts: 0,
+      totalQuantitySold: 0,
+      totalRevenue: 0,
+      completeRevenue: 0,
+      excludedRevenue: 0,
+      totalCostOfGoodsSold: 0,
+      totalGrossProfit: 0,
+      grossMarginPct: null,
+    };
+
+    entry.totalProducts += 1;
+    entry.totalQuantitySold += row.quantitySold;
+    entry.totalRevenue += row.revenue;
+
+    if (row.hasValidLatestCost) {
+      entry.completeProducts += 1;
+      entry.completeRevenue += row.revenue;
+      entry.totalCostOfGoodsSold += row.costOfGoodsSold || 0;
+      entry.totalGrossProfit += row.grossProfit || 0;
+    } else {
+      entry.incompleteProducts += 1;
+      entry.excludedRevenue += row.revenue;
+    }
+
+    categoryMap.set(key, entry);
+  }
+
+  const categoryTotals = Array.from(categoryMap.values())
+    .map((entry) => ({
+      ...entry,
+      totalQuantitySold: roundMoney(entry.totalQuantitySold, 4),
+      totalRevenue: roundMoney(entry.totalRevenue),
+      completeRevenue: roundMoney(entry.completeRevenue),
+      excludedRevenue: roundMoney(entry.excludedRevenue),
+      totalCostOfGoodsSold: roundMoney(entry.totalCostOfGoodsSold),
+      totalGrossProfit: roundMoney(entry.totalGrossProfit),
+      grossMarginPct: entry.completeRevenue > 0 ? roundMoney((entry.totalGrossProfit / entry.completeRevenue) * 100) : null,
+    }))
+    .sort((a, b) => b.totalGrossProfit - a.totalGrossProfit);
+
+  const dailyMap = new Map();
+  for (const row of salesItems) {
+    const day = dayKeyFromDate(row?.salesInvoice?.invoiceDate) || 'Unknown';
+    const productCode = normalizeProductCode(row.productCode);
+    const revenue = toNum(row.amount);
+    const quantitySold = toNum(row.qty, 4);
+    const costBasis = productCode ? latestCostMap.get(productCode) : null;
+    const hasValidLatestCost = !!costBasis?.hasValidCost;
+
+    const bucket = dailyMap.get(day) || {
+      day,
+      revenue: 0,
+      revenueWithCostBasis: 0,
+      excludedRevenue: 0,
+      quantitySold: 0,
+      costOfGoodsSold: 0,
+      grossProfit: 0,
+      incompleteProductCodes: new Set(),
+    };
+
+    bucket.revenue += revenue;
+    bucket.quantitySold += quantitySold;
+
+    if (hasValidLatestCost) {
+      const lineCost = roundMoney(costBasis.latestUnitCost * quantitySold);
+      bucket.revenueWithCostBasis += revenue;
+      bucket.costOfGoodsSold += lineCost;
+      bucket.grossProfit += revenue - lineCost;
+    } else {
+      bucket.excludedRevenue += revenue;
+      bucket.incompleteProductCodes.add(productCode || row.productName || 'Unknown');
+    }
+
+    dailyMap.set(day, bucket);
+  }
+
+  const dailyTotals = Array.from(dailyMap.values())
+    .map((bucket) => ({
+      day: bucket.day,
+      revenue: roundMoney(bucket.revenue),
+      revenueWithCostBasis: roundMoney(bucket.revenueWithCostBasis),
+      excludedRevenue: roundMoney(bucket.excludedRevenue),
+      quantitySold: roundMoney(bucket.quantitySold, 4),
+      costOfGoodsSold: roundMoney(bucket.costOfGoodsSold),
+      grossProfit: roundMoney(bucket.grossProfit),
+      grossMarginPct: bucket.revenueWithCostBasis > 0 ? roundMoney((bucket.grossProfit / bucket.revenueWithCostBasis) * 100) : null,
+      incompleteProducts: bucket.incompleteProductCodes.size,
+    }))
+    .sort((a, b) => a.day.localeCompare(b.day));
+
+  return {
+    summary,
+    profitabilitySummary: {
+      profitableProducts: summary.profitableProducts,
+      lossMakingProducts: summary.lossMakingProducts,
+      breakEvenProducts: Math.max(summary.completeProducts - summary.profitableProducts - summary.lossMakingProducts, 0),
+    },
+    dailyTotals,
+    categoryTotals,
+    products,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 
@@ -344,4 +649,5 @@ module.exports = {
   queryProductReport,
   queryUserReport,
   queryPaymentReport,
+  queryLatestCostProfitAnalytics,
 };
