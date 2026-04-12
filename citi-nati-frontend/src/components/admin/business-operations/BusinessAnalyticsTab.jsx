@@ -969,6 +969,7 @@ const BusinessAnalyticsTab = ({
   const [error, setError] = useState('');
   const [analytics, setAnalytics] = useState(null);
   const [activeView, setActiveView] = useState('overview');
+  const [productRankingMode, setProductRankingMode] = useState('sales');
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [activeTool, setActiveTool] = useState('growth');
   const [isToolModalOpen, setIsToolModalOpen] = useState(false);
@@ -1209,14 +1210,42 @@ const BusinessAnalyticsTab = ({
         .sort((a, b) => b.sales - a.sales)
         .slice(0, 8);
 
-      const topProducts = productRows
+      const rankedProducts = productRows
         .map((row) => ({
           productCode: row.productCode || 'N/A',
           productName: row.productName || 'Unnamed product',
           totalSales: Number(row.totalSales || 0),
           totalQuantity: Number(row.totalQuantitySold || 0),
+          estimatedMarginPct: row.estimatedMarginPct == null ? null : Number(row.estimatedMarginPct),
           contributionShare: totalSales > 0 ? (Number(row.totalSales || 0) / totalSales) * 100 : 0,
-        }))
+        }));
+
+      const periodDays = Math.max(Number(spanDays) || 1, 1);
+      const maxUnitsPerDay = rankedProducts.reduce((max, row) => Math.max(max, row.totalQuantity / periodDays), 0);
+      const maxSalesPerDay = rankedProducts.reduce((max, row) => Math.max(max, row.totalSales / periodDays), 0);
+
+      const fastMovers = rankedProducts
+        .map((row) => {
+          const unitsPerDay = row.totalQuantity / periodDays;
+          const salesPerDay = row.totalSales / periodDays;
+          const unitsFactor = maxUnitsPerDay > 0 ? (unitsPerDay / maxUnitsPerDay) : 0;
+          const salesFactor = maxSalesPerDay > 0 ? (salesPerDay / maxSalesPerDay) : 0;
+          const marginFactor = row.estimatedMarginPct == null
+            ? 0.5
+            : Math.min(Math.max(row.estimatedMarginPct, 0), 60) / 60;
+          const fastMoverScore = ((unitsFactor * 0.55) + (salesFactor * 0.3) + (marginFactor * 0.15)) * 100;
+
+          return {
+            ...row,
+            unitsPerDay,
+            salesPerDay,
+            fastMoverScore,
+          };
+        })
+        .sort((a, b) => b.fastMoverScore - a.fastMoverScore || b.totalQuantity - a.totalQuantity || b.totalSales - a.totalSales)
+        .slice(0, 10);
+
+      const topProducts = rankedProducts
         .sort((a, b) => b.totalSales - a.totalSales)
         .slice(0, 10);
 
@@ -1236,7 +1265,7 @@ const BusinessAnalyticsTab = ({
         kpis: { totalSales, invoiceCount, averageBasketValue, topProductsCount: topProducts.length },
         growth: { selected: selectedPeriodGrowth, monthVsPrevious: monthGrowth, yearVsPrevious: yearGrowth },
         trends: { daily: dailyTrend, monthly: monthlyTrend, yearly: yearlyComparison, quarterly: quarterlySummary },
-        rankings: { topProducts, topCategories, topUsers, branchPerformance },
+        rankings: { topProducts, fastMovers, topCategories, topUsers, branchPerformance, periodDays },
       });
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Failed to load analytics.');
@@ -1577,7 +1606,48 @@ const BusinessAnalyticsTab = ({
     return (
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '0.8rem' }}>
         <div style={{ ...cardStyle, padding: '0.85rem 0.95rem' }}>
-          <div style={sectionHead}>Top Products</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <div style={sectionHead}>Top Products</div>
+            <div style={{ display: 'inline-flex', border: '1px solid #dbe3ef', borderRadius: '999px', padding: '0.18rem', backgroundColor: '#f8fafc' }}>
+              <button
+                type="button"
+                onClick={() => setProductRankingMode('sales')}
+                style={{
+                  border: 'none',
+                  borderRadius: '999px',
+                  padding: '0.32rem 0.7rem',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  backgroundColor: productRankingMode === 'sales' ? '#1d4ed8' : 'transparent',
+                  color: productRankingMode === 'sales' ? '#fff' : '#475569',
+                }}
+              >
+                Sales Rank
+              </button>
+              <button
+                type="button"
+                onClick={() => setProductRankingMode('fast')}
+                style={{
+                  border: 'none',
+                  borderRadius: '999px',
+                  padding: '0.32rem 0.7rem',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  backgroundColor: productRankingMode === 'fast' ? '#0f766e' : 'transparent',
+                  color: productRankingMode === 'fast' ? '#fff' : '#475569',
+                }}
+              >
+                Fast Movers
+              </button>
+            </div>
+          </div>
+          <div style={{ color: '#64748b', fontSize: '0.74rem', marginBottom: '0.35rem' }}>
+            {productRankingMode === 'fast'
+              ? `Velocity score blends units/day, sales/day, and margin over ${intFmt(analytics.rankings.periodDays || 1)} day(s).`
+              : 'Ranked by total sales value in the selected period.'}
+          </div>
           <div style={{ overflowX: 'auto' }}>
             <table style={tableStyle}>
               <thead>
@@ -1585,20 +1655,24 @@ const BusinessAnalyticsTab = ({
                   <th style={thStyle}>#</th>
                   <th style={{ ...thStyle, width: '100%' }}>Product</th>
                   <th style={thStyle}>Qty</th>
+                  {productRankingMode === 'fast' && <th style={thStyle}>Qty/Day</th>}
                   <th style={thStyle}>Sales</th>
-                  <th style={thStyle}>Share</th>
+                  {productRankingMode === 'fast' && <th style={thStyle}>Score</th>}
+                  {productRankingMode !== 'fast' && <th style={thStyle}>Share</th>}
                 </tr>
               </thead>
               <tbody>
-                {analytics.rankings.topProducts.length === 0 ? (
-                  <tr><td colSpan={5} style={emptyStyle}>No data.</td></tr>
-                ) : analytics.rankings.topProducts.map((row, i) => (
+                {(productRankingMode === 'fast' ? analytics.rankings.fastMovers : analytics.rankings.topProducts).length === 0 ? (
+                  <tr><td colSpan={productRankingMode === 'fast' ? 6 : 5} style={emptyStyle}>No data.</td></tr>
+                ) : (productRankingMode === 'fast' ? analytics.rankings.fastMovers : analytics.rankings.topProducts).map((row, i) => (
                   <tr key={`${row.productCode}-${i}`}>
                     <td style={{ ...tdStyle, color: '#94a3b8' }}>{i + 1}</td>
                     <td style={tdBold}>{row.productName}<span style={{ display: 'block', color: '#94a3b8', fontSize: '0.72rem', fontWeight: 400 }}>{row.productCode}</span></td>
                     <td style={tdStyle}>{intFmt(row.totalQuantity)}</td>
+                    {productRankingMode === 'fast' && <td style={tdStyle}>{Number(row.unitsPerDay || 0).toFixed(2)}</td>}
                     <td style={tdBold}>{money(row.totalSales)}</td>
-                    <td style={{ ...tdStyle, color: '#2563eb', fontWeight: 700 }}>{row.contributionShare.toFixed(1)}%</td>
+                    {productRankingMode === 'fast' && <td style={{ ...tdStyle, color: '#0f766e', fontWeight: 800 }}>{Number(row.fastMoverScore || 0).toFixed(1)}</td>}
+                    {productRankingMode !== 'fast' && <td style={{ ...tdStyle, color: '#2563eb', fontWeight: 700 }}>{row.contributionShare.toFixed(1)}%</td>}
                   </tr>
                 ))}
               </tbody>
