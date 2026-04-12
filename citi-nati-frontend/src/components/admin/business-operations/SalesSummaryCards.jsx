@@ -22,7 +22,7 @@ const cards = [
   { key: 'averageInvoiceValue', label: 'Average Invoice Value', format: money, icon: 'fa-scale-balanced', accent: '#4f46e5' },
 ];
 
-const SalesSummaryCards = ({ summary, loading }) => {
+const SalesSummaryCards = ({ summary, loading, profitSummary, profitLoading }) => {
   return (
     <div
       style={{
@@ -57,6 +57,25 @@ const SalesSummaryCards = ({ summary, loading }) => {
           </div>
         </div>
       ))}
+      <div style={metricCardStyle}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
+          <span style={{ color: '#64748b', fontSize: '0.82rem', fontWeight: 700, letterSpacing: '0.02em', textTransform: 'uppercase' }}>Gross Profit</span>
+          <span style={{ width: '38px', height: '38px', borderRadius: '12px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#16534416', color: '#165344' }}>
+            <i className="fas fa-arrow-trend-up"></i>
+          </span>
+        </div>
+        <div style={{ marginTop: '1rem', fontSize: '1.12rem', lineHeight: 1.1, letterSpacing: '-0.01em', fontWeight: 800, color: profitSummary?.totalGrossProfit < 0 ? '#b91c1c' : '#0f172a', whiteSpace: 'nowrap' }}>
+          {profitLoading ? 'Loading...' : (profitSummary ? money(profitSummary.totalGrossProfit) : '—')}
+        </div>
+        {!profitLoading && profitSummary?.grossMarginPct != null && (
+          <div style={{ marginTop: '0.35rem', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+            {Number(profitSummary.grossMarginPct).toFixed(1)}% margin • {Number(profitSummary.coveragePct || 0).toFixed(0)}% coverage
+          </div>
+        )}
+        {!profitLoading && !profitSummary && (
+          <div style={{ marginTop: '0.35rem', fontSize: '0.78rem', color: '#94a3b8' }}>No cost basis data</div>
+        )}
+      </div>
     </div>
   );
 };

@@ -198,6 +198,8 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
   const [summaryMeta, setSummaryMeta] = useState({ filters: {}, dateRange: null });
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [summaryError, setSummaryError] = useState('');
+  const [profitSummary, setProfitSummary] = useState(null);
+  const [profitSummaryLoading, setProfitSummaryLoading] = useState(false);
 
   const [invoicesState, setInvoicesState] = useState({ data: [], pagination: null, loading: false, error: '' });
   const [productsState, setProductsState] = useState({ data: [], pagination: null, loading: false, error: '' });
@@ -319,6 +321,20 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
     }
   }, [filters]);
 
+  const fetchProfitSummary = useCallback(async () => {
+    setProfitSummaryLoading(true);
+    try {
+      const response = await api.get('/business-operations/reports/sales/profit-latest-cost', {
+        params: buildReportParams(filters),
+      });
+      setProfitSummary(response.data?.data?.summary || null);
+    } catch {
+      setProfitSummary(null);
+    } finally {
+      setProfitSummaryLoading(false);
+    }
+  }, [filters]);
+
   const fetchInvoices = useCallback(async () => {
     setInvoicesState((prev) => ({ ...prev, loading: true, error: '' }));
     try {
@@ -386,7 +402,8 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
 
   useEffect(() => {
     fetchSummary();
-  }, [fetchSummary, queryKey]);
+    fetchProfitSummary();
+  }, [fetchSummary, fetchProfitSummary, queryKey]);
 
   useEffect(() => {
     if (activeView === 'invoices') fetchInvoices();
@@ -656,7 +673,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
 
     return (
       <div style={{ display: 'grid', gap: '1rem' }}>
-        <SalesSummaryCards summary={summary} loading={summaryLoading} />
+        <SalesSummaryCards summary={summary} loading={summaryLoading} profitSummary={profitSummary} profitLoading={profitSummaryLoading} />
         <div style={{ ...baseCardStyle, padding: '1.25rem' }}>
           <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1rem' }}>Report Context</h3>
           <div style={{ marginTop: '0.85rem', display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>

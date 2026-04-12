@@ -366,7 +366,10 @@ function growthTone(delta) {
 
 function buildParamsForPeriod(period) {
   const base = {};
-  if (period.periodType === 'month') {
+  if (period.periodType === 'day') {
+    base.periodType = 'day';
+    base.date = period.date;
+  } else if (period.periodType === 'month') {
     base.periodType = 'month';
     base.month = String(period.month);
     base.year = String(period.year);
@@ -457,6 +460,11 @@ function previousPeriod(period) {
 }
 
 function dateRangeFromPeriod(period) {
+  if (period.periodType === 'day') {
+    const d = period.date || new Date().toISOString().slice(0, 10);
+    return { startDate: d, endDate: d, label: d };
+  }
+
   if (period.periodType === 'month') {
     const start = startOfMonth(Number(period.year), Number(period.month) - 1);
     const end = endOfMonth(Number(period.year), Number(period.month) - 1);
@@ -946,6 +954,7 @@ const BusinessAnalyticsTab = ({
   const [scope, setScope] = useState('inherit');
   const [filters, setFilters] = useState({
     periodType: 'month',
+    date: now.toISOString().slice(0, 10),
     month: now.getMonth() + 1,
     year: now.getFullYear(),
     quarter: Math.floor(now.getMonth() / 3) + 1,
@@ -1016,6 +1025,7 @@ const BusinessAnalyticsTab = ({
   const selectedPeriod = useMemo(() => {
     const period = {
       periodType: filters.periodType,
+      date: filters.date,
       month: Number(filters.month),
       year: Number(filters.year),
       quarter: Number(filters.quarter),
@@ -1695,12 +1705,20 @@ const BusinessAnalyticsTab = ({
             <label style={{ display: 'grid', gap: '0.35rem' }}>
               <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Period Type</span>
               <select value={filters.periodType} onChange={(event) => setFilters((prev) => ({ ...prev, periodType: event.target.value }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem', backgroundColor: '#fff', color: '#0f172a' }}>
+                <option value="day">Day</option>
                 <option value="month">Month</option>
                 <option value="quarter">Quarter</option>
                 <option value="year">Year</option>
                 <option value="custom">Custom Range</option>
               </select>
             </label>
+
+            {filters.periodType === 'day' && (
+              <label style={{ display: 'grid', gap: '0.35rem' }}>
+                <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Date</span>
+                <input type="date" value={filters.date} onChange={(event) => setFilters((prev) => ({ ...prev, date: event.target.value }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }} />
+              </label>
+            )}
 
             {(filters.periodType === 'month' || filters.periodType === 'quarter' || filters.periodType === 'year') && (
               <label style={{ display: 'grid', gap: '0.35rem' }}>
