@@ -1010,3 +1010,35 @@ model GoodsIntakeItem {
   @@index([expiryDate])
   @@map("goods_intake_items")
 }
+
+model SalesBalancingRecord {
+  id                  Int      @id @default(autoincrement())
+  balancingDate       DateTime @map("balancing_date")
+  locationId          Int      @map("location_id")
+  locationCode        String?  @map("location_code")
+  locationName        String?  @map("location_name")
+  referenceTitle      String?  @map("reference_title")
+  cashierReference    String?  @map("cashier_reference")
+  shiftReference      String?  @map("shift_reference")
+  preparedBy          String?  @map("prepared_by")
+  notes               String?
+  expectedSystemSales Float    @default(0) @map("expected_system_sales")
+  cashAmount          Float    @default(0) @map("cash_amount")
+  airtelMoneyAmount   Float    @default(0) @map("airtel_money_amount")
+  tnmMpambaAmount     Float    @default(0) @map("tnm_mpamba_amount")
+  posCardAmount       Float    @default(0) @map("pos_card_amount")
+  bankTransferAmount  Float    @default(0) @map("bank_transfer_amount")
+  otherAmount         Float    @default(0) @map("other_amount")
+  totalActualAmount   Float    @default(0) @map("total_actual_amount")
+  differenceAmount    Float    @default(0) @map("difference_amount")
+  resultStatus        String   @default("balanced") @map("result_status")
+  status              String   @default("draft")
+  finalizedAt         DateTime? @map("finalized_at")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@index([locationId, balancingDate])
+  @@index([status, balancingDate])
+  @@index([locationCode, balancingDate])
+  @@map("sales_balancing_records")
+}

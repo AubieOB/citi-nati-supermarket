@@ -11,6 +11,7 @@ import GoodsIntakeTab from './business-operations/GoodsIntakeTab.jsx';
 import ReportHistoryTab from './business-operations/ReportHistoryTab.jsx';
 import BusinessOperationsActionsTab from './business-operations/BusinessOperationsActionsTab.jsx';
 import BusinessAnalyticsTab from './business-operations/BusinessAnalyticsTab.jsx';
+import SalesBalancingTab from './business-operations/SalesBalancingTab.jsx';
 import BusinessOperationsImportButton from './business-operations/BusinessOperationsImportButton.jsx';
 import BusinessOperationsImportModal from './business-operations/BusinessOperationsImportModal.jsx';
 import Modal from '../common/Modal.jsx';
@@ -27,6 +28,7 @@ const TABS = [
   { id: 'employees', label: 'Employees', icon: 'fa-id-badge' },
   { id: 'payroll', label: 'Payroll', icon: 'fa-money-check-dollar' },
   { id: 'report-history', label: 'Report History', icon: 'fa-clock-rotate-left' },
+  { id: 'sales-balancing', label: 'Sales Balancing', icon: 'fa-scale-balanced' },
   { id: 'analytics-performance', label: 'Analytics', icon: 'fa-chart-line' },
   { id: 'actions', label: 'Actions', icon: 'fa-triangle-exclamation' },
 ];
@@ -194,6 +196,7 @@ const AdminBusinessOperations = () => {
     employees: <EmployeesTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} locations={locations} />,
     payroll: <PayrollTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} locations={locations} />,
     'report-history': <ReportHistoryTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} onNavigateTab={handleNavigateTab} />,
+    'sales-balancing': <SalesBalancingTab selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} selectedLocationName={selectedLocation?.name || ''} />,
     'analytics-performance': <BusinessAnalyticsTab selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} locations={locations} />,
     actions: <BusinessOperationsActionsTab />,
   };
