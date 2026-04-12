@@ -4,6 +4,7 @@ const { resolveEffectiveStock, enrichProductStock } = require('../utils/stockRes
 const { notifyLowStock } = require('../utils/messageService');
 const { recordPosSyncEvent } = require('../services/posSyncMonitor.service');
 const { getConfiguredVatRatePercent, getVatSettings, normalizeVatRatePercent, splitInclusiveVatAtRate } = require('../utils/vat');
+const { formatBusinessDateKey, formatBusinessTimeKey } = require('../utils/businessTime');
 
 const prisma = new PrismaClient();
 const EMERGENCY_SALE_MAX_RETRIES = Number.parseInt(process.env.EMERGENCY_SALE_MAX_RETRIES || '10', 10);
@@ -138,10 +139,7 @@ function normalizePaymentMethod(rawMethod) {
 }
 
 function formatLocalDateKey(dateValue) {
-  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
-  if (Number.isNaN(date.getTime())) return '';
-  const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
-  return local.toISOString().slice(0, 10);
+  return formatBusinessDateKey(dateValue) || '';
 }
 
 function getSaleVatContext(sale) {
@@ -192,7 +190,7 @@ function buildPosWriteInvoicePayload(emergencySale) {
     locationCode,
     customerCode: 'CASH',
     invoiceDate: formatLocalDateKey(emergencySale.createdAt || new Date()),
-    invoiceTime: new Date(emergencySale.createdAt || new Date()).toTimeString().slice(0, 8),
+    invoiceTime: formatBusinessTimeKey(emergencySale.createdAt || new Date()),
     grossSale: invoiceTotals.gross,
     vat: invoiceTotals.vatAmount,
     discount: Number(emergencySale.discount || 0),

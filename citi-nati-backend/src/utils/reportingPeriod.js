@@ -1,57 +1,28 @@
 'use strict';
 
+const {
+  formatBusinessDateKey,
+  parseDateKey,
+  addDaysToDateKey,
+  getIsoWeekStartDateKey,
+  startOfBusinessDayFromDateKey,
+  endOfBusinessDayFromDateKey,
+  startOfBusinessMonth,
+  endOfBusinessMonth,
+  startOfBusinessQuarter,
+  endOfBusinessQuarter,
+  startOfBusinessYear,
+  endOfBusinessYear,
+} = require('./businessTime');
+
 const VALID_PERIOD_TYPES = ['day', 'week', 'month', 'quarter', 'year', 'custom'];
 
-/**
- * Parse a YYYY-MM-DD string as midnight in server local time.
- * Returns null if the string is absent or invalid.
- */
 function parseDateString(str) {
-  if (!str || typeof str !== 'string') return null;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(str)) return null;
-  const d = new Date(`${str}T00:00:00`);
-  if (isNaN(d.getTime())) return null;
-  return d;
-}
-
-function formatLocalDate(dateValue) {
-  const date = new Date(dateValue);
-  if (Number.isNaN(date.getTime())) return null;
-  const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
-  return local.toISOString().slice(0, 10);
-}
-
-function startOfDay(date) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function endOfDay(date) {
-  const d = new Date(date);
-  d.setHours(23, 59, 59, 999);
-  return d;
-}
-
-/** Returns the Monday of the ISO week containing the given date (local time). */
-function getISOWeekStart(date) {
-  const d = new Date(date);
-  const dayOfWeek = d.getDay(); // 0=Sun, 1=Mon, …
-  const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-  d.setDate(d.getDate() + daysToMonday);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function getISOWeekEnd(weekStart) {
-  const d = new Date(weekStart);
-  d.setDate(d.getDate() + 6);
-  d.setHours(23, 59, 59, 999);
-  return d;
+  return parseDateKey(str) ? str : null;
 }
 
 /**
- * Resolve a period type + supporting params into a concrete local date range.
+ * Resolve a period type + supporting params into a concrete business-time date range.
  *
  * Returns { startDate: Date, endDate: Date, label: string } on success.
  * Returns { error: string } when params are incomplete or invalid.
@@ -87,7 +58,7 @@ function resolvePeriod(params) {
     };
   }
 
-  const currentYear = new Date().getFullYear();
+  const currentYear = Number((formatBusinessDateKey(new Date()) || '').slice(0, 4)) || new Date().getFullYear();
 
   switch (periodType) {
     case 'day': {
@@ -97,8 +68,8 @@ function resolvePeriod(params) {
       const d = parseDateString(date);
       if (!d) return { error: `Invalid date '${date}'. Use YYYY-MM-DD format` };
       return {
-        startDate: startOfDay(d),
-        endDate: endOfDay(d),
+        startDate: startOfBusinessDayFromDateKey(d),
+        endDate: endOfBusinessDayFromDateKey(d),
         label: date,
       };
     }
@@ -111,11 +82,12 @@ function resolvePeriod(params) {
       }
       const d = parseDateString(date);
       if (!d) return { error: `Invalid date '${date}'. Use YYYY-MM-DD format` };
-      const weekStart = getISOWeekStart(d);
+      const weekStart = getIsoWeekStartDateKey(d);
+      const weekEnd = addDaysToDateKey(weekStart, 6);
       return {
-        startDate: weekStart,
-        endDate: getISOWeekEnd(weekStart),
-        label: `Week of ${formatLocalDate(weekStart)}`,
+        startDate: startOfBusinessDayFromDateKey(weekStart),
+        endDate: endOfBusinessDayFromDateKey(weekEnd),
+        label: `Week of ${weekStart}`,
       };
     }
 
@@ -126,8 +98,8 @@ function resolvePeriod(params) {
         return { error: 'month (1–12) is required for periodType=month' };
       }
       return {
-        startDate: new Date(y, m - 1, 1, 0, 0, 0, 0),
-        endDate: new Date(y, m, 0, 23, 59, 59, 999),
+        startDate: startOfBusinessMonth(y, m),
+        endDate: endOfBusinessMonth(y, m),
         label: `${y}-${String(m).padStart(2, '0')}`,
       };
     }
@@ -138,10 +110,9 @@ function resolvePeriod(params) {
       if (!quarter || isNaN(q) || q < 1 || q > 4) {
         return { error: 'quarter (1–4) is required for periodType=quarter' };
       }
-      const startMonth = (q - 1) * 3; // 0-based month index
       return {
-        startDate: new Date(y, startMonth, 1, 0, 0, 0, 0),
-        endDate: new Date(y, startMonth + 3, 0, 23, 59, 59, 999),
+        startDate: startOfBusinessQuarter(y, q),
+        endDate: endOfBusinessQuarter(y, q),
         label: `Q${q} ${y}`,
       };
     }
@@ -152,8 +123,8 @@ function resolvePeriod(params) {
         return { error: 'year (YYYY) is required for periodType=year' };
       }
       return {
-        startDate: new Date(y, 0, 1, 0, 0, 0, 0),
-        endDate: new Date(y, 11, 31, 23, 59, 59, 999),
+        startDate: startOfBusinessYear(y),
+        endDate: endOfBusinessYear(y),
         label: String(y),
       };
     }
@@ -168,8 +139,8 @@ function resolvePeriod(params) {
       const e = parseDateString(customEnd);
       if (!s) return { error: `Invalid startDate '${customStart}'. Use YYYY-MM-DD format` };
       if (!e) return { error: `Invalid endDate '${customEnd}'. Use YYYY-MM-DD format` };
-      const start = startOfDay(s);
-      const end = endOfDay(e);
+      const start = startOfBusinessDayFromDateKey(s);
+      const end = endOfBusinessDayFromDateKey(e);
       if (start > end) return { error: 'startDate must be on or before endDate' };
       return {
         startDate: start,
@@ -188,8 +159,8 @@ function resolvePeriod(params) {
  */
 function formatDateRange(startDate, endDate) {
   return {
-    startDate: formatLocalDate(startDate),
-    endDate: formatLocalDate(endDate),
+    startDate: formatBusinessDateKey(startDate),
+    endDate: formatBusinessDateKey(endDate),
   };
 }
 

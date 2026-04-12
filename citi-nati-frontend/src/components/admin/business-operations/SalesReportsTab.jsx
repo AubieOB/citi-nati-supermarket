@@ -117,6 +117,15 @@ const AUTO_REFRESH_DEBOUNCE_MS = 350;
 const money = (value) => `MWK ${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const integer = (value) => Number(value || 0).toLocaleString('en-US');
 
+const formatInvoiceTimeDisplay = (value) => {
+  if (!value) return '';
+  const raw = String(value).trim();
+  if (/^\d{2}:\d{2}:\d{2}$/.test(raw)) return raw;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return raw;
+  return parsed.toLocaleTimeString('en-GB', { hour12: false });
+};
+
 const sectionTabStyle = (active) => ({
   border: 'none',
   backgroundColor: active ? '#0f172a' : '#e2e8f0',
@@ -726,7 +735,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
                   </td>
                   <td style={tdStyle}>
                     <div>{row.invoiceDate ? new Date(row.invoiceDate).toLocaleDateString() : 'N/A'}</div>
-                    <div style={{ color: '#64748b', fontSize: '0.82rem' }}>{row.invoiceTime ? new Date(row.invoiceTime).toLocaleTimeString() : ''}</div>
+                    <div style={{ color: '#64748b', fontSize: '0.82rem' }}>{formatInvoiceTimeDisplay(row.invoiceTime)}</div>
                   </td>
                   <td style={tdStyle}>{row.userName || 'Unknown'}</td>
                   <td style={tdStyle}>

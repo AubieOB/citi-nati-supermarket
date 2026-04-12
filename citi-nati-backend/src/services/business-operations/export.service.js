@@ -7,6 +7,7 @@ const PDFDocument = require('pdfkit');
 
 const { resolvePeriod, formatDateRange } = require('../../utils/reportingPeriod');
 const { extractFilters, buildInvoiceWhere, buildItemWhere } = require('../../utils/reportingFilters');
+const { formatBusinessDateKey, formatBusinessDateTimeLabel } = require('../../utils/businessTime');
 const {
   querySalesSummary,
   queryInvoiceList,
@@ -41,10 +42,7 @@ function money(value) {
 
 function toDateString(value) {
   if (!value) return '';
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
-  return local.toISOString().slice(0, 10);
+  return formatBusinessDateKey(value) || '';
 }
 
 function titleCase(value) {
@@ -399,7 +397,7 @@ function createPdfContext(report) {
     title: report.title,
     subtitle: `${titleCase(report.module)} • ${titleCase(report.type || 'summary')}`,
     periodText: getReportPeriodText(report),
-    generatedText: `${new Date().toLocaleDateString('en-GB')} ${new Date().toLocaleTimeString('en-GB')}`,
+    generatedText: formatBusinessDateTimeLabel(new Date()),
   };
 }
 

@@ -6,6 +6,7 @@ const {
   normalizeProductCode,
   resolveLatestProductCosts,
 } = require('./business-operations/latestProductCost.service');
+const { formatBusinessDateKey } = require('../utils/businessTime');
 
 const prisma = new PrismaClient();
 
@@ -354,16 +355,8 @@ function categoryLabel(value) {
   return normalized || null;
 }
 
-function formatLocalDateKey(value) {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
-  return local.toISOString().slice(0, 10);
-}
-
 function dayKeyFromDate(value) {
-  return formatLocalDateKey(value);
+  return formatBusinessDateKey(value);
 }
 
 async function queryLatestCostProfitAnalytics(itemWhere, filters = {}) {

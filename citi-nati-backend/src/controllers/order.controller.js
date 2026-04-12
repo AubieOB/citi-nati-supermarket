@@ -6,6 +6,7 @@ const { notifyDriverAssigned, notifyOrderCompleted } = require('../utils/message
 const { sendDriverAssignedEmail, sendDeliveryStatusEmail, sendRefundNotificationEmail } = require('../utils/emailService');
 const { isPaymentConfirmedInCache } = require('../utils/webhookCache');
 const { splitInclusiveVat } = require('../utils/vat');
+const { formatBusinessDateTimeLabel } = require('../utils/businessTime');
 
 const prisma = new PrismaClient();
 
@@ -809,7 +810,7 @@ const getReceipt = async (req, res) => {
     doc.fontSize(9).font('Helvetica').fillColor('#999').text('Thank you for shopping with Citi-Nati Supermarket!', { align: 'center' });
     doc.text('© 2026 Citi-Nati Supermarket. All rights reserved.', { align: 'center' });
     doc.moveDown(0.3);
-    doc.fontSize(8).text(`Receipt Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`, { align: 'center' });
+    doc.fontSize(8).text(`Receipt Generated: ${formatBusinessDateTimeLabel(new Date())}`, { align: 'center' });
 
     doc.end();
 
