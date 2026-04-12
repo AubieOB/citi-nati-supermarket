@@ -16,9 +16,7 @@ function roundMoney(value, decimals = 2) {
 }
 
 function buildLatestCostScope(filters = {}) {
-  const where = {
-    status: 'finalized',
-  };
+  const where = {};
 
   const andConditions = [];
   const locationCode = normalizeProductCode(filters.locationCode || filters.branchCode);
@@ -45,120 +43,89 @@ function buildLatestCostScope(filters = {}) {
   return where;
 }
 
-function buildMatchedCodes(item, requestedCodes) {
-  const matches = new Set();
-  const sourceCode = normalizeProductCode(item?.product?.sourceCode);
-  const barcode = normalizeProductCode(item?.barcode);
-
-  if (sourceCode && requestedCodes.has(sourceCode)) {
-    matches.add(sourceCode);
-  }
-
-  if (barcode && requestedCodes.has(barcode)) {
-    matches.add(barcode);
-  }
-
-  return Array.from(matches.values());
+function buildLookupKey(syncSourceCode, productCode) {
+  const normalizedSource = normalizeProductCode(syncSourceCode);
+  const normalizedProduct = normalizeProductCode(productCode);
+  if (!normalizedSource || !normalizedProduct) return null;
+  return `${normalizedSource}::${normalizedProduct}`;
 }
 
-function shapeLatestCostRecord(item, productCode) {
-  const unitCost = roundMoney(item?.unitCost, 4);
-  const goodsIntake = item?.goodsIntake || {};
-  const reference = normalizeProductCode(goodsIntake.receiptReference) || normalizeProductCode(goodsIntake.intakeRef);
+function shapeLatestCostRecord(record) {
+  const unitCost = record?.latestUnitCost == null ? null : roundMoney(record.latestUnitCost, 4);
+  const reference = normalizeProductCode(record?.latestGrnReference) || normalizeProductCode(record?.latestGrnNo);
 
   return {
-    productCode,
-    productId: item?.productId || item?.product?.id || null,
-    matchedBy: normalizeProductCode(item?.product?.sourceCode) === productCode ? 'productCode' : 'barcode',
+    productCode: normalizeProductCode(record?.productCode),
+    syncSourceCode: normalizeProductCode(record?.syncSourceCode),
+    branchCode: normalizeProductCode(record?.branchCode),
+    branchName: normalizeProductCode(record?.branchName),
     latestUnitCost: unitCost,
-    hasValidCost: unitCost > 0,
-    latestStockAdditionDate: goodsIntake.purchaseDate || null,
-    latestRecordedAt: goodsIntake.finalizedAt || goodsIntake.updatedAt || item?.updatedAt || item?.createdAt || null,
+    hasValidCost: unitCost != null && unitCost > 0,
+    latestStockAdditionDate: record?.latestGrnDate || null,
+    latestRecordedAt: record?.sourceUpdatedAt || record?.sourceSyncedAt || record?.lastReceivedAt || record?.updatedAt || null,
     latestGrnReference: reference,
-    intakeRef: normalizeProductCode(goodsIntake.intakeRef),
-    receiptReference: normalizeProductCode(goodsIntake.receiptReference),
-    goodsIntakeId: goodsIntake.id || null,
-    goodsIntakeStatus: goodsIntake.status || null,
-    productNameAtCostBasis: normalizeProductCode(item?.productName),
-    barcode: normalizeProductCode(item?.barcode),
-    lineNo: item?.lineNo || null,
-    locationId: goodsIntake.locationId || null,
-    locationCode: normalizeProductCode(goodsIntake.locationCode),
+    latestGrnNo: normalizeProductCode(record?.latestGrnNo),
+    sourceUpdatedAt: record?.sourceUpdatedAt || null,
+    productNameAtCostBasis: normalizeProductCode(record?.productName),
+    stockDetailId: normalizeProductCode(record?.stockDetailId),
+    locationId: record?.locationId || null,
+    locationCode: normalizeProductCode(record?.locationCode),
   };
 }
 
-async function resolveLatestProductCosts({ productCodes = [], filters = {} } = {}) {
-  const normalizedCodes = Array.from(new Set(
-    (Array.isArray(productCodes) ? productCodes : [])
-      .map((code) => normalizeProductCode(code))
-      .filter(Boolean),
+async function resolveLatestProductCosts({ productKeys = [], filters = {} } = {}) {
+  const normalizedKeys = Array.from(new Set(
+    (Array.isArray(productKeys) ? productKeys : [])
+      .map((row) => ({
+        syncSourceCode: normalizeProductCode(row?.syncSourceCode),
+        productCode: normalizeProductCode(row?.productCode),
+      }))
+      .filter((row) => row.syncSourceCode && row.productCode)
+      .map((row) => buildLookupKey(row.syncSourceCode, row.productCode)),
   ));
 
-  if (normalizedCodes.length === 0) {
+  if (normalizedKeys.length === 0) {
     return new Map();
   }
 
-  const requestedCodes = new Set(normalizedCodes);
-  const items = await prisma.goodsIntakeItem.findMany({
+  const pairs = normalizedKeys.map((key) => {
+    const [syncSourceCode, productCode] = key.split('::');
+    return { syncSourceCode, productCode };
+  });
+
+  const snapshots = await prisma.posLatestProductCost.findMany({
     where: {
-      goodsIntake: buildLatestCostScope(filters),
-      OR: [
-        { barcode: { in: normalizedCodes } },
-        { product: { sourceCode: { in: normalizedCodes } } },
-      ],
+      ...buildLatestCostScope(filters),
+      OR: pairs.map((row) => ({
+        syncSourceCode: row.syncSourceCode,
+        productCode: row.productCode,
+      })),
     },
     select: {
-      id: true,
-      lineNo: true,
-      barcode: true,
-      productId: true,
+      branchCode: true,
+      branchName: true,
+      syncSourceCode: true,
+      productCode: true,
       productName: true,
-      unitCost: true,
-      createdAt: true,
+      latestUnitCost: true,
+      latestGrnNo: true,
+      latestGrnReference: true,
+      latestGrnDate: true,
+      stockDetailId: true,
+      sourceUpdatedAt: true,
+      sourceSyncedAt: true,
+      lastReceivedAt: true,
       updatedAt: true,
-      product: {
-        select: {
-          id: true,
-          sourceCode: true,
-        },
-      },
-      goodsIntake: {
-        select: {
-          id: true,
-          intakeRef: true,
-          receiptReference: true,
-          purchaseDate: true,
-          finalizedAt: true,
-          updatedAt: true,
-          status: true,
-          locationId: true,
-          locationCode: true,
-        },
-      },
+      locationId: true,
+      locationCode: true,
     },
-    orderBy: [
-      { goodsIntake: { purchaseDate: 'desc' } },
-      { goodsIntake: { finalizedAt: 'desc' } },
-      { goodsIntake: { updatedAt: 'desc' } },
-      { updatedAt: 'desc' },
-      { id: 'desc' },
-    ],
   });
 
   const costMap = new Map();
-  for (const item of items) {
-    const matches = buildMatchedCodes(item, requestedCodes);
-    if (matches.length === 0) continue;
-
-    for (const productCode of matches) {
-      if (!costMap.has(productCode)) {
-        costMap.set(productCode, shapeLatestCostRecord(item, productCode));
-      }
-    }
-
-    if (costMap.size >= requestedCodes.size) {
-      break;
-    }
+  for (const snapshot of snapshots) {
+    const key = buildLookupKey(snapshot.syncSourceCode, snapshot.productCode);
+    if (!key) continue;
+    costMap.set(key, shapeLatestCostRecord(snapshot));
   }
 
   return costMap;
@@ -166,6 +133,7 @@ async function resolveLatestProductCosts({ productCodes = [], filters = {} } = {
 
 module.exports = {
   normalizeProductCode,
+  buildLookupKey,
   buildLatestCostScope,
   resolveLatestProductCosts,
 };

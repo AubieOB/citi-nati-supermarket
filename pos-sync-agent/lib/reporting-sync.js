@@ -7,6 +7,50 @@ class ReportingSyncService {
     this.config = config;
     this.state = state;
     this.branchTag = `[BRANCH:${config.branch.branchCode}|REPORTING]`;
+    this.latestCostColumnConfig = null;
+  }
+
+  async getTableColumns(pool, tableName) {
+    const request = pool.request();
+    request.input('tableName', sql.VarChar(128), tableName);
+    const result = await request.query(`
+      SELECT COLUMN_NAME
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = @tableName
+      ORDER BY ORDINAL_POSITION
+    `);
+    return new Set((result.recordset || []).map((row) => String(row.COLUMN_NAME || '').trim()));
+  }
+
+  async resolveLatestCostColumnConfig(pool) {
+    if (this.latestCostColumnConfig) {
+      return this.latestCostColumnConfig;
+    }
+
+    const [stockDetailsColumns, stocksColumns] = await Promise.all([
+      this.getTableColumns(pool, 'stockdetails'),
+      this.getTableColumns(pool, 'stocks'),
+    ]);
+
+    const pickFirst = (columns, candidates) => candidates.find((column) => columns.has(column)) || null;
+
+    const costColumn = pickFirst(stockDetailsColumns, ['CostPrice', 'UnitCost', 'BuyingPrice', 'PurchasePrice', 'AvgCost']);
+    const stockDateColumn = pickFirst(stocksColumns, ['GRNDate', 'GrnDate', 'ReceivedDate', 'StockDate', 'CreatedAt', 'CreatedOn', 'EntryDate', 'Date']);
+    const stockRefColumn = pickFirst(stocksColumns, ['ReferenceNo', 'ReceiptReference', 'RefNo']);
+
+    this.latestCostColumnConfig = {
+      costExpr: costColumn ? `TRY_CONVERT(decimal(18, 4), sd.${costColumn})` : 'NULL',
+      grnDateExpr: stockDateColumn ? `TRY_CONVERT(datetime, s.${stockDateColumn})` : 'NULL',
+      grnReferenceExpr: stockRefColumn ? `CAST(s.${stockRefColumn} AS varchar(100))` : 'CAST(sd.GRNNo AS varchar(100))',
+    };
+
+    console.log(`${this.branchTag} [LATEST COST] Resolved POS columns`, {
+      costColumn: costColumn || null,
+      stockDateColumn: stockDateColumn || null,
+      stockRefColumn: stockRefColumn || null,
+    });
+
+    return this.latestCostColumnConfig;
   }
 
   async fetchInvoiceHeaders(pool, batchSize = 100) {
@@ -227,7 +271,7 @@ class ReportingSyncService {
     };
   }
 
-  async sendToBackend(payload) {
+  async sendInvoicesToBackend(payload) {
     try {
       if (!this.config.backend.baseUrl) {
         throw new Error('BACKEND_BASE_URL not configured');
@@ -264,49 +308,160 @@ class ReportingSyncService {
     }
   }
 
+  async fetchLatestProductCosts(pool) {
+    const columnConfig = await this.resolveLatestCostColumnConfig(pool);
+    const request = pool.request();
+    request.input('LocationCode', sql.VarChar(10), this.config.posDb.locationCode);
+
+    const query = `
+      WITH ranked_costs AS (
+        SELECT
+          sd.ProductCode,
+          pm.ProductName,
+          s.LocationCode,
+          CAST(sd.GRNNo AS varchar(100)) AS LatestGRNNo,
+          ${columnConfig.grnReferenceExpr} AS LatestGRNReference,
+          ${columnConfig.grnDateExpr} AS LatestGRNDate,
+          ${columnConfig.costExpr} AS LatestUnitCost,
+          CAST(sd.StockDetailID AS varchar(100)) AS StockDetailID,
+          ROW_NUMBER() OVER (
+            PARTITION BY sd.ProductCode
+            ORDER BY
+              CASE WHEN ${columnConfig.grnDateExpr} IS NULL THEN 1 ELSE 0 END ASC,
+              ${columnConfig.grnDateExpr} DESC,
+              TRY_CONVERT(bigint, sd.GRNNo) DESC,
+              TRY_CONVERT(bigint, sd.StockDetailID) DESC,
+              CAST(sd.GRNNo AS varchar(100)) DESC
+          ) AS rn
+        FROM POS.dbo.stockdetails sd
+        INNER JOIN POS.dbo.stocks s ON sd.GRNNo = s.GRNNo
+        LEFT JOIN POS.dbo.productsmaster pm ON pm.ProductCode = sd.ProductCode
+        WHERE s.LocationCode = @LocationCode
+          AND sd.ProductCode IS NOT NULL
+      )
+      SELECT
+        ProductCode,
+        ProductName,
+        LocationCode,
+        LatestGRNNo,
+        LatestGRNReference,
+        LatestGRNDate,
+        LatestUnitCost,
+        StockDetailID
+      FROM ranked_costs
+      WHERE rn = 1
+      ORDER BY ProductCode ASC
+    `;
+
+    const result = await request.query(query);
+    const rows = (result.recordset || []).map((row) => ({
+      productCode: row.ProductCode == null ? null : String(row.ProductCode).trim(),
+      productName: row.ProductName == null ? null : String(row.ProductName).trim(),
+      locationCode: row.LocationCode == null ? null : String(row.LocationCode).trim(),
+      latestGrnNo: row.LatestGRNNo == null ? null : String(row.LatestGRNNo).trim(),
+      latestGrnReference: row.LatestGRNReference == null ? null : String(row.LatestGRNReference).trim(),
+      latestGrnDate: row.LatestGRNDate instanceof Date ? row.LatestGRNDate.toISOString() : (row.LatestGRNDate || null),
+      latestUnitCost: row.LatestUnitCost == null ? null : Number(row.LatestUnitCost),
+      stockDetailId: row.StockDetailID == null ? null : String(row.StockDetailID).trim(),
+      sourceUpdatedAt: row.LatestGRNDate instanceof Date ? row.LatestGRNDate.toISOString() : (row.LatestGRNDate || null),
+    })).filter((row) => row.productCode);
+
+    console.log(`${this.branchTag} [LATEST COST] Fetched ${rows.length} latest product cost rows`);
+    return rows;
+  }
+
+  async sendLatestProductCostsToBackend(latestProductCosts) {
+    try {
+      if (!this.config.backend.baseUrl) {
+        throw new Error('BACKEND_BASE_URL not configured');
+      }
+
+      const endpoint = this.config.reporting.backendLatestProductCostEndpoint || '/api/pos-sync/reporting/latest-product-costs';
+      const fullUrl = `${this.config.backend.baseUrl}${endpoint}`;
+      const metadata = getSyncMetadata(this.config);
+      const batchSize = 500;
+      let sent = 0;
+
+      for (let index = 0; index < latestProductCosts.length; index += batchSize) {
+        const batch = latestProductCosts.slice(index, index + batchSize);
+        console.log(`${this.branchTag} [LATEST COST] Posting batch ${Math.floor(index / batchSize) + 1} with ${batch.length} products to ${endpoint}`);
+
+        const response = await axios.post(fullUrl, {
+          ...metadata,
+          latestProductCosts: batch,
+        }, {
+          headers: {
+            'Content-Type': 'application/json',
+            'x-pos-secret': this.config.backend.apiToken,
+            'x-branch-code': this.config.branch.branchCode,
+            'x-sync-source-code': this.config.branch.syncSourceCode,
+          },
+          timeout: 60000,
+        });
+
+        if (!response.data || !response.data.success) {
+          throw new Error(`Backend returned success=false: ${JSON.stringify(response.data)}`);
+        }
+
+        sent += batch.length;
+      }
+
+      return { success: true, productCount: sent };
+    } catch (error) {
+      console.error(`${this.branchTag} [LATEST COST] ❌ Failed to send to backend:`, error.message);
+      throw error;
+    }
+  }
+
   async syncBatch(pool, batchSize) {
     try {
       console.log(`${this.branchTag} [SYNC] Starting batch sync (batch size: ${batchSize})`);
+
+      let invoiceCount = 0;
+      let detailCount = 0;
+      let checkpoint = this.state.getLastSyncedInvoiceNo();
 
       // Fetch invoice headers
       const headers = await this.fetchInvoiceHeaders(pool, batchSize);
 
       if (headers.length === 0) {
         console.log(`${this.branchTag} [SYNC] No new invoices to sync`);
-        return {
-          success: true,
-          invoiceCount: 0,
-          detailCount: 0,
-          checkpoint: this.state.getLastSyncedInvoiceNo(),
-        };
+      } else {
+        const invoiceCodes = headers.map((h) => h.InvoiceNo);
+
+        // Fetch related invoice details
+        const detailsMap = await this.fetchInvoiceDetails(pool, invoiceCodes);
+
+        // Build payload
+        const payload = this.buildPayload(headers, detailsMap);
+
+        // Send to backend
+        const sendResult = await this.sendInvoicesToBackend(payload);
+
+        // Update checkpoint only after successful backend acknowledgment
+        const lastInvoiceNo = Math.max(...invoiceCodes);
+        const saved = this.state.updateCheckpoint(lastInvoiceNo, headers.length);
+
+        if (!saved) {
+          console.warn(`${this.branchTag} [SYNC] ⚠️ Checkpoint save failed, but backend acknowledged sync`);
+        }
+
+        checkpoint = lastInvoiceNo;
+        invoiceCount = sendResult.invoiceCount;
+        detailCount = sendResult.detailCount;
       }
 
-      const invoiceCodes = headers.map((h) => h.InvoiceNo);
+      const latestProductCosts = await this.fetchLatestProductCosts(pool);
+      const latestCostResult = await this.sendLatestProductCostsToBackend(latestProductCosts);
 
-      // Fetch related invoice details
-      const detailsMap = await this.fetchInvoiceDetails(pool, invoiceCodes);
-
-      // Build payload
-      const payload = this.buildPayload(headers, detailsMap);
-
-      // Send to backend
-      const sendResult = await this.sendToBackend(payload);
-
-      // Update checkpoint only after successful backend acknowledgment
-      const lastInvoiceNo = Math.max(...invoiceCodes);
-      const saved = this.state.updateCheckpoint(lastInvoiceNo, headers.length);
-
-      if (!saved) {
-        console.warn(`${this.branchTag} [SYNC] ⚠️ Checkpoint save failed, but backend acknowledged sync`);
-      }
-
-      console.log(`${this.branchTag} [SYNC] ✅ Sync batch complete: ${headers.length} invoices, checkpoint=${lastInvoiceNo}`);
+      console.log(`${this.branchTag} [SYNC] ✅ Sync batch complete: ${invoiceCount} invoices, ${latestCostResult.productCount} latest cost rows, checkpoint=${checkpoint}`);
 
       return {
         success: true,
-        invoiceCount: sendResult.invoiceCount,
-        detailCount: sendResult.detailCount,
-        checkpoint: lastInvoiceNo,
+        invoiceCount,
+        detailCount,
+        latestProductCostCount: latestCostResult.productCount,
+        checkpoint,
       };
     } catch (error) {
       console.error(`${this.branchTag} [SYNC] ❌ Batch sync failed:`, error.message);

@@ -1,4 +1,4 @@
-const { ingestReportingBatch } = require('../services/reportingSyncIngest.service');
+const { ingestReportingBatch, ingestLatestProductCosts } = require('../services/reportingSyncIngest.service');
 
 function isAuthorizedAgent(req) {
   const provided = req.headers['x-pos-secret'];
@@ -77,6 +77,47 @@ function validateReportingPayload(payload) {
   return errors;
 }
 
+function validateLatestProductCostsPayload(payload) {
+  const errors = [];
+
+  if (!payload || typeof payload !== 'object') {
+    return ['Payload must be a JSON object'];
+  }
+
+  if (!payload.branchCode || typeof payload.branchCode !== 'string') {
+    errors.push('branchCode is required');
+  }
+
+  if (!payload.branchName || typeof payload.branchName !== 'string') {
+    errors.push('branchName is required');
+  }
+
+  if (!payload.syncSourceCode || typeof payload.syncSourceCode !== 'string') {
+    errors.push('syncSourceCode is required');
+  }
+
+  if (!Array.isArray(payload.latestProductCosts)) {
+    errors.push('latestProductCosts must be an array');
+  } else {
+    payload.latestProductCosts.forEach((item, index) => {
+      if (!item || typeof item !== 'object') {
+        errors.push(`latestProductCosts[${index}] must be an object`);
+        return;
+      }
+
+      if (!item.productCode || typeof item.productCode !== 'string') {
+        errors.push(`latestProductCosts[${index}].productCode is required`);
+      }
+
+      if (item.latestUnitCost !== undefined && item.latestUnitCost !== null && !isFiniteNumber(item.latestUnitCost)) {
+        errors.push(`latestProductCosts[${index}].latestUnitCost must be numeric`);
+      }
+    });
+  }
+
+  return errors;
+}
+
 async function receiveReportingInvoices(req, res) {
   try {
     if (!isAuthorizedAgent(req)) {
@@ -145,6 +186,56 @@ async function receiveReportingInvoices(req, res) {
   }
 }
 
+async function receiveLatestProductCosts(req, res) {
+  try {
+    if (!isAuthorizedAgent(req)) {
+      return res.status(403).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const payload = req.body || {};
+    const validationErrors = validateLatestProductCostsPayload(payload);
+
+    if (validationErrors.length > 0) {
+      console.error('[REPORTING SYNC][LATEST COSTS] Validation failed:', {
+        syncSourceCode: payload.syncSourceCode,
+        branchCode: payload.branchCode,
+        errors: validationErrors,
+      });
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: validationErrors,
+      });
+    }
+
+    console.log('[REPORTING SYNC][LATEST COSTS] Received latest product costs batch', {
+      branchCode: payload.branchCode,
+      branchName: payload.branchName,
+      syncSourceCode: payload.syncSourceCode,
+      products: payload.latestProductCosts.length,
+    });
+
+    const result = await ingestLatestProductCosts(payload);
+
+    return res.status(200).json({
+      success: true,
+      receivedProducts: result.receivedProducts,
+      storedProducts: result.storedProducts + result.updatedProducts,
+      insertedProducts: result.storedProducts,
+      updatedProducts: result.updatedProducts,
+      syncSourceCode: result.syncSourceCode,
+    });
+  } catch (error) {
+    console.error('[REPORTING SYNC][LATEST COSTS] Processing failed:', error.message);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to process latest product cost sync batch',
+      details: error.message,
+    });
+  }
+}
+
 module.exports = {
   receiveReportingInvoices,
+  receiveLatestProductCosts,
 };

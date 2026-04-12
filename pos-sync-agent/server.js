@@ -1894,7 +1894,7 @@ async function pollAndProcessReportingSync() {
     const result = await reportingSyncService.syncBatch(pool, appConfig.reporting.batchSize);
 
     if (result.success) {
-      console.log(`${BRANCH_TAG} [REPORTING SYNC] ✅ Sync complete: ${result.invoiceCount} invoices, ${result.detailCount} details, checkpoint=${result.checkpoint}`);
+      console.log(`${BRANCH_TAG} [REPORTING SYNC] ✅ Sync complete: ${result.invoiceCount} invoices, ${result.detailCount} details, ${result.latestProductCostCount || 0} latest cost rows, checkpoint=${result.checkpoint}`);
     }
   } catch (error) {
     console.error(`${BRANCH_TAG} [REPORTING SYNC] ❌ Polling error:`, error.message);

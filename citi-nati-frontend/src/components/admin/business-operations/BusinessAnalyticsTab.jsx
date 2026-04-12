@@ -513,6 +513,11 @@ function moneyOrDash(value) {
   return value == null ? 'N/A' : money(value);
 }
 
+function joinLabels(values = []) {
+  const rows = Array.isArray(values) ? values.filter(Boolean) : [];
+  return rows.length > 0 ? rows.join(', ') : 'N/A';
+}
+
 const LatestCostProfitSubview = ({ active, selectedPeriod, effectiveScope, locations, scopeLabel, periodLabel, refreshTick }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -555,7 +560,7 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, effectiveScope, locat
           <div>
             <strong style={{ color: '#0f172a' }}>Latest-Cost Profit Analytics</strong>
             <p style={{ margin: '0.3rem 0 0', color: '#64748b', fontSize: '0.84rem', lineHeight: 1.5 }}>
-              Profit is calculated from sold revenue minus COGS using each product&apos;s latest unit cost from its most recent finalized GRN / stock addition.
+              Profit is calculated from sold revenue minus COGS using each product&apos;s latest unit cost from the most recent GRN in POS SQL for that branch / sync source.
             </p>
           </div>
           <button
@@ -576,7 +581,7 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, effectiveScope, locat
             Scope: {scopeLabel}
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', padding: '0.28rem 0.6rem', borderRadius: '999px', backgroundColor: '#ecfeff', color: '#155e75', fontSize: '0.76rem', fontWeight: 800 }}>
-            Basis: Latest finalized GRN unit cost
+            Basis: Latest POS GRN unit cost
           </span>
         </div>
       </div>
@@ -603,7 +608,7 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, effectiveScope, locat
               { label: 'COGS From Latest Cost', value: money(summary.totalCostOfGoodsSold), note: 'Latest unit cost multiplied by sold quantity.' },
               { label: 'Gross Profit', value: money(summary.totalGrossProfit), note: summary.grossMarginPct == null ? 'Margin unavailable' : `Margin ${Number(summary.grossMarginPct).toFixed(1)}%` },
               { label: 'Excluded Revenue', value: money(summary.excludedRevenue), note: `${intFmt(summary.incompleteProducts)} incomplete product(s)` },
-              { label: 'Daily / Period Ready', value: intFmt(summary.completeProducts), note: `${intFmt(summary.totalProducts)} tracked products total` },
+              { label: 'Daily / Period Ready', value: intFmt(summary.completeProducts), note: `${intFmt(summary.uniqueProducts || 0)} unique products • ${intFmt(summary.totalProducts)} branch rows` },
             ].map((kpi) => (
               <div key={kpi.label} style={{ ...cardStyle, padding: '0.9rem 1rem' }}>
                 <div style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>{kpi.label}</div>
@@ -632,7 +637,7 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, effectiveScope, locat
             <div style={{ ...cardStyle, padding: '0.95rem 1rem', borderColor: '#fcd34d', backgroundColor: '#fffbeb' }}>
               <strong style={{ color: '#92400e' }}>Incomplete Profit Coverage</strong>
               <p style={{ margin: '0.28rem 0 0', color: '#92400e', fontSize: '0.82rem', lineHeight: 1.5 }}>
-                {intFmt(summary.incompleteProducts)} product(s) do not have a valid latest GRN cost in the current scope. Their revenue is shown, but it is excluded from gross profit so the system does not invent profit numbers.
+                {intFmt(summary.incompleteProducts)} product row(s) do not have a valid latest POS GRN cost in the current scope. Their revenue is shown, but it is excluded from gross profit so the system does not invent profit numbers.
               </p>
             </div>
           )}
@@ -688,7 +693,7 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, effectiveScope, locat
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '0.8rem' }}>
             <div style={{ ...cardStyle, padding: '0.9rem 0.95rem' }}>
               <strong style={{ color: '#0f172a' }}>Products Missing Latest Cost</strong>
-              <p style={{ margin: '0.3rem 0 0.6rem', color: '#64748b', fontSize: '0.82rem' }}>These products are flagged and excluded from profit totals until a valid latest GRN cost exists.</p>
+              <p style={{ margin: '0.3rem 0 0.6rem', color: '#64748b', fontSize: '0.82rem' }}>These products are flagged and excluded from profit totals until a valid latest POS GRN cost exists.</p>
               <div style={{ maxHeight: '360px', overflowY: 'auto', display: 'grid', gap: '0.42rem' }}>
                 {incompleteProducts.length === 0 ? (
                   <div style={{ color: '#166534', fontSize: '0.84rem', fontWeight: 700 }}>All tracked products have a valid latest cost basis.</div>
@@ -699,7 +704,7 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, effectiveScope, locat
                       <span style={{ color: '#9a3412', fontWeight: 800, fontSize: '0.76rem' }}>{row.productCode || 'No product code'}</span>
                     </div>
                     <div style={{ marginTop: '0.28rem', color: '#7c2d12', fontSize: '0.78rem', lineHeight: 1.45 }}>{row.incompleteReason}</div>
-                    <div style={{ marginTop: '0.28rem', color: '#9a3412', fontSize: '0.76rem' }}>Revenue: <strong>{money(row.revenue)}</strong> | Qty: <strong>{intFmt(row.quantitySold)}</strong></div>
+                    <div style={{ marginTop: '0.28rem', color: '#9a3412', fontSize: '0.76rem' }}>Revenue: <strong>{money(row.revenue)}</strong> | Qty: <strong>{intFmt(row.quantitySold)}</strong> | Scope: <strong>{joinLabels(row.branchCodes || row.syncSourceCodes || [])}</strong></div>
                   </div>
                 ))}
               </div>
@@ -717,6 +722,7 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, effectiveScope, locat
                       <div>
                         <strong style={{ color: '#0f172a', fontSize: '0.84rem' }}>{row.productName}</strong>
                         <div style={{ marginTop: '0.16rem', color: '#64748b', fontSize: '0.76rem' }}>{row.productCode || 'No product code'} {row.category ? `• ${row.category}` : ''}</div>
+                        <div style={{ marginTop: '0.12rem', color: '#94a3b8', fontSize: '0.73rem' }}>Branches: {joinLabels(row.branchCodes)} | Sources: {joinLabels(row.syncSourceCodes)}</div>
                       </div>
                       <div style={{ color: '#1d4ed8', fontWeight: 900, fontSize: '0.86rem' }}>{money(row.grossProfit)}</div>
                     </div>
@@ -724,18 +730,24 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, effectiveScope, locat
                     <div style={{ marginTop: '0.34rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.35rem' }}>
                       <div style={{ color: '#64748b', fontSize: '0.76rem' }}>Revenue: <span style={{ color: '#0f172a', fontWeight: 700 }}>{money(row.revenue)}</span></div>
                       <div style={{ color: '#64748b', fontSize: '0.76rem' }}>Qty: <span style={{ color: '#0f172a', fontWeight: 700 }}>{intFmt(row.quantitySold)}</span></div>
-                      <div style={{ color: '#64748b', fontSize: '0.76rem' }}>Latest Unit Cost: <span style={{ color: '#0f172a', fontWeight: 700 }}>{moneyOrDash(row.latestCostBasis?.latestUnitCost)}</span></div>
+                      <div style={{ color: '#64748b', fontSize: '0.76rem' }}>Latest Unit Cost: <span style={{ color: '#0f172a', fontWeight: 700 }}>{row.latestCostBasis?.length === 1 ? moneyOrDash(row.latestCostBasis[0]?.latestUnitCost) : `${row.latestCostBasis?.length || 0} branch basis records`}</span></div>
                       <div style={{ color: '#64748b', fontSize: '0.76rem' }}>COGS: <span style={{ color: '#0f172a', fontWeight: 700 }}>{moneyOrDash(row.costOfGoodsSold)}</span></div>
                       <div style={{ color: '#64748b', fontSize: '0.76rem' }}>Margin: <span style={{ color: '#0f172a', fontWeight: 700 }}>{row.grossMarginPct == null ? 'N/A' : `${Number(row.grossMarginPct).toFixed(1)}%`}</span></div>
                     </div>
 
-                    <div style={{ marginTop: '0.34rem', padding: '0.45rem 0.5rem', borderRadius: '10px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                      <div style={{ color: '#475569', fontSize: '0.74rem', fontWeight: 800 }}>Latest Cost Basis</div>
-                      <div style={{ marginTop: '0.18rem', color: '#334155', fontSize: '0.76rem', lineHeight: 1.45 }}>
-                        Reference: <strong>{row.latestCostBasis?.latestGrnReference || row.latestCostBasis?.intakeRef || 'N/A'}</strong><br />
-                        Stock addition date: <strong>{formatDateTimeLabel(row.latestCostBasis?.latestStockAdditionDate)}</strong><br />
-                        Recorded at: <strong>{formatDateTimeLabel(row.latestCostBasis?.latestRecordedAt)}</strong>
-                      </div>
+                    <div style={{ marginTop: '0.34rem', display: 'grid', gap: '0.32rem' }}>
+                      {(Array.isArray(row.latestCostBasis) ? row.latestCostBasis : []).map((basis, index) => (
+                        <div key={`${row.productCode || row.productName}-basis-${basis.syncSourceCode || index}`} style={{ padding: '0.45rem 0.5rem', borderRadius: '10px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                          <div style={{ color: '#475569', fontSize: '0.74rem', fontWeight: 800 }}>Latest Cost Basis {basis.branchCode ? `• ${basis.branchCode}` : ''}</div>
+                          <div style={{ marginTop: '0.18rem', color: '#334155', fontSize: '0.76rem', lineHeight: 1.45 }}>
+                            Source: <strong>{basis.syncSourceCode || 'N/A'}</strong><br />
+                            GRN: <strong>{basis.latestGrnReference || basis.latestGrnNo || 'N/A'}</strong><br />
+                            GRN date: <strong>{formatDateTimeLabel(basis.latestStockAdditionDate)}</strong><br />
+                            Latest unit cost: <strong>{moneyOrDash(basis.latestUnitCost)}</strong><br />
+                            Synced at: <strong>{formatDateTimeLabel(basis.latestRecordedAt)}</strong>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}

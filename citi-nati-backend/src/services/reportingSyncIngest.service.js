@@ -24,6 +24,27 @@ function toDateOrNull(value) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function normalizeLatestProductCost(item, batchMeta) {
+  return {
+    syncSourceId: batchMeta.syncSourceId,
+    branchCode: batchMeta.branchCode,
+    branchName: batchMeta.branchName,
+    locationId: batchMeta.locationId,
+    locationCode: toStringOrNull(item.locationCode),
+    syncSourceCode: batchMeta.syncSourceCode,
+    productCode: toStringOrNull(item.productCode),
+    productName: toStringOrNull(item.productName),
+    latestUnitCost: item.latestUnitCost == null ? null : toFloat(item.latestUnitCost, null),
+    latestGrnNo: toStringOrNull(item.latestGrnNo),
+    latestGrnReference: toStringOrNull(item.latestGrnReference),
+    latestGrnDate: toDateOrNull(item.latestGrnDate),
+    stockDetailId: toStringOrNull(item.stockDetailId),
+    sourceUpdatedAt: toDateOrNull(item.sourceUpdatedAt),
+    sourceSyncedAt: batchMeta.syncedAt,
+    lastReceivedAt: new Date(),
+  };
+}
+
 function normalizeInvoice(invoice, batchMeta) {
   return {
     syncSourceId: batchMeta.syncSourceId,
@@ -241,6 +262,66 @@ async function ingestReportingBatch(payload) {
   return result;
 }
 
+async function ingestLatestProductCosts(payload) {
+  const latestProductCosts = Array.isArray(payload.latestProductCosts) ? payload.latestProductCosts : [];
+  const syncedAt = toDateOrNull(payload.syncedAt) || new Date();
+
+  const result = {
+    receivedProducts: latestProductCosts.length,
+    storedProducts: 0,
+    updatedProducts: 0,
+    syncSourceCode: payload.syncSourceCode,
+  };
+
+  await prisma.$transaction(async (tx) => {
+    const source = await upsertSyncSource(tx, payload);
+
+    const batchMeta = {
+      syncSourceId: source.id,
+      branchCode: payload.branchCode,
+      branchName: payload.branchName,
+      locationId: toInt(payload.locationId),
+      syncSourceCode: payload.syncSourceCode,
+      syncedAt,
+    };
+
+    for (const item of latestProductCosts) {
+      const productCode = toStringOrNull(item.productCode);
+      if (!productCode) continue;
+
+      const data = normalizeLatestProductCost(item, batchMeta);
+      const existing = await tx.posLatestProductCost.findUnique({
+        where: {
+          syncSourceCode_productCode: {
+            syncSourceCode: batchMeta.syncSourceCode,
+            productCode,
+          },
+        },
+        select: { id: true },
+      });
+
+      if (!existing) {
+        await tx.posLatestProductCost.create({
+          data: {
+            ...data,
+            firstReceivedAt: new Date(),
+          },
+        });
+        result.storedProducts += 1;
+      } else {
+        await tx.posLatestProductCost.update({
+          where: { id: existing.id },
+          data,
+        });
+        result.updatedProducts += 1;
+      }
+    }
+  });
+
+  return result;
+}
+
 module.exports = {
   ingestReportingBatch,
+  ingestLatestProductCosts,
 };
