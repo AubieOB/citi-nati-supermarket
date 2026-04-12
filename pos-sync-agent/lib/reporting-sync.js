@@ -39,8 +39,8 @@ class ReportingSyncService {
     const stockRefColumn = pickFirst(stocksColumns, ['ReferenceNo', 'ReceiptReference', 'RefNo']);
 
     this.latestCostColumnConfig = {
-      costExpr: costColumn ? `TRY_CONVERT(decimal(18, 4), sd.${costColumn})` : 'NULL',
-      grnDateExpr: stockDateColumn ? `TRY_CONVERT(datetime, s.${stockDateColumn})` : 'NULL',
+      costExpr: costColumn ? `CAST(sd.${costColumn} AS decimal(18, 4))` : 'NULL',
+      grnDateExpr: stockDateColumn ? `CAST(s.${stockDateColumn} AS datetime)` : 'NULL',
       grnReferenceExpr: stockRefColumn ? `CAST(s.${stockRefColumn} AS varchar(100))` : 'CAST(sd.GRNNo AS varchar(100))',
     };
 
@@ -329,9 +329,8 @@ class ReportingSyncService {
             ORDER BY
               CASE WHEN ${columnConfig.grnDateExpr} IS NULL THEN 1 ELSE 0 END ASC,
               ${columnConfig.grnDateExpr} DESC,
-              TRY_CONVERT(bigint, sd.GRNNo) DESC,
-              TRY_CONVERT(bigint, sd.StockDetailID) DESC,
-              CAST(sd.GRNNo AS varchar(100)) DESC
+              CAST(sd.StockDetailID AS varchar(100)) DESC,
+              sd.GRNNo DESC
           ) AS rn
         FROM POS.dbo.stockdetails sd
         INNER JOIN POS.dbo.stocks s ON sd.GRNNo = s.GRNNo
