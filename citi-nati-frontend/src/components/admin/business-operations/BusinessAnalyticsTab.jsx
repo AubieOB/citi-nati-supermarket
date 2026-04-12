@@ -1243,11 +1243,11 @@ const BusinessAnalyticsTab = ({
           };
         })
         .sort((a, b) => b.fastMoverScore - a.fastMoverScore || b.totalQuantity - a.totalQuantity || b.totalSales - a.totalSales)
-        .slice(0, 10);
+        .slice(0, 50);
 
       const topProducts = rankedProducts
         .sort((a, b) => b.totalSales - a.totalSales)
-        .slice(0, 10);
+        .slice(0, 50);
 
       const topUsers = userRows
         .map((row) => ({
