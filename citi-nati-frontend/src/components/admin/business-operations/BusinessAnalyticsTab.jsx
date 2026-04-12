@@ -526,6 +526,7 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, effectiveScope, locat
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [isMissingOpen, setIsMissingOpen] = useState(false);
   const [isProductOpen, setIsProductOpen] = useState(false);
+  const [maximizedModalKey, setMaximizedModalKey] = useState('');
 
   const fetchProfitAnalytics = useCallback(async () => {
     if (!active) return;
@@ -556,6 +557,11 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, effectiveScope, locat
   const products = Array.isArray(profitData?.products) ? profitData.products : [];
   const incompleteProducts = products.filter((row) => row.isIncomplete);
   const completeProducts = products.filter((row) => !row.isIncomplete);
+  const isModalMaximized = (modalKey) => maximizedModalKey === modalKey;
+  const closeModal = (setOpen) => {
+    setOpen(false);
+    setMaximizedModalKey('');
+  };
 
   return (
     <div style={{ display: 'grid', gap: '0.85rem' }}>
@@ -729,16 +735,27 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, effectiveScope, locat
 
       {/* Daily Profit Modal */}
       {isDailyOpen && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 220, display: 'grid', placeItems: 'center', padding: '1rem' }}>
-          <div style={{ ...cardStyle, width: 'min(680px, 98vw)', maxHeight: '88vh', display: 'flex', flexDirection: 'column', borderRadius: '18px', overflow: 'hidden' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 220, display: 'grid', placeItems: 'center', padding: isModalMaximized('daily') ? '0.35rem' : '1rem' }}>
+          <div style={{ ...cardStyle, width: isModalMaximized('daily') ? 'calc(100vw - 0.7rem)' : 'min(680px, 98vw)', height: isModalMaximized('daily') ? 'calc(100vh - 0.7rem)' : '88vh', maxHeight: 'none', display: 'flex', flexDirection: 'column', borderRadius: isModalMaximized('daily') ? '10px' : '18px', overflow: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.1rem', borderBottom: '1px solid #e2e8f0' }}>
               <div>
                 <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0f766e', fontWeight: 800 }}>Daily Breakdown</div>
                 <div style={{ marginTop: '0.2rem', fontWeight: 800, fontSize: '1.05rem', color: '#0f172a' }}>Daily Profit Totals</div>
               </div>
-              <button type="button" onClick={() => setIsDailyOpen(false)} style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
-                <i className="fas fa-times" />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <button
+                  type="button"
+                  title={isModalMaximized('daily') ? 'Restore' : 'Maximize'}
+                  aria-label={isModalMaximized('daily') ? 'Restore modal' : 'Maximize modal'}
+                  onClick={() => setMaximizedModalKey((prev) => (prev === 'daily' ? '' : 'daily'))}
+                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', color: '#334155', cursor: 'pointer' }}
+                >
+                  <i className={`fas ${isModalMaximized('daily') ? 'fa-window-restore' : 'fa-window-maximize'}`} />
+                </button>
+                <button type="button" onClick={() => closeModal(setIsDailyOpen)} style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+                  <i className="fas fa-times" />
+                </button>
+              </div>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1.1rem', display: 'grid', gap: '0.42rem' }}>
               {dailyTotals.length === 0 ? (
@@ -764,16 +781,27 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, effectiveScope, locat
 
       {/* Category Profit Modal */}
       {isCategoryOpen && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 220, display: 'grid', placeItems: 'center', padding: '1rem' }}>
-          <div style={{ ...cardStyle, width: 'min(680px, 98vw)', maxHeight: '88vh', display: 'flex', flexDirection: 'column', borderRadius: '18px', overflow: 'hidden' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 220, display: 'grid', placeItems: 'center', padding: isModalMaximized('category') ? '0.35rem' : '1rem' }}>
+          <div style={{ ...cardStyle, width: isModalMaximized('category') ? 'calc(100vw - 0.7rem)' : 'min(680px, 98vw)', height: isModalMaximized('category') ? 'calc(100vh - 0.7rem)' : '88vh', maxHeight: 'none', display: 'flex', flexDirection: 'column', borderRadius: isModalMaximized('category') ? '10px' : '18px', overflow: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.1rem', borderBottom: '1px solid #e2e8f0' }}>
               <div>
                 <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1d4ed8', fontWeight: 800 }}>Category Totals</div>
                 <div style={{ marginTop: '0.2rem', fontWeight: 800, fontSize: '1.05rem', color: '#0f172a' }}>Category Profit Totals</div>
               </div>
-              <button type="button" onClick={() => setIsCategoryOpen(false)} style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
-                <i className="fas fa-times" />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <button
+                  type="button"
+                  title={isModalMaximized('category') ? 'Restore' : 'Maximize'}
+                  aria-label={isModalMaximized('category') ? 'Restore modal' : 'Maximize modal'}
+                  onClick={() => setMaximizedModalKey((prev) => (prev === 'category' ? '' : 'category'))}
+                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', color: '#334155', cursor: 'pointer' }}
+                >
+                  <i className={`fas ${isModalMaximized('category') ? 'fa-window-restore' : 'fa-window-maximize'}`} />
+                </button>
+                <button type="button" onClick={() => closeModal(setIsCategoryOpen)} style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+                  <i className="fas fa-times" />
+                </button>
+              </div>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1.1rem', display: 'grid', gap: '0.42rem' }}>
               {categoryTotals.length === 0 ? (
@@ -799,16 +827,27 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, effectiveScope, locat
 
       {/* Missing Cost Modal */}
       {isMissingOpen && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 220, display: 'grid', placeItems: 'center', padding: '1rem' }}>
-          <div style={{ ...cardStyle, width: 'min(680px, 98vw)', maxHeight: '88vh', display: 'flex', flexDirection: 'column', borderRadius: '18px', overflow: 'hidden' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 220, display: 'grid', placeItems: 'center', padding: isModalMaximized('missing') ? '0.35rem' : '1rem' }}>
+          <div style={{ ...cardStyle, width: isModalMaximized('missing') ? 'calc(100vw - 0.7rem)' : 'min(680px, 98vw)', height: isModalMaximized('missing') ? 'calc(100vh - 0.7rem)' : '88vh', maxHeight: 'none', display: 'flex', flexDirection: 'column', borderRadius: isModalMaximized('missing') ? '10px' : '18px', overflow: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.1rem', borderBottom: '1px solid #fcd34d', backgroundColor: '#fffbeb' }}>
               <div>
                 <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#b45309', fontWeight: 800 }}>Missing Cost</div>
                 <div style={{ marginTop: '0.2rem', fontWeight: 800, fontSize: '1.05rem', color: '#92400e' }}>Products Missing Latest Cost</div>
               </div>
-              <button type="button" onClick={() => setIsMissingOpen(false)} style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
-                <i className="fas fa-times" />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <button
+                  type="button"
+                  title={isModalMaximized('missing') ? 'Restore' : 'Maximize'}
+                  aria-label={isModalMaximized('missing') ? 'Restore modal' : 'Maximize modal'}
+                  onClick={() => setMaximizedModalKey((prev) => (prev === 'missing' ? '' : 'missing'))}
+                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fcd34d', background: '#fff', color: '#92400e', cursor: 'pointer' }}
+                >
+                  <i className={`fas ${isModalMaximized('missing') ? 'fa-window-restore' : 'fa-window-maximize'}`} />
+                </button>
+                <button type="button" onClick={() => closeModal(setIsMissingOpen)} style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+                  <i className="fas fa-times" />
+                </button>
+              </div>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1.1rem', display: 'grid', gap: '0.42rem', alignContent: 'start' }}>
               {incompleteProducts.length === 0 ? (
@@ -830,16 +869,27 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, effectiveScope, locat
 
       {/* Per-Product Profit Modal */}
       {isProductOpen && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 220, display: 'grid', placeItems: 'center', padding: '1rem' }}>
-          <div style={{ ...cardStyle, width: 'min(820px, 98vw)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', borderRadius: '18px', overflow: 'hidden' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 220, display: 'grid', placeItems: 'center', padding: isModalMaximized('product') ? '0.35rem' : '1rem' }}>
+          <div style={{ ...cardStyle, width: isModalMaximized('product') ? 'calc(100vw - 0.7rem)' : 'min(820px, 98vw)', height: isModalMaximized('product') ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', display: 'flex', flexDirection: 'column', borderRadius: isModalMaximized('product') ? '10px' : '18px', overflow: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.1rem', borderBottom: '1px solid #e2e8f0' }}>
               <div>
                 <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6d28d9', fontWeight: 800 }}>Per-Product Profit</div>
                 <div style={{ marginTop: '0.2rem', fontWeight: 800, fontSize: '1.05rem', color: '#0f172a' }}>{completeProducts.length} Product{completeProducts.length !== 1 ? 's' : ''} with Cost Basis</div>
               </div>
-              <button type="button" onClick={() => setIsProductOpen(false)} style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
-                <i className="fas fa-times" />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <button
+                  type="button"
+                  title={isModalMaximized('product') ? 'Restore' : 'Maximize'}
+                  aria-label={isModalMaximized('product') ? 'Restore modal' : 'Maximize modal'}
+                  onClick={() => setMaximizedModalKey((prev) => (prev === 'product' ? '' : 'product'))}
+                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', color: '#334155', cursor: 'pointer' }}
+                >
+                  <i className={`fas ${isModalMaximized('product') ? 'fa-window-restore' : 'fa-window-maximize'}`} />
+                </button>
+                <button type="button" onClick={() => closeModal(setIsProductOpen)} style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+                  <i className="fas fa-times" />
+                </button>
+              </div>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1.1rem', display: 'grid', gap: '0.42rem', alignContent: 'start' }}>
               {completeProducts.length === 0 ? (
