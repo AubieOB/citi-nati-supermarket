@@ -32,6 +32,10 @@ function roundMoney(val, decimals = 2) {
   return Number(n.toFixed(decimals));
 }
 
+function productGroupKey(productCode, productName) {
+  return `${productCode || ''}__${productName || ''}`;
+}
+
 // ---------------------------------------------------------------------------
 // 1. Sales Summary
 // ---------------------------------------------------------------------------
@@ -179,7 +183,6 @@ async function queryProductReport(itemWhere, pagination, sort) {
         amount: true,
         taxAmount: true,
         discountAmount: true,
-        costPrice: true,
         discount: true,
       },
       _avg: { unitPrice: true },
@@ -194,9 +197,39 @@ async function queryProductReport(itemWhere, pagination, sort) {
       .then((r) => r.length),
   ]);
 
+  const groupFilters = groups.map((g) => ({
+    productCode: g.productCode,
+    productName: g.productName,
+  }));
+
+  const costRows = groupFilters.length
+    ? await prisma.salesInvoiceItem.findMany({
+      where: {
+        ...itemWhere,
+        OR: groupFilters,
+      },
+      select: {
+        productCode: true,
+        productName: true,
+        qty: true,
+        costPrice: true,
+      },
+    })
+    : [];
+
+  const totalCostByGroup = new Map();
+  for (const row of costRows) {
+    const key = productGroupKey(row.productCode, row.productName);
+    const qty = Number(row.qty || 0);
+    const unitCost = Number(row.costPrice || 0);
+    if (!Number.isFinite(qty) || !Number.isFinite(unitCost) || qty <= 0 || unitCost <= 0) continue;
+    const lineCost = unitCost * qty;
+    totalCostByGroup.set(key, (totalCostByGroup.get(key) || 0) + lineCost);
+  }
+
   const products = groups.map((g) => {
     const totalSales = toNum(g._sum.amount);
-    const totalCost = toNum(g._sum.costPrice);
+    const totalCost = roundMoney(totalCostByGroup.get(productGroupKey(g.productCode, g.productName)) || 0);
     const hasMarginData = totalCost > 0 && totalSales > 0;
     const estimatedMargin = hasMarginData
       ? toNum(((totalSales - totalCost) / totalSales) * 100)
