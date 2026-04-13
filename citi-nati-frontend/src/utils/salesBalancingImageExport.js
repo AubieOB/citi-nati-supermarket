@@ -56,40 +56,40 @@ export async function exportSalesBalancingReportImage({
   header.style.cssText = `
     display: flex;
     align-items: center;
-    gap: 16px;
-    margin-bottom: 32px;
+    gap: 20px;
+    margin-bottom: 16px;
     border-bottom: 2px solid ${BRAND.border};
-    padding-bottom: 20px;
+    padding-bottom: 16px;
   `;
 
   const logoImg = document.createElement('img');
   logoImg.src = logo;
-  logoImg.style.cssText = 'height: 60px; width: auto;';
+  logoImg.style.cssText = 'height: 74px; width: auto;';
   header.appendChild(logoImg);
 
   const headerTitle = document.createElement('div');
-  headerTitle.style.cssText = 'flex: 1;';
+  headerTitle.style.cssText = 'flex: 1; min-width: 0;';
   headerTitle.innerHTML = `
-    <div style="font-size: 30px; font-weight: bold; margin-bottom: 4px;">
+    <div style="font-size: 35px; font-weight: bold; margin-bottom: 4px; white-space: nowrap; line-height: 1.1;">
       <span style="color: ${BRAND.purple};">Citi-</span><span style="color: ${BRAND.green};">Nati Supermarket</span>
     </div>
-    <div style="font-size: 28px; font-weight: bold; color: ${BRAND.text}; margin-top: 4px;">${title}</div>
-    <div style="font-size: 19px; color: ${BRAND.muted}; margin-top: 6px;">Generated on: ${generated}</div>
+    <div style="font-size: 25px; font-weight: bold; color: ${BRAND.text}; margin-top: 4px; white-space: nowrap; line-height: 1.15;">${title}</div>
+    <div style="font-size: 15px; color: ${BRAND.muted}; margin-top: 6px;">Generated on: ${generated}</div>
   `;
   header.appendChild(headerTitle);
 
-  const preparedInfo = document.createElement('div');
-  preparedInfo.style.cssText = `
-    text-align: right;
-    font-size: 19px;
+  container.appendChild(header);
+
+  const metaRow = document.createElement('div');
+  metaRow.style.cssText = `
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 20px;
+    font-size: 15px;
     color: ${BRAND.muted};
   `;
-  preparedInfo.innerHTML = `
-    <div>Prepared by: <strong>${record.preparedBy || '-'}</strong></div>
-  `;
-  header.appendChild(preparedInfo);
-
-  container.appendChild(header);
+  metaRow.innerHTML = `<div>Prepared by: <strong>${record.preparedBy || '-'}</strong></div>`;
+  container.appendChild(metaRow);
 
   // Info section
   const infoSection = document.createElement('div');
@@ -348,3 +348,4 @@ export async function exportSalesBalancingReportImage({
     document.body.removeChild(container);
   }
 }
+
