@@ -46,7 +46,6 @@ const PAYMENT_FIELDS = [
   { key: 'tnmMpambaAmount', label: 'TNM Mpamba', icon: 'fa-sim-card' },
   { key: 'posCardAmount', label: 'POS / Card Machine', icon: 'fa-credit-card' },
   { key: 'bankTransferAmount', label: 'M0626 / National Bank / Bank Transfer', icon: 'fa-bank' },
-  { key: 'otherAmount', label: 'Other', icon: 'fa-ellipsis' },
 ];
 
 function normalizeAmount(value) {
@@ -91,7 +90,7 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
     tnmMpambaAmount: 0,
     posCardAmount: 0,
     bankTransferAmount: 0,
-    otherAmount: 0,
+    emergencyExpensesAmount: 0,
     notes: '',
   });
 
@@ -118,7 +117,7 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
         tnmMpambaAmount: normalizeAmount(record.tnmMpambaAmount),
         posCardAmount: normalizeAmount(record.posCardAmount),
         bankTransferAmount: normalizeAmount(record.bankTransferAmount),
-        otherAmount: normalizeAmount(record.otherAmount),
+        emergencyExpensesAmount: normalizeAmount(record.emergencyExpensesAmount),
         notes: record.notes || '',
       });
     } else {
@@ -134,7 +133,7 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
         tnmMpambaAmount: 0,
         posCardAmount: 0,
         bankTransferAmount: 0,
-        otherAmount: 0,
+        emergencyExpensesAmount: 0,
         notes: '',
       });
     }
@@ -206,7 +205,8 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
     }
   };
 
-  const totalActual = PAYMENT_FIELDS.reduce((sum, field) => sum + normalizeAmount(form[field.key]), 0);
+  const paymentMethodsTotal = PAYMENT_FIELDS.reduce((sum, field) => sum + normalizeAmount(form[field.key]), 0);
+  const totalActual = Number((paymentMethodsTotal + normalizeAmount(form.emergencyExpensesAmount)).toFixed(2));
   const difference = Number((totalActual - normalizeAmount(form.expectedSystemSales)).toFixed(2));
   const resultStatus = Math.abs(difference) < 0.005 ? 'balanced' : difference < 0 ? 'shortage' : 'overage';
 
@@ -229,7 +229,7 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
       tnmMpambaAmount: normalizeAmount(form.tnmMpambaAmount),
       posCardAmount: normalizeAmount(form.posCardAmount),
       bankTransferAmount: normalizeAmount(form.bankTransferAmount),
-      otherAmount: normalizeAmount(form.otherAmount),
+      emergencyExpensesAmount: normalizeAmount(form.emergencyExpensesAmount),
       notes: form.notes.trim() || null,
     });
   };
@@ -355,6 +355,52 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
             </div>
           </div>
 
+          {/* Emergency Expenses Section */}
+          <div>
+            <h4 style={{ margin: 0, color: '#334155', fontSize: '0.95rem', fontWeight: 800, marginBottom: '0.75rem' }}>
+              <i className="fas fa-exclamation-circle" style={{ marginRight: '0.35rem' }}></i>
+              Emergency Expenses
+            </h4>
+            <p style={{ margin: '0 0 0.75rem', color: '#64748b', fontSize: '0.85rem' }}>
+              Expenses from the day's operations that would have been part of sales if not spent (e.g., repairs, utilities paid from cash).
+            </p>
+            <div style={{ ...amountCardStyle, borderColor: activeAmountKey === 'emergencyExpensesAmount' ? '#8f94c9' : '#dbe3f0', boxShadow: activeAmountKey === 'emergencyExpensesAmount' ? '0 0 0 3px rgba(143, 148, 201, 0.16), inset 0 1px 0 rgba(255,255,255,0.92)' : amountCardStyle.boxShadow, backgroundColor: activeAmountKey === 'emergencyExpensesAmount' ? '#eef2ff' : amountCardStyle.backgroundColor }}>
+              <label style={labelStyle}>
+                <i className="fas fa-exclamation-triangle" style={{ marginRight: '0.35rem', color: '#c2410c' }}></i>
+                Emergency Expenses (contributed to total)
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#5B4B8A', letterSpacing: '0.08em' }}>MWK</span>
+                <input
+                  ref={(element) => {
+                    if (element) {
+                      amountInputRefs.current.set('emergencyExpensesAmount', element);
+                    } else {
+                      amountInputRefs.current.delete('emergencyExpensesAmount');
+                    }
+                  }}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.emergencyExpensesAmount || 0}
+                  onChange={setAmount('emergencyExpensesAmount')}
+                  onFocus={(event) => {
+                    setActiveAmountKey('emergencyExpensesAmount');
+                    event.target.select();
+                  }}
+                  onClick={(event) => event.target.select()}
+                  onBlur={() => setActiveAmountKey((current) => (current === 'emergencyExpensesAmount' ? '' : current))}
+                  placeholder="0.00"
+                  style={{
+                    ...amountInputStyle,
+                    borderColor: activeAmountKey === 'emergencyExpensesAmount' ? '#8f94c9' : '#cbd5e1',
+                    background: activeAmountKey === 'emergencyExpensesAmount' ? 'linear-gradient(180deg, #ffffff 0%, #eef2ff 100%)' : amountInputStyle.background,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Summary Section */}
           <div style={{ backgroundColor: '#f8fafc', borderRadius: '14px', padding: '1rem', border: '1px solid #e2e8f0' }}>
             <h4 style={{ margin: '0 0 0.75rem', color: '#334155', fontSize: '0.95rem', fontWeight: 800 }}>Calculation Summary</h4>
@@ -373,6 +419,8 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
               </div>
               <div>
                 <div style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800, marginBottom: '0.3rem' }}>Total Actual Entered</div>
+                <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginBottom: '0.2rem' }}>Payment Methods: {MONEY(paymentMethodsTotal)}</div>
+                <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginBottom: '0.3rem' }}>+ Emergency Expenses: {MONEY(form.emergencyExpensesAmount)}</div>
                 <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>{MONEY(totalActual)}</div>
               </div>
               <div>

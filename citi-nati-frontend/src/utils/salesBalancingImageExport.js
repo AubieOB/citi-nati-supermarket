@@ -181,7 +181,6 @@ export async function exportSalesBalancingReportImage({
     ['TNM Mpamba', money(record.tnmMpambaAmount)],
     ['POS / Card Machine', money(record.posCardAmount)],
     ['M0626 / Bank Transfer', money(record.bankTransferAmount)],
-    ['Other', money(record.otherAmount)],
   ];
 
   const paymentTable = document.createElement('table');
@@ -219,15 +218,36 @@ export async function exportSalesBalancingReportImage({
 
   const totalTd1 = document.createElement('td');
   totalTd1.style.cssText = 'padding: 12px 16px;';
-  totalTd1.textContent = 'Total Actual Entered';
+  totalTd1.textContent = 'Total Payment Methods';
 
   const totalTd2 = document.createElement('td');
   totalTd2.style.cssText = 'padding: 12px 16px; text-align: right;';
-  totalTd2.textContent = money(record.totalActualAmount);
+  totalTd2.textContent = money(record.totalActualAmount - (record.emergencyExpensesAmount || 0));
 
   totalRow.appendChild(totalTd1);
   totalRow.appendChild(totalTd2);
   paymentTable.appendChild(totalRow);
+
+  // Emergency expenses row
+  const expensesRow = document.createElement('tr');
+  expensesRow.style.cssText = `
+    background-color: #fff8dc;
+    font-weight: bold;
+    font-size: 16px;
+    border-top: 2px solid ${BRAND.border};
+  `;
+
+  const expensesTd1 = document.createElement('td');
+  expensesTd1.style.cssText = 'padding: 12px 16px; color: #c2410c;';
+  expensesTd1.textContent = '⚠ Emergency Expenses (contributed)';
+
+  const expensesTd2 = document.createElement('td');
+  expensesTd2.style.cssText = 'padding: 12px 16px; text-align: right; color: #c2410c;';
+  expensesTd2.textContent = money(record.emergencyExpensesAmount || 0);
+
+  expensesRow.appendChild(expensesTd1);
+  expensesRow.appendChild(expensesTd2);
+  paymentTable.appendChild(expensesRow);
 
   paymentSection.appendChild(paymentTable);
   container.appendChild(paymentSection);
