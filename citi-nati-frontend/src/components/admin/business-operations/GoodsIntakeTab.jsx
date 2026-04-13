@@ -779,7 +779,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
   );
 
   return (
-    <div style={{ display: 'grid', gap: '1rem', width: '100%', minWidth: 0 }}>
+    <div style={{ display: 'grid', gridTemplateRows: 'auto 1fr', gap: '1rem', width: '100%', minWidth: 0, height: 'calc(100vh - 230px)', maxHeight: 'calc(100vh - 230px)', overflow: 'hidden' }}>
       <section style={{ ...themedCardStyle, padding: '1rem', width: '100%', minWidth: 0 }}>
         <div style={{ display: 'grid', gap: '0.9rem', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
           <button
@@ -842,7 +842,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
         </div>
       </section>
 
-      <section style={{ ...themedCardStyle, padding: '1rem', width: '100%', minWidth: 0 }}>
+      <section style={{ ...themedCardStyle, padding: '1rem', width: '100%', minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <h3 style={{ margin: 0, color: colors.text }}>Purchase Intake History</h3>
           <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
@@ -859,7 +859,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
 
         {listError && <div style={{ marginTop: '0.8rem', fontSize: '0.86rem', color: '#b91c1c' }}>{listError}</div>}
 
-        <div style={{ marginTop: '0.8rem', width: '100%', maxWidth: '100%', overflowX: 'auto' }}>
+        <div style={{ marginTop: '0.8rem', flex: 1, minHeight: 0, width: '100%', maxWidth: '100%', overflow: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '980px' }}>
             <thead>
               <tr>
