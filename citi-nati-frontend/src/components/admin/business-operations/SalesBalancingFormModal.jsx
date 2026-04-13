@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import api from '../../../utils/api.js';
 
 const fieldStyle = {
   width: '100%',
@@ -96,6 +97,8 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
 
   const [validationError, setValidationError] = useState('');
   const [activeAmountKey, setActiveAmountKey] = useState('cashAmount');
+  const [loadingExpected, setLoadingExpected] = useState(false);
+  const [expectedError, setExpectedError] = useState('');
   const isCreateMode = !record;
 
   useEffect(() => {
@@ -143,6 +146,41 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen || !selectedLocationId || !form.balancingDate) return;
+
+    let cancelled = false;
+    const loadExpectedSales = async () => {
+      setLoadingExpected(true);
+      setExpectedError('');
+      try {
+        const response = await api.get('/business-operations/sales-balancing/expected', {
+          params: {
+            locationId: selectedLocationId,
+            balancingDate: form.balancingDate,
+          },
+        });
+
+        if (cancelled) return;
+        const expectedSystemSales = Number(response?.data?.data?.expectedSystemSales || 0);
+        setForm((prev) => ({ ...prev, expectedSystemSales: normalizeAmount(expectedSystemSales) }));
+      } catch (err) {
+        if (cancelled) return;
+        setExpectedError(err?.response?.data?.error || 'Could not refresh expected system sales for this date/location.');
+      } finally {
+        if (!cancelled) {
+          setLoadingExpected(false);
+        }
+      }
+    };
+
+    loadExpectedSales();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [form.balancingDate, isOpen, selectedLocationId]);
 
   if (!isOpen) return null;
 
@@ -322,8 +360,16 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
             <h4 style={{ margin: '0 0 0.75rem', color: '#334155', fontSize: '0.95rem', fontWeight: 800 }}>Calculation Summary</h4>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.8rem' }}>
               <div>
-                <div style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800, marginBottom: '0.3rem' }}>Expected System Sales</div>
+                <div style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800, marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <span>Expected System Sales</span>
+                  {loadingExpected && <i className="fas fa-spinner fa-spin" style={{ fontSize: '0.72rem' }}></i>}
+                </div>
                 <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>{MONEY(form.expectedSystemSales)}</div>
+                {!loadingExpected && expectedError && (
+                  <div style={{ marginTop: '0.25rem', color: '#b45309', fontSize: '0.72rem', lineHeight: 1.35 }}>
+                    {expectedError}
+                  </div>
+                )}
               </div>
               <div>
                 <div style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800, marginBottom: '0.3rem' }}>Total Actual Entered</div>
