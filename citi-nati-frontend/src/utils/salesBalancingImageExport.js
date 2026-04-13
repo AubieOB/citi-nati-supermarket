@@ -70,7 +70,7 @@ export async function exportSalesBalancingReportImage({
   const headerTitle = document.createElement('div');
   headerTitle.style.cssText = 'flex: 1;';
   headerTitle.innerHTML = `
-    <div style="font-size: 44px; font-weight: bold; margin-bottom: 4px;">
+    <div style="font-size: 30px; font-weight: bold; margin-bottom: 4px;">
       <span style="color: ${BRAND.purple};">Citi-</span><span style="color: ${BRAND.green};">Nati Supermarket</span>
     </div>
     <div style="font-size: 22px; font-weight: bold; color: ${BRAND.text}; margin-top: 4px;">${title}</div>
