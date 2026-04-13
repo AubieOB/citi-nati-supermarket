@@ -2378,7 +2378,7 @@ const BusinessAnalyticsTab = ({
               </div>
             );
           })()}
-        </>
+
           {/* Workspace modal — Overview / Trends / Rankings */}
           {activeWorkspaceModal && ['overview', 'trends', 'rankings'].includes(activeWorkspaceModal) && (
             <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 220, display: 'grid', placeItems: 'center', padding: isWorkspaceMaximized ? '0.35rem' : '1rem' }}>
@@ -2589,3 +2589,17 @@ const BusinessAnalyticsTab = ({
               </div>
             );
           })()}
+        </>
+      )}
+
+      {loading && (
+        <div style={{ ...cardStyle, padding: '1rem 1.1rem', color: isAdminDarkTheme ? '#b2c3d9' : '#64748b' }}>
+          <i className="fas fa-spinner fa-spin" style={{ marginRight: '0.45rem' }}></i>
+          Loading business analytics...
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default BusinessAnalyticsTab;
