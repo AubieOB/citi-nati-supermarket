@@ -70,18 +70,18 @@ export async function exportSalesBalancingReportImage({
   const headerTitle = document.createElement('div');
   headerTitle.style.cssText = 'flex: 1;';
   headerTitle.innerHTML = `
-    <div style="font-size: 30px; font-weight: bold; margin-bottom: 4px;">
+    <div style="font-size: 35px; font-weight: bold; margin-bottom: 4px;">
       <span style="color: ${BRAND.purple};">Citi-</span><span style="color: ${BRAND.green};">Nati Supermarket</span>
     </div>
-    <div style="font-size: 22px; font-weight: bold; color: ${BRAND.text}; margin-top: 4px;">${title}</div>
-    <div style="font-size: 13px; color: ${BRAND.muted}; margin-top: 6px;">Generated: ${generated}</div>
+    <div style="font-size: 25px; font-weight: bold; color: ${BRAND.text}; margin-top: 4px;">${title}</div>
+    <div style="font-size: 16px; color: ${BRAND.muted}; margin-top: 6px;">Generated on: ${generated}</div>
   `;
   header.appendChild(headerTitle);
 
   const preparedInfo = document.createElement('div');
   preparedInfo.style.cssText = `
     text-align: right;
-    font-size: 13px;
+    font-size: 16px;
     color: ${BRAND.muted};
   `;
   preparedInfo.innerHTML = `
@@ -105,7 +105,7 @@ export async function exportSalesBalancingReportImage({
     background-color: ${BRAND.background};
     padding: 12px 16px;
     font-weight: bold;
-    font-size: 18px;
+    font-size: 20px;
     border-bottom: 1px solid ${BRAND.border};
   `;
   infoTitle.textContent = 'Balancing Details';
@@ -123,7 +123,7 @@ export async function exportSalesBalancingReportImage({
   infoTable.style.cssText = `
     width: 100%;
     border-collapse: collapse;
-    font-size: 15px;
+    font-size: 17px;
   `;
 
   infoRows.forEach((row, idx) => {
@@ -170,7 +170,7 @@ export async function exportSalesBalancingReportImage({
     color: white;
     padding: 12px 16px;
     font-weight: bold;
-    font-size: 18px;
+    font-size: 20px;
   `;
   paymentTitle.textContent = 'Payment Methods';
   paymentSection.appendChild(paymentTitle);
@@ -187,7 +187,7 @@ export async function exportSalesBalancingReportImage({
   paymentTable.style.cssText = `
     width: 100%;
     border-collapse: collapse;
-    font-size: 15px;
+    font-size: 17px;
   `;
 
   paymentRows.forEach((row, idx) => {
@@ -263,7 +263,7 @@ export async function exportSalesBalancingReportImage({
   `;
 
   summarySection.innerHTML = `
-    <div style="display: grid; gap: 8px; font-size: 15px;">
+    <div style="display: grid; gap: 8px; font-size: 17px;">
       <div style="display: flex; justify-content: space-between;">
         <span style="font-weight: bold;">Expected System Sales:</span>
         <span>${money(record.expectedSystemSales)}</span>
@@ -294,7 +294,7 @@ export async function exportSalesBalancingReportImage({
     const notesTitle = document.createElement('div');
     notesTitle.style.cssText = `
       font-weight: bold;
-      font-size: 16px;
+      font-size: 18px;
       margin-bottom: 8px;
       color: ${BRAND.text};
     `;
@@ -303,7 +303,7 @@ export async function exportSalesBalancingReportImage({
 
     const notesContent = document.createElement('div');
     notesContent.style.cssText = `
-      font-size: 14px;
+      font-size: 16px;
       line-height: 1.6;
       color: ${BRAND.muted};
       white-space: pre-wrap;
