@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import api from '../../../utils/api.js';
 import { boAlert, boConfirm } from '../../../utils/boDialogBus.js';
 import { exportSalesBalancingReportPdf } from '../../../utils/salesBalancingPdfExport.js';
+import SalesBalancingFormModal from './SalesBalancingFormModal.jsx';
 
 const cardStyle = {
   backgroundColor: '#fff',
@@ -10,34 +11,20 @@ const cardStyle = {
   boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)',
 };
 
+const workspaceCardStyle = {
+  border: '1px solid #e2e8f0',
+  backgroundColor: '#fff',
+  borderRadius: '14px',
+  padding: '0.95rem 1rem',
+  cursor: 'pointer',
+  textAlign: 'left',
+  display: 'grid',
+  gap: '0.42rem',
+  boxShadow: '0 6px 18px rgba(15, 23, 42, 0.04)',
+  transition: 'transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background-color 0.16s ease',
+};
+
 const MONEY = (value) => `MWK ${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-const PAYMENT_FIELDS = [
-  { key: 'cashAmount', label: 'Cash' },
-  { key: 'airtelMoneyAmount', label: 'Airtel Money' },
-  { key: 'tnmMpambaAmount', label: 'TNM Mpamba' },
-  { key: 'posCardAmount', label: 'POS / Card Machine' },
-  { key: 'bankTransferAmount', label: 'M0626 / National Bank / Bank Transfer' },
-  { key: 'otherAmount', label: 'Other' },
-];
-
-const defaultForm = () => ({
-  id: null,
-  balancingDate: new Date().toISOString().slice(0, 10),
-  referenceTitle: '',
-  cashierReference: '',
-  shiftReference: '',
-  preparedBy: '',
-  notes: '',
-  expectedSystemSales: 0,
-  cashAmount: 0,
-  airtelMoneyAmount: 0,
-  tnmMpambaAmount: 0,
-  posCardAmount: 0,
-  bankTransferAmount: 0,
-  otherAmount: 0,
-  status: 'draft',
-});
 
 const statusBadgeStyle = (resultStatus) => {
   if (resultStatus === 'shortage') {
@@ -56,45 +43,16 @@ function normalizeAmount(value) {
 }
 
 const SalesBalancingTab = ({ selectedLocationId = null, selectedLocationCode = '', selectedLocationName = '' }) => {
-  const [form, setForm] = useState(defaultForm);
-  const [loadingExpected, setLoadingExpected] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [isHistoryModalMaximized, setIsHistoryModalMaximized] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState(null);
+  const [formSaving, setFormSaving] = useState(false);
+  const [formError, setFormError] = useState('');
   const [historyState, setHistoryState] = useState({ data: [], pagination: null, loading: false, error: '' });
   const [historyFilter, setHistoryFilter] = useState({ status: 'all', page: 1 });
 
   const hasLocationScope = Boolean(selectedLocationId);
-
-  const totalActualAmount = useMemo(() => PAYMENT_FIELDS.reduce((sum, field) => sum + normalizeAmount(form[field.key]), 0), [form]);
-  const differenceAmount = useMemo(() => Number((totalActualAmount - normalizeAmount(form.expectedSystemSales)).toFixed(2)), [form.expectedSystemSales, totalActualAmount]);
-  const resultStatus = useMemo(() => {
-    if (Math.abs(differenceAmount) < 0.005) return 'balanced';
-    if (differenceAmount < 0) return 'shortage';
-    return 'overage';
-  }, [differenceAmount]);
-
-  const loadExpectedSales = useCallback(async () => {
-    if (!hasLocationScope) return;
-
-    setLoadingExpected(true);
-    try {
-      const response = await api.get('/business-operations/sales-balancing/expected', {
-        params: {
-          locationId: selectedLocationId,
-          balancingDate: form.balancingDate,
-        },
-      });
-      const expected = Number(response?.data?.data?.expectedSystemSales || 0);
-      setForm((prev) => ({ ...prev, expectedSystemSales: expected }));
-    } catch (error) {
-      await boAlert({
-        title: 'Expected Sales Error',
-        message: error?.response?.data?.error || 'Failed to load expected system sales for this date and branch.',
-        type: 'warning',
-      });
-    } finally {
-      setLoadingExpected(false);
-    }
-  }, [form.balancingDate, hasLocationScope, selectedLocationId]);
 
   const loadHistory = useCallback(async () => {
     if (!hasLocationScope) {
@@ -132,166 +90,92 @@ const SalesBalancingTab = ({ selectedLocationId = null, selectedLocationCode = '
   }, [hasLocationScope, historyFilter.page, historyFilter.status, selectedLocationId]);
 
   useEffect(() => {
-    if (!hasLocationScope) return;
-    loadExpectedSales();
-  }, [hasLocationScope, loadExpectedSales]);
-
-  useEffect(() => {
     loadHistory();
   }, [loadHistory]);
 
-  const setAmount = (key, value) => {
-    setForm((prev) => ({ ...prev, [key]: value === '' ? '' : normalizeAmount(value) }));
+  const openCreateForm = () => {
+    setFormError('');
+    setSelectedRecord(null);
+    setIsFormModalOpen(true);
   };
 
-  const resetForm = () => {
-    setForm(defaultForm());
-    setTimeout(() => {
-      loadExpectedSales();
-    }, 0);
+  const openEditForm = (record) => {
+    setFormError('');
+    setSelectedRecord(record);
+    setIsFormModalOpen(true);
   };
 
-  const saveRecord = async ({ finalize = false } = {}) => {
-    if (!hasLocationScope) {
-      await boAlert({ title: 'Location Required', message: 'Select one branch/location before saving balancing.', type: 'warning' });
-      return;
-    }
-
-    if (!form.balancingDate) {
-      await boAlert({ title: 'Date Required', message: 'Balancing date is required.', type: 'warning' });
-      return;
-    }
-
-    if (finalize) {
-      const confirmed = await boConfirm({
-        title: 'Finalize Balancing',
-        message: 'Finalize this balancing record? This should only be done after verification.',
-        confirmText: 'Finalize',
-      });
-      if (!confirmed) return;
-    }
-
-    const payload = {
-      balancingDate: form.balancingDate,
-      locationId: selectedLocationId,
-      locationCode: selectedLocationCode || null,
-      locationName: selectedLocationName || null,
-      referenceTitle: form.referenceTitle,
-      cashierReference: form.cashierReference,
-      shiftReference: form.shiftReference,
-      preparedBy: form.preparedBy,
-      notes: form.notes,
-      expectedSystemSales: normalizeAmount(form.expectedSystemSales),
-      cashAmount: normalizeAmount(form.cashAmount),
-      airtelMoneyAmount: normalizeAmount(form.airtelMoneyAmount),
-      tnmMpambaAmount: normalizeAmount(form.tnmMpambaAmount),
-      posCardAmount: normalizeAmount(form.posCardAmount),
-      bankTransferAmount: normalizeAmount(form.bankTransferAmount),
-      otherAmount: normalizeAmount(form.otherAmount),
-      status: finalize ? 'finalized' : 'draft',
-    };
-
-    setSaving(true);
+  const handleFormSubmit = async (payload) => {
+    setFormSaving(true);
+    setFormError('');
     try {
-      const response = form.id
-        ? await api.put(`/business-operations/sales-balancing/${form.id}`, payload)
-        : await api.post('/business-operations/sales-balancing', payload);
+      const isCreate = !selectedRecord;
+      const submitPayload = {
+        ...payload,
+        locationId: selectedLocationId,
+        locationCode: selectedLocationCode || null,
+        locationName: selectedLocationName || null,
+      };
 
-      const saved = response?.data?.data;
-      if (saved) {
-        setForm({
-          id: saved.id,
-          balancingDate: saved.balancingDate ? new Date(saved.balancingDate).toISOString().slice(0, 10) : form.balancingDate,
-          referenceTitle: saved.referenceTitle || '',
-          cashierReference: saved.cashierReference || '',
-          shiftReference: saved.shiftReference || '',
-          preparedBy: saved.preparedBy || '',
-          notes: saved.notes || '',
-          expectedSystemSales: normalizeAmount(saved.expectedSystemSales),
-          cashAmount: normalizeAmount(saved.cashAmount),
-          airtelMoneyAmount: normalizeAmount(saved.airtelMoneyAmount),
-          tnmMpambaAmount: normalizeAmount(saved.tnmMpambaAmount),
-          posCardAmount: normalizeAmount(saved.posCardAmount),
-          bankTransferAmount: normalizeAmount(saved.bankTransferAmount),
-          otherAmount: normalizeAmount(saved.otherAmount),
-          status: saved.status || (finalize ? 'finalized' : 'draft'),
-        });
+      if (isCreate) {
+        await api.post('/business-operations/sales-balancing', submitPayload);
+      } else {
+        await api.put(`/business-operations/sales-balancing/${selectedRecord.id}`, submitPayload);
       }
 
+      setIsFormModalOpen(false);
+      setSelectedRecord(null);
       await boAlert({
-        title: finalize ? 'Balancing Finalized' : 'Draft Saved',
-        message: finalize ? 'Sales balancing has been finalized successfully.' : 'Sales balancing draft saved successfully.',
+        title: isCreate ? 'Record Created' : 'Record Updated',
+        message: isCreate ? 'Balancing record has been created successfully.' : 'Balancing record has been updated successfully.',
         type: 'success',
       });
-
       loadHistory();
     } catch (error) {
-      await boAlert({
-        title: 'Save Failed',
-        message: error?.response?.data?.error || 'Failed to save sales balancing record.',
-        type: 'warning',
-      });
+      setFormError(error?.response?.data?.error || 'Failed to save balancing record.');
     } finally {
-      setSaving(false);
+      setFormSaving(false);
     }
   };
 
-  const loadRecordToForm = (record) => {
-    if (!record) return;
-    setForm({
-      id: record.id,
-      balancingDate: record.balancingDate ? new Date(record.balancingDate).toISOString().slice(0, 10) : defaultForm().balancingDate,
-      referenceTitle: record.referenceTitle || '',
-      cashierReference: record.cashierReference || '',
-      shiftReference: record.shiftReference || '',
-      preparedBy: record.preparedBy || '',
-      notes: record.notes || '',
-      expectedSystemSales: normalizeAmount(record.expectedSystemSales),
-      cashAmount: normalizeAmount(record.cashAmount),
-      airtelMoneyAmount: normalizeAmount(record.airtelMoneyAmount),
-      tnmMpambaAmount: normalizeAmount(record.tnmMpambaAmount),
-      posCardAmount: normalizeAmount(record.posCardAmount),
-      bankTransferAmount: normalizeAmount(record.bankTransferAmount),
-      otherAmount: normalizeAmount(record.otherAmount),
-      status: record.status || 'draft',
-    });
-  };
-
-  const finalizeFromHistory = async (record) => {
+  const handleFinalize = async (record) => {
     const confirmed = await boConfirm({
       title: 'Finalize Balancing',
-      message: `Finalize balancing record for ${new Date(record.balancingDate).toLocaleDateString('en-GB')}?`,
-      confirmText: 'Finalize',
+      message: `Finalize balancing record for ${new Date(record.balancingDate).toLocaleDateString('en-GB')}? This action cannot be undone.`,
+      confirmText: 'Yes, Finalize',
     });
     if (!confirmed) return;
 
     try {
       await api.post(`/business-operations/sales-balancing/${record.id}/finalize`, {});
-      await boAlert({ title: 'Finalized', message: 'Balancing record finalized.', type: 'success' });
+      await boAlert({
+        title: 'Finalized',
+        message: 'Balancing record has been finalized successfully.',
+        type: 'success',
+      });
       loadHistory();
-      if (form.id === record.id) {
-        setForm((prev) => ({ ...prev, status: 'finalized' }));
-      }
     } catch (error) {
-      await boAlert({ title: 'Finalize Failed', message: error?.response?.data?.error || 'Failed to finalize record.', type: 'warning' });
+      await boAlert({
+        title: 'Finalize Failed',
+        message: error?.response?.data?.error || 'Failed to finalize record.',
+        type: 'error',
+      });
     }
   };
 
-  const currentExportRecord = {
-    ...form,
-    locationCode: selectedLocationCode,
-    locationName: selectedLocationName,
-    totalActualAmount,
-    differenceAmount,
-    resultStatus,
+  const handleExportPdf = (record) => {
+    exportSalesBalancingReportPdf({ record, companyName: 'Citi-Nati Supermarket', title: 'Sales Balancing Report' });
   };
 
   if (!hasLocationScope) {
     return (
       <div style={{ ...cardStyle, padding: '1.2rem 1.3rem' }}>
-        <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.15rem' }}>Sales Balancing</h3>
+        <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.15rem' }}>
+          <i className="fas fa-scale-balanced" style={{ marginRight: '0.5rem', color: '#5B4B8A' }}></i>
+          Sales Balancing
+        </h3>
         <p style={{ margin: '0.55rem 0 0', color: '#64748b', lineHeight: 1.65 }}>
-          Sales balancing is strictly branch-based. Select one specific location from Location Scope (not All Locations) to continue.
+          Sales balancing requires a specific branch/location to be selected. Please choose one location from the Location Scope selector to proceed with daily reconciliation.
         </p>
       </div>
     );
@@ -299,226 +183,274 @@ const SalesBalancingTab = ({ selectedLocationId = null, selectedLocationCode = '
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
+      {/* Header */}
       <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.9rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'grid', gap: '0.5rem' }}>
           <div>
-            <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.15rem' }}>Sales Balancing</h3>
-            <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.9rem' }}>
+            <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.15rem' }}>
+              <i className="fas fa-scale-balanced" style={{ marginRight: '0.5rem', color: '#5B4B8A' }}></i>
+              Sales Balancing
+            </h3>
+            <p style={{ margin: '0.3rem 0 0', color: '#64748b', fontSize: '0.9rem' }}>
               Daily end-of-day branch reconciliation for actual payment takings vs expected system sales.
             </p>
-            <p style={{ margin: '0.25rem 0 0', color: '#334155', fontSize: '0.82rem', fontWeight: 700 }}>
-              Active Branch: {selectedLocationName || selectedLocationCode || `ID ${selectedLocationId}`}
+          </div>
+          <div style={{ paddingTop: '0.3rem' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', backgroundColor: '#f0f4ff', color: '#5B4B8A', padding: '0.35rem 0.75rem', borderRadius: '999px', fontSize: '0.85rem', fontWeight: 700 }}>
+              <i className="fas fa-location-dot"></i>
+              {selectedLocationName || selectedLocationCode || `Location ${selectedLocationId}`}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Workspace Cards */}
+      <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
+        <div style={{ display: 'grid', gap: '0.78rem' }}>
+          <div>
+            <strong style={{ color: '#0f172a' }}>Balancing Workspaces</strong>
+            <p style={{ margin: '0.3rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>
+              Choose a workspace to enter daily reconciliation or view balancing history.
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.75rem' }}>
+            {/* New Balancing Card */}
             <button
               type="button"
-              onClick={loadExpectedSales}
-              disabled={loadingExpected || saving}
-              style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.56rem 0.86rem', fontWeight: 700, cursor: loadingExpected || saving ? 'not-allowed' : 'pointer' }}
+              onClick={openCreateForm}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 12px 24px rgba(15, 23, 42, 0.12)';
+                e.currentTarget.style.borderColor = '#cbd5e1';
+                e.currentTarget.style.backgroundColor = '#f8fafc';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 6px 18px rgba(15, 23, 42, 0.04)';
+                e.currentTarget.style.borderColor = '#e2e8f0';
+                e.currentTarget.style.backgroundColor = '#fff';
+              }}
+              style={workspaceCardStyle}
             >
-              <i className={`fas ${loadingExpected ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`} style={{ marginRight: '0.4rem' }}></i>
-              Load Expected Sales
+              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '34px', height: '34px', borderRadius: '10px', backgroundColor: '#dbeafe', color: '#1d4ed8' }}>
+                <i className="fas fa-plus" />
+              </span>
+              <span style={{ color: '#0f172a', fontWeight: 800, fontSize: '0.95rem' }}>New Balancing Record</span>
+              <span style={{ color: '#64748b', fontSize: '0.84rem', lineHeight: 1.45 }}>Enter today's actual payment totals and generate balancing summary.</span>
             </button>
+
+            {/* View History Card */}
             <button
               type="button"
-              onClick={() => exportSalesBalancingReportPdf({ record: currentExportRecord })}
-              style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.56rem 0.86rem', fontWeight: 700, cursor: 'pointer' }}
+              title="Click to open"
+              onClick={() => {
+                setIsHistoryModalMaximized(false);
+                setIsHistoryModalOpen(true);
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 12px 24px rgba(15, 23, 42, 0.12)';
+                e.currentTarget.style.borderColor = '#cbd5e1';
+                e.currentTarget.style.backgroundColor = '#f8fafc';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 6px 18px rgba(15, 23, 42, 0.04)';
+                e.currentTarget.style.borderColor = '#e2e8f0';
+                e.currentTarget.style.backgroundColor = '#fff';
+              }}
+              style={workspaceCardStyle}
             >
-              <i className="fas fa-file-pdf" style={{ marginRight: '0.4rem' }}></i>
-              Export PDF
+              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '34px', height: '34px', borderRadius: '10px', backgroundColor: '#fce7f3', color: '#db2777' }}>
+                <i className="fas fa-history" />
+              </span>
+              <span style={{ color: '#0f172a', fontWeight: 800, fontSize: '0.95rem' }}>Balancing History</span>
+              <span style={{ color: '#64748b', fontSize: '0.84rem', lineHeight: 1.45 }}>View, edit, or finalize past balancing records for this branch.</span>
             </button>
           </div>
         </div>
       </div>
 
-      <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
-          <label style={{ display: 'grid', gap: '0.3rem' }}>
-            <span style={{ color: '#334155', fontWeight: 700, fontSize: '0.82rem' }}>Balancing Date</span>
-            <input type="date" value={form.balancingDate} onChange={(event) => setForm((prev) => ({ ...prev, balancingDate: event.target.value }))} style={{ border: '1px solid #cbd5e1', borderRadius: '10px', padding: '0.62rem 0.72rem' }} />
-          </label>
-          <label style={{ display: 'grid', gap: '0.3rem' }}>
-            <span style={{ color: '#334155', fontWeight: 700, fontSize: '0.82rem' }}>Reference / Title</span>
-            <input value={form.referenceTitle} onChange={(event) => setForm((prev) => ({ ...prev, referenceTitle: event.target.value }))} placeholder="EOD Reconciliation" style={{ border: '1px solid #cbd5e1', borderRadius: '10px', padding: '0.62rem 0.72rem' }} />
-          </label>
-          <label style={{ display: 'grid', gap: '0.3rem' }}>
-            <span style={{ color: '#334155', fontWeight: 700, fontSize: '0.82rem' }}>Prepared By</span>
-            <input value={form.preparedBy} onChange={(event) => setForm((prev) => ({ ...prev, preparedBy: event.target.value }))} placeholder="Operator name" style={{ border: '1px solid #cbd5e1', borderRadius: '10px', padding: '0.62rem 0.72rem' }} />
-          </label>
-          <label style={{ display: 'grid', gap: '0.3rem' }}>
-            <span style={{ color: '#334155', fontWeight: 700, fontSize: '0.82rem' }}>Cashier / Session Ref</span>
-            <input value={form.cashierReference} onChange={(event) => setForm((prev) => ({ ...prev, cashierReference: event.target.value }))} placeholder="Cashier, shift, till" style={{ border: '1px solid #cbd5e1', borderRadius: '10px', padding: '0.62rem 0.72rem' }} />
-          </label>
-        </div>
-      </div>
+      {/* History Modal */}
+      {isHistoryModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: isHistoryModalMaximized ? '0.35rem' : '1rem' }}>
+          <div style={{ ...cardStyle, width: isHistoryModalMaximized ? 'calc(100vw - 0.7rem)' : 'min(1200px, 97vw)', height: isHistoryModalMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isHistoryModalMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column' }}>
+            {/* Modal Header */}
+            <div style={{ flexShrink: 0, padding: '1rem 1.1rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(15,23,42,0.04)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <div>
+                  <h2 style={{ margin: 0, color: '#0f172a', fontSize: '1.15rem', fontWeight: 800 }}>Balancing History</h2>
+                  <p style={{ margin: '0.28rem 0 0', color: '#64748b', fontSize: '0.86rem' }}>View, edit, finalize, and export past balancing records.</p>
+                </div>
+                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={() => setIsHistoryModalMaximized(!isHistoryModalMaximized)}
+                    style={{ border: '1px solid #e2e8f0', backgroundColor: '#fff', color: '#475569', borderRadius: '10px', padding: '0.5rem 0.65rem', cursor: 'pointer', fontWeight: 700 }}
+                  >
+                    <i className={`fas ${isHistoryModalMaximized ? 'fa-compress' : 'fa-expand'}`} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsHistoryModalOpen(false)}
+                    style={{ border: '1px solid #e2e8f0', backgroundColor: '#fff', color: '#475569', borderRadius: '10px', padding: '0.5rem 0.65rem', cursor: 'pointer', fontWeight: 700 }}
+                  >
+                    <i className="fas fa-times" />
+                  </button>
+                </div>
+              </div>
+            </div>
 
-      <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
-        <strong style={{ color: '#0f172a' }}>Payment Method Totals</strong>
-        <div style={{ marginTop: '0.75rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
-          {PAYMENT_FIELDS.map((field) => (
-            <label key={field.key} style={{ display: 'grid', gap: '0.3rem' }}>
-              <span style={{ color: '#334155', fontWeight: 700, fontSize: '0.82rem' }}>{field.label}</span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={form[field.key]}
-                onChange={(event) => setAmount(field.key, event.target.value)}
-                style={{ border: '1px solid #cbd5e1', borderRadius: '10px', padding: '0.62rem 0.72rem' }}
-              />
-            </label>
-          ))}
-        </div>
-      </div>
+            {/* Modal Content */}
+            <div style={{ flex: 1, overflow: 'auto', padding: '1rem 1.1rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <select
+                  value={historyFilter.status}
+                  onChange={(e) => setHistoryFilter({ ...historyFilter, status: e.target.value, page: 1 })}
+                  style={{ border: '1px solid #cbd5e1', borderRadius: '10px', padding: '0.5rem 0.65rem', fontWeight: 600, fontSize: '0.9rem' }}
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="draft">Draft Only</option>
+                  <option value="finalized">Finalized Only</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={loadHistory}
+                  style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.5rem 0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  <i className="fas fa-rotate-right" style={{ marginRight: '0.35rem' }}></i>
+                  Refresh
+                </button>
+              </div>
 
-      <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
-        <strong style={{ color: '#0f172a' }}>Auto Summary</strong>
-        <div style={{ marginTop: '0.75rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
-          <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.8rem' }}>
-            <div style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800 }}>Expected System Sales</div>
-            <div style={{ marginTop: '0.36rem', fontWeight: 800, color: '#0f172a', fontSize: '1.04rem' }}>{MONEY(form.expectedSystemSales)}</div>
-          </div>
-          <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.8rem' }}>
-            <div style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800 }}>Total Actual Entered</div>
-            <div style={{ marginTop: '0.36rem', fontWeight: 800, color: '#0f172a', fontSize: '1.04rem' }}>{MONEY(totalActualAmount)}</div>
-          </div>
-          <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.8rem' }}>
-            <div style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800 }}>Difference</div>
-            <div style={{ marginTop: '0.36rem', fontWeight: 800, color: resultStatus === 'balanced' ? '#166534' : resultStatus === 'shortage' ? '#b91c1c' : '#c2410c', fontSize: '1.04rem' }}>{MONEY(differenceAmount)}</div>
-          </div>
-          <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.8rem' }}>
-            <div style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800 }}>Result</div>
-            <span style={{ marginTop: '0.45rem', display: 'inline-flex', borderRadius: '999px', padding: '0.3rem 0.7rem', fontWeight: 800, fontSize: '0.82rem', ...statusBadgeStyle(resultStatus) }}>
-              {resultStatus === 'balanced' ? 'Balanced' : resultStatus === 'shortage' ? 'Shortage' : 'Overage'}
-            </span>
-          </div>
-        </div>
-      </div>
+              {historyState.error && (
+                <div style={{ padding: '0.9rem 1rem', backgroundColor: '#fef2f2', color: '#b91c1c', borderRadius: '12px', border: '1px solid #fecaca', marginBottom: '1rem' }}>
+                  {historyState.error}
+                </div>
+              )}
 
-      <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
-        <label style={{ display: 'grid', gap: '0.38rem' }}>
-          <span style={{ color: '#334155', fontWeight: 700, fontSize: '0.84rem' }}>Notes / Comments</span>
-          <textarea
-            value={form.notes}
-            onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))}
-            rows={4}
-            placeholder="Cash rechecked, delayed mobile money confirmation, missing slip, float adjustment..."
-            style={{ border: '1px solid #cbd5e1', borderRadius: '12px', padding: '0.7rem 0.75rem', resize: 'vertical' }}
-          />
-        </label>
-
-        <div style={{ marginTop: '0.85rem', display: 'flex', gap: '0.52rem', flexWrap: 'wrap' }}>
-          <button type="button" onClick={() => saveRecord({ finalize: false })} disabled={saving || form.status === 'finalized'} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.58rem 0.9rem', fontWeight: 700, cursor: saving || form.status === 'finalized' ? 'not-allowed' : 'pointer' }}>
-            <i className={`fas ${saving ? 'fa-spinner fa-spin' : 'fa-floppy-disk'}`} style={{ marginRight: '0.4rem' }}></i>
-            Save Draft
-          </button>
-          <button type="button" onClick={() => saveRecord({ finalize: true })} disabled={saving || form.status === 'finalized'} style={{ border: '1px solid #86efac', backgroundColor: '#f0fdf4', color: '#166534', borderRadius: '10px', padding: '0.58rem 0.9rem', fontWeight: 800, cursor: saving || form.status === 'finalized' ? 'not-allowed' : 'pointer' }}>
-            <i className="fas fa-check-circle" style={{ marginRight: '0.4rem' }}></i>
-            Finalize / Save Balancing
-          </button>
-          <button type="button" onClick={resetForm} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#475569', borderRadius: '10px', padding: '0.58rem 0.9rem', fontWeight: 700, cursor: 'pointer' }}>
-            <i className="fas fa-eraser" style={{ marginRight: '0.4rem' }}></i>
-            New Record
-          </button>
-        </div>
-      </div>
-
-      <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <strong style={{ color: '#0f172a' }}>Balancing History</strong>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <select
-              value={historyFilter.status}
-              onChange={(event) => setHistoryFilter((prev) => ({ ...prev, status: event.target.value, page: 1 }))}
-              style={{ border: '1px solid #cbd5e1', borderRadius: '10px', padding: '0.45rem 0.55rem' }}
-            >
-              <option value="all">All statuses</option>
-              <option value="draft">Draft</option>
-              <option value="finalized">Finalized</option>
-            </select>
-            <button type="button" onClick={loadHistory} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.45rem 0.72rem', fontWeight: 700, cursor: 'pointer' }}>
-              <i className="fas fa-rotate-right" style={{ marginRight: '0.35rem' }}></i>
-              Refresh
-            </button>
-          </div>
-        </div>
-
-        {historyState.error && (
-          <div style={{ marginTop: '0.7rem', border: '1px solid #fecaca', backgroundColor: '#fef2f2', color: '#b91c1c', borderRadius: '10px', padding: '0.7rem 0.8rem' }}>
-            {historyState.error}
-          </div>
-        )}
-
-        <div style={{ marginTop: '0.8rem', overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
-            <thead>
-              <tr>
-                {['Date', 'Branch', 'Expected', 'Actual', 'Difference', 'Result', 'Prepared By', 'Status', 'Actions'].map((header) => (
-                  <th key={header} style={{ textAlign: 'left', padding: '0.7rem', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '0.76rem', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{header}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
               {historyState.loading ? (
-                <tr><td colSpan={9} style={{ padding: '1rem', color: '#64748b' }}>Loading history...</td></tr>
+                <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
+                  <i className="fas fa-spinner fa-spin" style={{ marginRight: '0.5rem' }}></i>
+                  Loading history...
+                </div>
               ) : !historyState.data.length ? (
-                <tr><td colSpan={9} style={{ padding: '1rem', color: '#64748b' }}>No balancing records found for this branch yet.</td></tr>
-              ) : historyState.data.map((row) => (
-                <tr key={row.id}>
-                  <td style={{ padding: '0.7rem', borderBottom: '1px solid #eef2f7', whiteSpace: 'nowrap' }}>{row.balancingDate ? new Date(row.balancingDate).toLocaleDateString('en-GB') : '-'}</td>
-                  <td style={{ padding: '0.7rem', borderBottom: '1px solid #eef2f7' }}>{row.locationName || row.locationCode || '-'}</td>
-                  <td style={{ padding: '0.7rem', borderBottom: '1px solid #eef2f7', whiteSpace: 'nowrap' }}>{MONEY(row.expectedSystemSales)}</td>
-                  <td style={{ padding: '0.7rem', borderBottom: '1px solid #eef2f7', whiteSpace: 'nowrap' }}>{MONEY(row.totalActualAmount)}</td>
-                  <td style={{ padding: '0.7rem', borderBottom: '1px solid #eef2f7', whiteSpace: 'nowrap' }}>{MONEY(row.differenceAmount)}</td>
-                  <td style={{ padding: '0.7rem', borderBottom: '1px solid #eef2f7' }}>
-                    <span style={{ display: 'inline-flex', borderRadius: '999px', padding: '0.2rem 0.55rem', fontWeight: 700, fontSize: '0.75rem', ...statusBadgeStyle(row.resultStatus) }}>
-                      {row.resultStatus === 'balanced' ? 'Balanced' : row.resultStatus === 'shortage' ? 'Shortage' : 'Overage'}
-                    </span>
-                  </td>
-                  <td style={{ padding: '0.7rem', borderBottom: '1px solid #eef2f7' }}>{row.preparedBy || '-'}</td>
-                  <td style={{ padding: '0.7rem', borderBottom: '1px solid #eef2f7', textTransform: 'capitalize' }}>{row.status || 'draft'}</td>
-                  <td style={{ padding: '0.7rem', borderBottom: '1px solid #eef2f7' }}>
-                    <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                      <button type="button" onClick={() => loadRecordToForm(row)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '8px', padding: '0.24rem 0.5rem', fontWeight: 700, cursor: 'pointer' }}>View/Edit</button>
-                      <button type="button" onClick={() => exportSalesBalancingReportPdf({ record: row })} style={{ border: '1px solid #bfdbfe', backgroundColor: '#eff6ff', color: '#1d4ed8', borderRadius: '8px', padding: '0.24rem 0.5rem', fontWeight: 700, cursor: 'pointer' }}>PDF</button>
-                      {row.status !== 'finalized' && (
-                        <button type="button" onClick={() => finalizeFromHistory(row)} style={{ border: '1px solid #86efac', backgroundColor: '#f0fdf4', color: '#166534', borderRadius: '8px', padding: '0.24rem 0.5rem', fontWeight: 700, cursor: 'pointer' }}>Finalize</button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
+                  No balancing records found for this branch yet.
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                        {['Date', 'Expected', 'Actual', 'Difference', 'Result', 'Prepared By', 'Status', 'Actions'].map((header) => (
+                          <th key={header} style={{ textAlign: 'left', padding: '0.8rem 0.7rem', color: '#475569', fontSize: '0.76rem', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap', fontWeight: 800 }}>{header}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {historyState.data.map((row) => (
+                        <tr key={row.id} style={{ borderBottom: '1px solid #eef2f7', transition: 'background-color 0.2s' }}>
+                          <td style={{ padding: '0.8rem 0.7rem', whiteSpace: 'nowrap' }}>{row.balancingDate ? new Date(row.balancingDate).toLocaleDateString('en-GB') : '-'}</td>
+                          <td style={{ padding: '0.8rem 0.7rem', whiteSpace: 'nowrap' }}>{MONEY(row.expectedSystemSales)}</td>
+                          <td style={{ padding: '0.8rem 0.7rem', whiteSpace: 'nowrap', fontWeight: 700, color: '#0f172a' }}>{MONEY(row.totalActualAmount || 0)}</td>
+                          <td style={{ padding: '0.8rem 0.7rem', whiteSpace: 'nowrap', fontWeight: 700 }}>
+                            <span style={{ color: (row.differenceAmount || 0) < 0 ? '#b91c1c' : (row.differenceAmount || 0) > 0 ? '#c2410c' : '#166534' }}>
+                              {MONEY(row.differenceAmount)}
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.8rem 0.7rem' }}>
+                            <span style={{ display: 'inline-flex', borderRadius: '999px', padding: '0.25rem 0.6rem', fontWeight: 700, fontSize: '0.75rem', ...statusBadgeStyle(row.resultStatus) }}>
+                              {row.resultStatus === 'balanced' ? '✓ Balanced' : row.resultStatus === 'shortage' ? '⚠ Shortage' : '◆ Overage'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.8rem 0.7rem' }}>{row.preparedBy || '-'}</td>
+                          <td style={{ padding: '0.8rem 0.7rem', textTransform: 'capitalize' }}>
+                            <span style={{ display: 'inline-flex', borderRadius: '6px', padding: '0.2rem 0.5rem', fontSize: '0.75rem', fontWeight: 700, backgroundColor: row.status === 'finalized' ? '#dcfce7' : '#fef2f2', color: row.status === 'finalized' ? '#166534' : '#b91c1c' }}>
+                              {row.status}
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.8rem 0.7rem' }}>
+                            <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+                              <button
+                                type="button"
+                                onClick={() => { openEditForm(row); setIsHistoryModalOpen(false); }}
+                                style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '6px', padding: '0.2rem 0.5rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.75rem' }}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleExportPdf(row)}
+                                style={{ border: '1px solid #bfdbfe', backgroundColor: '#eff6ff', color: '#1d4ed8', borderRadius: '6px', padding: '0.2rem 0.5rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.75rem' }}
+                              >
+                                PDF
+                              </button>
+                              {row.status !== 'finalized' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleFinalize(row)}
+                                  style={{ border: '1px solid #86efac', backgroundColor: '#f0fdf4', color: '#166534', borderRadius: '6px', padding: '0.2rem 0.5rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.75rem' }}
+                                >
+                                  Finalize
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
-        {historyState.pagination && (
-          <div style={{ marginTop: '0.7rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <span style={{ color: '#64748b', fontSize: '0.85rem' }}>
-              Page {historyState.pagination.page} of {historyState.pagination.totalPages} • {historyState.pagination.total} records
-            </span>
-            <div style={{ display: 'flex', gap: '0.45rem' }}>
-              <button
-                type="button"
-                onClick={() => setHistoryFilter((prev) => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
-                disabled={historyState.pagination.page <= 1}
-                style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '8px', padding: '0.3rem 0.65rem', fontWeight: 700, cursor: historyState.pagination.page <= 1 ? 'not-allowed' : 'pointer' }}
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                onClick={() => setHistoryFilter((prev) => ({ ...prev, page: prev.page + 1 }))}
-                disabled={historyState.pagination.page >= historyState.pagination.totalPages}
-                style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '8px', padding: '0.3rem 0.65rem', fontWeight: 700, cursor: historyState.pagination.page >= historyState.pagination.totalPages ? 'not-allowed' : 'pointer' }}
-              >
-                Next
-              </button>
+              {/* Pagination */}
+              {historyState.pagination && (
+                <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600 }}>
+                    Page {historyState.pagination.page} of {historyState.pagination.totalPages} • {historyState.pagination.total} total records
+                  </span>
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setHistoryFilter({ ...historyFilter, page: Math.max(1, historyFilter.page - 1) })}
+                      disabled={historyState.pagination.page <= 1}
+                      style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '8px', padding: '0.4rem 0.7rem', fontWeight: 700, cursor: historyState.pagination.page <= 1 ? 'not-allowed' : 'pointer', opacity: historyState.pagination.page <= 1 ? 0.5 : 1 }}
+                    >
+                      ← Previous
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setHistoryFilter({ ...historyFilter, page: historyFilter.page + 1 })}
+                      disabled={historyState.pagination.page >= historyState.pagination.totalPages}
+                      style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '8px', padding: '0.4rem 0.7rem', fontWeight: 700, cursor: historyState.pagination.page >= historyState.pagination.totalPages ? 'not-allowed' : 'pointer', opacity: historyState.pagination.page >= historyState.pagination.totalPages ? 0.5 : 1 }}
+                    >
+                      Next →
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Form Modal */}
+      <SalesBalancingFormModal
+        isOpen={isFormModalOpen}
+        record={selectedRecord}
+        selectedLocationId={selectedLocationId}
+        selectedLocationCode={selectedLocationCode}
+        selectedLocationName={selectedLocationName}
+        saving={formSaving}
+        error={formError}
+        onClose={() => {
+          setIsFormModalOpen(false);
+          setSelectedRecord(null);
+          setFormError('');
+        }}
+        onSubmit={handleFormSubmit}
+      />
     </div>
   );
 };
