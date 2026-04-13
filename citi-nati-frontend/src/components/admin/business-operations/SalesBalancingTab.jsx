@@ -138,6 +138,31 @@ const SalesBalancingTab = ({ selectedLocationId = null, selectedLocationCode = '
     }
   };
 
+  const handleDelete = async (record) => {
+    const confirmed = await boConfirm({
+      title: 'Delete Balancing Record',
+      message: `Permanently delete the balancing record for ${new Date(record.balancingDate).toLocaleDateString('en-GB')}? This action cannot be undone.`,
+      confirmText: 'Yes, Delete',
+    });
+    if (!confirmed) return;
+
+    try {
+      await api.delete(`/business-operations/sales-balancing/${record.id}`);
+      await boAlert({
+        title: 'Deleted',
+        message: 'Balancing record has been deleted.',
+        type: 'success',
+      });
+      loadHistory();
+    } catch (error) {
+      await boAlert({
+        title: 'Delete Failed',
+        message: error?.response?.data?.error || 'Failed to delete record.',
+        type: 'error',
+      });
+    }
+  };
+
   const handleFinalize = async (record) => {
     const confirmed = await boConfirm({
       title: 'Finalize Balancing',
@@ -395,6 +420,13 @@ const SalesBalancingTab = ({ selectedLocationId = null, selectedLocationCode = '
                                   Finalize
                                 </button>
                               )}
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(row)}
+                                style={{ border: '1px solid #fecaca', backgroundColor: '#fef2f2', color: '#b91c1c', borderRadius: '6px', padding: '0.2rem 0.5rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.75rem' }}
+                              >
+                                Delete
+                              </button>
                             </div>
                           </td>
                         </tr>

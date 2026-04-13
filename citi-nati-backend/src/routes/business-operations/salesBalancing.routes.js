@@ -8,6 +8,7 @@ const {
   getSalesBalancingRecordById,
   listSalesBalancingRecords,
   finalizeSalesBalancingRecord,
+  deleteSalesBalancingRecord,
 } = require('../../controllers/business-operations/salesBalancing.controller');
 
 const router = express.Router();
@@ -18,5 +19,6 @@ router.get('/:id', getSalesBalancingRecordById);
 router.post('/', createSalesBalancingRecord);
 router.put('/:id', updateSalesBalancingRecord);
 router.post('/:id/finalize', finalizeSalesBalancingRecord);
+router.delete('/:id', deleteSalesBalancingRecord);
 
 module.exports = router;

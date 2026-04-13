@@ -278,6 +278,25 @@ async function finalizeSalesBalancingRecord(req, res) {
   }
 }
 
+async function deleteSalesBalancingRecord(req, res) {
+  try {
+    const id = toInt(req.params.id);
+    if (!id) {
+      return res.status(400).json({ success: false, error: 'Invalid balancing record id' });
+    }
+
+    const data = await salesBalancingService.deleteSalesBalancingRecord(id);
+    if (!data) {
+      return res.status(404).json({ success: false, error: 'Sales balancing record not found' });
+    }
+
+    return res.json({ success: true, data });
+  } catch (err) {
+    console.error('[BO][SALES_BALANCING] deleteSalesBalancingRecord error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to delete sales balancing record' });
+  }
+}
+
 module.exports = {
   getExpectedSales,
   createSalesBalancingRecord,
@@ -285,4 +304,5 @@ module.exports = {
   getSalesBalancingRecordById,
   listSalesBalancingRecords,
   finalizeSalesBalancingRecord,
+  deleteSalesBalancingRecord,
 };

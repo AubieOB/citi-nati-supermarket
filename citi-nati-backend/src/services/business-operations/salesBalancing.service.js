@@ -301,6 +301,12 @@ async function finalizeSalesBalancingRecord(id, preparedBy = null) {
   });
 }
 
+async function deleteSalesBalancingRecord(id) {
+  const existing = await prisma.salesBalancingRecord.findUnique({ where: { id: Number(id) } });
+  if (!existing) return null;
+  return prisma.salesBalancingRecord.delete({ where: { id: Number(id) } });
+}
+
 module.exports = {
   getExpectedSystemSales,
   createSalesBalancingRecord,
@@ -308,4 +314,5 @@ module.exports = {
   getSalesBalancingRecordById,
   listSalesBalancingRecords,
   finalizeSalesBalancingRecord,
+  deleteSalesBalancingRecord,
 };
