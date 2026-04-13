@@ -39,6 +39,7 @@ function computeTotals(payload = {}) {
   const tnmMpambaAmount = normalizeAmount(payload.tnmMpambaAmount);
   const posCardAmount = normalizeAmount(payload.posCardAmount);
   const bankTransferAmount = normalizeAmount(payload.bankTransferAmount);
+  const emergencyExpensesAmount = normalizeAmount(payload.emergencyExpensesAmount);
   const otherAmount = normalizeAmount(payload.otherAmount);
 
   const totalActualAmount = roundMoney(
@@ -47,6 +48,7 @@ function computeTotals(payload = {}) {
     + tnmMpambaAmount
     + posCardAmount
     + bankTransferAmount
+    + emergencyExpensesAmount
     + otherAmount,
   );
 
@@ -56,6 +58,7 @@ function computeTotals(payload = {}) {
     tnmMpambaAmount,
     posCardAmount,
     bankTransferAmount,
+    emergencyExpensesAmount,
     otherAmount,
     totalActualAmount,
   };
@@ -169,6 +172,9 @@ async function updateSalesBalancingRecord(id, payload) {
     tnmMpambaAmount: payload.tnmMpambaAmount != null ? payload.tnmMpambaAmount : existing.tnmMpambaAmount,
     posCardAmount: payload.posCardAmount != null ? payload.posCardAmount : existing.posCardAmount,
     bankTransferAmount: payload.bankTransferAmount != null ? payload.bankTransferAmount : existing.bankTransferAmount,
+    emergencyExpensesAmount: payload.emergencyExpensesAmount != null
+      ? payload.emergencyExpensesAmount
+      : (existing.emergencyExpensesAmount || 0),
     otherAmount: payload.otherAmount != null ? payload.otherAmount : existing.otherAmount,
   });
 

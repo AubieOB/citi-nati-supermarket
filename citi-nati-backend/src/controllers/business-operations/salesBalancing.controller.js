@@ -19,6 +19,7 @@ const PAYMENT_FIELDS = [
   'tnmMpambaAmount',
   'posCardAmount',
   'bankTransferAmount',
+  'emergencyExpensesAmount',
   'otherAmount',
 ];
 
@@ -122,6 +123,7 @@ async function createSalesBalancingRecord(req, res) {
       tnmMpambaAmount: req.body.tnmMpambaAmount,
       posCardAmount: req.body.posCardAmount,
       bankTransferAmount: req.body.bankTransferAmount,
+      emergencyExpensesAmount: req.body.emergencyExpensesAmount,
       otherAmount: req.body.otherAmount,
       status: req.body.status,
     });
@@ -176,6 +178,7 @@ async function updateSalesBalancingRecord(req, res) {
       tnmMpambaAmount: req.body.tnmMpambaAmount,
       posCardAmount: req.body.posCardAmount,
       bankTransferAmount: req.body.bankTransferAmount,
+      emergencyExpensesAmount: req.body.emergencyExpensesAmount,
       otherAmount: req.body.otherAmount,
       status: req.body.status,
     });

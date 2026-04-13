@@ -1028,6 +1028,7 @@ model SalesBalancingRecord {
   tnmMpambaAmount     Float    @default(0) @map("tnm_mpamba_amount")
   posCardAmount       Float    @default(0) @map("pos_card_amount")
   bankTransferAmount  Float    @default(0) @map("bank_transfer_amount")
+  emergencyExpensesAmount Float @default(0) @map("emergency_expenses_amount")
   otherAmount         Float    @default(0) @map("other_amount")
   totalActualAmount   Float    @default(0) @map("total_actual_amount")
   differenceAmount    Float    @default(0) @map("difference_amount")
