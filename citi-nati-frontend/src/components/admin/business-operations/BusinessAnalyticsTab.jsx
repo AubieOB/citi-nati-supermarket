@@ -975,6 +975,10 @@ const BusinessAnalyticsTab = ({
   const [isToolModalOpen, setIsToolModalOpen] = useState(false);
   const [activeWorkspaceModal, setActiveWorkspaceModal] = useState('');
   const [isWorkspaceMaximized, setIsWorkspaceMaximized] = useState(false);
+    const [isLatestProfitModalOpen, setIsLatestProfitModalOpen] = useState(false);
+    const [isLatestProfitMaximized, setIsLatestProfitMaximized] = useState(false);
+    const [isActionCenterModalOpen, setIsActionCenterModalOpen] = useState(false);
+    const [isActionCenterMaximized, setIsActionCenterMaximized] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisInputs, setAnalysisInputs] = useState({
     previousValue: 0,
@@ -1427,12 +1431,14 @@ const BusinessAnalyticsTab = ({
   };
 
   useEffect(() => {
-    if ((!isToolModalOpen && !activeWorkspaceModal) || typeof window === 'undefined') return undefined;
+    if ((!isToolModalOpen && !activeWorkspaceModal && !isLatestProfitModalOpen && !isActionCenterModalOpen) || typeof window === 'undefined') return undefined;
 
     const onEsc = (event) => {
       if (event.key === 'Escape') {
         setIsToolModalOpen(false);
         closeWorkspaceModal();
+          setIsLatestProfitModalOpen(false);
+          setIsActionCenterModalOpen(false);
       }
     };
 
@@ -1756,16 +1762,7 @@ const BusinessAnalyticsTab = ({
           </div>
         </div>
 
-        <div style={{ marginTop: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.7rem', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            onClick={() => setFiltersExpanded((prev) => !prev)}
-            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '999px', padding: '0.42rem 0.72rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
-          >
-            <i className={`fas ${filtersExpanded ? 'fa-chevron-up' : 'fa-sliders'}`} style={{ marginRight: '0.38rem' }}></i>
-            {filtersExpanded ? 'Hide Filters' : 'Show Filters'}
-          </button>
-
+        <div style={{ marginTop: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.7rem' }}>
           <button
             type="button"
             onClick={() => {
@@ -1775,85 +1772,79 @@ const BusinessAnalyticsTab = ({
             style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '9px', padding: '0.55rem 0.78rem', fontWeight: 700, cursor: 'pointer' }}
           >
             <i className={`fas ${refreshing ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`} style={{ marginRight: '0.4rem' }}></i>
-            Refresh Analytics
+            const filtersPanel = (
+              <div style={{ padding: '0.75rem 1.1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', flexShrink: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.7rem' }}>
+                <label style={{ display: 'grid', gap: '0.35rem' }}>
+                  <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Period Type</span>
+                  <select value={filters.periodType} onChange={(e) => setFilters((prev) => ({ ...prev, periodType: e.target.value }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem', backgroundColor: '#fff', color: '#0f172a' }}>
+                    <option value="day">Day</option>
+                    <option value="month">Month</option>
+                    <option value="quarter">Quarter</option>
+                    <option value="year">Year</option>
+                    <option value="custom">Custom Range</option>
+                  </select>
+                </label>
+                {filters.periodType === 'day' && (
+                  <label style={{ display: 'grid', gap: '0.35rem' }}>
+                    <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Date</span>
+                    <input type="date" value={filters.date} onChange={(e) => setFilters((prev) => ({ ...prev, date: e.target.value }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }} />
+                  </label>
+                )}
+                {(filters.periodType === 'month' || filters.periodType === 'quarter' || filters.periodType === 'year') && (
+                  <label style={{ display: 'grid', gap: '0.35rem' }}>
+                    <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Year</span>
+                    <input type="number" value={filters.year} onChange={(e) => setFilters((prev) => ({ ...prev, year: Number(e.target.value || new Date().getFullYear()) }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }} />
+                  </label>
+                )}
+                {filters.periodType === 'month' && (
+                  <label style={{ display: 'grid', gap: '0.35rem' }}>
+                    <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Month</span>
+                    <select value={filters.month} onChange={(e) => setFilters((prev) => ({ ...prev, month: Number(e.target.value) }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }}>
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                        <option key={m} value={m}>{new Date(Number(filters.year || new Date().getFullYear()), m - 1, 1).toLocaleDateString('en-GB', { month: 'long' })}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                {filters.periodType === 'quarter' && (
+                  <label style={{ display: 'grid', gap: '0.35rem' }}>
+                    <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Quarter</span>
+                    <select value={filters.quarter} onChange={(e) => setFilters((prev) => ({ ...prev, quarter: Number(e.target.value) }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }}>
+                      <option value={1}>Q1</option>
+                      <option value={2}>Q2</option>
+                      <option value={3}>Q3</option>
+                      <option value={4}>Q4</option>
+                    </select>
+                  </label>
+                )}
+                {filters.periodType === 'custom' && (
+                  <>
+                    <label style={{ display: 'grid', gap: '0.35rem' }}>
+                      <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Start Date</span>
+                      <input type="date" value={filters.startDate} onChange={(e) => setFilters((prev) => ({ ...prev, startDate: e.target.value }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }} />
+                    </label>
+                    <label style={{ display: 'grid', gap: '0.35rem' }}>
+                      <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>End Date</span>
+                      <input type="date" value={filters.endDate} onChange={(e) => setFilters((prev) => ({ ...prev, endDate: e.target.value }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }} />
+                    </label>
+                  </>
+                )}
+                <label style={{ display: 'grid', gap: '0.35rem' }}>
+                  <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Branch Scope</span>
+                  <select value={scope} onChange={(e) => setScope(e.target.value)} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }}>
+                    <option value="inherit">Inherit BO Scope</option>
+                    <option value="all">All Branches</option>
+                    {locationOptions.map((row) => (
+                      <option key={row.id} value={row.id}>{row.label}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            );
+
+            return (
           </button>
         </div>
-
-        {filtersExpanded && (
-          <div style={{ marginTop: '0.75rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.7rem' }}>
-            <label style={{ display: 'grid', gap: '0.35rem' }}>
-              <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Period Type</span>
-              <select value={filters.periodType} onChange={(event) => setFilters((prev) => ({ ...prev, periodType: event.target.value }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem', backgroundColor: '#fff', color: '#0f172a' }}>
-                <option value="day">Day</option>
-                <option value="month">Month</option>
-                <option value="quarter">Quarter</option>
-                <option value="year">Year</option>
-                <option value="custom">Custom Range</option>
-              </select>
-            </label>
-
-            {filters.periodType === 'day' && (
-              <label style={{ display: 'grid', gap: '0.35rem' }}>
-                <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Date</span>
-                <input type="date" value={filters.date} onChange={(event) => setFilters((prev) => ({ ...prev, date: event.target.value }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }} />
-              </label>
-            )}
-
-            {(filters.periodType === 'month' || filters.periodType === 'quarter' || filters.periodType === 'year') && (
-              <label style={{ display: 'grid', gap: '0.35rem' }}>
-                <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Year</span>
-                <input type="number" value={filters.year} onChange={(event) => setFilters((prev) => ({ ...prev, year: Number(event.target.value || new Date().getFullYear()) }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }} />
-              </label>
-            )}
-
-            {filters.periodType === 'month' && (
-              <label style={{ display: 'grid', gap: '0.35rem' }}>
-                <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Month</span>
-                <select value={filters.month} onChange={(event) => setFilters((prev) => ({ ...prev, month: Number(event.target.value) }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }}>
-                  {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
-                    <option key={month} value={month}>{new Date(Number(filters.year || new Date().getFullYear()), month - 1, 1).toLocaleDateString('en-GB', { month: 'long' })}</option>
-                  ))}
-                </select>
-              </label>
-            )}
-
-            {filters.periodType === 'quarter' && (
-              <label style={{ display: 'grid', gap: '0.35rem' }}>
-                <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Quarter</span>
-                <select value={filters.quarter} onChange={(event) => setFilters((prev) => ({ ...prev, quarter: Number(event.target.value) }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }}>
-                  <option value={1}>Q1</option>
-                  <option value={2}>Q2</option>
-                  <option value={3}>Q3</option>
-                  <option value={4}>Q4</option>
-                </select>
-              </label>
-            )}
-
-            {filters.periodType === 'custom' && (
-              <>
-                <label style={{ display: 'grid', gap: '0.35rem' }}>
-                  <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Start Date</span>
-                  <input type="date" value={filters.startDate} onChange={(event) => setFilters((prev) => ({ ...prev, startDate: event.target.value }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }} />
-                </label>
-                <label style={{ display: 'grid', gap: '0.35rem' }}>
-                  <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>End Date</span>
-                  <input type="date" value={filters.endDate} onChange={(event) => setFilters((prev) => ({ ...prev, endDate: event.target.value }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }} />
-                </label>
-              </>
-            )}
-
-            <label style={{ display: 'grid', gap: '0.35rem' }}>
-              <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Branch Scope</span>
-              <select value={scope} onChange={(event) => setScope(event.target.value)} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }}>
-                <option value="inherit">Inherit BO Scope</option>
-                <option value="all">All Branches</option>
-                {locationOptions.map((row) => (
-                  <option key={row.id} value={row.id}>{row.label}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-        )}
       </div>
 
       {error && (
@@ -1864,148 +1855,30 @@ const BusinessAnalyticsTab = ({
 
       {!loading && analytics && (
         <>
-          <div style={{ ...cardStyle, padding: '0.7rem 0.8rem' }}>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {/* Launcher Cards Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '0.85rem' }}>
               {[
-                { id: 'overview', label: 'Overview' },
-                { id: 'trends', label: 'Trends' },
-                { id: 'rankings', label: 'Rankings' },
-                { id: 'latest-profit', label: 'Latest Cost Profit' },
-                { id: 'analysis', label: 'Action Center' },
-              ].map((view) => {
-                const isActive = activeView === view.id;
-                return (
-                  <button
-                    key={view.id}
-                    type="button"
-                    onClick={() => setActiveView(view.id)}
-                    style={{
-                      border: isActive ? '1px solid #1d4ed8' : '1px solid #cbd5e1',
-                      backgroundColor: isActive ? '#dbeafe' : '#fff',
-                      color: isActive ? '#1d4ed8' : '#334155',
-                      borderRadius: '999px',
-                      padding: '0.34rem 0.7rem',
-                      fontWeight: 800,
-                      fontSize: '0.78rem',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {view.label}
-                  </button>
-                );
-              })}
+                { key: 'overview', label: 'Overview Workspace', title: 'Open Growth & KPI Overview', description: 'View growth deltas, KPI snapshots, and quick health summary in a focused modal.', accent: '#1d4ed8', border: '#bfdbfe', bg: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 60%)', onClick: () => openWorkspaceModal('overview') },
+                { key: 'trends', label: 'Trends Workspace', title: 'Open Daily, Monthly, Yearly Trends', description: 'Inspect sales cadence and invoice patterns without long page scrolling.', accent: '#0f766e', border: '#99f6e4', bg: 'linear-gradient(135deg, #f0fdfa 0%, #ffffff 60%)', onClick: () => openWorkspaceModal('trends') },
+                { key: 'rankings', label: 'Rankings Workspace', title: 'Open Product, Category, User, Branch Rankings', description: 'Browse all ranking tables in one modal workspace.', accent: '#6d28d9', border: '#d8b4fe', bg: 'linear-gradient(135deg, #f8f5ff 0%, #ffffff 60%)', onClick: () => openWorkspaceModal('rankings') },
+                { key: 'latest-profit', label: 'Latest Cost Profit', title: 'Open Profit Analytics', description: 'Profit calculated from sold revenue minus COGS using the latest GRN unit costs per branch.', accent: '#059669', border: '#6ee7b7', bg: 'linear-gradient(135deg, #ecfdf5 0%, #ffffff 60%)', onClick: () => setIsLatestProfitModalOpen(true) },
+                { key: 'action-center', label: 'Action Center', title: 'Open Analytics Calculators', description: 'Run practical business calculators, comparison analysis, and scenario forecasting.', accent: '#4338ca', border: '#a5b4fc', bg: 'linear-gradient(135deg, #f0f1ff 0%, #ffffff 60%)', onClick: () => setIsActionCenterModalOpen(true) },
+              ].map((card) => (
+                <button
+                  key={card.key}
+                  type="button"
+                  onClick={card.onClick}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(15, 23, 42, 0.1)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 10px rgba(15, 23, 42, 0.04)'; }}
+                  style={{ textAlign: 'left', border: `1px solid ${card.border}`, background: card.bg, borderRadius: '20px', padding: '1.1rem', cursor: 'pointer', boxShadow: '0 4px 10px rgba(15, 23, 42, 0.04)', transition: 'transform 0.14s ease, box-shadow 0.14s ease' }}
+                >
+                  <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: card.accent, fontWeight: 800 }}>{card.label}</div>
+                  <div style={{ marginTop: '0.35rem', fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>{card.title}</div>
+                  <div style={{ marginTop: '0.4rem', color: '#64748b', fontSize: '0.84rem' }}>{card.description}</div>
+                  <div style={{ marginTop: '0.5rem', color: card.accent, fontSize: '0.78rem', fontWeight: 800 }}>Open →</div>
+                </button>
+              ))}
             </div>
-          </div>
-
-          {activeView === 'latest-profit' && (
-            <LatestCostProfitSubview
-              active={activeView === 'latest-profit'}
-              selectedPeriod={selectedPeriod}
-              effectiveScope={effectiveScope}
-              locations={locations}
-              scopeLabel={scopeLabel}
-              periodLabel={selectedDateRange.label}
-              refreshTick={profitRefreshTick}
-            />
-          )}
-
-          {activeView === 'overview' && (
-            <button
-              type="button"
-              onClick={() => openWorkspaceModal('overview')}
-              style={{
-                ...cardStyle,
-                textAlign: 'left',
-                border: '1px solid #bfdbfe',
-                background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 60%)',
-                borderRadius: '20px',
-                padding: '1.1rem',
-                cursor: 'pointer',
-              }}
-            >
-              <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1d4ed8', fontWeight: 800 }}>Overview Workspace</div>
-              <div style={{ marginTop: '0.35rem', fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>Open Growth & KPI Overview</div>
-              <div style={{ marginTop: '0.4rem', color: '#64748b', fontSize: '0.84rem' }}>View growth deltas, KPI snapshots, and quick health summary in a focused modal.</div>
-            </button>
-          )}
-
-          {activeView === 'trends' && (
-            <button
-              type="button"
-              onClick={() => openWorkspaceModal('trends')}
-              style={{
-                ...cardStyle,
-                textAlign: 'left',
-                border: '1px solid #99f6e4',
-                background: 'linear-gradient(135deg, #f0fdfa 0%, #ffffff 60%)',
-                borderRadius: '20px',
-                padding: '1.1rem',
-                cursor: 'pointer',
-              }}
-            >
-              <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0f766e', fontWeight: 800 }}>Trends Workspace</div>
-              <div style={{ marginTop: '0.35rem', fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>Open Daily, Monthly, Yearly Trends</div>
-              <div style={{ marginTop: '0.4rem', color: '#64748b', fontSize: '0.84rem' }}>Inspect sales cadence and invoice patterns without long page scrolling.</div>
-            </button>
-          )}
-
-          {activeView === 'rankings' && (
-            <button
-              type="button"
-              onClick={() => openWorkspaceModal('rankings')}
-              style={{
-                ...cardStyle,
-                textAlign: 'left',
-                border: '1px solid #d8b4fe',
-                background: 'linear-gradient(135deg, #f8f5ff 0%, #ffffff 60%)',
-                borderRadius: '20px',
-                padding: '1.1rem',
-                cursor: 'pointer',
-              }}
-            >
-              <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6d28d9', fontWeight: 800 }}>Rankings Workspace</div>
-              <div style={{ marginTop: '0.35rem', fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>Open Product, Category, User, Branch Rankings</div>
-              <div style={{ marginTop: '0.4rem', color: '#64748b', fontSize: '0.84rem' }}>Browse all ranking tables in one modal workspace.</div>
-            </button>
-          )}
-
-          {activeWorkspaceModal && ['overview', 'trends', 'rankings'].includes(activeWorkspaceModal) && (
-            <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 220, display: 'grid', placeItems: 'center', padding: isWorkspaceMaximized ? '0.35rem' : '1rem' }}>
-              <div style={{ ...cardStyle, width: isWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1320px, 98vw)', height: isWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', display: 'flex', flexDirection: 'column', borderRadius: isWorkspaceMaximized ? '10px' : '18px', overflow: 'hidden' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.1rem', borderBottom: '1px solid #e2e8f0' }}>
-                  <div>
-                    <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#475569', fontWeight: 800 }}>Analytics Workspace</div>
-                    <div style={{ marginTop: '0.2rem', fontWeight: 800, fontSize: '1.05rem', color: '#0f172a' }}>
-                      {activeWorkspaceModal === 'overview' ? 'Overview' : activeWorkspaceModal === 'trends' ? 'Trends' : 'Rankings'}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                    <button
-                      type="button"
-                      title={isWorkspaceMaximized ? 'Restore' : 'Maximize'}
-                      aria-label={isWorkspaceMaximized ? 'Restore workspace' : 'Maximize workspace'}
-                      onClick={() => setIsWorkspaceMaximized((prev) => !prev)}
-                      style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', color: '#334155', cursor: 'pointer' }}
-                    >
-                      <i className={`fas ${isWorkspaceMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={closeWorkspaceModal}
-                      style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}
-                    >
-                      <i className="fas fa-times" />
-                    </button>
-                  </div>
-                </div>
-                <div style={{ flex: 1, overflow: 'auto', padding: '1rem', display: 'grid', gap: '0.8rem' }}>
-                  {activeWorkspaceModal === 'overview' && overviewWorkspaceContent}
-                  {activeWorkspaceModal === 'trends' && trendsWorkspaceContent}
-                  {activeWorkspaceModal === 'rankings' && rankingsWorkspaceContent}
-                </div>
-              </div>
-            </div>
-          )}
 
           {false && activeView === 'overview' && (
             <>
@@ -2506,16 +2379,213 @@ const BusinessAnalyticsTab = ({
             );
           })()}
         </>
-      )}
+          {/* Workspace modal — Overview / Trends / Rankings */}
+          {activeWorkspaceModal && ['overview', 'trends', 'rankings'].includes(activeWorkspaceModal) && (
+            <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 220, display: 'grid', placeItems: 'center', padding: isWorkspaceMaximized ? '0.35rem' : '1rem' }}>
+              <div style={{ ...cardStyle, width: isWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1320px, 98vw)', height: isWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', display: 'flex', flexDirection: 'column', borderRadius: isWorkspaceMaximized ? '10px' : '18px', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.1rem', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#475569', fontWeight: 800 }}>Analytics Workspace</div>
+                    <div style={{ marginTop: '0.2rem', fontWeight: 800, fontSize: '1.05rem', color: '#0f172a' }}>
+                      {activeWorkspaceModal === 'overview' ? 'Overview' : activeWorkspaceModal === 'trends' ? 'Trends' : 'Rankings'}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <button type="button" onClick={() => setFiltersExpanded((prev) => !prev)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.42rem 0.65rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>
+                      <i className={`fas ${filtersExpanded ? 'fa-chevron-up' : 'fa-sliders'}`} style={{ marginRight: '0.38rem' }}></i>
+                      {filtersExpanded ? 'Hide Filters' : 'Filters'}
+                    </button>
+                    <button type="button" title={isWorkspaceMaximized ? 'Restore' : 'Maximize'} aria-label={isWorkspaceMaximized ? 'Restore workspace' : 'Maximize workspace'} onClick={() => setIsWorkspaceMaximized((prev) => !prev)} style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', color: '#334155', cursor: 'pointer' }}>
+                      <i className={`fas ${isWorkspaceMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
+                    </button>
+                    <button type="button" onClick={closeWorkspaceModal} style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}>
+                      <i className="fas fa-times" />
+                    </button>
+                  </div>
+                </div>
+                {filtersExpanded && filtersPanel}
+                <div style={{ flex: 1, overflow: 'auto', padding: '1rem', display: 'grid', gap: '0.8rem', alignContent: 'start' }}>
+                  {activeWorkspaceModal === 'overview' && overviewWorkspaceContent}
+                  {activeWorkspaceModal === 'trends' && trendsWorkspaceContent}
+                  {activeWorkspaceModal === 'rankings' && rankingsWorkspaceContent}
+                </div>
+              </div>
+            </div>
+          )}
 
-      {loading && (
-        <div style={{ ...cardStyle, padding: '1rem 1.1rem', color: isAdminDarkTheme ? '#b2c3d9' : '#64748b' }}>
-          <i className="fas fa-spinner fa-spin" style={{ marginRight: '0.45rem' }}></i>
-          Loading business analytics...
-        </div>
-      )}
-    </div>
-  );
-};
+          {/* Latest Cost Profit modal */}
+          {isLatestProfitModalOpen && (
+            <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 220, display: 'grid', placeItems: 'center', padding: isLatestProfitMaximized ? '0.35rem' : '1rem' }}>
+              <div style={{ ...cardStyle, width: isLatestProfitMaximized ? 'calc(100vw - 0.7rem)' : 'min(1320px, 98vw)', height: isLatestProfitMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', display: 'flex', flexDirection: 'column', borderRadius: isLatestProfitMaximized ? '10px' : '18px', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.1rem', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#059669', fontWeight: 800 }}>Latest Cost Profit</div>
+                    <div style={{ marginTop: '0.2rem', fontWeight: 800, fontSize: '1.05rem', color: '#0f172a' }}>Latest-Cost Profit Analytics</div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <button type="button" onClick={() => setFiltersExpanded((prev) => !prev)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.42rem 0.65rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>
+                      <i className={`fas ${filtersExpanded ? 'fa-chevron-up' : 'fa-sliders'}`} style={{ marginRight: '0.38rem' }}></i>
+                      {filtersExpanded ? 'Hide Filters' : 'Filters'}
+                    </button>
+                    <button type="button" title={isLatestProfitMaximized ? 'Restore' : 'Maximize'} onClick={() => setIsLatestProfitMaximized((prev) => !prev)} style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', color: '#334155', cursor: 'pointer' }}>
+                      <i className={`fas ${isLatestProfitMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
+                    </button>
+                    <button type="button" onClick={() => setIsLatestProfitModalOpen(false)} style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}>
+                      <i className="fas fa-times" />
+                    </button>
+                  </div>
+                </div>
+                {filtersExpanded && filtersPanel}
+                <div style={{ flex: 1, overflow: 'auto', padding: '1rem' }}>
+                  <LatestCostProfitSubview
+                    active={isLatestProfitModalOpen}
+                    selectedPeriod={selectedPeriod}
+                    effectiveScope={effectiveScope}
+                    locations={locations}
+                    scopeLabel={scopeLabel}
+                    periodLabel={selectedDateRange.label}
+                    refreshTick={profitRefreshTick}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
-export default BusinessAnalyticsTab;
+          {/* Action Center modal */}
+          {isActionCenterModalOpen && (() => {
+            const status = analysisResult ? analysisStatusStyle(analysisResult.status) : null;
+            return (
+              <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 220, display: 'grid', placeItems: 'center', padding: isActionCenterMaximized ? '0.35rem' : '1rem' }}>
+                <div style={{ ...cardStyle, width: isActionCenterMaximized ? 'calc(100vw - 0.7rem)' : 'min(1320px, 98vw)', height: isActionCenterMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', display: 'flex', flexDirection: 'column', borderRadius: isActionCenterMaximized ? '10px' : '18px', overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.1rem', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#4338ca', fontWeight: 800 }}>Action Center</div>
+                      <div style={{ marginTop: '0.2rem', fontWeight: 800, fontSize: '1.05rem', color: '#0f172a' }}>Analytics Calculators</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                      <button type="button" onClick={() => setFiltersExpanded((prev) => !prev)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.42rem 0.65rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>
+                        <i className={`fas ${filtersExpanded ? 'fa-chevron-up' : 'fa-sliders'}`} style={{ marginRight: '0.38rem' }}></i>
+                        {filtersExpanded ? 'Hide Filters' : 'Filters'}
+                      </button>
+                      <button type="button" title={isActionCenterMaximized ? 'Restore' : 'Maximize'} onClick={() => setIsActionCenterMaximized((prev) => !prev)} style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', color: '#334155', cursor: 'pointer' }}>
+                        <i className={`fas ${isActionCenterMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
+                      </button>
+                      <button type="button" onClick={() => setIsActionCenterModalOpen(false)} style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}>
+                        <i className="fas fa-times" />
+                      </button>
+                    </div>
+                  </div>
+                  {filtersExpanded && filtersPanel}
+                  <div style={{ flex: 1, overflow: 'auto', padding: '1rem', display: 'grid', gap: '0.85rem', alignContent: 'start' }}>
+                    <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.7rem', flexWrap: 'wrap' }}>
+                        <div>
+                          <strong style={{ color: '#0f172a' }}>Analytics Action Center</strong>
+                          <p style={{ margin: '0.28rem 0 0', color: '#64748b', fontSize: '0.84rem' }}>
+                            Run practical business calculators, comparison analysis, and scenario forecasting using manual or live system values.
+                          </p>
+                        </div>
+                        <div style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Scope: {analytics.scopeLabel}</div>
+                      </div>
+                      <div style={{ marginTop: '0.75rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '0.55rem' }}>
+                        {ANALYSIS_TOOLS.map((tool) => {
+                          const isActive = activeTool === tool.id;
+                          return (
+                            <button key={tool.id} type="button" onClick={() => openToolModal(tool.id)} style={{ textAlign: 'left', border: isActive ? '1px solid #1d4ed8' : '1px solid #cbd5e1', backgroundColor: isActive ? '#dbeafe' : '#fff', borderRadius: '12px', padding: '0.62rem 0.7rem', cursor: 'pointer' }}>
+                              <div style={{ color: isActive ? '#1d4ed8' : '#0f172a', fontWeight: 800, fontSize: '0.82rem' }}>{tool.title}</div>
+                              <div style={{ marginTop: '0.2rem', color: '#64748b', fontSize: '0.76rem', lineHeight: 1.35 }}>{tool.description}</div>
+                              <div style={{ marginTop: '0.32rem', color: '#2563eb', fontSize: '0.74rem', fontWeight: 800 }}>Open calculator →</div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {isToolModalOpen && (
+                      <div role="dialog" aria-modal="true" onClick={() => setIsToolModalOpen(false)} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.58)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', zIndex: 1400 }}>
+                        <div onClick={(event) => event.stopPropagation()} style={{ width: 'min(1240px, 98vw)', maxHeight: '92vh', overflowY: 'auto', background: 'linear-gradient(145deg, #f8fafc 0%, #eef4ff 52%, #f8fafc 100%)', border: '1px solid #bfdbfe', borderRadius: '20px', boxShadow: '0 30px 60px rgba(15, 23, 42, 0.35)', padding: '1rem', display: 'grid', gap: '0.78rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.7rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                            <div>
+                              <strong style={{ color: '#0f172a' }}>{activeToolConfig.title}</strong>
+                              <p style={{ margin: '0.26rem 0 0', color: '#64748b', fontSize: '0.82rem' }}>{activeToolConfig.description}</p>
+                            </div>
+                            <button type="button" onClick={() => setIsToolModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '9px', color: '#334155', padding: '0.42rem 0.7rem', fontWeight: 800, cursor: 'pointer' }}>
+                              <i className="fas fa-xmark" style={{ marginRight: '0.35rem' }}></i>Close
+                            </button>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '0.8rem' }}>
+                            <div style={{ ...cardStyle, padding: '0.95rem 1rem', background: 'linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)', borderColor: '#bfdbfe' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <strong style={{ color: '#0f172a' }}>Calculator Panel</strong>
+                                <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>Manual + System Assisted</span>
+                              </div>
+                              <div style={{ marginTop: '0.62rem', display: 'flex', flexWrap: 'wrap', gap: '0.42rem', marginBottom: '0.75rem' }}>
+                                <button type="button" onClick={() => applyAnalysisPreset('selected-vs-previous')} style={{ border: '1px solid #bfdbfe', backgroundColor: '#eff6ff', borderRadius: '999px', padding: '0.34rem 0.6rem', fontSize: '0.74rem', fontWeight: 800, color: '#1e3a8a', cursor: 'pointer' }}>Use Selected vs Previous</button>
+                                <button type="button" onClick={() => applyAnalysisPreset('month-vs-previous')} style={{ border: '1px solid #bfdbfe', backgroundColor: '#eff6ff', borderRadius: '999px', padding: '0.34rem 0.6rem', fontSize: '0.74rem', fontWeight: 800, color: '#1e3a8a', cursor: 'pointer' }}>Use Month vs Previous</button>
+                                <button type="button" onClick={() => applyAnalysisPreset('year-vs-previous')} style={{ border: '1px solid #bfdbfe', backgroundColor: '#eff6ff', borderRadius: '999px', padding: '0.34rem 0.6rem', fontSize: '0.74rem', fontWeight: 800, color: '#1e3a8a', cursor: 'pointer' }}>Use Year vs Previous</button>
+                                <button type="button" onClick={() => applyAnalysisPreset('kpi-base')} style={{ border: '1px solid #bfdbfe', backgroundColor: '#eff6ff', borderRadius: '999px', padding: '0.34rem 0.6rem', fontSize: '0.74rem', fontWeight: 800, color: '#1e3a8a', cursor: 'pointer' }}>Use KPI Snapshot</button>
+                                <button type="button" onClick={() => applyAnalysisPreset('branch-compare')} style={{ border: '1px solid #bfdbfe', backgroundColor: '#eff6ff', borderRadius: '999px', padding: '0.34rem 0.6rem', fontSize: '0.74rem', fontWeight: 800, color: '#1e3a8a', cursor: 'pointer' }}>Use BT vs ZA Sales</button>
+                              </div>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.6rem' }}>
+                                {activeToolConfig.fields.map((fieldKey) => {
+                                  const fieldDef = ANALYSIS_FIELDS[fieldKey] || { label: fieldKey, step: '0.01' };
+                                  return (
+                                    <label key={fieldKey} style={{ display: 'grid', gap: '0.28rem', border: '1px solid #dbeafe', borderRadius: '12px', padding: '0.45rem 0.5rem', backgroundColor: '#f8fbff', minWidth: 0, overflow: 'hidden' }}>
+                                      <span style={{ color: '#475569', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.03em' }}>{fieldDef.label}</span>
+                                      <input type="number" step={fieldDef.step} value={analysisInputs[fieldKey]} onChange={(event) => updateAnalysisInput(fieldKey, event.target.value)} style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', border: '1px solid #93c5fd', borderRadius: '10px', padding: '0.58rem 0.62rem', color: '#0f172a', backgroundColor: '#fff', fontFamily: 'Consolas, Menlo, Monaco, monospace', fontWeight: 800, fontSize: '0.95rem', boxShadow: 'inset 0 1px 3px rgba(15, 23, 42, 0.08)' }} />
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                              <div style={{ marginTop: '0.72rem', display: 'flex', gap: '0.52rem', flexWrap: 'wrap' }}>
+                                <button type="button" onClick={runAnalysis} style={{ border: '1px solid #1d4ed8', background: 'linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%)', color: '#fff', borderRadius: '10px', padding: '0.54rem 0.86rem', fontWeight: 900, letterSpacing: '0.02em', cursor: 'pointer', boxShadow: '0 10px 20px rgba(37, 99, 235, 0.28)' }}>
+                                  <i className="fas fa-play" style={{ marginRight: '0.34rem', fontSize: '0.72rem' }}></i>Run Calculation
+                                </button>
+                                <button type="button" onClick={() => { const r = { ...analysisInputs }; Object.keys(r).forEach((k) => { r[k] = k === 'projectedGrowthPct' ? 10 : 0; }); setAnalysisInputs(r); setAnalysisResult(null); }} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.5rem 0.8rem', fontWeight: 800, cursor: 'pointer' }}>
+                                  <i className="fas fa-rotate-left" style={{ marginRight: '0.34rem', fontSize: '0.72rem' }}></i>Reset Inputs
+                                </button>
+                              </div>
+                            </div>
+                            <div style={{ ...cardStyle, padding: '0.95rem 1rem', background: 'linear-gradient(180deg, #ffffff 0%, #f0f9ff 100%)', borderColor: '#bae6fd' }}>
+                              <strong style={{ color: '#0f172a' }}>Results Panel</strong>
+                              {!analysisResult ? (
+                                <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.82rem' }}>Run a calculator to view final result, formula basis, interpretation, and performance signal.</p>
+                              ) : (
+                                <>
+                                  <div style={{ marginTop: '0.62rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.55rem', flexWrap: 'wrap' }}>
+                                    <span style={{ color: '#334155', fontSize: '0.8rem', fontWeight: 700 }}>{analysisResult.title}</span>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', borderRadius: '999px', padding: '0.24rem 0.54rem', backgroundColor: status.bg, color: status.color, fontSize: '0.74rem', fontWeight: 800 }}>{status.label}</span>
+                                  </div>
+                                  <div style={{ marginTop: '0.62rem', border: '1px solid #93c5fd', borderRadius: '14px', padding: '0.82rem 0.84rem', background: 'linear-gradient(145deg, #eff6ff 0%, #dbeafe 100%)' }}>
+                                    <div style={{ color: '#1e3a8a', fontSize: '0.74rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{analysisResult.mainLabel}</div>
+                                    <div style={{ marginTop: '0.24rem', color: '#0f172a', fontWeight: 900, fontSize: '1.48rem', fontFamily: 'Consolas, Menlo, Monaco, monospace' }}>{analysisResult.mainValue}</div>
+                                    <div style={{ marginTop: '0.24rem', color: '#1e40af', fontSize: '0.82rem', fontWeight: 800 }}>{analysisResult.subValue}</div>
+                                  </div>
+                                  <div style={{ marginTop: '0.62rem', border: '1px solid #dbeafe', borderRadius: '10px', padding: '0.62rem 0.68rem', backgroundColor: '#ffffff' }}>
+                                    <div style={{ color: '#475569', fontSize: '0.74rem', fontWeight: 800 }}>Formula Used</div>
+                                    <div style={{ marginTop: '0.2rem', color: '#0f172a', fontSize: '0.8rem', fontWeight: 700, fontFamily: 'Consolas, Menlo, Monaco, monospace' }}>{analysisResult.formula}</div>
+                                    <div style={{ marginTop: '0.34rem', color: '#334155', fontSize: '0.8rem', lineHeight: 1.5 }}>{analysisResult.interpretation}</div>
+                                  </div>
+                                  <div style={{ marginTop: '0.62rem' }}>
+                                    <div style={{ color: '#64748b', fontSize: '0.74rem', fontWeight: 800, marginBottom: '0.28rem' }}>Values Used</div>
+                                    <div style={{ display: 'grid', gap: '0.3rem' }}>
+                                      {analysisResult.usedValues.map((row) => (
+                                        <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.52rem', border: '1px solid #e2e8f0', borderRadius: '9px', padding: '0.36rem 0.5rem', backgroundColor: '#fff' }}>
+                                          <span style={{ color: '#64748b', fontSize: '0.76rem', fontWeight: 700 }}>{row.label}</span>
+                                          <span style={{ color: '#0f172a', fontSize: '0.8rem', fontWeight: 900, fontFamily: 'Consolas, Menlo, Monaco, monospace' }}>{row.value}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
