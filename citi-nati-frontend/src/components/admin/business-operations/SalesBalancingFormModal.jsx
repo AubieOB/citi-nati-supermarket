@@ -19,6 +19,26 @@ const labelStyle = {
   fontSize: '0.88rem',
 };
 
+const amountInputStyle = {
+  ...fieldStyle,
+  padding: '0.72rem 0.95rem',
+  textAlign: 'right',
+  fontSize: '1.55rem',
+  fontWeight: 800,
+  fontFamily: 'Consolas, monospace',
+  letterSpacing: '0.4px',
+  color: '#0f172a',
+  background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+};
+
+const amountCardStyle = {
+  border: '1px solid #dbe3f0',
+  borderRadius: '16px',
+  padding: '0.85rem',
+  backgroundColor: '#f8fafc',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)',
+};
+
 const PAYMENT_FIELDS = [
   { key: 'cashAmount', label: 'Cash', icon: 'fa-money-bill' },
   { key: 'airtelMoneyAmount', label: 'Airtel Money', icon: 'fa-mobile' },
@@ -74,11 +94,13 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
   });
 
   const [validationError, setValidationError] = useState('');
+  const [activeAmountKey, setActiveAmountKey] = useState('cashAmount');
   const isCreateMode = !record;
 
   useEffect(() => {
     if (!isOpen) return;
     setValidationError('');
+    setActiveAmountKey('cashAmount');
     if (record) {
       setForm({
         balancingDate: toDateInputValue(record.balancingDate) || new Date().toISOString().slice(0, 10),
@@ -225,20 +247,46 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
             </h4>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.9rem' }}>
               {PAYMENT_FIELDS.map((field) => (
-                <div key={field.key}>
+                <div
+                  key={field.key}
+                  style={{
+                    ...amountCardStyle,
+                    borderColor: activeAmountKey === field.key ? '#8f94c9' : '#dbe3f0',
+                    boxShadow: activeAmountKey === field.key
+                      ? '0 0 0 3px rgba(143, 148, 201, 0.16), inset 0 1px 0 rgba(255,255,255,0.92)'
+                      : amountCardStyle.boxShadow,
+                    backgroundColor: activeAmountKey === field.key ? '#eef2ff' : amountCardStyle.backgroundColor,
+                  }}
+                >
                   <label style={labelStyle}>
                     <i className={`fas ${field.icon}`} style={{ marginRight: '0.35rem', color: '#5B4B8A' }}></i>
                     {field.label}
                   </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#5B4B8A', letterSpacing: '0.08em' }}>MWK</span>
                   <input
                     type="number"
                     min="0"
                     step="0.01"
                     value={form[field.key] || 0}
                     onChange={setAmount(field.key)}
+                    onFocus={(event) => {
+                      setActiveAmountKey(field.key);
+                      event.target.select();
+                    }}
+                    onClick={(event) => event.target.select()}
+                    onBlur={() => setActiveAmountKey((current) => (current === field.key ? '' : current))}
+                    autoFocus={isCreateMode && field.key === 'cashAmount'}
                     placeholder="0.00"
-                    style={fieldStyle}
+                    style={{
+                      ...amountInputStyle,
+                      borderColor: activeAmountKey === field.key ? '#8f94c9' : '#cbd5e1',
+                      background: activeAmountKey === field.key
+                        ? 'linear-gradient(180deg, #ffffff 0%, #eef2ff 100%)'
+                        : amountInputStyle.background,
+                    }}
                   />
+                  </div>
                 </div>
               ))}
             </div>
