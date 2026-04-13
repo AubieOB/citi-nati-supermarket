@@ -975,10 +975,11 @@ const BusinessAnalyticsTab = ({
   const [isToolModalOpen, setIsToolModalOpen] = useState(false);
   const [activeWorkspaceModal, setActiveWorkspaceModal] = useState('');
   const [isWorkspaceMaximized, setIsWorkspaceMaximized] = useState(false);
-    const [isLatestProfitModalOpen, setIsLatestProfitModalOpen] = useState(false);
-    const [isLatestProfitMaximized, setIsLatestProfitMaximized] = useState(false);
-    const [isActionCenterModalOpen, setIsActionCenterModalOpen] = useState(false);
-    const [isActionCenterMaximized, setIsActionCenterMaximized] = useState(false);
+  const [activeRankingSectionModal, setActiveRankingSectionModal] = useState('');
+  const [isLatestProfitModalOpen, setIsLatestProfitModalOpen] = useState(false);
+  const [isLatestProfitMaximized, setIsLatestProfitMaximized] = useState(false);
+  const [isActionCenterModalOpen, setIsActionCenterModalOpen] = useState(false);
+  const [isActionCenterMaximized, setIsActionCenterMaximized] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisInputs, setAnalysisInputs] = useState({
     previousValue: 0,
@@ -1423,28 +1424,31 @@ const BusinessAnalyticsTab = ({
   const openWorkspaceModal = (modalId) => {
     setActiveWorkspaceModal(modalId);
     setIsWorkspaceMaximized(false);
+    setActiveRankingSectionModal('');
   };
 
   const closeWorkspaceModal = () => {
     setActiveWorkspaceModal('');
     setIsWorkspaceMaximized(false);
+    setActiveRankingSectionModal('');
   };
 
   useEffect(() => {
-    if ((!isToolModalOpen && !activeWorkspaceModal && !isLatestProfitModalOpen && !isActionCenterModalOpen) || typeof window === 'undefined') return undefined;
+    if ((!isToolModalOpen && !activeWorkspaceModal && !activeRankingSectionModal && !isLatestProfitModalOpen && !isActionCenterModalOpen) || typeof window === 'undefined') return undefined;
 
     const onEsc = (event) => {
       if (event.key === 'Escape') {
         setIsToolModalOpen(false);
+        setActiveRankingSectionModal('');
         closeWorkspaceModal();
-          setIsLatestProfitModalOpen(false);
-          setIsActionCenterModalOpen(false);
+        setIsLatestProfitModalOpen(false);
+        setIsActionCenterModalOpen(false);
       }
     };
 
     window.addEventListener('keydown', onEsc);
     return () => window.removeEventListener('keydown', onEsc);
-  }, [activeWorkspaceModal, isToolModalOpen]);
+  }, [activeRankingSectionModal, activeWorkspaceModal, isActionCenterModalOpen, isLatestProfitModalOpen, isToolModalOpen]);
 
   const overviewWorkspaceContent = analytics ? (
     <>
@@ -1612,138 +1616,198 @@ const BusinessAnalyticsTab = ({
     const tableStyle = { width: '100%', borderCollapse: 'collapse', tableLayout: 'auto' };
     const sectionHead = { color: '#0f172a', fontSize: '0.82rem', fontWeight: 800, marginBottom: '0.4rem' };
     const emptyStyle = { color: '#94a3b8', fontSize: '0.82rem', padding: '0.4rem 0' };
+    const launcherCards = [
+      { id: 'top-products', label: 'Top Products', title: productRankingMode === 'fast' ? 'Fast Movers & Sales Rank' : 'Sales Rank & Fast Movers', description: 'Open product ranking table with Sales Rank and Fast Movers views.', accent: '#1d4ed8', border: '#bfdbfe', bg: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 60%)' },
+      { id: 'top-categories', label: 'Top Categories', title: 'Category Contribution Rankings', description: 'Open category-level quantity, sales and contribution analysis.', accent: '#0f766e', border: '#99f6e4', bg: 'linear-gradient(135deg, #f0fdfa 0%, #ffffff 60%)' },
+      { id: 'cashier-performance', label: 'Cashier Performance', title: 'User Sales Rankings', description: 'Open cashier invoice and average basket performance table.', accent: '#6d28d9', border: '#d8b4fe', bg: 'linear-gradient(135deg, #f8f5ff 0%, #ffffff 60%)' },
+      { id: 'branch-performance', label: 'Branch Performance', title: 'Branch Contribution Rankings', description: 'Open branch-level sales, basket and contribution share.', accent: '#b45309', border: '#fed7aa', bg: 'linear-gradient(135deg, #fff7ed 0%, #ffffff 60%)' },
+    ];
+
+    const activeRankingMeta = launcherCards.find((card) => card.id === activeRankingSectionModal);
 
     return (
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '0.8rem' }}>
-        <div style={{ ...cardStyle, padding: '0.85rem 0.95rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <div style={sectionHead}>Top Products</div>
-            <div style={{ display: 'inline-flex', border: '1px solid #dbe3ef', borderRadius: '999px', padding: '0.18rem', backgroundColor: '#f8fafc' }}>
+      <>
+        <div style={{ ...cardStyle, padding: '0.95rem 1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <div>
+              <strong style={{ color: '#0f172a' }}>Rankings Launcher</strong>
+              <p style={{ margin: '0.28rem 0 0', color: '#64748b', fontSize: '0.82rem' }}>
+                Open each ranking section in a focused modal workspace.
+              </p>
+            </div>
+            <div style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>4 section modals</div>
+          </div>
+
+          <div style={{ marginTop: '0.8rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '0.62rem' }}>
+            {launcherCards.map((card) => (
               <button
+                key={card.id}
                 type="button"
-                onClick={() => setProductRankingMode('sales')}
-                style={{
-                  border: 'none',
-                  borderRadius: '999px',
-                  padding: '0.32rem 0.7rem',
-                  fontSize: '0.74rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  backgroundColor: productRankingMode === 'sales' ? '#1d4ed8' : 'transparent',
-                  color: productRankingMode === 'sales' ? '#fff' : '#475569',
-                }}
+                onClick={() => setActiveRankingSectionModal(card.id)}
+                style={{ textAlign: 'left', border: `1px solid ${card.border}`, background: card.bg, borderRadius: '14px', padding: '0.78rem 0.82rem', cursor: 'pointer' }}
               >
-                Sales Rank
+                <div style={{ color: card.accent, fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{card.label}</div>
+                <div style={{ marginTop: '0.25rem', color: '#0f172a', fontSize: '0.92rem', fontWeight: 800 }}>{card.title}</div>
+                <div style={{ marginTop: '0.28rem', color: '#64748b', fontSize: '0.78rem', lineHeight: 1.35 }}>{card.description}</div>
+                <div style={{ marginTop: '0.34rem', color: card.accent, fontSize: '0.75rem', fontWeight: 800 }}>Open section →</div>
               </button>
-              <button
-                type="button"
-                onClick={() => setProductRankingMode('fast')}
-                style={{
-                  border: 'none',
-                  borderRadius: '999px',
-                  padding: '0.32rem 0.7rem',
-                  fontSize: '0.74rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  backgroundColor: productRankingMode === 'fast' ? '#0f766e' : 'transparent',
-                  color: productRankingMode === 'fast' ? '#fff' : '#475569',
-                }}
-              >
-                Fast Movers
-              </button>
+            ))}
+          </div>
+        </div>
+
+        {activeRankingSectionModal && (
+          <div role="dialog" aria-modal="true" onClick={() => setActiveRankingSectionModal('')} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.58)', display: 'grid', placeItems: 'center', padding: '1rem', zIndex: 1400 }}>
+            <div onClick={(event) => event.stopPropagation()} style={{ ...cardStyle, width: 'min(1280px, 98vw)', maxHeight: '92vh', overflowY: 'auto', borderRadius: '16px', padding: '0.9rem 0.95rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.7rem', flexWrap: 'wrap', marginBottom: '0.72rem' }}>
+                <div>
+                  <div style={{ color: '#475569', fontSize: '0.73rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Rankings Section</div>
+                  <strong style={{ color: '#0f172a', fontSize: '1rem' }}>{activeRankingMeta?.title || 'Details'}</strong>
+                </div>
+                <button type="button" onClick={() => setActiveRankingSectionModal('')} style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}>
+                  <i className="fas fa-times" />
+                </button>
+              </div>
+
+              {activeRankingSectionModal === 'top-products' && (
+                <div style={{ ...cardStyle, padding: '0.85rem 0.95rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <div style={sectionHead}>Top Products</div>
+                    <div style={{ display: 'inline-flex', border: '1px solid #dbe3ef', borderRadius: '999px', padding: '0.18rem', backgroundColor: '#f8fafc' }}>
+                      <button
+                        type="button"
+                        onClick={() => setProductRankingMode('sales')}
+                        style={{
+                          border: 'none',
+                          borderRadius: '999px',
+                          padding: '0.32rem 0.7rem',
+                          fontSize: '0.74rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          backgroundColor: productRankingMode === 'sales' ? '#1d4ed8' : 'transparent',
+                          color: productRankingMode === 'sales' ? '#fff' : '#475569',
+                        }}
+                      >
+                        Sales Rank
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setProductRankingMode('fast')}
+                        style={{
+                          border: 'none',
+                          borderRadius: '999px',
+                          padding: '0.32rem 0.7rem',
+                          fontSize: '0.74rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          backgroundColor: productRankingMode === 'fast' ? '#0f766e' : 'transparent',
+                          color: productRankingMode === 'fast' ? '#fff' : '#475569',
+                        }}
+                      >
+                        Fast Movers
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{ color: '#64748b', fontSize: '0.74rem', marginBottom: '0.35rem' }}>
+                    {productRankingMode === 'fast'
+                      ? `Velocity score blends units/day, sales/day, and margin over ${intFmt(analytics.rankings.periodDays || 1)} day(s).`
+                      : 'Ranked by total sales value in the selected period.'}
+                  </div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={tableStyle}>
+                      <thead>
+                        <tr>
+                          <th style={thStyle}>#</th>
+                          <th style={{ ...thStyle, width: '100%' }}>Product</th>
+                          <th style={thStyle}>Qty</th>
+                          {productRankingMode === 'fast' && <th style={thStyle}>Qty/Day</th>}
+                          <th style={thStyle}>Sales</th>
+                          {productRankingMode === 'fast' && <th style={thStyle}>Score</th>}
+                          {productRankingMode !== 'fast' && <th style={thStyle}>Share</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(productRankingMode === 'fast' ? analytics.rankings.fastMovers : analytics.rankings.topProducts).length === 0 ? (
+                          <tr><td colSpan={productRankingMode === 'fast' ? 6 : 5} style={emptyStyle}>No data.</td></tr>
+                        ) : (productRankingMode === 'fast' ? analytics.rankings.fastMovers : analytics.rankings.topProducts).map((row, i) => (
+                          <tr key={`${row.productCode}-${i}`}>
+                            <td style={{ ...tdStyle, color: '#94a3b8' }}>{i + 1}</td>
+                            <td style={tdBold}>{row.productName}<span style={{ display: 'block', color: '#94a3b8', fontSize: '0.72rem', fontWeight: 400 }}>{row.productCode}</span></td>
+                            <td style={tdStyle}>{intFmt(row.totalQuantity)}</td>
+                            {productRankingMode === 'fast' && <td style={tdStyle}>{Number(row.unitsPerDay || 0).toFixed(2)}</td>}
+                            <td style={tdBold}>{money(row.totalSales)}</td>
+                            {productRankingMode === 'fast' && <td style={{ ...tdStyle, color: '#0f766e', fontWeight: 800 }}>{Number(row.fastMoverScore || 0).toFixed(1)}</td>}
+                            {productRankingMode !== 'fast' && <td style={{ ...tdStyle, color: '#2563eb', fontWeight: 700 }}>{row.contributionShare.toFixed(1)}%</td>}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {activeRankingSectionModal === 'top-categories' && (
+                <div style={{ ...cardStyle, padding: '0.85rem 0.95rem' }}>
+                  <div style={sectionHead}>Top Categories</div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={tableStyle}>
+                      <thead><tr><th style={thStyle}>#</th><th style={{ ...thStyle, width: '100%' }}>Category</th><th style={thStyle}>Qty</th><th style={thStyle}>Sales</th><th style={thStyle}>Share</th></tr></thead>
+                      <tbody>
+                        {analytics.rankings.topCategories.length === 0 ? (
+                          <tr><td colSpan={5} style={emptyStyle}>No data.</td></tr>
+                        ) : analytics.rankings.topCategories.map((row, i) => (
+                          <tr key={`${row.category}-${i}`}>
+                            <td style={{ ...tdStyle, color: '#94a3b8' }}>{i + 1}</td>
+                            <td style={tdBold}>{row.category}</td>
+                            <td style={tdStyle}>{intFmt(row.quantity)}</td>
+                            <td style={tdBold}>{money(row.sales)}</td>
+                            <td style={{ ...tdStyle, color: '#2563eb', fontWeight: 700 }}>{row.contributionShare.toFixed(1)}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {activeRankingSectionModal === 'cashier-performance' && (
+                <div style={{ ...cardStyle, padding: '0.85rem 0.95rem' }}>
+                  <div style={sectionHead}>Cashier Performance</div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={tableStyle}>
+                      <thead><tr><th style={{ ...thStyle, width: '100%' }}>User</th><th style={thStyle}>Inv</th><th style={thStyle}>Sales</th><th style={thStyle}>Avg</th></tr></thead>
+                      <tbody>
+                        {analytics.rankings.topUsers.length === 0 ? (
+                          <tr><td colSpan={4} style={emptyStyle}>No data.</td></tr>
+                        ) : analytics.rankings.topUsers.map((row, i) => (
+                          <tr key={`${row.userName}-${i}`}><td style={tdBold}>{row.userName}</td><td style={tdStyle}>{intFmt(row.totalInvoices)}</td><td style={tdBold}>{money(row.totalSales)}</td><td style={tdStyle}>{money(row.averageInvoiceValue)}</td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {activeRankingSectionModal === 'branch-performance' && (
+                <div style={{ ...cardStyle, padding: '0.85rem 0.95rem' }}>
+                  <div style={sectionHead}>Branch Performance</div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={tableStyle}>
+                      <thead><tr><th style={thStyle}>Branch</th><th style={thStyle}>Inv</th><th style={thStyle}>Sales</th><th style={thStyle}>Avg Basket</th><th style={thStyle}>Share</th></tr></thead>
+                      <tbody>
+                        {analytics.rankings.branchPerformance.length === 0 ? (
+                          <tr><td colSpan={5} style={emptyStyle}>No branch data in this period.</td></tr>
+                        ) : analytics.rankings.branchPerformance.map((row, i) => (
+                          <tr key={`${row.code}-${i}`}><td style={tdBold}>{row.code}</td><td style={tdStyle}>{intFmt(row.invoices)}</td><td style={tdBold}>{money(row.sales)}</td><td style={tdStyle}>{money(row.averageBasket)}</td><td style={{ ...tdStyle, color: '#2563eb', fontWeight: 700 }}>{row.contributionShare.toFixed(1)}%</td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-          <div style={{ color: '#64748b', fontSize: '0.74rem', marginBottom: '0.35rem' }}>
-            {productRankingMode === 'fast'
-              ? `Velocity score blends units/day, sales/day, and margin over ${intFmt(analytics.rankings.periodDays || 1)} day(s).`
-              : 'Ranked by total sales value in the selected period.'}
-          </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={tableStyle}>
-              <thead>
-                <tr>
-                  <th style={thStyle}>#</th>
-                  <th style={{ ...thStyle, width: '100%' }}>Product</th>
-                  <th style={thStyle}>Qty</th>
-                  {productRankingMode === 'fast' && <th style={thStyle}>Qty/Day</th>}
-                  <th style={thStyle}>Sales</th>
-                  {productRankingMode === 'fast' && <th style={thStyle}>Score</th>}
-                  {productRankingMode !== 'fast' && <th style={thStyle}>Share</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {(productRankingMode === 'fast' ? analytics.rankings.fastMovers : analytics.rankings.topProducts).length === 0 ? (
-                  <tr><td colSpan={productRankingMode === 'fast' ? 6 : 5} style={emptyStyle}>No data.</td></tr>
-                ) : (productRankingMode === 'fast' ? analytics.rankings.fastMovers : analytics.rankings.topProducts).map((row, i) => (
-                  <tr key={`${row.productCode}-${i}`}>
-                    <td style={{ ...tdStyle, color: '#94a3b8' }}>{i + 1}</td>
-                    <td style={tdBold}>{row.productName}<span style={{ display: 'block', color: '#94a3b8', fontSize: '0.72rem', fontWeight: 400 }}>{row.productCode}</span></td>
-                    <td style={tdStyle}>{intFmt(row.totalQuantity)}</td>
-                    {productRankingMode === 'fast' && <td style={tdStyle}>{Number(row.unitsPerDay || 0).toFixed(2)}</td>}
-                    <td style={tdBold}>{money(row.totalSales)}</td>
-                    {productRankingMode === 'fast' && <td style={{ ...tdStyle, color: '#0f766e', fontWeight: 800 }}>{Number(row.fastMoverScore || 0).toFixed(1)}</td>}
-                    {productRankingMode !== 'fast' && <td style={{ ...tdStyle, color: '#2563eb', fontWeight: 700 }}>{row.contributionShare.toFixed(1)}%</td>}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div style={{ ...cardStyle, padding: '0.85rem 0.95rem' }}>
-          <div style={sectionHead}>Top Categories</div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={tableStyle}>
-              <thead><tr><th style={thStyle}>#</th><th style={{ ...thStyle, width: '100%' }}>Category</th><th style={thStyle}>Qty</th><th style={thStyle}>Sales</th><th style={thStyle}>Share</th></tr></thead>
-              <tbody>
-                {analytics.rankings.topCategories.length === 0 ? (
-                  <tr><td colSpan={5} style={emptyStyle}>No data.</td></tr>
-                ) : analytics.rankings.topCategories.map((row, i) => (
-                  <tr key={`${row.category}-${i}`}>
-                    <td style={{ ...tdStyle, color: '#94a3b8' }}>{i + 1}</td>
-                    <td style={tdBold}>{row.category}</td>
-                    <td style={tdStyle}>{intFmt(row.quantity)}</td>
-                    <td style={tdBold}>{money(row.sales)}</td>
-                    <td style={{ ...tdStyle, color: '#2563eb', fontWeight: 700 }}>{row.contributionShare.toFixed(1)}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div style={{ ...cardStyle, padding: '0.85rem 0.95rem' }}>
-          <div style={sectionHead}>Cashier Performance</div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={tableStyle}>
-              <thead><tr><th style={{ ...thStyle, width: '100%' }}>User</th><th style={thStyle}>Inv</th><th style={thStyle}>Sales</th><th style={thStyle}>Avg</th></tr></thead>
-              <tbody>
-                {analytics.rankings.topUsers.length === 0 ? (
-                  <tr><td colSpan={4} style={emptyStyle}>No data.</td></tr>
-                ) : analytics.rankings.topUsers.map((row, i) => (
-                  <tr key={`${row.userName}-${i}`}><td style={tdBold}>{row.userName}</td><td style={tdStyle}>{intFmt(row.totalInvoices)}</td><td style={tdBold}>{money(row.totalSales)}</td><td style={tdStyle}>{money(row.averageInvoiceValue)}</td></tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div style={{ ...cardStyle, padding: '0.85rem 0.95rem' }}>
-          <div style={sectionHead}>Branch Performance</div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={tableStyle}>
-              <thead><tr><th style={thStyle}>Branch</th><th style={thStyle}>Inv</th><th style={thStyle}>Sales</th><th style={thStyle}>Avg Basket</th><th style={thStyle}>Share</th></tr></thead>
-              <tbody>
-                {analytics.rankings.branchPerformance.length === 0 ? (
-                  <tr><td colSpan={5} style={emptyStyle}>No branch data in this period.</td></tr>
-                ) : analytics.rankings.branchPerformance.map((row, i) => (
-                  <tr key={`${row.code}-${i}`}><td style={tdBold}>{row.code}</td><td style={tdStyle}>{intFmt(row.invoices)}</td><td style={tdBold}>{money(row.sales)}</td><td style={tdStyle}>{money(row.averageBasket)}</td><td style={{ ...tdStyle, color: '#2563eb', fontWeight: 700 }}>{row.contributionShare.toFixed(1)}%</td></tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+        )}
+      </>
     );
   })() : null;
 
