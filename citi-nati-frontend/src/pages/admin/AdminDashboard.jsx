@@ -119,6 +119,7 @@ const rememberOriginalStyle = (element, key, value) => {
 
 const restoreInlineDarkOverrides = (root) => {
   if (!root) return;
+  // Restore elements with tracking attributes
   const nodes = root.querySelectorAll('[data-admin-dark-bg-original], [data-admin-dark-border-original], [data-admin-dark-color-original]');
   nodes.forEach((element) => {
     const originalBg = element.getAttribute('data-admin-dark-bg-original');
@@ -138,6 +139,19 @@ const restoreInlineDarkOverrides = (root) => {
       element.style.color = originalColor === '__none__' ? '' : originalColor;
       element.removeAttribute('data-admin-dark-color-original');
     }
+
+    const originalShadow = element.getAttribute('data-admin-dark-shadow-original');
+    if (originalShadow !== null) {
+      element.style.boxShadow = originalShadow === '__none__' ? '' : originalShadow;
+      element.removeAttribute('data-admin-dark-shadow-original');
+    }
+  });
+
+  // Force recompute of all styled elements to clear any residual dark mode colors
+  const allStyled = root.querySelectorAll('[style*="background"], [style*="color"], [style*="border"]');
+  allStyled.forEach((el) => {
+    // Trigger style recomputation by forcing a layout recalc
+    void el.offsetHeight;
   });
 };
 
@@ -148,6 +162,7 @@ const applyInlineDarkOverrides = (element) => {
   const inlineBg = element.style.backgroundColor || element.style.background;
   const inlineBorder = element.style.borderColor || element.style.border;
   const inlineText = element.style.color;
+  const inlineBoxShadow = element.style.boxShadow;
 
   if (inlineBg) {
     const bgRgb = parseColor(inlineBg);
@@ -169,6 +184,12 @@ const applyInlineDarkOverrides = (element) => {
       rememberOriginalStyle(element, 'border', element.style.borderColor);
       element.style.borderColor = ADMIN_DARK_BORDER;
     }
+  }
+
+  // Handle box shadows with light theme colors
+  if (inlineBoxShadow && inlineBoxShadow.includes('rgba(15, 23, 42')) {
+    rememberOriginalStyle(element, 'shadow', inlineBoxShadow);
+    element.style.boxShadow = inlineBoxShadow.replace(/rgba\(15,\s*23,\s*42/g, 'rgba(0, 0, 0');
   }
 };
 
@@ -276,7 +297,13 @@ const AdminDashboard = () => {
       node.querySelectorAll('[style]').forEach((child) => applyInlineDarkOverrides(child));
     };
 
+    // Initial scan and apply
     scanAndApply(root);
+
+    // Re-scan after a short delay to catch elements rendered after effect
+    const delayedScanTimer = setTimeout(() => {
+      scanAndApply(root);
+    }, 100);
 
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
@@ -301,6 +328,7 @@ const AdminDashboard = () => {
     });
 
     return () => {
+      clearTimeout(delayedScanTimer);
       observer.disconnect();
       if (theme !== 'dark') {
         restoreInlineDarkOverrides(root);
