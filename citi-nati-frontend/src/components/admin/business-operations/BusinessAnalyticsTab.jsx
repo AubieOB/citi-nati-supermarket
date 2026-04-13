@@ -1747,6 +1747,76 @@ const BusinessAnalyticsTab = ({
     );
   })() : null;
 
+  const filtersPanel = (
+    <div style={{ padding: '0.75rem 1.1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', flexShrink: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.7rem' }}>
+      <label style={{ display: 'grid', gap: '0.35rem' }}>
+        <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Period Type</span>
+        <select value={filters.periodType} onChange={(e) => setFilters((prev) => ({ ...prev, periodType: e.target.value }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem', backgroundColor: '#fff', color: '#0f172a' }}>
+          <option value="day">Day</option>
+          <option value="month">Month</option>
+          <option value="quarter">Quarter</option>
+          <option value="year">Year</option>
+          <option value="custom">Custom Range</option>
+        </select>
+      </label>
+      {filters.periodType === 'day' && (
+        <label style={{ display: 'grid', gap: '0.35rem' }}>
+          <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Date</span>
+          <input type="date" value={filters.date} onChange={(e) => setFilters((prev) => ({ ...prev, date: e.target.value }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }} />
+        </label>
+      )}
+      {(filters.periodType === 'month' || filters.periodType === 'quarter' || filters.periodType === 'year') && (
+        <label style={{ display: 'grid', gap: '0.35rem' }}>
+          <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Year</span>
+          <input type="number" value={filters.year} onChange={(e) => setFilters((prev) => ({ ...prev, year: Number(e.target.value || new Date().getFullYear()) }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }} />
+        </label>
+      )}
+      {filters.periodType === 'month' && (
+        <label style={{ display: 'grid', gap: '0.35rem' }}>
+          <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Month</span>
+          <select value={filters.month} onChange={(e) => setFilters((prev) => ({ ...prev, month: Number(e.target.value) }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }}>
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+              <option key={m} value={m}>{new Date(Number(filters.year || new Date().getFullYear()), m - 1, 1).toLocaleDateString('en-GB', { month: 'long' })}</option>
+            ))}
+          </select>
+        </label>
+      )}
+      {filters.periodType === 'quarter' && (
+        <label style={{ display: 'grid', gap: '0.35rem' }}>
+          <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Quarter</span>
+          <select value={filters.quarter} onChange={(e) => setFilters((prev) => ({ ...prev, quarter: Number(e.target.value) }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }}>
+            <option value={1}>Q1</option>
+            <option value={2}>Q2</option>
+            <option value={3}>Q3</option>
+            <option value={4}>Q4</option>
+          </select>
+        </label>
+      )}
+      {filters.periodType === 'custom' && (
+        <>
+          <label style={{ display: 'grid', gap: '0.35rem' }}>
+            <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Start Date</span>
+            <input type="date" value={filters.startDate} onChange={(e) => setFilters((prev) => ({ ...prev, startDate: e.target.value }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }} />
+          </label>
+          <label style={{ display: 'grid', gap: '0.35rem' }}>
+            <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>End Date</span>
+            <input type="date" value={filters.endDate} onChange={(e) => setFilters((prev) => ({ ...prev, endDate: e.target.value }))} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }} />
+          </label>
+        </>
+      )}
+      <label style={{ display: 'grid', gap: '0.35rem' }}>
+        <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Branch Scope</span>
+        <select value={scope} onChange={(e) => setScope(e.target.value)} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }}>
+          <option value="inherit">Inherit BO Scope</option>
+          <option value="all">All Branches</option>
+          {locationOptions.map((row) => (
+            <option key={row.id} value={row.id}>{row.label}</option>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
+
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
       <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
