@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import api from '../../../utils/api.js';
 import { boAlert, boConfirm } from '../../../utils/boDialogBus.js';
 import { exportSalesBalancingReportPdf } from '../../../utils/salesBalancingPdfExport.js';
+import { exportSalesBalancingReportImage } from '../../../utils/salesBalancingImageExport.js';
 import SalesBalancingFormModal from './SalesBalancingFormModal.jsx';
 
 const cardStyle = {
@@ -190,6 +191,19 @@ const SalesBalancingTab = ({ selectedLocationId = null, selectedLocationCode = '
 
   const handleExportPdf = (record) => {
     exportSalesBalancingReportPdf({ record, companyName: 'Citi-Nati Supermarket', title: 'Sales Balancing Report' });
+  };
+
+  const handleExportImage = async (record, format = 'png') => {
+    try {
+      await exportSalesBalancingReportImage({ record, companyName: 'Citi-Nati Supermarket', title: 'Sales Balancing Report', format });
+    } catch (error) {
+      console.error('Image export error:', error);
+      boAlert({
+        title: 'Image Export Failed',
+        message: 'Failed to generate image. Please try again.',
+        type: 'error',
+      });
+    }
   };
 
   if (!hasLocationScope) {
@@ -410,6 +424,22 @@ const SalesBalancingTab = ({ selectedLocationId = null, selectedLocationCode = '
                                 style={{ border: '1px solid #bfdbfe', backgroundColor: '#eff6ff', color: '#1d4ed8', borderRadius: '6px', padding: '0.2rem 0.5rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.75rem' }}
                               >
                                 PDF
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleExportImage(row, 'png')}
+                                style={{ border: '1px solid #d4d4d8', backgroundColor: '#f4f4f5', color: '#3f3f46', borderRadius: '6px', padding: '0.2rem 0.5rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.75rem' }}
+                                title="Export as PNG image"
+                              >
+                                PNG
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleExportImage(row, 'jpg')}
+                                style={{ border: '1px solid #d4d4d8', backgroundColor: '#f4f4f5', color: '#3f3f46', borderRadius: '6px', padding: '0.2rem 0.5rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.75rem' }}
+                                title="Export as JPG image"
+                              >
+                                JPG
                               </button>
                               {row.status !== 'finalized' && (
                                 <button
