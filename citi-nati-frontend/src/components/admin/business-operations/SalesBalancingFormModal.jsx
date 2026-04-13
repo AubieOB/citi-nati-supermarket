@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 const fieldStyle = {
   width: '100%',
@@ -77,6 +77,7 @@ const statusBadgeStyle = (resultStatus) => {
 };
 
 const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedLocationCode, selectedLocationName, saving, error, onClose, onSubmit }) => {
+  const amountInputRefs = useRef(new Map());
   const [form, setForm] = useState({
     balancingDate: new Date().toISOString().slice(0, 10),
     referenceTitle: '',
@@ -149,6 +150,22 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
   const setAmount = (key) => (event) => {
     const val = event.target.value;
     setForm((prev) => ({ ...prev, [key]: val === '' ? 0 : normalizeAmount(val) }));
+  };
+
+  const handleAmountKeyDown = (fieldKey) => (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    const currentIndex = PAYMENT_FIELDS.findIndex((field) => field.key === fieldKey);
+    const nextField = PAYMENT_FIELDS[currentIndex + 1];
+    if (!nextField) {
+      event.currentTarget.select();
+      return;
+    }
+    const nextInput = amountInputRefs.current.get(nextField.key);
+    if (nextInput) {
+      nextInput.focus();
+      nextInput.select();
+    }
   };
 
   const totalActual = PAYMENT_FIELDS.reduce((sum, field) => sum + normalizeAmount(form[field.key]), 0);
@@ -264,28 +281,36 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
                   </label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
                     <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#5B4B8A', letterSpacing: '0.08em' }}>MWK</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={form[field.key] || 0}
-                    onChange={setAmount(field.key)}
-                    onFocus={(event) => {
-                      setActiveAmountKey(field.key);
-                      event.target.select();
-                    }}
-                    onClick={(event) => event.target.select()}
-                    onBlur={() => setActiveAmountKey((current) => (current === field.key ? '' : current))}
-                    autoFocus={isCreateMode && field.key === 'cashAmount'}
-                    placeholder="0.00"
-                    style={{
-                      ...amountInputStyle,
-                      borderColor: activeAmountKey === field.key ? '#8f94c9' : '#cbd5e1',
-                      background: activeAmountKey === field.key
-                        ? 'linear-gradient(180deg, #ffffff 0%, #eef2ff 100%)'
-                        : amountInputStyle.background,
-                    }}
-                  />
+                    <input
+                      ref={(element) => {
+                        if (element) {
+                          amountInputRefs.current.set(field.key, element);
+                        } else {
+                          amountInputRefs.current.delete(field.key);
+                        }
+                      }}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={form[field.key] || 0}
+                      onChange={setAmount(field.key)}
+                      onFocus={(event) => {
+                        setActiveAmountKey(field.key);
+                        event.target.select();
+                      }}
+                      onKeyDown={handleAmountKeyDown(field.key)}
+                      onClick={(event) => event.target.select()}
+                      onBlur={() => setActiveAmountKey((current) => (current === field.key ? '' : current))}
+                      autoFocus={isCreateMode && field.key === 'cashAmount'}
+                      placeholder="0.00"
+                      style={{
+                        ...amountInputStyle,
+                        borderColor: activeAmountKey === field.key ? '#8f94c9' : '#cbd5e1',
+                        background: activeAmountKey === field.key
+                          ? 'linear-gradient(180deg, #ffffff 0%, #eef2ff 100%)'
+                          : amountInputStyle.background,
+                      }}
+                    />
                   </div>
                 </div>
               ))}
