@@ -474,7 +474,6 @@ const AdminInbox = () => {
 
   const unreadCount = messages.filter(m => !m.read).length;
   const showPerformanceWarning = totalMessages >= INBOX_PERFORMANCE_WARNING_THRESHOLD;
-  const messagesListHeight = `calc(100vh - ${filterBarLayout.top + filterBarHeight + 16}px)`;
 
   return (
     <div style={{
@@ -816,7 +815,6 @@ const AdminInbox = () => {
           display: 'flex',
           flexDirection: 'column',
           gap: '1rem',
-          height: messagesListHeight,
           overflowY: 'auto',
           paddingBottom: '0.5rem',
         }}>

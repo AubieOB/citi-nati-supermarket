@@ -255,7 +255,7 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, onNavigat
   }, [selectedLocationId]);
 
   return (
-    <div style={{ display: 'grid', gap: '1rem' }}>
+    <div style={{ display: 'grid', gridTemplateRows: 'auto auto 1fr', gap: '1rem', height: 'calc(100vh - 230px)', maxHeight: 'calc(100vh - 230px)', overflow: 'hidden' }}>
       <div style={{ ...cardStyle, padding: '1.2rem 1.3rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
           <div>
@@ -347,7 +347,7 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, onNavigat
       ) : state.loading ? (
         <div style={cardStyle}><EmptyState message="Loading report activity..." /></div>
       ) : (
-        <div style={{ ...cardStyle, overflow: 'hidden' }}>
+        <div style={{ ...cardStyle, overflow: 'hidden', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '1rem 1.1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
             <strong style={{ color: '#0f172a' }}>Recent Activity</strong>
             <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>{activeActivityMeta.description}</p>
@@ -361,7 +361,7 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, onNavigat
             ))}
           </div>
 
-          <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>
+          <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem', flex: 1, minHeight: 0, overflowY: 'auto' }}>
             {activeActivity === 'sales' && (
               !state.invoices.length ? (
                 <EmptyState message="No sales invoices available right now." />
