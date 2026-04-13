@@ -976,6 +976,7 @@ const BusinessAnalyticsTab = ({
   const [activeWorkspaceModal, setActiveWorkspaceModal] = useState('');
   const [isWorkspaceMaximized, setIsWorkspaceMaximized] = useState(false);
   const [activeRankingSectionModal, setActiveRankingSectionModal] = useState('');
+  const [isRankingSectionMaximized, setIsRankingSectionMaximized] = useState(false);
   const [isLatestProfitModalOpen, setIsLatestProfitModalOpen] = useState(false);
   const [isLatestProfitMaximized, setIsLatestProfitMaximized] = useState(false);
   const [isActionCenterModalOpen, setIsActionCenterModalOpen] = useState(false);
@@ -1044,12 +1045,12 @@ const BusinessAnalyticsTab = ({
 
   const selectedDateRange = useMemo(() => dateRangeFromPeriod(selectedPeriod), [selectedPeriod]);
 
-  const computeAnalytics = useCallback(async () => {
+  const computeAnalytics = useCallback(async (isBackground = false) => {
     if (refreshInFlightRef.current) return;
     refreshInFlightRef.current = true;
 
     setError('');
-    setRefreshing(true);
+    if (!isBackground) setRefreshing(true);
 
     const shouldShowLoading = !hasLoadedOnceRef.current;
     if (shouldShowLoading) setLoading(true);
@@ -1292,7 +1293,7 @@ const BusinessAnalyticsTab = ({
 
   useEffect(() => {
     refreshIntervalRef.current = setInterval(() => {
-      computeAnalytics();
+      computeAnalytics(true);
       setProfitRefreshTick((prev) => prev + 1);
     }, AUTO_REFRESH_MS);
 
@@ -1301,7 +1302,7 @@ const BusinessAnalyticsTab = ({
         clearTimeout(refreshTimeoutRef.current);
       }
       refreshTimeoutRef.current = setTimeout(() => {
-        computeAnalytics();
+        computeAnalytics(true);
         setProfitRefreshTick((prev) => prev + 1);
       }, AUTO_REFRESH_DEBOUNCE_MS);
     };
@@ -1425,12 +1426,14 @@ const BusinessAnalyticsTab = ({
     setActiveWorkspaceModal(modalId);
     setIsWorkspaceMaximized(false);
     setActiveRankingSectionModal('');
+    setIsRankingSectionMaximized(false);
   };
 
   const closeWorkspaceModal = () => {
     setActiveWorkspaceModal('');
     setIsWorkspaceMaximized(false);
     setActiveRankingSectionModal('');
+    setIsRankingSectionMaximized(false);
   };
 
   useEffect(() => {
@@ -1440,6 +1443,7 @@ const BusinessAnalyticsTab = ({
       if (event.key === 'Escape') {
         setIsToolModalOpen(false);
         setActiveRankingSectionModal('');
+        setIsRankingSectionMaximized(false);
         closeWorkspaceModal();
         setIsLatestProfitModalOpen(false);
         setIsActionCenterModalOpen(false);
@@ -1656,16 +1660,21 @@ const BusinessAnalyticsTab = ({
         </div>
 
         {activeRankingSectionModal && (
-          <div role="dialog" aria-modal="true" onClick={() => setActiveRankingSectionModal('')} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.58)', display: 'grid', placeItems: 'center', padding: '1rem', zIndex: 1400 }}>
-            <div onClick={(event) => event.stopPropagation()} style={{ ...cardStyle, width: 'min(1280px, 98vw)', maxHeight: '92vh', overflowY: 'auto', borderRadius: '16px', padding: '0.9rem 0.95rem' }}>
+          <div role="dialog" aria-modal="true" onClick={() => { setActiveRankingSectionModal(''); setIsRankingSectionMaximized(false); }} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.58)', display: 'grid', placeItems: 'center', padding: isRankingSectionMaximized ? '0.35rem' : '1rem', zIndex: 1400 }}>
+            <div onClick={(event) => event.stopPropagation()} style={{ ...cardStyle, width: isRankingSectionMaximized ? 'calc(100vw - 0.7rem)' : 'min(1280px, 98vw)', height: isRankingSectionMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', overflowY: 'auto', borderRadius: isRankingSectionMaximized ? '10px' : '16px', padding: '0.9rem 0.95rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.7rem', flexWrap: 'wrap', marginBottom: '0.72rem' }}>
                 <div>
                   <div style={{ color: '#475569', fontSize: '0.73rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Rankings Section</div>
                   <strong style={{ color: '#0f172a', fontSize: '1rem' }}>{activeRankingMeta?.title || 'Details'}</strong>
                 </div>
-                <button type="button" onClick={() => setActiveRankingSectionModal('')} style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}>
-                  <i className="fas fa-times" />
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <button type="button" title={isRankingSectionMaximized ? 'Restore' : 'Maximize'} aria-label={isRankingSectionMaximized ? 'Restore' : 'Maximize'} onClick={() => setIsRankingSectionMaximized((prev) => !prev)} style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', color: '#334155', cursor: 'pointer' }}>
+                    <i className={`fas ${isRankingSectionMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
+                  </button>
+                  <button type="button" onClick={() => { setActiveRankingSectionModal(''); setIsRankingSectionMaximized(false); }} style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}>
+                    <i className="fas fa-times" />
+                  </button>
+                </div>
               </div>
 
               {activeRankingSectionModal === 'top-products' && (
