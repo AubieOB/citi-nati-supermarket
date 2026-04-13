@@ -52,12 +52,12 @@ export function exportSalesBalancingReportPdf({
   doc.text('Nati Supermarket', margin + 35, 16);
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(15);
+  doc.setFontSize(17);
   doc.setTextColor(...BRAND.text);
   doc.text(title, margin, 28);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10.5);
+  doc.setFontSize(12);
   doc.setTextColor(...BRAND.muted);
   doc.text(`Generated on: ${generated}`, pageWidth - margin, 16, { align: 'right' });
   doc.text(`Prepared by: ${record.preparedBy || '-'}`, pageWidth - margin, 21, { align: 'right' });
@@ -77,7 +77,7 @@ export function exportSalesBalancingReportPdf({
       ['Cashier / Session', record.cashierReference || record.shiftReference || '-'],
       ['Status', titleCase(record.status || 'draft')],
     ],
-    styles: { fontSize: 10.5, cellPadding: 2.8, textColor: BRAND.text, lineColor: BRAND.border, lineWidth: 0.2 },
+    styles: { fontSize: 12, cellPadding: 3.2, textColor: BRAND.text, lineColor: BRAND.border, lineWidth: 0.2 },
     headStyles: { fillColor: BRAND.purple, textColor: [255, 255, 255] },
     columnStyles: { 0: { cellWidth: 52, fontStyle: 'bold' }, 1: { cellWidth: contentWidth - 52 } },
   });
@@ -98,7 +98,7 @@ export function exportSalesBalancingReportPdf({
     head: [['Payment Method', 'Amount']],
     body: paymentRows,
     foot: [['Total Actual Entered', money(record.totalActualAmount)]],
-    styles: { fontSize: 10.5, cellPadding: 2.8, textColor: BRAND.text, lineColor: BRAND.border, lineWidth: 0.2 },
+    styles: { fontSize: 12, cellPadding: 3.2, textColor: BRAND.text, lineColor: BRAND.border, lineWidth: 0.2 },
     headStyles: { fillColor: BRAND.green, textColor: [255, 255, 255] },
     footStyles: { fillColor: [248, 250, 252], textColor: BRAND.text, fontStyle: 'bold' },
     columnStyles: { 0: { cellWidth: contentWidth - 46 }, 1: { cellWidth: 46, halign: 'right' } },
@@ -111,7 +111,7 @@ export function exportSalesBalancingReportPdf({
 
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...BRAND.text);
-  doc.setFontSize(11);
+  doc.setFontSize(13);
   doc.text(`Expected System Sales: ${money(record.expectedSystemSales)}`, margin + 3, summaryStart + 8);
   doc.text(`Actual Total Entered: ${money(record.totalActualAmount)}`, margin + 3, summaryStart + 14);
 
@@ -120,7 +120,7 @@ export function exportSalesBalancingReportPdf({
   doc.text(diffLabel, margin + 3, summaryStart + 20);
 
   doc.setTextColor(...BRAND.text);
-  doc.setFontSize(9.8);
+  doc.setFontSize(11);
   doc.setFont('helvetica', 'normal');
   const notesText = record.notes && String(record.notes).trim().length ? String(record.notes).trim() : 'No notes provided.';
   const noteStartY = summaryStart + 34;
