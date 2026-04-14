@@ -44,6 +44,31 @@ const MAINTENANCE_MODE_KEY = 'maintenance_mode_enabled';
 const MAINTENANCE_MESSAGE_KEY = 'maintenance_mode_message';
 const DEFAULT_MAINTENANCE_MESSAGE = 'We are currently carrying out maintenance to improve your experience. We apologize for the inconvenience.';
 
+function normalizeLocationCode(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  return normalized || null;
+}
+
+async function resolveLocationScopedProductCodes(locationCode) {
+  const normalizedLocationCode = normalizeLocationCode(locationCode);
+  if (!normalizedLocationCode) return null;
+
+  const rows = await prisma.productExpiryBatch.findMany({
+    where: {
+      locationCode: {
+        equals: normalizedLocationCode,
+        mode: 'insensitive',
+      },
+    },
+    select: { productCode: true },
+    distinct: ['productCode'],
+  });
+
+  return rows
+    .map((row) => String(row.productCode || '').trim())
+    .filter(Boolean);
+}
+
 const getSettingValue = async (key, fallbackValue) => {
   const setting = await prisma.siteSetting.findUnique({ where: { key } });
   return setting ? setting.value : fallbackValue;
@@ -712,13 +737,30 @@ router.post('/pos-promotions/revert', verifyTokenMiddleware, verifyAdmin, revert
  */
 router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
   try {
-    const { search = '', page = 1, limit = 5000 } = req.query;
+    const { search = '', page = 1, limit = 5000, locationCode } = req.query;
     const skip = (page - 1) * limit;
+    const normalizedLocationCode = normalizeLocationCode(locationCode);
 
     // Build where clause
     const where = {
       sourceCode: { not: null }, // Only POS products
     };
+
+    if (normalizedLocationCode) {
+      const scopedProductCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
+      if (!scopedProductCodes || scopedProductCodes.length === 0) {
+        return res.json({
+          success: true,
+          products: [],
+          total: 0,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: 0,
+        });
+      }
+
+      where.sourceCode = { in: scopedProductCodes };
+    }
 
     if (search) {
       where.OR = [
@@ -777,6 +819,23 @@ router.put('/pos-products/:id/visibility', verifyTokenMiddleware, verifyAdmin, a
   try {
     const { id } = req.params;
     const { hideFromProductsPage } = req.body;
+    const normalizedLocationCode = normalizeLocationCode(req.query.locationCode || req.body?.locationCode);
+
+    if (normalizedLocationCode) {
+      const product = await prisma.product.findUnique({
+        where: { id: parseInt(id) },
+        select: { sourceCode: true },
+      });
+
+      if (!product?.sourceCode) {
+        return res.status(404).json({ success: false, error: 'Product not found' });
+      }
+
+      const scopedCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
+      if (!scopedCodes || !scopedCodes.includes(product.sourceCode)) {
+        return res.status(400).json({ success: false, error: 'Product is not available in the selected location scope' });
+      }
+    }
 
     const product = await prisma.product.update({
       where: { id: parseInt(id) },
@@ -864,6 +923,7 @@ router.put('/pos-products/:id/enabled', verifyTokenMiddleware, verifyAdmin, asyn
 router.delete('/pos-products/delete-selected', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
   try {
     const { productIds } = req.body;
+    const normalizedLocationCode = normalizeLocationCode(req.query.locationCode || req.body?.locationCode);
 
     if (!Array.isArray(productIds) || productIds.length === 0) {
       return res.status(400).json({
@@ -872,12 +932,20 @@ router.delete('/pos-products/delete-selected', verifyTokenMiddleware, verifyAdmi
       });
     }
 
-    const deleted = await prisma.product.deleteMany({
-      where: {
-        id: { in: productIds.map(id => parseInt(id)) },
-        sourceCode: { not: null }, // Only allow deleting POS products
-      },
-    });
+    const where = {
+      id: { in: productIds.map(id => parseInt(id)) },
+      sourceCode: { not: null }, // Only allow deleting POS products
+    };
+
+    if (normalizedLocationCode) {
+      const scopedCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
+      if (!scopedCodes || scopedCodes.length === 0) {
+        return res.json({ success: true, message: 'No POS products found for selected location', deletedCount: 0 });
+      }
+      where.sourceCode = { in: scopedCodes };
+    }
+
+    const deleted = await prisma.product.deleteMany({ where });
 
     console.log(`[ADMIN POS] Deleted ${deleted.count} selected products`);
 
@@ -903,11 +971,20 @@ router.delete('/pos-products/delete-selected', verifyTokenMiddleware, verifyAdmi
  */
 router.delete('/pos-products/delete-all', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
   try {
-    const deleted = await prisma.product.deleteMany({
-      where: {
-        sourceCode: { not: null }, // Only POS products
-      },
-    });
+    const normalizedLocationCode = normalizeLocationCode(req.query.locationCode || req.body?.locationCode);
+    const where = {
+      sourceCode: { not: null }, // Only POS products
+    };
+
+    if (normalizedLocationCode) {
+      const scopedCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
+      if (!scopedCodes || scopedCodes.length === 0) {
+        return res.json({ success: true, message: 'No POS products found for selected location', deletedCount: 0 });
+      }
+      where.sourceCode = { in: scopedCodes };
+    }
+
+    const deleted = await prisma.product.deleteMany({ where });
 
     console.log(`[ADMIN POS] Deleted ALL ${deleted.count} POS products`);
 

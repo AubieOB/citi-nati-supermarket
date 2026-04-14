@@ -6,6 +6,8 @@ async function getPosSyncMonitor(req, res) {
     const data = await getPosSyncMonitorSnapshot({
       hours: req.query.hours,
       limit: req.query.limit,
+      locationCode: req.query.locationCode,
+      branchCode: req.query.branchCode,
     });
     return res.json({ success: true, data });
   } catch (error) {
@@ -16,7 +18,11 @@ async function getPosSyncMonitor(req, res) {
 
 async function getPosSyncEvents(req, res) {
   try {
-    const events = await listPosSyncEvents({ limit: req.query.limit });
+    const events = await listPosSyncEvents({
+      limit: req.query.limit,
+      locationCode: req.query.locationCode,
+      branchCode: req.query.branchCode,
+    });
     return res.json({ success: true, events });
   } catch (error) {
     console.error('[ADMIN POS SYNC] Failed to load events:', error.message);

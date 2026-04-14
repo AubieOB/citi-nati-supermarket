@@ -81,7 +81,7 @@ function statusColor(status) {
   return '#b06c00';
 }
 
-const AdminEmergencySalesReports = () => {
+const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
   const [sales, setSales] = useState([]);
@@ -120,6 +120,7 @@ const AdminEmergencySalesReports = () => {
           endDate: nextFilters.endDate || undefined,
           product: nextFilters.product || undefined,
           cashier: nextFilters.cashier || undefined,
+          locationCode: selectedLocationCode,
         },
       });
 
@@ -136,7 +137,7 @@ const AdminEmergencySalesReports = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedLocationCode]);
 
   useEffect(() => {
     fetchReportSales(filters);

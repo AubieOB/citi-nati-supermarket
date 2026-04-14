@@ -31,7 +31,7 @@ const MESSAGE_TYPES = [
  * - Notification sounds for critical alerts (refunds)
  */
 
-const AdminInbox = () => {
+const AdminInbox = ({ selectedLocationCode = 'BT' }) => {
   const INBOX_PERFORMANCE_WARNING_THRESHOLD = 500;
   const INBOX_FETCH_LIMIT = 300;
   const [messages, setMessages] = useState([]);
@@ -57,7 +57,7 @@ const AdminInbox = () => {
     // Poll for new messages every 30 seconds
     const interval = setInterval(fetchMessages, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedLocationCode]);
 
 
 
@@ -262,6 +262,7 @@ const AdminInbox = () => {
         params: {
           limit: INBOX_FETCH_LIMIT,
           offset: 0,
+          branchCode: selectedLocationCode,
         },
       });
       setMessages(response.data.messages || []);
@@ -370,7 +371,7 @@ const AdminInbox = () => {
 
   const handleMarkAsRead = async (messageId) => {
     try {
-      await api.patch(`/admin/messages/${messageId}/read`);
+      await api.patch(`/admin/messages/${messageId}/read`, null, { params: { branchCode: selectedLocationCode } });
       setMessages(messages.map(msg =>
         msg.id === messageId ? { ...msg, read: true } : msg
       ));
@@ -381,7 +382,7 @@ const AdminInbox = () => {
 
   const handleMarkAsUnread = async (messageId) => {
     try {
-      await api.patch(`/admin/messages/${messageId}/unread`);
+      await api.patch(`/admin/messages/${messageId}/unread`, null, { params: { branchCode: selectedLocationCode } });
       setMessages(messages.map(msg =>
         msg.id === messageId ? { ...msg, read: false } : msg
       ));
@@ -396,7 +397,7 @@ const AdminInbox = () => {
       'Are you sure you want to delete this message?',
       async () => {
         try {
-          await api.delete(`/admin/messages/${messageId}`);
+          await api.delete(`/admin/messages/${messageId}`, { params: { branchCode: selectedLocationCode } });
           setMessages(messages.filter(msg => msg.id !== messageId));
           setTotalMessages((prev) => Math.max(0, prev - 1));
         } catch (err) {
@@ -412,7 +413,7 @@ const AdminInbox = () => {
       'Are you sure you want to delete all messages? This action cannot be undone.',
       async () => {
         try {
-          await api.delete('/admin/messages');
+          await api.delete('/admin/messages', { params: { branchCode: selectedLocationCode } });
           setMessages([]);
           setTotalMessages(0);
         } catch (err) {
@@ -424,7 +425,7 @@ const AdminInbox = () => {
 
   const handleMarkAllAsRead = async () => {
     try {
-      const response = await api.patch('/admin/messages/read/all');
+      const response = await api.patch('/admin/messages/read/all', null, { params: { branchCode: selectedLocationCode } });
       // Update all messages to read state
       setMessages(messages.map(msg => ({ ...msg, read: true })));
       toast.success(`Marked ${response.data.updated} message${response.data.updated !== 1 ? 's' : ''} as read`, {

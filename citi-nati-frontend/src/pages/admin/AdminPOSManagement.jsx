@@ -23,7 +23,7 @@ import '../../styles/global.css';
  * - Stats cards showing product overview
  */
 
-const AdminPOSManagement = () => {
+const AdminPOSManagement = ({ selectedLocationCode = 'BT' }) => {
   const [products, setProducts] = useState([]);
   const [selectedProducts, setSelectedProducts] = useState(new Set());
   const [loading, setLoading] = useState(true);
@@ -55,6 +55,9 @@ const AdminPOSManagement = () => {
       if (searchValue) params.append('search', searchValue);
       params.append('page', pageNum);
       params.append('limit', limit);
+      if (selectedLocationCode) {
+        params.append('locationCode', selectedLocationCode);
+      }
 
       const response = await api.get(`/admin/pos-products?${params.toString()}`);
       
@@ -210,7 +213,7 @@ const AdminPOSManagement = () => {
   // Initial fetch
   useEffect(() => {
     fetchProducts('', 1, 'all');
-  }, []);
+  }, [selectedLocationCode]);
 
   // Handle pagination
   const handlePageChange = (newPage) => {
@@ -267,6 +270,9 @@ const AdminPOSManagement = () => {
             if (product) {
               await api.put(`/admin/pos-products/${productId}/visibility`, {
                 hideFromProductsPage: hideFromProducts,
+                locationCode: selectedLocationCode,
+              }, {
+                params: { locationCode: selectedLocationCode },
               });
             }
           }
@@ -297,6 +303,9 @@ const AdminPOSManagement = () => {
     try {
       const response = await api.put(`/admin/pos-products/${productId}/visibility`, {
         hideFromProductsPage: !hideFromProductsPage,
+        locationCode: selectedLocationCode,
+      }, {
+        params: { locationCode: selectedLocationCode },
       });
 
       if (response.data.success) {
@@ -332,6 +341,7 @@ const AdminPOSManagement = () => {
       try {
         setLoading(true);
         const response = await api.delete('/admin/pos-products/delete-selected', {
+          params: { locationCode: selectedLocationCode },
           data: { productIds: Array.from(selectedProducts) },
         });
 
@@ -359,7 +369,10 @@ const AdminPOSManagement = () => {
     showConfirm(title, message, async () => {
       try {
         setLoading(true);
-        const response = await api.delete('/admin/pos-products/delete-all');
+        const response = await api.delete('/admin/pos-products/delete-all', {
+          params: { locationCode: selectedLocationCode },
+          data: { locationCode: selectedLocationCode },
+        });
 
         if (response.data.success) {
           showSuccess(`Deleted all ${response.data.deletedCount} POS products`);

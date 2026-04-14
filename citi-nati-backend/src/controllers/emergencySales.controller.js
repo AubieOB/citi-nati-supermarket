@@ -15,6 +15,58 @@ const SYNC_STATUS = {
   FAILED: 'sync_failed',
 };
 
+const SUPPORTED_LOCATION_CODES = ['BT', 'ZA'];
+
+function normalizeLocationCode(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  return normalized || null;
+}
+
+function normalizeBranchCode(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  return normalized || null;
+}
+
+function getBranchNameFromLocationCode(locationCode) {
+  if (locationCode === 'BT') return 'Blantyre';
+  if (locationCode === 'ZA') return 'Zomba';
+  return locationCode || 'Unknown';
+}
+
+function getBranchCodeFromLocationCode(locationCode) {
+  if (locationCode === 'BT') return 'BLANTYRE';
+  if (locationCode === 'ZA') return 'ZOMBA';
+  return locationCode || null;
+}
+
+function resolveSaleScopeFromSnapshot(sale) {
+  const snapshot = sale?.cartSnapshot && typeof sale.cartSnapshot === 'object' ? sale.cartSnapshot : {};
+  const locationCode = normalizeLocationCode(snapshot.locationCode || snapshot.posLocationCode || process.env.POS_LOCATION_CODE || 'SH');
+  const branchCode = normalizeBranchCode(snapshot.branchCode || getBranchCodeFromLocationCode(locationCode));
+  const branchName = String(snapshot.branchName || getBranchNameFromLocationCode(locationCode) || '').trim() || null;
+  return { locationCode, branchCode, branchName };
+}
+
+async function resolveLocationScopedProductCodes(locationCode) {
+  const normalizedLocationCode = normalizeLocationCode(locationCode);
+  if (!normalizedLocationCode) return null;
+
+  const rows = await prisma.productExpiryBatch.findMany({
+    where: {
+      locationCode: {
+        equals: normalizedLocationCode,
+        mode: 'insensitive',
+      },
+    },
+    select: { productCode: true },
+    distinct: ['productCode'],
+  });
+
+  return rows
+    .map((row) => String(row.productCode || '').trim())
+    .filter(Boolean);
+}
+
 function toMoney(value) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return 0;
@@ -26,7 +78,7 @@ function toSafeInt(value, fallback = 0) {
   return Number.isInteger(parsed) ? parsed : fallback;
 }
 
-function generateEmergencySaleRef() {
+function generateEmergencySaleRef(scopeCode = 'GEN') {
   const now = new Date();
   const yyyy = String(now.getFullYear());
   const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -35,7 +87,7 @@ function generateEmergencySaleRef() {
   const min = String(now.getMinutes()).padStart(2, '0');
   const sec = String(now.getSeconds()).padStart(2, '0');
   const suffix = crypto.randomBytes(3).toString('hex').toUpperCase();
-  return `EMR-${yyyy}${mm}${dd}-${hh}${min}${sec}-${suffix}`;
+  return `EMR-${scopeCode}-${yyyy}${mm}${dd}-${hh}${min}${sec}-${suffix}`;
 }
 
 async function getCashierIdentity(req) {
@@ -162,7 +214,8 @@ function getSaleVatContext(sale) {
 }
 
 function buildPosWriteInvoicePayload(emergencySale) {
-  const locationCode = process.env.POS_LOCATION_CODE || 'SH';
+  const saleScope = resolveSaleScopeFromSnapshot(emergencySale);
+  const locationCode = saleScope.locationCode || process.env.POS_LOCATION_CODE || 'SH';
   const priceTypeCode = process.env.POS_PRICE_TYPE_CODE || 'RT';
   const vatContext = getSaleVatContext(emergencySale);
 
@@ -207,6 +260,9 @@ function buildPosWriteInvoicePayload(emergencySale) {
     items,
     emergencySaleId: emergencySale.id,
     saleRef: emergencySale.saleRef,
+    branchCode: saleScope.branchCode,
+    branchName: saleScope.branchName,
+    locationScopeCode: saleScope.locationCode,
   };
 }
 
@@ -267,7 +323,17 @@ function validateAgentSecret(req) {
 async function lookupEmergencyProducts(req, res) {
   try {
     const query = String(req.query.q || req.query.search || '').trim();
+    const locationCode = normalizeLocationCode(req.query.locationCode || req.query.branchCode);
     if (!query) {
+      return res.status(200).json({ success: true, products: [] });
+    }
+
+    if (!locationCode || !SUPPORTED_LOCATION_CODES.includes(locationCode)) {
+      return res.status(400).json({ success: false, error: 'locationCode is required (BT or ZA)' });
+    }
+
+    const scopedProductCodes = await resolveLocationScopedProductCodes(locationCode);
+    if (!scopedProductCodes || scopedProductCodes.length === 0) {
       return res.status(200).json({ success: true, products: [] });
     }
 
@@ -275,6 +341,7 @@ async function lookupEmergencyProducts(req, res) {
       where: {
         enabled: true,
         hideFromProductsPage: false,
+        sourceCode: { in: scopedProductCodes },
         OR: [
           { barcode: { equals: query, mode: 'insensitive' } },
           { sourceCode: { equals: query, mode: 'insensitive' } },
@@ -329,6 +396,18 @@ async function lookupEmergencyProducts(req, res) {
 
 async function createEmergencySale(req, res) {
   try {
+    const locationCode = normalizeLocationCode(req.body?.locationCode || req.body?.branchCode || req.query?.locationCode);
+    if (!locationCode || !SUPPORTED_LOCATION_CODES.includes(locationCode)) {
+      return res.status(400).json({ success: false, error: 'locationCode is required (BT or ZA)' });
+    }
+
+    const branchCode = getBranchCodeFromLocationCode(locationCode);
+    const branchName = getBranchNameFromLocationCode(locationCode);
+    const scopedProductCodes = await resolveLocationScopedProductCodes(locationCode);
+    if (!scopedProductCodes || scopedProductCodes.length === 0) {
+      return res.status(400).json({ success: false, error: `No products are available for location ${locationCode}` });
+    }
+
     const rawItems = Array.isArray(req.body?.items) ? req.body.items : [];
     if (rawItems.length === 0) {
       return res.status(400).json({ success: false, error: 'At least one invoice item is required' });
@@ -359,7 +438,10 @@ async function createEmergencySale(req, res) {
 
     const created = await prisma.$transaction(async (tx) => {
       const products = await tx.product.findMany({
-        where: { id: { in: productIds } },
+        where: {
+          id: { in: productIds },
+          sourceCode: { in: scopedProductCodes },
+        },
         select: {
           id: true,
           name: true,
@@ -423,11 +505,11 @@ async function createEmergencySale(req, res) {
       const tenderedAmount = tenderedAmountRaw == null || tenderedAmountRaw === '' ? total : Math.max(0, toMoney(tenderedAmountRaw));
       const changeAmount = tenderedAmount > total ? toMoney(tenderedAmount - total) : 0;
 
-      let saleRef = generateEmergencySaleRef();
+      let saleRef = generateEmergencySaleRef(locationCode);
       for (let attempt = 0; attempt < 5; attempt += 1) {
         const existing = await tx.emergencySale.findUnique({ where: { saleRef } });
         if (!existing) break;
-        saleRef = generateEmergencySaleRef();
+        saleRef = generateEmergencySaleRef(locationCode);
       }
 
       const sale = await tx.emergencySale.create({
@@ -462,6 +544,9 @@ async function createEmergencySale(req, res) {
             tendered_amount: tenderedAmount,
             change_amount: changeAmount,
             payment_method: paymentMethod,
+            locationCode,
+            branchCode,
+            branchName,
           },
         },
       });
@@ -567,6 +652,8 @@ async function listEmergencySales(req, res) {
     const search = String(req.query.search || '').trim();
     const cashier = String(req.query.cashier || '').trim();
     const product = String(req.query.product || '').trim();
+    const locationCode = normalizeLocationCode(req.query.locationCode || req.query.branchCode);
+    const branchCode = normalizeBranchCode(req.query.branchCode || getBranchCodeFromLocationCode(locationCode));
     const startDate = String(req.query.startDate || '').trim();
     const endDate = String(req.query.endDate || '').trim();
     const requesterRole = String(req.user?.role || '').trim().toLowerCase();
@@ -634,6 +721,12 @@ async function listEmergencySales(req, res) {
           },
         },
       });
+    }
+
+    if (locationCode) {
+      andClauses.push({ cartSnapshot: { path: ['locationCode'], equals: locationCode } });
+    } else if (branchCode) {
+      andClauses.push({ cartSnapshot: { path: ['branchCode'], equals: branchCode } });
     }
 
     const where = andClauses.length > 0 ? { AND: andClauses } : {};
@@ -745,6 +838,13 @@ async function getPendingEmergencySalesForPosSync(req, res) {
       return res.status(403).json({ success: false, error: 'Unauthorized' });
     }
 
+    const branchCode = normalizeBranchCode(req.headers['x-branch-code'] || req.query.branchCode || req.query.locationCode || req.body?.branchCode || req.body?.locationCode);
+    const locationCode = normalizeLocationCode(req.query.locationCode || req.body?.locationCode || (branchCode === 'BLANTYRE' ? 'BT' : branchCode === 'ZOMBA' ? 'ZA' : null));
+
+    if (!locationCode || !SUPPORTED_LOCATION_CODES.includes(locationCode)) {
+      return res.status(400).json({ success: false, error: 'Agent branch/location scope is required for pending emergency sales polling' });
+    }
+
     const limit = Math.min(50, Math.max(1, toSafeInt(req.query.limit ?? req.body?.limit, 10)));
     const sales = await prisma.emergencySale.findMany({
       where: {
@@ -754,6 +854,7 @@ async function getPendingEmergencySalesForPosSync(req, res) {
         retryCount: {
           lt: Number.isFinite(EMERGENCY_SALE_MAX_RETRIES) ? EMERGENCY_SALE_MAX_RETRIES : 10,
         },
+        cartSnapshot: { path: ['locationCode'], equals: locationCode },
       },
       include: {
         items: true,
@@ -796,6 +897,9 @@ async function ackEmergencySaleSynced(req, res) {
       return res.status(403).json({ success: false, error: 'Unauthorized' });
     }
 
+    const agentBranchCode = normalizeBranchCode(req.headers['x-branch-code'] || req.body?.branchCode || req.body?.locationCode);
+    const agentLocationCode = normalizeLocationCode(req.body?.locationCode || req.body?.metadata?.locationCode || (agentBranchCode === 'BLANTYRE' ? 'BT' : agentBranchCode === 'ZOMBA' ? 'ZA' : null));
+
     const saleRef = String(req.body?.sale_ref || req.body?.saleRef || '').trim();
     const emergencySaleId = toSafeInt(req.body?.emergency_sale_id ?? req.body?.emergencySaleId);
     const posInvoiceNo = req.body?.pos_invoice_no ?? req.body?.posInvoiceNo;
@@ -810,6 +914,11 @@ async function ackEmergencySaleSynced(req, res) {
 
     if (!sale) {
       return res.status(404).json({ success: false, error: 'Emergency sale not found' });
+    }
+
+    const saleScope = resolveSaleScopeFromSnapshot(sale);
+    if (agentLocationCode && saleScope.locationCode && saleScope.locationCode !== agentLocationCode) {
+      return res.status(403).json({ success: false, error: 'Emergency sale does not belong to this branch scope' });
     }
 
     if (sale.syncStatus === SYNC_STATUS.SYNCED) {
@@ -839,6 +948,8 @@ async function ackEmergencySaleSynced(req, res) {
       metadata: {
         saleRef: updated.saleRef,
         posInvoiceNo: updated.posInvoiceNo,
+        locationCode: saleScope.locationCode,
+        branchCode: saleScope.branchCode,
       },
     });
 
@@ -860,6 +971,9 @@ async function ackEmergencySaleSyncFailed(req, res) {
       return res.status(403).json({ success: false, error: 'Unauthorized' });
     }
 
+    const agentBranchCode = normalizeBranchCode(req.headers['x-branch-code'] || req.body?.branchCode || req.body?.locationCode);
+    const agentLocationCode = normalizeLocationCode(req.body?.locationCode || req.body?.metadata?.locationCode || (agentBranchCode === 'BLANTYRE' ? 'BT' : agentBranchCode === 'ZOMBA' ? 'ZA' : null));
+
     const saleRef = String(req.body?.sale_ref || req.body?.saleRef || '').trim();
     const emergencySaleId = toSafeInt(req.body?.emergency_sale_id ?? req.body?.emergencySaleId);
     const syncError = String(req.body?.sync_error || req.body?.error || req.body?.errorMessage || 'Unknown POS sync error').slice(0, 1000);
@@ -874,6 +988,11 @@ async function ackEmergencySaleSyncFailed(req, res) {
 
     if (!sale) {
       return res.status(404).json({ success: false, error: 'Emergency sale not found' });
+    }
+
+    const saleScope = resolveSaleScopeFromSnapshot(sale);
+    if (agentLocationCode && saleScope.locationCode && saleScope.locationCode !== agentLocationCode) {
+      return res.status(403).json({ success: false, error: 'Emergency sale does not belong to this branch scope' });
     }
 
     if (sale.syncStatus === SYNC_STATUS.SYNCED) {
@@ -904,6 +1023,8 @@ async function ackEmergencySaleSyncFailed(req, res) {
       metadata: {
         saleRef: updated.saleRef,
         retryCount: updated.retryCount,
+        locationCode: saleScope.locationCode,
+        branchCode: saleScope.branchCode,
       },
     });
 

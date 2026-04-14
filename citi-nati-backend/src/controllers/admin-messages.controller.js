@@ -23,6 +23,11 @@ const ADMIN_MESSAGE_EMIT_COOLDOWN_MS = Number.isFinite(parsedEmitCooldownMs) && 
 
 const emitCooldownCache = new Map();
 
+function normalizeBranchCode(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  return normalized || null;
+}
+
 function shouldEmitUpdate(eventKey) {
   const now = Date.now();
   const lastEmittedAt = emitCooldownCache.get(eventKey);
@@ -110,11 +115,16 @@ function emitAdminMessage(event, payload) {
  */
 const getMessages = async (req, res) => {
   try {
-    const { type, limit, offset = 0 } = req.query;
+    const { type, limit, offset = 0, branchCode, locationCode } = req.query;
 
     let where = {};
     if (type) {
       where.type = type;
+    }
+
+    const scopedBranchCode = normalizeBranchCode(branchCode || locationCode);
+    if (scopedBranchCode) {
+      where.branchCode = scopedBranchCode;
     }
 
     const parsedLimit = limit != null && String(limit).trim() !== ''
@@ -234,7 +244,9 @@ const deleteMessage = async (req, res) => {
  */
 const deleteAllMessages = async (req, res) => {
   try {
-    const result = await prisma.adminMessage.deleteMany();
+    const scopedBranchCode = normalizeBranchCode(req.query.branchCode || req.query.locationCode || req.body?.branchCode || req.body?.locationCode);
+    const where = scopedBranchCode ? { branchCode: scopedBranchCode } : undefined;
+    const result = await prisma.adminMessage.deleteMany({ where });
 
     return res.json({ success: true, deleted: result.count });
   } catch (error) {
@@ -248,8 +260,21 @@ const deleteAllMessages = async (req, res) => {
  */
 const markAllAsRead = async (req, res) => {
   try {
+    const scopedBranchCode = normalizeBranchCode(req.query.branchCode || req.query.locationCode || req.body?.branchCode || req.body?.locationCode);
+    const whereUnread = {
+      read: false,
+      ...(scopedBranchCode ? { branchCode: scopedBranchCode } : {}),
+    };
+    const whereLifecycle = {
+      read: true,
+      lifecycleState: {
+        in: [MESSAGE_STATES.ACTIVE, MESSAGE_STATES.RECURRING],
+      },
+      ...(scopedBranchCode ? { branchCode: scopedBranchCode } : {}),
+    };
+
     const result = await prisma.adminMessage.updateMany({
-      where: { read: false },
+      where: whereUnread,
       data: {
         read: true,
         acknowledgedAt: new Date(),
@@ -257,12 +282,7 @@ const markAllAsRead = async (req, res) => {
     });
 
     await prisma.adminMessage.updateMany({
-      where: {
-        read: true,
-        lifecycleState: {
-          in: [MESSAGE_STATES.ACTIVE, MESSAGE_STATES.RECURRING],
-        },
-      },
+      where: whereLifecycle,
       data: {
         lifecycleState: MESSAGE_STATES.ACKNOWLEDGED,
       },

@@ -197,7 +197,7 @@ function FailureBar({ items = [] }) {
   );
 }
 
-export default function AdminPOSSyncMonitor() {
+export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
   const [activeTab, setActiveTab] = useState('overview');
   const [monitor, setMonitor] = useState(null);
@@ -237,7 +237,7 @@ export default function AdminPOSSyncMonitor() {
       window.removeEventListener('resize', update);
       if (resizeObserver) resizeObserver.disconnect();
     };
-  }, []);
+  }, [selectedLocationCode]);
 
   // Re-measure header height after every render (content can wrap on narrow screens)
   useEffect(() => {
@@ -249,7 +249,13 @@ export default function AdminPOSSyncMonitor() {
     try {
       if (showSpinner) setLoading(true);
       else setRefreshing(true);
-      const response = await api.get('/admin/pos-sync/monitor?hours=24&limit=40');
+      const response = await api.get('/admin/pos-sync/monitor', {
+        params: {
+          hours: 24,
+          limit: 40,
+          locationCode: selectedLocationCode,
+        },
+      });
       setMonitor(response.data?.data || null);
     } catch (error) {
       notifyError(`Failed to load POS sync monitor: ${error.response?.data?.error || error.message}`, 4000);
@@ -262,7 +268,7 @@ export default function AdminPOSSyncMonitor() {
   const scheduleRefresh = useCallback(() => {
     if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
     refreshTimeoutRef.current = setTimeout(() => fetchMonitorData(false), 350);
-  }, [fetchMonitorData]);
+  }, [fetchMonitorData, selectedLocationCode]);
 
   useEffect(() => {
     fetchMonitorData(true);

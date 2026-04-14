@@ -216,11 +216,13 @@ const AdminDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [speechAlertsEnabled, setSpeechAlertsPreference] = useState(() => getSpeechAlertsEnabled());
+  const [selectedOperationalLocationCode, setSelectedOperationalLocationCode] = useState('BT');
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') return 'light';
     return window.localStorage.getItem(ADMIN_THEME_KEY) === 'dark' ? 'dark' : 'light';
   });
   const isDarkTheme = theme === 'dark';
+  const selectedOperationalLocationLabel = selectedOperationalLocationCode === 'ZA' ? 'Zomba' : 'Blantyre';
   const navigate = useNavigate();
   const tabs = [
     { id: 'inbox', label: 'Inbox', icon: 'fa-inbox' },
@@ -411,6 +413,39 @@ const AdminDashboard = () => {
           </button>
         </div>
 
+        <div style={{
+          padding: sidebarCollapsed ? '0.75rem' : '0.75rem 1.5rem',
+          borderBottom: `1px solid ${isDarkTheme ? '#2e2e2e' : '#ece7f7'}`,
+          marginBottom: '0.5rem',
+        }}>
+          {!sidebarCollapsed && (
+            <label htmlFor="admin-operational-location" style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: isDarkTheme ? '#b9c5d8' : '#6b5fa2', marginBottom: '0.4rem', letterSpacing: '0.04em' }}>
+              OPERATIONAL LOCATION
+            </label>
+          )}
+          <select
+            id="admin-operational-location"
+            value={selectedOperationalLocationCode}
+            onChange={(event) => setSelectedOperationalLocationCode(event.target.value)}
+            title={`Operational scope: ${selectedOperationalLocationLabel}`}
+            style={{
+              width: '100%',
+              borderRadius: '6px',
+              border: `1px solid ${isDarkTheme ? '#3b4252' : '#d9cfee'}`,
+              backgroundColor: isDarkTheme ? '#1f2430' : '#f5f2fb',
+              color: isDarkTheme ? '#e6ecff' : '#4a3f74',
+              padding: sidebarCollapsed ? '0.45rem' : '0.5rem 0.6rem',
+              fontSize: sidebarCollapsed ? '0.72rem' : '0.82rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              textAlign: sidebarCollapsed ? 'center' : 'left',
+            }}
+          >
+            <option value="BT">Blantyre</option>
+            <option value="ZA">Zomba</option>
+          </select>
+        </div>
+
         {/* Sidebar Menu Items Container - Grows to fill space */}
         <div style={{
           flex: 1,
@@ -577,17 +612,17 @@ const AdminDashboard = () => {
             : undefined}
         >
           <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>Loading...</div>}>
-            {activeTab === 'inbox' && <AdminInbox />}
+            {activeTab === 'inbox' && <AdminInbox selectedLocationCode={selectedOperationalLocationCode} />}
             {activeTab === 'quotations' && <AdminQuotations />}
-            {activeTab === 'products' && <AdminProducts />}
-            {activeTab === 'stocks' && <AdminStocks />}
-            {activeTab === 'emergency-sales' && <AdminEmergencySales />}
-            {activeTab === 'emergency-sales-reports' && <AdminEmergencySalesReports />}
+            {activeTab === 'products' && <AdminProducts selectedLocationCode={selectedOperationalLocationCode} />}
+            {activeTab === 'stocks' && <AdminStocks selectedLocationCode={selectedOperationalLocationCode} />}
+            {activeTab === 'emergency-sales' && <AdminEmergencySales selectedLocationCode={selectedOperationalLocationCode} />}
+            {activeTab === 'emergency-sales-reports' && <AdminEmergencySalesReports selectedLocationCode={selectedOperationalLocationCode} />}
             {activeTab === 'system' && <AdminSystem />}
             {activeTab === 'security' && <AdminSecurity />}
             {activeTab === 'promotions' && <AdminPromotions />}
-            {activeTab === 'pos-management' && <AdminPOSManagement />}
-            {activeTab === 'pos-sync-monitor' && <AdminPOSSyncMonitor />}
+            {activeTab === 'pos-management' && <AdminPOSManagement selectedLocationCode={selectedOperationalLocationCode} />}
+            {activeTab === 'pos-sync-monitor' && <AdminPOSSyncMonitor selectedLocationCode={selectedOperationalLocationCode} />}
             {activeTab === 'orders' && <AdminOrders />}
             {activeTab === 'users' && <AdminUsers />}
             {activeTab === 'sales' && <AdminSales />}

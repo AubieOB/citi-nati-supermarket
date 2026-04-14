@@ -25,7 +25,7 @@ import '../../css/admin-responsive-filters.css';
  * - Sale status management
  */
 
-const AdminProducts = () => {
+const AdminProducts = ({ selectedLocationCode = 'BT' }) => {
   const MAX_PRODUCT_NAME_LENGTH = 120;
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -602,7 +602,11 @@ const AdminProducts = () => {
       let all = [];
 
       const fetchProductsPage = async (pageNumber) => {
-        return api.get(`/products?page=${pageNumber}&pageSize=${perPage}`);
+        const params = new URLSearchParams({ page: String(pageNumber), pageSize: String(perPage) });
+        if (selectedLocationCode) {
+          params.append('locationCode', selectedLocationCode);
+        }
+        return api.get(`/products?${params.toString()}`);
       };
 
       const normalizeAdminPosProduct = (product) => ({
@@ -635,7 +639,11 @@ const AdminProducts = () => {
       if (firstItems.length === 0) {
         try {
           console.warn('[ADMIN PRODUCTS UI] /products returned 0; trying /admin/pos-products fallback');
-          const adminResp = await api.get('/admin/pos-products?page=1&limit=5000');
+          const params = new URLSearchParams({ page: '1', limit: '5000' });
+          if (selectedLocationCode) {
+            params.append('locationCode', selectedLocationCode);
+          }
+          const adminResp = await api.get(`/admin/pos-products?${params.toString()}`);
           const adminItems = Array.isArray(adminResp?.data?.products)
             ? adminResp.data.products.map(normalizeAdminPosProduct)
             : [];
@@ -939,7 +947,7 @@ const AdminProducts = () => {
       window.removeEventListener('resize', updateFilterBarLayout);
       if (resizeObserver) resizeObserver.disconnect();
     };
-  }, []);
+  }, [selectedLocationCode]);
 
   // Handle category change
   const handleCategoryChange = (value) => {

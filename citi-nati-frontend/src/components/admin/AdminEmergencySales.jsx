@@ -92,7 +92,7 @@ function safeParseJson(value, fallback) {
   }
 }
 
-const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
+const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocationCode = 'BT' }) => {
   const { user } = useAuth();
 
   const rootRef = useRef(null);
@@ -187,6 +187,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
           page: 1,
           pageSize: isAdminScope ? 200 : 20,
           status: 'all',
+          locationCode: selectedLocationCode,
         },
       });
 
@@ -201,7 +202,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
     } catch (error) {
       notifyError(`Failed to load emergency sales: ${error.response?.data?.error || error.message}`, 3000);
     }
-  }, [apiBase]);
+  }, [apiBase, selectedLocationCode]);
 
   useEffect(() => {
     fetchEmergencySales();
@@ -336,11 +337,11 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
     if (!trimmed) return [];
 
     const response = await api.get(`/${apiBase}/lookup`, {
-      params: { q: trimmed },
+      params: { q: trimmed, locationCode: selectedLocationCode },
     });
 
     return response.data?.products || [];
-  }, [apiBase]);
+  }, [apiBase, selectedLocationCode]);
 
   const lookupAndAddFromScan = useCallback(async (scanValue) => {
     const query = String(scanValue || '').trim();
@@ -654,6 +655,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
         discount: discountValue,
         tendered_amount: tendered,
         payment_method: paymentMethod,
+        locationCode: selectedLocationCode,
       });
 
       const savedSale = response.data?.sale;
@@ -678,7 +680,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales' }) => {
     } finally {
       setIsSubmittingSale(false);
     }
-  }, [apiBase, cart, clearInvoice, discountValue, fetchEmergencySales, paymentMethod, printReceipt, tendered]);
+  }, [apiBase, cart, clearInvoice, discountValue, fetchEmergencySales, paymentMethod, printReceipt, tendered, selectedLocationCode]);
 
   const updateLineQty = useCallback((lineId, nextQtyRaw) => {
     const nextQty = Math.max(0, parseInt(nextQtyRaw, 10) || 0);

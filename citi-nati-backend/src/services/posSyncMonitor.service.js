@@ -33,6 +33,28 @@ function toClientEvent(event) {
   };
 }
 
+function normalizeScopeCode(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  return normalized || null;
+}
+
+function toScopeFromLocationCode(locationCode) {
+  if (locationCode === 'BT') return 'BLANTYRE';
+  if (locationCode === 'ZA') return 'ZOMBA';
+  return null;
+}
+
+function eventMatchesScope(event, scopedBranchCode, scopedLocationCode) {
+  if (!scopedBranchCode && !scopedLocationCode) return true;
+  const metadata = event?.metadata && typeof event.metadata === 'object' ? event.metadata : {};
+  const eventBranchCode = normalizeScopeCode(metadata.branchCode || event?.branchCode || null);
+  const eventLocationCode = normalizeScopeCode(metadata.locationCode || event?.locationCode || null);
+
+  if (scopedBranchCode && eventBranchCode === scopedBranchCode) return true;
+  if (scopedLocationCode && eventLocationCode === scopedLocationCode) return true;
+  return false;
+}
+
 async function recordPosSyncEvent(payload = {}) {
   try {
     const event = await prisma.posSyncEvent.create({
@@ -179,16 +201,18 @@ function analyzeHealth({ enabled, agentHealthy, queueStats, emergencySummary, re
   };
 }
 
-async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40 } = {}) {
+async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40, locationCode, branchCode } = {}) {
   const { checkPOSHealth, getRuntimeConfig } = require('./posSync.service');
   const safeHours = Math.max(1, Math.min(168, Number.parseInt(hours, 10) || 24));
   const safeLimit = Math.max(10, Math.min(100, Number.parseInt(limit, 10) || 40));
+  const scopedLocationCode = normalizeScopeCode(locationCode);
+  const scopedBranchCode = normalizeScopeCode(branchCode) || toScopeFromLocationCode(scopedLocationCode);
   const since = new Date(Date.now() - safeHours * 60 * 60 * 1000);
 
   const [config, agentHealthyDirect, recentEvents, queueStats, recentCommands, emergencyGrouped, recentEmergencyFailures, recentWindowEvents] = await Promise.all([
     getRuntimeConfig(),
     checkPOSHealth(),
-    prisma.posSyncEvent.findMany({ orderBy: { createdAt: 'desc' }, take: safeLimit }),
+    prisma.posSyncEvent.findMany({ orderBy: { createdAt: 'desc' }, take: safeLimit * 10 }),
     posCommandQueueService.getStats(),
     posCommandQueueService.listCommands({ take: 20 }),
     prisma.emergencySale.groupBy({ by: ['syncStatus'], _count: { _all: true } }),
@@ -201,10 +225,16 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40 } = {}) {
     prisma.posSyncEvent.findMany({ where: { createdAt: { gte: since } }, orderBy: { createdAt: 'asc' } }),
   ]);
 
+  const scopedRecentEvents = recentEvents
+    .filter((event) => eventMatchesScope(event, scopedBranchCode, scopedLocationCode))
+    .slice(0, safeLimit);
+
+  const scopedRecentWindowEvents = recentWindowEvents.filter((event) => eventMatchesScope(event, scopedBranchCode, scopedLocationCode));
+
   // If the direct HTTP probe failed (e.g. backend can't reach the agent's LAN address),
   // fall back to recent event evidence: a success event within the last 10 minutes means
   // the agent is clearly alive and communicating.
-  const recentSuccessViaEvents = recentEvents.find(
+  const recentSuccessViaEvents = scopedRecentEvents.find(
     (e) => e.status === 'success' && (Date.now() - new Date(e.createdAt).getTime()) < 10 * 60 * 1000,
   );
   const agentHealthy = agentHealthyDirect || recentSuccessViaEvents != null;
@@ -214,7 +244,7 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40 } = {}) {
   const sourceBreakdown = {};
   const failureReasons = {};
 
-  for (const event of recentWindowEvents) {
+  for (const event of scopedRecentWindowEvents) {
     const createdAt = new Date(event.createdAt);
     createdAt.setMinutes(0, 0, 0);
 
@@ -252,11 +282,11 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40 } = {}) {
     agentHealthy,
     queueStats,
     emergencySummary,
-    recentEvents: recentWindowEvents.slice().reverse(),
+    recentEvents: scopedRecentWindowEvents.slice().reverse(),
   });
 
-  const recentFailure = recentEvents.find((event) => event.status === 'failed') || null;
-  const recentSuccess = recentEvents.find((event) => event.status === 'success') || null;
+  const recentFailure = scopedRecentEvents.find((event) => event.status === 'failed') || null;
+  const recentSuccess = scopedRecentEvents.find((event) => event.status === 'success') || null;
 
   return {
     config,
@@ -266,16 +296,16 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40 } = {}) {
       healthScore: health.healthScore,
       healthLabel: health.label,
       failureRate: health.failureRate,
-      lastEventAt: recentEvents[0]?.createdAt || null,
+      lastEventAt: scopedRecentEvents[0]?.createdAt || null,
       lastSuccessfulEventAt: recentSuccess?.createdAt || null,
       lastFailedEventAt: recentFailure?.createdAt || null,
       issues: health.issues,
       recommendations: health.recommendations,
     },
     stats: {
-      eventsInWindow: recentWindowEvents.length,
-      successCount: recentWindowEvents.filter((event) => event.status === 'success').length,
-      failedCount: recentWindowEvents.filter((event) => event.status === 'failed').length,
+      eventsInWindow: scopedRecentWindowEvents.length,
+      successCount: scopedRecentWindowEvents.filter((event) => event.status === 'success').length,
+      failedCount: scopedRecentWindowEvents.filter((event) => event.status === 'failed').length,
       queue: queueStats,
       emergencySales: emergencySummary,
       sourceBreakdown,
@@ -287,16 +317,25 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40 } = {}) {
         .slice(0, 6)
         .map(([label, count]) => ({ label, count })),
     },
-    recentEvents: recentEvents.map(toClientEvent),
+    recentEvents: scopedRecentEvents.map(toClientEvent),
     recentCommands,
     recentEmergencyFailures,
+    scope: {
+      branchCode: scopedBranchCode,
+      locationCode: scopedLocationCode,
+    },
   };
 }
 
-async function listPosSyncEvents({ limit = 50 } = {}) {
+async function listPosSyncEvents({ limit = 50, locationCode, branchCode } = {}) {
   const safeLimit = Math.max(10, Math.min(200, Number.parseInt(limit, 10) || 50));
-  const events = await prisma.posSyncEvent.findMany({ orderBy: { createdAt: 'desc' }, take: safeLimit });
-  return events.map(toClientEvent);
+  const scopedLocationCode = normalizeScopeCode(locationCode);
+  const scopedBranchCode = normalizeScopeCode(branchCode) || toScopeFromLocationCode(scopedLocationCode);
+  const events = await prisma.posSyncEvent.findMany({ orderBy: { createdAt: 'desc' }, take: safeLimit * 10 });
+  return events
+    .filter((event) => eventMatchesScope(event, scopedBranchCode, scopedLocationCode))
+    .slice(0, safeLimit)
+    .map(toClientEvent);
 }
 
 module.exports = {

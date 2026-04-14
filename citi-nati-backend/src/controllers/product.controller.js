@@ -464,6 +464,31 @@ function shouldForceAdminExpiryEnrichment(req) {
   return Boolean(decodedToken && decodedToken.role === 'admin');
 }
 
+function normalizeScopeCode(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  return normalized || null;
+}
+
+async function resolveLocationScopedProductCodes(locationCode) {
+  const normalizedLocationCode = normalizeScopeCode(locationCode);
+  if (!normalizedLocationCode) return null;
+
+  const rows = await prisma.productExpiryBatch.findMany({
+    where: {
+      locationCode: {
+        equals: normalizedLocationCode,
+        mode: 'insensitive',
+      },
+    },
+    select: { productCode: true },
+    distinct: ['productCode'],
+  });
+
+  return rows
+    .map((row) => normalizeProductCode(row.productCode))
+    .filter(Boolean);
+}
+
 function getStartOfToday() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -877,10 +902,11 @@ const getProducts = async (req, res) => {
 
     // Extract query parameters for filtering and pagination
     // Support both offset-based (offset, limit) and page-based (page, pageSize) for backwards compatibility
-    const { search, category, onSale, page, pageSize, offset, limit, includePosExpiry } = req.query;
+    const { search, category, onSale, page, pageSize, offset, limit, includePosExpiry, locationCode } = req.query;
     const requestedPosExpiry = String(includePosExpiry || '').trim().toLowerCase() === 'true';
     const forceAdminPosExpiry = shouldForceAdminExpiryEnrichment(req);
     const shouldIncludePosExpiry = requestedPosExpiry || forceAdminPosExpiry;
+    const normalizedLocationCode = normalizeScopeCode(locationCode);
 
     console.log('[ADMIN PRODUCTS] expiry enrichment decision', {
       includePosExpiryQuery: includePosExpiry,
@@ -931,6 +957,25 @@ const getProducts = async (req, res) => {
     // On Sale filter
     if (onSale === 'true') {
       where.isOnSale = true;
+    }
+
+    if (normalizedLocationCode) {
+      const scopedProductCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
+      if (!scopedProductCodes || scopedProductCodes.length === 0) {
+        return res.status(200).json({
+          products: [],
+          pagination: {
+            total: 0,
+            count: 0,
+            offset: skip,
+            limit: take,
+          },
+        });
+      }
+
+      where.sourceCode = {
+        in: scopedProductCodes,
+      };
     }
 
     // Get total count for pagination metadata
@@ -1763,7 +1808,12 @@ const syncProductsFromPOSAgent = async (req, res) => {
       });
     }
 
-    const { products } = req.body;
+    const { products, metadata = {} } = req.body;
+
+    const branchCode = normalizeScopeCode(req.headers['x-branch-code'] || metadata.branchCode || req.body.branchCode || 'BLANTYRE');
+    const branchName = String(metadata.branchName || req.body.branchName || branchCode).trim() || branchCode;
+    const payloadLocationCode = normalizeScopeCode(metadata.locationCode || req.body.locationCode || process.env.POS_LOCATION_CODE || 'SH');
+    const syncLogPrefix = `[${branchCode} SYNC]`;
 
     if (!products || !Array.isArray(products)) {
       console.error('[POS AGENT PUSH] Invalid products format');
@@ -1773,7 +1823,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
       });
     }
 
-    console.log(`[POS AGENT PUSH] Received ${products.length} products from POS Agent`);
+    console.log(`${syncLogPrefix} Received ${products.length} products from POS Agent`);
 
     let synced = 0;
     let skipped = 0;
@@ -1819,7 +1869,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
                   productCode: sourceCode,
                   expiryDate,
                   remainingQty,
-                  locationCode: batch?.locationCode || process.env.POS_LOCATION_CODE || 'SH',
+                  locationCode: normalizeScopeCode(batch?.locationCode) || payloadLocationCode,
                   batchNo: encodeExpiryBatchReference(stockDetailId, grnNo, batch?.batchNo),
                   lastSyncedAt: new Date(),
                 };
@@ -1851,6 +1901,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
               barcode: product.barcode || '',
               expiryDate: nearestExpiryDate,
               expiryBatchCount: normalizedBatches.length,
+              ...(branchCode === 'ZOMBA' ? { hideFromProductsPage: true } : {}),
               updatedAt: new Date(),
             },
             create: {
@@ -1863,6 +1914,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
               barcode: product.barcode || '',
               expiryDate: nearestExpiryDate,
               expiryBatchCount: normalizedBatches.length,
+              hideFromProductsPage: branchCode === 'ZOMBA',
               isActive: true,
               createdAt: new Date(),
               updatedAt: new Date(),
@@ -1880,6 +1932,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
         await prisma.productExpiryBatch.deleteMany({
           where: {
             productCode: sourceCode,
+            locationCode: payloadLocationCode,
           },
         });
 
@@ -1928,12 +1981,12 @@ const syncProductsFromPOSAgent = async (req, res) => {
           }
         }
         
-        console.log(`[POS AGENT PUSH] ✅ Synced product: ${product.name} (${product.sourceCode})`);
+        console.log(`${syncLogPrefix} products synced: ${product.name} (${product.sourceCode})`);
       } catch (error) {
         skipped++;
         const errorMsg = `Failed to sync product ${product.sourceCode}: ${error.message}`;
         errors.push(errorMsg);
-        console.error(`[POS AGENT PUSH] ❌ ${errorMsg}`);
+        console.error(`${syncLogPrefix} error (product sync): ${errorMsg}`);
       }
     }
 
@@ -1946,13 +1999,13 @@ const syncProductsFromPOSAgent = async (req, res) => {
           total: products.length,
           timestamp: new Date().toISOString(),
         });
-        console.log(`[POS AGENT PUSH] 🔄 Emitted real-time update to ${synced} synced products`);
+        console.log(`${syncLogPrefix} emitted realtime update for ${synced} synced products`);
       } catch (ioErr) {
-        console.warn('[POS AGENT PUSH] Could not emit socket event:', ioErr.message);
+        console.warn(`${syncLogPrefix} realtime emit warning:`, ioErr.message);
       }
     }
 
-    console.log(`[POS AGENT PUSH] Sync complete - Synced: ${synced}, Skipped: ${skipped}`);
+    console.log(`${syncLogPrefix} Sync complete - Synced: ${synced}, Skipped: ${skipped}`);
 
     await recordPosSyncEvent({
       eventType: 'agent-push-products',
@@ -1967,6 +2020,9 @@ const syncProductsFromPOSAgent = async (req, res) => {
         total: products.length,
         synced,
         skipped,
+        branchCode,
+        branchName,
+        locationCode: payloadLocationCode,
         errors: errors.slice(0, 20),
       },
     });

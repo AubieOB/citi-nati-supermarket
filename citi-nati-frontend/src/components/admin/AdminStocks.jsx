@@ -25,7 +25,7 @@ import '../../css/admin-responsive-filters.css';
  * - Set low stock alerts
  */
 
-const AdminStocks = () => {
+const AdminStocks = ({ selectedLocationCode = 'BT' }) => {
   // `products` is deprecated; we now rely on `allProducts` for everything.
   // previously products was only used in stats cards which caused counts to be wrong
   const [allProducts, setAllProducts] = useState([]); // Store all products for client-side filtering
@@ -58,7 +58,7 @@ const AdminStocks = () => {
   useEffect(() => {
     fetchProducts();
     setupSocketListeners();
-  }, []);
+  }, [selectedLocationCode]);
 
   /**
    * Real-time stock updates via Socket.io
@@ -142,7 +142,11 @@ const AdminStocks = () => {
   const fetchProducts = async () => {
     try {
       // Load first page immediately
-      const res1 = await api.get(`/products?page=1&pageSize=100`);
+      const firstParams = new URLSearchParams({ page: '1', pageSize: '100' });
+      if (selectedLocationCode) {
+        firstParams.append('locationCode', selectedLocationCode);
+      }
+      const res1 = await api.get(`/products?${firstParams.toString()}`);
       const firstBatch = (res1.data.products || []).map((product) => enrichProductStock(product));
       setAllProducts(firstBatch);
 
@@ -161,7 +165,11 @@ const AdminStocks = () => {
           const perPage = 100;
 
           while (true) {
-            const res = await api.get(`/products?page=${page}&pageSize=${perPage}`);
+            const params = new URLSearchParams({ page: String(page), pageSize: String(perPage) });
+            if (selectedLocationCode) {
+              params.append('locationCode', selectedLocationCode);
+            }
+            const res = await api.get(`/products?${params.toString()}`);
             const items = res.data.products || [];
             if (items.length === 0) break;
             collected = collected.concat(items.map((product) => enrichProductStock(product)));
