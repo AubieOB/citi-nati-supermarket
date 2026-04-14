@@ -96,8 +96,7 @@ class ReportingSyncService {
             Bank_Name,
             Bank_CARD_HOLDER,
             Bank_CARD_NO,
-            Bank_CARD_EXPIARY,
-            QuoteNo
+            Bank_CARD_EXPIARY
         FROM invoice
         WHERE InvoiceNo > @lastSyncedInvoiceNo
         ORDER BY InvoiceNo ASC
