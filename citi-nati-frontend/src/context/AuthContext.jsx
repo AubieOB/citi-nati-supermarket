@@ -63,6 +63,24 @@ export const AuthProvider = ({ children }) => {
     initializeAuth();
   }, []);
 
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      clearAuthToken();
+      setToken(null);
+      setUser(null);
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('app:session-expired', handleSessionExpired);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('app:session-expired', handleSessionExpired);
+      }
+    };
+  }, []);
+
   /**
    * Login: Called after successful API authentication
    * Stores token and user, sets axios header

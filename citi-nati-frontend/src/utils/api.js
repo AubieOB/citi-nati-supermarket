@@ -13,6 +13,8 @@
 import axios from 'axios';
 import { tokenStorage } from './tokenStorage.js';
 
+let isHandlingSessionExpiry = false;
+
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api',
   withCredentials: true,
@@ -33,6 +35,41 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
+    return Promise.reject(error);
+  }
+);
+
+/**
+ * Response interceptor to handle expired/invalid sessions once globally.
+ * Prevents repeated 401 storms in admin dashboards when token has expired.
+ */
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    const requestUrl = String(error?.config?.url || '');
+    const hasToken = Boolean(tokenStorage.getToken());
+    const isAuthRequest = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register');
+
+    if (status === 401 && hasToken && !isAuthRequest && !isHandlingSessionExpiry) {
+      isHandlingSessionExpiry = true;
+
+      // Clear local auth immediately so app state stops sending stale token.
+      delete api.defaults.headers.common.Authorization;
+      tokenStorage.clear();
+
+      if (typeof window !== 'undefined') {
+        try {
+          window.dispatchEvent(new CustomEvent('app:session-expired'));
+        } catch (dispatchError) {
+          console.warn('[API] Failed to dispatch session-expired event:', dispatchError);
+        }
+
+        // Force a clean route transition to login to recover quickly.
+        window.location.assign('/login?reason=session-expired');
+      }
+    }
+
     return Promise.reject(error);
   }
 );
