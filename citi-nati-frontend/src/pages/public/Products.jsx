@@ -14,6 +14,8 @@ import Modal from '../../components/common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
 import '../../styles/global.css';
 
+const STOREFRONT_LOCATION_CODE = String(import.meta.env.VITE_STOREFRONT_LOCATION_CODE || 'BT').trim().toUpperCase();
+
 /**
  * HELPER FUNCTIONS - Defined before component
  */
@@ -125,6 +127,7 @@ const Products = () => {
           params.append('page', '1');
           params.append('pageSize', pageSize);
           params.append('search', query);
+          params.append('locationCode', STOREFRONT_LOCATION_CODE);
           if (selectedCategorySearchRef.current) params.append('category', selectedCategorySearchRef.current);
           if (onSaleOnlyRef.current) params.append('onSale', 'true');
 
@@ -196,6 +199,7 @@ const Products = () => {
       const params = new URLSearchParams();
       params.append('limit', limit);
       params.append('offset', currentOffset);
+      params.append('locationCode', STOREFRONT_LOCATION_CODE);
       if (selectedCategory) params.append('category', selectedCategory);
       if (onSaleOnly) params.append('onSale', 'true');
 
@@ -271,7 +275,9 @@ const Products = () => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await api.get('/products/categories');
+        const response = await api.get('/products/categories', {
+          params: { locationCode: STOREFRONT_LOCATION_CODE },
+        });
         if (response.data.categories) {
           setCategories(response.data.categories);
           console.log('[PRODUCTS] Categories loaded:', response.data.categories);
@@ -341,7 +347,8 @@ const Products = () => {
         const response = await api.get('/products', {
           params: {
             page: 1,
-            pageSize: 1
+            pageSize: 1,
+            locationCode: STOREFRONT_LOCATION_CODE,
           }
         });
         

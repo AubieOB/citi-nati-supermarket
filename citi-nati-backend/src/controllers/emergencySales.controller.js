@@ -57,17 +57,44 @@ function resolveSaleScopeFromSnapshot(sale) {
   return { locationCode, branchCode, branchName };
 }
 
-async function resolveLocationScopedProductCodes(locationCode) {
+function expandLocationScopeCodes(locationCode) {
   const normalizedLocationCode = normalizeLocationCode(locationCode);
-  if (!normalizedLocationCode) return null;
+  if (!normalizedLocationCode) return [];
 
-  const rows = await prisma.productExpiryBatch.findMany({
-    where: {
+  if (normalizedLocationCode === 'BT') {
+    return ['BT'];
+  }
+
+  if (ZOMBA_LOCATION_CODES.includes(normalizedLocationCode)) {
+    return [...ZOMBA_LOCATION_CODES];
+  }
+
+  return [normalizedLocationCode];
+}
+
+function buildLocationCodeScopeWhere(locationCodes) {
+  if (!Array.isArray(locationCodes) || locationCodes.length === 0) {
+    return null;
+  }
+
+  return {
+    OR: locationCodes.map((code) => ({
       locationCode: {
-        equals: normalizedLocationCode,
+        equals: code,
         mode: 'insensitive',
       },
-    },
+    })),
+  };
+}
+
+async function resolveLocationScopedProductCodes(locationCode) {
+  const scopeCodes = expandLocationScopeCodes(locationCode);
+  if (scopeCodes.length === 0) return null;
+
+  const scopedWhere = buildLocationCodeScopeWhere(scopeCodes);
+
+  const rows = await prisma.productExpiryBatch.findMany({
+    where: scopedWhere || undefined,
     select: { productCode: true },
     distinct: ['productCode'],
   });

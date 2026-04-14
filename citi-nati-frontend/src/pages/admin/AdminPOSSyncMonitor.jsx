@@ -253,8 +253,7 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
         params: {
           hours: 24,
           limit: 40,
-          // Only filter by location for non-BT branches; legacy BT events are untagged
-          ...(selectedLocationCode && selectedLocationCode !== 'BT' && { locationCode: selectedLocationCode }),
+          ...(selectedLocationCode && { locationCode: selectedLocationCode }),
         },
       });
       setMonitor(response.data?.data || null);
@@ -264,7 +263,7 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [selectedLocationCode]);
 
   const scheduleRefresh = useCallback(() => {
     if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);

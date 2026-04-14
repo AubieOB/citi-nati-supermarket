@@ -143,7 +143,7 @@ const AdminStocks = ({ selectedLocationCode = 'BT' }) => {
     try {
       // Load first page immediately
       const firstParams = new URLSearchParams({ page: '1', pageSize: '100' });
-      if (selectedLocationCode && selectedLocationCode !== 'BT') {
+      if (selectedLocationCode) {
         firstParams.append('locationCode', selectedLocationCode);
       }
       const res1 = await api.get(`/products?${firstParams.toString()}`);
@@ -166,7 +166,7 @@ const AdminStocks = ({ selectedLocationCode = 'BT' }) => {
 
           while (true) {
             const params = new URLSearchParams({ page: String(page), pageSize: String(perPage) });
-            if (selectedLocationCode && selectedLocationCode !== 'BT') {
+            if (selectedLocationCode) {
               params.append('locationCode', selectedLocationCode);
             }
             const res = await api.get(`/products?${params.toString()}`);

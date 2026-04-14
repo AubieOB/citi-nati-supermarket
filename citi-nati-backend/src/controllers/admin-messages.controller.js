@@ -28,6 +28,32 @@ function normalizeBranchCode(value) {
   return normalized || null;
 }
 
+function expandBranchScopeCodes(value) {
+  const normalized = normalizeBranchCode(value);
+  if (!normalized) return [];
+
+  if (normalized === 'BT' || normalized === 'BLANTYRE') {
+    return ['BLANTYRE', 'BT'];
+  }
+
+  if (['ZA', 'SH', 'BAR', 'WH', 'ST999', 'ZOMBA'].includes(normalized)) {
+    return ['ZOMBA', 'ZA', 'SH', 'BAR', 'WH', 'ST999'];
+  }
+
+  return [normalized];
+}
+
+function buildBranchScopeWhere(value) {
+  const scopedCodes = expandBranchScopeCodes(value);
+  if (!scopedCodes.length) {
+    return null;
+  }
+
+  return {
+    in: scopedCodes,
+  };
+}
+
 function shouldEmitUpdate(eventKey) {
   const now = Date.now();
   const lastEmittedAt = emitCooldownCache.get(eventKey);
@@ -122,9 +148,9 @@ const getMessages = async (req, res) => {
       where.type = type;
     }
 
-    const scopedBranchCode = normalizeBranchCode(branchCode || locationCode);
-    if (scopedBranchCode) {
-      where.branchCode = scopedBranchCode;
+    const scopedBranchWhere = buildBranchScopeWhere(branchCode || locationCode);
+    if (scopedBranchWhere) {
+      where.branchCode = scopedBranchWhere;
     }
 
     const parsedLimit = limit != null && String(limit).trim() !== ''
@@ -244,8 +270,8 @@ const deleteMessage = async (req, res) => {
  */
 const deleteAllMessages = async (req, res) => {
   try {
-    const scopedBranchCode = normalizeBranchCode(req.query.branchCode || req.query.locationCode || req.body?.branchCode || req.body?.locationCode);
-    const where = scopedBranchCode ? { branchCode: scopedBranchCode } : undefined;
+    const scopedBranchWhere = buildBranchScopeWhere(req.query.branchCode || req.query.locationCode || req.body?.branchCode || req.body?.locationCode);
+    const where = scopedBranchWhere ? { branchCode: scopedBranchWhere } : undefined;
     const result = await prisma.adminMessage.deleteMany({ where });
 
     return res.json({ success: true, deleted: result.count });
@@ -260,17 +286,17 @@ const deleteAllMessages = async (req, res) => {
  */
 const markAllAsRead = async (req, res) => {
   try {
-    const scopedBranchCode = normalizeBranchCode(req.query.branchCode || req.query.locationCode || req.body?.branchCode || req.body?.locationCode);
+    const scopedBranchWhere = buildBranchScopeWhere(req.query.branchCode || req.query.locationCode || req.body?.branchCode || req.body?.locationCode);
     const whereUnread = {
       read: false,
-      ...(scopedBranchCode ? { branchCode: scopedBranchCode } : {}),
+      ...(scopedBranchWhere ? { branchCode: scopedBranchWhere } : {}),
     };
     const whereLifecycle = {
       read: true,
       lifecycleState: {
         in: [MESSAGE_STATES.ACTIVE, MESSAGE_STATES.RECURRING],
       },
-      ...(scopedBranchCode ? { branchCode: scopedBranchCode } : {}),
+      ...(scopedBranchWhere ? { branchCode: scopedBranchWhere } : {}),
     };
 
     const result = await prisma.adminMessage.updateMany({

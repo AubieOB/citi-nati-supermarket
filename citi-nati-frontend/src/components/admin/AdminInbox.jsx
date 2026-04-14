@@ -262,8 +262,7 @@ const AdminInbox = ({ selectedLocationCode = 'BT' }) => {
         params: {
           limit: INBOX_FETCH_LIMIT,
           offset: 0,
-          // Only filter by location for non-BT branches; legacy BT messages are untagged
-          ...(selectedLocationCode && selectedLocationCode !== 'BT' && { branchCode: selectedLocationCode }),
+          ...(selectedLocationCode && { branchCode: selectedLocationCode }),
         },
       });
       setMessages(response.data.messages || []);

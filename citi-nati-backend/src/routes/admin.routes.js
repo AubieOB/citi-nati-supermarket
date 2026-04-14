@@ -49,17 +49,46 @@ function normalizeLocationCode(value) {
   return normalized || null;
 }
 
-async function resolveLocationScopedProductCodes(locationCode) {
-  const normalizedLocationCode = normalizeLocationCode(locationCode);
-  if (!normalizedLocationCode) return null;
+const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH', 'ST999'];
 
-  const rows = await prisma.productExpiryBatch.findMany({
-    where: {
+function expandLocationScopeCodes(locationCode) {
+  const normalizedLocationCode = normalizeLocationCode(locationCode);
+  if (!normalizedLocationCode) return [];
+
+  if (normalizedLocationCode === 'BT') {
+    return ['BT'];
+  }
+
+  if (ZOMBA_LOCATION_CODES.includes(normalizedLocationCode)) {
+    return [...ZOMBA_LOCATION_CODES];
+  }
+
+  return [normalizedLocationCode];
+}
+
+function buildLocationCodeScopeWhere(locationCodes) {
+  if (!Array.isArray(locationCodes) || locationCodes.length === 0) {
+    return null;
+  }
+
+  return {
+    OR: locationCodes.map((code) => ({
       locationCode: {
-        equals: normalizedLocationCode,
+        equals: code,
         mode: 'insensitive',
       },
-    },
+    })),
+  };
+}
+
+async function resolveLocationScopedProductCodes(locationCode) {
+  const scopeCodes = expandLocationScopeCodes(locationCode);
+  if (scopeCodes.length === 0) return null;
+
+  const scopedWhere = buildLocationCodeScopeWhere(scopeCodes);
+
+  const rows = await prisma.productExpiryBatch.findMany({
+    where: scopedWhere || undefined,
     select: { productCode: true },
     distinct: ['productCode'],
   });
@@ -67,11 +96,6 @@ async function resolveLocationScopedProductCodes(locationCode) {
   return rows
     .map((row) => String(row.productCode || '').trim())
     .filter(Boolean);
-}
-
-function shouldUseLegacyBlantyreReadFallback(locationCode, scopedProductCodes) {
-  const normalizedLocationCode = normalizeLocationCode(locationCode);
-  return normalizedLocationCode === 'BT' && (!Array.isArray(scopedProductCodes) || scopedProductCodes.length === 0);
 }
 
 const getSettingValue = async (key, fallbackValue) => {
@@ -753,9 +777,7 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
 
     if (normalizedLocationCode) {
       const scopedProductCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
-      if (shouldUseLegacyBlantyreReadFallback(normalizedLocationCode, scopedProductCodes)) {
-        console.warn('[ADMIN POS] Legacy Blantyre fallback activated for read listing (no ProductExpiryBatch scope rows found)');
-      } else if (!scopedProductCodes || scopedProductCodes.length === 0) {
+      if (!scopedProductCodes || scopedProductCodes.length === 0) {
         return res.json({
           success: true,
           products: [],

@@ -469,17 +469,55 @@ function normalizeScopeCode(value) {
   return normalized || null;
 }
 
-async function resolveLocationScopedProductCodes(locationCode) {
-  const normalizedLocationCode = normalizeScopeCode(locationCode);
-  if (!normalizedLocationCode) return null;
+const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH', 'ST999'];
 
-  const rows = await prisma.productExpiryBatch.findMany({
-    where: {
+function expandLocationScopeCodes(locationCode) {
+  const normalizedLocationCode = normalizeScopeCode(locationCode);
+  if (!normalizedLocationCode) return [];
+
+  if (normalizedLocationCode === 'BT') {
+    return ['BT'];
+  }
+
+  if (ZOMBA_LOCATION_CODES.includes(normalizedLocationCode)) {
+    return [...ZOMBA_LOCATION_CODES];
+  }
+
+  return [normalizedLocationCode];
+}
+
+function buildLocationCodeScopeWhere(locationCodes) {
+  if (!Array.isArray(locationCodes) || locationCodes.length === 0) {
+    return null;
+  }
+
+  return {
+    OR: locationCodes.map((code) => ({
       locationCode: {
-        equals: normalizedLocationCode,
+        equals: code,
         mode: 'insensitive',
       },
-    },
+    })),
+  };
+}
+
+function isAdminRequest(req) {
+  const decodedToken = getDecodedTokenFromRequest(req);
+  return Boolean(decodedToken && decodedToken.role === 'admin');
+}
+
+function getStorefrontLocationCode() {
+  return normalizeScopeCode(process.env.STOREFRONT_LOCATION_CODE || process.env.PUBLIC_STOREFRONT_LOCATION_CODE || 'BT');
+}
+
+async function resolveLocationScopedProductCodes(locationCode) {
+  const scopeCodes = expandLocationScopeCodes(locationCode);
+  if (scopeCodes.length === 0) return null;
+
+  const scopedWhere = buildLocationCodeScopeWhere(scopeCodes);
+
+  const rows = await prisma.productExpiryBatch.findMany({
+    where: scopedWhere || undefined,
     select: { productCode: true },
     distinct: ['productCode'],
   });
@@ -911,7 +949,8 @@ const getProducts = async (req, res) => {
     const requestedPosExpiry = String(includePosExpiry || '').trim().toLowerCase() === 'true';
     const forceAdminPosExpiry = shouldForceAdminExpiryEnrichment(req);
     const shouldIncludePosExpiry = requestedPosExpiry || forceAdminPosExpiry;
-    const normalizedLocationCode = normalizeScopeCode(locationCode);
+    const requestedLocationCode = normalizeScopeCode(locationCode);
+    const normalizedLocationCode = requestedLocationCode || (!isAdminRequest(req) ? getStorefrontLocationCode() : null);
 
     console.log('[ADMIN PRODUCTS] expiry enrichment decision', {
       includePosExpiryQuery: includePosExpiry,
@@ -966,9 +1005,7 @@ const getProducts = async (req, res) => {
 
     if (normalizedLocationCode) {
       const scopedProductCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
-      if (shouldUseLegacyBlantyreReadFallback(normalizedLocationCode, scopedProductCodes)) {
-        console.warn('[PRODUCTS] Legacy Blantyre fallback activated for read listing (no ProductExpiryBatch scope rows found)');
-      } else if (!scopedProductCodes || scopedProductCodes.length === 0) {
+      if (!scopedProductCodes || scopedProductCodes.length === 0) {
         return res.status(200).json({
           products: [],
           pagination: {
@@ -2101,15 +2138,29 @@ const deletePOSProducts = async (req, res) => {
  */
 const getCategories = async (req, res) => {
   try {
+    const requestedLocationCode = normalizeScopeCode(req.query.locationCode);
+    const effectiveLocationCode = requestedLocationCode || (!isAdminRequest(req) ? getStorefrontLocationCode() : null);
+
     // Get all distinct categories from Product table (single source of truth)
-    const categories = await prisma.product.findMany({
-      where: {
-        category: {
-          not: null
-        },
-        enabled: true,
-        isActive: true
+    const where = {
+      category: {
+        not: null
       },
+      enabled: true,
+      isActive: true
+    };
+
+    if (effectiveLocationCode) {
+      const scopedProductCodes = await resolveLocationScopedProductCodes(effectiveLocationCode);
+      if (!scopedProductCodes || scopedProductCodes.length === 0) {
+        return res.status(200).json({ categories: [] });
+      }
+
+      where.sourceCode = { in: scopedProductCodes };
+    }
+
+    const categories = await prisma.product.findMany({
+      where,
       distinct: ['category'],
       select: {
         category: true

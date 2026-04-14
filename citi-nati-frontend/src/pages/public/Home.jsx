@@ -6,6 +6,8 @@ import PromotionBanner from '../../components/common/PromotionBanner.jsx';
 import api from '../../utils/api.js';
 import '../../styles/global.css';
 
+const STOREFRONT_LOCATION_CODE = String(import.meta.env.VITE_STOREFRONT_LOCATION_CODE || 'BT').trim().toUpperCase();
+
 const Home = () => {
   useEffect(() => {
     // Warm up the backend - silent health check to wake Render free tier
@@ -21,7 +23,13 @@ const Home = () => {
     // Prefetch first page of products silently for instant navigation
     const prefetchProducts = async () => {
       try {
-        await api.get('/products?page=1&pageSize=20');
+        await api.get('/products', {
+          params: {
+            page: 1,
+            pageSize: 20,
+            locationCode: STOREFRONT_LOCATION_CODE,
+          },
+        });
         console.log('[PREFETCH] Products prefetched successfully');
       } catch (err) {
         console.warn('[PREFETCH] Product prefetch failed (non-critical):', err.message);

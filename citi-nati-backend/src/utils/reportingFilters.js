@@ -38,6 +38,8 @@ const ALLOWED_PAYMENT_SORT_FIELDS = new Set(['payMethod', 'totalAmount', 'invoic
 
 const ALLOWED_SORT_ORDERS = new Set(['asc', 'desc']);
 
+const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH', 'ST999'];
+
 // ---------------------------------------------------------------------------
 // Filter extraction from raw query params
 // ---------------------------------------------------------------------------
@@ -84,7 +86,8 @@ function buildInvoiceWhere(dateRange, filters = {}) {
   if (filters.branchCode) where.branchCode = filters.branchCode;
   if (filters.syncSourceCode) where.syncSourceCode = filters.syncSourceCode;
 
-  const hasLocationCode = !!filters.locationCode;
+  const expandedLocationCodes = expandLocationScopeCodes(filters.locationCode);
+  const hasLocationCode = expandedLocationCodes.length > 0;
   const hasLocationId = filters.locationId !== null && filters.locationId !== undefined;
 
   if (hasLocationCode && hasLocationId) {
@@ -92,12 +95,14 @@ function buildInvoiceWhere(dateRange, filters = {}) {
     // Match either to avoid unintentionally excluding valid branch rows.
     andConditions.push({
       OR: [
-        { locationCode: filters.locationCode },
+        ...expandedLocationCodes.map((code) => ({ locationCode: code })),
         { locationId: filters.locationId },
       ],
     });
   } else if (hasLocationCode) {
-    where.locationCode = filters.locationCode;
+    where.locationCode = expandedLocationCodes.length === 1
+      ? expandedLocationCodes[0]
+      : { in: expandedLocationCodes };
   } else if (hasLocationId) {
     where.locationId = filters.locationId;
   }
@@ -228,6 +233,21 @@ function sanitizeStr(val) {
   if (!val || typeof val !== 'string') return null;
   const trimmed = val.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function expandLocationScopeCodes(locationCode) {
+  const normalized = sanitizeStr(locationCode)?.toUpperCase();
+  if (!normalized) return [];
+
+  if (normalized === 'BT') {
+    return ['BT'];
+  }
+
+  if (ZOMBA_LOCATION_CODES.includes(normalized)) {
+    return [...ZOMBA_LOCATION_CODES];
+  }
+
+  return [normalized];
 }
 
 function parseOptionalInt(val) {
