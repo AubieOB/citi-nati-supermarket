@@ -15,7 +15,8 @@ const SYNC_STATUS = {
   FAILED: 'sync_failed',
 };
 
-const SUPPORTED_LOCATION_CODES = ['BT', 'ZA'];
+const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH', 'ST999'];
+const SUPPORTED_LOCATION_CODES = ['BT'].concat(ZOMBA_LOCATION_CODES);
 
 function normalizeLocationCode(value) {
   const normalized = String(value || '').trim().toUpperCase();
@@ -27,15 +28,24 @@ function normalizeBranchCode(value) {
   return normalized || null;
 }
 
+function isZombaLocationCode(locationCode) {
+  return !!locationCode && ZOMBA_LOCATION_CODES.includes(locationCode);
+}
+
+function getDefaultAgentLocationCode(branchCode) {
+  if (branchCode === 'BLANTYRE') return 'BT';
+  return null;
+}
+
 function getBranchNameFromLocationCode(locationCode) {
   if (locationCode === 'BT') return 'Blantyre';
-  if (locationCode === 'ZA') return 'Zomba';
+  if (isZombaLocationCode(locationCode)) return 'Zomba';
   return locationCode || 'Unknown';
 }
 
 function getBranchCodeFromLocationCode(locationCode) {
   if (locationCode === 'BT') return 'BLANTYRE';
-  if (locationCode === 'ZA') return 'ZOMBA';
+  if (isZombaLocationCode(locationCode)) return 'ZOMBA';
   return locationCode || null;
 }
 
@@ -329,7 +339,7 @@ async function lookupEmergencyProducts(req, res) {
     }
 
     if (!locationCode || !SUPPORTED_LOCATION_CODES.includes(locationCode)) {
-      return res.status(400).json({ success: false, error: 'locationCode is required (BT or ZA)' });
+      return res.status(400).json({ success: false, error: 'locationCode is required and must be one of BT, SH, BAR, WH, ST999, or ZA' });
     }
 
     const scopedProductCodes = await resolveLocationScopedProductCodes(locationCode);
@@ -398,7 +408,7 @@ async function createEmergencySale(req, res) {
   try {
     const locationCode = normalizeLocationCode(req.body?.locationCode || req.body?.branchCode || req.query?.locationCode);
     if (!locationCode || !SUPPORTED_LOCATION_CODES.includes(locationCode)) {
-      return res.status(400).json({ success: false, error: 'locationCode is required (BT or ZA)' });
+      return res.status(400).json({ success: false, error: 'locationCode is required and must be one of BT, SH, BAR, WH, ST999, or ZA' });
     }
 
     const branchCode = getBranchCodeFromLocationCode(locationCode);
@@ -868,6 +878,10 @@ async function getPendingEmergencySalesForPosSync(req, res) {
     }
 
     const limit = Math.min(50, Math.max(1, toSafeInt(req.query.limit ?? req.body?.limit, 10)));
+    const locationScopeFilter = locationCodes.flatMap((locationCode) => ([
+      { cartSnapshot: { path: ['locationCode'], equals: locationCode } },
+      { cartSnapshot: { path: ['posLocationCode'], equals: locationCode } },
+    ]));
     const sales = await prisma.emergencySale.findMany({
       where: {
         syncStatus: {
@@ -876,7 +890,7 @@ async function getPendingEmergencySalesForPosSync(req, res) {
         retryCount: {
           lt: Number.isFinite(EMERGENCY_SALE_MAX_RETRIES) ? EMERGENCY_SALE_MAX_RETRIES : 10,
         },
-        cartSnapshot: { path: ['locationCode'], in: locationCodes },
+        OR: locationScopeFilter,
       },
       include: {
         items: true,
@@ -920,7 +934,7 @@ async function ackEmergencySaleSynced(req, res) {
     }
 
     const agentBranchCode = normalizeBranchCode(req.headers['x-branch-code'] || req.body?.branchCode || req.body?.locationCode);
-    const agentLocationCode = normalizeLocationCode(req.body?.locationCode || req.body?.metadata?.locationCode || (agentBranchCode === 'BLANTYRE' ? 'BT' : agentBranchCode === 'ZOMBA' ? 'ZA' : null));
+    const agentLocationCode = normalizeLocationCode(req.body?.locationCode || req.body?.metadata?.locationCode || getDefaultAgentLocationCode(agentBranchCode));
 
     const saleRef = String(req.body?.sale_ref || req.body?.saleRef || '').trim();
     const emergencySaleId = toSafeInt(req.body?.emergency_sale_id ?? req.body?.emergencySaleId);
@@ -994,7 +1008,7 @@ async function ackEmergencySaleSyncFailed(req, res) {
     }
 
     const agentBranchCode = normalizeBranchCode(req.headers['x-branch-code'] || req.body?.branchCode || req.body?.locationCode);
-    const agentLocationCode = normalizeLocationCode(req.body?.locationCode || req.body?.metadata?.locationCode || (agentBranchCode === 'BLANTYRE' ? 'BT' : agentBranchCode === 'ZOMBA' ? 'ZA' : null));
+    const agentLocationCode = normalizeLocationCode(req.body?.locationCode || req.body?.metadata?.locationCode || getDefaultAgentLocationCode(agentBranchCode));
 
     const saleRef = String(req.body?.sale_ref || req.body?.saleRef || '').trim();
     const emergencySaleId = toSafeInt(req.body?.emergency_sale_id ?? req.body?.emergencySaleId);

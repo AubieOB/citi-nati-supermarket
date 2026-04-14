@@ -10,7 +10,7 @@ class ReportingSyncService {
     this.branchTag = config.branch.logPrefix || `[${config.branch.branchCode} SYNC]`;
     this.latestCostColumnConfig = null;
     this.invoiceHasQuoteNo = null;
-    this.invoiceDetailsHasGrnDate = null;
+    this.invoiceDetailsColumnSupport = null;
   }
 
   async getTableColumns(pool, tableName) {
@@ -74,22 +74,28 @@ class ReportingSyncService {
     return this.invoiceHasQuoteNo;
   }
 
-  async resolveInvoiceDetailsGrnDateSupport(pool) {
-    if (this.invoiceDetailsHasGrnDate !== null) {
-      return this.invoiceDetailsHasGrnDate;
+  async resolveInvoiceDetailsColumnSupport(pool) {
+    if (this.invoiceDetailsColumnSupport) {
+      return this.invoiceDetailsColumnSupport;
     }
 
     try {
       const invoiceDetailsColumns = await this.getTableColumns(pool, 'invoicedetails');
-      this.invoiceDetailsHasGrnDate = invoiceDetailsColumns.has('GrnDate');
-      console.log(`${this.branchTag} [SCHEMA] invoicedetails.GrnDate present: ${this.invoiceDetailsHasGrnDate}`);
+      this.invoiceDetailsColumnSupport = {
+        hasCostPrice: invoiceDetailsColumns.has('CostPrice'),
+        hasGrnDate: invoiceDetailsColumns.has('GrnDate'),
+      };
+      console.log(`${this.branchTag} [SCHEMA] invoicedetails optional columns`, this.invoiceDetailsColumnSupport);
     } catch (error) {
       // Keep sync running even if schema introspection fails.
-      this.invoiceDetailsHasGrnDate = false;
-      console.warn(`${this.branchTag} [SCHEMA][WARN] Could not detect invoicedetails.GrnDate, defaulting to absent: ${error.message}`);
+      this.invoiceDetailsColumnSupport = {
+        hasCostPrice: false,
+        hasGrnDate: false,
+      };
+      console.warn(`${this.branchTag} [SCHEMA][WARN] Could not detect invoicedetails optional columns, defaulting to absent: ${error.message}`);
     }
 
-    return this.invoiceDetailsHasGrnDate;
+    return this.invoiceDetailsColumnSupport;
   }
 
   async fetchInvoiceHeaders(pool, batchSize = 100) {
@@ -160,7 +166,7 @@ class ReportingSyncService {
     }
 
     try {
-      const hasGrnDate = await this.resolveInvoiceDetailsGrnDateSupport(pool);
+      const columnSupport = await this.resolveInvoiceDetailsColumnSupport(pool);
       const request = pool.request();
 
       // Build parameterized IN clause for invoice codes
@@ -169,7 +175,8 @@ class ReportingSyncService {
         request.input(`invoiceCode${idx}`, sql.Int, code);
       });
 
-      const grnDateSelect = hasGrnDate ? ',\n            GrnDate' : '';
+      const costPriceSelect = columnSupport.hasCostPrice ? ',\n            CostPrice' : '';
+      const grnDateSelect = columnSupport.hasGrnDate ? ',\n            GrnDate' : '';
 
       const query = `
         SELECT
@@ -194,8 +201,7 @@ class ReportingSyncService {
             LevyAmount,
             Printed,
             Sub_Qty,
-            DiscountAmount,
-            CostPrice${grnDateSelect}
+            DiscountAmount${costPriceSelect}${grnDateSelect}
         FROM invoicedetails
         WHERE InvoiceCode IN (${placeholders})
         ORDER BY InvoiceCode ASC, InvDetailID ASC
