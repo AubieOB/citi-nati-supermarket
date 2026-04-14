@@ -71,6 +71,7 @@ const AdminProducts = ({ selectedLocationCode = 'BT' }) => {
   const expiryAlertsPageSize = 12;
   const POS_ALERTS_CLIENT_CACHE_TTL_MS = 5 * 60 * 1000;
   const searchTimeoutRef = useRef(null);
+  const fetchRequestIdRef = useRef(0);
   const recognitionRef = useRef(null);
   const voiceEnabledRef = useRef(false);
   const posExpiryFetchedAtRef = useRef(0);
@@ -417,10 +418,15 @@ const AdminProducts = ({ selectedLocationCode = 'BT' }) => {
     }
   };
 
-  // Fetch products on mount
+  // Refetch and reset location-scoped UI state when operational location changes.
   useEffect(() => {
+    setSearchTerm('');
+    setSelectedCategory('');
+    setOnSaleOnly(false);
+    setCurrentPage(1);
+    setExpandedBatchRows({});
     fetchProducts();
-  }, []);
+  }, [selectedLocationCode]);
 
   useEffect(() => {
     if (activeSubTab === 'expiry-alerts') {
@@ -537,15 +543,6 @@ const AdminProducts = ({ selectedLocationCode = 'BT' }) => {
       const handleProductUpdate = (updatedProduct) => {
         console.log('[AdminProducts] 🔄 Product update received:', updatedProduct.name);
         
-        // If product is now hidden, remove it from the admin view
-        if (updatedProduct.hideFromProductsPage) {
-          console.log('[AdminProducts] 🙈 Product hidden, removing:', updatedProduct.name);
-          setProducts(prevProducts =>
-            prevProducts.filter(p => p.id !== updatedProduct.id)
-          );
-          return;
-        }
-        
         // Update the products list with complete product details
         setProducts(prevProducts =>
           prevProducts.map(product =>
@@ -593,8 +590,12 @@ const AdminProducts = ({ selectedLocationCode = 'BT' }) => {
   }, []);
 
   const fetchProducts = async () => {
+    const requestId = Date.now();
+    fetchRequestIdRef.current = requestId;
+
     try {
       setError(null);
+      setLoading(true);
 
       // Load first page immediately (limit 100 per page)
       let page = 1;
@@ -674,6 +675,10 @@ const AdminProducts = ({ selectedLocationCode = 'BT' }) => {
         return getExpirySeverity(a) - getExpirySeverity(b);
       });
 
+      if (fetchRequestIdRef.current !== requestId) {
+        return;
+      }
+
       setProducts(sorted);
       setLoading(false); // Stop showing loading spinner immediately
       console.log('[AdminProducts] First page loaded:', firstItems.length, 'products');
@@ -695,6 +700,10 @@ const AdminProducts = ({ selectedLocationCode = 'BT' }) => {
               sorted = all.sort((a, b) => {
                 return getExpirySeverity(a) - getExpirySeverity(b);
               });
+
+              if (fetchRequestIdRef.current !== requestId) {
+                return;
+              }
               
               setProducts(sorted);
               console.log('[AdminProducts] Background load: +', items.length, 'products (total:', sorted.length, ')');
@@ -718,7 +727,6 @@ const AdminProducts = ({ selectedLocationCode = 'BT' }) => {
 
   // Filter products based on search and filters
   const filteredProducts = products
-    .filter(product => !product.hideFromProductsPage) // Hide hidden products
     .filter(product => {
       // Search filter (AND logic - all search terms must match)
       const searchTerms = searchTerm.toLowerCase().trim().split(/\s+/).filter(t => t);

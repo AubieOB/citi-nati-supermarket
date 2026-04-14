@@ -38,6 +38,17 @@ function normalizeScopeCode(value) {
   return normalized || null;
 }
 
+const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH', 'ST999'];
+
+function expandLocationScopeCodes(locationCode) {
+  const normalized = normalizeScopeCode(locationCode);
+  if (!normalized) return [];
+
+  if (normalized === 'BT') return ['BT'];
+  if (ZOMBA_LOCATION_CODES.includes(normalized)) return [...ZOMBA_LOCATION_CODES];
+  return [normalized];
+}
+
 function toScopeFromLocationCode(locationCode) {
   if (locationCode === 'BT') return 'BLANTYRE';
   if (locationCode === 'ZA') return 'ZOMBA';
@@ -49,9 +60,10 @@ function eventMatchesScope(event, scopedBranchCode, scopedLocationCode) {
   const metadata = event?.metadata && typeof event.metadata === 'object' ? event.metadata : {};
   const eventBranchCode = normalizeScopeCode(metadata.branchCode || event?.branchCode || null);
   const eventLocationCode = normalizeScopeCode(metadata.locationCode || event?.locationCode || null);
+  const scopedLocationCodes = expandLocationScopeCodes(scopedLocationCode);
 
   if (scopedBranchCode && eventBranchCode === scopedBranchCode) return true;
-  if (scopedLocationCode && eventLocationCode === scopedLocationCode) return true;
+  if (scopedLocationCodes.length > 0 && eventLocationCode && scopedLocationCodes.includes(eventLocationCode)) return true;
   return false;
 }
 

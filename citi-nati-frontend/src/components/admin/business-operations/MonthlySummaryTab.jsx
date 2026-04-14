@@ -155,7 +155,8 @@ const MonthlySummaryTab = ({
 
     if (selectedLocationId) {
       params.locationId = selectedLocationId;
-    } else if (selectedLocationCode.trim()) {
+    }
+    if (selectedLocationCode.trim()) {
       params.locationCode = selectedLocationCode.trim().toUpperCase();
     }
 
@@ -195,6 +196,7 @@ const MonthlySummaryTab = ({
     };
 
     if (selectedLocationId) params.locationId = selectedLocationId;
+    if (selectedLocationCode.trim()) params.locationCode = selectedLocationCode.trim().toUpperCase();
 
     try {
       const response = await api.get('/business-operations/expenses/summary/overview', { params });
@@ -208,7 +210,7 @@ const MonthlySummaryTab = ({
         return { loading: false, error: nextError, summary: null };
       });
     }
-  }, [activeRange.endDate, activeRange.startDate, selectedLocationId]);
+  }, [activeRange.endDate, activeRange.startDate, selectedLocationCode, selectedLocationId]);
 
   const fetchPayroll = useCallback(async ({ background = false } = {}) => {
     setPayrollState((prev) => ({

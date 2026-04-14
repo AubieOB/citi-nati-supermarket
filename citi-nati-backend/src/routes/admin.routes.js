@@ -81,14 +81,35 @@ function buildLocationCodeScopeWhere(locationCodes) {
   };
 }
 
-async function resolveLocationScopedProductCodes(locationCode) {
-  const scopeCodes = expandLocationScopeCodes(locationCode);
-  if (scopeCodes.length === 0) return null;
+function deriveBranchCodeFromScopeCodes(scopeCodes = []) {
+  if (scopeCodes.includes('BT')) return 'BLANTYRE';
+  if (scopeCodes.some((code) => ZOMBA_LOCATION_CODES.includes(code))) return 'ZOMBA';
+  return null;
+}
 
-  const scopedWhere = buildLocationCodeScopeWhere(scopeCodes);
+async function resolveLocationScopedProductCodesFromSales(scopeCodes = []) {
+  if (!Array.isArray(scopeCodes) || scopeCodes.length === 0) {
+    return [];
+  }
 
-  const rows = await prisma.productExpiryBatch.findMany({
-    where: scopedWhere || undefined,
+  const derivedBranchCode = deriveBranchCodeFromScopeCodes(scopeCodes);
+  const locationPredicates = scopeCodes.map((code) => ({
+    locationCode: {
+      equals: code,
+      mode: 'insensitive',
+    },
+  }));
+
+  const rows = await prisma.salesInvoiceItem.findMany({
+    where: {
+      productCode: { not: null },
+      salesInvoice: {
+        OR: [
+          ...locationPredicates,
+          ...(derivedBranchCode ? [{ branchCode: derivedBranchCode }] : []),
+        ],
+      },
+    },
     select: { productCode: true },
     distinct: ['productCode'],
   });
@@ -96,6 +117,45 @@ async function resolveLocationScopedProductCodes(locationCode) {
   return rows
     .map((row) => String(row.productCode || '').trim())
     .filter(Boolean);
+}
+
+async function resolveLocationScopedProductCodes(locationCode) {
+  const scopeCodes = expandLocationScopeCodes(locationCode);
+  if (scopeCodes.length === 0) return null;
+
+  const scopedWhere = buildLocationCodeScopeWhere(scopeCodes);
+
+  const expiryRows = await prisma.productExpiryBatch.findMany({
+    where: scopedWhere || undefined,
+    select: { productCode: true },
+    distinct: ['productCode'],
+  });
+
+  const scopedCodes = new Set(
+    expiryRows
+      .map((row) => String(row.productCode || '').trim())
+      .filter(Boolean)
+  );
+
+  if (scopedCodes.size === 0) {
+    const salesCodes = await resolveLocationScopedProductCodesFromSales(scopeCodes);
+    salesCodes.forEach((code) => scopedCodes.add(code));
+  }
+
+  if (scopedCodes.size === 0 && scopeCodes.includes('BT')) {
+    const legacyRows = await prisma.product.findMany({
+      where: { sourceCode: { not: null } },
+      select: { sourceCode: true },
+      distinct: ['sourceCode'],
+    });
+
+    legacyRows
+      .map((row) => String(row.sourceCode || '').trim())
+      .filter(Boolean)
+      .forEach((code) => scopedCodes.add(code));
+  }
+
+  return Array.from(scopedCodes.values());
 }
 
 const getSettingValue = async (key, fallbackValue) => {

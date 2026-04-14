@@ -510,21 +510,88 @@ function getStorefrontLocationCode() {
   return normalizeScopeCode(process.env.STOREFRONT_LOCATION_CODE || process.env.PUBLIC_STOREFRONT_LOCATION_CODE || 'BT');
 }
 
+function deriveBranchCodeFromScopeCodes(scopeCodes = []) {
+  const hasBlantyre = scopeCodes.includes('BT');
+  if (hasBlantyre) return 'BLANTYRE';
+
+  const hasZomba = scopeCodes.some((code) => ZOMBA_LOCATION_CODES.includes(code));
+  if (hasZomba) return 'ZOMBA';
+
+  return null;
+}
+
+async function resolveLocationScopedProductCodesFromSales(scopeCodes = []) {
+  if (!Array.isArray(scopeCodes) || scopeCodes.length === 0) {
+    return [];
+  }
+
+  const derivedBranchCode = deriveBranchCodeFromScopeCodes(scopeCodes);
+  const locationCodePredicates = scopeCodes.map((code) => ({
+    locationCode: {
+      equals: code,
+      mode: 'insensitive',
+    },
+  }));
+
+  const salesRows = await prisma.salesInvoiceItem.findMany({
+    where: {
+      productCode: { not: null },
+      salesInvoice: {
+        OR: [
+          ...locationCodePredicates,
+          ...(derivedBranchCode ? [{ branchCode: derivedBranchCode }] : []),
+        ],
+      },
+    },
+    select: {
+      productCode: true,
+    },
+    distinct: ['productCode'],
+  });
+
+  return salesRows
+    .map((row) => normalizeProductCode(row.productCode))
+    .filter(Boolean);
+}
+
 async function resolveLocationScopedProductCodes(locationCode) {
   const scopeCodes = expandLocationScopeCodes(locationCode);
   if (scopeCodes.length === 0) return null;
 
   const scopedWhere = buildLocationCodeScopeWhere(scopeCodes);
 
-  const rows = await prisma.productExpiryBatch.findMany({
+  const expiryRows = await prisma.productExpiryBatch.findMany({
     where: scopedWhere || undefined,
     select: { productCode: true },
     distinct: ['productCode'],
   });
 
-  return rows
-    .map((row) => normalizeProductCode(row.productCode))
-    .filter(Boolean);
+  const scopedCodes = new Set(
+    expiryRows
+      .map((row) => normalizeProductCode(row.productCode))
+      .filter(Boolean)
+  );
+
+  if (scopedCodes.size === 0) {
+    const salesCodes = await resolveLocationScopedProductCodesFromSales(scopeCodes);
+    salesCodes.forEach((code) => scopedCodes.add(code));
+  }
+
+  // Keep legacy Blantyre operations usable when historical rows predate location tagging.
+  if (scopedCodes.size === 0 && scopeCodes.includes('BT')) {
+    const legacyRows = await prisma.product.findMany({
+      where: { sourceCode: { not: null } },
+      select: { sourceCode: true },
+      distinct: ['sourceCode'],
+    });
+
+    legacyRows
+      .map((row) => normalizeProductCode(row.sourceCode))
+      .filter(Boolean)
+      .forEach((code) => scopedCodes.add(code));
+  }
+
+  return Array.from(scopedCodes.values());
 }
 
 function shouldUseLegacyBlantyreReadFallback(locationCode, scopedProductCodes) {
@@ -982,8 +1049,11 @@ const getProducts = async (req, res) => {
     const where = {
       isActive: true,
       enabled: true, // Only show enabled products
-      hideFromProductsPage: false, // Exclude hidden products
     };
+
+    if (!isAdminRequest(req)) {
+      where.hideFromProductsPage = false; // Public storefront only
+    }
 
     // Search filter (case-insensitive name search)
     if (search) {

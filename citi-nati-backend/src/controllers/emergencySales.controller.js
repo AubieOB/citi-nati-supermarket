@@ -87,14 +87,35 @@ function buildLocationCodeScopeWhere(locationCodes) {
   };
 }
 
-async function resolveLocationScopedProductCodes(locationCode) {
-  const scopeCodes = expandLocationScopeCodes(locationCode);
-  if (scopeCodes.length === 0) return null;
+function deriveBranchCodeFromScopeCodes(scopeCodes = []) {
+  if (scopeCodes.includes('BT')) return 'BLANTYRE';
+  if (scopeCodes.some((code) => ZOMBA_LOCATION_CODES.includes(code))) return 'ZOMBA';
+  return null;
+}
 
-  const scopedWhere = buildLocationCodeScopeWhere(scopeCodes);
+async function resolveLocationScopedProductCodesFromSales(scopeCodes = []) {
+  if (!Array.isArray(scopeCodes) || scopeCodes.length === 0) {
+    return [];
+  }
 
-  const rows = await prisma.productExpiryBatch.findMany({
-    where: scopedWhere || undefined,
+  const derivedBranchCode = deriveBranchCodeFromScopeCodes(scopeCodes);
+  const locationPredicates = scopeCodes.map((code) => ({
+    locationCode: {
+      equals: code,
+      mode: 'insensitive',
+    },
+  }));
+
+  const rows = await prisma.salesInvoiceItem.findMany({
+    where: {
+      productCode: { not: null },
+      salesInvoice: {
+        OR: [
+          ...locationPredicates,
+          ...(derivedBranchCode ? [{ branchCode: derivedBranchCode }] : []),
+        ],
+      },
+    },
     select: { productCode: true },
     distinct: ['productCode'],
   });
@@ -102,6 +123,69 @@ async function resolveLocationScopedProductCodes(locationCode) {
   return rows
     .map((row) => String(row.productCode || '').trim())
     .filter(Boolean);
+}
+
+function buildEmergencySalesLocationScopeFilters(locationCode) {
+  const scopeCodes = expandLocationScopeCodes(locationCode);
+  if (scopeCodes.length === 0) {
+    return [];
+  }
+
+  const branchCode = getBranchCodeFromLocationCode(locationCode);
+  const base = scopeCodes.flatMap((code) => ([
+    { cartSnapshot: { path: ['locationCode'], equals: code } },
+    { cartSnapshot: { path: ['posLocationCode'], equals: code } },
+  ]));
+
+  if (branchCode) {
+    base.push({ cartSnapshot: { path: ['branchCode'], equals: branchCode } });
+  }
+
+  // Preserve legacy Blantyre emergency-sale rows created before location tagging.
+  if (scopeCodes.includes('BT')) {
+    base.push({ cartSnapshot: { path: ['branchCode'], equals: null } });
+  }
+
+  return base;
+}
+
+async function resolveLocationScopedProductCodes(locationCode) {
+  const scopeCodes = expandLocationScopeCodes(locationCode);
+  if (scopeCodes.length === 0) return null;
+
+  const scopedWhere = buildLocationCodeScopeWhere(scopeCodes);
+
+  const expiryRows = await prisma.productExpiryBatch.findMany({
+    where: scopedWhere || undefined,
+    select: { productCode: true },
+    distinct: ['productCode'],
+  });
+
+  const scopedCodes = new Set(
+    expiryRows
+      .map((row) => String(row.productCode || '').trim())
+      .filter(Boolean)
+  );
+
+  if (scopedCodes.size === 0) {
+    const salesCodes = await resolveLocationScopedProductCodesFromSales(scopeCodes);
+    salesCodes.forEach((code) => scopedCodes.add(code));
+  }
+
+  if (scopedCodes.size === 0 && scopeCodes.includes('BT')) {
+    const legacyRows = await prisma.product.findMany({
+      where: { sourceCode: { not: null } },
+      select: { sourceCode: true },
+      distinct: ['sourceCode'],
+    });
+
+    legacyRows
+      .map((row) => String(row.sourceCode || '').trim())
+      .filter(Boolean)
+      .forEach((code) => scopedCodes.add(code));
+  }
+
+  return Array.from(scopedCodes.values());
 }
 
 function toMoney(value) {
@@ -377,7 +461,6 @@ async function lookupEmergencyProducts(req, res) {
     const products = await prisma.product.findMany({
       where: {
         enabled: true,
-        hideFromProductsPage: false,
         sourceCode: { in: scopedProductCodes },
         OR: [
           { barcode: { equals: query, mode: 'insensitive' } },
@@ -761,7 +844,10 @@ async function listEmergencySales(req, res) {
     }
 
     if (locationCode) {
-      andClauses.push({ cartSnapshot: { path: ['locationCode'], equals: locationCode } });
+      const locationScopeFilters = buildEmergencySalesLocationScopeFilters(locationCode);
+      if (locationScopeFilters.length > 0) {
+        andClauses.push({ OR: locationScopeFilters });
+      }
     } else if (branchCode) {
       andClauses.push({ cartSnapshot: { path: ['branchCode'], equals: branchCode } });
     }

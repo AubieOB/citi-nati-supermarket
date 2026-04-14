@@ -53,11 +53,18 @@ const AdminStocks = ({ selectedLocationCode = 'BT' }) => {
   const pageSize = 20;
   const searchTimeoutRef = useRef(null);
   const filterBarRef = useRef(null);
+  const fetchRequestIdRef = useRef(0);
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
 
   useEffect(() => {
+    setSearchTerm('');
+    setFilterCategory('all');
+    setStockStatusFilter('all');
+    setCurrentPage(1);
+    setAllProducts([]);
     fetchProducts();
-    setupSocketListeners();
+    const cleanup = setupSocketListeners();
+    return cleanup;
   }, [selectedLocationCode]);
 
   /**
@@ -105,15 +112,6 @@ const AdminStocks = ({ selectedLocationCode = 'BT' }) => {
       const handleProductUpdate = (updatedProduct) => {
         console.log('[AdminStocks] Product updated via Socket.io:', updatedProduct.id);
         
-        // If product is now hidden, remove it from display
-        if (updatedProduct.hideFromProductsPage) {
-          console.log('[AdminStocks] Product hidden, removing from list:', updatedProduct.name);
-          setAllProducts(prevProducts =>
-            prevProducts.filter(p => p.id !== updatedProduct.id)
-          );
-          return;
-        }
-        
         // Update product details
         setAllProducts(prevProducts =>
           prevProducts.map(p =>
@@ -140,7 +138,12 @@ const AdminStocks = ({ selectedLocationCode = 'BT' }) => {
   // fetch all pages from the backend (pageSize max is 100 on the server).
   // Load first page immediately to show UI, then fetch remaining pages in background
   const fetchProducts = async () => {
+    const requestId = Date.now();
+    fetchRequestIdRef.current = requestId;
+
     try {
+      setLoading(true);
+
       // Load first page immediately
       const firstParams = new URLSearchParams({ page: '1', pageSize: '100' });
       if (selectedLocationCode) {
@@ -148,6 +151,11 @@ const AdminStocks = ({ selectedLocationCode = 'BT' }) => {
       }
       const res1 = await api.get(`/products?${firstParams.toString()}`);
       const firstBatch = (res1.data.products || []).map((product) => enrichProductStock(product));
+
+      if (fetchRequestIdRef.current !== requestId) {
+        return;
+      }
+
       setAllProducts(firstBatch);
 
       // Extract categories from first batch
@@ -175,6 +183,10 @@ const AdminStocks = ({ selectedLocationCode = 'BT' }) => {
             collected = collected.concat(items.map((product) => enrichProductStock(product)));
             if (items.length < perPage) break;
             page += 1;
+          }
+
+          if (fetchRequestIdRef.current !== requestId) {
+            return;
           }
 
           setAllProducts(collected);
@@ -313,7 +325,6 @@ const AdminStocks = ({ selectedLocationCode = 'BT' }) => {
 
   // Filter products with debounced search
   const filteredProducts = allProducts
-    .filter(product => !product.hideFromProductsPage) // Exclude hidden products
     .filter(product => {
       const term = searchTerm.toLowerCase();
       const searchableProductCode = String(product.productCode || product.sourceCode || product.code || '').toLowerCase();
