@@ -223,6 +223,8 @@ class ReportingSyncService {
   normalizeInvoiceRow(row) {
     if (!row) return null;
 
+    const invoiceSubLocation = getSubLocationByCode(row.LocationCode);
+
     return {
       invoiceNo: Number(row.InvoiceNo),
       invoiceSerialNo: Number(row.InvoiceSerialNo),
@@ -263,13 +265,15 @@ class ReportingSyncService {
       branchName: this.config.branch.branchName,
       locationId: this.config.branch.locationId,
       locationCode: row.LocationCode || this.config.posDb.locationCode,
-      subLocationName: getSubLocationByCode(row.LocationCode)?.name || null,
-      subLocationCategory: getSubLocationByCode(row.LocationCode)?.category || null,
+      subLocationName: (invoiceSubLocation && invoiceSubLocation.name) || null,
+      subLocationCategory: (invoiceSubLocation && invoiceSubLocation.category) || null,
     };
   }
 
   normalizeDetailRow(row) {
     if (!row) return null;
+
+    const detailSubLocation = getSubLocationByCode(row.LocationCode);
 
     return {
       invDetailId: Number(row.InvDetailID),
@@ -290,8 +294,8 @@ class ReportingSyncService {
       fPrice: Number(row.FPrice || 0),
       uploadStatus: row.UploadStatus || null,
       locationCode: row.LocationCode || null,
-      subLocationName: getSubLocationByCode(row.LocationCode)?.name || null,
-      subLocationCategory: getSubLocationByCode(row.LocationCode)?.category || null,
+      subLocationName: (detailSubLocation && detailSubLocation.name) || null,
+      subLocationCategory: (detailSubLocation && detailSubLocation.category) || null,
       branchCode: this.config.branch.branchCode,
       branchName: this.config.branch.branchName,
       locationId: this.config.branch.locationId,
