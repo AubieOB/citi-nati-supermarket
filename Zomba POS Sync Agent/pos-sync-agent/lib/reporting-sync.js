@@ -8,6 +8,7 @@ class ReportingSyncService {
     this.state = state;
     this.branchTag = config.branch.logPrefix || `[${config.branch.branchCode} SYNC]`;
     this.latestCostColumnConfig = null;
+    this.invoiceHasQuoteNo = null;
   }
 
   async getTableColumns(pool, tableName) {
@@ -53,13 +54,34 @@ class ReportingSyncService {
     return this.latestCostColumnConfig;
   }
 
+  async resolveInvoiceQuoteNoSupport(pool) {
+    if (this.invoiceHasQuoteNo !== null) {
+      return this.invoiceHasQuoteNo;
+    }
+
+    try {
+      const invoiceColumns = await this.getTableColumns(pool, 'invoice');
+      this.invoiceHasQuoteNo = invoiceColumns.has('QuoteNo');
+      console.log(`${this.branchTag} [SCHEMA] invoice.QuoteNo present: ${this.invoiceHasQuoteNo}`);
+    } catch (error) {
+      // Keep sync running even if schema introspection fails.
+      this.invoiceHasQuoteNo = false;
+      console.warn(`${this.branchTag} [SCHEMA][WARN] Could not detect invoice.QuoteNo, defaulting to absent: ${error.message}`);
+    }
+
+    return this.invoiceHasQuoteNo;
+  }
+
   async fetchInvoiceHeaders(pool, batchSize = 100) {
     try {
       const lastSyncedInvoiceNo = this.state.getLastSyncedInvoiceNo();
+      const hasQuoteNo = await this.resolveInvoiceQuoteNoSupport(pool);
 
       const request = pool.request();
       request.input('lastSyncedInvoiceNo', sql.Int, lastSyncedInvoiceNo);
       request.input('batchSize', sql.Int, batchSize);
+
+      const quoteNoSelect = hasQuoteNo ? ',\n            QuoteNo' : '';
 
       const query = `
         SELECT TOP (@batchSize)
@@ -96,7 +118,7 @@ class ReportingSyncService {
             Bank_Name,
             Bank_CARD_HOLDER,
             Bank_CARD_NO,
-            Bank_CARD_EXPIARY
+            Bank_CARD_EXPIARY${quoteNoSelect}
         FROM invoice
         WHERE InvoiceNo > @lastSyncedInvoiceNo
         ORDER BY InvoiceNo ASC
