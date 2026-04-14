@@ -1,6 +1,7 @@
 const sql = require('mssql');
 const axios = require('axios');
 const { getSyncMetadata } = require('./config');
+const { enrichRowWithSubLocation, getSubLocationByCode } = require('./sub-locations');
 
 class ReportingSyncService {
   constructor(config, state) {
@@ -9,6 +10,7 @@ class ReportingSyncService {
     this.branchTag = config.branch.logPrefix || `[${config.branch.branchCode} SYNC]`;
     this.latestCostColumnConfig = null;
     this.invoiceHasQuoteNo = null;
+    this.invoiceDetailsHasGrnDate = null;
   }
 
   async getTableColumns(pool, tableName) {
@@ -70,6 +72,24 @@ class ReportingSyncService {
     }
 
     return this.invoiceHasQuoteNo;
+  }
+
+  async resolveInvoiceDetailsGrnDateSupport(pool) {
+    if (this.invoiceDetailsHasGrnDate !== null) {
+      return this.invoiceDetailsHasGrnDate;
+    }
+
+    try {
+      const invoiceDetailsColumns = await this.getTableColumns(pool, 'invoicedetails');
+      this.invoiceDetailsHasGrnDate = invoiceDetailsColumns.has('GrnDate');
+      console.log(`${this.branchTag} [SCHEMA] invoicedetails.GrnDate present: ${this.invoiceDetailsHasGrnDate}`);
+    } catch (error) {
+      // Keep sync running even if schema introspection fails.
+      this.invoiceDetailsHasGrnDate = false;
+      console.warn(`${this.branchTag} [SCHEMA][WARN] Could not detect invoicedetails.GrnDate, defaulting to absent: ${error.message}`);
+    }
+
+    return this.invoiceDetailsHasGrnDate;
   }
 
   async fetchInvoiceHeaders(pool, batchSize = 100) {
@@ -140,6 +160,7 @@ class ReportingSyncService {
     }
 
     try {
+      const hasGrnDate = await this.resolveInvoiceDetailsGrnDateSupport(pool);
       const request = pool.request();
 
       // Build parameterized IN clause for invoice codes
@@ -147,6 +168,8 @@ class ReportingSyncService {
       invoiceCodes.forEach((code, idx) => {
         request.input(`invoiceCode${idx}`, sql.Int, code);
       });
+
+      const grnDateSelect = hasGrnDate ? ',\n            GrnDate' : '';
 
       const query = `
         SELECT
@@ -172,8 +195,7 @@ class ReportingSyncService {
             Printed,
             Sub_Qty,
             DiscountAmount,
-            CostPrice,
-            GrnDate
+            CostPrice${grnDateSelect}
         FROM invoicedetails
         WHERE InvoiceCode IN (${placeholders})
         ORDER BY InvoiceCode ASC, InvDetailID ASC
@@ -241,6 +263,8 @@ class ReportingSyncService {
       branchName: this.config.branch.branchName,
       locationId: this.config.branch.locationId,
       locationCode: row.LocationCode || this.config.posDb.locationCode,
+      subLocationName: getSubLocationByCode(row.LocationCode)?.name || null,
+      subLocationCategory: getSubLocationByCode(row.LocationCode)?.category || null,
     };
   }
 
@@ -266,6 +290,8 @@ class ReportingSyncService {
       fPrice: Number(row.FPrice || 0),
       uploadStatus: row.UploadStatus || null,
       locationCode: row.LocationCode || null,
+      subLocationName: getSubLocationByCode(row.LocationCode)?.name || null,
+      subLocationCategory: getSubLocationByCode(row.LocationCode)?.category || null,
       branchCode: this.config.branch.branchCode,
       branchName: this.config.branch.branchName,
       locationId: this.config.branch.locationId,
