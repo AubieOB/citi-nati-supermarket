@@ -839,10 +839,32 @@ async function getPendingEmergencySalesForPosSync(req, res) {
     }
 
     const branchCode = normalizeBranchCode(req.headers['x-branch-code'] || req.query.branchCode || req.query.locationCode || req.body?.branchCode || req.body?.locationCode);
-    const locationCode = normalizeLocationCode(req.query.locationCode || req.body?.locationCode || (branchCode === 'BLANTYRE' ? 'BT' : branchCode === 'ZOMBA' ? 'ZA' : null));
+    
+    // For Zomba branch, support multiple sub-locations (SH, BAR, WH, ST999, etc.)
+    // For other branches, use the single location code
+    let locationCodes = [];
+    
+    if (branchCode === 'ZOMBA') {
+      // Zomba supports multiple sub-locations; if explicit location provided, use it; otherwise fetch all
+      const explicitLocation = normalizeLocationCode(req.query.locationCode || req.body?.locationCode);
+      if (explicitLocation && SUPPORTED_LOCATION_CODES.includes(explicitLocation)) {
+        locationCodes = [explicitLocation];
+      } else {
+        // Fetch emergency sales from all possible Zomba sub-locations
+        locationCodes = ['SH', 'BAR', 'WH', 'ST999'];
+      }
+    } else if (branchCode === 'BLANTYRE') {
+      locationCodes = ['BT'];
+    } else {
+      const locationCode = normalizeLocationCode(req.query.locationCode || req.body?.locationCode);
+      if (!locationCode || !SUPPORTED_LOCATION_CODES.includes(locationCode)) {
+        return res.status(400).json({ success: false, error: 'Agent branch/location scope is required for pending emergency sales polling' });
+      }
+      locationCodes = [locationCode];
+    }
 
-    if (!locationCode || !SUPPORTED_LOCATION_CODES.includes(locationCode)) {
-      return res.status(400).json({ success: false, error: 'Agent branch/location scope is required for pending emergency sales polling' });
+    if (locationCodes.length === 0) {
+      return res.status(400).json({ success: false, error: 'Unable to determine valid location codes for branch' });
     }
 
     const limit = Math.min(50, Math.max(1, toSafeInt(req.query.limit ?? req.body?.limit, 10)));
@@ -854,7 +876,7 @@ async function getPendingEmergencySalesForPosSync(req, res) {
         retryCount: {
           lt: Number.isFinite(EMERGENCY_SALE_MAX_RETRIES) ? EMERGENCY_SALE_MAX_RETRIES : 10,
         },
-        cartSnapshot: { path: ['locationCode'], equals: locationCode },
+        cartSnapshot: { path: ['locationCode'], in: locationCodes },
       },
       include: {
         items: true,
