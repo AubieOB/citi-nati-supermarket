@@ -554,6 +554,37 @@ async function resolveLocationScopedProductCodesFromSales(scopeCodes = []) {
     .filter(Boolean);
 }
 
+async function resolveLocationScopedProductCodesFromLatestCosts(scopeCodes = []) {
+  if (!Array.isArray(scopeCodes) || scopeCodes.length === 0) {
+    return [];
+  }
+
+  const derivedBranchCode = deriveBranchCodeFromScopeCodes(scopeCodes);
+  const locationCodePredicates = scopeCodes.map((code) => ({
+    locationCode: {
+      equals: code,
+      mode: 'insensitive',
+    },
+  }));
+
+  const rows = await prisma.posLatestProductCost.findMany({
+    where: {
+      OR: [
+        ...locationCodePredicates,
+        ...(derivedBranchCode ? [{ branchCode: derivedBranchCode }] : []),
+      ],
+    },
+    select: {
+      productCode: true,
+    },
+    distinct: ['productCode'],
+  });
+
+  return rows
+    .map((row) => normalizeProductCode(row.productCode))
+    .filter(Boolean);
+}
+
 async function resolveLocationScopedProductCodes(locationCode) {
   const scopeCodes = expandLocationScopeCodes(locationCode);
   if (scopeCodes.length === 0) return null;
@@ -571,6 +602,11 @@ async function resolveLocationScopedProductCodes(locationCode) {
       .map((row) => normalizeProductCode(row.productCode))
       .filter(Boolean)
   );
+
+  if (scopedCodes.size === 0) {
+    const costCodes = await resolveLocationScopedProductCodesFromLatestCosts(scopeCodes);
+    costCodes.forEach((code) => scopedCodes.add(code));
+  }
 
   if (scopedCodes.size === 0) {
     const salesCodes = await resolveLocationScopedProductCodesFromSales(scopeCodes);
