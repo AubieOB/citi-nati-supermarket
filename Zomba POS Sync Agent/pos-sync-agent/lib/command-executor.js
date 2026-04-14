@@ -265,7 +265,7 @@ async function executeApplyPromotion(pool, payload, commandId) {
       locationCode: payload.locationCode || config.posDb.locationCode,
       priceTypeCode: payload.priceTypeCode || 'RT',
       promotionalPrice: Number(payload.promotionalPrice),
-      priceId: resultSummary?.insertedRow?.priceId,
+      priceId: (resultSummary && resultSummary.insertedRow && resultSummary.insertedRow.priceId),
     });
     return {
       message: 'Promotion write executed in productprices',
@@ -332,7 +332,7 @@ async function executeRevertPromotion(pool, payload, commandId) {
       locationCode: payload.locationCode || config.posDb.locationCode,
       priceTypeCode: payload.priceTypeCode || 'RT',
       restorePrice: payload.restorePrice == null ? null : Number(payload.restorePrice),
-      priceId: resultSummary?.insertedRow?.priceId,
+      priceId: (resultSummary && resultSummary.insertedRow && resultSummary.insertedRow.priceId),
     });
     return {
       message: 'Promotion revert executed in productprices',

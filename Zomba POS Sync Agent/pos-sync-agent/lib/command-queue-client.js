@@ -45,7 +45,7 @@ function withMetadata(payload = {}) {
 async function pollCommands(limit = 10) {
   const client = createClient();
   const response = await client.post('/api/pos-commands/poll', withMetadata({ limit }));
-  return response.data?.commands || [];
+  return (response.data && response.data.commands) || [];
 }
 
 async function completeCommand(id, resultSummary = {}) {
@@ -68,7 +68,7 @@ async function pollPendingEmergencySales(limit = 10) {
   const response = await client.get('/api/pos-sync/pending-emergency-sales', {
     params: { limit },
   });
-  return response.data?.sales || [];
+  return (response.data && response.data.sales) || [];
 }
 
 async function ackEmergencySaleSynced(payload = {}) {

@@ -45,7 +45,7 @@ async function getCurrentNames(request, productCode) {
       ) AS names
     `);
 
-  const row = result.recordset?.[0] || {};
+  const row = (result.recordset && result.recordset.length > 0 ? result.recordset[0] : {});
   return {
     productsName: row.productsName || null,
     productsMasterName: row.productsMasterName || null,
@@ -88,7 +88,7 @@ async function updateProductName(request, payload = {}) {
       SELECT @@ROWCOUNT AS affectedRows;
     `);
 
-  const productsAffected = Number(productsResult.recordset?.[0]?.affectedRows || 0);
+  const productsAffected = Number((productsResult.recordset && productsResult.recordset.length > 0 && productsResult.recordset[0].affectedRows) || 0);
 
   const masterUpdateRequest = createQueryRequest(request);
   const masterResult = await masterUpdateRequest
@@ -102,7 +102,7 @@ async function updateProductName(request, payload = {}) {
       SELECT @@ROWCOUNT AS affectedRows;
     `);
 
-  const productsMasterAffected = Number(masterResult.recordset?.[0]?.affectedRows || 0);
+  const productsMasterAffected = Number((masterResult.recordset && masterResult.recordset.length > 0 && masterResult.recordset[0].affectedRows) || 0);
 
   if (productsAffected <= 0 && productsMasterAffected <= 0) {
     throw new Error(`NON_RETRYABLE: No POS product rows were updated for ${productCode}`);

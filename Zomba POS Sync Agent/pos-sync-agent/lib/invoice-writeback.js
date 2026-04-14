@@ -45,7 +45,7 @@ async function findExistingInvoiceByRefNo(request, refNo) {
     ORDER BY InvoiceNo DESC
   `);
 
-  const invoiceCode = Number(result.recordset?.[0]?.InvoiceCode);
+  const invoiceCode = Number(result.recordset && result.recordset.length > 0 ? result.recordset[0].InvoiceCode : null);
   if (!Number.isFinite(invoiceCode) || invoiceCode <= 0) {
     return null;
   }
@@ -61,7 +61,7 @@ async function countInvoiceDetails(request, invoiceCode) {
     FROM POS.dbo.invoicedetails
     WHERE InvoiceCode = @InvoiceCode
   `);
-  return Number(result.recordset?.[0]?.DetailCount || 0);
+  return Number((result.recordset && result.recordset.length > 0 && result.recordset[0].DetailCount) || 0);
 }
 
 /**
@@ -77,7 +77,7 @@ async function getNextCashSaleNo(request) {
       FROM dbo.LastCashSaleNo WITH (UPDLOCK, HOLDLOCK)
     `);
 
-    const rowCount = Number(countResult.recordset?.[0]?.RecordCount || 0);
+    const rowCount = Number((countResult.recordset && countResult.recordset.length > 0 && countResult.recordset[0].RecordCount) || 0);
     if (rowCount !== 1) {
       throw new Error(`LastCashSaleNo table must contain exactly 1 row; found ${rowCount}`);
     }
@@ -140,7 +140,7 @@ async function updateLastCashSaleNo(request, newCashSaleNo) {
       SELECT TOP 1 *
       FROM dbo.LastCashSaleNo
     `);
-    const schemaRow = schemaResult.recordset?.[0] || {};
+    const schemaRow = (schemaResult.recordset && schemaResult.recordset.length > 0 ? schemaResult.recordset[0] : {});
     const counterColumn = Object.prototype.hasOwnProperty.call(schemaRow, 'LastCashSaleNo')
       ? 'LastCashSaleNo'
       : Object.prototype.hasOwnProperty.call(schemaRow, 'CashSaleNo')
@@ -161,7 +161,7 @@ async function updateLastCashSaleNo(request, newCashSaleNo) {
     updateRequest.input('ExpectedCashSaleNo', sql.Int, expectedCashSaleNo);
     const updateResult = await updateRequest.query(query);
 
-    const affectedRows = Number(updateResult.rowsAffected?.[0] || 0);
+    const affectedRows = Number((updateResult.rowsAffected && updateResult.rowsAffected.length > 0 ? updateResult.rowsAffected[0] : 0));
     if (affectedRows !== 1) {
       throw new Error(`LastCashSaleNo compare-and-set update failed; affected rows: ${affectedRows}`);
     }

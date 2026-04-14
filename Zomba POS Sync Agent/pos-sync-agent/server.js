@@ -329,8 +329,8 @@ function reconcileBatchesWithLiveStock(batches, liveStockQty) {
   return batches
     .filter((batch) => Number.isFinite(batch.remainingQty) && batch.remainingQty > 0)
     .sort((left, right) => {
-      const leftExp = left?.expiryDate ? new Date(left.expiryDate).getTime() : Number.POSITIVE_INFINITY;
-      const rightExp = right?.expiryDate ? new Date(right.expiryDate).getTime() : Number.POSITIVE_INFINITY;
+      const leftExp = (left && left.expiryDate) ? new Date(left.expiryDate).getTime() : Number.POSITIVE_INFINITY;
+      const rightExp = (right && right.expiryDate) ? new Date(right.expiryDate).getTime() : Number.POSITIVE_INFINITY;
       return leftExp - rightExp;
     });
 }
@@ -1374,10 +1374,10 @@ app.post('/pos-sync/apply-promotion', validateApiKey, requireFeature('enableProm
     });
 
     console.log('[PROMO] /apply-promotion DB query success:', {
-      productCode: result?.result?.productCode,
-      priceId: result?.result?.insertedRow?.priceId,
-      locationCode: result?.result?.locationCode,
-      priceTypeCode: result?.result?.priceTypeCode,
+      productCode: (result && result.result && result.result.productCode),
+      priceId: (result && result.result && result.result.insertedRow && result.result.insertedRow.priceId),
+      locationCode: (result && result.result && result.result.locationCode),
+      priceTypeCode: (result && result.result && result.result.priceTypeCode),
     });
 
     if (!result.success) {
@@ -1480,10 +1480,10 @@ app.post('/pos-sync/revert-promotion', validateApiKey, requireFeature('enablePro
     });
 
     console.log('[PROMO] /revert-promotion DB query success:', {
-      productCode: result?.result?.productCode,
-      priceId: result?.result?.insertedRow?.priceId,
-      locationCode: result?.result?.locationCode,
-      priceTypeCode: result?.result?.priceTypeCode,
+      productCode: (result && result.result && result.result.productCode),
+      priceId: (result && result.result && result.result.insertedRow && result.result.insertedRow.priceId),
+      locationCode: (result && result.result && result.result.locationCode),
+      priceTypeCode: (result && result.result && result.result.priceTypeCode),
     });
 
     if (!result.success) {
@@ -1844,14 +1844,14 @@ async function pollAndProcessEmergencySales() {
         await commandQueueClient.ackEmergencySaleSynced({
           sale_ref: sale.sale_ref,
           emergency_sale_id: sale.emergency_sale_id,
-          pos_invoice_no: resultSummary?.invoiceCode || null,
+          pos_invoice_no: (resultSummary && resultSummary.invoiceCode) || null,
         });
 
         console.log(`${BRANCH_TAG} [EMERGENCY SALES] sync success:`, {
           saleRef: sale.sale_ref,
           emergencySaleId: sale.emergency_sale_id,
-          invoiceCode: resultSummary?.invoiceCode || null,
-          alreadySynced: resultSummary?.alreadySynced === true,
+          invoiceCode: (resultSummary && resultSummary.invoiceCode) || null,
+          alreadySynced: (resultSummary && resultSummary.alreadySynced) === true,
         });
       } catch (error) {
         console.error(`${BRANCH_TAG} [EMERGENCY SALES] sync failed:`, {
