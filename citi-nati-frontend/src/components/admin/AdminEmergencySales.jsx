@@ -187,7 +187,8 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
           page: 1,
           pageSize: isAdminScope ? 200 : 20,
           status: 'all',
-          locationCode: selectedLocationCode,
+          // Only filter by location for non-BT branches; legacy BT sales are untagged
+          ...(selectedLocationCode && selectedLocationCode !== 'BT' && { locationCode: selectedLocationCode }),
         },
       });
 

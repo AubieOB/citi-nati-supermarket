@@ -120,7 +120,8 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
           endDate: nextFilters.endDate || undefined,
           product: nextFilters.product || undefined,
           cashier: nextFilters.cashier || undefined,
-          locationCode: selectedLocationCode,
+          // Only filter by location for non-BT branches; legacy BT sales are untagged
+          ...(selectedLocationCode && selectedLocationCode !== 'BT' && { locationCode: selectedLocationCode }),
         },
       });
 

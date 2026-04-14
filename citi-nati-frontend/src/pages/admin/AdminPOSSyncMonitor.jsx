@@ -253,7 +253,8 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
         params: {
           hours: 24,
           limit: 40,
-          locationCode: selectedLocationCode,
+          // Only filter by location for non-BT branches; legacy BT events are untagged
+          ...(selectedLocationCode && selectedLocationCode !== 'BT' && { locationCode: selectedLocationCode }),
         },
       });
       setMonitor(response.data?.data || null);

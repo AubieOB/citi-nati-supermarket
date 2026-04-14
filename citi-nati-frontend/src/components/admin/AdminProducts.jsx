@@ -603,7 +603,7 @@ const AdminProducts = ({ selectedLocationCode = 'BT' }) => {
 
       const fetchProductsPage = async (pageNumber) => {
         const params = new URLSearchParams({ page: String(pageNumber), pageSize: String(perPage) });
-        if (selectedLocationCode) {
+        if (selectedLocationCode && selectedLocationCode !== 'BT') {
           params.append('locationCode', selectedLocationCode);
         }
         return api.get(`/products?${params.toString()}`);
@@ -640,7 +640,7 @@ const AdminProducts = ({ selectedLocationCode = 'BT' }) => {
         try {
           console.warn('[ADMIN PRODUCTS UI] /products returned 0; trying /admin/pos-products fallback');
           const params = new URLSearchParams({ page: '1', limit: '5000' });
-          if (selectedLocationCode) {
+          if (selectedLocationCode && selectedLocationCode !== 'BT') {
             params.append('locationCode', selectedLocationCode);
           }
           const adminResp = await api.get(`/admin/pos-products?${params.toString()}`);

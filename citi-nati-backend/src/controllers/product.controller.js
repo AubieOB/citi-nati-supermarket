@@ -489,6 +489,11 @@ async function resolveLocationScopedProductCodes(locationCode) {
     .filter(Boolean);
 }
 
+function shouldUseLegacyBlantyreReadFallback(locationCode, scopedProductCodes) {
+  const normalizedLocationCode = normalizeScopeCode(locationCode);
+  return normalizedLocationCode === 'BT' && (!Array.isArray(scopedProductCodes) || scopedProductCodes.length === 0);
+}
+
 function getStartOfToday() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -961,7 +966,9 @@ const getProducts = async (req, res) => {
 
     if (normalizedLocationCode) {
       const scopedProductCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
-      if (!scopedProductCodes || scopedProductCodes.length === 0) {
+      if (shouldUseLegacyBlantyreReadFallback(normalizedLocationCode, scopedProductCodes)) {
+        console.warn('[PRODUCTS] Legacy Blantyre fallback activated for read listing (no ProductExpiryBatch scope rows found)');
+      } else if (!scopedProductCodes || scopedProductCodes.length === 0) {
         return res.status(200).json({
           products: [],
           pagination: {
@@ -971,11 +978,11 @@ const getProducts = async (req, res) => {
             limit: take,
           },
         });
+      } else {
+        where.sourceCode = {
+          in: scopedProductCodes,
+        };
       }
-
-      where.sourceCode = {
-        in: scopedProductCodes,
-      };
     }
 
     // Get total count for pagination metadata

@@ -55,7 +55,7 @@ const AdminPOSManagement = ({ selectedLocationCode = 'BT' }) => {
       if (searchValue) params.append('search', searchValue);
       params.append('page', pageNum);
       params.append('limit', limit);
-      if (selectedLocationCode) {
+      if (selectedLocationCode && selectedLocationCode !== 'BT') {
         params.append('locationCode', selectedLocationCode);
       }
 

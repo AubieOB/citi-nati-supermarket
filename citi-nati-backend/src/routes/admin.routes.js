@@ -69,6 +69,11 @@ async function resolveLocationScopedProductCodes(locationCode) {
     .filter(Boolean);
 }
 
+function shouldUseLegacyBlantyreReadFallback(locationCode, scopedProductCodes) {
+  const normalizedLocationCode = normalizeLocationCode(locationCode);
+  return normalizedLocationCode === 'BT' && (!Array.isArray(scopedProductCodes) || scopedProductCodes.length === 0);
+}
+
 const getSettingValue = async (key, fallbackValue) => {
   const setting = await prisma.siteSetting.findUnique({ where: { key } });
   return setting ? setting.value : fallbackValue;
@@ -748,7 +753,9 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
 
     if (normalizedLocationCode) {
       const scopedProductCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
-      if (!scopedProductCodes || scopedProductCodes.length === 0) {
+      if (shouldUseLegacyBlantyreReadFallback(normalizedLocationCode, scopedProductCodes)) {
+        console.warn('[ADMIN POS] Legacy Blantyre fallback activated for read listing (no ProductExpiryBatch scope rows found)');
+      } else if (!scopedProductCodes || scopedProductCodes.length === 0) {
         return res.json({
           success: true,
           products: [],
@@ -757,9 +764,9 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
           limit: parseInt(limit),
           totalPages: 0,
         });
+      } else {
+        where.sourceCode = { in: scopedProductCodes };
       }
-
-      where.sourceCode = { in: scopedProductCodes };
     }
 
     if (search) {
