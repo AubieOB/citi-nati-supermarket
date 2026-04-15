@@ -13,6 +13,7 @@ const commandExecutor = require('./lib/command-executor');
 const { buildConfig, getBranchTag, getSyncMetadata, validateStartupConfig } = require('./lib/config');
 const ReportingSyncService = require('./lib/reporting-sync');
 const ReportingSyncState = require('./lib/reporting-sync-state');
+const { ZOMBA_SUB_LOCATIONS } = require('./lib/sub-locations');
 
 const app = express();
 app.use(express.json());
@@ -211,12 +212,12 @@ function rejectDirectWritebackInProduction(req, res, next) {
 }
 
 /** Fetch products from POS with category information */
-async function fetchProductsFromPOS() {
+async function fetchProductsFromPOS(locationCode) {
   try {
     if (!pool) await initializePool();
 
-    // Get location code from environment or default to 'SH'
-    const LOCATION_CODE = appConfig.posDb.locationCode;
+    // Use provided location code or fall back to environment
+    const LOCATION_CODE = locationCode || appConfig.posDb.locationCode;
 
     // REAL-TIME STOCK + PRICE
     // Stock = SUM(QtyIn) - SUM(QtyOut) from ProductActivity
@@ -368,15 +369,15 @@ function shouldDebugExpiryBatch(productCode) {
  * Builds a Map<ProductCode, Batch[]> from SQL Server using vw_WillExpire_Products.
  * Each StockDetailID is one complete batch. No grouping, no aggregation.
  */
-async function buildActiveExpiryBatchesFromPOS() {
+async function buildActiveExpiryBatchesFromPOS(locationCode) {
   try {
     if (!pool) await initializePool();
-    const locationCode = appConfig.posDb.locationCode;
+    const normalizedLocationCode = locationCode || appConfig.posDb.locationCode;
     
     // Fetch all expiry rows from view - no pre-filtering by days here
     const result = await fetchExpiryCandidates({
       days: 3650,
-      locationCode,
+      locationCode: normalizedLocationCode,
       includeExpired: true,  // fetch all rows, apply date logic in agent
       source: 'view',  // prefer vw_WillExpire_Products
       productCodes: [],
@@ -435,7 +436,7 @@ async function buildActiveExpiryBatchesFromPOS() {
         grnNo,
         expiryDate: d.toISOString(),
         remainingQty: stockBalance,
-        locationCode: locationCode,
+        locationCode: normalizedLocationCode,
         batchNo: encodeExpiryBatchReference(stockDetailId, grnNo),
         source: result.source,
       };
@@ -751,10 +752,26 @@ app.get('/pos-sync/products', validateApiKey, requireFeature('enableReportingSyn
   try {
     console.log('[POS SYNC] /pos-sync/products endpoint called');
     
-    const products = await fetchProductsFromPOS();
-    console.log(`[POS SYNC] Fetched ${products.length} products from Global POS`);
+    // Fetch products from all Zomba sub-locations
+    const allProducts = [];
+    const zombaLocations = Object.values(ZOMBA_SUB_LOCATIONS).map(loc => loc.code);
+    
+    console.log(`[POS SYNC] Fetching from ${zombaLocations.length} Zomba locations: ${zombaLocations.join(', ')}`);
+    
+    for (const locationCode of zombaLocations) {
+      try {
+        const locationProducts = await fetchProductsFromPOS(locationCode);
+        console.log(`[POS SYNC] Fetched ${locationProducts.length} products from ${locationCode}`);
+        allProducts.push(...locationProducts);
+      } catch (locationErr) {
+        console.error(`[POS SYNC] Error fetching products from ${locationCode}:`, locationErr.message);
+        // Continue with other locations even if one fails
+      }
+    }
+    
+    console.log(`[POS SYNC] Fetched ${allProducts.length} products from all Zomba locations`);
 
-    if (!products || products.length === 0) {
+    if (!allProducts || allProducts.length === 0) {
       return res.json({
         success: true,
         count: 0,
@@ -764,12 +781,12 @@ app.get('/pos-sync/products', validateApiKey, requireFeature('enableReportingSyn
     }
 
     // Send to live server
-    const syncResult = await sendProductsToLiveServer(products);
+    const syncResult = await sendProductsToLiveServer(allProducts);
 
     res.json({
       success: true,
-      count: products.length,
-      data: products,
+      count: allProducts.length,
+      data: allProducts,
       syncResult: syncResult,
     });
   } catch (err) {
@@ -1675,10 +1692,28 @@ async function autoSync() {
 
   isAutoSyncRunning = true;
   try {
-    const products = await fetchProductsFromPOS();
-    if (products.length > 0) {
-      console.log(`${BRANCH_TAG} [AUTO SYNC] Triggered - fetched ${products.length} products`);
-      await sendProductsToLiveServer(products);
+    // Fetch products from all Zomba sub-locations
+    const allProducts = [];
+    const zombaLocations = Object.values(ZOMBA_SUB_LOCATIONS).map(loc => loc.code);
+    
+    console.log(`${BRANCH_TAG} [AUTO SYNC] Fetching from ${zombaLocations.length} Zomba locations: ${zombaLocations.join(', ')}`);
+    
+    for (const locationCode of zombaLocations) {
+      try {
+        const locationProducts = await fetchProductsFromPOS(locationCode);
+        console.log(`${BRANCH_TAG} [AUTO SYNC] Fetched ${locationProducts.length} products from ${locationCode}`);
+        allProducts.push(...locationProducts);
+      } catch (locationErr) {
+        console.error(`${BRANCH_TAG} [AUTO SYNC] Error fetching products from ${locationCode}:`, locationErr.message);
+        // Continue with other locations even if one fails
+      }
+    }
+    
+    if (allProducts.length > 0) {
+      console.log(`${BRANCH_TAG} [AUTO SYNC] Total: ${allProducts.length} products from all locations`);
+      await sendProductsToLiveServer(allProducts);
+    } else {
+      console.log(`${BRANCH_TAG} [AUTO SYNC] No products found from any location`);
     }
   } catch (err) {
     console.error(`${BRANCH_TAG} [AUTO SYNC] Error:`, err.message);
