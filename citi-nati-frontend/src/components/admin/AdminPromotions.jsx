@@ -13,15 +13,19 @@ import { notifySuccess, notifyError } from '../../utils/notifications.js';
  * 3. Randomly selected products
  */
 
-const AdminPromotions = () => {
-  const [categories, setCategories] = useState([]);
-  const [allProducts, setAllProducts] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [promotions, setPromotions] = useState({
+function createDefaultPromotionsState() {
+  return {
     global: { enabled: false, percentage: 10 },
     category: { enabled: false, percentage: 10, categoryId: null },
     selective: { enabled: false, percentage: 10, selectedProducts: [] },
-  });
+  };
+}
+
+const AdminPromotions = ({ selectedLocationCode = 'BT' }) => {
+  const [categories, setCategories] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [promotions, setPromotions] = useState(createDefaultPromotionsState);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('global');
   const [previewProducts, setPreviewProducts] = useState([]);
@@ -32,6 +36,7 @@ const AdminPromotions = () => {
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
   const textPrimary = isAdminDarkTheme ? '#f8fafc' : '#333';
   const textSecondary = isAdminDarkTheme ? '#cbd5e1' : '#666';
+  const selectedLocationLabel = selectedLocationCode === 'ZA' ? 'Zomba' : 'Blantyre';
 
   const clearSearch = () => {
     setSearchTerm('');
@@ -57,9 +62,6 @@ const AdminPromotions = () => {
   }, [searchTerm]);
 
   useEffect(() => {
-    fetchPromotionCatalog();
-    fetchCurrentPromotions();
-
     const cleanupSocket = setupSocketListeners();
     return () => {
       if (typeof cleanupSocket === 'function') {
@@ -67,6 +69,15 @@ const AdminPromotions = () => {
       }
     };
   }, []);
+
+  useEffect(() => {
+    setSearchTerm('');
+    setShowPreview(false);
+    setPreviewProducts([]);
+    setPromotions(createDefaultPromotionsState());
+    fetchPromotionCatalog();
+    fetchCurrentPromotions();
+  }, [selectedLocationCode]);
 
   useEffect(() => {
     let resizeObserver;
@@ -148,7 +159,7 @@ const AdminPromotions = () => {
       const all = [];
 
       while (true) {
-        const response = await api.get(`/products?page=${page}&pageSize=${perPage}`);
+        const response = await api.get(`/products?page=${page}&pageSize=${perPage}&locationCode=${encodeURIComponent(selectedLocationCode)}`);
         const items = response.data.products || [];
         all.push(...items);
 
@@ -173,7 +184,7 @@ const AdminPromotions = () => {
   const fetchCurrentPromotions = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/admin/promotions');
+      const response = await api.get(`/admin/promotions?locationCode=${encodeURIComponent(selectedLocationCode)}`);
       if (response.data.promotions) {
         setPromotions(response.data.promotions);
       }
@@ -231,7 +242,10 @@ const AdminPromotions = () => {
       }
 
       // Apply promotion via API
-      const response = await api.post(`/admin/promotions/${type}`, newPromotion);
+      const response = await api.post(`/admin/promotions/${type}`, {
+        ...newPromotion,
+        locationCode: selectedLocationCode,
+      });
       
       setPromotions(prev => ({
         ...prev,
@@ -251,7 +265,10 @@ const AdminPromotions = () => {
 
   const previewPromotion = async (type) => {
     try {
-      const payload = promotions[type];
+      const payload = {
+        ...promotions[type],
+        locationCode: selectedLocationCode,
+      };
       
       // For selective, pass selected product IDs
       if (type === 'selective' && (!payload.selectedProducts || payload.selectedProducts.length === 0)) {
@@ -627,7 +644,7 @@ const AdminPromotions = () => {
             <h1 style={{ margin: 0, color: textPrimary, fontSize: '1.15rem' }}>Promotions Management</h1>
           </div>
           <div style={{ color: textSecondary, fontSize: '0.85rem', fontWeight: '600' }}>
-            Catalog: {allProducts.length} products | {categories.length} categories
+            Scope: {selectedLocationLabel} ({selectedLocationCode}) | Catalog: {allProducts.length} products | {categories.length} categories
           </div>
         </div>
 

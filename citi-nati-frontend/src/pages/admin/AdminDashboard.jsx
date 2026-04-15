@@ -620,7 +620,7 @@ const AdminDashboard = () => {
             {activeTab === 'emergency-sales-reports' && <AdminEmergencySalesReports selectedLocationCode={selectedOperationalLocationCode} />}
             {activeTab === 'system' && <AdminSystem />}
             {activeTab === 'security' && <AdminSecurity />}
-            {activeTab === 'promotions' && <AdminPromotions />}
+            {activeTab === 'promotions' && <AdminPromotions selectedLocationCode={selectedOperationalLocationCode} />}
             {activeTab === 'pos-management' && <AdminPOSManagement selectedLocationCode={selectedOperationalLocationCode} />}
             {activeTab === 'pos-sync-monitor' && <AdminPOSSyncMonitor selectedLocationCode={selectedOperationalLocationCode} />}
             {activeTab === 'orders' && <AdminOrders />}
