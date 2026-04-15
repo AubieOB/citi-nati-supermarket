@@ -158,7 +158,7 @@ async function sendProductsToLiveServer(products) {
               expiryBatches: Array.isArray(p.ExpiryBatches) ? p.ExpiryBatches : [],
               branchCode: appConfig.branch.branchCode,
               branchName: appConfig.branch.branchName,
-              locationCode: appConfig.posDb.locationCode,
+              locationCode: p.LocationCode || appConfig.posDb.locationCode,
             })),
             metadata: syncMetadata,
           },
@@ -290,6 +290,7 @@ async function fetchProductsFromPOS(locationCode) {
 
       return {
         ...product,
+        LocationCode: LOCATION_CODE,
         ExpiryDate: nearestExpiryDate,
         ExpirySource: nearestBatch ? nearestBatch.source : null,
         ExpiryBatchCount: batches.length,
