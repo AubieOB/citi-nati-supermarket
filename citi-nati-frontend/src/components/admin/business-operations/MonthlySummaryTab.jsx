@@ -14,6 +14,15 @@ import NetSummaryCard from './monthly-summary/NetSummaryCard.jsx';
 const AUTO_REFRESH_MS = 30000;
 const AUTO_REFRESH_DEBOUNCE_MS = 350;
 
+const ZOMBA_LOCATION_CODES_FE = ['ZA', 'SH', 'BAR', 'WH'];
+function deriveBranchCodeFromLocationCode(locationCode) {
+  const code = String(locationCode || '').trim().toUpperCase();
+  if (!code) return '';
+  if (code === 'BT') return 'BLANTYRE';
+  if (ZOMBA_LOCATION_CODES_FE.includes(code)) return 'ZOMBA';
+  return '';
+}
+
 const cardStyle = {
   backgroundColor: '#fff',
   border: '1px solid #e2e8f0',
@@ -157,7 +166,10 @@ const MonthlySummaryTab = ({
       params.locationId = selectedLocationId;
     }
     if (selectedLocationCode.trim()) {
-      params.locationCode = selectedLocationCode.trim().toUpperCase();
+      const normalizedCode = selectedLocationCode.trim().toUpperCase();
+      params.locationCode = normalizedCode;
+      const branchCode = deriveBranchCodeFromLocationCode(normalizedCode);
+      if (branchCode) params.branchCode = branchCode;
     }
 
     try {
@@ -196,7 +208,12 @@ const MonthlySummaryTab = ({
     };
 
     if (selectedLocationId) params.locationId = selectedLocationId;
-    if (selectedLocationCode.trim()) params.locationCode = selectedLocationCode.trim().toUpperCase();
+    if (selectedLocationCode.trim()) {
+      const normalizedCode = selectedLocationCode.trim().toUpperCase();
+      params.locationCode = normalizedCode;
+      const branchCode = deriveBranchCodeFromLocationCode(normalizedCode);
+      if (branchCode) params.branchCode = branchCode;
+    }
 
     try {
       const response = await api.get('/business-operations/expenses/summary/overview', { params });

@@ -181,6 +181,17 @@ function buildReportParams(filters, extras = {}) {
   return compactParams({ ...filters, ...extras });
 }
 
+// Maps known BO location codes to the branchCode stored in SalesInvoice.
+// Must match the deriveBranchCodeFromLocationCode logic in reportingFilters.js.
+const ZOMBA_LOCATION_CODES_FE = ['ZA', 'SH', 'BAR', 'WH'];
+function deriveBranchCodeFromLocationCode(locationCode) {
+  const code = String(locationCode || '').trim().toUpperCase();
+  if (!code) return '';
+  if (code === 'BT') return 'BLANTYRE';
+  if (ZOMBA_LOCATION_CODES_FE.includes(code)) return 'ZOMBA';
+  return '';
+}
+
 function statusMessage(type) {
   if (type === 'invoices') return 'No invoices matched the selected filters.';
   if (type === 'products') return 'No product aggregates matched the selected filters.';
@@ -268,11 +279,13 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
     setFilters((prev) => {
       const nextLocationId = selectedLocationId ? String(selectedLocationId) : '';
       const nextLocationCode = selectedLocationId ? String(selectedLocationCode || '').trim().toUpperCase() : '';
-      if (prev.locationId === nextLocationId && prev.locationCode === nextLocationCode) return prev;
+      const nextBranchCode = deriveBranchCodeFromLocationCode(nextLocationCode);
+      if (prev.locationId === nextLocationId && prev.locationCode === nextLocationCode && prev.branchCode === nextBranchCode) return prev;
       return {
         ...prev,
         locationId: nextLocationId,
         locationCode: nextLocationCode,
+        branchCode: nextBranchCode,
       };
     });
     setViewState(DEFAULT_VIEW_STATE);
@@ -293,10 +306,12 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
   }, []);
 
   const resetFilters = useCallback(() => {
+    const nextLocationCode = selectedLocationId ? String(selectedLocationCode || '').trim().toUpperCase() : '';
     setFilters({
       ...DEFAULT_FILTERS,
       locationId: selectedLocationId ? String(selectedLocationId) : '',
-      locationCode: selectedLocationId ? String(selectedLocationCode || '').trim().toUpperCase() : '',
+      locationCode: nextLocationCode,
+      branchCode: deriveBranchCodeFromLocationCode(nextLocationCode),
     });
     setViewState(DEFAULT_VIEW_STATE);
   }, [selectedLocationCode, selectedLocationId]);

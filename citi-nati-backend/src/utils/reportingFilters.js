@@ -40,6 +40,17 @@ const ALLOWED_SORT_ORDERS = new Set(['asc', 'desc']);
 
 const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH'];
 
+// Maps a location code to the branch code stored in SalesInvoice.branchCode.
+// This is the reliable discriminator between branches because it comes directly
+// from the POS sync agent's BRANCH_CODE env variable.
+function deriveBranchCodeFromLocationCode(locationCode) {
+  const normalized = sanitizeStr(locationCode)?.toUpperCase();
+  if (!normalized) return null;
+  if (normalized === 'BT') return 'BLANTYRE';
+  if (ZOMBA_LOCATION_CODES.includes(normalized)) return 'ZOMBA';
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Filter extraction from raw query params
 // ---------------------------------------------------------------------------
@@ -83,7 +94,12 @@ function buildInvoiceWhere(dateRange, filters = {}) {
     };
   }
 
-  if (filters.branchCode) where.branchCode = filters.branchCode;
+  // Use explicit branchCode if provided; otherwise derive from locationCode.
+  // branchCode is the authoritative branch discriminator — it is stored from the
+  // POS agent's BRANCH_CODE env and is not affected by POS sub-location code
+  // ambiguities (e.g. both branches may use 'SH' as a sub-location code).
+  const effectiveBranchCode = filters.branchCode || deriveBranchCodeFromLocationCode(filters.locationCode);
+  if (effectiveBranchCode) where.branchCode = effectiveBranchCode;
   if (filters.syncSourceCode) where.syncSourceCode = filters.syncSourceCode;
 
   const expandedLocationCodes = expandLocationScopeCodes(filters.locationCode);
@@ -267,6 +283,7 @@ module.exports = {
   parsePagination,
   parseSort,
   buildResponseFilters,
+  deriveBranchCodeFromLocationCode,
   ALLOWED_INVOICE_SORT_FIELDS,
   ALLOWED_PRODUCT_SORT_FIELDS,
   ALLOWED_USER_SORT_FIELDS,

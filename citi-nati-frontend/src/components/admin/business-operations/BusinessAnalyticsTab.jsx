@@ -400,10 +400,10 @@ function withScope(params, scope, locations) {
 
   const location = locations.find((row) => String(row.id) === String(scope));
   if (location?.id) scoped.locationId = Number(location.id);
-  if (!location?.id) {
-    const locationCode = location?.code || normalizeLocationCodeFromName(location?.name || '');
-    if (locationCode) scoped.locationCode = locationCode;
-  }
+  // Always send locationCode alongside locationId so the backend can derive
+  // the authoritative branchCode for strict branch scoping.
+  const locationCode = location?.code || normalizeLocationCodeFromName(location?.name || '');
+  if (locationCode) scoped.locationCode = locationCode;
   return scoped;
 }
 

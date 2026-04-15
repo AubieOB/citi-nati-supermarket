@@ -15,10 +15,31 @@ function roundMoney(value, decimals = 2) {
   return Number(parsed.toFixed(decimals));
 }
 
+const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH'];
+
+// Mirrors the same function in reportingFilters.js — kept local to avoid
+// coupling unrelated modules. Must stay in sync with that version.
+function deriveBranchCodeFromLocationCode(locationCode) {
+  const code = String(locationCode || '').trim().toUpperCase();
+  if (!code) return null;
+  if (code === 'BT') return 'BLANTYRE';
+  if (ZOMBA_LOCATION_CODES.includes(code)) return 'ZOMBA';
+  return null;
+}
+
 function buildLatestCostScope(filters = {}) {
   const where = {};
 
   const andConditions = [];
+
+  // Derive an authoritative branchCode from the location selection.
+  // This is the same logic used in buildInvoiceWhere: branchCode is the
+  // reliable discriminator because it comes from the agent BRANCH_CODE env.
+  const effectiveBranchCode = filters.branchCode || deriveBranchCodeFromLocationCode(filters.locationCode);
+  if (effectiveBranchCode) {
+    where.branchCode = effectiveBranchCode;
+  }
+
   const locationCode = normalizeProductCode(filters.locationCode || filters.branchCode);
   const locationId = Number.isInteger(filters.locationId) ? filters.locationId : Number(filters.locationId);
   const hasLocationId = Number.isInteger(locationId) && locationId > 0;
