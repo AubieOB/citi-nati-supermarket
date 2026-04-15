@@ -219,24 +219,33 @@ async function fetchProductsFromPOS(locationCode) {
     // Use provided location code or fall back to environment
     const LOCATION_CODE = locationCode || appConfig.posDb.locationCode;
 
-    // REAL-TIME STOCK + PRICE
-    // Stock = SUM(QtyIn) - SUM(QtyOut) from ProductActivity
-    // Price = Most recent FPrice from productprices (by PriceID DESC = latest record)
+    // Use the stable DailyStockBalance snapshot for dashboard stock values.
+    // Price remains the most recent FPrice from productprices.
     const query = `
       SELECT 
           p.ProductCode,
           p.ProductName,
           ISNULL(p.Barcode,'') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
-          ISNULL(SUM(pa.QtyIn), 0) - ISNULL(SUM(pa.QtyOut), 0) AS QuantityAvailable,
+          ISNULL(dsb.StockBalance, 0) AS QuantityAvailable,
           ISNULL(
               (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC),
               (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode ORDER BY PriceID DESC)
           ) AS SellingPrice
       FROM POS.dbo.productsmaster p
       LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
-      LEFT JOIN POS.dbo.ProductActivity pa ON p.ProductCode = pa.ProductCode AND pa.LocationCode = @LocationCode
-      GROUP BY p.ProductCode, p.ProductName, p.Barcode, pt.ProductTypeName
+      LEFT JOIN (
+          SELECT
+              d.ProductCode,
+              d.StockBalance
+          FROM POS.dbo.DailyStockBalance d
+          WHERE d.LocationCode = @LocationCode
+            AND d.StockDate = (
+              SELECT MAX(StockDate)
+              FROM POS.dbo.DailyStockBalance
+              WHERE LocationCode = @LocationCode
+            )
+      ) dsb ON p.ProductCode = dsb.ProductCode
       ORDER BY p.ProductCode
     `;
 
@@ -244,9 +253,20 @@ async function fetchProductsFromPOS(locationCode) {
     request.input('LocationCode', sql.VarChar(10), LOCATION_CODE);
     const result = await request.query(query);
     
+    const negativeStockProducts = result.recordset.filter((product) => Number(product.QuantityAvailable || 0) < 0);
+
     console.log(`${SYNC_LOG_PREFIX} fetched ${result.recordset.length} products from location ${LOCATION_CODE}`);
-    console.log(`${SYNC_LOG_PREFIX} stock mode: SUM(QtyIn) - SUM(QtyOut)`);
+    console.log(`${SYNC_LOG_PREFIX} stock mode: DailyStockBalance latest snapshot`);
     console.log(`${SYNC_LOG_PREFIX} price mode: latest FPrice by PriceID DESC`);
+    console.log(`${SYNC_LOG_PREFIX} negative stock rows after snapshot query: ${negativeStockProducts.length}`);
+    if (negativeStockProducts.length > 0) {
+      console.log(`${SYNC_LOG_PREFIX} sample negative stock rows after snapshot query:`, negativeStockProducts.slice(0, 5).map((product) => ({
+        productCode: product.ProductCode,
+        productName: product.ProductName,
+        quantityAvailable: product.QuantityAvailable,
+        locationCode: LOCATION_CODE,
+      })));
+    }
     
     // Debug log first 5 products
     if (result.recordset.length > 0) {
