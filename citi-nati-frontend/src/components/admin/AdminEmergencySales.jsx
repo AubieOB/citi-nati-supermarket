@@ -94,6 +94,7 @@ function safeParseJson(value, fallback) {
 
 const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocationCode = 'BT' }) => {
   const { user } = useAuth();
+  const previousLocationCodeRef = useRef(selectedLocationCode);
 
   const rootRef = useRef(null);
   const hiddenBarcodeInputRef = useRef(null);
@@ -141,8 +142,33 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
 
   const draftStorageKey = useMemo(() => {
     const userId = user?.id || user?.email || 'anonymous';
-    return `emergency-sales-draft:${apiBase}:${userId}`;
-  }, [apiBase, user]);
+    return `emergency-sales-draft:${apiBase}:${userId}:${selectedLocationCode || 'BT'}`;
+  }, [apiBase, user, selectedLocationCode]);
+
+  useEffect(() => {
+    if (previousLocationCodeRef.current === selectedLocationCode) {
+      return;
+    }
+
+    const previousLocationCode = previousLocationCodeRef.current;
+    previousLocationCodeRef.current = selectedLocationCode;
+
+    // Reset volatile state so previous location data never bleeds into current scope.
+    setSearchModalOpen(false);
+    setSearchModalQuery('');
+    setSearchModalResults([]);
+    setSearchModalActiveIndex(0);
+    setShowQuickMenu(false);
+    setShowPaymentDialog(false);
+    setSelectedRowId(null);
+    setCart([]);
+    setLastReceipt(null);
+
+    console.log('[EMERGENCY SALES UI] location switched', {
+      from: previousLocationCode,
+      to: selectedLocationCode,
+    });
+  }, [selectedLocationCode]);
 
   const subtotal = useMemo(
     () => toMoney(cart.reduce((sum, line) => sum + toMoney(line.qty * line.unitPrice), 0)),
