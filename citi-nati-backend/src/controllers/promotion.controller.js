@@ -18,7 +18,6 @@ const POS_PROMO_REASON_CODE = 'WEBSITE_PROMOTION';
 const ACTIVE_PRODUCT_FILTER = {
   isActive: true,
   enabled: true,
-  hideFromProductsPage: false,
 };
 
 function normalizeLocationCode(value) {

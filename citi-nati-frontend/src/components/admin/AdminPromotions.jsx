@@ -170,10 +170,9 @@ const AdminPromotions = ({ selectedLocationCode = 'BT' }) => {
         page += 1;
       }
 
-      const visibleProducts = all.filter((product) => !product.hideFromProductsPage);
-      const uniqueCategories = [...new Set(visibleProducts.map((p) => p.category).filter(Boolean))].sort();
+      const uniqueCategories = [...new Set(all.map((p) => p.category).filter(Boolean))].sort();
 
-      setAllProducts(visibleProducts);
+      setAllProducts(all);
       setCategories(uniqueCategories);
     } catch (err) {
       console.error('Error fetching promotions catalog:', err);
