@@ -3,6 +3,7 @@ const { emitPosSyncEvent } = require('../utils/socket');
 const posCommandQueueService = require('./posCommandQueue.service');
 
 const prisma = new PrismaClient();
+const AGENT_LIVENESS_WINDOW_MS = Number.parseInt(process.env.POS_SYNC_AGENT_LIVENESS_WINDOW_MS || '90000', 10);
 
 function clampScore(value) {
   return Math.max(0, Math.min(100, value));
@@ -359,13 +360,34 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40, locationCode,
         agentUrl: null,
       };
 
-  // If the direct HTTP probe failed (e.g. backend can't reach the agent's LAN address),
-  // fall back to recent event evidence: a success event within the last 10 minutes means
-  // the agent is clearly alive and communicating.
+  // Reachability must be based on fresh, scope-correct evidence.
+  // Stale success should not keep an offline agent marked reachable.
+  const nowTs = Date.now();
+  const livenessWindowMs = Number.isFinite(AGENT_LIVENESS_WINDOW_MS) && AGENT_LIVENESS_WINDOW_MS > 0
+    ? AGENT_LIVENESS_WINDOW_MS
+    : 90000;
+
   const recentSuccessViaEvents = scopedRecentEvents.find(
-    (e) => e.status === 'success' && (Date.now() - new Date(e.createdAt).getTime()) < 10 * 60 * 1000,
-  );
-  const agentHealthy = agentHealthyDirect || recentSuccessViaEvents != null;
+    (event) => event.status === 'success' && (nowTs - new Date(event.createdAt).getTime()) <= livenessWindowMs,
+  ) || null;
+
+  const recentFailureViaEvents = scopedRecentEvents.find(
+    (event) => event.status === 'failed' && (nowTs - new Date(event.createdAt).getTime()) <= livenessWindowMs,
+  ) || null;
+
+  let agentHealthy = shouldUseDirectHealthProbe ? agentHealthyDirect : false;
+
+  if (recentSuccessViaEvents) {
+    agentHealthy = true;
+  }
+
+  if (recentFailureViaEvents) {
+    const successTs = recentSuccessViaEvents ? new Date(recentSuccessViaEvents.createdAt).getTime() : 0;
+    const failureTs = new Date(recentFailureViaEvents.createdAt).getTime();
+    if (!recentSuccessViaEvents || failureTs >= successTs) {
+      agentHealthy = false;
+    }
+  }
 
   const buckets = buildBuckets(safeHours);
   const bucketMap = new Map(buckets.map((bucket) => [bucket.key, bucket]));
