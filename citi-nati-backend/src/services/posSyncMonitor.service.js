@@ -361,7 +361,12 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40, locationCode,
       updatedAt: sale.updatedAt,
     }));
 
-  const shouldUseDirectHealthProbe = !scopedBranchCode || !backendConfiguredBranchCode || scopedBranchCode === backendConfiguredBranchCode;
+  // Only allow direct probe/config when backend branch identity is explicit and scope-matched.
+  // If backend branch identity is unknown, disable direct probe to avoid cross-branch leakage.
+  const hasExplicitBackendBranchScope = Boolean(backendConfiguredBranchCode);
+  const shouldUseDirectHealthProbe = !scopedBranchCode
+    ? hasExplicitBackendBranchScope
+    : (hasExplicitBackendBranchScope && scopedBranchCode === backendConfiguredBranchCode);
   const agentHealthyDirect = shouldUseDirectHealthProbe ? await checkPOSHealth() : false;
   const scopedConfig = shouldUseDirectHealthProbe
     ? config
