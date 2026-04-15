@@ -36,8 +36,8 @@ function expandBranchScopeCodes(value) {
     return ['BLANTYRE', 'BT'];
   }
 
-  if (['ZA', 'SH', 'BAR', 'WH', 'ST999', 'ZOMBA'].includes(normalized)) {
-    return ['ZOMBA', 'ZA', 'SH', 'BAR', 'WH', 'ST999'];
+  if (['ZA', 'SH', 'BAR', 'WH', 'ZOMBA'].includes(normalized)) {
+    return ['ZOMBA', 'ZA', 'SH', 'BAR', 'WH'];
   }
 
   return [normalized];

@@ -469,7 +469,7 @@ function normalizeScopeCode(value) {
   return normalized || null;
 }
 
-const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH', 'ST999'];
+const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH'];
 
 function expandLocationScopeCodes(locationCode) {
   const normalizedLocationCode = normalizeScopeCode(locationCode);

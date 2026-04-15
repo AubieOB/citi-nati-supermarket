@@ -38,7 +38,7 @@ const ALLOWED_PAYMENT_SORT_FIELDS = new Set(['payMethod', 'totalAmount', 'invoic
 
 const ALLOWED_SORT_ORDERS = new Set(['asc', 'desc']);
 
-const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH', 'ST999'];
+const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH'];
 
 // ---------------------------------------------------------------------------
 // Filter extraction from raw query params

@@ -15,7 +15,7 @@ const SYNC_STATUS = {
   FAILED: 'sync_failed',
 };
 
-const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH', 'ST999'];
+const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH'];
 const SUPPORTED_LOCATION_CODES = ['BT'].concat(ZOMBA_LOCATION_CODES);
 
 function normalizeLocationCode(value) {
@@ -484,7 +484,7 @@ async function lookupEmergencyProducts(req, res) {
     }
 
     if (!locationCode || !SUPPORTED_LOCATION_CODES.includes(locationCode)) {
-      return res.status(400).json({ success: false, error: 'locationCode is required and must be one of BT, SH, BAR, WH, ST999, or ZA' });
+      return res.status(400).json({ success: false, error: 'locationCode is required and must be one of BT, SH, BAR, WH, or ZA' });
     }
 
     const scopedProductCodes = await resolveLocationScopedProductCodes(locationCode);
@@ -552,7 +552,7 @@ async function createEmergencySale(req, res) {
   try {
     const locationCode = normalizeLocationCode(req.body?.locationCode || req.body?.branchCode || req.query?.locationCode);
     if (!locationCode || !SUPPORTED_LOCATION_CODES.includes(locationCode)) {
-      return res.status(400).json({ success: false, error: 'locationCode is required and must be one of BT, SH, BAR, WH, ST999, or ZA' });
+      return res.status(400).json({ success: false, error: 'locationCode is required and must be one of BT, SH, BAR, WH, or ZA' });
     }
 
     const branchCode = getBranchCodeFromLocationCode(locationCode);
@@ -997,7 +997,7 @@ async function getPendingEmergencySalesForPosSync(req, res) {
 
     const branchCode = normalizeBranchCode(req.headers['x-branch-code'] || req.query.branchCode || req.query.locationCode || req.body?.branchCode || req.body?.locationCode);
     
-    // For Zomba branch, support multiple sub-locations (SH, BAR, WH, ST999, etc.)
+    // For Zomba branch, support multiple sub-locations (SH, BAR, WH)
     // For other branches, use the single location code
     let locationCodes = [];
     
@@ -1008,7 +1008,7 @@ async function getPendingEmergencySalesForPosSync(req, res) {
         locationCodes = [explicitLocation];
       } else {
         // Fetch emergency sales from all possible Zomba sub-locations
-        locationCodes = ['SH', 'BAR', 'WH', 'ST999'];
+        locationCodes = ['SH', 'BAR', 'WH'];
       }
     } else if (branchCode === 'BLANTYRE') {
       locationCodes = ['BT'];

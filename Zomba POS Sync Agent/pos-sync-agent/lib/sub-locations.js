@@ -22,12 +22,6 @@ const ZOMBA_SUB_LOCATIONS = {
     description: 'Internal warehouse/storage',
     category: 'internal',
   },
-  ST999: {
-    code: 'ST999',
-    name: 'Store 999',
-    description: 'Sub-location ST999',
-    category: 'retail',
-  },
 };
 
 /**

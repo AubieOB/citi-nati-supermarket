@@ -49,7 +49,7 @@ function normalizeLocationCode(value) {
   return normalized || null;
 }
 
-const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH', 'ST999'];
+const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH'];
 
 function expandLocationScopeCodes(locationCode) {
   const normalizedLocationCode = normalizeLocationCode(locationCode);
