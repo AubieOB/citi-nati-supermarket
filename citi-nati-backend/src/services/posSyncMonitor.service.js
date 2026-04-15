@@ -51,8 +51,92 @@ function expandLocationScopeCodes(locationCode) {
 
 function toScopeFromLocationCode(locationCode) {
   if (locationCode === 'BT') return 'BLANTYRE';
-  if (locationCode === 'ZA') return 'ZOMBA';
+  if (locationCode && ZOMBA_LOCATION_CODES.includes(locationCode)) return 'ZOMBA';
   return null;
+}
+
+function normalizeBranchCode(value) {
+  const normalized = normalizeScopeCode(value);
+  if (normalized === 'BT') return 'BLANTYRE';
+  if (normalized && ZOMBA_LOCATION_CODES.includes(normalized)) return 'ZOMBA';
+  return normalized;
+}
+
+function inferBranchCodeFromAgentId(agentId) {
+  const normalized = String(agentId || '').trim().toUpperCase();
+  if (!normalized) return null;
+  if (normalized.includes('BLANTYRE') || normalized.includes('BT')) return 'BLANTYRE';
+  if (normalized.includes('ZOMBA') || normalized.includes('ZA')) return 'ZOMBA';
+  return null;
+}
+
+function commandMatchesScope(command, scopedBranchCode, scopedLocationCode) {
+  if (!scopedBranchCode && !scopedLocationCode) return true;
+
+  const payload = command?.payload && typeof command.payload === 'object' ? command.payload : {};
+  const scopedLocationCodes = expandLocationScopeCodes(scopedLocationCode);
+  const payloadBranchCode = normalizeBranchCode(payload.branchCode);
+  const payloadLocationCode = normalizeScopeCode(payload.locationCode);
+  const payloadRequestedLocationCode = normalizeScopeCode(payload.requestedLocationCode);
+  const commandAgentBranchCode = normalizeBranchCode(inferBranchCodeFromAgentId(command?.agentId));
+
+  if (scopedBranchCode && payloadBranchCode === scopedBranchCode) return true;
+  if (scopedBranchCode && commandAgentBranchCode === scopedBranchCode) return true;
+
+  if (scopedLocationCodes.length > 0) {
+    if (payloadRequestedLocationCode && scopedLocationCodes.includes(payloadRequestedLocationCode)) return true;
+    if (payloadLocationCode && scopedLocationCodes.includes(payloadLocationCode)) return true;
+  }
+
+  return false;
+}
+
+function emergencySaleMatchesScope(sale, scopedBranchCode, scopedLocationCode) {
+  if (!scopedBranchCode && !scopedLocationCode) return true;
+
+  const snapshot = sale?.cartSnapshot && typeof sale.cartSnapshot === 'object' ? sale.cartSnapshot : {};
+  const scopedLocationCodes = expandLocationScopeCodes(scopedLocationCode);
+
+  const saleBranchCode = normalizeBranchCode(snapshot.branchCode || snapshot.locationCode || snapshot.posLocationCode || null);
+  const saleLocationCode = normalizeScopeCode(snapshot.posLocationCode || snapshot.locationCode || null);
+
+  if (scopedBranchCode && saleBranchCode === scopedBranchCode) return true;
+  if (scopedLocationCodes.length > 0 && saleLocationCode && scopedLocationCodes.includes(saleLocationCode)) return true;
+  return false;
+}
+
+function summarizeQueueStatsFromCommands(commands = []) {
+  const stats = {
+    PENDING: 0,
+    PROCESSING: 0,
+    COMPLETED: 0,
+    FAILED: 0,
+  };
+
+  for (const command of commands) {
+    const key = String(command.status || '').toUpperCase();
+    if (Object.prototype.hasOwnProperty.call(stats, key)) {
+      stats[key] += 1;
+    }
+  }
+
+  return stats;
+}
+
+function summarizeEmergencySales(sales = []) {
+  const summary = {
+    pending: 0,
+    synced: 0,
+    failed: 0,
+  };
+
+  for (const sale of sales) {
+    if (sale.syncStatus === 'pending_pos_sync') summary.pending += 1;
+    if (sale.syncStatus === 'synced_to_pos') summary.synced += 1;
+    if (sale.syncStatus === 'sync_failed') summary.failed += 1;
+  }
+
+  return summary;
 }
 
 function eventMatchesScope(event, scopedBranchCode, scopedLocationCode) {
@@ -218,21 +302,24 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40, locationCode,
   const safeHours = Math.max(1, Math.min(168, Number.parseInt(hours, 10) || 24));
   const safeLimit = Math.max(10, Math.min(100, Number.parseInt(limit, 10) || 40));
   const scopedLocationCode = normalizeScopeCode(locationCode);
-  const scopedBranchCode = normalizeScopeCode(branchCode) || toScopeFromLocationCode(scopedLocationCode);
+  const scopedBranchCode = normalizeBranchCode(branchCode) || toScopeFromLocationCode(scopedLocationCode);
+  const backendConfiguredBranchCode = normalizeBranchCode(process.env.POS_BRANCH_CODE || process.env.BRANCH_CODE || null);
   const since = new Date(Date.now() - safeHours * 60 * 60 * 1000);
 
-  const [config, agentHealthyDirect, recentEvents, queueStats, recentCommands, emergencyGrouped, recentEmergencyFailures, recentWindowEvents] = await Promise.all([
+  const [config, recentEvents, recentCommandsRaw, emergencySalesRaw, recentWindowEvents] = await Promise.all([
     getRuntimeConfig(),
-    checkPOSHealth(),
     prisma.posSyncEvent.findMany({ orderBy: { createdAt: 'desc' }, take: safeLimit * 10 }),
-    posCommandQueueService.getStats(),
-    posCommandQueueService.listCommands({ take: 20 }),
-    prisma.emergencySale.groupBy({ by: ['syncStatus'], _count: { _all: true } }),
+    posCommandQueueService.listCommands({ take: safeLimit * 10 }),
     prisma.emergencySale.findMany({
-      where: { syncStatus: 'sync_failed' },
-      orderBy: { updatedAt: 'desc' },
-      take: 10,
-      select: { id: true, saleRef: true, retryCount: true, syncError: true, updatedAt: true },
+      select: {
+        id: true,
+        saleRef: true,
+        retryCount: true,
+        syncError: true,
+        updatedAt: true,
+        syncStatus: true,
+        cartSnapshot: true,
+      },
     }),
     prisma.posSyncEvent.findMany({ where: { createdAt: { gte: since } }, orderBy: { createdAt: 'asc' } }),
   ]);
@@ -242,6 +329,35 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40, locationCode,
     .slice(0, safeLimit);
 
   const scopedRecentWindowEvents = recentWindowEvents.filter((event) => eventMatchesScope(event, scopedBranchCode, scopedLocationCode));
+
+  const scopedCommands = recentCommandsRaw
+    .filter((command) => commandMatchesScope(command, scopedBranchCode, scopedLocationCode));
+  const queueStats = summarizeQueueStatsFromCommands(scopedCommands);
+  const recentCommands = scopedCommands.slice(0, 20);
+
+  const scopedEmergencySales = emergencySalesRaw
+    .filter((sale) => emergencySaleMatchesScope(sale, scopedBranchCode, scopedLocationCode));
+  const emergencySummary = summarizeEmergencySales(scopedEmergencySales);
+  const recentEmergencyFailures = scopedEmergencySales
+    .filter((sale) => sale.syncStatus === 'sync_failed')
+    .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())
+    .slice(0, 10)
+    .map((sale) => ({
+      id: sale.id,
+      saleRef: sale.saleRef,
+      retryCount: sale.retryCount,
+      syncError: sale.syncError,
+      updatedAt: sale.updatedAt,
+    }));
+
+  const shouldUseDirectHealthProbe = !scopedBranchCode || !backendConfiguredBranchCode || scopedBranchCode === backendConfiguredBranchCode;
+  const agentHealthyDirect = shouldUseDirectHealthProbe ? await checkPOSHealth() : false;
+  const scopedConfig = shouldUseDirectHealthProbe
+    ? config
+    : {
+        ...config,
+        agentUrl: null,
+      };
 
   // If the direct HTTP probe failed (e.g. backend can't reach the agent's LAN address),
   // fall back to recent event evidence: a success event within the last 10 minutes means
@@ -277,18 +393,6 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40, locationCode,
     }
   }
 
-  const emergencySummary = {
-    pending: 0,
-    synced: 0,
-    failed: 0,
-  };
-
-  for (const row of emergencyGrouped) {
-    if (row.syncStatus === 'pending_pos_sync') emergencySummary.pending = row._count._all;
-    if (row.syncStatus === 'synced_to_pos') emergencySummary.synced = row._count._all;
-    if (row.syncStatus === 'sync_failed') emergencySummary.failed = row._count._all;
-  }
-
   const health = analyzeHealth({
     enabled: config.enabled,
     agentHealthy,
@@ -301,7 +405,7 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40, locationCode,
   const recentSuccess = scopedRecentEvents.find((event) => event.status === 'success') || null;
 
   return {
-    config,
+    config: scopedConfig,
     summary: {
       enabled: config.enabled,
       agentHealthy,
@@ -335,6 +439,7 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40, locationCode,
     scope: {
       branchCode: scopedBranchCode,
       locationCode: scopedLocationCode,
+      backendConfiguredBranchCode,
     },
   };
 }

@@ -34,6 +34,10 @@ async function togglePosSync(req, res) {
   try {
     const updatedEnabled = await setPosSyncEnabled(Boolean(req.body?.enabled));
     const config = await getRuntimeConfig();
+    const locationCode = String(req.body?.locationCode || req.query?.locationCode || '').trim().toUpperCase() || null;
+    const branchCode = locationCode === 'BT'
+      ? 'BLANTYRE'
+      : (['ZA', 'SH', 'BAR', 'WH'].includes(locationCode) ? 'ZOMBA' : null);
 
     await recordPosSyncEvent({
       eventType: 'toggle',
@@ -47,6 +51,8 @@ async function togglePosSync(req, res) {
         : 'Re-enable POS sync only after the underlying agent or connectivity issue has been resolved.',
       metadata: {
         updatedBy: req.user?.email || req.user?.id || 'admin',
+        branchCode,
+        locationCode,
       },
     });
 

@@ -144,6 +144,40 @@ function statusTone(status) {
   return { bg: '#dbeafe', fg: '#1d4ed8' };
 }
 
+function normalizeScopeCode(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  return normalized || null;
+}
+
+function deriveBranchCodeFromLocationCode(locationCode) {
+  const normalized = normalizeScopeCode(locationCode);
+  if (normalized === 'BT') return 'BLANTYRE';
+  if (['ZA', 'SH', 'BAR', 'WH'].includes(normalized)) return 'ZOMBA';
+  return null;
+}
+
+function expandScopeLocationCodes(locationCode) {
+  const normalized = normalizeScopeCode(locationCode);
+  if (!normalized) return [];
+  if (normalized === 'BT') return ['BT'];
+  if (['ZA', 'SH', 'BAR', 'WH'].includes(normalized)) return ['ZA', 'SH', 'BAR', 'WH'];
+  return [normalized];
+}
+
+function eventMatchesSelectedScope(event, selectedLocationCode) {
+  const scopeBranchCode = deriveBranchCodeFromLocationCode(selectedLocationCode);
+  const scopeLocationCodes = expandScopeLocationCodes(selectedLocationCode);
+  if (!scopeBranchCode && scopeLocationCodes.length === 0) return true;
+
+  const metadata = event?.metadata && typeof event.metadata === 'object' ? event.metadata : {};
+  const eventBranchCode = normalizeScopeCode(metadata.branchCode || null);
+  const eventLocationCode = normalizeScopeCode(metadata.locationCode || null);
+
+  if (scopeBranchCode && eventBranchCode === scopeBranchCode) return true;
+  if (eventLocationCode && scopeLocationCodes.includes(eventLocationCode)) return true;
+  return false;
+}
+
 /* ──────────────── sub-components ──────────────── */
 
 function MetricCard({ label, value, hint, accent }) {
@@ -207,6 +241,7 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
   const [toggleSaving, setToggleSaving] = useState(false);
   const refreshTimeoutRef = useRef(null);
   const lastToastEventRef = useRef(null);
+  const previousLocationCodeRef = useRef(selectedLocationCode);
 
   // ── Sticky header layout (matches AdminQuotations / AdminPromotions pattern) ──
   const headerRef = useRef(null);
@@ -271,6 +306,23 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
   }, [fetchMonitorData, selectedLocationCode]);
 
   useEffect(() => {
+    if (previousLocationCodeRef.current === selectedLocationCode) {
+      return;
+    }
+
+    previousLocationCodeRef.current = selectedLocationCode;
+    setMonitor(null);
+    setLoading(true);
+    setRefreshing(false);
+    lastToastEventRef.current = null;
+
+    if (refreshTimeoutRef.current) {
+      clearTimeout(refreshTimeoutRef.current);
+      refreshTimeoutRef.current = null;
+    }
+  }, [selectedLocationCode]);
+
+  useEffect(() => {
     fetchMonitorData(true);
     const interval = setInterval(() => fetchMonitorData(false), 30000);
     return () => {
@@ -285,6 +337,10 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
     if (!socket) return undefined;
 
     const handlePosSyncEvent = (event) => {
+      if (!eventMatchesSelectedScope(event, selectedLocationCode)) {
+        return;
+      }
+
       setMonitor((prev) => {
         if (!prev) return prev;
         const nextEvents = [event, ...(prev.recentEvents || []).filter((e) => e.id !== event.id)].slice(0, 40);
@@ -312,13 +368,15 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
 
     socket.on('posSyncEvent', handlePosSyncEvent);
     return () => socket.off('posSyncEvent', handlePosSyncEvent);
-  }, [scheduleRefresh]);
+  }, [scheduleRefresh, selectedLocationCode]);
 
   // ── Actions ────────────────────────────────────────────────────
   const handleManualSync = async () => {
     try {
       setManualSyncing(true);
-      const response = await api.post('/admin/pos-sync/manual-sync');
+      const response = await api.post('/admin/pos-sync/manual-sync', {
+        locationCode: selectedLocationCode,
+      });
       const result = response.data?.result || {};
       notifySuccess(`Manual POS sync complete: ${result.synced || 0} synced, ${result.skipped || 0} skipped`, 3500);
       await fetchMonitorData(false);
@@ -334,7 +392,10 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
     try {
       setToggleSaving(true);
       const nextEnabled = !monitor.config.enabled;
-      await api.post('/admin/pos-sync/toggle', { enabled: nextEnabled });
+      await api.post('/admin/pos-sync/toggle', {
+        enabled: nextEnabled,
+        locationCode: selectedLocationCode,
+      });
       notifySuccess(`POS sync ${nextEnabled ? 'enabled' : 'disabled'}`, 3000);
       await fetchMonitorData(false);
     } catch (error) {
@@ -386,6 +447,9 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
               </span>
               <span style={S.badge('#f1f5f9', '#475569')}>
                 Agent: {summary.agentHealthy ? 'reachable' : 'unreachable'}
+              </span>
+              <span style={S.badge('#f1f5f9', '#475569')}>
+                Scope: {selectedLocationCode === 'ZA' ? 'Zomba' : 'Blantyre'} ({selectedLocationCode})
               </span>
               <span style={S.badge('#f1f5f9', '#475569')}>
                 Last event: {rel(summary.lastEventAt)}

@@ -313,6 +313,8 @@ async function syncProductsFromPOS() {
         skipped,
         total: posProducts.length,
         errors,
+        branchCode: DEFAULT_POS_BRANCH_CODE,
+        locationCode: String(process.env.POS_LOCATION_CODE || '').trim().toUpperCase() || null,
       },
     });
 
@@ -337,6 +339,8 @@ async function syncProductsFromPOS() {
       durationMs: Date.now() - startedAt,
       metadata: {
         endpoint: '/pos-sync/products',
+        branchCode: DEFAULT_POS_BRANCH_CODE,
+        locationCode: String(process.env.POS_LOCATION_CODE || '').trim().toUpperCase() || null,
       },
     });
     return {

@@ -32,6 +32,8 @@ async function recordMonitorEvent(payload) {
 
 async function enqueueCommand(commandType, payload, meta = {}) {
   try {
+    const payloadBranchCode = String(payload?.branchCode || '').trim().toUpperCase() || null;
+    const payloadLocationCode = String(payload?.requestedLocationCode || payload?.locationCode || '').trim().toUpperCase() || null;
     const command = await prisma.posWriteCommand.create({
       data: {
         commandType,
@@ -77,6 +79,8 @@ async function enqueueCommand(commandType, payload, meta = {}) {
         commandType: command.commandType,
         source: command.source,
         relatedEntityId: command.relatedEntityId,
+        branchCode: payloadBranchCode,
+        locationCode: payloadLocationCode,
       },
     });
 
@@ -240,6 +244,9 @@ async function markCommandFailed(id, errorMessage, retryable = true, agentId = n
     const canRetry = retryable && nextRetryCount < command.maxRetries;
     const nextRetryAt = canRetry ? getNextRetryAt(nextRetryCount) : null;
 
+    const payloadBranchCode = String(command.payload?.branchCode || '').trim().toUpperCase() || null;
+    const payloadLocationCode = String(command.payload?.requestedLocationCode || command.payload?.locationCode || '').trim().toUpperCase() || null;
+
     const data = canRetry
       ? {
           status: POS_COMMAND_STATUS.PENDING,
@@ -299,7 +306,8 @@ async function markCommandFailed(id, errorMessage, retryable = true, agentId = n
         productCode: command.payload?.productCode || null,
         oldName: command.payload?.oldName || null,
         newName: command.payload?.newName || null,
-        locationCode: command.payload?.locationCode || null,
+        branchCode: payloadBranchCode,
+        locationCode: payloadLocationCode,
       },
     });
   } catch (error) {
