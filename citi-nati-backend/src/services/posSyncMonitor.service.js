@@ -307,7 +307,7 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40, locationCode,
   const backendConfiguredBranchCode = normalizeBranchCode(process.env.POS_BRANCH_CODE || process.env.BRANCH_CODE || null);
   const since = new Date(Date.now() - safeHours * 60 * 60 * 1000);
 
-  const [config, recentEvents, recentCommandsRaw, emergencySalesRaw, recentWindowEvents] = await Promise.all([
+  const [config, recentEvents, recentCommandsRaw, emergencySalesRaw, recentWindowEvents, latestProductSync] = await Promise.all([
     getRuntimeConfig(),
     prisma.posSyncEvent.findMany({ orderBy: { createdAt: 'desc' }, take: safeLimit * 10 }),
     posCommandQueueService.listCommands({ take: safeLimit * 10 }),
@@ -323,6 +323,16 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40, locationCode,
       },
     }),
     prisma.posSyncEvent.findMany({ where: { createdAt: { gte: since } }, orderBy: { createdAt: 'asc' } }),
+    prisma.product.aggregate({
+      _max: {
+        lastSyncedAt: true,
+      },
+      where: scopedBranchCode
+        ? {
+            branchCode: scopedBranchCode,
+          }
+        : undefined,
+    }),
   ]);
 
   const scopedRecentEvents = recentEvents
@@ -425,6 +435,7 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40, locationCode,
 
   const recentFailure = scopedRecentEvents.find((event) => event.status === 'failed') || null;
   const recentSuccess = scopedRecentEvents.find((event) => event.status === 'success') || null;
+  const lastSuccessfulSyncAt = latestProductSync?._max?.lastSyncedAt || null;
 
   return {
     config: scopedConfig,
@@ -435,6 +446,7 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40, locationCode,
       healthLabel: health.label,
       failureRate: health.failureRate,
       lastEventAt: scopedRecentEvents[0]?.createdAt || null,
+      lastSuccessfulSyncAt,
       lastSuccessfulEventAt: recentSuccess?.createdAt || null,
       lastFailedEventAt: recentFailure?.createdAt || null,
       issues: health.issues,
