@@ -325,13 +325,12 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40, locationCode,
     prisma.posSyncEvent.findMany({ where: { createdAt: { gte: since } }, orderBy: { createdAt: 'asc' } }),
     prisma.product.aggregate({
       _max: {
-        lastSyncedAt: true,
+        updatedAt: true,
       },
-      where: scopedBranchCode
-        ? {
-            branchCode: scopedBranchCode,
-          }
-        : undefined,
+      where: {
+        ...(scopedBranchCode ? { branchCode: scopedBranchCode } : {}),
+        sourceCode: { not: null },
+      },
     }),
   ]);
 
@@ -440,7 +439,7 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40, locationCode,
 
   const recentFailure = scopedRecentEvents.find((event) => event.status === 'failed') || null;
   const recentSuccess = scopedRecentEvents.find((event) => event.status === 'success') || null;
-  const lastSuccessfulSyncAt = latestProductSync?._max?.lastSyncedAt || null;
+  const lastSuccessfulSyncAt = latestProductSync?._max?.updatedAt || null;
 
   return {
     config: scopedConfig,
