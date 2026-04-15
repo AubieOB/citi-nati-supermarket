@@ -2113,7 +2113,7 @@ const AdminProducts = ({ selectedLocationCode = 'BT' }) => {
                 
                 return (
                   <tr 
-                    key={product.id} 
+                    key={`${product.branchCode || 'UNKNOWN'}-${product.id}`} 
                     style={{ 
                       borderBottom: '1px solid #eee',
                       backgroundColor: product.expiryStatus?.status === 'expired'

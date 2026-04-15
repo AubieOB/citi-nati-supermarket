@@ -871,6 +871,7 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
 
     if (normalizedLocationCode) {
       const scopedProductCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
+      const derivedBranchCode = deriveBranchCodeFromScopeCodes(expandLocationScopeCodes(normalizedLocationCode));
       if (!scopedProductCodes || scopedProductCodes.length === 0) {
         return res.json({
           success: true,
@@ -882,6 +883,9 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
         });
       } else {
         where.sourceCode = { in: scopedProductCodes };
+        if (derivedBranchCode) {
+          where.branchCode = derivedBranchCode;
+        }
       }
     }
 
@@ -903,6 +907,7 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
       take: parseInt(limit),
       select: {
         id: true,
+        branchCode: true,
         name: true,
         sourceCode: true,
         category: true,
@@ -1062,10 +1067,14 @@ router.delete('/pos-products/delete-selected', verifyTokenMiddleware, verifyAdmi
 
     if (normalizedLocationCode) {
       const scopedCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
+      const derivedBranchCode = deriveBranchCodeFromScopeCodes(expandLocationScopeCodes(normalizedLocationCode));
       if (!scopedCodes || scopedCodes.length === 0) {
         return res.json({ success: true, message: 'No POS products found for selected location', deletedCount: 0 });
       }
       where.sourceCode = { in: scopedCodes };
+      if (derivedBranchCode) {
+        where.branchCode = derivedBranchCode;
+      }
     }
 
     const deleted = await prisma.product.deleteMany({ where });
@@ -1101,10 +1110,14 @@ router.delete('/pos-products/delete-all', verifyTokenMiddleware, verifyAdmin, as
 
     if (normalizedLocationCode) {
       const scopedCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
+      const derivedBranchCode = deriveBranchCodeFromScopeCodes(expandLocationScopeCodes(normalizedLocationCode));
       if (!scopedCodes || scopedCodes.length === 0) {
         return res.json({ success: true, message: 'No POS products found for selected location', deletedCount: 0 });
       }
       where.sourceCode = { in: scopedCodes };
+      if (derivedBranchCode) {
+        where.branchCode = derivedBranchCode;
+      }
     }
 
     const deleted = await prisma.product.deleteMany({ where });

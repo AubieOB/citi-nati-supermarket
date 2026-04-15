@@ -18,6 +18,7 @@ const { emitProductUpdate } = require('../utils/socket');
 const productImageMappingService = require('./productImageMapping.service');
 
 const prisma = new PrismaClient();
+const DEFAULT_POS_BRANCH_CODE = String(process.env.POS_BRANCH_CODE || process.env.BRANCH_CODE || 'BLANTYRE').trim().toUpperCase();
 
 function resolvePosAgentUrl() {
   const candidates = [
@@ -205,6 +206,7 @@ async function syncProductsFromPOS() {
       try {
         // Map POS product structure to database format
         const productData = {
+          branchCode: DEFAULT_POS_BRANCH_CODE,
           name: posProduct.ProductName || 'Unknown Product',
           price: posProduct.SellingPrice || 0,
           stock: posProduct.QuantityAvailable || 0,
@@ -222,7 +224,10 @@ async function syncProductsFromPOS() {
 
         // Find existing product by source code
         const existingProduct = await prisma.product.findFirst({
-          where: { sourceCode: posProduct.ProductCode },
+          where: {
+            sourceCode: posProduct.ProductCode,
+            branchCode: DEFAULT_POS_BRANCH_CODE,
+          },
         });
 
         if (existingProduct) {

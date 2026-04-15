@@ -116,9 +116,9 @@ async function reattachImageByProductCode(productCodeOrSourceCode) {
   const mapping = await prisma.productImageMapping.findUnique({ where: { productCode: code } });
   if (!mapping) return null;
 
-  // Update the product row's image field by sourceCode
+  // Update all branch-scoped product rows sharing this sourceCode.
   try {
-    await prisma.product.update({
+    await prisma.product.updateMany({
       where: { sourceCode: code },
       data: { image: mapping.secureUrl },
     });
@@ -155,7 +155,7 @@ async function bulkReattachImages(productCodes) {
         return;
       }
       try {
-        await prisma.product.update({
+        await prisma.product.updateMany({
           where: { sourceCode: code },
           data: { image: mapping.secureUrl },
         });
@@ -200,7 +200,7 @@ async function permanentlyDeleteImageMapping(productCode) {
 
   // Clear the image on the product row if it still exists
   try {
-    await prisma.product.update({
+    await prisma.product.updateMany({
       where: { sourceCode: code },
       data: { image: null },
     });

@@ -1111,6 +1111,7 @@ const getProducts = async (req, res) => {
 
     if (normalizedLocationCode) {
       const scopedProductCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
+      const derivedBranchCode = deriveBranchCodeFromScopeCodes(expandLocationScopeCodes(normalizedLocationCode));
       if (!scopedProductCodes || scopedProductCodes.length === 0) {
         return res.status(200).json({
           products: [],
@@ -1125,6 +1126,9 @@ const getProducts = async (req, res) => {
         where.sourceCode = {
           in: scopedProductCodes,
         };
+        if (derivedBranchCode) {
+          where.branchCode = derivedBranchCode;
+        }
       }
     }
 
@@ -1138,6 +1142,7 @@ const getProducts = async (req, res) => {
       where,
       select: {
         id: true,
+        branchCode: true,
         name: true,
         sourceCode: true,
         price: true,
@@ -1990,13 +1995,17 @@ const syncProductsFromPOSAgent = async (req, res) => {
           continue;
         }
 
-        const existingProduct = await prisma.product.findUnique({
-          where: { sourceCode },
+        const existingProduct = await prisma.product.findFirst({
+          where: {
+            sourceCode,
+            branchCode,
+          },
           select: {
             id: true,
             name: true,
             stock: true,
             sourceCode: true,
+            branchCode: true,
             lowStockThreshold: true,
             overrideActive: true,
             overrideStock: true,
@@ -2039,38 +2048,34 @@ const syncProductsFromPOSAgent = async (req, res) => {
         // IMPORTANT: override fields (overrideActive, overrideStock, overrideReason,
         // overrideUpdatedAt, overrideUpdatedBy) are intentionally NOT included in the
         // update block — POS sync must never overwrite admin-set website stock overrides.
-        const result = await prisma.product.upsert(
-          {
-            where: { sourceCode },
-            update: {
-              name: product.name,
-              price: product.price || 0,
-              stock: product.stock || 0,
-              category: product.category || 'Uncategorized',
-              description: product.description || '',
-              barcode: product.barcode || '',
-              expiryDate: nearestExpiryDate,
-              expiryBatchCount: normalizedBatches.length,
-              ...(branchCode === 'ZOMBA' ? { hideFromProductsPage: true } : {}),
-              updatedAt: new Date(),
-            },
-            create: {
-              sourceCode,
-              name: product.name,
-              price: product.price || 0,
-              stock: product.stock || 0,
-              category: product.category || 'Uncategorized',
-              description: product.description || '',
-              barcode: product.barcode || '',
-              expiryDate: nearestExpiryDate,
-              expiryBatchCount: normalizedBatches.length,
-              hideFromProductsPage: branchCode === 'ZOMBA',
-              isActive: true,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
-          }
-        );
+        const baseProductData = {
+          name: product.name,
+          price: product.price || 0,
+          stock: product.stock || 0,
+          category: product.category || 'Uncategorized',
+          description: product.description || '',
+          barcode: product.barcode || '',
+          expiryDate: nearestExpiryDate,
+          expiryBatchCount: normalizedBatches.length,
+          ...(branchCode === 'ZOMBA' ? { hideFromProductsPage: true } : {}),
+          updatedAt: new Date(),
+        };
+
+        const result = existingProduct
+          ? await prisma.product.update({
+              where: { id: existingProduct.id },
+              data: baseProductData,
+            })
+          : await prisma.product.create({
+              data: {
+                branchCode,
+                sourceCode,
+                ...baseProductData,
+                hideFromProductsPage: branchCode === 'ZOMBA',
+                isActive: true,
+                createdAt: new Date(),
+              },
+            });
 
         // Reattach persistent image mapping after upsert so images survive wipe+resync flows.
         try {
@@ -2258,11 +2263,15 @@ const getCategories = async (req, res) => {
 
     if (effectiveLocationCode) {
       const scopedProductCodes = await resolveLocationScopedProductCodes(effectiveLocationCode);
+      const derivedBranchCode = deriveBranchCodeFromScopeCodes(expandLocationScopeCodes(effectiveLocationCode));
       if (!scopedProductCodes || scopedProductCodes.length === 0) {
         return res.status(200).json({ categories: [] });
       }
 
       where.sourceCode = { in: scopedProductCodes };
+      if (derivedBranchCode) {
+        where.branchCode = derivedBranchCode;
+      }
     }
 
     const categories = await prisma.product.findMany({
@@ -2423,9 +2432,13 @@ const getExpiryBatchAlerts = async (req, res) => {
     }
 
     const productCodes = Array.from(new Set(rawRows.map((row) => row.productCode).filter(Boolean)));
+    const derivedBranchCode = deriveBranchCodeFromScopeCodes(expandLocationScopeCodes(locationCode));
     const products = productCodes.length > 0
       ? await prisma.product.findMany({
-          where: { sourceCode: { in: productCodes } },
+          where: {
+            sourceCode: { in: productCodes },
+            ...(derivedBranchCode ? { branchCode: derivedBranchCode } : {}),
+          },
           select: { sourceCode: true, name: true, category: true },
         })
       : [];

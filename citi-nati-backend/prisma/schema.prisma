@@ -47,7 +47,8 @@ model User {
 
 model Product {
   id                      Int        @id @default(autoincrement())
-  sourceCode              String?    @unique
+  branchCode              String     @default("BLANTYRE") @map("branch_code")
+  sourceCode              String?
   name                    String
   price                   Float
   originalPrice           Float?
@@ -76,6 +77,8 @@ model Product {
   createdAt               DateTime   @default(now())
   updatedAt               DateTime   @updatedAt
 
+  @@unique([branchCode, sourceCode])
+  @@index([branchCode])
   @@index([enabled])
   @@index([category])
   @@index([name])
