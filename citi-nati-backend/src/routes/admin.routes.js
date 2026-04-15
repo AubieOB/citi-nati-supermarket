@@ -166,14 +166,21 @@ async function resolveLocationScopedProductCodes(locationCode) {
       .filter(Boolean)
   );
 
-  if (scopedCodes.size === 0) {
-    const costCodes = await resolveLocationScopedProductCodesFromLatestCosts(scopeCodes);
-    costCodes.forEach((code) => scopedCodes.add(code));
-  }
+  const costCodes = await resolveLocationScopedProductCodesFromLatestCosts(scopeCodes);
+  costCodes.forEach((code) => scopedCodes.add(code));
 
-  if (scopedCodes.size === 0) {
-    const salesCodes = await resolveLocationScopedProductCodesFromSales(scopeCodes);
-    salesCodes.forEach((code) => scopedCodes.add(code));
+  const salesCodes = await resolveLocationScopedProductCodesFromSales(scopeCodes);
+  salesCodes.forEach((code) => scopedCodes.add(code));
+
+  const isZombaScope = scopeCodes.some((code) => ['SH', 'BAR', 'WH'].includes(code));
+  if (isZombaScope) {
+    console.log('[ADMIN POS][SCOPE][ZA] code-source diagnostics', {
+      scopeCodes,
+      expiryDistinctCount: expiryRows.length,
+      latestCostDistinctCount: costCodes.length,
+      salesDistinctCount: salesCodes.length,
+      combinedDistinctCount: scopedCodes.size,
+    });
   }
 
   if (scopedCodes.size === 0 && scopeCodes.includes('BT')) {

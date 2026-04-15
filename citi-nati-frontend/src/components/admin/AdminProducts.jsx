@@ -753,6 +753,17 @@ const AdminProducts = ({ selectedLocationCode = 'BT' }) => {
     currentPage * pageSize
   );
 
+  useEffect(() => {
+    console.log('[ADMIN PRODUCTS UI] render diagnostics', {
+      selectedLocationCode,
+      totalFetched: products.length,
+      totalFiltered: filteredProducts.length,
+      totalPaginated: paginatedProducts.length,
+      currentPage,
+      pageSize,
+    });
+  }, [selectedLocationCode, products.length, filteredProducts.length, paginatedProducts.length, currentPage]);
+
   // Get unique categories for filter dropdown
   const categories = [...new Set(products.map(p => p.category))].sort();
 

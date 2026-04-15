@@ -603,14 +603,21 @@ async function resolveLocationScopedProductCodes(locationCode) {
       .filter(Boolean)
   );
 
-  if (scopedCodes.size === 0) {
-    const costCodes = await resolveLocationScopedProductCodesFromLatestCosts(scopeCodes);
-    costCodes.forEach((code) => scopedCodes.add(code));
-  }
+  const costCodes = await resolveLocationScopedProductCodesFromLatestCosts(scopeCodes);
+  costCodes.forEach((code) => scopedCodes.add(code));
 
-  if (scopedCodes.size === 0) {
-    const salesCodes = await resolveLocationScopedProductCodesFromSales(scopeCodes);
-    salesCodes.forEach((code) => scopedCodes.add(code));
+  const salesCodes = await resolveLocationScopedProductCodesFromSales(scopeCodes);
+  salesCodes.forEach((code) => scopedCodes.add(code));
+
+  const isZombaScope = scopeCodes.some((code) => ['SH', 'BAR', 'WH'].includes(code));
+  if (isZombaScope) {
+    console.log('[PRODUCTS][SCOPE][ZA] code-source diagnostics', {
+      scopeCodes,
+      expiryDistinctCount: expiryRows.length,
+      latestCostDistinctCount: costCodes.length,
+      salesDistinctCount: salesCodes.length,
+      combinedDistinctCount: scopedCodes.size,
+    });
   }
 
   // Keep legacy Blantyre operations usable when historical rows predate location tagging.
@@ -1171,6 +1178,15 @@ const getProducts = async (req, res) => {
 
     // Debug logging
     console.log(`[PRODUCTS] Retrieved: ${products.length}, Total: ${total}, Category: ${category || 'all'}, Search: ${search || 'none'}`);
+    if (normalizedLocationCode && ['ZA', 'SH', 'BAR', 'WH'].includes(normalizedLocationCode)) {
+      console.log('[PRODUCTS][ZA] response diagnostics', {
+        requestedLocationCode: normalizedLocationCode,
+        totalCount: total,
+        pageRowCount: products.length,
+        skip,
+        take,
+      });
+    }
 
     // expiryDate is stored on each product record via POS sync; formatProduct computes expiryStatus from it.
     // The product list always uses stored DB batches (fast). Live POS fetch is reserved for the
