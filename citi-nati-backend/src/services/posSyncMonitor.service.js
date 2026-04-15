@@ -152,6 +152,22 @@ function eventMatchesScope(event, scopedBranchCode, scopedLocationCode) {
   return false;
 }
 
+function isAgentContactEvent(event) {
+  if (!event || typeof event !== 'object') return false;
+
+  const source = String(event.source || '').trim().toLowerCase();
+  const eventType = String(event.eventType || '').trim().toLowerCase();
+  const hasAgentId = Boolean(String(event.agentId || '').trim());
+
+  if (source === 'pos-sync-agent') return true;
+
+  if ((eventType === 'commands-claimed' || eventType === 'command-completed') && hasAgentId) {
+    return true;
+  }
+
+  return false;
+}
+
 async function recordPosSyncEvent(payload = {}) {
   try {
     const event = await prisma.posSyncEvent.create({
@@ -307,7 +323,7 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40, locationCode,
   const backendConfiguredBranchCode = normalizeBranchCode(process.env.POS_BRANCH_CODE || process.env.BRANCH_CODE || null);
   const since = new Date(Date.now() - safeHours * 60 * 60 * 1000);
 
-  const [config, recentEvents, recentCommandsRaw, emergencySalesRaw, recentWindowEvents, latestProductSync] = await Promise.all([
+  const [config, recentEvents, recentCommandsRaw, emergencySalesRaw, recentWindowEvents] = await Promise.all([
     getRuntimeConfig(),
     prisma.posSyncEvent.findMany({ orderBy: { createdAt: 'desc' }, take: safeLimit * 10 }),
     posCommandQueueService.listCommands({ take: safeLimit * 10 }),
@@ -323,15 +339,6 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40, locationCode,
       },
     }),
     prisma.posSyncEvent.findMany({ where: { createdAt: { gte: since } }, orderBy: { createdAt: 'asc' } }),
-    prisma.product.aggregate({
-      _max: {
-        updatedAt: true,
-      },
-      where: {
-        ...(scopedBranchCode ? { branchCode: scopedBranchCode } : {}),
-        sourceCode: { not: null },
-      },
-    }),
   ]);
 
   const scopedRecentEvents = recentEvents
@@ -381,26 +388,14 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40, locationCode,
     ? AGENT_LIVENESS_WINDOW_MS
     : 90000;
 
-  const recentSuccessViaEvents = scopedRecentEvents.find(
-    (event) => event.status === 'success' && (nowTs - new Date(event.createdAt).getTime()) <= livenessWindowMs,
-  ) || null;
-
-  const recentFailureViaEvents = scopedRecentEvents.find(
-    (event) => event.status === 'failed' && (nowTs - new Date(event.createdAt).getTime()) <= livenessWindowMs,
+  const recentAgentContactViaEvents = scopedRecentEvents.find(
+    (event) => isAgentContactEvent(event) && (nowTs - new Date(event.createdAt).getTime()) <= livenessWindowMs,
   ) || null;
 
   let agentHealthy = shouldUseDirectHealthProbe ? agentHealthyDirect : false;
 
-  if (recentSuccessViaEvents) {
+  if (recentAgentContactViaEvents) {
     agentHealthy = true;
-  }
-
-  if (recentFailureViaEvents) {
-    const successTs = recentSuccessViaEvents ? new Date(recentSuccessViaEvents.createdAt).getTime() : 0;
-    const failureTs = new Date(recentFailureViaEvents.createdAt).getTime();
-    if (!recentSuccessViaEvents || failureTs >= successTs) {
-      agentHealthy = false;
-    }
   }
 
   const buckets = buildBuckets(safeHours);
@@ -439,7 +434,10 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40, locationCode,
 
   const recentFailure = scopedRecentEvents.find((event) => event.status === 'failed') || null;
   const recentSuccess = scopedRecentEvents.find((event) => event.status === 'success') || null;
-  const lastSuccessfulSyncAt = latestProductSync?._max?.updatedAt || null;
+  const lastSuccessfulSyncEvent = scopedRecentEvents.find(
+    (event) => event.status === 'success' && String(event.eventType || '').trim().toLowerCase() === 'agent-push-products'
+  ) || null;
+  const lastSuccessfulSyncAt = lastSuccessfulSyncEvent?.createdAt || null;
 
   return {
     config: scopedConfig,

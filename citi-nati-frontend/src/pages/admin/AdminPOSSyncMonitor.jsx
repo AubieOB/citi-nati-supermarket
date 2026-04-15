@@ -551,7 +551,7 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
                 <div style={{ backgroundColor: '#f8fafc', borderRadius: '8px', padding: '0.85rem 1rem' }}>
                   <div style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Last Sync Success</div>
                   <div style={{ marginTop: '0.3rem', color: '#0f172a', fontWeight: 600, fontSize: '0.9rem' }}>
-                    {rel(summary.lastSuccessfulSyncAt || summary.lastSuccessfulEventAt)}
+                    {rel(summary.lastSuccessfulSyncAt)}
                   </div>
                 </div>
               </div>
