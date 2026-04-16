@@ -229,6 +229,93 @@ router.get('/test', verifyTokenMiddleware, verifyAdmin, (req, res) => {
 });
 
 /**
+ * GET /api/admin/zomba-stock-trace
+ * Quick trace endpoint for Zomba operational stock verification.
+ * Query params:
+ *   productCode (optional, defaults to Castel Beer 9501100002174)
+ */
+router.get('/zomba-stock-trace', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const productCode = String(req.query.productCode || '9501100002174').trim();
+    if (!productCode) {
+      return res.status(400).json({ success: false, error: 'productCode is required' });
+    }
+
+    const [product, latestShBatch] = await Promise.all([
+      prisma.product.findFirst({
+        where: {
+          branchCode: 'ZOMBA',
+          sourceCode: productCode,
+        },
+        select: {
+          id: true,
+          name: true,
+          sourceCode: true,
+          branchCode: true,
+          stock: true,
+          updatedAt: true,
+          overrideActive: true,
+          overrideStock: true,
+          lowStockThreshold: true,
+        },
+      }),
+      prisma.productExpiryBatch.findFirst({
+        where: {
+          productCode,
+          locationCode: {
+            equals: 'SH',
+            mode: 'insensitive',
+          },
+        },
+        orderBy: [
+          { lastSyncedAt: 'desc' },
+          { updatedAt: 'desc' },
+        ],
+        select: {
+          id: true,
+          locationCode: true,
+          expiryDate: true,
+          remainingQty: true,
+          lastSyncedAt: true,
+          updatedAt: true,
+        },
+      }),
+    ]);
+
+    const payload = {
+      productCode,
+      zombaOperationalRule: {
+        locationCode: 'SH',
+        source: 'DailyStockBalance latest snapshot <= today (agent-enforced)',
+      },
+      product: product || null,
+      latestShBatchSyncMeta: latestShBatch || null,
+      trace: {
+        sourceUsed: 'PersistedProduct.stock from POS agent push',
+        finalStockReturned: Number(product?.stock || 0),
+      },
+    };
+
+    console.log('[ZOMBA STOCK][TRACE ENDPOINT]', {
+      productCode,
+      source: payload.zombaOperationalRule.source,
+      locationCode: 'SH',
+      finalStockReturned: payload.trace.finalStockReturned,
+      productUpdatedAt: product?.updatedAt || null,
+      latestShBatchSyncedAt: latestShBatch?.lastSyncedAt || null,
+    });
+
+    return res.json({
+      success: true,
+      ...payload,
+    });
+  } catch (error) {
+    console.error('[ZOMBA STOCK][TRACE ENDPOINT] error:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to load Zomba stock trace' });
+  }
+});
+
+/**
  * GET /api/admin/dashboard
  * Admin dashboard statistics
  * Protected: Admin only
