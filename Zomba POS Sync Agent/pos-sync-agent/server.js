@@ -218,42 +218,40 @@ async function fetchProductsFromPOS(locationCode) {
     // Use provided location code or fall back to environment
     const LOCATION_CODE = locationCode || appConfig.posDb.locationCode;
 
-    // Operational stock source priority (aligned to POS stock balance behavior):
-    //   1. DailyStockBalance latest snapshot (primary)
-    //   2. Stocks.StockQty (fallback)
-    // Do NOT fall back to ProductActivity cumulative totals for dashboard stock,
-    // because that can inflate balances relative to POS stock-balance screens.
+    // Operational stock source: ONLY DailyStockBalance for the given LocationCode.
+    // Use ROW_NUMBER() to get the single latest snapshot row per product.
+    // No fallback to Stocks, Stocks.StockQty, or ProductActivity — those can cause
+    // aggregation across sub-locations and inflate values vs POS stock-balance screen.
+    // For Zomba: LocationCode is always 'SH' (enforced by getOperationalSyncLocations).
     const query = `
-      SELECT 
+      WITH latest_stock AS (
+        SELECT
+          ProductCode,
+          StockBalance,
+          ROW_NUMBER() OVER (
+            PARTITION BY ProductCode
+            ORDER BY StockDate DESC
+          ) AS rn
+        FROM POS.dbo.DailyStockBalance
+        WHERE LocationCode = @LocationCode
+      )
+      SELECT
           p.ProductCode,
           p.ProductName,
-          ISNULL(p.Barcode,'') AS Barcode,
+          ISNULL(p.Barcode, '') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
-        COALESCE(dsb.StockBalance, st.StockQty, 0) AS QuantityAvailable,
-        CASE
-          WHEN dsb.StockBalance IS NOT NULL THEN 'DailyStockBalance'
-          WHEN st.StockQty IS NOT NULL THEN 'Stocks'
-          ELSE 'NoStockRow'
-        END AS StockSource,
+          ISNULL(ls.StockBalance, 0) AS QuantityAvailable,
+          CASE
+            WHEN ls.StockBalance IS NOT NULL THEN 'DailyStockBalance'
+            ELSE 'NoStockRow'
+          END AS StockSource,
           ISNULL(
               (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC),
               (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode ORDER BY PriceID DESC)
           ) AS SellingPrice
       FROM POS.dbo.productsmaster p
       LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
-      LEFT JOIN POS.dbo.Stocks st ON st.ProductCode = p.ProductCode AND st.LocationCode = @LocationCode
-      LEFT JOIN (
-          SELECT
-              d.ProductCode,
-              d.StockBalance
-          FROM POS.dbo.DailyStockBalance d
-          WHERE d.LocationCode = @LocationCode
-            AND d.StockDate = (
-              SELECT MAX(StockDate)
-              FROM POS.dbo.DailyStockBalance
-              WHERE LocationCode = @LocationCode
-            )
-      ) dsb ON p.ProductCode = dsb.ProductCode
+      LEFT JOIN latest_stock ls ON ls.ProductCode = p.ProductCode AND ls.rn = 1
       ORDER BY p.ProductCode
     `;
 
@@ -261,8 +259,10 @@ async function fetchProductsFromPOS(locationCode) {
     request.input('LocationCode', sql.VarChar(10), LOCATION_CODE);
     const result = await request.query(query);
 
+    console.log(`${SYNC_LOG_PREFIX} [DEBUG] selected location: ${LOCATION_CODE}`);
+    console.log(`${SYNC_LOG_PREFIX} [DEBUG] locationCode used in query: ${LOCATION_CODE}`);
     console.log(`${SYNC_LOG_PREFIX} fetched ${result.recordset.length} products from location ${LOCATION_CODE}`);
-    console.log(`${SYNC_LOG_PREFIX} stock mode: DailyStockBalance -> Stocks.StockQty (ProductActivity fallback disabled)`);
+    console.log(`${SYNC_LOG_PREFIX} stock mode: DailyStockBalance latest snapshot via ROW_NUMBER() (SH-only, no Stocks/ProductActivity fallback)`);
     console.log(`${SYNC_LOG_PREFIX} price mode: latest FPrice by PriceID DESC`);
 
     const stockSourceSummary = result.recordset.reduce((acc, row) => {
@@ -275,11 +275,11 @@ async function fetchProductsFromPOS(locationCode) {
       sourceBreakdown: stockSourceSummary,
     });
     
-    // Debug log first 5 products
+    // Debug log first 5 products (with location and stock source)
     if (result.recordset.length > 0) {
-      console.log(`${SYNC_LOG_PREFIX} sample products:`);
+      console.log(`${SYNC_LOG_PREFIX} [DEBUG] sample product stock (locationCode=${LOCATION_CODE}):`);
       result.recordset.slice(0, 5).forEach(product => {
-        console.log(`${SYNC_LOG_PREFIX} ${product.ProductCode}: ${product.ProductName} | stock=${product.QuantityAvailable} | price=${product.SellingPrice}`);
+        console.log(`${SYNC_LOG_PREFIX} [DEBUG]  ${product.ProductCode}: ${product.ProductName} | stock=${product.QuantityAvailable} | source=${product.StockSource} | price=${product.SellingPrice}`);
       });
     }
 
