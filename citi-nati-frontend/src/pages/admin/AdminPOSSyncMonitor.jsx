@@ -170,12 +170,59 @@ function eventMatchesSelectedScope(event, selectedLocationCode) {
   if (!scopeBranchCode && scopeLocationCodes.length === 0) return true;
 
   const metadata = event?.metadata && typeof event.metadata === 'object' ? event.metadata : {};
-  const eventBranchCode = normalizeScopeCode(metadata.branchCode || null);
+  const eventBranchCode = deriveBranchCodeFromLocationCode(metadata.branchCode)
+    || deriveBranchCodeFromLocationCode(metadata.locationCode)
+    || normalizeScopeCode(metadata.branchCode || null);
   const eventLocationCode = normalizeScopeCode(metadata.locationCode || null);
 
   if (scopeBranchCode && eventBranchCode === scopeBranchCode) return true;
   if (eventLocationCode && scopeLocationCodes.includes(eventLocationCode)) return true;
   return false;
+}
+
+function toHourBucketKey(value) {
+  const bucket = new Date(value);
+  bucket.setMinutes(0, 0, 0);
+  return bucket.toISOString();
+}
+
+function incrementActivityTimeline(timeline = [], event) {
+  const key = toHourBucketKey(event.createdAt || new Date().toISOString());
+  return timeline.map((bucket) => {
+    if (bucket.key !== key) return bucket;
+
+    const next = {
+      ...bucket,
+      total: (bucket.total || 0) + 1,
+    };
+
+    if (event.status === 'success') next.success = (bucket.success || 0) + 1;
+    else if (event.status === 'failed') next.failed = (bucket.failed || 0) + 1;
+    else if (event.status === 'warning') next.warning = (bucket.warning || 0) + 1;
+    else next.info = (bucket.info || 0) + 1;
+
+    return next;
+  });
+}
+
+function incrementFailureReasons(items = [], event) {
+  if (event.status !== 'failed') return items;
+  const label = event.reason || event.title || 'Unknown failure';
+  const nextItems = [...items];
+  const existingIndex = nextItems.findIndex((item) => item.label === label);
+
+  if (existingIndex >= 0) {
+    nextItems[existingIndex] = {
+      ...nextItems[existingIndex],
+      count: (nextItems[existingIndex].count || 0) + 1,
+    };
+  } else {
+    nextItems.push({ label, count: 1 });
+  }
+
+  return nextItems
+    .sort((left, right) => right.count - left.count)
+    .slice(0, 6);
 }
 
 /* ──────────────── sub-components ──────────────── */
@@ -343,6 +390,7 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
 
       setMonitor((prev) => {
         if (!prev) return prev;
+        const alreadyTracked = (prev.recentEvents || []).some((existingEvent) => existingEvent.id === event.id);
         const nextEvents = [event, ...(prev.recentEvents || []).filter((e) => e.id !== event.id)].slice(0, 40);
         return {
           ...prev,
@@ -352,6 +400,21 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
             lastEventAt: event.createdAt,
             lastFailedEventAt: event.status === 'failed' ? event.createdAt : prev.summary?.lastFailedEventAt,
             lastSuccessfulEventAt: event.status === 'success' ? event.createdAt : prev.summary?.lastSuccessfulEventAt,
+          },
+          stats: alreadyTracked ? prev.stats : {
+            ...(prev.stats || {}),
+            eventsInWindow: (prev.stats?.eventsInWindow || 0) + 1,
+            successCount: event.status === 'success' ? (prev.stats?.successCount || 0) + 1 : (prev.stats?.successCount || 0),
+            failedCount: event.status === 'failed' ? (prev.stats?.failedCount || 0) + 1 : (prev.stats?.failedCount || 0),
+            sourceBreakdown: {
+              ...(prev.stats?.sourceBreakdown || {}),
+              [event.source]: ((prev.stats?.sourceBreakdown || {})[event.source] || 0) + 1,
+            },
+          },
+          graphs: alreadyTracked ? prev.graphs : {
+            ...(prev.graphs || {}),
+            activityTimeline: incrementActivityTimeline(prev.graphs?.activityTimeline || [], event),
+            topFailureReasons: incrementFailureReasons(prev.graphs?.topFailureReasons || [], event),
           },
         };
       });

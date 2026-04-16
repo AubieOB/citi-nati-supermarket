@@ -48,13 +48,14 @@ function expandLocationScopeCodes(locationCode) {
   if (!normalized) return [];
 
   if (normalized === 'BT') return ['BT'];
-  if (ZOMBA_LOCATION_CODES.includes(normalized)) return ['SH'];
+  if (ZOMBA_LOCATION_CODES.includes(normalized)) return [...ZOMBA_LOCATION_CODES];
   return [normalized];
 }
 
 function toScopeFromLocationCode(locationCode) {
-  if (locationCode === 'BT') return 'BLANTYRE';
-  if (locationCode && ZOMBA_LOCATION_CODES.includes(locationCode)) return 'ZOMBA';
+  const normalized = normalizeScopeCode(locationCode);
+  if (normalized === 'BT') return 'BLANTYRE';
+  if (normalized && ZOMBA_LOCATION_CODES.includes(normalized)) return 'ZOMBA';
   return null;
 }
 
@@ -69,8 +70,25 @@ function inferBranchCodeFromAgentId(agentId) {
   const normalized = String(agentId || '').trim().toUpperCase();
   if (!normalized) return null;
   if (normalized.includes('BLANTYRE') || normalized.includes('BT')) return 'BLANTYRE';
-  if (normalized.includes('ZOMBA') || normalized.includes('ZA')) return 'ZOMBA';
+  if (normalized.includes('ZOMBA') || normalized.includes('ZA') || normalized.includes('SH')) return 'ZOMBA';
   return null;
+}
+
+function getEventBranchCode(event) {
+  const metadata = event?.metadata && typeof event.metadata === 'object' ? event.metadata : {};
+  return normalizeBranchCode(
+    metadata.branchCode
+    || event?.branchCode
+    || metadata.locationCode
+    || event?.locationCode
+    || inferBranchCodeFromAgentId(event?.agentId)
+    || null
+  );
+}
+
+function getEventLocationCode(event) {
+  const metadata = event?.metadata && typeof event.metadata === 'object' ? event.metadata : {};
+  return normalizeScopeCode(metadata.locationCode || event?.locationCode || null);
 }
 
 function commandMatchesScope(command, scopedBranchCode, scopedLocationCode) {
@@ -144,9 +162,8 @@ function summarizeEmergencySales(sales = []) {
 
 function eventMatchesScope(event, scopedBranchCode, scopedLocationCode) {
   if (!scopedBranchCode && !scopedLocationCode) return true;
-  const metadata = event?.metadata && typeof event.metadata === 'object' ? event.metadata : {};
-  const eventBranchCode = normalizeScopeCode(metadata.branchCode || event?.branchCode || null);
-  const eventLocationCode = normalizeScopeCode(metadata.locationCode || event?.locationCode || null);
+  const eventBranchCode = getEventBranchCode(event);
+  const eventLocationCode = getEventLocationCode(event);
   const scopedLocationCodes = expandLocationScopeCodes(scopedLocationCode);
 
   if (scopedBranchCode && eventBranchCode === scopedBranchCode) return true;
@@ -507,3 +524,4 @@ module.exports = {
   getPosSyncMonitorSnapshot,
   listPosSyncEvents,
 };
+
