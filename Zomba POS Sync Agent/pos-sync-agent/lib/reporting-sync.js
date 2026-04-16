@@ -11,6 +11,7 @@ class ReportingSyncService {
     this.latestCostColumnConfig = null;
     this.invoiceHasQuoteNo = null;
     this.invoiceDetailsColumnSupport = null;
+    this.lastLatestCostSyncAt = 0;
   }
 
   async getTableColumns(pool, tableName) {
@@ -458,7 +459,7 @@ class ReportingSyncService {
       const endpoint = this.config.reporting.backendLatestProductCostEndpoint || '/api/pos-sync/reporting/latest-product-costs';
       const fullUrl = `${this.config.backend.baseUrl}${endpoint}`;
       const metadata = getSyncMetadata(this.config);
-      const batchSize = 500;
+      const batchSize = this.config.reporting.latestCostBatchSize || 500;
       let sent = 0;
 
       for (let index = 0; index < latestProductCosts.length; index += batchSize) {
@@ -499,6 +500,8 @@ class ReportingSyncService {
       let invoiceCount = 0;
       let detailCount = 0;
       let checkpoint = this.state.getLastSyncedInvoiceNo();
+      let latestProductCostCount = 0;
+      let latestProductCostThrottled = false;
 
       // Fetch invoice headers
       const headers = await this.fetchInvoiceHeaders(pool, batchSize);
@@ -530,16 +533,32 @@ class ReportingSyncService {
         detailCount = sendResult.detailCount;
       }
 
-      const latestProductCosts = await this.fetchLatestProductCosts(pool);
-      const latestCostResult = await this.sendLatestProductCostsToBackend(latestProductCosts);
+      const latestCostSyncIntervalMs = this.config.reporting.latestCostSyncIntervalMs || 0;
+      const now = Date.now();
+      const dueForLatestCostSync = !this.lastLatestCostSyncAt || latestCostSyncIntervalMs <= 0 || (now - this.lastLatestCostSyncAt) >= latestCostSyncIntervalMs;
 
-      console.log(`${this.branchTag} [SYNC] ✅ Sync batch complete: ${invoiceCount} invoices, ${latestCostResult.productCount} latest cost rows, checkpoint=${checkpoint}`);
+      if (dueForLatestCostSync) {
+        const latestProductCosts = await this.fetchLatestProductCosts(pool);
+        const latestCostResult = await this.sendLatestProductCostsToBackend(latestProductCosts);
+        latestProductCostCount = latestCostResult.productCount;
+        this.lastLatestCostSyncAt = Date.now();
+      } else {
+        latestProductCostThrottled = true;
+        const remainingMs = Math.max(0, latestCostSyncIntervalMs - (now - this.lastLatestCostSyncAt));
+        console.log(`${this.branchTag} [LATEST COST] Skipping full latest-cost sync for ${Math.ceil(remainingMs / 1000)}s (interval ${Math.round(latestCostSyncIntervalMs / 1000)}s)`);
+      }
+
+      const latestCostSummary = latestProductCostThrottled
+        ? 'latest cost sync throttled'
+        : `${latestProductCostCount} latest cost rows`;
+      console.log(`${this.branchTag} [SYNC] ✅ Sync batch complete: ${invoiceCount} invoices, ${latestCostSummary}, checkpoint=${checkpoint}`);
 
       return {
         success: true,
         invoiceCount,
         detailCount,
-        latestProductCostCount: latestCostResult.productCount,
+        latestProductCostCount,
+        latestProductCostThrottled,
         checkpoint,
       };
     } catch (error) {

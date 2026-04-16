@@ -31,6 +31,8 @@ const sqlConfig = {
   password: appConfig.posDb.password,
   server: SQL_SERVER,
   database: SQL_DATABASE,
+  connectionTimeout: appConfig.posDb.connectionTimeoutMs,
+  requestTimeout: appConfig.posDb.requestTimeoutMs,
   options: {
     encrypt: false,
     trustServerCertificate: true, // needed for local SQL Server
@@ -75,6 +77,8 @@ async function initializePool() {
       console.log(`${BRANCH_TAG} [DB CONFIG] SQL user: ${SQL_USER || '(not set)'}`);
       console.log(`${BRANCH_TAG} [DB CONFIG] SQL server: ${SQL_SERVER}`);
       console.log(`${BRANCH_TAG} [DB CONFIG] SQL database: ${SQL_DATABASE}`);
+      console.log(`${BRANCH_TAG} [DB CONFIG] SQL connection timeout: ${appConfig.posDb.connectionTimeoutMs}ms`);
+      console.log(`${BRANCH_TAG} [DB CONFIG] SQL request timeout: ${appConfig.posDb.requestTimeoutMs}ms`);
       pool = new sql.ConnectionPool(sqlConfig);
       await pool.connect();
       console.log(`${BRANCH_TAG} Connected to SQL Server`);
@@ -2022,7 +2026,10 @@ async function pollAndProcessReportingSync() {
     const result = await reportingSyncService.syncBatch(pool, appConfig.reporting.batchSize);
 
     if (result.success) {
-      console.log(`${BRANCH_TAG} [REPORTING SYNC] ✅ Sync complete: ${result.invoiceCount} invoices, ${result.detailCount} details, ${result.latestProductCostCount || 0} latest cost rows, checkpoint=${result.checkpoint}`);
+      const latestCostSummary = result.latestProductCostThrottled
+        ? 'latest cost sync throttled'
+        : `${result.latestProductCostCount || 0} latest cost rows`;
+      console.log(`${BRANCH_TAG} [REPORTING SYNC] ✅ Sync complete: ${result.invoiceCount} invoices, ${result.detailCount} details, ${latestCostSummary}, checkpoint=${result.checkpoint}`);
     }
   } catch (error) {
     console.error(`${BRANCH_TAG} [REPORTING SYNC] ❌ Polling error:`, error.message);
