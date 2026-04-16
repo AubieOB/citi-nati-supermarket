@@ -588,13 +588,19 @@ async function lookupEmergencyProducts(req, res) {
         : { sourceCode: { in: scopedProductCodes } }),
     };
 
-    // Fast exact-match query (barcode/sourceCode) first for scanner and direct code inputs.
-    const exactProducts = await prisma.product.findMany({
+    // Single combined query: exact matches (barcode/sourceCode) + contains matches (name/barcode/sourceCode).
+    // Sorting via frontend ensures exact matches appear first, while contains matches still show for flexibility.
+    const products = await prisma.product.findMany({
       where: {
         ...baseWhere,
         OR: [
+          // Exact matches (barcode or sourceCode)
           { barcode: { equals: query, mode: 'insensitive' } },
           { sourceCode: { equals: query, mode: 'insensitive' } },
+          // Contains matches (name, barcode, or sourceCode)
+          { name: { contains: query, mode: 'insensitive' } },
+          { barcode: { contains: query, mode: 'insensitive' } },
+          { sourceCode: { contains: query, mode: 'insensitive' } },
         ],
       },
       select: {
@@ -610,44 +616,11 @@ async function lookupEmergencyProducts(req, res) {
         overrideStock: true,
         lowStockThreshold: true,
       },
-      take: 10,
+      take: 30,
       orderBy: [
         { name: 'asc' },
       ],
     });
-
-    let products = exactProducts;
-
-    // If no exact match, run contains search.
-    if (products.length === 0) {
-      products = await prisma.product.findMany({
-        where: {
-          ...baseWhere,
-          OR: [
-            { name: { contains: query, mode: 'insensitive' } },
-            { barcode: { contains: query, mode: 'insensitive' } },
-            { sourceCode: { contains: query, mode: 'insensitive' } },
-          ],
-        },
-        select: {
-          id: true,
-          name: true,
-          sourceCode: true,
-          barcode: true,
-          price: true,
-          discountPrice: true,
-          isOnSale: true,
-          stock: true,
-          overrideActive: true,
-          overrideStock: true,
-          lowStockThreshold: true,
-        },
-        take: 30,
-        orderBy: [
-          { name: 'asc' },
-        ],
-      });
-    }
 
     const mapped = products
       .map((product) => {
