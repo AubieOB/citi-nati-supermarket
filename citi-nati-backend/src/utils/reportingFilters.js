@@ -39,6 +39,7 @@ const ALLOWED_PAYMENT_SORT_FIELDS = new Set(['payMethod', 'totalAmount', 'invoic
 const ALLOWED_SORT_ORDERS = new Set(['asc', 'desc']);
 
 const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH'];
+const BRANCH_SCOPE_LOCATION_CODES = ['BT', 'ZA'];
 
 // Maps a location code to the branch code stored in SalesInvoice.branchCode.
 // This is the reliable discriminator between branches because it comes directly
@@ -102,11 +103,20 @@ function buildInvoiceWhere(dateRange, filters = {}) {
   if (effectiveBranchCode) where.branchCode = effectiveBranchCode;
   if (filters.syncSourceCode) where.syncSourceCode = filters.syncSourceCode;
 
+  const normalizedRequestedLocationCode = sanitizeStr(filters.locationCode)?.toUpperCase();
+  // BO top-level scope uses BT/ZA as branch selectors, not POS sub-location filters.
+  // When we already have an effective branchCode, enforcing locationId/locationCode
+  // can over-filter to zero if stored POS rows use different locationId/locationCode
+  // conventions (while still belonging to the same branch).
+  const isBranchScopeSelection = Boolean(effectiveBranchCode)
+    && Boolean(normalizedRequestedLocationCode)
+    && BRANCH_SCOPE_LOCATION_CODES.includes(normalizedRequestedLocationCode);
+
   const expandedLocationCodes = expandLocationScopeCodes(filters.locationCode);
   const hasLocationCode = expandedLocationCodes.length > 0;
   const hasLocationId = filters.locationId !== null && filters.locationId !== undefined;
 
-  if (hasLocationCode && hasLocationId) {
+  if (!isBranchScopeSelection && hasLocationCode && hasLocationId) {
     // Synced datasets may carry one location identifier but not the other.
     // Match either to avoid unintentionally excluding valid branch rows.
     andConditions.push({
@@ -115,11 +125,11 @@ function buildInvoiceWhere(dateRange, filters = {}) {
         { locationId: filters.locationId },
       ],
     });
-  } else if (hasLocationCode) {
+  } else if (!isBranchScopeSelection && hasLocationCode) {
     where.locationCode = expandedLocationCodes.length === 1
       ? expandedLocationCodes[0]
       : { in: expandedLocationCodes };
-  } else if (hasLocationId) {
+  } else if (!isBranchScopeSelection && hasLocationId) {
     where.locationId = filters.locationId;
   }
 

@@ -16,6 +16,7 @@ function roundMoney(value, decimals = 2) {
 }
 
 const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH'];
+const BRANCH_SCOPE_LOCATION_CODES = ['BT', 'ZA'];
 
 // Mirrors the same function in reportingFilters.js — kept local to avoid
 // coupling unrelated modules. Must stay in sync with that version.
@@ -40,20 +41,25 @@ function buildLatestCostScope(filters = {}) {
     where.branchCode = effectiveBranchCode;
   }
 
+  const normalizedRequestedLocationCode = String(filters.locationCode || '').trim().toUpperCase();
+  const isBranchScopeSelection = Boolean(effectiveBranchCode)
+    && Boolean(normalizedRequestedLocationCode)
+    && BRANCH_SCOPE_LOCATION_CODES.includes(normalizedRequestedLocationCode);
+
   const locationCode = normalizeProductCode(filters.locationCode || filters.branchCode);
   const locationId = Number.isInteger(filters.locationId) ? filters.locationId : Number(filters.locationId);
   const hasLocationId = Number.isInteger(locationId) && locationId > 0;
 
-  if (locationCode && hasLocationId) {
+  if (!isBranchScopeSelection && locationCode && hasLocationId) {
     andConditions.push({
       OR: [
         { locationCode },
         { locationId },
       ],
     });
-  } else if (locationCode) {
+  } else if (!isBranchScopeSelection && locationCode) {
     where.locationCode = locationCode;
-  } else if (hasLocationId) {
+  } else if (!isBranchScopeSelection && hasLocationId) {
     where.locationId = locationId;
   }
 
