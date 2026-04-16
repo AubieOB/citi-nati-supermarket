@@ -2021,6 +2021,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
         const sourceCode = String(product.sourceCode || '').trim();
         const productLocationCode = normalizeScopeCode(product.locationCode || product.LocationCode || payloadLocationCode);
         const stockSourceRaw = String(product.stockSource || product.StockSource || '').trim();
+        const stockDateRaw = String(product.stockDate || product.StockDate || '').trim() || null;
 
         // Validate required fields
         if (!sourceCode || !product.name) {
@@ -2032,7 +2033,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
         // Zomba operational rule: only SH stock is accepted for persisted product stock.
         if (branchCode === 'ZOMBA' && productLocationCode !== 'SH') {
           skipped++;
-          const rejection = `[ZOMBA STOCK][REJECTED] product=${sourceCode} source=${stockSourceRaw || 'Unknown'} location=${productLocationCode || 'NULL'} stock=${Number(product.stock || 0)} reason=NON_SH_LOCATION`;
+          const rejection = `[ZOMBA STOCK][REJECTED] product=${sourceCode} stockDate=${stockDateRaw || 'NULL'} source=${stockSourceRaw || 'Unknown'} location=${productLocationCode || 'NULL'} stock=${Number(product.stock || 0)} reason=NON_SH_LOCATION`;
           errors.push(rejection);
           console.warn(rejection);
           continue;
@@ -2044,7 +2045,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
           const allowedSource = normalizedSource.includes('dailystockbalance') || normalizedSource === 'nostockrow';
           if (!allowedSource) {
             skipped++;
-            const rejection = `[ZOMBA STOCK][REJECTED] product=${sourceCode} source=${stockSourceRaw} location=${productLocationCode || 'NULL'} stock=${Number(product.stock || 0)} reason=NON_DAILY_STOCK_SOURCE`;
+            const rejection = `[ZOMBA STOCK][REJECTED] product=${sourceCode} stockDate=${stockDateRaw || 'NULL'} source=${stockSourceRaw} location=${productLocationCode || 'NULL'} stock=${Number(product.stock || 0)} reason=NON_DAILY_STOCK_SOURCE`;
             errors.push(rejection);
             console.warn(rejection);
             continue;
@@ -2168,9 +2169,9 @@ const syncProductsFromPOSAgent = async (req, res) => {
           if (branchCode === 'ZOMBA') {
             const stockSourceLabel = stockSourceRaw || 'UnknownPayloadSource';
             const isVerificationProduct = sourceCode === '9501100002174';
-            console.log(`[ZOMBA STOCK] product=${sourceCode} source=${stockSourceLabel} location=${productLocationCode || payloadLocationCode || 'SH'} stock=${Number(completeProduct.stock || 0)}`);
+            console.log(`[ZOMBA STOCK] product=${sourceCode} stockDate=${stockDateRaw || 'NULL'} source=${stockSourceLabel} location=${productLocationCode || payloadLocationCode || 'SH'} stock=${Number(completeProduct.stock || 0)}`);
             if (isVerificationProduct) {
-              console.log(`[ZOMBA STOCK][VERIFY] product=9501100002174 source=${stockSourceLabel} location=${productLocationCode || payloadLocationCode || 'SH'} stock=${Number(completeProduct.stock || 0)}`);
+              console.log(`[ZOMBA STOCK][VERIFY] product=9501100002174 stockDate=${stockDateRaw || 'NULL'} source=${stockSourceLabel} location=${productLocationCode || payloadLocationCode || 'SH'} stock=${Number(completeProduct.stock || 0)}`);
             }
           }
 

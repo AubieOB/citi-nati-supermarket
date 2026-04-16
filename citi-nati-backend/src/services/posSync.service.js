@@ -207,10 +207,11 @@ async function syncProductsFromPOS() {
         const productCode = String(posProduct.ProductCode || '').trim();
         const productLocationCode = String(posProduct.LocationCode || posProduct.locationCode || process.env.POS_LOCATION_CODE || '').trim().toUpperCase() || null;
         const stockSource = String(posProduct.StockSource || posProduct.stockSource || 'Unknown').trim();
+        const stockDate = String(posProduct.StockDate || posProduct.stockDate || '').trim() || null;
 
         if (DEFAULT_POS_BRANCH_CODE === 'ZOMBA' && productLocationCode && productLocationCode !== 'SH') {
           skipped++;
-          const rejection = `[ZOMBA STOCK][REJECTED][MANUAL_SYNC] product=${productCode || 'UNKNOWN'} source=${stockSource} location=${productLocationCode} stock=${Number(posProduct.QuantityAvailable || 0)} reason=NON_SH_LOCATION`;
+          const rejection = `[ZOMBA STOCK][REJECTED][MANUAL_SYNC] product=${productCode || 'UNKNOWN'} stockDate=${stockDate || 'NULL'} source=${stockSource} location=${productLocationCode} stock=${Number(posProduct.QuantityAvailable || 0)} reason=NON_SH_LOCATION`;
           errors.push({ code: productCode || null, error: rejection });
           console.warn(rejection);
           continue;
@@ -235,9 +236,9 @@ async function syncProductsFromPOS() {
         };
 
         if (DEFAULT_POS_BRANCH_CODE === 'ZOMBA') {
-          console.log(`[ZOMBA STOCK] product=${productCode || 'UNKNOWN'} source=${stockSource || 'Unknown'} location=${productLocationCode || 'SH'} stock=${Number(productData.stock || 0)}`);
+          console.log(`[ZOMBA STOCK] product=${productCode || 'UNKNOWN'} stockDate=${stockDate || 'NULL'} source=${stockSource || 'Unknown'} location=${productLocationCode || 'SH'} stock=${Number(productData.stock || 0)}`);
           if (productCode === '9501100002174') {
-            console.log(`[ZOMBA STOCK][VERIFY] product=9501100002174 source=${stockSource || 'Unknown'} location=${productLocationCode || 'SH'} stock=${Number(productData.stock || 0)}`);
+            console.log(`[ZOMBA STOCK][VERIFY] product=9501100002174 stockDate=${stockDate || 'NULL'} source=${stockSource || 'Unknown'} location=${productLocationCode || 'SH'} stock=${Number(productData.stock || 0)}`);
           }
         }
 

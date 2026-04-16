@@ -147,6 +147,7 @@ async function sendProductsToLiveServer(products) {
               price: p.SellingPrice,
               stock: p.QuantityAvailable,
               stockSource: p.StockSource || null,
+              stockDate: p.StockDate ? (p.StockDate instanceof Date ? p.StockDate.toISOString() : p.StockDate) : null,
               barcode: p.Barcode || '',
               category: p.CategoryName || 'Uncategorized',
               expiryDate: p.ExpiryDate ? (p.ExpiryDate instanceof Date ? p.ExpiryDate.toISOString() : p.ExpiryDate) : null,
@@ -228,6 +229,7 @@ async function fetchProductsFromPOS(locationCode) {
       WITH latest_stock AS (
         SELECT
           ProductCode,
+          StockDate,
           StockBalance,
           ROW_NUMBER() OVER (
             PARTITION BY ProductCode
@@ -235,12 +237,14 @@ async function fetchProductsFromPOS(locationCode) {
           ) AS rn
         FROM POS.dbo.DailyStockBalance
         WHERE LocationCode = @LocationCode
+          AND CAST(StockDate AS date) <= CAST(GETDATE() AS date)
       )
       SELECT
           p.ProductCode,
           p.ProductName,
           ISNULL(p.Barcode, '') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
+          ls.StockDate,
           ISNULL(ls.StockBalance, 0) AS QuantityAvailable,
           CASE
             WHEN ls.StockBalance IS NOT NULL THEN 'DailyStockBalance'
@@ -263,7 +267,7 @@ async function fetchProductsFromPOS(locationCode) {
     console.log(`${SYNC_LOG_PREFIX} [DEBUG] selected location: ${LOCATION_CODE}`);
     console.log(`${SYNC_LOG_PREFIX} [DEBUG] locationCode used in query: ${LOCATION_CODE}`);
     console.log(`${SYNC_LOG_PREFIX} fetched ${result.recordset.length} products from location ${LOCATION_CODE}`);
-    console.log(`${SYNC_LOG_PREFIX} stock mode: DailyStockBalance latest snapshot via ROW_NUMBER() (SH-only, no Stocks/ProductActivity fallback)`);
+    console.log(`${SYNC_LOG_PREFIX} stock mode: DailyStockBalance latest snapshot via ROW_NUMBER() (SH-only, StockDate <= today, no Stocks/ProductActivity fallback)`);
     console.log(`${SYNC_LOG_PREFIX} price mode: latest FPrice by PriceID DESC`);
 
     const stockSourceSummary = result.recordset.reduce((acc, row) => {
@@ -280,7 +284,8 @@ async function fetchProductsFromPOS(locationCode) {
     if (result.recordset.length > 0) {
       console.log(`${SYNC_LOG_PREFIX} [DEBUG] sample product stock (locationCode=${LOCATION_CODE}):`);
       result.recordset.slice(0, 5).forEach(product => {
-        console.log(`${SYNC_LOG_PREFIX} [DEBUG]  ${product.ProductCode}: ${product.ProductName} | stock=${product.QuantityAvailable} | source=${product.StockSource} | price=${product.SellingPrice}`);
+        const stockDateLabel = product.StockDate ? new Date(product.StockDate).toISOString().slice(0, 10) : 'NULL';
+        console.log(`${SYNC_LOG_PREFIX} [DEBUG]  ${product.ProductCode}: ${product.ProductName} | stockDate=${stockDateLabel} | stock=${product.QuantityAvailable} | source=${product.StockSource} | price=${product.SellingPrice}`);
       });
     }
 
