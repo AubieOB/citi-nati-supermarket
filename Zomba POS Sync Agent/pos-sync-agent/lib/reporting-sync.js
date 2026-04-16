@@ -102,12 +102,20 @@ class ReportingSyncService {
     try {
       const lastSyncedInvoiceNo = this.state.getLastSyncedInvoiceNo();
       const hasQuoteNo = await this.resolveInvoiceQuoteNoSupport(pool);
+      const recentDays = Number(this.config.reporting?.limitToRecentDays || 0);
+      const useRecentWindow = Number.isFinite(recentDays) && recentDays > 0;
 
       const request = pool.request();
       request.input('lastSyncedInvoiceNo', sql.Int, lastSyncedInvoiceNo);
       request.input('batchSize', sql.Int, batchSize);
+      if (useRecentWindow) {
+        request.input('recentDays', sql.Int, recentDays);
+      }
 
       const quoteNoSelect = hasQuoteNo ? ',\n            QuoteNo' : '';
+      const recentWindowPredicate = useRecentWindow
+        ? '\n          AND InvoiceDate >= DATEADD(DAY, -@recentDays, CAST(GETDATE() AS date))'
+        : '';
 
       const query = `
         SELECT TOP (@batchSize)
@@ -147,10 +155,14 @@ class ReportingSyncService {
             Bank_CARD_EXPIARY${quoteNoSelect}
         FROM invoice
         WHERE InvoiceNo > @lastSyncedInvoiceNo
+        ${recentWindowPredicate}
         ORDER BY InvoiceNo ASC
       `;
 
       const result = await request.query(query);
+      if (useRecentWindow) {
+        console.log(`${this.branchTag} [FETCH] Recent-window mode active: last ${recentDays} day(s)`);
+      }
       console.log(`${this.branchTag} [FETCH] Fetched ${result.recordset.length} invoice headers`);
 
       return result.recordset || [];
