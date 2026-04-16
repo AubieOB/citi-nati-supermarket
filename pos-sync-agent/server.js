@@ -1084,15 +1084,47 @@ app.get('/pos-sync/stock-by-location', validateApiKey, async (req, res) => {
   try {
     if (!pool) await initializePool();
 
-    const LOCATION_CODE = appConfig.posDb.locationCode;
+    const LOCATION_CODE = appConfig.branch.branchCode === 'ZOMBA'
+      ? 'SH'
+      : appConfig.posDb.locationCode;
 
-    const query = `
+    const query = appConfig.branch.branchCode === 'ZOMBA'
+      ? `
+      WITH latest_sh_stock AS (
+        SELECT
+          ProductCode,
+          LocationCode,
+          StockDate,
+          StockBalance,
+          ROW_NUMBER() OVER (
+            PARTITION BY ProductCode
+            ORDER BY StockDate DESC
+          ) AS rn
+        FROM POS.dbo.DailyStockBalance
+        WHERE LocationCode = @LocationCode
+          AND CAST(StockDate AS date) <= CAST(GETDATE() AS date)
+      )
+      SELECT 
+          s.ProductCode,
+          p.ProductName,
+          s.LocationCode,
+          s.StockBalance AS AvailableStock,
+          s.StockDate,
+          'DailyStockBalance' AS StockSource
+      FROM latest_sh_stock s
+      INNER JOIN POS.dbo.productsmaster p 
+          ON s.ProductCode = p.ProductCode
+      WHERE s.rn = 1
+      ORDER BY s.ProductCode
+    `
+      : `
       SELECT 
           d.ProductCode,
           p.ProductName,
           d.LocationCode,
           d.StockBalance AS AvailableStock,
-          d.StockDate
+          d.StockDate,
+          'DailyStockBalance' AS StockSource
       FROM POS.dbo.DailyStockBalance d
       INNER JOIN POS.dbo.productsmaster p 
           ON d.ProductCode = p.ProductCode
@@ -1109,7 +1141,13 @@ app.get('/pos-sync/stock-by-location', validateApiKey, async (req, res) => {
     request.input('LocationCode', sql.VarChar(10), LOCATION_CODE);
     const result = await request.query(query);
 
-    console.log(`[/pos-sync/stock-by-location] Fetched stock for ${result.recordset.length} products at location ${LOCATION_CODE}`);
+    console.log(`[/pos-sync/stock-by-location] Fetched stock for ${result.recordset.length} products at location ${LOCATION_CODE}${appConfig.branch.branchCode === 'ZOMBA' ? ' using latest DailyStockBalance <= today' : ''}`);
+    if (appConfig.branch.branchCode === 'ZOMBA') {
+      result.recordset.slice(0, 5).forEach((row) => {
+        const stockDateLabel = row.StockDate ? new Date(row.StockDate).toISOString().slice(0, 10) : 'NULL';
+        console.log(`[ZOMBA STOCK] product=${row.ProductCode} source=DailyStockBalance location=${row.LocationCode} stockDate=${stockDateLabel} stock=${Number(row.AvailableStock || 0)}`);
+      });
+    }
 
     res.json({
       success: true,
