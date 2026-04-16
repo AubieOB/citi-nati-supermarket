@@ -18,7 +18,9 @@ const SYNC_STATUS = {
 const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH'];
 const SUPPORTED_LOCATION_CODES = ['BT'].concat(ZOMBA_LOCATION_CODES);
 const SCOPED_PRODUCT_CODES_CACHE_TTL_MS = Number.parseInt(process.env.EMERGENCY_SCOPE_CODES_CACHE_TTL_MS || '30000', 10);
+const EMERGENCY_LOOKUP_CACHE_TTL_MS = Number.parseInt(process.env.EMERGENCY_LOOKUP_CACHE_TTL_MS || '8000', 10);
 const scopedProductCodesCache = new Map();
+const emergencyLookupCache = new Map();
 
 function normalizeLocationCode(value) {
   const normalized = String(value || '').trim().toUpperCase();
@@ -100,6 +102,29 @@ function deriveBranchCodeFromScopeCodes(scopeCodes = []) {
 function getScopeCacheKey(locationCode) {
   const scopeCodes = expandLocationScopeCodes(locationCode);
   return scopeCodes.join('|') || String(locationCode || 'NONE');
+}
+
+function getLookupCacheKey(locationCode, query) {
+  return `${String(locationCode || '').toUpperCase()}|${String(query || '').trim().toLowerCase()}`;
+}
+
+function readLookupCache(locationCode, query) {
+  const key = getLookupCacheKey(locationCode, query);
+  const entry = emergencyLookupCache.get(key);
+  if (!entry) return null;
+  if ((Date.now() - entry.cachedAt) > EMERGENCY_LOOKUP_CACHE_TTL_MS) {
+    emergencyLookupCache.delete(key);
+    return null;
+  }
+  return entry.products;
+}
+
+function writeLookupCache(locationCode, query, products) {
+  const key = getLookupCacheKey(locationCode, query);
+  emergencyLookupCache.set(key, {
+    cachedAt: Date.now(),
+    products,
+  });
 }
 
 async function resolveLocationScopedProductCodesFromSales(scopeCodes = []) {
@@ -519,6 +544,23 @@ async function lookupEmergencyProducts(req, res) {
       return res.status(400).json({ success: false, error: 'locationCode is required and must be one of BT, SH, BAR, WH, or ZA' });
     }
 
+    const normalizedQuery = query.toLowerCase();
+    const isLikelyCodeLookup = /^[0-9a-z-]+$/i.test(query) && query.length >= 3;
+    if (!isLikelyCodeLookup && normalizedQuery.length < 2) {
+      return res.status(200).json({ success: true, products: [] });
+    }
+
+    const cachedProducts = readLookupCache(locationCode, query);
+    if (cachedProducts) {
+      console.log('[EMERGENCY SALES][LOOKUP] cache-hit', {
+        locationCode,
+        query,
+        resultCount: cachedProducts.length,
+        durationMs: Date.now() - startedAt,
+      });
+      return res.status(200).json({ success: true, products: cachedProducts });
+    }
+
     const derivedBranchCode = deriveBranchCodeFromScopeCodes(expandLocationScopeCodes(locationCode));
     const isZombaScope = isZombaLocationCode(locationCode);
     let scopedProductCodes = null;
@@ -538,7 +580,6 @@ async function lookupEmergencyProducts(req, res) {
       query,
     });
 
-    const exactQuery = query.toLowerCase();
     const baseWhere = {
       enabled: true,
       ...(derivedBranchCode ? { branchCode: derivedBranchCode } : {}),
@@ -608,7 +649,6 @@ async function lookupEmergencyProducts(req, res) {
       });
     }
 
-    const normalizedQuery = exactQuery;
     const mapped = products
       .map((product) => {
         const enriched = enrichProductStock(product);
@@ -627,6 +667,8 @@ async function lookupEmergencyProducts(req, res) {
         if (aExact === bExact) return String(a.name || '').localeCompare(String(b.name || ''));
         return aExact ? -1 : 1;
       });
+
+    writeLookupCache(locationCode, query, mapped);
 
     if (isZombaLocationCode(locationCode) && mapped.length > 0) {
       const sample = mapped[0];

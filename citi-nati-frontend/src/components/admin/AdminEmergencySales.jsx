@@ -105,6 +105,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
   const scanBufferRef = useRef('');
   const scanLastKeyAtRef = useRef(0);
   const scanClearTimeoutRef = useRef(null);
+  const lookupCacheRef = useRef(new Map());
 
   const [cart, setCart] = useState([]);
   const [selectedRowId, setSelectedRowId] = useState(null);
@@ -163,6 +164,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
     setSelectedRowId(null);
     setCart([]);
     setLastReceipt(null);
+    lookupCacheRef.current.clear();
 
     console.log('[EMERGENCY SALES UI] location switched', {
       from: previousLocationCode,
@@ -362,11 +364,23 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
     const trimmed = String(query || '').trim();
     if (!trimmed) return [];
 
+    const cacheKey = `${String(selectedLocationCode || '').toUpperCase()}|${trimmed.toLowerCase()}`;
+    const cached = lookupCacheRef.current.get(cacheKey);
+    if (cached && (Date.now() - cached.cachedAt) < 8000) {
+      return cached.products;
+    }
+
     const response = await api.get(`/${apiBase}/lookup`, {
       params: { q: trimmed, locationCode: selectedLocationCode },
     });
 
-    return response.data?.products || [];
+    const products = response.data?.products || [];
+    lookupCacheRef.current.set(cacheKey, {
+      cachedAt: Date.now(),
+      products,
+    });
+
+    return products;
   }, [apiBase, selectedLocationCode]);
 
   const lookupAndAddFromScan = useCallback(async (scanValue) => {
