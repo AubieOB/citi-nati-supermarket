@@ -110,7 +110,7 @@ const Header = () => {
 
   /**
    * Get dashboard link based on user role
-   * Roles: admin, driver, user
+   * Roles: admin, driver, cashier, user
    */
   const getDashboardLink = () => {
     if (!user) return null;
@@ -124,6 +124,10 @@ const Header = () => {
 
     if (user.role === 'driver') {
       return { path: '/driver', label: 'Driver Dashboard' };
+    }
+
+    if (user.role === 'cashier') {
+      return { path: '/cashier', label: 'Cashier Dashboard' };
     }
 
     // USER role doesn't have dashboard
