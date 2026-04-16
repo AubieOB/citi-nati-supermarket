@@ -215,10 +215,10 @@ async function fetchProductsFromPOS() {
     // Get location code from environment or default to 'SH'
     const LOCATION_CODE = appConfig.posDb.locationCode;
 
-    // Stock source priority (most reliable first):
-    //   1. Stocks.StockQty (current POS stock balance)
-    //   2. DailyStockBalance latest snapshot
-    //   3. ProductActivity running total (QtyIn - QtyOut)
+    // Stock source priority:
+    //   1. DailyStockBalance latest snapshot (matches POS stock-balance screen)
+    //   2. Stocks.StockQty (fallback)
+    //   3. ProductActivity running total (QtyIn - QtyOut) (last fallback)
     // Price = Most recent FPrice from productprices (by PriceID DESC = latest record)
     const query = `
       SELECT 
@@ -226,7 +226,7 @@ async function fetchProductsFromPOS() {
           p.ProductName,
           ISNULL(p.Barcode,'') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
-          COALESCE(st.StockQty, dsb.StockBalance, pa.LiveQty, 0) AS QuantityAvailable,
+          COALESCE(dsb.StockBalance, st.StockQty, pa.LiveQty, 0) AS QuantityAvailable,
           ISNULL(
               (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC),
               (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode ORDER BY PriceID DESC)
@@ -260,7 +260,7 @@ async function fetchProductsFromPOS() {
     const result = await request.query(query);
     
     console.log(`[POS FETCH] ✅ Fetched ${result.recordset.length} products from location: ${LOCATION_CODE}`);
-    console.log(`[POS FETCH] Stock: Stocks.StockQty -> DailyStockBalance -> ProductActivity fallback chain`);
+    console.log(`[POS FETCH] Stock: DailyStockBalance -> Stocks.StockQty -> ProductActivity fallback chain`);
     console.log(`[POS FETCH] Price: Most recent FPrice (by PriceID DESC)`);
     
     // Debug log first 5 products

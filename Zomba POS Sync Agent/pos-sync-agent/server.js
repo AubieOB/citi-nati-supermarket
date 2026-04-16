@@ -219,10 +219,10 @@ async function fetchProductsFromPOS(locationCode) {
     // Use provided location code or fall back to environment
     const LOCATION_CODE = locationCode || appConfig.posDb.locationCode;
 
-    // Stock source priority (most reliable first):
-    //   1. Stocks.StockQty (current POS stock balance)
-    //   2. DailyStockBalance latest snapshot
-    //   3. ProductActivity running total (QtyIn - QtyOut)
+    // Stock source priority:
+    //   1. DailyStockBalance latest snapshot (matches POS stock-balance screen)
+    //   2. Stocks.StockQty (fallback)
+    //   3. ProductActivity running total (QtyIn - QtyOut) (last fallback)
     // This avoids false zeroes if any one source is temporarily stale.
     const query = `
       SELECT 
@@ -230,7 +230,7 @@ async function fetchProductsFromPOS(locationCode) {
           p.ProductName,
           ISNULL(p.Barcode,'') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
-          COALESCE(st.StockQty, dsb.StockBalance, pa.LiveQty, 0) AS QuantityAvailable,
+          COALESCE(dsb.StockBalance, st.StockQty, pa.LiveQty, 0) AS QuantityAvailable,
           ISNULL(
               (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC),
               (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode ORDER BY PriceID DESC)
@@ -264,7 +264,7 @@ async function fetchProductsFromPOS(locationCode) {
     const result = await request.query(query);
 
     console.log(`${SYNC_LOG_PREFIX} fetched ${result.recordset.length} products from location ${LOCATION_CODE}`);
-    console.log(`${SYNC_LOG_PREFIX} stock mode: Stocks.StockQty -> DailyStockBalance -> ProductActivity fallback chain`);
+    console.log(`${SYNC_LOG_PREFIX} stock mode: DailyStockBalance -> Stocks.StockQty -> ProductActivity fallback chain`);
     console.log(`${SYNC_LOG_PREFIX} price mode: latest FPrice by PriceID DESC`);
     
     // Debug log first 5 products
