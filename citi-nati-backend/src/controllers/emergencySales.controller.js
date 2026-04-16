@@ -1161,13 +1161,18 @@ async function getPendingEmergencySalesForPosSync(req, res) {
     const locationScopeFilter = locationCodes.flatMap((locationCode) => ([
       { cartSnapshot: { path: ['locationCode'], equals: locationCode } },
       { cartSnapshot: { path: ['posLocationCode'], equals: locationCode } },
+      // Legacy rows may only store the admin-facing location scope code.
+      { cartSnapshot: { path: ['locationScopeCode'], equals: locationCode } },
     ]));
     const branchScopeFilters = [];
     if (branchCode === 'BLANTYRE') {
       branchScopeFilters.push({ cartSnapshot: { path: ['branchCode'], equals: 'BLANTYRE' } });
       branchScopeFilters.push({ cartSnapshot: { path: ['branchCode'], equals: null } });
     } else if (branchCode === 'ZOMBA') {
+      // Backward compatibility: older rows can have missing/null branchCode or ZA-like scope tagging.
       branchScopeFilters.push({ cartSnapshot: { path: ['branchCode'], equals: 'ZOMBA' } });
+      branchScopeFilters.push({ cartSnapshot: { path: ['branchCode'], equals: 'ZA' } });
+      branchScopeFilters.push({ cartSnapshot: { path: ['branchCode'], equals: null } });
     }
 
     const sales = await prisma.emergencySale.findMany({
