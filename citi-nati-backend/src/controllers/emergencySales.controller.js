@@ -1140,8 +1140,8 @@ async function getPendingEmergencySalesForPosSync(req, res) {
       if (explicitLocation && SUPPORTED_LOCATION_CODES.includes(explicitLocation)) {
         locationCodes = [explicitLocation];
       } else {
-        // Fetch emergency sales from all possible Zomba sub-locations
-        locationCodes = ['SH', 'BAR', 'WH'];
+        // Fetch emergency sales from all possible Zomba sub-locations (ZA is the admin-facing code)
+        locationCodes = ['ZA', 'SH', 'BAR', 'WH'];
       }
     } else if (branchCode === 'BLANTYRE') {
       locationCodes = ['BT'];
