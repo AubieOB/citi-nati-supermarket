@@ -238,26 +238,47 @@ async function ingestReportingBatch(payload) {
     syncSourceCode: payload.syncSourceCode,
   };
 
-  await prisma.$transaction(async (tx) => {
-    const source = await upsertSyncSource(tx, payload);
+  try {
+    await prisma.$transaction(async (tx) => {
+      const source = await upsertSyncSource(tx, payload);
 
-    const batchMeta = {
-      syncSourceId: source.id,
-      branchCode: payload.branchCode,
-      branchName: payload.branchName,
-      locationId: toInt(payload.locationId),
+      const batchMeta = {
+        syncSourceId: source.id,
+        branchCode: payload.branchCode,
+        branchName: payload.branchName,
+        locationId: toInt(payload.locationId),
+        syncSourceCode: payload.syncSourceCode,
+        syncedAt,
+      };
+
+      for (const invoice of invoices) {
+        try {
+          const processed = await processInvoice(tx, invoice, batchMeta);
+          result.storedInvoices += processed.inserted;
+          result.updatedInvoices += processed.updated;
+          result.storedDetails += processed.detailsInserted;
+          result.updatedDetails += processed.detailsUpdated;
+        } catch (invoiceErr) {
+          console.error('[REPORTING SYNC][INGEST] Error processing invoice:', {
+            syncSourceCode: batchMeta.syncSourceCode,
+            invoiceNo: invoice && invoice.invoiceNo ? invoice.invoiceNo : null,
+            message: invoiceErr && invoiceErr.message ? invoiceErr.message : String(invoiceErr),
+            code: invoiceErr && invoiceErr.code ? invoiceErr.code : null,
+          });
+          throw invoiceErr;
+        }
+      }
+    });
+  } catch (txErr) {
+    console.error('[REPORTING SYNC][INGEST] Transaction failed:', {
       syncSourceCode: payload.syncSourceCode,
-      syncedAt,
-    };
-
-    for (const invoice of invoices) {
-      const processed = await processInvoice(tx, invoice, batchMeta);
-      result.storedInvoices += processed.inserted;
-      result.updatedInvoices += processed.updated;
-      result.storedDetails += processed.detailsInserted;
-      result.updatedDetails += processed.detailsUpdated;
-    }
-  });
+      branchCode: payload.branchCode,
+      invoiceCount: invoices.length,
+      message: txErr && txErr.message ? txErr.message : String(txErr),
+      code: txErr && txErr.code ? txErr.code : null,
+    });
+    throw txErr;
+  }
 
   return result;
 }

@@ -177,11 +177,19 @@ async function receiveReportingInvoices(req, res) {
       syncSourceCode: result.syncSourceCode,
     });
   } catch (error) {
-    console.error('[REPORTING SYNC] Processing failed:', error.message);
+    console.error('[REPORTING SYNC] Processing failed:', {
+      message: error && error.message ? error.message : String(error),
+      code: error && error.code ? error.code : null,
+      statusCode: error && error.statusCode ? error.statusCode : null,
+      meta: error && error.meta ? error.meta : null,
+      stack: error && error.stack ? error.stack : null,
+      branchCode: req.body && req.body.branchCode ? req.body.branchCode : null,
+      invoiceCount: (req.body && Array.isArray(req.body.invoices) ? req.body.invoices.length : 0),
+    });
     return res.status(500).json({
       success: false,
       error: 'Failed to process reporting sync batch',
-      details: error.message,
+      details: error && error.message ? error.message : String(error),
     });
   }
 }
