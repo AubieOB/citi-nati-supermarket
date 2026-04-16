@@ -17,6 +17,8 @@ const SYNC_STATUS = {
 
 const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH'];
 const SUPPORTED_LOCATION_CODES = ['BT'].concat(ZOMBA_LOCATION_CODES);
+const SCOPED_PRODUCT_CODES_CACHE_TTL_MS = Number.parseInt(process.env.EMERGENCY_SCOPE_CODES_CACHE_TTL_MS || '30000', 10);
+const scopedProductCodesCache = new Map();
 
 function normalizeLocationCode(value) {
   const normalized = String(value || '').trim().toUpperCase();
@@ -93,6 +95,11 @@ function deriveBranchCodeFromScopeCodes(scopeCodes = []) {
   if (scopeCodes.includes('BT')) return 'BLANTYRE';
   if (scopeCodes.some((code) => ZOMBA_LOCATION_CODES.includes(code))) return 'ZOMBA';
   return null;
+}
+
+function getScopeCacheKey(locationCode) {
+  const scopeCodes = expandLocationScopeCodes(locationCode);
+  return scopeCodes.join('|') || String(locationCode || 'NONE');
 }
 
 async function resolveLocationScopedProductCodesFromSales(scopeCodes = []) {
@@ -188,6 +195,13 @@ function buildEmergencySalesLocationScopeFilters(locationCode) {
 }
 
 async function resolveLocationScopedProductCodes(locationCode) {
+  const cacheKey = getScopeCacheKey(locationCode);
+  const cached = scopedProductCodesCache.get(cacheKey);
+  const now = Date.now();
+  if (cached && (now - cached.cachedAt) < SCOPED_PRODUCT_CODES_CACHE_TTL_MS) {
+    return cached.codes;
+  }
+
   const scopeCodes = expandLocationScopeCodes(locationCode);
   if (scopeCodes.length === 0) return null;
 
@@ -234,7 +248,9 @@ async function resolveLocationScopedProductCodes(locationCode) {
       .forEach((code) => scopedCodes.add(code));
   }
 
-  return Array.from(scopedCodes.values());
+  const codes = Array.from(scopedCodes.values());
+  scopedProductCodesCache.set(cacheKey, { codes, cachedAt: now });
+  return codes;
 }
 
 function toMoney(value) {
@@ -492,6 +508,7 @@ function validateAgentSecret(req) {
 
 async function lookupEmergencyProducts(req, res) {
   try {
+    const startedAt = Date.now();
     const query = String(req.query.q || req.query.search || '').trim();
     const locationCode = normalizeLocationCode(req.query.locationCode || req.query.branchCode);
     if (!query) {
@@ -502,28 +519,41 @@ async function lookupEmergencyProducts(req, res) {
       return res.status(400).json({ success: false, error: 'locationCode is required and must be one of BT, SH, BAR, WH, or ZA' });
     }
 
-    const scopedProductCodes = await resolveLocationScopedProductCodes(locationCode);
     const derivedBranchCode = deriveBranchCodeFromScopeCodes(expandLocationScopeCodes(locationCode));
-    if (!scopedProductCodes || scopedProductCodes.length === 0) {
-      return res.status(200).json({ success: true, products: [] });
+    const isZombaScope = isZombaLocationCode(locationCode);
+    let scopedProductCodes = null;
+
+    if (!isZombaScope) {
+      scopedProductCodes = await resolveLocationScopedProductCodes(locationCode);
+      if (!scopedProductCodes || scopedProductCodes.length === 0) {
+        return res.status(200).json({ success: true, products: [] });
+      }
     }
 
     console.log('[EMERGENCY SALES][LOOKUP] scope', {
       locationCode,
       derivedBranchCode,
-      scopedProductCodeCount: scopedProductCodes.length,
+      scopedProductCodeCount: Array.isArray(scopedProductCodes) ? scopedProductCodes.length : null,
+      mode: isZombaScope ? 'ZOMBA_FAST_PATH' : 'SCOPED_CODES_PATH',
       query,
     });
 
-    const products = await prisma.product.findMany({
+    const exactQuery = query.toLowerCase();
+    const baseWhere = {
+      enabled: true,
+      ...(derivedBranchCode ? { branchCode: derivedBranchCode } : {}),
+      ...(isZombaScope
+        ? { sourceCode: { not: null } }
+        : { sourceCode: { in: scopedProductCodes } }),
+    };
+
+    // Fast exact-match query (barcode/sourceCode) first for scanner and direct code inputs.
+    const exactProducts = await prisma.product.findMany({
       where: {
-        enabled: true,
-        sourceCode: { in: scopedProductCodes },
-        ...(derivedBranchCode ? { branchCode: derivedBranchCode } : {}),
+        ...baseWhere,
         OR: [
           { barcode: { equals: query, mode: 'insensitive' } },
           { sourceCode: { equals: query, mode: 'insensitive' } },
-          { name: { contains: query, mode: 'insensitive' } },
         ],
       },
       select: {
@@ -539,13 +569,46 @@ async function lookupEmergencyProducts(req, res) {
         overrideStock: true,
         lowStockThreshold: true,
       },
-      take: 30,
+      take: 10,
       orderBy: [
         { name: 'asc' },
       ],
     });
 
-    const normalizedQuery = query.toLowerCase();
+    let products = exactProducts;
+
+    // If no exact match, run contains search.
+    if (products.length === 0) {
+      products = await prisma.product.findMany({
+        where: {
+          ...baseWhere,
+          OR: [
+            { name: { contains: query, mode: 'insensitive' } },
+            { barcode: { contains: query, mode: 'insensitive' } },
+            { sourceCode: { contains: query, mode: 'insensitive' } },
+          ],
+        },
+        select: {
+          id: true,
+          name: true,
+          sourceCode: true,
+          barcode: true,
+          price: true,
+          discountPrice: true,
+          isOnSale: true,
+          stock: true,
+          overrideActive: true,
+          overrideStock: true,
+          lowStockThreshold: true,
+        },
+        take: 30,
+        orderBy: [
+          { name: 'asc' },
+        ],
+      });
+    }
+
+    const normalizedQuery = exactQuery;
     const mapped = products
       .map((product) => {
         const enriched = enrichProductStock(product);
@@ -573,6 +636,14 @@ async function lookupEmergencyProducts(req, res) {
         console.log(`[ZOMBA STOCK][VERIFY][EMERGENCY_LOOKUP] product=9501100002174 source=PersistedProductStock location=SH stock=${Number(verifyProduct.stock || 0)}`);
       }
     }
+
+    console.log('[EMERGENCY SALES][LOOKUP] performance', {
+      locationCode,
+      mode: isZombaScope ? 'ZOMBA_FAST_PATH' : 'SCOPED_CODES_PATH',
+      query,
+      resultCount: mapped.length,
+      durationMs: Date.now() - startedAt,
+    });
 
     return res.status(200).json({ success: true, products: mapped });
   } catch (error) {
