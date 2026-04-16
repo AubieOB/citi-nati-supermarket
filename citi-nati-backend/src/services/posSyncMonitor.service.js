@@ -448,7 +448,7 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40, locationCode,
   const lastSuccessfulSyncEvent = scopedRecentEvents.find(
     (event) => event.status === 'success' && String(event.eventType || '').trim().toLowerCase() === 'agent-push-products'
   ) || null;
-  const lastSuccessfulSyncAt = lastSuccessfulSyncEvent?.createdAt || null;
+  const lastSuccessfulSyncAt = lastSuccessfulSyncEvent?.createdAt || recentSuccess?.createdAt || null;
 
   return {
     config: scopedConfig,

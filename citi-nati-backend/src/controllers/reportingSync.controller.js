@@ -1,4 +1,32 @@
 const { ingestReportingBatch, ingestLatestProductCosts } = require('../services/reportingSyncIngest.service');
+const { recordPosSyncEvent } = require('../services/posSyncMonitor.service');
+
+function deriveAgentLocationCode(branchCode, payloadLocationCode) {
+  const normalizedBranchCode = String(branchCode || '').trim().toUpperCase();
+  const normalizedPayloadLocationCode = String(payloadLocationCode || '').trim().toUpperCase();
+
+  if (normalizedPayloadLocationCode) {
+    return normalizedPayloadLocationCode;
+  }
+
+  if (normalizedBranchCode === 'ZOMBA') {
+    return 'SH';
+  }
+
+  if (normalizedBranchCode === 'BLANTYRE') {
+    return 'BT';
+  }
+
+  return null;
+}
+
+async function recordReportingMonitorEvent(payload = {}) {
+  try {
+    await recordPosSyncEvent(payload);
+  } catch (eventErr) {
+    console.warn('[REPORTING SYNC] monitor event record failed:', eventErr.message);
+  }
+}
 
 function isAuthorizedAgent(req) {
   const provided = req.headers['x-pos-secret'];
@@ -155,6 +183,25 @@ async function receiveReportingInvoices(req, res) {
 
     const result = await ingestReportingBatch(payload);
 
+    await recordReportingMonitorEvent({
+      eventType: 'agent-reporting-invoices',
+      source: 'pos-sync-agent',
+      status: 'success',
+      level: 'info',
+      title: 'Reporting invoices synced',
+      message: `POS agent synced ${result.receivedInvoices} reporting invoice(s) with ${result.storedDetails + result.updatedDetails} detail row(s).`,
+      suggestion: 'No action required.',
+      metadata: {
+        branchCode: String(payload.branchCode || '').trim().toUpperCase() || null,
+        branchName: payload.branchName || null,
+        locationCode: deriveAgentLocationCode(payload.branchCode, payload.locationCode),
+        syncSourceCode: payload.syncSourceCode || null,
+        receivedInvoices: result.receivedInvoices,
+        storedInvoices: result.storedInvoices + result.updatedInvoices,
+        storedDetails: result.storedDetails + result.updatedDetails,
+      },
+    });
+
     console.log('[REPORTING SYNC] Batch persisted', {
       branchCode: payload.branchCode,
       syncSourceCode: payload.syncSourceCode,
@@ -186,6 +233,24 @@ async function receiveReportingInvoices(req, res) {
       branchCode: req.body && req.body.branchCode ? req.body.branchCode : null,
       invoiceCount: (req.body && Array.isArray(req.body.invoices) ? req.body.invoices.length : 0),
     });
+    await recordReportingMonitorEvent({
+      eventType: 'agent-reporting-invoices',
+      source: 'pos-sync-agent',
+      status: 'failed',
+      level: 'error',
+      title: 'Reporting invoice sync failed',
+      message: 'The backend failed to process a reporting invoice batch from POS agent.',
+      reason: error && error.message ? error.message : String(error),
+      suggestion: 'Inspect reporting sync payload shape and backend ingest constraints.',
+      metadata: {
+        branchCode: req.body && req.body.branchCode ? String(req.body.branchCode).trim().toUpperCase() : null,
+        branchName: req.body && req.body.branchName ? req.body.branchName : null,
+        locationCode: deriveAgentLocationCode(req.body && req.body.branchCode, req.body && req.body.locationCode),
+        syncSourceCode: req.body && req.body.syncSourceCode ? req.body.syncSourceCode : null,
+        invoiceCount: req.body && Array.isArray(req.body.invoices) ? req.body.invoices.length : 0,
+      },
+    });
+
     return res.status(500).json({
       success: false,
       error: 'Failed to process reporting sync batch',
@@ -225,6 +290,24 @@ async function receiveLatestProductCosts(req, res) {
 
     const result = await ingestLatestProductCosts(payload);
 
+    await recordReportingMonitorEvent({
+      eventType: 'agent-reporting-latest-costs',
+      source: 'pos-sync-agent',
+      status: 'success',
+      level: 'info',
+      title: 'Latest product costs synced',
+      message: `POS agent synced ${result.receivedProducts} latest product cost record(s).`,
+      suggestion: 'No action required.',
+      metadata: {
+        branchCode: String(payload.branchCode || '').trim().toUpperCase() || null,
+        branchName: payload.branchName || null,
+        locationCode: deriveAgentLocationCode(payload.branchCode, payload.locationCode),
+        syncSourceCode: payload.syncSourceCode || null,
+        receivedProducts: result.receivedProducts,
+        storedProducts: result.storedProducts + result.updatedProducts,
+      },
+    });
+
     return res.status(200).json({
       success: true,
       receivedProducts: result.receivedProducts,
@@ -235,6 +318,25 @@ async function receiveLatestProductCosts(req, res) {
     });
   } catch (error) {
     console.error('[REPORTING SYNC][LATEST COSTS] Processing failed:', error.message);
+
+    await recordReportingMonitorEvent({
+      eventType: 'agent-reporting-latest-costs',
+      source: 'pos-sync-agent',
+      status: 'failed',
+      level: 'error',
+      title: 'Latest product costs sync failed',
+      message: 'The backend failed to process latest product cost payload from POS agent.',
+      reason: error.message,
+      suggestion: 'Review SQL permissions/columns and agent-side latest cost query compatibility.',
+      metadata: {
+        branchCode: req.body && req.body.branchCode ? String(req.body.branchCode).trim().toUpperCase() : null,
+        branchName: req.body && req.body.branchName ? req.body.branchName : null,
+        locationCode: deriveAgentLocationCode(req.body && req.body.branchCode, req.body && req.body.locationCode),
+        syncSourceCode: req.body && req.body.syncSourceCode ? req.body.syncSourceCode : null,
+        productCount: req.body && Array.isArray(req.body.latestProductCosts) ? req.body.latestProductCosts.length : 0,
+      },
+    });
+
     return res.status(500).json({
       success: false,
       error: 'Failed to process latest product cost sync batch',
