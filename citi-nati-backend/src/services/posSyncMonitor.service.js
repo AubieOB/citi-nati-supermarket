@@ -3,9 +3,9 @@ const { emitPosSyncEvent } = require('../utils/socket');
 const posCommandQueueService = require('./posCommandQueue.service');
 
 const prisma = new PrismaClient();
-// Default liveness window: 30 minutes. Agents sync every few minutes; 90s was too tight and caused
-// false "Agent: unreachable" even when the agent had recently pushed data.
-const AGENT_LIVENESS_WINDOW_MS = Number.parseInt(process.env.POS_SYNC_AGENT_LIVENESS_WINDOW_MS || '1800000', 10);
+// Default liveness window: 2 hours. Agents sync every few minutes; short windows cause false
+// "Agent: unreachable" when there are brief gaps (network, sleep, restart) in event flow.
+const AGENT_LIVENESS_WINDOW_MS = Number.parseInt(process.env.POS_SYNC_AGENT_LIVENESS_WINDOW_MS || '7200000', 10);
 
 function clampScore(value) {
   return Math.max(0, Math.min(100, value));
@@ -384,7 +384,11 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40, locationCode,
     ? AGENT_LIVENESS_WINDOW_MS
     : 1800000;
 
-  const recentAgentContactViaEvents = scopedRecentEvents.find(
+  // Use scopedRecentWindowEvents (full 24h scoped query, not limited by total-event cap) for liveness.
+  // scopedRecentEvents is capped at the 400 most recent total events, which may exclude older Zomba
+  // events when high-frequency branches push many events ahead of them in the sorted results.
+  const allScopedForLiveness = scopedRecentWindowEvents.length > 0 ? scopedRecentWindowEvents : scopedRecentEvents;
+  const recentAgentContactViaEvents = allScopedForLiveness.find(
     (event) => isAgentContactEvent(event) && (nowTs - new Date(event.createdAt).getTime()) <= livenessWindowMs,
   ) || null;
 
