@@ -287,6 +287,7 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
   const [manualSyncing, setManualSyncing] = useState(false);
   const [toggleSaving, setToggleSaving] = useState(false);
   const [clearingFailedCommands, setClearingFailedCommands] = useState(false);
+  const [clearFailedConfirmOpen, setClearFailedConfirmOpen] = useState(false);
   const refreshTimeoutRef = useRef(null);
   const lastToastEventRef = useRef(null);
   const previousLocationCodeRef = useRef(selectedLocationCode);
@@ -452,8 +453,6 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
   };
 
   const handleClearFailedCommands = async () => {
-    const failedCount = monitor?.stats?.queue?.FAILED || 0;
-    if (!window.confirm(`Delete all ${failedCount} failed write-back commands? This cannot be undone.`)) return;
     try {
       setClearingFailedCommands(true);
       const response = await api.delete('/admin/pos-sync/failed-commands');
@@ -463,6 +462,7 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
       notifyError(`Failed to clear commands: ${error.response?.data?.error || error.message}`, 4000);
     } finally {
       setClearingFailedCommands(false);
+      setClearFailedConfirmOpen(false);
     }
   };
 
@@ -780,7 +780,7 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
             {(queue.FAILED || 0) > 0 && (
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem' }}>
                 <button
-                  onClick={handleClearFailedCommands}
+                  onClick={() => setClearFailedConfirmOpen(true)}
                   disabled={clearingFailedCommands}
                   style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.5rem 1.1rem', fontWeight: 700, fontSize: '0.85rem', cursor: clearingFailedCommands ? 'wait' : 'pointer', opacity: clearingFailedCommands ? 0.7 : 1 }}
                 >
@@ -872,6 +872,81 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
           </div>
         )}
       </div>
+
+      {clearFailedConfirmOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.45)',
+            zIndex: 200,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+          }}
+          onClick={() => {
+            if (!clearingFailedCommands) setClearFailedConfirmOpen(false);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Confirm clear failed commands"
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: '420px',
+              backgroundColor: '#fff',
+              border: '1px solid #e2e8f0',
+              borderRadius: '12px',
+              boxShadow: '0 20px 40px rgba(15, 23, 42, 0.25)',
+              padding: '1rem 1rem 0.9rem',
+            }}
+          >
+            <h4 style={{ margin: 0, color: '#0f172a', fontSize: '1rem', fontWeight: 800 }}>
+              Clear Failed Commands?
+            </h4>
+            <p style={{ margin: '0.6rem 0 1rem', color: '#475569', lineHeight: 1.5, fontSize: '0.9rem' }}>
+              Delete all {queue.FAILED || 0} failed write-back command(s). This action cannot be undone.
+            </p>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.55rem' }}>
+              <button
+                onClick={() => setClearFailedConfirmOpen(false)}
+                disabled={clearingFailedCommands}
+                style={{
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#fff',
+                  color: '#334155',
+                  borderRadius: '8px',
+                  padding: '0.45rem 0.9rem',
+                  fontWeight: 700,
+                  cursor: clearingFailedCommands ? 'not-allowed' : 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleClearFailedCommands}
+                disabled={clearingFailedCommands}
+                style={{
+                  border: 'none',
+                  backgroundColor: '#dc2626',
+                  color: '#fff',
+                  borderRadius: '8px',
+                  padding: '0.45rem 0.9rem',
+                  fontWeight: 700,
+                  cursor: clearingFailedCommands ? 'wait' : 'pointer',
+                  opacity: clearingFailedCommands ? 0.75 : 1,
+                }}
+              >
+                {clearingFailedCommands ? 'Clearing...' : 'Yes, Clear'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
