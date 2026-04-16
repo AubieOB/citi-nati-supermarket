@@ -220,8 +220,21 @@ async function processInvoice(tx, invoice, batchMeta) {
     let detailsInserted = 0;
     let detailsUpdated = 0;
 
-    for (const item of details) {
+    for (let idx = 0; idx < details.length; idx++) {
+      const item = details[idx];
       const sourceInvDetailId = toInt(item.invDetailId);
+      
+      // Pre-validation for detail items
+      if (!sourceInvDetailId || sourceInvDetailId <= 0) {
+        console.error('[REPORTING SYNC][DETAIL] Skipping detail with invalid sourceInvDetailId:', {
+          invoiceNo: invoice.invoiceNo,
+          detailIndex: idx,
+          invDetailId: item.invDetailId,
+          sourceInvDetailId,
+        });
+        continue;
+      }
+
       const detailData = normalizeInvoiceItem(item, batchMeta.syncSourceCode, salesInvoice.id);
 
       try {
@@ -253,8 +266,10 @@ async function processInvoice(tx, invoice, batchMeta) {
       } catch (itemErr) {
         console.error('[REPORTING SYNC][DETAIL] Item operation failed:', {
           invoiceNo: invoice.invoiceNo,
+          detailIndex: idx,
           invDetailId: item.invDetailId,
           sourceInvDetailId,
+          detailDataKeys: Object.keys(detailData),
           message: itemErr && itemErr.message ? itemErr.message : String(itemErr),
           code: itemErr && itemErr.code ? itemErr.code : null,
         });
