@@ -161,80 +161,121 @@ async function processInvoice(tx, invoice, batchMeta) {
     throw new Error(`NON_RETRYABLE: Invoice missing invoiceDate (invoiceNo=${invoice.invoiceNo})`);
   }
 
-  const existingInvoice = await tx.salesInvoice.findUnique({
-    where: {
-      syncSourceCode_sourceInvoiceNo: {
-        syncSourceCode: batchMeta.syncSourceCode,
-        sourceInvoiceNo: invoiceData.sourceInvoiceNo,
-      },
-    },
-    select: { id: true },
-  });
-
-  let salesInvoice;
-  let inserted = 0;
-  let updated = 0;
-
-  if (!existingInvoice) {
-    salesInvoice = await tx.salesInvoice.create({
-      data: {
-        ...invoiceData,
-        firstReceivedAt: new Date(),
-      },
-      select: { id: true },
-    });
-    inserted = 1;
-  } else {
-    salesInvoice = await tx.salesInvoice.update({
-      where: { id: existingInvoice.id },
-      data: invoiceData,
-      select: { id: true },
-    });
-    updated = 1;
-  }
-
-  const details = Array.isArray(invoice.details) ? invoice.details : [];
-  let detailsInserted = 0;
-  let detailsUpdated = 0;
-
-  for (const item of details) {
-    const sourceInvDetailId = toInt(item.invDetailId);
-    const detailData = normalizeInvoiceItem(item, batchMeta.syncSourceCode, salesInvoice.id);
-
-    const existingItem = await tx.salesInvoiceItem.findUnique({
+  try {
+    const existingInvoice = await tx.salesInvoice.findUnique({
       where: {
-        syncSourceCode_sourceInvDetailId: {
+        syncSourceCode_sourceInvoiceNo: {
           syncSourceCode: batchMeta.syncSourceCode,
-          sourceInvDetailId,
+          sourceInvoiceNo: invoiceData.sourceInvoiceNo,
         },
       },
       select: { id: true },
     });
 
-    if (!existingItem) {
-      await tx.salesInvoiceItem.create({
-        data: {
-          ...detailData,
-          firstReceivedAt: new Date(),
-        },
-      });
-      detailsInserted += 1;
-    } else {
-      await tx.salesInvoiceItem.update({
-        where: { id: existingItem.id },
-        data: detailData,
-      });
-      detailsUpdated += 1;
-    }
-  }
+    let salesInvoice;
+    let inserted = 0;
+    let updated = 0;
 
-  return {
-    inserted,
-    updated,
-    detailsInserted,
-    detailsUpdated,
-    detailCount: details.length,
-  };
+    if (!existingInvoice) {
+      try {
+        salesInvoice = await tx.salesInvoice.create({
+          data: {
+            ...invoiceData,
+            firstReceivedAt: new Date(),
+          },
+          select: { id: true },
+        });
+        inserted = 1;
+      } catch (createErr) {
+        console.error('[REPORTING SYNC][CREATE INVOICE] Creation failed:', {
+          invoiceNo: invoice.invoiceNo,
+          syncSourceCode: batchMeta.syncSourceCode,
+          sourceInvoiceNo: invoiceData.sourceInvoiceNo,
+          message: createErr && createErr.message ? createErr.message : String(createErr),
+          code: createErr && createErr.code ? createErr.code : null,
+        });
+        throw createErr;
+      }
+    } else {
+      try {
+        salesInvoice = await tx.salesInvoice.update({
+          where: { id: existingInvoice.id },
+          data: invoiceData,
+          select: { id: true },
+        });
+        updated = 1;
+      } catch (updateErr) {
+        console.error('[REPORTING SYNC][UPDATE INVOICE] Update failed:', {
+          invoiceNo: invoice.invoiceNo,
+          syncSourceCode: batchMeta.syncSourceCode,
+          sourceInvoiceNo: invoiceData.sourceInvoiceNo,
+          message: updateErr && updateErr.message ? updateErr.message : String(updateErr),
+          code: updateErr && updateErr.code ? updateErr.code : null,
+        });
+        throw updateErr;
+      }
+    }
+
+    const details = Array.isArray(invoice.details) ? invoice.details : [];
+    let detailsInserted = 0;
+    let detailsUpdated = 0;
+
+    for (const item of details) {
+      const sourceInvDetailId = toInt(item.invDetailId);
+      const detailData = normalizeInvoiceItem(item, batchMeta.syncSourceCode, salesInvoice.id);
+
+      try {
+        const existingItem = await tx.salesInvoiceItem.findUnique({
+          where: {
+            syncSourceCode_sourceInvDetailId: {
+              syncSourceCode: batchMeta.syncSourceCode,
+              sourceInvDetailId,
+            },
+          },
+          select: { id: true },
+        });
+
+        if (!existingItem) {
+          await tx.salesInvoiceItem.create({
+            data: {
+              ...detailData,
+              firstReceivedAt: new Date(),
+            },
+          });
+          detailsInserted += 1;
+        } else {
+          await tx.salesInvoiceItem.update({
+            where: { id: existingItem.id },
+            data: detailData,
+          });
+          detailsUpdated += 1;
+        }
+      } catch (itemErr) {
+        console.error('[REPORTING SYNC][DETAIL] Item operation failed:', {
+          invoiceNo: invoice.invoiceNo,
+          invDetailId: item.invDetailId,
+          sourceInvDetailId,
+          message: itemErr && itemErr.message ? itemErr.message : String(itemErr),
+          code: itemErr && itemErr.code ? itemErr.code : null,
+        });
+        throw itemErr;
+      }
+    }
+
+    return {
+      inserted,
+      updated,
+      detailsInserted,
+      detailsUpdated,
+      detailCount: details.length,
+    };
+  } catch (err) {
+    console.error('[REPORTING SYNC][PROCESS INVOICE] Overall invoice processing failed:', {
+      invoiceNo: invoice.invoiceNo,
+      message: err && err.message ? err.message : String(err),
+    });
+    throw err;
+  }
 }
 
 async function ingestReportingBatch(payload) {
