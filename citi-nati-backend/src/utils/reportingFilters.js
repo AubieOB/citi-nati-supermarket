@@ -41,6 +41,11 @@ const ALLOWED_SORT_ORDERS = new Set(['asc', 'desc']);
 const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH'];
 const BRANCH_SCOPE_LOCATION_CODES = ['BT', 'ZA'];
 
+const BRANCH_SYNC_SOURCE_PREFIXES = {
+  BLANTYRE: ['BLANTYRE', 'BT'],
+  ZOMBA: ['ZOMBA', 'ZA'],
+};
+
 // Maps a location code to the branch code stored in SalesInvoice.branchCode.
 // This is the reliable discriminator between branches because it comes directly
 // from the POS sync agent's BRANCH_CODE env variable.
@@ -50,6 +55,22 @@ function deriveBranchCodeFromLocationCode(locationCode) {
   if (normalized === 'BT') return 'BLANTYRE';
   if (ZOMBA_LOCATION_CODES.includes(normalized)) return 'ZOMBA';
   return null;
+}
+
+function buildBranchScopePredicate(branchCode) {
+  const normalizedBranch = sanitizeStr(branchCode)?.toUpperCase();
+  if (!normalizedBranch) return null;
+
+  const syncPrefixes = BRANCH_SYNC_SOURCE_PREFIXES[normalizedBranch] || [normalizedBranch];
+
+  return {
+    OR: [
+      { branchCode: { equals: normalizedBranch, mode: 'insensitive' } },
+      ...syncPrefixes.map((prefix) => ({
+        syncSourceCode: { startsWith: prefix, mode: 'insensitive' },
+      })),
+    ],
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -100,7 +121,10 @@ function buildInvoiceWhere(dateRange, filters = {}) {
   // POS agent's BRANCH_CODE env and is not affected by POS sub-location code
   // ambiguities (e.g. both branches may use 'SH' as a sub-location code).
   const effectiveBranchCode = filters.branchCode || deriveBranchCodeFromLocationCode(filters.locationCode);
-  if (effectiveBranchCode) where.branchCode = effectiveBranchCode;
+  const branchScopePredicate = buildBranchScopePredicate(effectiveBranchCode);
+  if (branchScopePredicate) {
+    andConditions.push(branchScopePredicate);
+  }
   if (filters.syncSourceCode) where.syncSourceCode = filters.syncSourceCode;
 
   const normalizedRequestedLocationCode = sanitizeStr(filters.locationCode)?.toUpperCase();

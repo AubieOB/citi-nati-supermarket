@@ -18,6 +18,11 @@ function roundMoney(value, decimals = 2) {
 const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH'];
 const BRANCH_SCOPE_LOCATION_CODES = ['BT', 'ZA'];
 
+const BRANCH_SYNC_SOURCE_PREFIXES = {
+  BLANTYRE: ['BLANTYRE', 'BT'],
+  ZOMBA: ['ZOMBA', 'ZA'],
+};
+
 // Mirrors the same function in reportingFilters.js — kept local to avoid
 // coupling unrelated modules. Must stay in sync with that version.
 function deriveBranchCodeFromLocationCode(locationCode) {
@@ -26,6 +31,22 @@ function deriveBranchCodeFromLocationCode(locationCode) {
   if (code === 'BT') return 'BLANTYRE';
   if (ZOMBA_LOCATION_CODES.includes(code)) return 'ZOMBA';
   return null;
+}
+
+function buildBranchScopePredicate(branchCode) {
+  const normalized = String(branchCode || '').trim().toUpperCase();
+  if (!normalized) return null;
+
+  const prefixes = BRANCH_SYNC_SOURCE_PREFIXES[normalized] || [normalized];
+
+  return {
+    OR: [
+      { branchCode: { equals: normalized, mode: 'insensitive' } },
+      ...prefixes.map((prefix) => ({
+        syncSourceCode: { startsWith: prefix, mode: 'insensitive' },
+      })),
+    ],
+  };
 }
 
 function buildLatestCostScope(filters = {}) {
@@ -37,8 +58,9 @@ function buildLatestCostScope(filters = {}) {
   // This is the same logic used in buildInvoiceWhere: branchCode is the
   // reliable discriminator because it comes from the agent BRANCH_CODE env.
   const effectiveBranchCode = filters.branchCode || deriveBranchCodeFromLocationCode(filters.locationCode);
-  if (effectiveBranchCode) {
-    where.branchCode = effectiveBranchCode;
+  const branchScopePredicate = buildBranchScopePredicate(effectiveBranchCode);
+  if (branchScopePredicate) {
+    andConditions.push(branchScopePredicate);
   }
 
   const normalizedRequestedLocationCode = String(filters.locationCode || '').trim().toUpperCase();
