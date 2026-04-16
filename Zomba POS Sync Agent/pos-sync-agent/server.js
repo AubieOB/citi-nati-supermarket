@@ -49,6 +49,25 @@ let pool;
 let reportingSyncState;
 let reportingSyncService;
 
+/** Expiry batch cache - refreshed every 5 minutes so heavy view query doesn't block every 15s product push tick */
+let expiryBatchCache = null;
+let expiryBatchCachedAt = 0;
+const EXPIRY_BATCH_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+async function getCachedExpiryBatches() {
+  const now = Date.now();
+  if (expiryBatchCache && (now - expiryBatchCachedAt) < EXPIRY_BATCH_CACHE_TTL_MS) {
+    console.log(`[POS FETCH][EXPIRY] using cached expiry batch map (age=${Math.round((now - expiryBatchCachedAt) / 1000)}s, size=${expiryBatchCache.size})`);
+    return expiryBatchCache;
+  }
+  console.log('[POS FETCH][EXPIRY] refreshing expiry batch cache...');
+  const freshMap = await buildActiveExpiryBatchesFromPOS();
+  expiryBatchCache = freshMap;
+  expiryBatchCachedAt = Date.now();
+  console.log(`[POS FETCH][EXPIRY] expiry batch cache refreshed: ${freshMap.size} products`);
+  return freshMap;
+}
+
 /** Initialize SQL connection pool */
 async function initializePool() {
   if (!pool) {
@@ -289,8 +308,10 @@ async function fetchProductsFromPOS(locationCode) {
       });
     }
 
-    // Enrich each product with active expiry batches from the same SQL Server
-    const expiryBatchesMap = await buildActiveExpiryBatchesFromPOS();
+    // Enrich each product with active expiry batches from the same SQL Server.
+    // Use the 5-minute cache so the heavy vw_WillExpire_Products view query does not
+    // block every 15-second product-push tick (preventing isAutoSyncRunning from releasing).
+    const expiryBatchesMap = await getCachedExpiryBatches();
     let enrichedWithExpiry = 0;
     const enrichedRecords = result.recordset.map(product => {
       const code = String(product.ProductCode || '').trim();
