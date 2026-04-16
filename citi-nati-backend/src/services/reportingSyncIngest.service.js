@@ -303,49 +303,43 @@ async function ingestReportingBatch(payload) {
     updatedInvoices: 0,
     storedDetails: 0,
     updatedDetails: 0,
+    skippedInvoices: 0,
     syncSourceCode: payload.syncSourceCode,
   };
 
-  try {
-    await prisma.$transaction(async (tx) => {
-      const source = await upsertSyncSource(tx, payload);
+  // Upsert the sync source once outside any per-invoice transaction
+  const source = await upsertSyncSource(prisma, payload);
 
-      const batchMeta = {
-        syncSourceId: source.id,
-        branchCode: payload.branchCode,
-        branchName: payload.branchName,
-        locationId: toInt(payload.locationId),
-        syncSourceCode: payload.syncSourceCode,
-        syncedAt,
-      };
+  const batchMeta = {
+    syncSourceId: source.id,
+    branchCode: payload.branchCode,
+    branchName: payload.branchName,
+    locationId: toInt(payload.locationId),
+    syncSourceCode: payload.syncSourceCode,
+    syncedAt,
+  };
 
-      for (const invoice of invoices) {
-        try {
-          const processed = await processInvoice(tx, invoice, batchMeta);
-          result.storedInvoices += processed.inserted;
-          result.updatedInvoices += processed.updated;
-          result.storedDetails += processed.detailsInserted;
-          result.updatedDetails += processed.detailsUpdated;
-        } catch (invoiceErr) {
-          console.error('[REPORTING SYNC][INGEST] Error processing invoice:', {
-            syncSourceCode: batchMeta.syncSourceCode,
-            invoiceNo: invoice && invoice.invoiceNo ? invoice.invoiceNo : null,
-            message: invoiceErr && invoiceErr.message ? invoiceErr.message : String(invoiceErr),
-            code: invoiceErr && invoiceErr.code ? invoiceErr.code : null,
-          });
-          throw invoiceErr;
-        }
-      }
-    });
-  } catch (txErr) {
-    console.error('[REPORTING SYNC][INGEST] Transaction failed:', {
-      syncSourceCode: payload.syncSourceCode,
-      branchCode: payload.branchCode,
-      invoiceCount: invoices.length,
-      message: txErr && txErr.message ? txErr.message : String(txErr),
-      code: txErr && txErr.code ? txErr.code : null,
-    });
-    throw txErr;
+  // Process each invoice in its own short-lived transaction to avoid timeouts
+  for (const invoice of invoices) {
+    try {
+      const processed = await prisma.$transaction(
+        async (tx) => processInvoice(tx, invoice, batchMeta),
+        { timeout: 30000 },
+      );
+      result.storedInvoices += processed.inserted;
+      result.updatedInvoices += processed.updated;
+      result.storedDetails += processed.detailsInserted;
+      result.updatedDetails += processed.detailsUpdated;
+    } catch (invoiceErr) {
+      result.skippedInvoices += 1;
+      console.error('[REPORTING SYNC][INGEST] Error processing invoice (skipped):', {
+        syncSourceCode: batchMeta.syncSourceCode,
+        invoiceNo: invoice && invoice.invoiceNo ? invoice.invoiceNo : null,
+        message: invoiceErr && invoiceErr.message ? invoiceErr.message : String(invoiceErr),
+        code: invoiceErr && invoiceErr.code ? invoiceErr.code : null,
+      });
+      // Continue processing remaining invoices instead of aborting the whole batch
+    }
   }
 
   return result;
@@ -362,24 +356,23 @@ async function ingestLatestProductCosts(payload) {
     syncSourceCode: payload.syncSourceCode,
   };
 
-  await prisma.$transaction(async (tx) => {
-    const source = await upsertSyncSource(tx, payload);
+  const source = await upsertSyncSource(prisma, payload);
 
-    const batchMeta = {
-      syncSourceId: source.id,
-      branchCode: payload.branchCode,
-      branchName: payload.branchName,
-      locationId: toInt(payload.locationId),
-      syncSourceCode: payload.syncSourceCode,
-      syncedAt,
-    };
+  const batchMeta = {
+    syncSourceId: source.id,
+    branchCode: payload.branchCode,
+    branchName: payload.branchName,
+    locationId: toInt(payload.locationId),
+    syncSourceCode: payload.syncSourceCode,
+    syncedAt,
+  };
 
-    for (const item of latestProductCosts) {
+  for (const item of latestProductCosts) {
       const productCode = toStringOrNull(item.productCode);
       if (!productCode) continue;
 
       const data = normalizeLatestProductCost(item, batchMeta);
-      const existing = await tx.posLatestProductCost.findUnique({
+      const existing = await prisma.posLatestProductCost.findUnique({
         where: {
           syncSourceCode_productCode: {
             syncSourceCode: batchMeta.syncSourceCode,
@@ -390,7 +383,7 @@ async function ingestLatestProductCosts(payload) {
       });
 
       if (!existing) {
-        await tx.posLatestProductCost.create({
+        await prisma.posLatestProductCost.create({
           data: {
             ...data,
             firstReceivedAt: new Date(),
@@ -398,14 +391,13 @@ async function ingestLatestProductCosts(payload) {
         });
         result.storedProducts += 1;
       } else {
-        await tx.posLatestProductCost.update({
+        await prisma.posLatestProductCost.update({
           where: { id: existing.id },
           data,
         });
         result.updatedProducts += 1;
       }
     }
-  });
 
   return result;
 }
