@@ -219,15 +219,19 @@ async function fetchProductsFromPOS(locationCode) {
     // Use provided location code or fall back to environment
     const LOCATION_CODE = locationCode || appConfig.posDb.locationCode;
 
-    // Use the stable DailyStockBalance snapshot for dashboard stock values.
-    // Price remains the most recent FPrice from productprices.
+    // Stock source priority:
+    //   1. DailyStockBalance latest snapshot (preferred - stable daily figure)
+    //   2. Stocks table real-time qty (fallback when DailyStockBalance is being
+    //      rebuilt or has no entry for this product/location)
+    // This prevents a DailyStockBalance rebuild window from writing stock=0
+    // to the backend for all products.
     const query = `
       SELECT 
           p.ProductCode,
           p.ProductName,
           ISNULL(p.Barcode,'') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
-          ISNULL(dsb.StockBalance, 0) AS QuantityAvailable,
+          COALESCE(dsb.StockBalance, st.StockQty, 0) AS QuantityAvailable,
           ISNULL(
               (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC),
               (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode ORDER BY PriceID DESC)
@@ -246,6 +250,9 @@ async function fetchProductsFromPOS(locationCode) {
               WHERE LocationCode = @LocationCode
             )
       ) dsb ON p.ProductCode = dsb.ProductCode
+      LEFT JOIN POS.dbo.Stocks st
+          ON st.ProductCode = p.ProductCode
+          AND st.LocationCode = @LocationCode
       ORDER BY p.ProductCode
     `;
 
@@ -256,7 +263,7 @@ async function fetchProductsFromPOS(locationCode) {
     const negativeStockProducts = result.recordset.filter((product) => Number(product.QuantityAvailable || 0) < 0);
 
     console.log(`${SYNC_LOG_PREFIX} fetched ${result.recordset.length} products from location ${LOCATION_CODE}`);
-    console.log(`${SYNC_LOG_PREFIX} stock mode: DailyStockBalance latest snapshot`);
+    console.log(`${SYNC_LOG_PREFIX} stock mode: DailyStockBalance (latest snapshot) with Stocks table fallback`);
     console.log(`${SYNC_LOG_PREFIX} price mode: latest FPrice by PriceID DESC`);
     console.log(`${SYNC_LOG_PREFIX} negative stock rows after snapshot query: ${negativeStockProducts.length}`);
     if (negativeStockProducts.length > 0) {
