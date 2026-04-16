@@ -100,7 +100,10 @@ async function resolveLocationScopedProductCodesFromSales(scopeCodes = []) {
     return [];
   }
 
-  const derivedBranchCode = deriveBranchCodeFromScopeCodes(scopeCodes);
+  // Preserve branch-level fallback only for legacy Blantyre rows.
+  const derivedBranchCode = scopeCodes.includes('BT')
+    ? deriveBranchCodeFromScopeCodes(scopeCodes)
+    : null;
   const locationPredicates = scopeCodes.map((code) => ({
     locationCode: {
       equals: code,
@@ -132,7 +135,10 @@ async function resolveLocationScopedProductCodesFromLatestCosts(scopeCodes = [])
     return [];
   }
 
-  const derivedBranchCode = deriveBranchCodeFromScopeCodes(scopeCodes);
+  // Preserve branch-level fallback only for legacy Blantyre rows.
+  const derivedBranchCode = scopeCodes.includes('BT')
+    ? deriveBranchCodeFromScopeCodes(scopeCodes)
+    : null;
   const locationPredicates = scopeCodes.map((code) => ({
     locationCode: {
       equals: code,
@@ -163,12 +169,13 @@ function buildEmergencySalesLocationScopeFilters(locationCode) {
   }
 
   const branchCode = getBranchCodeFromLocationCode(locationCode);
+  const includeBranchFallback = scopeCodes.includes('BT');
   const base = scopeCodes.flatMap((code) => ([
     { cartSnapshot: { path: ['locationCode'], equals: code } },
     { cartSnapshot: { path: ['posLocationCode'], equals: code } },
   ]));
 
-  if (branchCode) {
+  if (branchCode && includeBranchFallback) {
     base.push({ cartSnapshot: { path: ['branchCode'], equals: branchCode } });
   }
 

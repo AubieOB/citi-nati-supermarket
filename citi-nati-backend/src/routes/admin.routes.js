@@ -93,7 +93,10 @@ async function resolveLocationScopedProductCodesFromSales(scopeCodes = []) {
     return [];
   }
 
-  const derivedBranchCode = deriveBranchCodeFromScopeCodes(scopeCodes);
+  // Preserve branch-level fallback only for legacy Blantyre rows.
+  const derivedBranchCode = scopeCodes.includes('BT')
+    ? deriveBranchCodeFromScopeCodes(scopeCodes)
+    : null;
   const locationPredicates = scopeCodes.map((code) => ({
     locationCode: {
       equals: code,
@@ -125,7 +128,10 @@ async function resolveLocationScopedProductCodesFromLatestCosts(scopeCodes = [])
     return [];
   }
 
-  const derivedBranchCode = deriveBranchCodeFromScopeCodes(scopeCodes);
+  // Preserve branch-level fallback only for legacy Blantyre rows.
+  const derivedBranchCode = scopeCodes.includes('BT')
+    ? deriveBranchCodeFromScopeCodes(scopeCodes)
+    : null;
   const locationPredicates = scopeCodes.map((code) => ({
     locationCode: {
       equals: code,

@@ -13,7 +13,6 @@ const commandExecutor = require('./lib/command-executor');
 const { buildConfig, getBranchTag, getSyncMetadata, validateStartupConfig } = require('./lib/config');
 const ReportingSyncService = require('./lib/reporting-sync');
 const ReportingSyncState = require('./lib/reporting-sync-state');
-const { ZOMBA_SUB_LOCATIONS } = require('./lib/sub-locations');
 
 const app = express();
 app.use(express.json());
@@ -219,18 +218,23 @@ async function fetchProductsFromPOS(locationCode) {
     // Use provided location code or fall back to environment
     const LOCATION_CODE = locationCode || appConfig.posDb.locationCode;
 
-    // Stock source priority:
-    //   1. DailyStockBalance latest snapshot (matches POS stock-balance screen)
+    // Operational stock source priority (aligned to POS stock balance behavior):
+    //   1. DailyStockBalance latest snapshot (primary)
     //   2. Stocks.StockQty (fallback)
-    //   3. ProductActivity running total (QtyIn - QtyOut) (last fallback)
-    // This avoids false zeroes if any one source is temporarily stale.
+    // Do NOT fall back to ProductActivity cumulative totals for dashboard stock,
+    // because that can inflate balances relative to POS stock-balance screens.
     const query = `
       SELECT 
           p.ProductCode,
           p.ProductName,
           ISNULL(p.Barcode,'') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
-          COALESCE(dsb.StockBalance, st.StockQty, pa.LiveQty, 0) AS QuantityAvailable,
+        COALESCE(dsb.StockBalance, st.StockQty, 0) AS QuantityAvailable,
+        CASE
+          WHEN dsb.StockBalance IS NOT NULL THEN 'DailyStockBalance'
+          WHEN st.StockQty IS NOT NULL THEN 'Stocks'
+          ELSE 'NoStockRow'
+        END AS StockSource,
           ISNULL(
               (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC),
               (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode ORDER BY PriceID DESC)
@@ -250,12 +254,6 @@ async function fetchProductsFromPOS(locationCode) {
               WHERE LocationCode = @LocationCode
             )
       ) dsb ON p.ProductCode = dsb.ProductCode
-      OUTER APPLY (
-          SELECT ISNULL(SUM(pa.QtyIn), 0) - ISNULL(SUM(pa.QtyOut), 0) AS LiveQty
-          FROM POS.dbo.ProductActivity pa
-          WHERE pa.ProductCode = p.ProductCode
-            AND pa.LocationCode = @LocationCode
-      ) pa
       ORDER BY p.ProductCode
     `;
 
@@ -264,8 +262,18 @@ async function fetchProductsFromPOS(locationCode) {
     const result = await request.query(query);
 
     console.log(`${SYNC_LOG_PREFIX} fetched ${result.recordset.length} products from location ${LOCATION_CODE}`);
-    console.log(`${SYNC_LOG_PREFIX} stock mode: DailyStockBalance -> Stocks.StockQty -> ProductActivity fallback chain`);
+    console.log(`${SYNC_LOG_PREFIX} stock mode: DailyStockBalance -> Stocks.StockQty (ProductActivity fallback disabled)`);
     console.log(`${SYNC_LOG_PREFIX} price mode: latest FPrice by PriceID DESC`);
+
+    const stockSourceSummary = result.recordset.reduce((acc, row) => {
+      const key = String(row.StockSource || 'Unknown');
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    console.log(`${SYNC_LOG_PREFIX} stock-source diagnostics`, {
+      locationCode: LOCATION_CODE,
+      sourceBreakdown: stockSourceSummary,
+    });
     
     // Debug log first 5 products
     if (result.recordset.length > 0) {
@@ -338,6 +346,15 @@ async function fetchProductsFromPOS(locationCode) {
     console.error('[POS FETCH] Error fetching products:', err.message);
     return [];
   }
+}
+
+function getOperationalSyncLocations() {
+  // Business rule: Zomba operational dashboard stock must reflect SH only.
+  if (appConfig.branch.branchCode === 'ZOMBA') {
+    return ['SH'];
+  }
+
+  return [appConfig.posDb.locationCode];
 }
 
 function reconcileBatchesWithLiveStock(batches, liveStockQty) {
@@ -772,13 +789,19 @@ app.get('/pos-sync/products', validateApiKey, requireFeature('enableReportingSyn
   try {
     console.log('[POS SYNC] /pos-sync/products endpoint called');
     
-    // Fetch products from all Zomba sub-locations
+    // Fetch products from operational location scope only.
     const allProducts = [];
-    const zombaLocations = Object.values(ZOMBA_SUB_LOCATIONS).map(loc => loc.code);
+    const syncLocations = getOperationalSyncLocations();
     
-    console.log(`[POS SYNC] Fetching from ${zombaLocations.length} Zomba locations: ${zombaLocations.join(', ')}`);
+    console.log('[POS SYNC] operational stock scope diagnostics', {
+      branchCode: appConfig.branch.branchCode,
+      configuredLocationCode: appConfig.posDb.locationCode,
+      includedLocations: syncLocations,
+      mode: appConfig.branch.branchCode === 'ZOMBA' ? 'SH_ONLY_OPERATIONAL' : 'CONFIGURED_LOCATION_ONLY',
+      stockSource: 'DailyStockBalance primary, Stocks fallback',
+    });
     
-    for (const locationCode of zombaLocations) {
+    for (const locationCode of syncLocations) {
       try {
         const locationProducts = await fetchProductsFromPOS(locationCode);
         console.log(`[POS SYNC] Fetched ${locationProducts.length} products from ${locationCode}`);
@@ -789,7 +812,7 @@ app.get('/pos-sync/products', validateApiKey, requireFeature('enableReportingSyn
       }
     }
     
-    console.log(`[POS SYNC] Fetched ${allProducts.length} products from all Zomba locations`);
+    console.log(`[POS SYNC] Fetched ${allProducts.length} products from operational scope: ${syncLocations.join(', ')}`);
 
     if (!allProducts || allProducts.length === 0) {
       return res.json({
@@ -1712,13 +1735,19 @@ async function autoSync() {
 
   isAutoSyncRunning = true;
   try {
-    // Fetch products from all Zomba sub-locations
+    // Fetch products from operational location scope only.
     const allProducts = [];
-    const zombaLocations = Object.values(ZOMBA_SUB_LOCATIONS).map(loc => loc.code);
+    const syncLocations = getOperationalSyncLocations();
     
-    console.log(`${BRANCH_TAG} [AUTO SYNC] Fetching from ${zombaLocations.length} Zomba locations: ${zombaLocations.join(', ')}`);
+    console.log(`${BRANCH_TAG} [AUTO SYNC] operational stock scope diagnostics`, {
+      branchCode: appConfig.branch.branchCode,
+      configuredLocationCode: appConfig.posDb.locationCode,
+      includedLocations: syncLocations,
+      mode: appConfig.branch.branchCode === 'ZOMBA' ? 'SH_ONLY_OPERATIONAL' : 'CONFIGURED_LOCATION_ONLY',
+      stockSource: 'DailyStockBalance primary, Stocks fallback',
+    });
     
-    for (const locationCode of zombaLocations) {
+    for (const locationCode of syncLocations) {
       try {
         const locationProducts = await fetchProductsFromPOS(locationCode);
         console.log(`${BRANCH_TAG} [AUTO SYNC] Fetched ${locationProducts.length} products from ${locationCode}`);
@@ -1730,7 +1759,7 @@ async function autoSync() {
     }
     
     if (allProducts.length > 0) {
-      console.log(`${BRANCH_TAG} [AUTO SYNC] Total: ${allProducts.length} products from all locations`);
+      console.log(`${BRANCH_TAG} [AUTO SYNC] Total: ${allProducts.length} products from operational scope (${syncLocations.join(', ')})`);
       await sendProductsToLiveServer(allProducts);
     } else {
       console.log(`${BRANCH_TAG} [AUTO SYNC] No products found from any location`);
