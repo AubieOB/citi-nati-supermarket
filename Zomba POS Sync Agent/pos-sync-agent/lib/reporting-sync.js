@@ -102,7 +102,8 @@ class ReportingSyncService {
     try {
       const lastSyncedInvoiceNo = this.state.getLastSyncedInvoiceNo();
       const hasQuoteNo = await this.resolveInvoiceQuoteNoSupport(pool);
-      const recentDays = Number(this.config.reporting?.limitToRecentDays || 0);
+      const reportingConfig = this.config && this.config.reporting ? this.config.reporting : {};
+      const recentDays = Number(reportingConfig.limitToRecentDays || 0);
       const useRecentWindow = Number.isFinite(recentDays) && recentDays > 0;
 
       const request = pool.request();
