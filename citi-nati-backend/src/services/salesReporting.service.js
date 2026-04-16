@@ -202,20 +202,41 @@ async function queryProductReport(itemWhere, pagination, sort) {
     productName: g.productName,
   }));
 
-  const costRows = groupFilters.length
-    ? await prisma.salesInvoiceItem.findMany({
-      where: {
-        ...itemWhere,
-        OR: groupFilters,
-      },
-      select: {
-        productCode: true,
-        productName: true,
-        qty: true,
-        costPrice: true,
-      },
-    })
-    : [];
+  // Fetch categories from Product master table and cost data from invoice items
+  const [categoryMap, costRows] = await Promise.all([
+    groupFilters.length
+      ? prisma.product.findMany({
+        where: {
+          OR: groupFilters.map((f) => ({ sourceCode: f.productCode })),
+        },
+        select: {
+          sourceCode: true,
+          category: true,
+        },
+      })
+        .then((rows) => {
+          const map = new Map();
+          rows.forEach((r) => {
+            map.set(r.sourceCode || '', r.category || 'Uncategorized');
+          });
+          return map;
+        })
+      : Promise.resolve(new Map()),
+    groupFilters.length
+      ? prisma.salesInvoiceItem.findMany({
+        where: {
+          ...itemWhere,
+          OR: groupFilters,
+        },
+        select: {
+          productCode: true,
+          productName: true,
+          qty: true,
+          costPrice: true,
+        },
+      })
+      : Promise.resolve([]),
+  ]);
 
   const totalCostByGroup = new Map();
   for (const row of costRows) {
@@ -238,6 +259,7 @@ async function queryProductReport(itemWhere, pagination, sort) {
     return {
       productCode: g.productCode,
       productName: g.productName,
+      productCategory: categoryMap.get(g.productCode || '') || 'Uncategorized',
       totalQuantitySold: toNum(g._sum.qty, 4),
       totalSales,
       totalTax: toNum(g._sum.taxAmount),

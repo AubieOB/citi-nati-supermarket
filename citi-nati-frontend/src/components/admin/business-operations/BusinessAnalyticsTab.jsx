@@ -1221,12 +1221,13 @@ const BusinessAnalyticsTab = ({
         .filter((b) => b.sales > 0);
 
       // Rankings from product/user API responses
+      // Aggregate products by their category
       const categoryMap = productRows.reduce((acc, row) => {
-        const key = String(row.category || row.categoryName || row.productCategory || 'Uncategorized').trim() || 'Uncategorized';
-        const entry = acc.get(key) || { category: key, sales: 0, quantity: 0 };
+        const categoryName = String(row.productCategory || 'Uncategorized').trim() || 'Uncategorized';
+        const entry = acc.get(categoryName) || { category: categoryName, sales: 0, quantity: 0 };
         entry.sales += Number(row.totalSales || 0);
         entry.quantity += Number(row.totalQuantitySold || 0);
-        acc.set(key, entry);
+        acc.set(categoryName, entry);
         return acc;
       }, new Map());
 
