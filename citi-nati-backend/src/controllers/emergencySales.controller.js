@@ -67,7 +67,8 @@ function expandLocationScopeCodes(locationCode) {
   }
 
   if (ZOMBA_LOCATION_CODES.includes(normalizedLocationCode)) {
-    return [...ZOMBA_LOCATION_CODES];
+    // Zomba operations are handled via SH in POS.
+    return ['SH'];
   }
 
   return [normalizedLocationCode];

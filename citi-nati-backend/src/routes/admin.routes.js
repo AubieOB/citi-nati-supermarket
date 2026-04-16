@@ -60,7 +60,8 @@ function expandLocationScopeCodes(locationCode) {
   }
 
   if (ZOMBA_LOCATION_CODES.includes(normalizedLocationCode)) {
-    return [...ZOMBA_LOCATION_CODES];
+    // Zomba POS writes through SH only.
+    return ['SH'];
   }
 
   return [normalizedLocationCode];

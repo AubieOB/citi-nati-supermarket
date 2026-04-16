@@ -46,7 +46,7 @@ function expandLocationScopeCodes(locationCode) {
   if (!normalized) return [];
 
   if (normalized === 'BT') return ['BT'];
-  if (ZOMBA_LOCATION_CODES.includes(normalized)) return [...ZOMBA_LOCATION_CODES];
+  if (ZOMBA_LOCATION_CODES.includes(normalized)) return ['SH'];
   return [normalized];
 }
 

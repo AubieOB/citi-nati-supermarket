@@ -480,7 +480,8 @@ function expandLocationScopeCodes(locationCode) {
   }
 
   if (ZOMBA_LOCATION_CODES.includes(normalizedLocationCode)) {
-    return [...ZOMBA_LOCATION_CODES];
+    // Zomba POS sales are transacted through SH.
+    return ['SH'];
   }
 
   return [normalizedLocationCode];

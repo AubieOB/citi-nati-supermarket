@@ -294,7 +294,8 @@ function expandLocationScopeCodes(locationCode) {
   }
 
   if (ZOMBA_LOCATION_CODES.includes(normalized)) {
-    return [...ZOMBA_LOCATION_CODES];
+    // Zomba POS scope is anchored to SH.
+    return ['SH'];
   }
 
   return [normalized];
