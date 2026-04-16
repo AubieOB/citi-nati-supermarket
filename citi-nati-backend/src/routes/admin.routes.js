@@ -27,6 +27,7 @@ const {
   getPosSyncEvents,
   togglePosSync,
   runManualPosSync,
+  clearFailedQueueCommands,
 } = require('../controllers/posSyncMonitor.controller');
 const { getExpiryBatchAlerts, setStockOverride } = require('../controllers/product.controller');
 const { emitProductUpdate } = require('../utils/socket');
@@ -428,6 +429,7 @@ router.get('/pos-sync/monitor', verifyTokenMiddleware, verifyAdmin, getPosSyncMo
 router.get('/pos-sync/events', verifyTokenMiddleware, verifyAdmin, getPosSyncEvents);
 router.post('/pos-sync/toggle', verifyTokenMiddleware, verifyAdmin, togglePosSync);
 router.post('/pos-sync/manual-sync', verifyTokenMiddleware, verifyAdmin, runManualPosSync);
+router.delete('/pos-sync/failed-commands', verifyTokenMiddleware, verifyAdmin, clearFailedQueueCommands);
 
 /**
  * GET /api/admin/security-key/status

@@ -286,6 +286,7 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
   const [refreshing, setRefreshing] = useState(false);
   const [manualSyncing, setManualSyncing] = useState(false);
   const [toggleSaving, setToggleSaving] = useState(false);
+  const [clearingFailedCommands, setClearingFailedCommands] = useState(false);
   const refreshTimeoutRef = useRef(null);
   const lastToastEventRef = useRef(null);
   const previousLocationCodeRef = useRef(selectedLocationCode);
@@ -447,6 +448,20 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
       notifyError(`Manual POS sync failed: ${error.response?.data?.error || error.message}`, 4500);
     } finally {
       setManualSyncing(false);
+    }
+  };
+
+  const handleClearFailedCommands = async () => {
+    const failedCount = monitor?.stats?.queue?.FAILED || 0;\n    if (!window.confirm(`Delete all ${failedCount} failed write-back commands? This cannot be undone.`)) return;
+    try {
+      setClearingFailedCommands(true);
+      const response = await api.delete('/admin/pos-sync/failed-commands');
+      notifySuccess(`Cleared ${response.data?.deletedCount ?? 0} failed command(s)`, 3500);
+      await fetchMonitorData(false);
+    } catch (error) {
+      notifyError(`Failed to clear commands: ${error.response?.data?.error || error.message}`, 4000);
+    } finally {
+      setClearingFailedCommands(false);
     }
   };
 
@@ -760,6 +775,18 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
                 </div>
               ))}
             </div>
+
+            {(queue.FAILED || 0) > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem' }}>
+                <button
+                  onClick={handleClearFailedCommands}
+                  disabled={clearingFailedCommands}
+                  style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.5rem 1.1rem', fontWeight: 700, fontSize: '0.85rem', cursor: clearingFailedCommands ? 'wait' : 'pointer', opacity: clearingFailedCommands ? 0.7 : 1 }}
+                >
+                  {clearingFailedCommands ? 'Clearing…' : `Clear ${queue.FAILED} Failed Command${queue.FAILED !== 1 ? 's' : ''}`}
+                </button>
+              </div>
+            )}
 
             <div style={S.card}>
               <h3 style={S.sectionTitle}>Recent Queue Commands</h3>

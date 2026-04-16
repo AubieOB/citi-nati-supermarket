@@ -351,6 +351,13 @@ async function getStats() {
   return stats;
 }
 
+async function clearFailedCommands() {
+  const result = await prisma.posWriteCommand.deleteMany({
+    where: { status: POS_COMMAND_STATUS.FAILED },
+  });
+  return result.count;
+}
+
 module.exports = {
   enqueueCommand,
   claimPendingCommands,
@@ -358,5 +365,6 @@ module.exports = {
   markCommandFailed,
   getCommandById,
   listCommands,
+  clearFailedCommands,
   getStats,
 };

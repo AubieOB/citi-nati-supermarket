@@ -1,5 +1,6 @@
 const { syncProductsFromPOS, setPosSyncEnabled, getRuntimeConfig } = require('../services/posSync.service');
 const { getPosSyncMonitorSnapshot, listPosSyncEvents, recordPosSyncEvent } = require('../services/posSyncMonitor.service');
+const queueService = require('../services/posCommandQueue.service');
 
 async function getPosSyncMonitor(req, res) {
   try {
@@ -85,9 +86,30 @@ async function runManualPosSync(req, res) {
   }
 }
 
+async function clearFailedQueueCommands(req, res) {
+  try {
+    const deleted = await queueService.clearFailedCommands();
+    await recordPosSyncEvent({
+      eventType: 'failed-commands-cleared',
+      source: 'admin-dashboard',
+      status: 'success',
+      level: 'info',
+      title: 'Failed POS queue commands cleared',
+      message: `An admin deleted ${deleted} failed write-back command(s) from the queue.`,
+      suggestion: 'Investigate why commands were failing before new ones are queued.',
+      metadata: { deletedCount: deleted, clearedBy: req.user?.email || req.user?.id || 'admin' },
+    });
+    return res.json({ success: true, deletedCount: deleted });
+  } catch (error) {
+    console.error('[ADMIN POS SYNC] Failed to clear failed commands:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to clear failed commands' });
+  }
+}
+
 module.exports = {
   getPosSyncMonitor,
   getPosSyncEvents,
   togglePosSync,
   runManualPosSync,
+  clearFailedQueueCommands,
 };
