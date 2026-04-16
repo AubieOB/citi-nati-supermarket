@@ -1,5 +1,6 @@
 'use strict';
 
+const { PrismaClient } = require('@prisma/client');
 const { resolvePeriod, formatDateRange } = require('../utils/reportingPeriod');
 const {
   extractFilters,
@@ -63,6 +64,69 @@ function logReportScope(endpoint, req, whereClause, extra = {}) {
   }
 }
 
+const _diagPrisma = new PrismaClient();
+
+/**
+ * When rowsFetched is 0 and a branch scope is active, probe the DB to find
+ * out whether ANY invoices exist for that branch (ignoring the date filter)
+ * and what date range they cover. Fires asynchronously so it never delays responses.
+ */
+async function _probeBranchDataAsync(branchCode, invoiceWhere) {
+  try {
+    // Build a where without the invoiceDate range but with the same branch predicate
+    const branchOnlyWhere = {};
+    if (invoiceWhere.AND) {
+      // Keep all AND conditions except the invoiceDate condition
+      const andWithoutDate = invoiceWhere.AND.filter(
+        (c) => !(c.invoiceDate),
+      );
+      if (andWithoutDate.length > 0) branchOnlyWhere.AND = andWithoutDate;
+    }
+    if (invoiceWhere.branchCode) branchOnlyWhere.branchCode = invoiceWhere.branchCode;
+    if (invoiceWhere.syncSourceCode) branchOnlyWhere.syncSourceCode = invoiceWhere.syncSourceCode;
+    if (invoiceWhere.OR) branchOnlyWhere.OR = invoiceWhere.OR;
+
+    const [totalCount, groupBy] = await Promise.all([
+      _diagPrisma.salesInvoice.count({ where: branchOnlyWhere }),
+      _diagPrisma.salesInvoice.groupBy({
+        by: ['branchCode', 'syncSourceCode'],
+        _count: { id: true },
+        _min: { invoiceDate: true },
+        _max: { invoiceDate: true },
+        where: branchOnlyWhere,
+        take: 10,
+      }),
+    ]);
+
+    if (totalCount === 0) {
+      // Broaden further: check ALL branches to confirm DB is populated at all
+      const allBranches = await _diagPrisma.salesInvoice.groupBy({
+        by: ['branchCode', 'syncSourceCode'],
+        _count: { id: true },
+        take: 20,
+      });
+      console.log('[BO REPORTING][ZERO-DATA PROBE] No invoices found for branch even without date filter.', {
+        queriedBranchCode: branchCode,
+        allBranchesInDB: allBranches,
+      });
+    } else {
+      console.log('[BO REPORTING][ZERO-DATA PROBE] Invoices exist for branch outside current date range!', {
+        queriedBranchCode: branchCode,
+        totalWithoutDateFilter: totalCount,
+        breakdown: groupBy.map((g) => ({
+          branchCode: g.branchCode,
+          syncSourceCode: g.syncSourceCode,
+          count: g._count.id,
+          earliestDate: g._min.invoiceDate,
+          latestDate: g._max.invoiceDate,
+        })),
+      });
+    }
+  } catch (probeErr) {
+    console.warn('[BO REPORTING][ZERO-DATA PROBE] Probe query failed:', probeErr.message);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 1. GET /reports/sales/summary
 // ---------------------------------------------------------------------------
@@ -85,9 +149,13 @@ async function getSalesSummary(req, res) {
     const invoiceWhere = buildInvoiceWhere(period, filters);
 
     const data = await querySalesSummary(invoiceWhere);
-    logReportScope('/reports/sales/summary', req, invoiceWhere, {
-      rowsFetched: Number(data?.totalInvoices || 0),
-    });
+    const rowsFetched = Number(data?.totalInvoices || 0);
+    logReportScope('/reports/sales/summary', req, invoiceWhere, { rowsFetched });
+
+    // If zero results and a branch scope is active, fire a diagnostic probe
+    if (rowsFetched === 0 && (req.query.branchCode || req.query.locationCode || req.query.locationId)) {
+      _probeBranchDataAsync(req.query.branchCode || req.query.locationCode, invoiceWhere).catch(() => {});
+    }
 
     return res.json({
       success: true,
