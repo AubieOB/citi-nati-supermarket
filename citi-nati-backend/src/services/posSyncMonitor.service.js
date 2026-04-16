@@ -3,7 +3,9 @@ const { emitPosSyncEvent } = require('../utils/socket');
 const posCommandQueueService = require('./posCommandQueue.service');
 
 const prisma = new PrismaClient();
-const AGENT_LIVENESS_WINDOW_MS = Number.parseInt(process.env.POS_SYNC_AGENT_LIVENESS_WINDOW_MS || '90000', 10);
+// Default liveness window: 30 minutes. Agents sync every few minutes; 90s was too tight and caused
+// false "Agent: unreachable" even when the agent had recently pushed data.
+const AGENT_LIVENESS_WINDOW_MS = Number.parseInt(process.env.POS_SYNC_AGENT_LIVENESS_WINDOW_MS || '1800000', 10);
 
 function clampScore(value) {
   return Math.max(0, Math.min(100, value));
@@ -374,19 +376,13 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40, locationCode,
     ? hasExplicitBackendBranchScope
     : (hasExplicitBackendBranchScope && scopedBranchCode === backendConfiguredBranchCode);
   const agentHealthyDirect = shouldUseDirectHealthProbe ? await checkPOSHealth() : false;
-  const scopedConfig = shouldUseDirectHealthProbe
-    ? config
-    : {
-        ...config,
-        agentUrl: null,
-      };
 
   // Reachability must be based on fresh, scope-correct evidence.
   // Stale success should not keep an offline agent marked reachable.
   const nowTs = Date.now();
   const livenessWindowMs = Number.isFinite(AGENT_LIVENESS_WINDOW_MS) && AGENT_LIVENESS_WINDOW_MS > 0
     ? AGENT_LIVENESS_WINDOW_MS
-    : 90000;
+    : 1800000;
 
   const recentAgentContactViaEvents = scopedRecentEvents.find(
     (event) => isAgentContactEvent(event) && (nowTs - new Date(event.createdAt).getTime()) <= livenessWindowMs,
@@ -397,6 +393,17 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40, locationCode,
   if (recentAgentContactViaEvents) {
     agentHealthy = true;
   }
+
+  // When the agent is confirmed healthy via recent events (it IS pushing to this backend),
+  // show the configured agent URL. Hiding it as null only makes sense when we genuinely
+  // don't know which branch the backend URL belongs to — but if recent events prove the
+  // scoped agent is active, the configured URL is the correct one to display.
+  const scopedConfig = (shouldUseDirectHealthProbe || agentHealthy)
+    ? config
+    : {
+        ...config,
+        agentUrl: null,
+      };
 
   const buckets = buildBuckets(safeHours);
   const bucketMap = new Map(buckets.map((bucket) => [bucket.key, bucket]));
