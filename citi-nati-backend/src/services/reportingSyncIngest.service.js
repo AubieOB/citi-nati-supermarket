@@ -149,6 +149,18 @@ async function upsertSyncSource(tx, payload) {
 
 async function processInvoice(tx, invoice, batchMeta) {
   const invoiceData = normalizeInvoice(invoice, batchMeta);
+
+  // Pre-insert validation: catch missing required fields early
+  if (!invoiceData.sourceInvoiceNo) {
+    throw new Error(`NON_RETRYABLE: Invoice missing sourceInvoiceNo (invoiceNo=${invoice.invoiceNo})`);
+  }
+  if (!invoiceData.sourceInvoiceSerialNo) {
+    throw new Error(`NON_RETRYABLE: Invoice missing sourceInvoiceSerialNo (invoiceNo=${invoice.invoiceNo})`);
+  }
+  if (!invoiceData.invoiceDate) {
+    throw new Error(`NON_RETRYABLE: Invoice missing invoiceDate (invoiceNo=${invoice.invoiceNo})`);
+  }
+
   const existingInvoice = await tx.salesInvoice.findUnique({
     where: {
       syncSourceCode_sourceInvoiceNo: {
