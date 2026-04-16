@@ -42,6 +42,27 @@ function resolvePeriodOrRespond(req, res) {
   return result; // { startDate: Date, endDate: Date, label: string }
 }
 
+function logReportScope(endpoint, req, whereClause, extra = {}) {
+  try {
+    const scope = {
+      locationId: req.query.locationId || null,
+      locationCode: req.query.locationCode || null,
+      branchCode: req.query.branchCode || null,
+      syncSourceCode: req.query.syncSourceCode || null,
+    };
+
+    console.log('[BO REPORTING][SCOPE]', {
+      endpoint,
+      scope,
+      effectiveBranchCode: whereClause?.branchCode || null,
+      where: whereClause,
+      ...extra,
+    });
+  } catch (_err) {
+    // Logging must never block report responses.
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 1. GET /reports/sales/summary
 // ---------------------------------------------------------------------------
@@ -64,6 +85,9 @@ async function getSalesSummary(req, res) {
     const invoiceWhere = buildInvoiceWhere(period, filters);
 
     const data = await querySalesSummary(invoiceWhere);
+    logReportScope('/reports/sales/summary', req, invoiceWhere, {
+      rowsFetched: Number(data?.totalInvoices || 0),
+    });
 
     return res.json({
       success: true,
@@ -102,6 +126,11 @@ async function getSalesInvoices(req, res) {
 
     const invoiceWhere = buildInvoiceWhere(period, filters);
     const { invoices, total } = await queryInvoiceList(invoiceWhere, pagination, sort);
+    logReportScope('/reports/sales/invoices', req, invoiceWhere, {
+      rowsFetched: Number(total || 0),
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+    });
 
     return res.json({
       success: true,
@@ -146,6 +175,11 @@ async function getSalesProducts(req, res) {
 
     const itemWhere = buildItemWhere(period, filters);
     const { products, total } = await queryProductReport(itemWhere, pagination, sort);
+    logReportScope('/reports/sales/products', req, itemWhere?.salesInvoice || {}, {
+      rowsFetched: Number(total || 0),
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+    });
 
     return res.json({
       success: true,
@@ -188,6 +222,11 @@ async function getSalesUsers(req, res) {
 
     const invoiceWhere = buildInvoiceWhere(period, filters);
     const { users, total } = await queryUserReport(invoiceWhere, pagination, sort);
+    logReportScope('/reports/sales/users', req, invoiceWhere, {
+      rowsFetched: Number(total || 0),
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+    });
 
     return res.json({
       success: true,
@@ -235,6 +274,11 @@ async function getSalesPayments(req, res) {
       { totalAmount: 0, invoiceCount: 0 },
     );
 
+    logReportScope('/reports/sales/payments', req, invoiceWhere, {
+      rowsFetched: Number(payments.length || 0),
+      invoiceCount: Number(totals.invoiceCount || 0),
+    });
+
     return res.json({
       success: true,
       filters: buildResponseFilters(req.query, period),
@@ -268,6 +312,11 @@ async function getSalesProfitLatestCost(req, res) {
     const dateRange = formatDateRange(period.startDate, period.endDate);
     const itemWhere = buildItemWhere(period, filters);
     const data = await queryLatestCostProfitAnalytics(itemWhere, filters);
+    logReportScope('/reports/sales/profit-latest-cost', req, itemWhere?.salesInvoice || {}, {
+      rowsFetched: Number(data?.summary?.totalProducts || 0),
+      completeProducts: Number(data?.summary?.completeProducts || 0),
+      incompleteProducts: Number(data?.summary?.incompleteProducts || 0),
+    });
 
     return res.json({
       success: true,

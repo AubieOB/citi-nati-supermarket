@@ -394,7 +394,13 @@ function withScope(params, scope, locations) {
   if (scope === 'all') return scoped;
 
   if (String(scope).startsWith('code:')) {
-    scoped.locationCode = String(scope).slice(5).trim().toUpperCase();
+    const code = String(scope).slice(5).trim().toUpperCase();
+    scoped.locationCode = code;
+    if (code === 'BT') {
+      scoped.branchCode = 'BLANTYRE';
+    } else if (['ZA', 'SH', 'BAR', 'WH'].includes(code)) {
+      scoped.branchCode = 'ZOMBA';
+    }
     return scoped;
   }
 

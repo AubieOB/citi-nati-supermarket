@@ -45,6 +45,16 @@ function getCurrentMonthParams() {
   };
 }
 
+const ZOMBA_LOCATION_CODES_FE = ['ZA', 'SH', 'BAR', 'WH'];
+
+function deriveBranchCodeFromLocationCode(locationCode) {
+  const code = String(locationCode || '').trim().toUpperCase();
+  if (!code) return '';
+  if (code === 'BT') return 'BLANTYRE';
+  if (ZOMBA_LOCATION_CODES_FE.includes(code)) return 'ZOMBA';
+  return '';
+}
+
 const exportButtonStyle = (disabled) => ({
   border: '1px solid #cbd5e1',
   backgroundColor: '#fff',
@@ -67,7 +77,7 @@ const activityTabStyle = (active) => ({
   cursor: 'pointer',
 });
 
-const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, onNavigateTab }) => {
+const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedLocationCode = '', onNavigateTab }) => {
   const [state, setState] = useState({
     loading: true,
     error: '',
@@ -100,7 +110,15 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, onNavigat
         error: background ? current.error : '',
       };
     });
-    const monthParams = { ...getCurrentMonthParams(), ...(selectedLocationId && { locationId: selectedLocationId }) };
+    const normalizedLocationCode = String(selectedLocationCode || '').trim().toUpperCase();
+    const derivedBranchCode = deriveBranchCodeFromLocationCode(normalizedLocationCode);
+
+    const monthParams = {
+      ...getCurrentMonthParams(),
+      ...(selectedLocationId && { locationId: selectedLocationId }),
+      ...(normalizedLocationCode && { locationCode: normalizedLocationCode }),
+      ...(derivedBranchCode && { branchCode: derivedBranchCode }),
+    };
 
     try {
       const [salesSummaryResponse, invoicesResponse, expensesResponse, supplierTransactionsResponse, payrollPeriodsResponse] = await Promise.all([
@@ -146,7 +164,7 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, onNavigat
         };
       });
     }
-  }, [selectedLocationId]);
+  }, [selectedLocationCode, selectedLocationId]);
 
   useEffect(() => {
     fetchActivity();
