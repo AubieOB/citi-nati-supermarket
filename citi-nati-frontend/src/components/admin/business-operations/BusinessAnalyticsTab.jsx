@@ -1196,19 +1196,28 @@ const BusinessAnalyticsTab = ({
       });
 
       // Branch performance from location-scoped summaries
-      const branchPerformance = branchCodes
-        .map((code, i) => {
-          const s = allResponses[BRANCH_SLICE[0] + i]?.data?.data || {};
-          const bSales = Number(s.netSales || 0);
-          const bInvoices = Number(s.totalInvoices || 0);
-          return {
-            code,
-            sales: bSales,
-            invoices: bInvoices,
-            averageBasket: bInvoices > 0 ? bSales / bInvoices : 0,
-            contributionShare: totalSales > 0 ? (bSales / totalSales) * 100 : 0,
-          };
-        })
+      // First, get all branch data
+      const allBranchData = branchCodes.map((code, i) => {
+        const s = allResponses[BRANCH_SLICE[0] + i]?.data?.data || {};
+        const bSales = Number(s.netSales || 0);
+        const bInvoices = Number(s.totalInvoices || 0);
+        return {
+          code,
+          sales: bSales,
+          invoices: bInvoices,
+          averageBasket: bInvoices > 0 ? bSales / bInvoices : 0,
+        };
+      });
+      
+      // Calculate total across all branches for accurate share percentage
+      const branchTotalSales = allBranchData.reduce((sum, b) => sum + b.sales, 0);
+      
+      // Add contribution share based on combined branch total
+      const branchPerformance = allBranchData
+        .map((b) => ({
+          ...b,
+          contributionShare: branchTotalSales > 0 ? (b.sales / branchTotalSales) * 100 : 0,
+        }))
         .filter((b) => b.sales > 0);
 
       // Rankings from product/user API responses
