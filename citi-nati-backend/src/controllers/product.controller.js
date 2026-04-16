@@ -1185,6 +1185,15 @@ const getProducts = async (req, res) => {
 
     // Debug logging
     console.log(`[PRODUCTS] Retrieved: ${products.length}, Total: ${total}, Category: ${category || 'all'}, Search: ${search || 'none'}`);
+    const isZombaOperationalScope = normalizedLocationCode && ['ZA', 'SH', 'BAR', 'WH'].includes(normalizedLocationCode);
+    if (isZombaOperationalScope && products.length > 0) {
+      const sample = products[0];
+      console.log(`[ZOMBA STOCK][PRODUCTS_PANEL] product=${sample.sourceCode || 'UNKNOWN'} source=PersistedProductStock location=SH stock=${Number(sample.stock || 0)}`);
+      const verifyProduct = products.find((row) => String(row.sourceCode || '').trim() === '9501100002174');
+      if (verifyProduct) {
+        console.log(`[ZOMBA STOCK][VERIFY][PRODUCTS_PANEL] product=9501100002174 source=PersistedProductStock location=SH stock=${Number(verifyProduct.stock || 0)}`);
+      }
+    }
     if (normalizedLocationCode && ['ZA', 'SH', 'BAR', 'WH'].includes(normalizedLocationCode)) {
       console.log('[PRODUCTS][ZA] response diagnostics', {
         requestedLocationCode: normalizedLocationCode,
@@ -2010,12 +2019,36 @@ const syncProductsFromPOSAgent = async (req, res) => {
     for (const product of products) {
       try {
         const sourceCode = String(product.sourceCode || '').trim();
+        const productLocationCode = normalizeScopeCode(product.locationCode || product.LocationCode || payloadLocationCode);
+        const stockSourceRaw = String(product.stockSource || product.StockSource || '').trim();
 
         // Validate required fields
         if (!sourceCode || !product.name) {
           skipped++;
           errors.push(`Missing required fields for product: ${JSON.stringify(product)}`);
           continue;
+        }
+
+        // Zomba operational rule: only SH stock is accepted for persisted product stock.
+        if (branchCode === 'ZOMBA' && productLocationCode !== 'SH') {
+          skipped++;
+          const rejection = `[ZOMBA STOCK][REJECTED] product=${sourceCode} source=${stockSourceRaw || 'Unknown'} location=${productLocationCode || 'NULL'} stock=${Number(product.stock || 0)} reason=NON_SH_LOCATION`;
+          errors.push(rejection);
+          console.warn(rejection);
+          continue;
+        }
+
+        // Guard against legacy calculated/fallback payloads for Zomba operational stock.
+        if (branchCode === 'ZOMBA' && stockSourceRaw) {
+          const normalizedSource = stockSourceRaw.toLowerCase();
+          const allowedSource = normalizedSource.includes('dailystockbalance') || normalizedSource === 'nostockrow';
+          if (!allowedSource) {
+            skipped++;
+            const rejection = `[ZOMBA STOCK][REJECTED] product=${sourceCode} source=${stockSourceRaw} location=${productLocationCode || 'NULL'} stock=${Number(product.stock || 0)} reason=NON_DAILY_STOCK_SOURCE`;
+            errors.push(rejection);
+            console.warn(rejection);
+            continue;
+          }
         }
 
         const existingProduct = await prisma.product.findFirst({
@@ -2051,7 +2084,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
                   productCode: sourceCode,
                   expiryDate,
                   remainingQty,
-                  locationCode: normalizeScopeCode(batch?.locationCode) || payloadLocationCode,
+                  locationCode: normalizeScopeCode(batch?.locationCode) || productLocationCode || payloadLocationCode,
                   batchNo: encodeExpiryBatchReference(stockDetailId, grnNo, batch?.batchNo),
                   lastSyncedAt: new Date(),
                 };
@@ -2110,7 +2143,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
         await prisma.productExpiryBatch.deleteMany({
           where: {
             productCode: sourceCode,
-            locationCode: payloadLocationCode,
+            locationCode: productLocationCode || payloadLocationCode,
           },
         });
 
@@ -2131,6 +2164,15 @@ const syncProductsFromPOSAgent = async (req, res) => {
         if (completeProduct) {
           const currentStockStatus = enrichProductStock(completeProduct).stock_status;
           const isAlertState = ['low_stock', 'out_of_stock'].includes(currentStockStatus);
+
+          if (branchCode === 'ZOMBA') {
+            const stockSourceLabel = stockSourceRaw || 'UnknownPayloadSource';
+            const isVerificationProduct = sourceCode === '9501100002174';
+            console.log(`[ZOMBA STOCK] product=${sourceCode} source=${stockSourceLabel} location=${productLocationCode || payloadLocationCode || 'SH'} stock=${Number(completeProduct.stock || 0)}`);
+            if (isVerificationProduct) {
+              console.log(`[ZOMBA STOCK][VERIFY] product=9501100002174 source=${stockSourceLabel} location=${productLocationCode || payloadLocationCode || 'SH'} stock=${Number(completeProduct.stock || 0)}`);
+            }
+          }
 
           if (isAlertState) {
             await notifyLowStock(completeProduct);

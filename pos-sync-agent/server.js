@@ -145,6 +145,7 @@ async function sendProductsToLiveServer(products) {
               name: p.ProductName,
               price: p.SellingPrice,
               stock: p.QuantityAvailable,
+              stockSource: p.StockSource || null,
               barcode: p.Barcode || '',
               category: p.CategoryName || 'Uncategorized',
               expiryDate: p.ExpiryDate ? (p.ExpiryDate instanceof Date ? p.ExpiryDate.toISOString() : p.ExpiryDate) : null,
@@ -154,6 +155,9 @@ async function sendProductsToLiveServer(products) {
               daysToExpiry: Number.isFinite(Number(p.DaysToExpiry)) ? Number(p.DaysToExpiry) : null,
               expiryStatus: p.ExpiryStatus || null,
               expiryBatches: Array.isArray(p.ExpiryBatches) ? p.ExpiryBatches : [],
+              branchCode: appConfig.branch.branchCode,
+              branchName: appConfig.branch.branchName,
+              locationCode: p.LocationCode || getOperationalSyncLocation(),
             })),
             metadata: syncMetadata,
           },
@@ -208,25 +212,60 @@ function rejectDirectWritebackInProduction(req, res, next) {
 }
 
 /** Fetch products from POS with category information */
-async function fetchProductsFromPOS() {
+async function fetchProductsFromPOS(locationCode) {
   try {
     if (!pool) await initializePool();
 
-    // Get location code from environment or default to 'SH'
-    const LOCATION_CODE = appConfig.posDb.locationCode;
+    const configuredLocationCode = String(locationCode || appConfig.posDb.locationCode || 'SH').trim().toUpperCase();
+    const LOCATION_CODE = appConfig.branch.branchCode === 'ZOMBA' ? 'SH' : configuredLocationCode;
 
-    // Stock source priority:
-    //   1. DailyStockBalance latest snapshot (matches POS stock-balance screen)
-    //   2. Stocks.StockQty (fallback)
-    //   3. ProductActivity running total (QtyIn - QtyOut) (last fallback)
-    // Price = Most recent FPrice from productprices (by PriceID DESC = latest record)
-    const query = `
+    // Zomba operational rule: SH-only stock from latest DailyStockBalance snapshot.
+    // Blantyre/other branches keep existing fallback behavior.
+    const query = appConfig.branch.branchCode === 'ZOMBA'
+      ? `
+      WITH latest_stock AS (
+        SELECT
+          ProductCode,
+          StockBalance,
+          ROW_NUMBER() OVER (
+            PARTITION BY ProductCode
+            ORDER BY StockDate DESC
+          ) AS rn
+        FROM POS.dbo.DailyStockBalance
+        WHERE LocationCode = @LocationCode
+      )
+      SELECT
+          p.ProductCode,
+          p.ProductName,
+          ISNULL(p.Barcode, '') AS Barcode,
+          ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
+          ISNULL(ls.StockBalance, 0) AS QuantityAvailable,
+          CASE
+            WHEN ls.StockBalance IS NOT NULL THEN 'DailyStockBalance'
+            ELSE 'NoStockRow'
+          END AS StockSource,
+          ISNULL(
+              (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC),
+              (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode ORDER BY PriceID DESC)
+          ) AS SellingPrice
+      FROM POS.dbo.productsmaster p
+      LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
+      LEFT JOIN latest_stock ls ON ls.ProductCode = p.ProductCode AND ls.rn = 1
+      ORDER BY p.ProductCode
+    `
+      : `
       SELECT 
           p.ProductCode,
           p.ProductName,
           ISNULL(p.Barcode,'') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
           COALESCE(dsb.StockBalance, st.StockQty, pa.LiveQty, 0) AS QuantityAvailable,
+          CASE
+            WHEN dsb.StockBalance IS NOT NULL THEN 'DailyStockBalance'
+            WHEN st.StockQty IS NOT NULL THEN 'Stocks'
+            WHEN pa.LiveQty IS NOT NULL THEN 'ProductActivity'
+            ELSE 'NoStockRow'
+          END AS StockSource,
           ISNULL(
               (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC),
               (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode ORDER BY PriceID DESC)
@@ -259,15 +298,32 @@ async function fetchProductsFromPOS() {
     request.input('LocationCode', sql.VarChar(10), LOCATION_CODE);
     const result = await request.query(query);
     
+    console.log(`[POS FETCH] [DEBUG] selected location: ${LOCATION_CODE}`);
+    console.log(`[POS FETCH] [DEBUG] locationCode used in query: ${LOCATION_CODE}`);
     console.log(`[POS FETCH] ✅ Fetched ${result.recordset.length} products from location: ${LOCATION_CODE}`);
-    console.log(`[POS FETCH] Stock: DailyStockBalance -> Stocks.StockQty -> ProductActivity fallback chain`);
+    if (appConfig.branch.branchCode === 'ZOMBA') {
+      console.log(`[POS FETCH] Stock mode: ZOMBA SH-only DailyStockBalance latest snapshot via ROW_NUMBER()`);
+    } else {
+      console.log(`[POS FETCH] Stock: DailyStockBalance -> Stocks.StockQty -> ProductActivity fallback chain`);
+    }
     console.log(`[POS FETCH] Price: Most recent FPrice (by PriceID DESC)`);
+
+    const stockSourceSummary = result.recordset.reduce((acc, row) => {
+      const key = String(row.StockSource || 'Unknown');
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    console.log('[POS FETCH] stock-source diagnostics', {
+      branchCode: appConfig.branch.branchCode,
+      locationCode: LOCATION_CODE,
+      sourceBreakdown: stockSourceSummary,
+    });
     
     // Debug log first 5 products
     if (result.recordset.length > 0) {
-      console.log(`[POS FETCH] Sample products:`);
+      console.log(`[POS FETCH] [DEBUG] sample product stock (locationCode=${LOCATION_CODE}):`);
       result.recordset.slice(0, 5).forEach(product => {
-        console.log(`  - ${product.ProductCode}: ${product.ProductName} | Stock: ${product.QuantityAvailable} | Price: ${product.SellingPrice}`);
+        console.log(`[POS FETCH] [DEBUG] ${product.ProductCode}: ${product.ProductName} | stock=${product.QuantityAvailable} | source=${product.StockSource} | price=${product.SellingPrice}`);
       });
     }
 
@@ -305,6 +361,7 @@ async function fetchProductsFromPOS() {
 
       return {
         ...product,
+        LocationCode: LOCATION_CODE,
         ExpiryDate: nearestExpiryDate,
         ExpirySource: nearestBatch ? nearestBatch.source : null,
         ExpiryBatchCount: batches.length,
@@ -333,6 +390,15 @@ async function fetchProductsFromPOS() {
     console.error('[POS FETCH] Error fetching products:', err.message);
     return [];
   }
+}
+
+function getOperationalSyncLocation() {
+  // Zomba operational stock must always be read from SH regardless of env overrides.
+  if (appConfig.branch.branchCode === 'ZOMBA') {
+    return 'SH';
+  }
+
+  return String(appConfig.posDb.locationCode || 'SH').trim().toUpperCase();
 }
 
 function reconcileBatchesWithLiveStock(batches, liveStockQty) {
@@ -766,9 +832,20 @@ async function fetchExpiryCandidates({ days, locationCode, includeExpired, sourc
 app.get('/pos-sync/products', validateApiKey, requireFeature('enableReportingSync', 'Reporting sync'), async (req, res) => {
   try {
     console.log('[POS SYNC] /pos-sync/products endpoint called');
-    
-    const products = await fetchProductsFromPOS();
-    console.log(`[POS SYNC] Fetched ${products.length} products from Global POS`);
+
+    const locationCode = getOperationalSyncLocation();
+    console.log('[POS SYNC] operational stock scope diagnostics', {
+      branchCode: appConfig.branch.branchCode,
+      configuredLocationCode: appConfig.posDb.locationCode,
+      locationCode,
+      mode: appConfig.branch.branchCode === 'ZOMBA' ? 'SH_ONLY_OPERATIONAL' : 'CONFIGURED_LOCATION_ONLY',
+      stockSource: appConfig.branch.branchCode === 'ZOMBA'
+        ? 'DailyStockBalance latest snapshot only'
+        : 'DailyStockBalance -> Stocks.StockQty -> ProductActivity fallback',
+    });
+
+    const products = await fetchProductsFromPOS(locationCode);
+    console.log(`[POS SYNC] Fetched ${products.length} products from Global POS (location=${locationCode})`);
 
     if (!products || products.length === 0) {
       return res.json({
@@ -1691,9 +1768,20 @@ async function autoSync() {
 
   isAutoSyncRunning = true;
   try {
-    const products = await fetchProductsFromPOS();
+    const locationCode = getOperationalSyncLocation();
+    console.log(`${BRANCH_TAG} [AUTO SYNC] operational stock scope diagnostics`, {
+      branchCode: appConfig.branch.branchCode,
+      configuredLocationCode: appConfig.posDb.locationCode,
+      locationCode,
+      mode: appConfig.branch.branchCode === 'ZOMBA' ? 'SH_ONLY_OPERATIONAL' : 'CONFIGURED_LOCATION_ONLY',
+      stockSource: appConfig.branch.branchCode === 'ZOMBA'
+        ? 'DailyStockBalance latest snapshot only'
+        : 'DailyStockBalance -> Stocks.StockQty -> ProductActivity fallback',
+    });
+
+    const products = await fetchProductsFromPOS(locationCode);
     if (products.length > 0) {
-      console.log(`${BRANCH_TAG} [AUTO SYNC] Triggered - fetched ${products.length} products`);
+      console.log(`${BRANCH_TAG} [AUTO SYNC] Triggered - fetched ${products.length} products from ${locationCode}`);
       await sendProductsToLiveServer(products);
     }
   } catch (err) {

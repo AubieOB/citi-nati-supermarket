@@ -565,6 +565,15 @@ async function lookupEmergencyProducts(req, res) {
         return aExact ? -1 : 1;
       });
 
+    if (isZombaLocationCode(locationCode) && mapped.length > 0) {
+      const sample = mapped[0];
+      console.log(`[ZOMBA STOCK][EMERGENCY_LOOKUP] product=${sample.sourceCode || sample.productCode || 'UNKNOWN'} source=PersistedProductStock location=SH stock=${Number(sample.stock || 0)}`);
+      const verifyProduct = mapped.find((row) => String(row.sourceCode || row.productCode || '').trim() === '9501100002174');
+      if (verifyProduct) {
+        console.log(`[ZOMBA STOCK][VERIFY][EMERGENCY_LOOKUP] product=9501100002174 source=PersistedProductStock location=SH stock=${Number(verifyProduct.stock || 0)}`);
+      }
+    }
+
     return res.status(200).json({ success: true, products: mapped });
   } catch (error) {
     console.error('[EMERGENCY SALES] lookup failed:', error.message);

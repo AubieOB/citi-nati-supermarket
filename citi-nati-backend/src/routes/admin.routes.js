@@ -934,6 +934,16 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
       orderBy: { createdAt: 'desc' },
     });
 
+    const isZombaScope = normalizedLocationCode && ['ZA', 'SH', 'BAR', 'WH'].includes(normalizedLocationCode);
+    if (isZombaScope && products.length > 0) {
+      const sample = products[0];
+      console.log(`[ZOMBA STOCK][POS_MANAGEMENT] product=${sample.sourceCode || 'UNKNOWN'} source=PersistedProductStock location=SH stock=${Number(sample.stock || 0)}`);
+      const verifyProduct = products.find((row) => String(row.sourceCode || '').trim() === '9501100002174');
+      if (verifyProduct) {
+        console.log(`[ZOMBA STOCK][VERIFY][POS_MANAGEMENT] product=9501100002174 source=PersistedProductStock location=SH stock=${Number(verifyProduct.stock || 0)}`);
+      }
+    }
+
     res.json({
       success: true,
       products,

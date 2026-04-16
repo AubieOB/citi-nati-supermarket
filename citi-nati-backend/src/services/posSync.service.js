@@ -204,6 +204,18 @@ async function syncProductsFromPOS() {
     // Process each product from POS
     for (const posProduct of posProducts) {
       try {
+        const productCode = String(posProduct.ProductCode || '').trim();
+        const productLocationCode = String(posProduct.LocationCode || posProduct.locationCode || process.env.POS_LOCATION_CODE || '').trim().toUpperCase() || null;
+        const stockSource = String(posProduct.StockSource || posProduct.stockSource || 'Unknown').trim();
+
+        if (DEFAULT_POS_BRANCH_CODE === 'ZOMBA' && productLocationCode && productLocationCode !== 'SH') {
+          skipped++;
+          const rejection = `[ZOMBA STOCK][REJECTED][MANUAL_SYNC] product=${productCode || 'UNKNOWN'} source=${stockSource} location=${productLocationCode} stock=${Number(posProduct.QuantityAvailable || 0)} reason=NON_SH_LOCATION`;
+          errors.push({ code: productCode || null, error: rejection });
+          console.warn(rejection);
+          continue;
+        }
+
         // Map POS product structure to database format
         const productData = {
           branchCode: DEFAULT_POS_BRANCH_CODE,
@@ -221,6 +233,13 @@ async function syncProductsFromPOS() {
           syncedFromPOS: true,
           lastSyncedAt: new Date(),
         };
+
+        if (DEFAULT_POS_BRANCH_CODE === 'ZOMBA') {
+          console.log(`[ZOMBA STOCK] product=${productCode || 'UNKNOWN'} source=${stockSource || 'Unknown'} location=${productLocationCode || 'SH'} stock=${Number(productData.stock || 0)}`);
+          if (productCode === '9501100002174') {
+            console.log(`[ZOMBA STOCK][VERIFY] product=9501100002174 source=${stockSource || 'Unknown'} location=${productLocationCode || 'SH'} stock=${Number(productData.stock || 0)}`);
+          }
+        }
 
         // Find existing product by source code
         const existingProduct = await prisma.product.findFirst({

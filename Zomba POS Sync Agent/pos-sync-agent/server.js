@@ -146,6 +146,7 @@ async function sendProductsToLiveServer(products) {
               name: p.ProductName,
               price: p.SellingPrice,
               stock: p.QuantityAvailable,
+              stockSource: p.StockSource || null,
               barcode: p.Barcode || '',
               category: p.CategoryName || 'Uncategorized',
               expiryDate: p.ExpiryDate ? (p.ExpiryDate instanceof Date ? p.ExpiryDate.toISOString() : p.ExpiryDate) : null,
@@ -798,7 +799,7 @@ app.get('/pos-sync/products', validateApiKey, requireFeature('enableReportingSyn
       configuredLocationCode: appConfig.posDb.locationCode,
       includedLocations: syncLocations,
       mode: appConfig.branch.branchCode === 'ZOMBA' ? 'SH_ONLY_OPERATIONAL' : 'CONFIGURED_LOCATION_ONLY',
-      stockSource: 'DailyStockBalance primary, Stocks fallback',
+      stockSource: 'DailyStockBalance latest snapshot only',
     });
     
     for (const locationCode of syncLocations) {
@@ -1744,7 +1745,7 @@ async function autoSync() {
       configuredLocationCode: appConfig.posDb.locationCode,
       includedLocations: syncLocations,
       mode: appConfig.branch.branchCode === 'ZOMBA' ? 'SH_ONLY_OPERATIONAL' : 'CONFIGURED_LOCATION_ONLY',
-      stockSource: 'DailyStockBalance primary, Stocks fallback',
+      stockSource: 'DailyStockBalance latest snapshot only',
     });
     
     for (const locationCode of syncLocations) {
