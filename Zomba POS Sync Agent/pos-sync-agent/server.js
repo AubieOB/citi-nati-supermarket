@@ -1968,6 +1968,14 @@ let autoSyncStarted = false;
 
 function logStartupConfiguration() {
   const validation = validateStartupConfig(appConfig);
+  const nodeVersion = process.version;
+  const nodeMajor = Number.parseInt(String(nodeVersion).replace(/^v/, '').split('.')[0], 10);
+
+  console.log(`${BRANCH_TAG} [BOOT] Runtime: Node ${nodeVersion}`);
+  if (Number.isInteger(nodeMajor) && nodeMajor < 14) {
+    console.warn(`${BRANCH_TAG} [BOOT][WARN] Node ${nodeVersion} may be too old for modern JS syntax. Recommended: Node 16+.`);
+  }
+
   console.log(`${BRANCH_TAG} [BOOT] Branch: ${appConfig.branch.branchName} (${appConfig.branch.branchCode})`);
   console.log(`${BRANCH_TAG} [BOOT] Source: ${appConfig.branch.syncSourceCode} | LocationId: ${appConfig.branch.locationId}`);
   console.log(`${BRANCH_TAG} [BOOT] Feature flags:`, appConfig.features);
