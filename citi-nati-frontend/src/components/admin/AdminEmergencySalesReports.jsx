@@ -84,6 +84,7 @@ function statusColor(status) {
 const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
+  const [retryingSaleId, setRetryingSaleId] = useState(null);
   const [sales, setSales] = useState([]);
   const [summary, setSummary] = useState({
     pending_pos_sync: 0,
@@ -498,6 +499,22 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
     notifySuccess('Cashier report PDF downloaded', 2000);
   };
 
+  const handleRetrySync = async (sale) => {
+    const saleRef = sale?.sale_ref || sale?.saleRef || '#unknown';
+    if (!sale?.id) return;
+
+    try {
+      setRetryingSaleId(sale.id);
+      await api.post(`/admin/emergency-sales/${sale.id}/retry-sync`);
+      notifySuccess(`Retry queued for ${saleRef}`, 2500);
+      await fetchReportSales(filters);
+    } catch (error) {
+      notifyError(`Retry failed: ${error.response?.data?.error || error.message}`, 3000);
+    } finally {
+      setRetryingSaleId(null);
+    }
+  };
+
   return (
     <div style={{ position: 'relative' }}>
       <div
@@ -722,12 +739,13 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
                         <th style={{ textAlign: 'right', padding: '0.6rem', borderBottom: '1px solid #dbeafe' }}>Items</th>
                         <th style={{ textAlign: 'right', padding: '0.6rem', borderBottom: '1px solid #dbeafe' }}>Total</th>
                         <th style={{ textAlign: 'left', padding: '0.6rem', borderBottom: '1px solid #dbeafe' }}>Sync Status</th>
+                        <th style={{ textAlign: 'center', padding: '0.6rem', borderBottom: '1px solid #dbeafe' }}>Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {sales.length === 0 && (
                         <tr>
-                          <td colSpan={6} style={{ textAlign: 'center', padding: '1rem', color: textMuted }}>
+                          <td colSpan={7} style={{ textAlign: 'center', padding: '1rem', color: textMuted }}>
                             No emergency sales found for these filters.
                           </td>
                         </tr>
@@ -749,6 +767,28 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
                           <td style={{ padding: '0.6rem', borderBottom: '1px solid #e2e8f0', color: statusColor(sale.sync_status), fontWeight: 700 }}>
                             {STATUS_LABELS[sale.sync_status] || sale.sync_status || '-'}
                           </td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>
+                            {sale.sync_status === 'sync_failed' ? (
+                              <button
+                                onClick={() => handleRetrySync(sale)}
+                                disabled={retryingSaleId === sale.id}
+                                style={{
+                                  padding: '0.35rem 0.55rem',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  backgroundColor: '#dc2626',
+                                  color: '#fff',
+                                  fontWeight: 700,
+                                  cursor: retryingSaleId === sale.id ? 'wait' : 'pointer',
+                                  opacity: retryingSaleId === sale.id ? 0.7 : 1,
+                                }}
+                              >
+                                {retryingSaleId === sale.id ? 'Retrying...' : 'Retry Sync'}
+                              </button>
+                            ) : (
+                              <span style={{ color: textMuted, fontSize: '0.82rem' }}>-</span>
+                            )}
+                          </td>
                         </tr>
                       ))}
 
@@ -759,6 +799,7 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
                           <td style={{ padding: '0.6rem', borderBottom: '1px solid #bfdbfe' }}></td>
                           <td style={{ padding: '0.6rem', borderBottom: '1px solid #bfdbfe', textAlign: 'right', fontWeight: 800 }}>{salesTotalsRow.items}</td>
                           <td style={{ padding: '0.6rem', borderBottom: '1px solid #bfdbfe', textAlign: 'right', fontWeight: 800 }}>{formatMoney(salesTotalsRow.total)}</td>
+                          <td style={{ padding: '0.6rem', borderBottom: '1px solid #bfdbfe' }}></td>
                           <td style={{ padding: '0.6rem', borderBottom: '1px solid #bfdbfe' }}></td>
                         </tr>
                       )}

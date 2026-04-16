@@ -452,7 +452,8 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
   };
 
   const handleClearFailedCommands = async () => {
-    const failedCount = monitor?.stats?.queue?.FAILED || 0;\n    if (!window.confirm(`Delete all ${failedCount} failed write-back commands? This cannot be undone.`)) return;
+    const failedCount = monitor?.stats?.queue?.FAILED || 0;
+    if (!window.confirm(`Delete all ${failedCount} failed write-back commands? This cannot be undone.`)) return;
     try {
       setClearingFailedCommands(true);
       const response = await api.delete('/admin/pos-sync/failed-commands');
