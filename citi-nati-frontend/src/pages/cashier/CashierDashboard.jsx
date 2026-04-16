@@ -87,9 +87,13 @@ const CashierDashboard = () => {
               backgroundColor: 'rgba(255,255,255,0.2)', 
               padding: '0.25rem 0.6rem', 
               borderRadius: '4px',
-              fontWeight: '600'
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem'
             }}>
-              📍 {selectedLocation === 'ZA' ? 'Zomba' : 'Blantyre'}
+              <i className="fas fa-location-dot" style={{ fontSize: '0.9rem' }}></i>
+              {selectedLocation === 'ZA' ? 'Zomba' : 'Blantyre'}
             </span>
           )}
         </div>
@@ -157,9 +161,14 @@ const CashierDashboard = () => {
               color: '#1a1a1a',
               fontSize: '1.5rem',
               textAlign: 'center',
-              fontWeight: '700'
+              fontWeight: '700',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.7rem'
             }}>
-              📍 Select Your Location
+              <i className="fas fa-location-dot" style={{ fontSize: '1.3rem' }}></i>
+              Select Your Location
             </h2>
             <p style={{ 
               color: '#666', 
@@ -185,11 +194,15 @@ const CashierDashboard = () => {
                   fontWeight: '700',
                   cursor: 'pointer',
                   transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.6rem'
                 }}
                 onMouseEnter={(e) => { e.target.style.backgroundColor = '#c59563'; e.target.style.transform = 'translateY(-2px)'; }}
                 onMouseLeave={(e) => { e.target.style.backgroundColor = '#d4a574'; e.target.style.transform = 'translateY(0)'; }}
               >
-                <i className="fas fa-map-pin" style={{ marginRight: '0.5rem' }}></i>
+                <i className="fas fa-location-dot" style={{ fontSize: '1.1rem' }}></i>
                 Zomba (ZA)
               </button>
               <button
@@ -205,11 +218,15 @@ const CashierDashboard = () => {
                   fontWeight: '700',
                   cursor: 'pointer',
                   transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.6rem'
                 }}
                 onMouseEnter={(e) => { e.target.style.backgroundColor = '#3a7bc8'; e.target.style.transform = 'translateY(-2px)'; }}
                 onMouseLeave={(e) => { e.target.style.backgroundColor = '#4a90e2'; e.target.style.transform = 'translateY(0)'; }}
               >
-                <i className="fas fa-map-pin" style={{ marginRight: '0.5rem' }}></i>
+                <i className="fas fa-location-dot" style={{ fontSize: '1.1rem' }}></i>
                 Blantyre (BT)
               </button>
             </div>
@@ -247,7 +264,7 @@ const CashierDashboard = () => {
               alignItems: 'center',
               gap: '0.5rem'
             }}>
-              <i className="fas fa-exclamation-triangle"></i>
+              <i className="fas fa-triangle-exclamation"></i>
               Location Confirmation
             </h2>
             
@@ -264,15 +281,19 @@ const CashierDashboard = () => {
                 margin: '0.5rem 0',
                 lineHeight: '1.6'
               }}>
-                <strong>⚠️ Please verify your location:</strong>
+                <strong><i className="fas fa-circle-exclamation" style={{ marginRight: '0.4rem', color: '#f39c12' }}></i>Please verify your location:</strong>
               </p>
               <p style={{ 
                 color: '#333', 
                 fontSize: '1.1rem', 
                 margin: '1rem 0 0.5rem 0',
-                fontWeight: '700'
+                fontWeight: '700',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
               }}>
-                {pendingLocation === 'ZA' ? '📍 Zomba' : '📍 Blantyre'}
+                <i className="fas fa-location-dot" style={{ fontSize: '1.2rem' }}></i>
+                {pendingLocation === 'ZA' ? 'Zomba' : 'Blantyre'}
               </p>
               <p style={{ 
                 color: '#666', 
@@ -307,11 +328,15 @@ const CashierDashboard = () => {
                   fontWeight: '600',
                   cursor: 'pointer',
                   transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.4rem'
                 }}
                 onMouseEnter={(e) => { e.target.style.backgroundColor = '#d0d0d0'; }}
                 onMouseLeave={(e) => { e.target.style.backgroundColor = '#e8e8e8'; }}
               >
-                <i className="fas fa-redo" style={{ marginRight: '0.4rem' }}></i>
+                <i className="fas fa-rotate-left" style={{ fontSize: '0.9rem' }}></i>
                 Change Location
               </button>
               <button
@@ -327,11 +352,15 @@ const CashierDashboard = () => {
                   fontWeight: '600',
                   cursor: 'pointer',
                   transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.4rem'
                 }}
                 onMouseEnter={(e) => { e.target.style.backgroundColor = '#229954'; e.target.style.transform = 'translateY(-2px)'; }}
                 onMouseLeave={(e) => { e.target.style.backgroundColor = '#27ae60'; e.target.style.transform = 'translateY(0)'; }}
               >
-                <i className="fas fa-check" style={{ marginRight: '0.4rem' }}></i>
+                <i className="fas fa-circle-check" style={{ fontSize: '0.9rem' }}></i>
                 Confirm Location
               </button>
             </div>
