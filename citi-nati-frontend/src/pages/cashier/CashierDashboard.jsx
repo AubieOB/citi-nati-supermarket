@@ -1,5 +1,4 @@
 import React, { Suspense, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import AdminEmergencySales from '../../components/admin/AdminEmergencySales.jsx';
 import Modal from '../../components/common/Modal.jsx';
@@ -19,7 +18,6 @@ import '../../styles/admin-dashboard.css';
  * 3. Once confirmed, lock to that location for the session
  */
 const CashierDashboard = () => {
-  const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { modal, showConfirm, closeModal } = useModal();
   
@@ -80,28 +78,6 @@ const CashierDashboard = () => {
         flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          <button
-            onClick={() => navigate('/cashier')}
-            style={{
-              background: 'rgba(255,255,255,0.15)',
-              border: 'none',
-              borderRadius: '6px',
-              color: '#fff',
-              padding: '0.4rem 0.6rem',
-              cursor: 'pointer',
-              fontSize: '1rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'background 0.2s',
-            }}
-            onMouseEnter={(e) => { e.target.style.background = 'rgba(255,255,255,0.25)'; }}
-            onMouseLeave={(e) => { e.target.style.background = 'rgba(255,255,255,0.15)'; }}
-            title="Cashier Dashboard"
-            aria-label="Cashier Dashboard"
-          >
-            <i className="fas fa-home"></i>
-          </button>
           <i className="fas fa-cash-register" style={{ fontSize: '1.1rem' }}></i>
           <span style={{ fontWeight: '700', fontSize: '1rem' }}>Citi-Nati POS — Cashier</span>
           {selectedLocation && (
