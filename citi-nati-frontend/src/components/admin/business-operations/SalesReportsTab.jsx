@@ -121,6 +121,8 @@ const formatInvoiceTimeDisplay = (value) => {
   if (!value) return '';
   const raw = String(value).trim();
   if (/^\d{2}:\d{2}:\d{2}$/.test(raw)) return raw;
+  const isoTimeMatch = raw.match(/T(\d{2}:\d{2}:\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?$/);
+  if (isoTimeMatch) return isoTimeMatch[1];
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return raw;
   return parsed.toLocaleTimeString('en-GB', { hour12: false });
