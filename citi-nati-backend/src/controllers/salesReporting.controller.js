@@ -94,7 +94,6 @@ async function _probeBranchDataAsync(branchCode, invoiceWhere) {
         _min: { invoiceDate: true },
         _max: { invoiceDate: true },
         where: branchOnlyWhere,
-        take: 10,
       }),
     ]);
 
@@ -103,7 +102,6 @@ async function _probeBranchDataAsync(branchCode, invoiceWhere) {
       const allBranches = await _diagPrisma.salesInvoice.groupBy({
         by: ['branchCode', 'syncSourceCode'],
         _count: { id: true },
-        take: 20,
       });
       console.log('[BO REPORTING][ZERO-DATA PROBE] No invoices found for branch even without date filter.', {
         queriedBranchCode: branchCode,
@@ -123,7 +121,12 @@ async function _probeBranchDataAsync(branchCode, invoiceWhere) {
       });
     }
   } catch (probeErr) {
-    console.warn('[BO REPORTING][ZERO-DATA PROBE] Probe query failed:', probeErr.message);
+    console.warn('[BO REPORTING][ZERO-DATA PROBE] Probe query failed:', {
+      message: probeErr?.message || null,
+      code: probeErr?.code || null,
+      name: probeErr?.name || null,
+      meta: probeErr?.meta || null,
+    });
   }
 }
 
