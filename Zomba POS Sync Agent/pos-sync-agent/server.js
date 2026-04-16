@@ -219,25 +219,43 @@ async function fetchProductsFromPOS(locationCode) {
     // Use provided location code or fall back to environment
     const LOCATION_CODE = locationCode || appConfig.posDb.locationCode;
 
-    // Stock source: SUM(QtyIn) - SUM(QtyOut) from ProductActivity.
-    // This is a live running total that is always up to date, matching
-    // how the Blantyre agent works. It avoids the DailyStockBalance
-    // rebuild window problem that caused stock to flicker to 0.
+    // Stock source priority (most reliable first):
+    //   1. Stocks.StockQty (current POS stock balance)
+    //   2. DailyStockBalance latest snapshot
+    //   3. ProductActivity running total (QtyIn - QtyOut)
+    // This avoids false zeroes if any one source is temporarily stale.
     const query = `
       SELECT 
           p.ProductCode,
           p.ProductName,
           ISNULL(p.Barcode,'') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
-          ISNULL(SUM(pa.QtyIn), 0) - ISNULL(SUM(pa.QtyOut), 0) AS QuantityAvailable,
+          COALESCE(st.StockQty, dsb.StockBalance, pa.LiveQty, 0) AS QuantityAvailable,
           ISNULL(
               (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC),
               (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode ORDER BY PriceID DESC)
           ) AS SellingPrice
       FROM POS.dbo.productsmaster p
       LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
-      LEFT JOIN POS.dbo.ProductActivity pa ON p.ProductCode = pa.ProductCode AND pa.LocationCode = @LocationCode
-      GROUP BY p.ProductCode, p.ProductName, p.Barcode, pt.ProductTypeName
+      LEFT JOIN POS.dbo.Stocks st ON st.ProductCode = p.ProductCode AND st.LocationCode = @LocationCode
+      LEFT JOIN (
+          SELECT
+              d.ProductCode,
+              d.StockBalance
+          FROM POS.dbo.DailyStockBalance d
+          WHERE d.LocationCode = @LocationCode
+            AND d.StockDate = (
+              SELECT MAX(StockDate)
+              FROM POS.dbo.DailyStockBalance
+              WHERE LocationCode = @LocationCode
+            )
+      ) dsb ON p.ProductCode = dsb.ProductCode
+      OUTER APPLY (
+          SELECT ISNULL(SUM(pa.QtyIn), 0) - ISNULL(SUM(pa.QtyOut), 0) AS LiveQty
+          FROM POS.dbo.ProductActivity pa
+          WHERE pa.ProductCode = p.ProductCode
+            AND pa.LocationCode = @LocationCode
+      ) pa
       ORDER BY p.ProductCode
     `;
 
@@ -246,7 +264,7 @@ async function fetchProductsFromPOS(locationCode) {
     const result = await request.query(query);
 
     console.log(`${SYNC_LOG_PREFIX} fetched ${result.recordset.length} products from location ${LOCATION_CODE}`);
-    console.log(`${SYNC_LOG_PREFIX} stock mode: SUM(QtyIn) - SUM(QtyOut) from ProductActivity (live)`);
+    console.log(`${SYNC_LOG_PREFIX} stock mode: Stocks.StockQty -> DailyStockBalance -> ProductActivity fallback chain`);
     console.log(`${SYNC_LOG_PREFIX} price mode: latest FPrice by PriceID DESC`);
     
     // Debug log first 5 products
