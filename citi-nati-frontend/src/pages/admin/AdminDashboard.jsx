@@ -45,7 +45,9 @@ const SIDEBAR_TAB_GROUPS = [
       { id: 'refunds', label: 'Refunds', icon: 'fa-undo' },
       { id: 'support', label: 'Support', icon: 'fa-life-ring' },
       { id: 'quotations', label: 'Quotations', icon: 'fa-file-invoice' },
-      { id: 'promotions', label: 'Promotions', icon: 'fa-tags' },
+      { id: 'sales', label: 'Online Sales', icon: 'fa-dollar-sign' },
+      { id: 'users', label: 'Users', icon: 'fa-users' },
+      { id: 'drivers', label: 'Drivers', icon: 'fa-car' },
     ],
   },
   {
@@ -55,6 +57,7 @@ const SIDEBAR_TAB_GROUPS = [
     tabs: [
       { id: 'products', label: 'Products', icon: 'fa-box' },
       { id: 'stocks', label: 'Stocks', icon: 'fa-warehouse' },
+      { id: 'promotions', label: 'Promotions', icon: 'fa-tags' },
     ],
   },
   {
@@ -74,10 +77,7 @@ const SIDEBAR_TAB_GROUPS = [
     label: 'Whole Business',
     icon: 'fa-briefcase',
     tabs: [
-      { id: 'sales', label: 'Sales', icon: 'fa-dollar-sign' },
       { id: 'business-operations', label: 'Business Operations', icon: 'fa-briefcase' },
-      { id: 'users', label: 'Users', icon: 'fa-users' },
-      { id: 'drivers', label: 'Drivers', icon: 'fa-car' },
     ],
   },
   {
