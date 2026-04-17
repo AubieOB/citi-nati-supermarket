@@ -350,10 +350,19 @@ const AdminInbox = () => {
     // Search filter
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
-      filtered = filtered.filter(msg =>
-        msg.title.toLowerCase().includes(search) ||
-        msg.message.toLowerCase().includes(search)
-      );
+      filtered = filtered.filter((msg) => {
+        const locationLabel = getLocationLabel(msg.branchCode).toLowerCase();
+        const branchCode = String(msg.branchCode || '').toLowerCase();
+        const locationCode = String(msg.locationCode || '').toLowerCase();
+
+        return (
+          String(msg.title || '').toLowerCase().includes(search)
+          || String(msg.message || '').toLowerCase().includes(search)
+          || locationLabel.includes(search)
+          || branchCode.includes(search)
+          || locationCode.includes(search)
+        );
+      });
     }
 
     // Type filter
