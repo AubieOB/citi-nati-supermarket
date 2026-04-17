@@ -223,10 +223,6 @@ const AdminRefunds = () => {
 
       {/* Header */}
       <div style={{ marginBottom: '2rem' }}>
-        <h2 style={{ color: '#5B4B8A', marginBottom: '0.5rem' }}>
-          <i className="fas fa-undo" style={{ marginRight: '0.5rem' }}></i>
-          Pending Online Refunds
-        </h2>
         <p style={{ color: '#666', marginBottom: '1rem' }}>
           Manage customer refunds that require manual processing
         </p>
