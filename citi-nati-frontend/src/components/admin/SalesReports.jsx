@@ -333,8 +333,6 @@ const SalesReports = ({ refreshTrigger }) => {
     );
   }
 
-  const reportsFilterSpacerHeight = Math.max(Math.min(filterBarHeight, 110) - 8, 0);
-
   return (
     <div style={{ position: 'relative' }}>
       <h2 style={{ marginTop: 0, marginBottom: '0.75rem', color: textPrimary }}>Reports & Downloads</h2>
@@ -345,11 +343,7 @@ const SalesReports = ({ refreshTrigger }) => {
       <div
         ref={filterBarRef}
         style={{
-          position: 'fixed',
-          top: `${filterBarLayout.top}px`,
-          left: `${filterBarLayout.left}px`,
-          width: `${filterBarLayout.width}px`,
-          zIndex: 81,
+          marginBottom: '1rem',
           backgroundColor: '#fff',
           padding: '0.75rem 1rem',
           borderRadius: '8px',
@@ -436,8 +430,6 @@ const SalesReports = ({ refreshTrigger }) => {
           </div>
         </div>
       </div>
-
-      <div style={{ height: `${reportsFilterSpacerHeight}px` }}></div>
 
       <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '1.25rem' }}>
         {activeReport === 'totalSales' && (
