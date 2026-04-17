@@ -122,6 +122,9 @@ function toSocketPayload(message) {
     message: message.message,
     read: message.read,
     branchCode: message.branchCode,
+    sourceModule: message.sourceModule,
+    entityType: message.entityType,
+    errorCode: message.errorCode,
     dedupeKey: message.dedupeKey,
     lifecycleState: message.lifecycleState,
     occurrenceCount: message.occurrenceCount,
@@ -142,11 +145,20 @@ function emitAdminMessage(event, payload) {
  */
 const getMessages = async (req, res) => {
   try {
-    const { type, limit, offset = 0, branchCode, locationCode } = req.query;
+    const { type, limit, offset = 0, branchCode, locationCode, includeStockAlerts } = req.query;
 
     let where = {};
     if (type) {
       where.type = type;
+    }
+
+    if (String(includeStockAlerts || '').toLowerCase() !== 'true') {
+      where.NOT = {
+        entityType: 'product',
+        errorCode: {
+          in: ['low_stock', 'out_of_stock'],
+        },
+      };
     }
 
     const scopedBranchWhere = buildBranchScopeWhere(branchCode || locationCode);

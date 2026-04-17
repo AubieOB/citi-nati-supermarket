@@ -59,6 +59,13 @@ const AdminInbox = () => {
     return normalized;
   };
 
+  const isStockAlertMessage = (message) => {
+    const errorCode = String(message?.errorCode || '').toLowerCase();
+    const entityType = String(message?.entityType || '').toLowerCase();
+
+    return entityType === 'product' && (errorCode === 'low_stock' || errorCode === 'out_of_stock');
+  };
+
   // Fetch messages on mount
   useEffect(() => {
     fetchMessages();
@@ -83,6 +90,9 @@ const AdminInbox = () => {
        */
       const handleNewAdminMessage = (newMessage) => {
         console.log('[AdminInbox] New message received via Socket.io:', newMessage);
+        if (isStockAlertMessage(newMessage)) {
+          return;
+        }
         
         // Check if message already exists (prevent duplicates)
         let wasInserted = false;
@@ -125,6 +135,7 @@ const AdminInbox = () => {
 
       const handleAdminMessageUpdated = (updatedMessage) => {
         if (!updatedMessage?.id) return;
+        if (isStockAlertMessage(updatedMessage)) return;
 
         let wasInserted = false;
         setMessages((prevMessages) => {
