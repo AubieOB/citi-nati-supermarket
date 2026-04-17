@@ -819,16 +819,6 @@ app.get('/pos-sync/products', validateApiKey, requireFeature('enableReportingSyn
     console.log('[POS SYNC] /pos-sync/products endpoint called');
 
     const locationCode = getOperationalSyncLocation();
-    console.log('[POS SYNC] operational stock scope diagnostics', {
-      branchCode: appConfig.branch.branchCode,
-      configuredLocationCode: appConfig.posDb.locationCode,
-      locationCode,
-      mode: appConfig.branch.branchCode === 'ZOMBA' ? 'SH_ONLY_OPERATIONAL' : 'CONFIGURED_LOCATION_ONLY',
-      stockSource: appConfig.branch.branchCode === 'ZOMBA'
-        ? 'DailyStockBalance latest snapshot only'
-        : 'DailyStockBalance -> Stocks.StockQty -> ProductActivity fallback',
-    });
-
     const products = await fetchProductsFromPOS(locationCode);
     console.log(`[POS SYNC] Fetched ${products.length} products from Global POS (location=${locationCode})`);
 
@@ -1792,16 +1782,6 @@ async function autoSync() {
   isAutoSyncRunning = true;
   try {
     const locationCode = getOperationalSyncLocation();
-    console.log(`${BRANCH_TAG} [AUTO SYNC] operational stock scope diagnostics`, {
-      branchCode: appConfig.branch.branchCode,
-      configuredLocationCode: appConfig.posDb.locationCode,
-      locationCode,
-      mode: appConfig.branch.branchCode === 'ZOMBA' ? 'SH_ONLY_OPERATIONAL' : 'CONFIGURED_LOCATION_ONLY',
-      stockSource: appConfig.branch.branchCode === 'ZOMBA'
-        ? 'DailyStockBalance latest snapshot only'
-        : 'DailyStockBalance -> Stocks.StockQty -> ProductActivity fallback',
-    });
-
     const products = await fetchProductsFromPOS(locationCode);
     if (products.length > 0) {
       console.log(`${BRANCH_TAG} [AUTO SYNC] Triggered - fetched ${products.length} products from ${locationCode}`);
