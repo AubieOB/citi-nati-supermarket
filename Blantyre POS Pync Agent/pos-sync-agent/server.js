@@ -258,6 +258,22 @@ async function fetchProductsFromPOS(locationCode) {
       ORDER BY p.ProductCode
     `
       : `
+      WITH latest_stock_blantyre AS (
+        SELECT
+          ProductCode,
+          StockBalance,
+          ROW_NUMBER() OVER (
+            PARTITION BY ProductCode
+            ORDER BY StockDate DESC
+          ) AS rn
+        FROM POS.dbo.DailyStockBalance
+        WHERE LocationCode = @LocationCode
+          AND StockDate = (
+              SELECT MAX(StockDate)
+              FROM POS.dbo.DailyStockBalance
+              WHERE LocationCode = @LocationCode
+            )
+      )
       SELECT 
           p.ProductCode,
           p.ProductName,
@@ -276,16 +292,9 @@ async function fetchProductsFromPOS(locationCode) {
       FROM POS.dbo.productsmaster p
       LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
       LEFT JOIN (
-          SELECT
-              d.ProductCode,
-              d.StockBalance
-          FROM POS.dbo.DailyStockBalance d
-          WHERE d.LocationCode = @LocationCode
-            AND d.StockDate = (
-              SELECT MAX(StockDate)
-              FROM POS.dbo.DailyStockBalance
-              WHERE LocationCode = @LocationCode
-            )
+          SELECT ProductCode, StockBalance
+          FROM latest_stock_blantyre
+          WHERE rn = 1
       ) dsb ON p.ProductCode = dsb.ProductCode
       OUTER APPLY (
           SELECT ISNULL(SUM(pa.QtyIn), 0) - ISNULL(SUM(pa.QtyOut), 0) AS LiveQty
