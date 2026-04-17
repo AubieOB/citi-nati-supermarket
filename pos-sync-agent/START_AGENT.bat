@@ -42,14 +42,5 @@ echo.
 echo Starting POS Sync Agent...
 echo.
 
-echo NOTE: Starting with QuickEdit protection to prevent console click pauses.
-echo.
-
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0START_AGENT_NO_FREEZE.ps1"
-if %ERRORLEVEL% NEQ 0 (
-    echo.
-    echo WARN: Safe startup failed, falling back to direct launch...
-    node server.js
-)
-
+node server.js
 pause

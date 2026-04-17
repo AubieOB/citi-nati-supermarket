@@ -25,12 +25,7 @@ import '../../css/admin-responsive-filters.css';
  * - Set low stock alerts
  */
 
-const AdminStocks = ({
-  selectedLocationCode = 'BT',
-  cachedProducts = [],
-  cachedProductsMeta = {},
-  onRefreshProductsCache,
-}) => {
+const AdminStocks = ({ selectedLocationCode = 'BT' }) => {
   // `products` is deprecated; we now rely on `allProducts` for everything.
   // previously products was only used in stats cards which caused counts to be wrong
   const [allProducts, setAllProducts] = useState([]); // Store all products for client-side filtering
@@ -66,41 +61,11 @@ const AdminStocks = ({
     setFilterCategory('all');
     setStockStatusFilter('all');
     setCurrentPage(1);
-
-    if (Array.isArray(cachedProducts) && cachedProducts.length > 0) {
-      const nextProducts = cachedProducts.map((product) => enrichProductStock(product));
-      const nextCategories = [...new Set(nextProducts.map((product) => product.category).filter(Boolean))];
-      setAllProducts(nextProducts);
-      setCategories(nextCategories);
-      setLoading(Boolean(cachedProductsMeta?.isLoading));
-    } else if (cachedProductsMeta?.lastLoadedAt) {
-      setAllProducts([]);
-      setCategories([]);
-      setLoading(false);
-    } else if (cachedProductsMeta?.isLoading || cachedProductsMeta?.isBackgroundLoading) {
-      setAllProducts([]);
-      setCategories([]);
-      setLoading(true);
-    } else {
-      setAllProducts([]);
-      setCategories([]);
-      fetchProducts();
-    }
-
+    setAllProducts([]);
+    fetchProducts();
     const cleanup = setupSocketListeners();
     return cleanup;
-  }, [selectedLocationCode, cachedProducts, cachedProductsMeta]);
-
-  useEffect(() => {
-    if (!Array.isArray(cachedProducts)) return;
-    const nextProducts = cachedProducts.map((product) => enrichProductStock(product));
-    const nextCategories = [...new Set(nextProducts.map((product) => product.category).filter(Boolean))];
-    setAllProducts(nextProducts);
-    setCategories(nextCategories);
-    if (cachedProductsMeta?.isLoading || cachedProductsMeta?.isBackgroundLoading) {
-      setLoading(cachedProducts.length === 0);
-    }
-  }, [cachedProducts, cachedProductsMeta]);
+  }, [selectedLocationCode]);
 
   /**
    * Real-time stock updates via Socket.io
@@ -179,64 +144,22 @@ const AdminStocks = ({
     try {
       setLoading(true);
 
-      const perPage = 100;
-      let page = 1;
-      let all = [];
-
-      const fetchProductsPage = async (pageNumber) => {
-        const params = new URLSearchParams({ page: String(pageNumber), pageSize: String(perPage) });
-        if (selectedLocationCode) {
-          params.append('locationCode', selectedLocationCode);
-        }
-        return api.get(`/products?${params.toString()}`);
-      };
-
-      const normalizeAdminPosProduct = (product) => enrichProductStock({
-        ...product,
-        id: product.id,
-        name: product.name,
-        sourceCode: product.sourceCode || null,
-        productCode: product.sourceCode || null,
-        category: product.category || 'Uncategorized',
-        price: Number(product.price || 0),
-        stock: Number(product.stock || 0),
-        image: product.image || null,
-      });
-
       // Load first page immediately
-      const firstResp = await fetchProductsPage(page);
-      const firstItems = firstResp?.data?.products || [];
-      const firstBatch = firstItems.map((product) => enrichProductStock(product));
-
-      if (firstItems.length === 0) {
-        try {
-          console.warn('[ADMIN STOCKS UI] /products returned 0; trying /admin/pos-products fallback');
-          const params = new URLSearchParams({ page: '1', limit: '5000' });
-          if (selectedLocationCode) {
-            params.append('locationCode', selectedLocationCode);
-          }
-          const adminResp = await api.get(`/admin/pos-products?${params.toString()}`);
-          const adminItems = Array.isArray(adminResp?.data?.products)
-            ? adminResp.data.products.map(normalizeAdminPosProduct)
-            : [];
-          all = adminItems;
-          console.log('[ADMIN STOCKS UI] /admin/pos-products fallback count', adminItems.length);
-        } catch (adminFallbackErr) {
-          console.warn('[ADMIN STOCKS UI] /admin/pos-products fallback failed', adminFallbackErr?.response?.data || adminFallbackErr.message);
-          all = firstBatch;
-        }
-      } else {
-        all = firstBatch;
+      const firstParams = new URLSearchParams({ page: '1', pageSize: '100' });
+      if (selectedLocationCode) {
+        firstParams.append('locationCode', selectedLocationCode);
       }
+      const res1 = await api.get(`/products?${firstParams.toString()}`);
+      const firstBatch = (res1.data.products || []).map((product) => enrichProductStock(product));
 
       if (fetchRequestIdRef.current !== requestId) {
         return;
       }
 
-      setAllProducts(all);
+      setAllProducts(firstBatch);
 
       // Extract categories from first batch
-      const uniqueCategories = [...new Set(all.map(p => p.category))];
+      const uniqueCategories = [...new Set(firstBatch.map(p => p.category))];
       setCategories(uniqueCategories.filter(Boolean));
 
       setCurrentPage(1);
@@ -245,24 +168,19 @@ const AdminStocks = ({
       // Load remaining pages in background (non-blocking)
       const collectRemaining = async () => {
         try {
-          let collected = [...all];
-          page += 1;
+          let collected = [...firstBatch];
+          let page = 2;
+          const perPage = 100;
 
           while (true) {
-            const res = await fetchProductsPage(page);
-            const items = res?.data?.products || [];
-            if (items.length === 0) break;
-
-            collected = collected.concat(items.map((product) => enrichProductStock(product)));
-
-            if (fetchRequestIdRef.current !== requestId) {
-              return;
+            const params = new URLSearchParams({ page: String(page), pageSize: String(perPage) });
+            if (selectedLocationCode) {
+              params.append('locationCode', selectedLocationCode);
             }
-
-            setAllProducts(collected);
-            const allCategories = [...new Set(collected.map(p => p.category))];
-            setCategories(allCategories.filter(Boolean));
-
+            const res = await api.get(`/products?${params.toString()}`);
+            const items = res.data.products || [];
+            if (items.length === 0) break;
+            collected = collected.concat(items.map((product) => enrichProductStock(product)));
             if (items.length < perPage) break;
             page += 1;
           }
@@ -281,7 +199,7 @@ const AdminStocks = ({
       };
 
       // Start background load if there are more pages
-      if (firstItems.length === perPage) {
+      if (firstBatch.length === 100) {
         collectRemaining();
       }
     } catch (err) {

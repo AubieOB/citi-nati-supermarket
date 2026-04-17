@@ -25,7 +25,6 @@ const AdminBusinessOperations = React.lazy(() => import('../../components/admin/
 
 import { useOrderUpdates } from '../../hooks/useOrderUpdates.js';
 import { getSpeechAlertsEnabled, setSpeechAlertsEnabled } from '../../utils/notifications.js';
-import api from '../../utils/api.js';
 import '../../styles/global.css';
 import '../../styles/admin-dashboard.css';
 
@@ -43,8 +42,6 @@ const SIDEBAR_SCOPES = [
   { id: 'business', label: 'Business', icon: 'fa-briefcase' },
   { id: 'administration', label: 'Admin', icon: 'fa-shield-halved' },
 ];
-
-const OPERATIONAL_LOCATION_CODES = ['BT', 'ZA'];
 
 const SIDEBAR_TABS = [
   { id: 'inbox', label: 'Inbox', icon: 'fa-inbox', scope: 'online-store' },
@@ -258,9 +255,6 @@ const AdminDashboard = () => {
   const scopePillsRef = useRef(null);
   const [speechAlertsEnabled, setSpeechAlertsPreference] = useState(() => getSpeechAlertsEnabled());
   const [selectedOperationalLocationCode, setSelectedOperationalLocationCode] = useState('BT');
-  const [adminProductsCacheByLocation, setAdminProductsCacheByLocation] = useState({});
-  const [adminProductsCacheMetaByLocation, setAdminProductsCacheMetaByLocation] = useState({});
-  const adminProductsFetchRequestRef = useRef({});
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') return 'light';
     return window.localStorage.getItem(ADMIN_THEME_KEY) === 'dark' ? 'dark' : 'light';
@@ -268,172 +262,6 @@ const AdminDashboard = () => {
   const isDarkTheme = theme === 'dark';
   const selectedOperationalLocationLabel = selectedOperationalLocationCode === 'ZA' ? 'Zomba' : 'Blantyre';
   const navigate = useNavigate();
-
-  const updateProductsCacheMeta = useCallback((locationCode, patch) => {
-    setAdminProductsCacheMetaByLocation((prev) => ({
-      ...prev,
-      [locationCode]: {
-        ...(prev[locationCode] || {}),
-        ...patch,
-      },
-    }));
-  }, []);
-
-  const preloadAdminProductsForLocation = useCallback(async (locationCode, options = {}) => {
-    const safeLocationCode = String(locationCode || '').trim() || 'BT';
-    const forceRefresh = options?.force === true;
-    const cacheMeta = adminProductsCacheMetaByLocation[safeLocationCode] || {};
-
-    if (!forceRefresh) {
-      if (cacheMeta.isLoading || cacheMeta.isBackgroundLoading) {
-        return;
-      }
-      if (cacheMeta.lastLoadedAt) {
-        return;
-      }
-    }
-
-    const requestId = Date.now();
-    adminProductsFetchRequestRef.current[safeLocationCode] = requestId;
-
-    const perPage = 100;
-    let page = 1;
-    let allItems = [];
-
-    const fetchProductsPage = async (pageNumber) => {
-      const params = new URLSearchParams({ page: String(pageNumber), pageSize: String(perPage) });
-      if (safeLocationCode) {
-        params.append('locationCode', safeLocationCode);
-      }
-      return api.get(`/products?${params.toString()}`);
-    };
-
-    const normalizeAdminPosProduct = (product) => ({
-      ...product,
-      id: product.id,
-      name: product.name,
-      sourceCode: product.sourceCode || null,
-      productCode: product.sourceCode || null,
-      category: product.category || 'Uncategorized',
-      price: Number(product.price || 0),
-      stock: Number(product.stock || 0),
-      image: product.image || null,
-    });
-
-    try {
-      updateProductsCacheMeta(safeLocationCode, {
-        isLoading: true,
-        isBackgroundLoading: false,
-        error: null,
-      });
-
-      const firstResp = await fetchProductsPage(page);
-      const firstItems = Array.isArray(firstResp?.data?.products) ? firstResp.data.products : [];
-
-      if (firstItems.length === 0) {
-        try {
-          const params = new URLSearchParams({ page: '1', limit: '5000' });
-          if (safeLocationCode) {
-            params.append('locationCode', safeLocationCode);
-          }
-          const adminResp = await api.get(`/admin/pos-products?${params.toString()}`);
-          const adminItems = Array.isArray(adminResp?.data?.products)
-            ? adminResp.data.products.map(normalizeAdminPosProduct)
-            : [];
-          allItems = adminItems;
-        } catch (fallbackErr) {
-          console.warn('[AdminDashboard] /admin/pos-products fallback failed:', fallbackErr?.response?.data || fallbackErr.message);
-          allItems = [];
-        }
-      } else {
-        allItems = firstItems;
-      }
-
-      if (adminProductsFetchRequestRef.current[safeLocationCode] !== requestId) {
-        return;
-      }
-
-      setAdminProductsCacheByLocation((prev) => ({
-        ...prev,
-        [safeLocationCode]: allItems,
-      }));
-
-      updateProductsCacheMeta(safeLocationCode, {
-        isLoading: false,
-        isBackgroundLoading: firstItems.length === perPage,
-        error: null,
-        lastLoadedAt: Date.now(),
-      });
-
-      if (firstItems.length === perPage) {
-        (async () => {
-          try {
-            page += 1;
-            while (true) {
-              const response = await fetchProductsPage(page);
-              const items = Array.isArray(response?.data?.products) ? response.data.products : [];
-              if (items.length === 0) {
-                break;
-              }
-
-              allItems = allItems.concat(items);
-              if (adminProductsFetchRequestRef.current[safeLocationCode] !== requestId) {
-                return;
-              }
-
-              setAdminProductsCacheByLocation((prev) => ({
-                ...prev,
-                [safeLocationCode]: allItems,
-              }));
-              updateProductsCacheMeta(safeLocationCode, {
-                isBackgroundLoading: true,
-                lastLoadedAt: Date.now(),
-              });
-
-              if (items.length < perPage) {
-                break;
-              }
-
-              page += 1;
-            }
-
-            if (adminProductsFetchRequestRef.current[safeLocationCode] !== requestId) {
-              return;
-            }
-
-            updateProductsCacheMeta(safeLocationCode, {
-              isBackgroundLoading: false,
-              lastLoadedAt: Date.now(),
-            });
-          } catch (bgErr) {
-            console.warn('[AdminDashboard] Background products loading error:', bgErr.message);
-            if (adminProductsFetchRequestRef.current[safeLocationCode] !== requestId) {
-              return;
-            }
-            updateProductsCacheMeta(safeLocationCode, {
-              isBackgroundLoading: false,
-            });
-          }
-        })();
-      }
-    } catch (error) {
-      console.error('[AdminDashboard] Failed to preload admin products cache:', error);
-      if (adminProductsFetchRequestRef.current[safeLocationCode] !== requestId) {
-        return;
-      }
-      updateProductsCacheMeta(safeLocationCode, {
-        isLoading: false,
-        isBackgroundLoading: false,
-        error: error?.response?.data?.error || error.message || 'Failed to load products',
-      });
-    }
-  }, [adminProductsCacheMetaByLocation, updateProductsCacheMeta]);
-
-  React.useEffect(() => {
-    OPERATIONAL_LOCATION_CODES.forEach((locationCode) => {
-      preloadAdminProductsForLocation(locationCode);
-    });
-  }, [preloadAdminProductsForLocation]);
 
   /**
    * Handle real-time order updates (for refreshing orders list)
@@ -567,11 +395,6 @@ const AdminDashboard = () => {
 
   const visibleTabs = SIDEBAR_TABS.filter((tab) => sidebarScope === 'all' || tab.scope === sidebarScope);
   const selectedScopeMeta = SIDEBAR_SCOPES.find((scope) => scope.id === sidebarScope) || SIDEBAR_SCOPES[0];
-  const activeLocationCachedProducts = adminProductsCacheByLocation[selectedOperationalLocationCode] || [];
-  const activeLocationCachedProductsMeta = adminProductsCacheMetaByLocation[selectedOperationalLocationCode] || {};
-  const handleRefreshAdminProductsCache = useCallback(async () => {
-    await preloadAdminProductsForLocation(selectedOperationalLocationCode, { force: true });
-  }, [preloadAdminProductsForLocation, selectedOperationalLocationCode]);
 
   return (
     <div className={`admin-dashboard-root ${isDarkTheme ? 'theme-dark' : 'theme-light'}`} data-admin-theme={theme}>
@@ -940,42 +763,14 @@ const AdminDashboard = () => {
           <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>Loading...</div>}>
             {activeTab === 'inbox' && <AdminInbox selectedLocationCode={selectedOperationalLocationCode} />}
             {activeTab === 'quotations' && <AdminQuotations />}
-            {activeTab === 'products' && (
-              <AdminProducts
-                selectedLocationCode={selectedOperationalLocationCode}
-                cachedProducts={activeLocationCachedProducts}
-                cachedProductsMeta={activeLocationCachedProductsMeta}
-                onRefreshProductsCache={handleRefreshAdminProductsCache}
-              />
-            )}
-            {activeTab === 'stocks' && (
-              <AdminStocks
-                selectedLocationCode={selectedOperationalLocationCode}
-                cachedProducts={activeLocationCachedProducts}
-                cachedProductsMeta={activeLocationCachedProductsMeta}
-                onRefreshProductsCache={handleRefreshAdminProductsCache}
-              />
-            )}
+            {activeTab === 'products' && <AdminProducts selectedLocationCode={selectedOperationalLocationCode} />}
+            {activeTab === 'stocks' && <AdminStocks selectedLocationCode={selectedOperationalLocationCode} />}
             {activeTab === 'emergency-sales' && <AdminEmergencySales selectedLocationCode={selectedOperationalLocationCode} />}
             {activeTab === 'emergency-sales-reports' && <AdminEmergencySalesReports selectedLocationCode={selectedOperationalLocationCode} />}
             {activeTab === 'system' && <AdminSystem />}
             {activeTab === 'security' && <AdminSecurity />}
-            {activeTab === 'promotions' && (
-              <AdminPromotions
-                selectedLocationCode={selectedOperationalLocationCode}
-                cachedProducts={activeLocationCachedProducts}
-                cachedProductsMeta={activeLocationCachedProductsMeta}
-                onRefreshProductsCache={handleRefreshAdminProductsCache}
-              />
-            )}
-            {activeTab === 'pos-management' && (
-              <AdminPOSManagement
-                selectedLocationCode={selectedOperationalLocationCode}
-                cachedProducts={activeLocationCachedProducts}
-                cachedProductsMeta={activeLocationCachedProductsMeta}
-                onRefreshProductsCache={handleRefreshAdminProductsCache}
-              />
-            )}
+            {activeTab === 'promotions' && <AdminPromotions selectedLocationCode={selectedOperationalLocationCode} />}
+            {activeTab === 'pos-management' && <AdminPOSManagement selectedLocationCode={selectedOperationalLocationCode} />}
             {activeTab === 'pos-sync-monitor' && <AdminPOSSyncMonitor selectedLocationCode={selectedOperationalLocationCode} />}
             {activeTab === 'orders' && <AdminOrders />}
             {activeTab === 'users' && <AdminUsers />}

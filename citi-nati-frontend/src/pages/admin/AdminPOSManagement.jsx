@@ -23,12 +23,7 @@ import '../../styles/global.css';
  * - Stats cards showing product overview
  */
 
-const AdminPOSManagement = ({
-  selectedLocationCode = 'BT',
-  cachedProducts = [],
-  cachedProductsMeta = {},
-  onRefreshProductsCache,
-}) => {
+const AdminPOSManagement = ({ selectedLocationCode = 'BT' }) => {
   const [products, setProducts] = useState([]);
   const [selectedProducts, setSelectedProducts] = useState(new Set());
   const [loading, setLoading] = useState(true);
@@ -53,13 +48,6 @@ const AdminPOSManagement = ({
     }
     return items.filter((item) => item.category === categoryFilter);
   };
-
-  const hasSharedProductsCache = Array.isArray(cachedProducts) && (
-    cachedProducts.length > 0
-    || Boolean(cachedProductsMeta?.lastLoadedAt)
-    || Boolean(cachedProductsMeta?.isLoading)
-    || Boolean(cachedProductsMeta?.isBackgroundLoading)
-  );
 
   /**
    * Fetch POS products with search and pagination
@@ -99,27 +87,6 @@ const AdminPOSManagement = ({
         setTotalPages(nextTotalPages);
         setPage((prevPage) => Math.min(prevPage, nextTotalPages));
       };
-
-      if (hasSharedProductsCache) {
-        const normalizedSearch = String(searchValue || '').trim().toLowerCase();
-        const allItems = normalizedSearch
-          ? cachedProducts.filter((product) => {
-              const name = String(product?.name || '').toLowerCase();
-              const code = String(product?.sourceCode || product?.productCode || '').toLowerCase();
-              const category = String(product?.category || '').toLowerCase();
-              return name.includes(normalizedSearch) || code.includes(normalizedSearch) || category.includes(normalizedSearch);
-            })
-          : cachedProducts;
-
-        if (fetchRequestIdRef.current !== requestId) {
-          return;
-        }
-
-        syncLocalState(allItems);
-        setError(cachedProductsMeta?.error || null);
-        setLoading(Boolean(cachedProductsMeta?.isLoading && allItems.length === 0));
-        return;
-      }
 
       const firstResponse = await fetchProductsPage(1);
       if (!firstResponse?.data?.success) {
@@ -314,11 +281,6 @@ const AdminPOSManagement = ({
     fetchProducts('', 1, 'all');
   }, [selectedLocationCode]);
 
-  useEffect(() => {
-    if (!hasSharedProductsCache) return;
-    fetchProducts(searchTerm, 1, selectedCategory);
-  }, [cachedProducts, cachedProductsMeta, hasSharedProductsCache]);
-
   // Handle pagination
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages) {
@@ -453,9 +415,6 @@ const AdminPOSManagement = ({
         if (response.data.success) {
           showSuccess(`Deleted ${response.data.deletedCount} products`);
           setSelectedProducts(new Set());
-          if (typeof onRefreshProductsCache === 'function') {
-            await onRefreshProductsCache();
-          }
           fetchProducts(searchTerm, page, selectedCategory);
         }
       } catch (err) {
@@ -486,9 +445,6 @@ const AdminPOSManagement = ({
           showSuccess(`Deleted all ${response.data.deletedCount} POS products`);
           setSelectedProducts(new Set());
           setPage(1);
-          if (typeof onRefreshProductsCache === 'function') {
-            await onRefreshProductsCache();
-          }
           fetchProducts('', 1, selectedCategory);
         }
       } catch (err) {

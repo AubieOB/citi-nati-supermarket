@@ -21,12 +21,7 @@ function createDefaultPromotionsState() {
   };
 }
 
-const AdminPromotions = ({
-  selectedLocationCode = 'BT',
-  cachedProducts = [],
-  cachedProductsMeta = {},
-  onRefreshProductsCache,
-}) => {
+const AdminPromotions = ({ selectedLocationCode = 'BT' }) => {
   const [categories, setCategories] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -43,12 +38,6 @@ const AdminPromotions = ({
   const textPrimary = isAdminDarkTheme ? '#f8fafc' : '#333';
   const textSecondary = isAdminDarkTheme ? '#cbd5e1' : '#666';
   const selectedLocationLabel = selectedLocationCode === 'ZA' ? 'Zomba' : 'Blantyre';
-  const hasSharedProductsCache = Array.isArray(cachedProducts) && (
-    cachedProducts.length > 0
-    || Boolean(cachedProductsMeta?.lastLoadedAt)
-    || Boolean(cachedProductsMeta?.isLoading)
-    || Boolean(cachedProductsMeta?.isBackgroundLoading)
-  );
 
   const clearSearch = () => {
     setSearchTerm('');
@@ -80,34 +69,16 @@ const AdminPromotions = ({
         cleanupSocket();
       }
     };
-  }, [selectedLocationCode]);
+  }, []);
 
   useEffect(() => {
     setSearchTerm('');
     setShowPreview(false);
     setPreviewProducts([]);
     setPromotions(createDefaultPromotionsState());
-
-    if (Array.isArray(cachedProducts) && cachedProducts.length > 0) {
-      const uniqueCategories = [...new Set(cachedProducts.map((p) => p.category).filter(Boolean))].sort();
-      setAllProducts(cachedProducts);
-      setCategories(uniqueCategories);
-    } else if (!hasSharedProductsCache) {
-      fetchPromotionCatalog();
-    } else {
-      setAllProducts([]);
-      setCategories([]);
-    }
-
+    fetchPromotionCatalog();
     fetchCurrentPromotions();
-  }, [selectedLocationCode, cachedProducts, hasSharedProductsCache]);
-
-  useEffect(() => {
-    if (!hasSharedProductsCache) return;
-    const uniqueCategories = [...new Set(cachedProducts.map((p) => p.category).filter(Boolean))].sort();
-    setAllProducts(cachedProducts);
-    setCategories(uniqueCategories);
-  }, [cachedProducts, hasSharedProductsCache]);
+  }, [selectedLocationCode]);
 
   useEffect(() => {
     let resizeObserver;
@@ -164,10 +135,6 @@ const AdminPromotions = ({
       }
 
       const handlePromotionUpdated = (updatedPromotion) => {
-        const promotionLocationCode = String(updatedPromotion?.locationCode || '').trim().toUpperCase();
-        if (promotionLocationCode && promotionLocationCode !== String(selectedLocationCode || '').trim().toUpperCase()) {
-          return;
-        }
         console.log('[AdminPromotions] Promotion updated via Socket.io:', updatedPromotion.type);
         setPromotions(prev => ({
           ...prev,
@@ -191,11 +158,6 @@ const AdminPromotions = ({
     catalogRequestIdRef.current = requestId;
 
     try {
-      if (typeof onRefreshProductsCache === 'function') {
-        await onRefreshProductsCache();
-        return;
-      }
-
       const perPage = 100;
       const fetchProductsPage = async (pageNumber) => {
         return api.get(`/products?page=${pageNumber}&pageSize=${perPage}&locationCode=${encodeURIComponent(selectedLocationCode)}`);
@@ -296,16 +258,6 @@ const AdminPromotions = ({
         }
       };
     });
-  };
-
-  const handleUnselectAllProducts = () => {
-    setPromotions(prev => ({
-      ...prev,
-      selective: {
-        ...prev.selective,
-        selectedProducts: [],
-      },
-    }));
   };
 
   const handleTogglePromotion = async (type) => {
@@ -548,30 +500,6 @@ const AdminPromotions = ({
               <i className="fas fa-search" style={{ marginRight: '0.5rem', color: '#5B4B8A' }}></i>
               Search & Select Products ({selectedCount} selected)
             </label>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              marginBottom: '0.5rem',
-            }}>
-              <button
-                type="button"
-                onClick={handleUnselectAllProducts}
-                disabled={selectedCount === 0}
-                style={{
-                  padding: '0.4rem 0.75rem',
-                  borderRadius: '4px',
-                  border: '1px solid #d32f2f',
-                  backgroundColor: selectedCount === 0 ? '#f3f4f6' : '#fff',
-                  color: selectedCount === 0 ? '#9ca3af' : '#d32f2f',
-                  cursor: selectedCount === 0 ? 'not-allowed' : 'pointer',
-                  fontWeight: '600',
-                  fontSize: '0.85rem',
-                }}
-              >
-                <i className="fas fa-ban" style={{ marginRight: '0.4rem' }}></i>
-                Unselect All
-              </button>
-            </div>
             <div style={{ position: 'relative', marginBottom: '0.75rem' }}>
               <input
                 type="text"
