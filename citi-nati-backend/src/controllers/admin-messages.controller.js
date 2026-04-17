@@ -85,17 +85,7 @@ function buildDedupeKey(type, options = {}) {
   const explicitKey = sanitizeKeyPart(options.dedupeKey);
   if (explicitKey) return explicitKey;
 
-  const parts = [
-    sanitizeKeyPart(type),
-    sanitizeKeyPart(options.sourceModule || options.source),
-    sanitizeKeyPart(options.entityType),
-    sanitizeKeyPart(options.entityId || options.relatedEntityId || options.referenceId),
-    sanitizeKeyPart(options.branchCode || options.locationCode || options.locationId),
-    sanitizeKeyPart(options.errorCode || options.stateCode),
-  ];
-
-  const normalized = parts.filter(Boolean).join('|');
-  return normalized || null;
+  return null;
 }
 
 function normalizeMessageOptions(referenceOrOptions, maybeOptions) {
