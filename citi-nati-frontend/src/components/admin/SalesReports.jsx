@@ -25,6 +25,7 @@ const SalesReports = ({ refreshTrigger }) => {
   const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
   const [filterBarHeight, setFilterBarHeight] = useState(0);
   const filterBarRef = useRef(null);
+  const catalogRequestIdRef = useRef(null);
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
   const textPrimary = isAdminDarkTheme ? '#f8fafc' : '#1f2937';
   const textSecondary = isAdminDarkTheme ? '#cbd5e1' : '#4b5563';
@@ -70,14 +71,61 @@ const SalesReports = ({ refreshTrigger }) => {
     const fetchData = async () => {
       if (!token) return;
 
+      const requestId = Date.now();
+      catalogRequestIdRef.current = requestId;
+
       try {
         setLoading(true);
-        const [daysData, productsResponse] = await Promise.all([
-          getSalesDayHistory(token),
-          api.get('/products?page=1&pageSize=5000'),
-        ]);
+        const daysPromise = getSalesDayHistory(token);
+
+        const perPage = 100;
+        const fetchProductsPage = async (pageNumber) => {
+          return api.get(`/products?page=${pageNumber}&pageSize=${perPage}`);
+        };
+
+        const firstProductsResponse = await fetchProductsPage(1);
+        let catalog = Array.isArray(firstProductsResponse?.data?.products)
+          ? firstProductsResponse.data.products
+          : [];
+
+        if (catalogRequestIdRef.current !== requestId) {
+          return;
+        }
+
+        setProductCatalog(catalog);
+
+        const daysData = await daysPromise;
         setSalesDays(daysData || []);
-        setProductCatalog(Array.isArray(productsResponse?.data?.products) ? productsResponse.data.products : []);
+
+        if (catalog.length === perPage) {
+          (async () => {
+            try {
+              let page = 2;
+              while (true) {
+                const response = await fetchProductsPage(page);
+                const items = Array.isArray(response?.data?.products) ? response.data.products : [];
+                if (items.length === 0) {
+                  break;
+                }
+
+                catalog = catalog.concat(items);
+                if (catalogRequestIdRef.current !== requestId) {
+                  return;
+                }
+
+                setProductCatalog(catalog);
+
+                if (items.length < perPage) {
+                  break;
+                }
+
+                page += 1;
+              }
+            } catch (bgErr) {
+              console.warn('[SalesReports] Background product catalog loading error:', bgErr.message);
+            }
+          })();
+        }
       } catch (error) {
         console.error('Error fetching reports data:', error);
         toast.error('Failed to load reports');
