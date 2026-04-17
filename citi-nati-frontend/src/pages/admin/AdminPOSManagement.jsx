@@ -33,53 +33,119 @@ const AdminPOSManagement = ({ selectedLocationCode = 'BT' }) => {
   const [categories, setCategories] = useState([]);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(50);
-  const [limit] = useState(5000);
   const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
   const [filterBarHeight, setFilterBarHeight] = useState(0);
   const searchTimeoutRef = useRef(null);
   const filterBarRef = useRef(null);
+  const fetchRequestIdRef = useRef(null);
   const { modal, closeModal, showError, showSuccess, showConfirm } = useModal();
+
+  const applyCategoryFilter = (items, categoryFilter = 'all') => {
+    if (!categoryFilter || categoryFilter === 'all') {
+      return items;
+    }
+    return items.filter((item) => item.category === categoryFilter);
+  };
 
   /**
    * Fetch POS products with search and pagination
    */
-  const fetchProducts = async (searchValue = '', pageNum = 1, categoryFilter = '') => {
+  const fetchProducts = async (searchValue = '', pageNum = 1, categoryFilter = 'all') => {
+    const requestId = Date.now();
+    fetchRequestIdRef.current = requestId;
+
     try {
       // only show spinner if we have no data yet
       if (products.length === 0) setLoading(true);
       setError(null);
+      setSelectedProducts(new Set());
+      setPage(pageNum);
 
-      const params = new URLSearchParams();
-      if (searchValue) params.append('search', searchValue);
-      params.append('page', pageNum);
-      params.append('limit', limit);
-      if (selectedLocationCode) {
-        params.append('locationCode', selectedLocationCode);
+      const perPage = 100;
+      const fetchProductsPage = async (pageNumber) => {
+        const params = new URLSearchParams();
+        if (searchValue) params.append('search', searchValue);
+        params.append('page', String(pageNumber));
+        params.append('limit', String(perPage));
+        if (selectedLocationCode) {
+          params.append('locationCode', selectedLocationCode);
+        }
+        return api.get(`/admin/pos-products?${params.toString()}`);
+      };
+
+      const syncLocalState = (allItems) => {
+        const uniqueCategories = [...new Set(allItems.map((p) => p.category).filter(Boolean))];
+        setCategories(uniqueCategories.sort());
+
+        const filteredItems = applyCategoryFilter(allItems, categoryFilter);
+        const nextTotalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
+
+        setProducts(filteredItems);
+        setTotal(filteredItems.length);
+        setTotalPages(nextTotalPages);
+        setPage((prevPage) => Math.min(prevPage, nextTotalPages));
+      };
+
+      const firstResponse = await fetchProductsPage(1);
+      if (!firstResponse?.data?.success) {
+        setProducts([]);
+        setCategories([]);
+        setTotal(0);
+        setTotalPages(1);
+        return;
       }
 
-      const response = await api.get(`/admin/pos-products?${params.toString()}`);
-      
-      if (response.data.success) {
-        let items = response.data.products;
-        
-        // Extract unique categories from all products
-        const uniqueCategories = [...new Set(items.map(p => p.category).filter(Boolean))];
-        setCategories(uniqueCategories.sort());
-        
-        // Filter by category if selected
-        if (categoryFilter && categoryFilter !== 'all') {
-          items = items.filter(p => p.category === categoryFilter);
-        }
-        
-        setProducts(items);
-        setTotal(response.data.total);
-        setTotalPages(response.data.totalPages);
+      let allItems = Array.isArray(firstResponse.data.products) ? firstResponse.data.products : [];
+      if (fetchRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      syncLocalState(allItems);
+      setLoading(false);
+
+      const knownTotal = Number(firstResponse.data.total || 0);
+      if (allItems.length >= perPage && knownTotal > allItems.length) {
+        (async () => {
+          try {
+            let nextPage = 2;
+            while (true) {
+              const response = await fetchProductsPage(nextPage);
+              if (!response?.data?.success) {
+                break;
+              }
+
+              const pageItems = Array.isArray(response.data.products) ? response.data.products : [];
+              if (pageItems.length === 0) {
+                break;
+              }
+
+              allItems = allItems.concat(pageItems);
+              if (fetchRequestIdRef.current !== requestId) {
+                return;
+              }
+
+              syncLocalState(allItems);
+
+              if (pageItems.length < perPage) {
+                break;
+              }
+
+              nextPage += 1;
+            }
+          } catch (bgErr) {
+            console.warn('[AdminPOS] Background products loading error:', bgErr.message);
+          }
+        })();
       }
     } catch (err) {
       console.error('Error fetching POS products:', err);
       setError(err.message);
+      setProducts([]);
+      setCategories([]);
+      setTotal(0);
+      setTotalPages(1);
     } finally {
       setLoading(false);
     }
@@ -219,7 +285,6 @@ const AdminPOSManagement = ({ selectedLocationCode = 'BT' }) => {
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages) {
       setPage(newPage);
-      fetchProducts(searchTerm, newPage, selectedCategory);
     }
   };
 
@@ -238,10 +303,12 @@ const AdminPOSManagement = ({ selectedLocationCode = 'BT' }) => {
 
   // Toggle all products on current page
   const toggleAllProducts = () => {
-    if (selectedProducts.size === products.length) {
+    const selectedOnPageCount = paginatedProducts.filter((product) => selectedProducts.has(product.id)).length;
+
+    if (selectedOnPageCount === paginatedProducts.length && paginatedProducts.length > 0) {
       setSelectedProducts(new Set());
     } else {
-      setSelectedProducts(new Set(products.map(p => p.id)));
+      setSelectedProducts(new Set(paginatedProducts.map((p) => p.id)));
     }
   };
 
@@ -390,6 +457,7 @@ const AdminPOSManagement = ({ selectedLocationCode = 'BT' }) => {
   };
 
   // Calculate stats
+  const paginatedProducts = products.slice((page - 1) * pageSize, page * pageSize);
   const hiddenCount = products.filter(p => p.hideFromProductsPage).length;
   const visibleCount = products.length - hiddenCount;
   const hasActiveFilters = Boolean(searchTerm) || selectedCategory !== 'all';
@@ -640,7 +708,7 @@ const AdminPOSManagement = ({ selectedLocationCode = 'BT' }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map((product) => (
+                  {paginatedProducts.map((product) => (
                     <tr key={product.id} style={{
                       ...styles.bodyRow,
                       backgroundColor: selectedProducts.has(product.id) ? '#f0f8ff' : 'transparent',

@@ -33,6 +33,7 @@ const AdminPromotions = ({ selectedLocationCode = 'BT' }) => {
   const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
   const [filterBarHeight, setFilterBarHeight] = useState(0);
   const filterBarRef = useRef(null);
+  const catalogRequestIdRef = useRef(null);
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
   const textPrimary = isAdminDarkTheme ? '#f8fafc' : '#333';
   const textSecondary = isAdminDarkTheme ? '#cbd5e1' : '#666';
@@ -153,27 +154,59 @@ const AdminPromotions = ({ selectedLocationCode = 'BT' }) => {
   };
 
   const fetchPromotionCatalog = async () => {
+    const requestId = Date.now();
+    catalogRequestIdRef.current = requestId;
+
     try {
-      const perPage = 200;
-      let page = 1;
-      const all = [];
+      const perPage = 100;
+      const fetchProductsPage = async (pageNumber) => {
+        return api.get(`/products?page=${pageNumber}&pageSize=${perPage}&locationCode=${encodeURIComponent(selectedLocationCode)}`);
+      };
 
-      while (true) {
-        const response = await api.get(`/products?page=${page}&pageSize=${perPage}&locationCode=${encodeURIComponent(selectedLocationCode)}`);
-        const items = response.data.products || [];
-        all.push(...items);
+      const syncCatalogState = (items) => {
+        const uniqueCategories = [...new Set(items.map((p) => p.category).filter(Boolean))].sort();
+        setAllProducts(items);
+        setCategories(uniqueCategories);
+      };
 
-        if (items.length < perPage) {
-          break;
-        }
+      const firstResponse = await fetchProductsPage(1);
+      let all = Array.isArray(firstResponse?.data?.products) ? firstResponse.data.products : [];
 
-        page += 1;
+      if (catalogRequestIdRef.current !== requestId) {
+        return;
       }
 
-      const uniqueCategories = [...new Set(all.map((p) => p.category).filter(Boolean))].sort();
+      syncCatalogState(all);
 
-      setAllProducts(all);
-      setCategories(uniqueCategories);
+      if (all.length === perPage) {
+        (async () => {
+          try {
+            let page = 2;
+            while (true) {
+              const response = await fetchProductsPage(page);
+              const items = Array.isArray(response?.data?.products) ? response.data.products : [];
+              if (items.length === 0) {
+                break;
+              }
+
+              all = all.concat(items);
+              if (catalogRequestIdRef.current !== requestId) {
+                return;
+              }
+
+              syncCatalogState(all);
+
+              if (items.length < perPage) {
+                break;
+              }
+
+              page += 1;
+            }
+          } catch (bgErr) {
+            console.warn('[AdminPromotions] Background catalog loading error:', bgErr.message);
+          }
+        })();
+      }
     } catch (err) {
       console.error('Error fetching promotions catalog:', err);
       notifyError('Failed to load products for promotions', 3000);
