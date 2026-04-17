@@ -610,6 +610,7 @@ const AdminDashboard = () => {
             <button
               key={tab.id}
               onClick={() => handleTabSelect(tab.id)}
+              title={sidebarCollapsed ? tab.label : undefined}
               style={{
                 width: '100%',
                 padding: sidebarCollapsed ? '0.95rem 0.75rem' : '0.9rem 1.5rem',
