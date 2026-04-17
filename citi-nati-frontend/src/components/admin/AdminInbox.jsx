@@ -771,7 +771,7 @@ const AdminInbox = () => {
             {filteredMessages.length} / {totalMessages || messages.length} messages
           </div>
         </div>
-        <div style={{ height: `${Math.max(filterBarHeight + 6, 0)}px` }}></div>
+        <div style={{ height: `${Math.max(filterBarHeight - 76, 0)}px` }}></div>
         </>
       )}
 
