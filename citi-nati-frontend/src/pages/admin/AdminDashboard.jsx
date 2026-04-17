@@ -34,6 +34,75 @@ const ADMIN_DARK_BG = '#1e1e1e';
 const ADMIN_DARK_BORDER = '#333333';
 const ADMIN_DARK_TEXT = '#dbe7f8';
 
+const SIDEBAR_TAB_GROUPS = [
+  {
+    id: 'online-store',
+    label: 'Online Store',
+    icon: 'fa-store',
+    tabs: [
+      { id: 'inbox', label: 'Inbox', icon: 'fa-inbox' },
+      { id: 'orders', label: 'Orders', icon: 'fa-list' },
+      { id: 'refunds', label: 'Refunds', icon: 'fa-undo' },
+      { id: 'support', label: 'Support', icon: 'fa-life-ring' },
+      { id: 'quotations', label: 'Quotations', icon: 'fa-file-invoice' },
+      { id: 'promotions', label: 'Promotions', icon: 'fa-tags' },
+    ],
+  },
+  {
+    id: 'shared-catalog',
+    label: 'Shared Catalog',
+    icon: 'fa-boxes-stacked',
+    tabs: [
+      { id: 'products', label: 'Products', icon: 'fa-box' },
+      { id: 'stocks', label: 'Stocks', icon: 'fa-warehouse' },
+    ],
+  },
+  {
+    id: 'physical-store',
+    label: 'Physical Store / POS',
+    icon: 'fa-cash-register',
+    tabs: [
+      { id: 'emergency-sales', label: 'Emergency Sale', icon: 'fa-cash-register' },
+      { id: 'emergency-sales-reports', label: 'Emergency Reports', icon: 'fa-file-alt' },
+      { id: 'pos-management', label: 'POS Management', icon: 'fa-database' },
+      { id: 'pos-sync-monitor', label: 'POS Sync Monitor', icon: 'fa-chart-line' },
+      { id: 'cashiers', label: 'Cashiers', icon: 'fa-user-tag' },
+    ],
+  },
+  {
+    id: 'business',
+    label: 'Whole Business',
+    icon: 'fa-briefcase',
+    tabs: [
+      { id: 'sales', label: 'Sales', icon: 'fa-dollar-sign' },
+      { id: 'business-operations', label: 'Business Operations', icon: 'fa-briefcase' },
+      { id: 'users', label: 'Users', icon: 'fa-users' },
+      { id: 'drivers', label: 'Drivers', icon: 'fa-car' },
+    ],
+  },
+  {
+    id: 'administration',
+    label: 'Administration',
+    icon: 'fa-shield-halved',
+    tabs: [
+      { id: 'system', label: 'System', icon: 'fa-cogs' },
+      { id: 'security', label: 'Security', icon: 'fa-key' },
+    ],
+  },
+];
+
+const TAB_GROUP_BY_ID = SIDEBAR_TAB_GROUPS.reduce((accumulator, group) => {
+  group.tabs.forEach((tab) => {
+    accumulator[tab.id] = group.id;
+  });
+  return accumulator;
+}, {});
+
+const DEFAULT_EXPANDED_GROUPS = SIDEBAR_TAB_GROUPS.reduce((accumulator, group) => {
+  accumulator[group.id] = group.id === 'online-store' || group.id === 'physical-store';
+  return accumulator;
+}, {});
+
 const extractColorToken = (value) => {
   if (!value || typeof value !== 'string') return null;
   const rgbMatch = value.match(/rgba?\([^)]*\)/i);
@@ -215,6 +284,10 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState(() => ({
+    ...DEFAULT_EXPANDED_GROUPS,
+    [TAB_GROUP_BY_ID[initialTab] || 'online-store']: true,
+  }));
   const [speechAlertsEnabled, setSpeechAlertsPreference] = useState(() => getSpeechAlertsEnabled());
   const [selectedOperationalLocationCode, setSelectedOperationalLocationCode] = useState('BT');
   const [theme, setTheme] = useState(() => {
@@ -224,27 +297,6 @@ const AdminDashboard = () => {
   const isDarkTheme = theme === 'dark';
   const selectedOperationalLocationLabel = selectedOperationalLocationCode === 'ZA' ? 'Zomba' : 'Blantyre';
   const navigate = useNavigate();
-  const tabs = [
-    { id: 'inbox', label: 'Inbox', icon: 'fa-inbox' },
-    { id: 'orders', label: 'Orders', icon: 'fa-list' },
-    { id: 'refunds', label: 'Refunds', icon: 'fa-undo' },
-    { id: 'support', label: 'Support', icon: 'fa-life-ring' },
-    { id: 'products', label: 'Products', icon: 'fa-box' },
-    { id: 'stocks', label: 'Stocks', icon: 'fa-warehouse' },
-    { id: 'quotations', label: 'Quotations', icon: 'fa-file-invoice' },
-    { id: 'emergency-sales', label: 'Emergency Sale', icon: 'fa-cash-register' },
-    { id: 'emergency-sales-reports', label: 'Emergency Reports', icon: 'fa-file-alt' },
-    { id: 'system', label: 'System', icon: 'fa-cogs' },
-    { id: 'promotions', label: 'Promotions', icon: 'fa-tags' },
-    { id: 'pos-management', label: 'POS Management', icon: 'fa-database' },
-    { id: 'pos-sync-monitor', label: 'POS Sync Monitor', icon: 'fa-chart-line' },
-    { id: 'users', label: 'Users', icon: 'fa-users' },
-    { id: 'drivers', label: 'Drivers', icon: 'fa-car' },
-    { id: 'cashiers', label: 'Cashiers', icon: 'fa-user-tag' },
-    { id: 'sales', label: 'Sales', icon: 'fa-dollar-sign' },
-    { id: 'business-operations', label: 'Business Operations', icon: 'fa-briefcase' },
-    { id: 'security', label: 'Security', icon: 'fa-key' },
-  ];
 
   /**
    * Handle real-time order updates (for refreshing orders list)
@@ -354,6 +406,34 @@ const AdminDashboard = () => {
     }
   }, [location.pathname, activeTab]);
 
+  React.useEffect(() => {
+    const activeGroupId = TAB_GROUP_BY_ID[activeTab];
+    if (!activeGroupId) return;
+    setExpandedGroups((prev) => ({
+      ...prev,
+      [activeGroupId]: true,
+    }));
+  }, [activeTab]);
+
+  const handleTabSelect = useCallback((tabId) => {
+    setActiveTab(tabId);
+    if (tabId === 'emergency-sales') {
+      navigate('/admin/emergency-sales');
+    } else if (tabId === 'business-operations') {
+      navigate('/admin/business-operations');
+    } else if (location.pathname !== '/admin') {
+      navigate('/admin');
+    }
+    setSidebarOpen(false);
+  }, [location.pathname, navigate]);
+
+  const toggleGroup = useCallback((groupId) => {
+    setExpandedGroups((prev) => ({
+      ...prev,
+      [groupId]: !prev[groupId],
+    }));
+  }, []);
+
   return (
     <div className={`admin-dashboard-root ${isDarkTheme ? 'theme-dark' : 'theme-light'}`} data-admin-theme={theme}>
       {/* Hamburger Menu Icon - Mobile Only */}
@@ -452,56 +532,93 @@ const AdminDashboard = () => {
           overflowY: 'auto',
           padding: '0'
         }}>
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => {
-                setActiveTab(tab.id);
-                if (tab.id === 'emergency-sales') {
-                  navigate('/admin/emergency-sales');
-                } else if (tab.id === 'business-operations') {
-                  navigate('/admin/business-operations');
-                } else if (location.pathname !== '/admin') {
-                  navigate('/admin');
-                }
-                setSidebarOpen(false); // Close sidebar on mobile after selection
-              }}
-              style={{
-                width: '100%',
-                padding: sidebarCollapsed ? '1rem 0.75rem' : '1rem 1.5rem',
-                border: 'none',
-                backgroundColor: 'transparent',
-                borderLeft: activeTab === tab.id
-                  ? `4px solid ${isDarkTheme ? '#7c71f5' : '#5B4B8A'}`
-                  : '4px solid transparent',
-                color: activeTab === tab.id
-                  ? (isDarkTheme ? '#ddd8ff' : '#5B4B8A')
-                  : (isDarkTheme ? '#a4b2c5' : '#666'),
-                fontWeight: activeTab === tab.id ? '600' : '500',
-                cursor: 'pointer',
-                fontSize: '0.95rem',
-                transition: 'all 0.2s ease',
-                textAlign: sidebarCollapsed ? 'center' : 'left',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                gap: sidebarCollapsed ? '0' : '0.75rem'
-              }}
-              onMouseOver={(e) => {
-                if (activeTab !== tab.id) {
-                  e.currentTarget.style.color = isDarkTheme ? '#d3ccff' : '#5B4B8A';
-                }
-              }}
-              onMouseOut={(e) => {
-                if (activeTab !== tab.id) {
-                  e.currentTarget.style.color = isDarkTheme ? '#a4b2c5' : '#666';
-                }
-              }}
-            >
-              <i className={`fas ${tab.icon}`} style={{ width: '20px', textAlign: 'center' }}></i>
-              {!sidebarCollapsed && <span>{tab.label}</span>}
-            </button>
-          ))}
+          {SIDEBAR_TAB_GROUPS.map((group) => {
+            const groupExpanded = sidebarCollapsed ? true : Boolean(expandedGroups[group.id]);
+            const groupHasActiveTab = group.tabs.some((tab) => tab.id === activeTab);
+
+            return (
+              <div key={group.id} style={{ marginBottom: '0.35rem' }}>
+                <button
+                  onClick={() => {
+                    if (!sidebarCollapsed) {
+                      toggleGroup(group.id);
+                    }
+                  }}
+                  title={group.label}
+                  style={{
+                    width: '100%',
+                    padding: sidebarCollapsed ? '0.85rem 0.75rem' : '0.8rem 1.25rem',
+                    border: 'none',
+                    backgroundColor: groupHasActiveTab
+                      ? (isDarkTheme ? 'rgba(124, 113, 245, 0.12)' : '#f3f0fa')
+                      : 'transparent',
+                    color: groupHasActiveTab
+                      ? (isDarkTheme ? '#e4deff' : '#5B4B8A')
+                      : (isDarkTheme ? '#b7c3d5' : '#6f668a'),
+                    cursor: sidebarCollapsed ? 'default' : 'pointer',
+                    fontSize: sidebarCollapsed ? '1rem' : '0.82rem',
+                    fontWeight: '700',
+                    letterSpacing: sidebarCollapsed ? 'normal' : '0.03em',
+                    textAlign: sidebarCollapsed ? 'center' : 'left',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: sidebarCollapsed ? 'center' : 'space-between',
+                    gap: '0.5rem',
+                    borderRadius: sidebarCollapsed ? '0' : '10px',
+                    margin: sidebarCollapsed ? '0' : '0 0.5rem 0.2rem',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: sidebarCollapsed ? '0' : '0.65rem', justifyContent: sidebarCollapsed ? 'center' : 'flex-start' }}>
+                    <i className={`fas ${group.icon}`} style={{ width: '18px', textAlign: 'center' }}></i>
+                    {!sidebarCollapsed && <span>{group.label}</span>}
+                  </span>
+                  {!sidebarCollapsed && <i className={`fas ${groupExpanded ? 'fa-chevron-up' : 'fa-chevron-down'}`} style={{ fontSize: '0.72rem' }}></i>}
+                </button>
+
+                {groupExpanded && group.tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => handleTabSelect(tab.id)}
+                    style={{
+                      width: '100%',
+                      padding: sidebarCollapsed ? '0.9rem 0.75rem' : '0.85rem 1.5rem 0.85rem 2.2rem',
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      borderLeft: activeTab === tab.id
+                        ? `4px solid ${isDarkTheme ? '#7c71f5' : '#5B4B8A'}`
+                        : '4px solid transparent',
+                      color: activeTab === tab.id
+                        ? (isDarkTheme ? '#ddd8ff' : '#5B4B8A')
+                        : (isDarkTheme ? '#a4b2c5' : '#666'),
+                      fontWeight: activeTab === tab.id ? '600' : '500',
+                      cursor: 'pointer',
+                      fontSize: '0.95rem',
+                      transition: 'all 0.2s ease',
+                      textAlign: sidebarCollapsed ? 'center' : 'left',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                      gap: sidebarCollapsed ? '0' : '0.75rem'
+                    }}
+                    onMouseOver={(e) => {
+                      if (activeTab !== tab.id) {
+                        e.currentTarget.style.color = isDarkTheme ? '#d3ccff' : '#5B4B8A';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      if (activeTab !== tab.id) {
+                        e.currentTarget.style.color = isDarkTheme ? '#a4b2c5' : '#666';
+                      }
+                    }}
+                  >
+                    <i className={`fas ${tab.icon}`} style={{ width: '20px', textAlign: 'center' }}></i>
+                    {!sidebarCollapsed && <span>{tab.label}</span>}
+                  </button>
+                ))}
+              </div>
+            );
+          })}
         </div>
 
         {/* Sidebar Footer - Preferences and Home Button */}
