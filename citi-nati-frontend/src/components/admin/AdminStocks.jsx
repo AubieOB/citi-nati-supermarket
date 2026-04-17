@@ -144,22 +144,64 @@ const AdminStocks = ({ selectedLocationCode = 'BT' }) => {
     try {
       setLoading(true);
 
+      const perPage = 100;
+      let page = 1;
+      let all = [];
+
+      const fetchProductsPage = async (pageNumber) => {
+        const params = new URLSearchParams({ page: String(pageNumber), pageSize: String(perPage) });
+        if (selectedLocationCode) {
+          params.append('locationCode', selectedLocationCode);
+        }
+        return api.get(`/products?${params.toString()}`);
+      };
+
+      const normalizeAdminPosProduct = (product) => enrichProductStock({
+        ...product,
+        id: product.id,
+        name: product.name,
+        sourceCode: product.sourceCode || null,
+        productCode: product.sourceCode || null,
+        category: product.category || 'Uncategorized',
+        price: Number(product.price || 0),
+        stock: Number(product.stock || 0),
+        image: product.image || null,
+      });
+
       // Load first page immediately
-      const firstParams = new URLSearchParams({ page: '1', pageSize: '100' });
-      if (selectedLocationCode) {
-        firstParams.append('locationCode', selectedLocationCode);
+      const firstResp = await fetchProductsPage(page);
+      const firstItems = firstResp?.data?.products || [];
+      const firstBatch = firstItems.map((product) => enrichProductStock(product));
+
+      if (firstItems.length === 0) {
+        try {
+          console.warn('[ADMIN STOCKS UI] /products returned 0; trying /admin/pos-products fallback');
+          const params = new URLSearchParams({ page: '1', limit: '5000' });
+          if (selectedLocationCode) {
+            params.append('locationCode', selectedLocationCode);
+          }
+          const adminResp = await api.get(`/admin/pos-products?${params.toString()}`);
+          const adminItems = Array.isArray(adminResp?.data?.products)
+            ? adminResp.data.products.map(normalizeAdminPosProduct)
+            : [];
+          all = adminItems;
+          console.log('[ADMIN STOCKS UI] /admin/pos-products fallback count', adminItems.length);
+        } catch (adminFallbackErr) {
+          console.warn('[ADMIN STOCKS UI] /admin/pos-products fallback failed', adminFallbackErr?.response?.data || adminFallbackErr.message);
+          all = firstBatch;
+        }
+      } else {
+        all = firstBatch;
       }
-      const res1 = await api.get(`/products?${firstParams.toString()}`);
-      const firstBatch = (res1.data.products || []).map((product) => enrichProductStock(product));
 
       if (fetchRequestIdRef.current !== requestId) {
         return;
       }
 
-      setAllProducts(firstBatch);
+      setAllProducts(all);
 
       // Extract categories from first batch
-      const uniqueCategories = [...new Set(firstBatch.map(p => p.category))];
+      const uniqueCategories = [...new Set(all.map(p => p.category))];
       setCategories(uniqueCategories.filter(Boolean));
 
       setCurrentPage(1);
@@ -168,19 +210,24 @@ const AdminStocks = ({ selectedLocationCode = 'BT' }) => {
       // Load remaining pages in background (non-blocking)
       const collectRemaining = async () => {
         try {
-          let collected = [...firstBatch];
-          let page = 2;
-          const perPage = 100;
+          let collected = [...all];
+          page += 1;
 
           while (true) {
-            const params = new URLSearchParams({ page: String(page), pageSize: String(perPage) });
-            if (selectedLocationCode) {
-              params.append('locationCode', selectedLocationCode);
-            }
-            const res = await api.get(`/products?${params.toString()}`);
-            const items = res.data.products || [];
+            const res = await fetchProductsPage(page);
+            const items = res?.data?.products || [];
             if (items.length === 0) break;
+
             collected = collected.concat(items.map((product) => enrichProductStock(product)));
+
+            if (fetchRequestIdRef.current !== requestId) {
+              return;
+            }
+
+            setAllProducts(collected);
+            const allCategories = [...new Set(collected.map(p => p.category))];
+            setCategories(allCategories.filter(Boolean));
+
             if (items.length < perPage) break;
             page += 1;
           }
@@ -199,7 +246,7 @@ const AdminStocks = ({ selectedLocationCode = 'BT' }) => {
       };
 
       // Start background load if there are more pages
-      if (firstBatch.length === 100) {
+      if (firstItems.length === perPage) {
         collectRemaining();
       }
     } catch (err) {
