@@ -315,7 +315,7 @@ const SalesReports = ({ refreshTrigger }) => {
       generateDriverSalesReportPDF(driverSales, {
         fromDate: fromDate ? new Date(fromDate).toLocaleDateString() : 'All Time',
         toDate: toDate ? new Date(toDate).toLocaleDateString() : 'All Time',
-      });
+      }, filteredSalesDays);
       toast.success('Driver sales report downloaded', { position: 'top-right' });
     } catch (error) {
       console.error('Error exporting driver report:', error);

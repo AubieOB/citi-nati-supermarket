@@ -18,6 +18,29 @@ const formatProductsCurrency = (amount) => {
   return `MWK ${new Intl.NumberFormat('en-US').format(numericAmount)}`;
 };
 
+const toFiniteNumber = (value) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+};
+
+const calculateInclusiveVat = (grossAmount, vatRatePercent, vatEnabled = true) => {
+  const gross = toFiniteNumber(grossAmount);
+  const rate = toFiniteNumber(vatRatePercent);
+  if (!vatEnabled || gross <= 0 || rate <= 0) return 0;
+  return Number(((gross * rate) / (100 + rate)).toFixed(2));
+};
+
+const resolveOrderVatAmount = (order = {}) => {
+  const explicitVat = toFiniteNumber(order?.vatAmount ?? order?.vat ?? order?.taxAmount ?? order?.tax);
+  if (explicitVat > 0) {
+    return explicitVat;
+  }
+
+  const vatEnabled = order?.vatEnabled !== false;
+  const vatRatePercent = toFiniteNumber(order?.configuredVatRatePercent ?? order?.vatRatePercent);
+  return calculateInclusiveVat(order?.total, vatRatePercent, vatEnabled);
+};
+
 const buildBrandedHeader = ({
   reportTitle,
   subText = '',
@@ -54,8 +77,19 @@ const buildBrandedHeader = ({
 
 export const generateSummaryReportPDF = (salesDays, dateRange = {}) => {
   const today = new Date().toLocaleDateString();
+  const vatByDay = (Array.isArray(salesDays) ? salesDays : []).reduce((acc, day) => {
+    const dayKey = Number(day?.id || 0);
+    const dayVatTotal = (Array.isArray(day?.orders) ? day.orders : []).reduce(
+      (sum, order) => sum + resolveOrderVatAmount(order),
+      0
+    );
+    acc[dayKey] = dayVatTotal;
+    return acc;
+  }, {});
+
   const totalOrders = salesDays.reduce((sum, day) => sum + (day.totalOrders || 0), 0);
   const totalRevenue = salesDays.reduce((sum, day) => sum + (day.totalSales || 0), 0);
+  const totalVat = salesDays.reduce((sum, day) => sum + (vatByDay[Number(day?.id || 0)] || 0), 0);
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px;">
@@ -69,7 +103,7 @@ export const generateSummaryReportPDF = (salesDays, dateRange = {}) => {
       <!-- Executive Summary -->
       <div style="background-color: #f0f9f6; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
         <h2 style="margin-top: 0; color: #333; font-size: 18px;">Executive Summary</h2>
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 15px;">
           <div style="background: white; padding: 15px; border-radius: 4px; text-align: center;">
             <p style="margin: 0 0 10px 0; color: #999; font-size: 12px; font-weight: bold;">TOTAL SALES DAYS</p>
             <p style="margin: 0; color: #2D8659; font-size: 28px; font-weight: bold;">${salesDays.length}</p>
@@ -82,6 +116,10 @@ export const generateSummaryReportPDF = (salesDays, dateRange = {}) => {
             <p style="margin: 0 0 10px 0; color: #999; font-size: 12px; font-weight: bold;">TOTAL REVENUE</p>
             <p style="margin: 0; color: #FF6B6B; font-size: 28px; font-weight: bold;">MWK ${totalRevenue.toFixed(2)}</p>
           </div>
+          <div style="background: white; padding: 15px; border-radius: 4px; text-align: center;">
+            <p style="margin: 0 0 10px 0; color: #999; font-size: 12px; font-weight: bold;">TOTAL VAT</p>
+            <p style="margin: 0; color: #b42318; font-size: 28px; font-weight: bold;">MWK ${totalVat.toFixed(2)}</p>
+          </div>
         </div>
       </div>
 
@@ -93,6 +131,7 @@ export const generateSummaryReportPDF = (salesDays, dateRange = {}) => {
             <th style="padding: 12px; text-align: left; font-weight: bold; border: 1px solid #ddd;">Date</th>
             <th style="padding: 12px; text-align: center; font-weight: bold; border: 1px solid #ddd;">Orders</th>
             <th style="padding: 12px; text-align: right; font-weight: bold; border: 1px solid #ddd;">Revenue</th>
+            <th style="padding: 12px; text-align: right; font-weight: bold; border: 1px solid #ddd;">VAT</th>
             <th style="padding: 12px; text-align: center; font-weight: bold; border: 1px solid #ddd;">Duration</th>
           </tr>
         </thead>
@@ -106,6 +145,7 @@ export const generateSummaryReportPDF = (salesDays, dateRange = {}) => {
                 <td style="padding: 12px; border: 1px solid #ddd;">${opened.toLocaleDateString()}</td>
                 <td style="padding: 12px; text-align: center; border: 1px solid #ddd; font-weight: 600;">${day.totalOrders || 0}</td>
                 <td style="padding: 12px; text-align: right; border: 1px solid #ddd; color: #2D8659; font-weight: 600;">MWK ${(day.totalSales || 0).toFixed(2)}</td>
+                <td style="padding: 12px; text-align: right; border: 1px solid #ddd; color: #b42318; font-weight: 600;">MWK ${(vatByDay[Number(day?.id || 0)] || 0).toFixed(2)}</td>
                 <td style="padding: 12px; text-align: center; border: 1px solid #ddd; font-size: 12px; color: #666;">${duration}m</td>
               </tr>
             `;
@@ -114,6 +154,7 @@ export const generateSummaryReportPDF = (salesDays, dateRange = {}) => {
             <td style="padding: 12px; border: 1px solid #ddd;">TOTAL</td>
             <td style="padding: 12px; text-align: center; border: 1px solid #ddd; color: #333;">${totalOrders}</td>
             <td style="padding: 12px; text-align: right; border: 1px solid #ddd; color: #2D8659; font-size: 16px;">MWK ${totalRevenue.toFixed(2)}</td>
+            <td style="padding: 12px; text-align: right; border: 1px solid #ddd; color: #b42318; font-size: 16px;">MWK ${totalVat.toFixed(2)}</td>
             <td style="padding: 12px; text-align: center; border: 1px solid #ddd;"></td>
           </tr>
         </tbody>
@@ -173,12 +214,24 @@ export const generateProductSalesReportPDF = (productSales, salesDays, dateRange
         if (!productName) return;
         if (!includeAllProducts && !selectedProductNames.has(productName)) return;
 
-        const quantity = Number(item?.quantity || 0);
-        const unitPrice = Number(item?.price ?? item?.unitPrice ?? item?.product?.price ?? 0);
+        const quantity = toFiniteNumber(item?.quantity || 0);
+        const unitPrice = toFiniteNumber(item?.price ?? item?.unitPrice ?? item?.product?.price ?? 0);
         const grossFromLine = Number(item?.total ?? item?.subtotal ?? (quantity * unitPrice));
-        const discount = Number(item?.discount ?? 0);
-        const vatAmount = Number(item?.vat ?? item?.tax ?? item?.taxAmount ?? 0);
+        const discount = toFiniteNumber(item?.discount ?? 0);
+        const itemVatExplicit = toFiniteNumber(item?.vat ?? item?.tax ?? item?.taxAmount ?? item?.vatAmount);
         const grossAmount = Number(grossFromLine.toFixed(2));
+        const orderTotal = toFiniteNumber(order?.total);
+        const orderVatAmount = resolveOrderVatAmount(order);
+        const orderVatRatePercent = toFiniteNumber(order?.configuredVatRatePercent ?? order?.vatRatePercent);
+        const orderVatEnabled = order?.vatEnabled !== false;
+        const proportionalVat = orderTotal > 0 && orderVatAmount > 0
+          ? Number(((grossAmount / orderTotal) * orderVatAmount).toFixed(2))
+          : 0;
+        const vatAmount = itemVatExplicit > 0
+          ? itemVatExplicit
+          : (proportionalVat > 0
+            ? proportionalVat
+            : calculateInclusiveVat(grossAmount, orderVatRatePercent, orderVatEnabled));
         const netAmount = Number((grossAmount - discount - vatAmount).toFixed(2));
 
         const entry = ensureProduct(productName);
@@ -458,11 +511,27 @@ export const generateDriverReportPDF = (drivers, dateRange = {}) => {
   html2pdf().set(opt).from(element).save();
 };
 
-export const generateDriverSalesReportPDF = (drivers, dateRange = {}) => {
+export const generateDriverSalesReportPDF = (drivers, dateRange = {}, salesDays = []) => {
   const today = new Date().toLocaleDateString();
-  
-  const totalOrders = drivers.reduce((sum, d) => sum + (d.totalDeliveries || 0), 0);
-  const totalEarnings = drivers.reduce((sum, d) => sum + (d.totalEarnings || 0), 0);
+
+  const vatByDriver = {};
+  (Array.isArray(salesDays) ? salesDays : []).forEach((day) => {
+    (Array.isArray(day?.orders) ? day.orders : []).forEach((order) => {
+      const driverId = order?.driver?.id;
+      if (!driverId) return;
+      if (!vatByDriver[driverId]) vatByDriver[driverId] = 0;
+      vatByDriver[driverId] += resolveOrderVatAmount(order);
+    });
+  });
+
+  const preparedDrivers = (Array.isArray(drivers) ? drivers : []).map((driver) => ({
+    ...driver,
+    vatTotal: toFiniteNumber(driver?.vatTotal) || toFiniteNumber(vatByDriver[driver?.id]),
+  }));
+
+  const totalOrders = preparedDrivers.reduce((sum, d) => sum + (d.totalDeliveries || 0), 0);
+  const totalEarnings = preparedDrivers.reduce((sum, d) => sum + (d.totalEarnings || 0), 0);
+  const totalVat = preparedDrivers.reduce((sum, d) => sum + (d.vatTotal || 0), 0);
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px;">
@@ -476,10 +545,10 @@ export const generateDriverSalesReportPDF = (drivers, dateRange = {}) => {
       <!-- Executive Summary -->
       <div style="background-color: #f5f3f9; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
         <h2 style="margin-top: 0; color: #333; font-size: 18px;">Summary</h2>
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 15px;">
           <div style="background: white; padding: 15px; border-radius: 4px; text-align: center;">
             <p style="margin: 0 0 10px 0; color: #999; font-size: 12px; font-weight: bold;">ACTIVE DRIVERS</p>
-            <p style="margin: 0; color: #5B4B8A; font-size: 28px; font-weight: bold;">${drivers.length}</p>
+            <p style="margin: 0; color: #5B4B8A; font-size: 28px; font-weight: bold;">${preparedDrivers.length}</p>
           </div>
           <div style="background: white; padding: 15px; border-radius: 4px; text-align: center;">
             <p style="margin: 0 0 10px 0; color: #999; font-size: 12px; font-weight: bold;">TOTAL DELIVERIES</p>
@@ -488,6 +557,10 @@ export const generateDriverSalesReportPDF = (drivers, dateRange = {}) => {
           <div style="background: white; padding: 15px; border-radius: 4px; text-align: center;">
             <p style="margin: 0 0 10px 0; color: #999; font-size: 12px; font-weight: bold;">TOTAL EARNINGS PAID</p>
             <p style="margin: 0; color: #5B4B8A; font-size: 28px; font-weight: bold;">MWK ${totalEarnings.toFixed(2)}</p>
+          </div>
+          <div style="background: white; padding: 15px; border-radius: 4px; text-align: center;">
+            <p style="margin: 0 0 10px 0; color: #999; font-size: 12px; font-weight: bold;">TOTAL VAT</p>
+            <p style="margin: 0; color: #b42318; font-size: 28px; font-weight: bold;">MWK ${totalVat.toFixed(2)}</p>
           </div>
         </div>
       </div>
@@ -501,21 +574,24 @@ export const generateDriverSalesReportPDF = (drivers, dateRange = {}) => {
             <th style="padding: 12px; text-align: left; font-weight: bold; border: 1px solid #ddd;">Contact</th>
             <th style="padding: 12px; text-align: center; font-weight: bold; border: 1px solid #ddd;">Deliveries</th>
             <th style="padding: 12px; text-align: right; font-weight: bold; border: 1px solid #ddd;">Total Earnings</th>
+            <th style="padding: 12px; text-align: right; font-weight: bold; border: 1px solid #ddd;">VAT</th>
           </tr>
         </thead>
         <tbody>
-          ${drivers.sort((a, b) => b.totalEarnings - a.totalEarnings).map((driver, idx) => `
+          ${preparedDrivers.sort((a, b) => b.totalEarnings - a.totalEarnings).map((driver, idx) => `
             <tr style="background-color: ${idx % 2 === 0 ? '#fff' : '#f9f9f9'}; border-bottom: 1px solid #ddd;">
               <td style="padding: 12px; border: 1px solid #ddd; font-weight: 600;">${driver.name}</td>
               <td style="padding: 12px; border: 1px solid #ddd; font-size: 12px; color: #666;">${driver.email}</td>
               <td style="padding: 12px; text-align: center; border: 1px solid #ddd; font-weight: 600;">${driver.totalDeliveries}</td>
               <td style="padding: 12px; text-align: right; border: 1px solid #ddd; color: #5B4B8A; font-weight: 600;">MWK ${driver.totalEarnings.toFixed(2)}</td>
+              <td style="padding: 12px; text-align: right; border: 1px solid #ddd; color: #b42318; font-weight: 600;">MWK ${(driver.vatTotal || 0).toFixed(2)}</td>
             </tr>
           `).join('')}
           <tr style="background-color: #f5f3f9; font-weight: bold; border-top: 2px solid #5B4B8A;">
             <td colSpan="2" style="padding: 12px; border: 1px solid #ddd;">TOTAL</td>
             <td style="padding: 12px; text-align: center; border: 1px solid #ddd; color: #333;">${totalOrders}</td>
             <td style="padding: 12px; text-align: right; border: 1px solid #ddd; color: #5B4B8A; font-size: 16px;">MWK ${totalEarnings.toFixed(2)}</td>
+            <td style="padding: 12px; text-align: right; border: 1px solid #ddd; color: #b42318; font-size: 16px;">MWK ${totalVat.toFixed(2)}</td>
           </tr>
         </tbody>
       </table>
