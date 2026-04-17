@@ -80,7 +80,7 @@ const AdminPromotions = ({
         cleanupSocket();
       }
     };
-  }, []);
+  }, [selectedLocationCode]);
 
   useEffect(() => {
     setSearchTerm('');
@@ -164,6 +164,10 @@ const AdminPromotions = ({
       }
 
       const handlePromotionUpdated = (updatedPromotion) => {
+        const promotionLocationCode = String(updatedPromotion?.locationCode || '').trim().toUpperCase();
+        if (promotionLocationCode && promotionLocationCode !== String(selectedLocationCode || '').trim().toUpperCase()) {
+          return;
+        }
         console.log('[AdminPromotions] Promotion updated via Socket.io:', updatedPromotion.type);
         setPromotions(prev => ({
           ...prev,

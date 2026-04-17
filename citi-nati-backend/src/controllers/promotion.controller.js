@@ -20,6 +20,140 @@ const ACTIVE_PRODUCT_FILTER = {
   enabled: true,
 };
 
+function expandLocationScopeCodes(locationCode) {
+  const normalizedLocationCode = normalizeLocationCode(locationCode);
+  if (!normalizedLocationCode) return [];
+
+  if (normalizedLocationCode === 'BT') {
+    return ['BT'];
+  }
+
+  if (ZOMBA_LOCATION_CODES.includes(normalizedLocationCode)) {
+    return ['SH'];
+  }
+
+  return [normalizedLocationCode];
+}
+
+async function resolveLocationScopedProductCodesFromSales(scopeCodes = []) {
+  if (!Array.isArray(scopeCodes) || scopeCodes.length === 0) {
+    return [];
+  }
+
+  const derivedBranchCode = scopeCodes.includes('BT')
+    ? deriveBranchCodeFromLocationCode('BT')
+    : null;
+  const locationCodePredicates = scopeCodes.map((code) => ({
+    locationCode: {
+      equals: code,
+      mode: 'insensitive',
+    },
+  }));
+
+  const salesRows = await prisma.salesInvoiceItem.findMany({
+    where: {
+      productCode: { not: null },
+      salesInvoice: {
+        OR: [
+          ...locationCodePredicates,
+          ...(derivedBranchCode ? [{ branchCode: derivedBranchCode }] : []),
+        ],
+      },
+    },
+    select: {
+      productCode: true,
+    },
+    distinct: ['productCode'],
+  });
+
+  return salesRows
+    .map((row) => String(row.productCode || '').trim())
+    .filter(Boolean);
+}
+
+async function resolveLocationScopedProductCodesFromLatestCosts(scopeCodes = []) {
+  if (!Array.isArray(scopeCodes) || scopeCodes.length === 0) {
+    return [];
+  }
+
+  const derivedBranchCode = scopeCodes.includes('BT')
+    ? deriveBranchCodeFromLocationCode('BT')
+    : null;
+  const locationCodePredicates = scopeCodes.map((code) => ({
+    locationCode: {
+      equals: code,
+      mode: 'insensitive',
+    },
+  }));
+
+  const rows = await prisma.posLatestProductCost.findMany({
+    where: {
+      OR: [
+        ...locationCodePredicates,
+        ...(derivedBranchCode ? [{ branchCode: derivedBranchCode }] : []),
+      ],
+    },
+    select: {
+      productCode: true,
+    },
+    distinct: ['productCode'],
+  });
+
+  return rows
+    .map((row) => String(row.productCode || '').trim())
+    .filter(Boolean);
+}
+
+async function resolveLocationScopedProductCodes(locationCode) {
+  const scopeCodes = expandLocationScopeCodes(locationCode);
+  if (scopeCodes.length === 0) {
+    return [];
+  }
+
+  const expiryRows = await prisma.productExpiryBatch.findMany({
+    where: {
+      OR: scopeCodes.map((code) => ({
+        locationCode: {
+          equals: code,
+          mode: 'insensitive',
+        },
+      })),
+    },
+    select: { productCode: true },
+    distinct: ['productCode'],
+  });
+
+  const scopedCodes = new Set(
+    expiryRows
+      .map((row) => String(row.productCode || '').trim())
+      .filter(Boolean)
+  );
+
+  const costCodes = await resolveLocationScopedProductCodesFromLatestCosts(scopeCodes);
+  costCodes.forEach((code) => scopedCodes.add(code));
+
+  const salesCodes = await resolveLocationScopedProductCodesFromSales(scopeCodes);
+  salesCodes.forEach((code) => scopedCodes.add(code));
+
+  if (scopedCodes.size === 0 && scopeCodes.includes('BT')) {
+    const legacyRows = await prisma.product.findMany({
+      where: {
+        branchCode: 'BLANTYRE',
+        sourceCode: { not: null },
+      },
+      select: { sourceCode: true },
+      distinct: ['sourceCode'],
+    });
+
+    legacyRows
+      .map((row) => String(row.sourceCode || '').trim())
+      .filter(Boolean)
+      .forEach((code) => scopedCodes.add(code));
+  }
+
+  return Array.from(scopedCodes.values());
+}
+
 function normalizeLocationCode(value) {
   const normalized = String(value || '').trim().toUpperCase();
   return normalized || null;
@@ -68,11 +202,17 @@ function resolvePromotionScope(req) {
   };
 }
 
-function getScopedActiveProductFilter(branchCode) {
-  return {
+function getScopedActiveProductFilter(branchCode, scopedProductCodes = null) {
+  const where = {
     ...ACTIVE_PRODUCT_FILTER,
     branchCode,
   };
+
+  if (Array.isArray(scopedProductCodes)) {
+    where.sourceCode = { in: scopedProductCodes };
+  }
+
+  return where;
 }
 
 function parseProductIds(ids = []) {
@@ -81,8 +221,8 @@ function parseProductIds(ids = []) {
     .filter((id) => Number.isInteger(id) && id > 0);
 }
 
-function getPromotionProductWhere(type, categoryId, selectedProducts, branchCode) {
-  const baseWhere = getScopedActiveProductFilter(branchCode);
+function getPromotionProductWhere(type, categoryId, selectedProducts, branchCode, scopedProductCodes = null) {
+  const baseWhere = getScopedActiveProductFilter(branchCode, scopedProductCodes);
 
   if (type === 'global') {
     return { ...baseWhere };
@@ -141,6 +281,9 @@ async function resolveProductsForPosQueue({
   scope,
 }) {
   const scopedBranchCode = scope?.branchCode || null;
+  const scopedProductCodes = Array.isArray(scope?.scopedProductCodes)
+    ? scope.scopedProductCodes
+    : null;
 
   if (enabled && Array.isArray(productCandidates) && productCandidates.length > 0) {
     return productCandidates.map((product) => ({
@@ -155,7 +298,7 @@ async function resolveProductsForPosQueue({
 
   if (type === 'global') {
     return prisma.product.findMany({
-      where: getPromotionProductWhere('global', null, [], scopedBranchCode),
+      where: getPromotionProductWhere('global', null, [], scopedBranchCode, scopedProductCodes),
       select: {
         id: true,
         name: true,
@@ -174,7 +317,7 @@ async function resolveProductsForPosQueue({
     }
 
     return prisma.product.findMany({
-      where: getPromotionProductWhere('category', categoryToUse, [], scopedBranchCode),
+      where: getPromotionProductWhere('category', categoryToUse, [], scopedBranchCode, scopedProductCodes),
       select: {
         id: true,
         name: true,
@@ -197,10 +340,7 @@ async function resolveProductsForPosQueue({
   }
 
   return prisma.product.findMany({
-    where: {
-      id: { in: selectiveIds },
-      branchCode: scopedBranchCode,
-    },
+    where: getPromotionProductWhere('selective', null, selectiveIds, scopedBranchCode, scopedProductCodes),
     select: {
       id: true,
       name: true,
@@ -367,12 +507,17 @@ async function queuePosPromotionCommands({
 /**
  * Emit promotion update to all connected clients (both admin and users) via Socket.io
  */
-const emitPromotionUpdate = (promotion) => {
+const emitPromotionUpdate = (promotion, scope = null) => {
   try {
     if (global.io) {
+      const scopedPromotion = {
+        ...promotion,
+        branchCode: scope?.branchCode || promotion.branchCode || null,
+        locationCode: scope?.locationCode || promotion.locationCode || null,
+      };
       // Broadcast to everyone - both admins and users seeing products page need to know
-      global.io.emit('promotionUpdated', promotion);
-      console.log(`[Socket.io] Promotion updated: ${promotion.type} - emitted to all clients`);
+      global.io.emit('promotionUpdated', scopedPromotion);
+      console.log(`[Socket.io] Promotion updated: ${promotion.type} - emitted to all clients for ${scopedPromotion.locationCode || scopedPromotion.branchCode || 'unknown-scope'}`);
     }
   } catch (err) {
     console.error('Error emitting promotion:', err);
@@ -466,6 +611,12 @@ const updatePromotion = async (req, res) => {
       });
     }
 
+    const scopedProductCodes = await resolveLocationScopedProductCodes(scope.locationCode);
+    const effectiveScope = {
+      ...scope,
+      scopedProductCodes,
+    };
+
     const previousPromotion = await prisma.promotion.findUnique({
       where: {
         branchCode_type: {
@@ -516,10 +667,7 @@ const updatePromotion = async (req, res) => {
       }
 
       const scopedSelectedCount = await prisma.product.count({
-        where: {
-          id: { in: parsedSelectedProducts },
-          branchCode: scope.branchCode,
-        },
+        where: getPromotionProductWhere('selective', null, parsedSelectedProducts, scope.branchCode, scopedProductCodes),
       });
 
       if (scopedSelectedCount !== parsedSelectedProducts.length) {
@@ -533,7 +681,7 @@ const updatePromotion = async (req, res) => {
     // First, reset all products (remove promotional pricing) if disabling
     if (!enabled) {
       await prisma.product.updateMany({
-        where: getScopedActiveProductFilter(scope.branchCode),
+        where: getScopedActiveProductFilter(scope.branchCode, scopedProductCodes),
         data: {
           discountPrice: null,
           isOnSale: false,
@@ -590,16 +738,16 @@ const updatePromotion = async (req, res) => {
     if (enabled) {
       if (type === 'global') {
         productsToUpdate = await prisma.product.findMany({
-          where: getPromotionProductWhere('global', null, [], scope.branchCode),
+          where: getPromotionProductWhere('global', null, [], scope.branchCode, scopedProductCodes),
         });
       } else if (type === 'category') {
         productsToUpdate = await prisma.product.findMany({
-          where: getPromotionProductWhere('category', categoryId, [], scope.branchCode),
+          where: getPromotionProductWhere('category', categoryId, [], scope.branchCode, scopedProductCodes),
         });
       } else if (type === 'selective') {
         if (parsedSelectedProducts.length > 0) {
           productsToUpdate = await prisma.product.findMany({
-            where: getPromotionProductWhere('selective', null, parsedSelectedProducts, scope.branchCode),
+            where: getPromotionProductWhere('selective', null, parsedSelectedProducts, scope.branchCode, scopedProductCodes),
           });
 
           if (productsToUpdate.length !== parsedSelectedProducts.length) {
@@ -643,14 +791,14 @@ const updatePromotion = async (req, res) => {
         previousPromotion,
         productCandidates: promotion.enabled ? productsToUpdate : null,
         actor,
-        scope,
+        scope: effectiveScope,
       });
 
       console.log(`[PROMO][QUEUE] ${type} bridge summary:`, posQueueSummary);
     }
     
     try {
-      emitPromotionUpdate(promotionResponse);
+      emitPromotionUpdate(promotionResponse, effectiveScope);
     } catch (emitErr) {
       console.error('[Promotions] Socket.io emit error:', emitErr);
       // Continue even if Socket.io fails
@@ -688,6 +836,8 @@ const previewPromotion = async (req, res) => {
       });
     }
 
+    const scopedProductCodes = await resolveLocationScopedProductCodes(scope.locationCode);
+
     // Validate type
     if (!['global', 'category', 'selective'].includes(type)) {
       return res.status(400).json({
@@ -701,7 +851,7 @@ const previewPromotion = async (req, res) => {
     if (type === 'global') {
       // Get all products
       products = await prisma.product.findMany({
-        where: getPromotionProductWhere('global', null, [], scope.branchCode),
+        where: getPromotionProductWhere('global', null, [], scope.branchCode, scopedProductCodes),
       });
     } else if (type === 'category') {
       // Get products in specific category
@@ -712,7 +862,7 @@ const previewPromotion = async (req, res) => {
         });
       }
       products = await prisma.product.findMany({
-        where: getPromotionProductWhere('category', categoryId, [], scope.branchCode),
+        where: getPromotionProductWhere('category', categoryId, [], scope.branchCode, scopedProductCodes),
       });
     } else if (type === 'selective') {
       // Get selected products
@@ -723,7 +873,7 @@ const previewPromotion = async (req, res) => {
         });
       }
       products = await prisma.product.findMany({
-        where: getPromotionProductWhere('selective', null, parsedSelectedProducts, scope.branchCode),
+        where: getPromotionProductWhere('selective', null, parsedSelectedProducts, scope.branchCode, scopedProductCodes),
       });
 
       if (products.length !== parsedSelectedProducts.length) {
@@ -779,6 +929,8 @@ const applyPromotion = async (req, res) => {
       });
     }
 
+    const scopedProductCodes = await resolveLocationScopedProductCodes(scope.locationCode);
+
     const promotions = await prisma.promotion.findMany({
       where: {
         enabled: true,
@@ -793,18 +945,18 @@ const applyPromotion = async (req, res) => {
 
       if (promotion.type === 'global') {
         products = await prisma.product.findMany({
-          where: getPromotionProductWhere('global', null, [], scope.branchCode),
+          where: getPromotionProductWhere('global', null, [], scope.branchCode, scopedProductCodes),
         });
       } else if (promotion.type === 'category') {
         products = await prisma.product.findMany({
-          where: getPromotionProductWhere('category', promotion.categoryId, [], scope.branchCode),
+          where: getPromotionProductWhere('category', promotion.categoryId, [], scope.branchCode, scopedProductCodes),
         });
       } else if (promotion.type === 'selective') {
         // Use selectedProductIds from database
         const selectedIds = parseProductIds(promotion.selectedProductIds || []);
         if (selectedIds.length === 0) continue; // Skip if no products selected
         products = await prisma.product.findMany({
-          where: getPromotionProductWhere('selective', null, selectedIds, scope.branchCode),
+          where: getPromotionProductWhere('selective', null, selectedIds, scope.branchCode, scopedProductCodes),
         });
       }
 
@@ -858,7 +1010,7 @@ const removePromotion = async (req, res) => {
 
     // Reset all product discount prices
     await prisma.product.updateMany({
-      where: getScopedActiveProductFilter(scope.branchCode),
+      where: getScopedActiveProductFilter(scope.branchCode, await resolveLocationScopedProductCodes(scope.locationCode)),
       data: {
         discountPrice: null,
         isOnSale: false,
