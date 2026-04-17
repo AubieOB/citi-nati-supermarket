@@ -556,6 +556,10 @@ const Products = () => {
       };
 
       const handlePromotionUpdated = (promotion) => {
+        const promotionLocationCode = String(promotion?.locationCode || '').trim().toUpperCase();
+        if (promotionLocationCode && promotionLocationCode !== STOREFRONT_LOCATION_CODE) {
+          return;
+        }
         console.log('[PRODUCTS] 🎯 Promotion updated:', promotion.type);
         // Refetch all products to get updated discount prices
         fetchProducts();

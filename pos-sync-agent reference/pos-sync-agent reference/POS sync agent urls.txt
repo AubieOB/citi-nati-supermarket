@@ -1,1 +1,0 @@
-curl -H "x-pos-secret: MySuperSecret123" http://localhost:5000/pos-sync/products
