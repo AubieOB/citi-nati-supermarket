@@ -31,7 +31,7 @@ const MESSAGE_TYPES = [
  * - Notification sounds for critical alerts (refunds)
  */
 
-const AdminInbox = ({ selectedLocationCode = 'BT' }) => {
+const AdminInbox = () => {
   const INBOX_PERFORMANCE_WARNING_THRESHOLD = 500;
   const INBOX_FETCH_LIMIT = 300;
   const [messages, setMessages] = useState([]);
@@ -51,13 +51,21 @@ const AdminInbox = ({ selectedLocationCode = 'BT' }) => {
   const soundedMessagesRef = useRef(new Set());
   const filterBarRef = useRef(null);
 
+  const getLocationLabel = (branchCode) => {
+    const normalized = String(branchCode || '').trim().toUpperCase();
+    if (!normalized) return 'Unscoped';
+    if (normalized === 'BT' || normalized === 'BLANTYRE') return 'Blantyre';
+    if (['ZA', 'ZOMBA', 'SH', 'BAR', 'WH'].includes(normalized)) return 'Zomba';
+    return normalized;
+  };
+
   // Fetch messages on mount
   useEffect(() => {
     fetchMessages();
     // Poll for new messages every 30 seconds
     const interval = setInterval(() => fetchMessages({ silent: true }), 30000);
     return () => clearInterval(interval);
-  }, [selectedLocationCode]);
+  }, []);
 
 
 
@@ -262,7 +270,6 @@ const AdminInbox = ({ selectedLocationCode = 'BT' }) => {
         params: {
           limit: INBOX_FETCH_LIMIT,
           offset: 0,
-          ...(selectedLocationCode && { branchCode: selectedLocationCode }),
         },
       });
       setMessages(response.data.messages || []);
@@ -371,7 +378,7 @@ const AdminInbox = ({ selectedLocationCode = 'BT' }) => {
 
   const handleMarkAsRead = async (messageId) => {
     try {
-      await api.patch(`/admin/messages/${messageId}/read`, null, { params: { branchCode: selectedLocationCode } });
+      await api.patch(`/admin/messages/${messageId}/read`);
       setMessages(messages.map(msg =>
         msg.id === messageId ? { ...msg, read: true } : msg
       ));
@@ -382,7 +389,7 @@ const AdminInbox = ({ selectedLocationCode = 'BT' }) => {
 
   const handleMarkAsUnread = async (messageId) => {
     try {
-      await api.patch(`/admin/messages/${messageId}/unread`, null, { params: { branchCode: selectedLocationCode } });
+      await api.patch(`/admin/messages/${messageId}/unread`);
       setMessages(messages.map(msg =>
         msg.id === messageId ? { ...msg, read: false } : msg
       ));
@@ -397,7 +404,7 @@ const AdminInbox = ({ selectedLocationCode = 'BT' }) => {
       'Are you sure you want to delete this message?',
       async () => {
         try {
-          await api.delete(`/admin/messages/${messageId}`, { params: { branchCode: selectedLocationCode } });
+          await api.delete(`/admin/messages/${messageId}`);
           setMessages(messages.filter(msg => msg.id !== messageId));
           setTotalMessages((prev) => Math.max(0, prev - 1));
         } catch (err) {
@@ -413,7 +420,7 @@ const AdminInbox = ({ selectedLocationCode = 'BT' }) => {
       'Are you sure you want to delete all messages? This action cannot be undone.',
       async () => {
         try {
-          await api.delete('/admin/messages', { params: { branchCode: selectedLocationCode } });
+          await api.delete('/admin/messages');
           setMessages([]);
           setTotalMessages(0);
         } catch (err) {
@@ -425,7 +432,7 @@ const AdminInbox = ({ selectedLocationCode = 'BT' }) => {
 
   const handleMarkAllAsRead = async () => {
     try {
-      const response = await api.patch('/admin/messages/read/all', null, { params: { branchCode: selectedLocationCode } });
+      const response = await api.patch('/admin/messages/read/all');
       // Update all messages to read state
       setMessages(messages.map(msg => ({ ...msg, read: true })));
       toast.success(`Marked ${response.data.updated} message${response.data.updated !== 1 ? 's' : ''} as read`, {
@@ -764,7 +771,7 @@ const AdminInbox = ({ selectedLocationCode = 'BT' }) => {
             {filteredMessages.length} / {totalMessages || messages.length} messages
           </div>
         </div>
-        <div style={{ height: `${Math.max(filterBarHeight - 76, 0)}px` }}></div>
+        <div style={{ height: `${Math.max(filterBarHeight + 6, 0)}px` }}></div>
         </>
       )}
 
@@ -934,6 +941,18 @@ const AdminInbox = ({ selectedLocationCode = 'BT' }) => {
                       }}>
                         Last seen {formatTime(message.lastSeenAt || message.createdAt)}
                       </p>
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        padding: '0.18rem 0.48rem',
+                        borderRadius: '999px',
+                        backgroundColor: '#eef2ff',
+                        color: '#3730a3',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                      }}>
+                        {getLocationLabel(message.branchCode)}
+                      </span>
                       {(message.occurrenceCount || 1) > 1 && (
                         <p style={{
                           margin: 0,

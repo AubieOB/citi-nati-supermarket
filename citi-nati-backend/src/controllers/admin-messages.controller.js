@@ -121,6 +121,7 @@ function toSocketPayload(message) {
     title: message.title,
     message: message.message,
     read: message.read,
+    branchCode: message.branchCode,
     dedupeKey: message.dedupeKey,
     lifecycleState: message.lifecycleState,
     occurrenceCount: message.occurrenceCount,
