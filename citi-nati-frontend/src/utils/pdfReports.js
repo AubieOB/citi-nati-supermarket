@@ -142,328 +142,161 @@ export const generateSummaryReportPDF = (salesDays, dateRange = {}) => {
 };
 
 export const generateProductSalesReportPDF = (productSales, salesDays, dateRange = {}) => {
-  const formatMoney = (value) => `MWK ${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  const selectedProductNames = new Set((Array.isArray(productSales) ? productSales : []).map((p) => String(p.name || '').trim()).filter(Boolean));
+  const today = new Date().toLocaleDateString();
+  const selectedProductNames = new Set((Array.isArray(productSales) ? productSales : [])
+    .map((p) => String(p?.name || '').trim())
+    .filter(Boolean));
   const includeAllProducts = selectedProductNames.size === 0;
 
-  const grouped = new Map();
-  const ensureGroup = (name) => {
-    if (!grouped.has(name)) {
-      grouped.set(name, {
-        productName: name,
-        rows: [],
-        totalQty: 0,
-        totalDiscount: 0,
-        totalNet: 0,
-        totalVat: 0,
-        totalGross: 0,
+  const aggregated = new Map();
+  const ensureProduct = (name) => {
+    if (!aggregated.has(name)) {
+      aggregated.set(name, {
+        name,
+        quantity: 0,
+        grossAmount: 0,
+        vatAmount: 0,
+        netAmount: 0,
       });
     }
-    return grouped.get(name);
+    return aggregated.get(name);
   };
 
   if (!includeAllProducts) {
-    selectedProductNames.forEach((name) => ensureGroup(name));
+    selectedProductNames.forEach((name) => ensureProduct(name));
   }
 
   (Array.isArray(salesDays) ? salesDays : []).forEach((day) => {
     (Array.isArray(day?.orders) ? day.orders : []).forEach((order) => {
-      const saleNo = order?.id ?? 'N/A';
-      const customer = order?.user?.name || order?.customerName || order?.customer?.name || 'N/A';
-      const orderDate = order?.createdAt || day?.closedAt || day?.openedAt || null;
-      const formattedDate = orderDate ? new Date(orderDate).toLocaleDateString('en-GB') : 'N/A';
-
       (Array.isArray(order?.items) ? order.items : []).forEach((item) => {
         const productName = String(item?.product?.name || item?.productName || 'Unknown Product').trim();
         if (!productName) return;
         if (!includeAllProducts && !selectedProductNames.has(productName)) return;
 
-        const qty = Number(item?.quantity || 0);
+        const quantity = Number(item?.quantity || 0);
         const unitPrice = Number(item?.price ?? item?.unitPrice ?? item?.product?.price ?? 0);
+        const grossFromLine = Number(item?.total ?? item?.subtotal ?? (quantity * unitPrice));
         const discount = Number(item?.discount ?? 0);
-        const vat = Number(item?.vat ?? item?.tax ?? item?.taxAmount ?? 0);
-        const gross = Number((qty * unitPrice).toFixed(2));
-        const net = Number((gross - discount - vat).toFixed(2));
+        const vatAmount = Number(item?.vat ?? item?.tax ?? item?.taxAmount ?? 0);
+        const grossAmount = Number(grossFromLine.toFixed(2));
+        const netAmount = Number((grossAmount - discount - vatAmount).toFixed(2));
 
-        const group = ensureGroup(productName);
-        group.rows.push({
-          date: formattedDate,
-          saleNo,
-          customer,
-          qty,
-          unitPrice,
-          discount,
-          net,
-          vat,
-          gross,
-        });
-        group.totalQty += qty;
-        group.totalDiscount += discount;
-        group.totalNet += net;
-        group.totalVat += vat;
-        group.totalGross += gross;
+        const entry = ensureProduct(productName);
+        entry.quantity += quantity;
+        entry.grossAmount += grossAmount;
+        entry.vatAmount += vatAmount;
+        entry.netAmount += netAmount;
       });
     });
   });
 
-  const groups = Array.from(grouped.values()).sort((a, b) => a.productName.localeCompare(b.productName));
+  const rows = Array.from(aggregated.values())
+    .map((row) => ({
+      ...row,
+      quantity: Number(row.quantity || 0),
+      grossAmount: Number(row.grossAmount || 0),
+      vatAmount: Number(row.vatAmount || 0),
+      netAmount: Number(row.netAmount || 0),
+    }))
+    .sort((a, b) => b.grossAmount - a.grossAmount || a.name.localeCompare(b.name));
 
-  const grandTotals = groups.reduce((acc, group) => {
-    acc.qty += group.totalQty;
-    acc.discount += group.totalDiscount;
-    acc.net += group.totalNet;
-    acc.vat += group.totalVat;
-    acc.gross += group.totalGross;
+  const totals = rows.reduce((acc, row) => {
+    acc.quantity += row.quantity;
+    acc.grossAmount += row.grossAmount;
+    acc.vatAmount += row.vatAmount;
+    acc.netAmount += row.netAmount;
     return acc;
   }, {
-    qty: 0,
-    discount: 0,
-    net: 0,
-    vat: 0,
-    gross: 0,
+    quantity: 0,
+    grossAmount: 0,
+    vatAmount: 0,
+    netAmount: 0,
   });
 
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4', compress: true });
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 10;
-  const periodFrom = dateRange.fromDate || 'All Time';
-  const periodTo = dateRange.toDate || 'All Time';
-  const generatedText = `${new Date().toLocaleDateString('en-GB')} ${new Date().toLocaleTimeString()}`;
-  const totalProducts = groups.length;
-  const sharedColumnStyles = {
-    0: { cellWidth: 22 },
-    1: { cellWidth: 18, halign: 'center' },
-    2: { cellWidth: 58 },
-    3: { cellWidth: 14, halign: 'center' },
-    4: { cellWidth: 24, halign: 'right' },
-    5: { cellWidth: 24, halign: 'right' },
-    6: { cellWidth: 24, halign: 'right' },
-    7: { cellWidth: 20, halign: 'right' },
-    8: { cellWidth: 24, halign: 'right' },
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px;">
+      ${buildBrandedHeader({
+        reportTitle: 'Sales by Product Report',
+        periodText: `Period: ${dateRange.fromDate} to ${dateRange.toDate}`,
+        generatedText: `Generated on ${today}`,
+        accentColor: BRAND_PURPLE,
+      })}
+
+      <!-- Executive Summary -->
+      <div style="background-color: #f5f3f9; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+        <h2 style="margin-top: 0; color: #333; font-size: 18px;">Summary</h2>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+          <div style="background: white; padding: 15px; border-radius: 4px; text-align: center;">
+            <p style="margin: 0 0 10px 0; color: #999; font-size: 12px; font-weight: bold;">PRODUCTS</p>
+            <p style="margin: 0; color: #5B4B8A; font-size: 28px; font-weight: bold;">${rows.length}</p>
+          </div>
+          <div style="background: white; padding: 15px; border-radius: 4px; text-align: center;">
+            <p style="margin: 0 0 10px 0; color: #999; font-size: 12px; font-weight: bold;">UNITS SOLD</p>
+            <p style="margin: 0; color: #2D8659; font-size: 28px; font-weight: bold;">${totals.quantity}</p>
+          </div>
+          <div style="background: white; padding: 15px; border-radius: 4px; text-align: center;">
+            <p style="margin: 0 0 10px 0; color: #999; font-size: 12px; font-weight: bold;">GROSS SALES</p>
+            <p style="margin: 0; color: #5B4B8A; font-size: 28px; font-weight: bold;">${formatProductsCurrency(totals.grossAmount)}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Product Sales Details -->
+      <h2 style="color: #333; font-size: 18px; margin-top: 30px; margin-bottom: 15px;">Product Sales Breakdown</h2>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+        <thead>
+          <tr style="background-color: #5B4B8A; color: white;">
+            <th style="padding: 12px; text-align: left; font-weight: bold; border: 1px solid #ddd;">Product</th>
+            <th style="padding: 12px; text-align: center; font-weight: bold; border: 1px solid #ddd;">Units</th>
+            <th style="padding: 12px; text-align: right; font-weight: bold; border: 1px solid #ddd;">Gross</th>
+            <th style="padding: 12px; text-align: right; font-weight: bold; border: 1px solid #ddd;">VAT</th>
+            <th style="padding: 12px; text-align: right; font-weight: bold; border: 1px solid #ddd;">Net</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.length > 0 ? rows.map((row, idx) => `
+            <tr style="background-color: ${idx % 2 === 0 ? '#fff' : '#f9f9f9'}; border-bottom: 1px solid #ddd;">
+              <td style="padding: 12px; border: 1px solid #ddd; font-weight: 600;">${escapeHtml(row.name)}</td>
+              <td style="padding: 12px; text-align: center; border: 1px solid #ddd; font-weight: 600;">${row.quantity}</td>
+              <td style="padding: 12px; text-align: right; border: 1px solid #ddd; color: #5B4B8A; font-weight: 600;">${formatProductsCurrency(row.grossAmount)}</td>
+              <td style="padding: 12px; text-align: right; border: 1px solid #ddd; color: #b42318; font-weight: 600;">${formatProductsCurrency(row.vatAmount)}</td>
+              <td style="padding: 12px; text-align: right; border: 1px solid #ddd; color: #2D8659; font-weight: 600;">${formatProductsCurrency(row.netAmount)}</td>
+            </tr>
+          `).join('') : `
+            <tr>
+              <td colspan="5" style="padding: 14px; text-align: center; border: 1px solid #ddd; color: #666;">No product sales data available for the selected period.</td>
+            </tr>
+          `}
+          <tr style="background-color: #f5f3f9; font-weight: bold; border-top: 2px solid #5B4B8A;">
+            <td style="padding: 12px; border: 1px solid #ddd;">TOTAL</td>
+            <td style="padding: 12px; text-align: center; border: 1px solid #ddd; color: #333;">${totals.quantity}</td>
+            <td style="padding: 12px; text-align: right; border: 1px solid #ddd; color: #5B4B8A; font-size: 16px;">${formatProductsCurrency(totals.grossAmount)}</td>
+            <td style="padding: 12px; text-align: right; border: 1px solid #ddd; color: #b42318; font-size: 16px;">${formatProductsCurrency(totals.vatAmount)}</td>
+            <td style="padding: 12px; text-align: right; border: 1px solid #ddd; color: #2D8659; font-size: 16px;">${formatProductsCurrency(totals.netAmount)}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Footer -->
+      <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; color: #999; font-size: 11px;">
+        <p style="margin: 0;">This is an automated report generated by Citi-Nati Supermarket Sales System</p>
+        <p style="margin: 5px 0 0 0;">For support, contact: admin@citinati.com</p>
+      </div>
+    </div>
+  `;
+
+  const element = document.createElement('div');
+  element.innerHTML = html;
+
+  const opt = {
+    margin: 10,
+    filename: `sales-by-product-${new Date().toISOString().split('T')[0]}.pdf`,
+    image: { type: 'png', quality: 1.0 },
+    html2canvas: { scale: 3, logging: false, useCORS: true, backgroundColor: '#ffffff' },
+    jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4', compress: true }
   };
-  let y = margin;
 
-  const drawHeader = () => {
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(45, 134, 89);
-    doc.setFontSize(17);
-    doc.text('Citi-Nati Supermarket', pageWidth / 2, y, { align: 'center' });
-
-    y += 6;
-    doc.setFontSize(12.5);
-    doc.setTextColor(40, 40, 40);
-    doc.text('Sales by Product - Detailed Breakdown', pageWidth / 2, y, { align: 'center' });
-
-    y += 5;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(90, 90, 90);
-    doc.text(`Period: ${periodFrom} to ${periodTo}`, margin, y);
-    doc.text(`Generated: ${generatedText}`, pageWidth - margin, y, { align: 'right' });
-
-    y += 4;
-    doc.setDrawColor(45, 134, 89);
-    doc.setLineWidth(0.5);
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 5;
-  };
-
-  const drawSummaryBand = () => {
-    const boxY = y;
-    const gap = 4;
-    const boxWidth = (pageWidth - (margin * 2) - (gap * 2)) / 3;
-    const boxHeight = 16;
-    const summaryBoxes = [
-      { title: 'Products', value: String(totalProducts), fill: [240, 249, 246], accent: [45, 134, 89] },
-      { title: 'Units Sold', value: String(grandTotals.qty), fill: [244, 240, 247], accent: [91, 75, 138] },
-      { title: 'Gross Sales', value: formatMoney(grandTotals.gross), fill: [255, 244, 219], accent: [180, 83, 9] },
-    ];
-
-    summaryBoxes.forEach((box, index) => {
-      const x = margin + (index * (boxWidth + gap));
-      doc.setFillColor(...box.fill);
-      doc.setDrawColor(225, 230, 235);
-      doc.roundedRect(x, boxY, boxWidth, boxHeight, 2, 2, 'FD');
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
-      doc.setTextColor(100, 100, 100);
-      doc.text(box.title.toUpperCase(), x + 3, boxY + 5);
-      doc.setFontSize(12);
-      doc.setTextColor(...box.accent);
-      doc.text(box.value, x + 3, boxY + 11.5);
-    });
-
-    y += boxHeight + 6;
-  };
-
-  const drawFooter = (pageNumber) => {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(130, 130, 130);
-    doc.text('Automated sales report generated by Citi-Nati Supermarket', margin, pageHeight - 5);
-    doc.text(`Page ${pageNumber}`, pageWidth - margin, pageHeight - 5, { align: 'right' });
-  };
-
-  drawHeader();
-  drawSummaryBand();
-
-  if (groups.length === 0) {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(11);
-    doc.setTextColor(100, 100, 100);
-    doc.text('No product sales data available for the selected date range/filter.', margin, y + 8);
-    doc.save(`sales-by-product-detailed-${new Date().toISOString().split('T')[0]}.pdf`);
-    return;
-  }
-
-  groups.forEach((group, groupIndex) => {
-    if (y > pageHeight - 48) {
-      doc.addPage();
-      y = margin;
-      drawHeader();
-      drawSummaryBand();
-    }
-
-    doc.setFillColor(248, 250, 252);
-    doc.setDrawColor(226, 232, 240);
-    doc.roundedRect(margin, y - 1, pageWidth - (margin * 2), 11, 2, 2, 'FD');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(17, 24, 39);
-    doc.text(`Product: ${group.productName}`, margin + 3, y + 4);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.5);
-    doc.setTextColor(75, 85, 99);
-    doc.text(`Qty ${group.totalQty}   |   Gross ${formatMoney(group.totalGross)}   |   VAT ${formatMoney(group.totalVat)}`, pageWidth - margin - 3, y + 4, { align: 'right' });
-    y += 12;
-
-    const bodyRows = group.rows.length > 0
-      ? group.rows.map((row) => [
-          row.date,
-          String(row.saleNo),
-          row.customer,
-          String(row.qty),
-          formatMoney(row.unitPrice),
-          formatMoney(row.discount),
-          formatMoney(row.net),
-          formatMoney(row.vat),
-          formatMoney(row.gross),
-        ])
-      : [['-', '-', 'No sales entries for this product in selected period', '-', '-', '-', '-', '-', '-']];
-
-    autoTable(doc, {
-      startY: y,
-      margin: { left: margin, right: margin },
-      head: [['Date', 'Sale No', 'Customer', 'Qty', 'Unit Price', 'Discount', 'Net Amount', 'VAT', 'Gross Amount']],
-      body: bodyRows,
-      theme: 'grid',
-      styles: {
-        fontSize: 8,
-        cellPadding: 2,
-        textColor: [34, 34, 34],
-        lineColor: [225, 225, 225],
-        lineWidth: 0.2,
-      },
-      headStyles: {
-        fillColor: [45, 134, 89],
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-      },
-      alternateRowStyles: {
-        fillColor: [250, 250, 250],
-      },
-      columnStyles: sharedColumnStyles,
-      pageBreak: 'auto',
-    });
-
-    y = (doc.lastAutoTable?.finalY || y + 8) + 3;
-
-    autoTable(doc, {
-      startY: y,
-      margin: { left: margin, right: margin },
-      head: [],
-      body: [[
-        'Subtotal for ' + group.productName,
-        '',
-        '',
-        String(group.totalQty),
-        '-',
-        formatMoney(group.totalDiscount),
-        formatMoney(group.totalNet),
-        formatMoney(group.totalVat),
-        formatMoney(group.totalGross),
-      ]],
-      theme: 'grid',
-      styles: {
-        fontSize: 8.5,
-        fontStyle: 'bold',
-        fillColor: [240, 249, 246],
-        textColor: [31, 41, 55],
-        cellPadding: 2,
-        lineColor: [200, 220, 210],
-        lineWidth: 0.2,
-      },
-      columnStyles: sharedColumnStyles,
-    });
-
-    y = (doc.lastAutoTable?.finalY || y + 6) + 5;
-
-    if (groupIndex < groups.length - 1) {
-      doc.setDrawColor(220, 220, 220);
-      doc.setLineWidth(0.2);
-      doc.line(margin, y - 2, pageWidth - margin, y - 2);
-    }
-  });
-
-  if (y > pageHeight - 26) {
-    doc.addPage();
-    y = margin;
-    drawHeader();
-  }
-
-  autoTable(doc, {
-    startY: y,
-    margin: { left: margin, right: margin },
-    head: [['Grand Totals', '', '', 'Qty', 'Unit Price', 'Discount', 'Net Amount', 'VAT', 'Gross Amount']],
-    body: [[
-      'ALL SELECTED PRODUCTS',
-      '',
-      '',
-      String(grandTotals.qty),
-      '-',
-      formatMoney(grandTotals.discount),
-      formatMoney(grandTotals.net),
-      formatMoney(grandTotals.vat),
-      formatMoney(grandTotals.gross),
-    ]],
-    theme: 'grid',
-    styles: {
-      fontSize: 9,
-      cellPadding: 2,
-      textColor: [20, 20, 20],
-      lineColor: [200, 200, 200],
-      lineWidth: 0.25,
-    },
-    headStyles: {
-      fillColor: [91, 75, 138],
-      textColor: [255, 255, 255],
-      fontStyle: 'bold',
-    },
-    bodyStyles: {
-      fillColor: [244, 240, 247],
-      fontStyle: 'bold',
-    },
-    columnStyles: sharedColumnStyles,
-  });
-
-  const pageCount = doc.getNumberOfPages();
-  for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
-    doc.setPage(pageNumber);
-    drawFooter(pageNumber);
-  }
-
-  doc.save(`sales-by-product-detailed-${new Date().toISOString().split('T')[0]}.pdf`);
+  html2pdf().set(opt).from(element).save();
 };
 
 export const generateDetailedReportPDF = (salesDays, dateRange = {}) => {
