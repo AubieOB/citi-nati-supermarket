@@ -1,5 +1,5 @@
 const { syncProductsFromPOS, setPosSyncEnabled, getRuntimeConfig } = require('../services/posSync.service');
-const { getPosSyncMonitorSnapshot, listPosSyncEvents, recordPosSyncEvent } = require('../services/posSyncMonitor.service');
+const { getPosSyncMonitorSnapshot, listPosSyncEvents, recordPosSyncEvent, clearFailedPosSyncEvents } = require('../services/posSyncMonitor.service');
 const queueService = require('../services/posCommandQueue.service');
 
 async function getPosSyncMonitor(req, res) {
@@ -106,10 +106,40 @@ async function clearFailedQueueCommands(req, res) {
   }
 }
 
+async function clearFailedActivityEvents(req, res) {
+  try {
+    const locationCode = String(req.body?.locationCode || req.query?.locationCode || '').trim().toUpperCase() || null;
+    const branchCode = String(req.body?.branchCode || req.query?.branchCode || '').trim().toUpperCase() || null;
+    const deleted = await clearFailedPosSyncEvents({ locationCode, branchCode });
+
+    await recordPosSyncEvent({
+      eventType: 'failed-activity-events-cleared',
+      source: 'admin-dashboard',
+      status: 'success',
+      level: 'info',
+      title: 'Failed activity events cleared',
+      message: `An admin deleted ${deleted} failed monitor event(s) from activity history.`,
+      suggestion: 'If failures return, focus on the top repeated error cause and re-test agent connectivity.',
+      metadata: {
+        deletedCount: deleted,
+        clearedBy: req.user?.email || req.user?.id || 'admin',
+        locationCode,
+        branchCode,
+      },
+    });
+
+    return res.json({ success: true, deletedCount: deleted });
+  } catch (error) {
+    console.error('[ADMIN POS SYNC] Failed to clear failed activity events:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to clear failed activity events' });
+  }
+}
+
 module.exports = {
   getPosSyncMonitor,
   getPosSyncEvents,
   togglePosSync,
   runManualPosSync,
   clearFailedQueueCommands,
+  clearFailedActivityEvents,
 };

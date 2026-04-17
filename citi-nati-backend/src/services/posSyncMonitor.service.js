@@ -3,9 +3,9 @@ const { emitPosSyncEvent } = require('../utils/socket');
 const posCommandQueueService = require('./posCommandQueue.service');
 
 const prisma = new PrismaClient();
-// Default liveness window: 2 hours. Agents sync every few minutes; short windows cause false
-// "Agent: unreachable" when there are brief gaps (network, sleep, restart) in event flow.
-const AGENT_LIVENESS_WINDOW_MS = Number.parseInt(process.env.POS_SYNC_AGENT_LIVENESS_WINDOW_MS || '7200000', 10);
+// Agent reachability is intentionally strict: only a successful scoped agent event within 1 minute
+// keeps the monitor status as reachable.
+const AGENT_SUCCESS_LIVENESS_WINDOW_MS = Number.parseInt(process.env.POS_SYNC_AGENT_LIVENESS_WINDOW_MS || '60000', 10);
 
 function clampScore(value) {
   return Math.max(0, Math.min(100, value));
@@ -334,7 +334,7 @@ function analyzeHealth({ enabled, agentHealthy, queueStats, emergencySummary, re
 }
 
 async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40, locationCode, branchCode } = {}) {
-  const { checkPOSHealth, getRuntimeConfig } = require('./posSync.service');
+  const { getRuntimeConfig } = require('./posSync.service');
   const safeHours = Math.max(1, Math.min(168, Number.parseInt(hours, 10) || 24));
   const safeLimit = Math.max(10, Math.min(100, Number.parseInt(limit, 10) || 40));
   const scopedLocationCode = normalizeScopeCode(locationCode);
@@ -386,40 +386,36 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40, locationCode,
       updatedAt: sale.updatedAt,
     }));
 
-  // Only allow direct probe/config when backend branch identity is explicit and scope-matched.
-  // If backend branch identity is unknown, disable direct probe to avoid cross-branch leakage.
+  // Only expose config directly when backend branch identity is explicit and scope-matched.
+  // If backend branch identity is unknown, hide agentUrl unless scoped events prove active reachability.
   const hasExplicitBackendBranchScope = Boolean(backendConfiguredBranchCode);
-  const shouldUseDirectHealthProbe = !scopedBranchCode
+  const shouldExposeConfigDirectly = !scopedBranchCode
     ? hasExplicitBackendBranchScope
     : (hasExplicitBackendBranchScope && scopedBranchCode === backendConfiguredBranchCode);
-  const agentHealthyDirect = shouldUseDirectHealthProbe ? await checkPOSHealth() : false;
 
-  // Reachability must be based on fresh, scope-correct evidence.
-  // Stale success should not keep an offline agent marked reachable.
+  // Reachability is based on fresh, scope-correct successful events only.
   const nowTs = Date.now();
-  const livenessWindowMs = Number.isFinite(AGENT_LIVENESS_WINDOW_MS) && AGENT_LIVENESS_WINDOW_MS > 0
-    ? AGENT_LIVENESS_WINDOW_MS
-    : 1800000;
+  const livenessWindowMs = Number.isFinite(AGENT_SUCCESS_LIVENESS_WINDOW_MS) && AGENT_SUCCESS_LIVENESS_WINDOW_MS > 0
+    ? AGENT_SUCCESS_LIVENESS_WINDOW_MS
+    : 60000;
 
   // Use scopedRecentWindowEvents (full 24h scoped query, not limited by total-event cap) for liveness.
   // scopedRecentEvents is capped at the 400 most recent total events, which may exclude older Zomba
   // events when high-frequency branches push many events ahead of them in the sorted results.
   const allScopedForLiveness = scopedRecentWindowEvents.length > 0 ? scopedRecentWindowEvents : scopedRecentEvents;
-  const recentAgentContactViaEvents = allScopedForLiveness.find(
-    (event) => isAgentContactEvent(event) && (nowTs - new Date(event.createdAt).getTime()) <= livenessWindowMs,
+  const recentSuccessfulAgentContactViaEvents = allScopedForLiveness.find(
+    (event) => event.status === 'success'
+      && isAgentContactEvent(event)
+      && (nowTs - new Date(event.createdAt).getTime()) <= livenessWindowMs,
   ) || null;
 
-  let agentHealthy = shouldUseDirectHealthProbe ? agentHealthyDirect : false;
-
-  if (recentAgentContactViaEvents) {
-    agentHealthy = true;
-  }
+  const agentHealthy = Boolean(recentSuccessfulAgentContactViaEvents);
 
   // When the agent is confirmed healthy via recent events (it IS pushing to this backend),
   // show the configured agent URL. Hiding it as null only makes sense when we genuinely
   // don't know which branch the backend URL belongs to — but if recent events prove the
   // scoped agent is active, the configured URL is the correct one to display.
-  const scopedConfig = (shouldUseDirectHealthProbe || agentHealthy)
+  const scopedConfig = (shouldExposeConfigDirectly || agentHealthy)
     ? config
     : {
         ...config,
@@ -519,9 +515,44 @@ async function listPosSyncEvents({ limit = 50, locationCode, branchCode } = {}) 
     .map(toClientEvent);
 }
 
+async function clearFailedPosSyncEvents({ locationCode, branchCode } = {}) {
+  const scopedLocationCode = normalizeScopeCode(locationCode);
+  const scopedBranchCode = normalizeBranchCode(branchCode) || toScopeFromLocationCode(scopedLocationCode);
+
+  const failedEvents = await prisma.posSyncEvent.findMany({
+    where: { status: 'failed' },
+    select: {
+      id: true,
+      source: true,
+      eventType: true,
+      status: true,
+      agentId: true,
+      metadata: true,
+      createdAt: true,
+    },
+  });
+
+  const scopedFailedEventIds = failedEvents
+    .filter((event) => eventMatchesScope(event, scopedBranchCode, scopedLocationCode))
+    .map((event) => event.id);
+
+  if (scopedFailedEventIds.length === 0) {
+    return 0;
+  }
+
+  const deleted = await prisma.posSyncEvent.deleteMany({
+    where: {
+      id: { in: scopedFailedEventIds },
+    },
+  });
+
+  return deleted.count;
+}
+
 module.exports = {
   recordPosSyncEvent,
   getPosSyncMonitorSnapshot,
   listPosSyncEvents,
+  clearFailedPosSyncEvents,
 };
 

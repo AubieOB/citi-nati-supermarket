@@ -288,6 +288,8 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
   const [toggleSaving, setToggleSaving] = useState(false);
   const [clearingFailedCommands, setClearingFailedCommands] = useState(false);
   const [clearFailedConfirmOpen, setClearFailedConfirmOpen] = useState(false);
+  const [clearingActivityErrors, setClearingActivityErrors] = useState(false);
+  const [clearActivityConfirmOpen, setClearActivityConfirmOpen] = useState(false);
   const refreshTimeoutRef = useRef(null);
   const lastToastEventRef = useRef(null);
   const previousLocationCodeRef = useRef(selectedLocationCode);
@@ -463,6 +465,22 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
     } finally {
       setClearingFailedCommands(false);
       setClearFailedConfirmOpen(false);
+    }
+  };
+
+  const handleClearActivityErrors = async () => {
+    try {
+      setClearingActivityErrors(true);
+      const response = await api.delete('/admin/pos-sync/failed-events', {
+        data: { locationCode: selectedLocationCode },
+      });
+      notifySuccess(`Cleared ${response.data?.deletedCount ?? 0} failed activity event(s)`, 3500);
+      await fetchMonitorData(false);
+    } catch (error) {
+      notifyError(`Failed to clear activity errors: ${error.response?.data?.error || error.message}`, 4000);
+    } finally {
+      setClearingActivityErrors(false);
+      setClearActivityConfirmOpen(false);
     }
   };
 
@@ -659,6 +677,17 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
             <div style={S.card}>
               <h3 style={S.sectionTitle}>Top Failure Reasons</h3>
               <p style={S.sectionSub}>Repeated failures grouped by reason so the loudest problems are obvious first.</p>
+              {(stats.failedCount || 0) > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.8rem' }}>
+                  <button
+                    onClick={() => setClearActivityConfirmOpen(true)}
+                    disabled={clearingActivityErrors}
+                    style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.45rem 0.9rem', fontWeight: 700, fontSize: '0.82rem', cursor: clearingActivityErrors ? 'wait' : 'pointer', opacity: clearingActivityErrors ? 0.7 : 1 }}
+                  >
+                    {clearingActivityErrors ? 'Clearing…' : 'Clear Activity Errors'}
+                  </button>
+                </div>
+              )}
               <FailureBar items={monitor?.graphs?.topFailureReasons || []} />
             </div>
           </>
@@ -942,6 +971,81 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
                 }}
               >
                 {clearingFailedCommands ? 'Clearing...' : 'Yes, Clear'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {clearActivityConfirmOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.45)',
+            zIndex: 200,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+          }}
+          onClick={() => {
+            if (!clearingActivityErrors) setClearActivityConfirmOpen(false);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Confirm clear activity errors"
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: '420px',
+              backgroundColor: '#fff',
+              border: '1px solid #e2e8f0',
+              borderRadius: '12px',
+              boxShadow: '0 20px 40px rgba(15, 23, 42, 0.25)',
+              padding: '1rem 1rem 0.9rem',
+            }}
+          >
+            <h4 style={{ margin: 0, color: '#0f172a', fontSize: '1rem', fontWeight: 800 }}>
+              Clear Activity Errors?
+            </h4>
+            <p style={{ margin: '0.6rem 0 1rem', color: '#475569', lineHeight: 1.5, fontSize: '0.9rem' }}>
+              Delete failed activity events for this scope. This will clear Top Failure Reasons and reduce failed counts in the monitor.
+            </p>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.55rem' }}>
+              <button
+                onClick={() => setClearActivityConfirmOpen(false)}
+                disabled={clearingActivityErrors}
+                style={{
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#fff',
+                  color: '#334155',
+                  borderRadius: '8px',
+                  padding: '0.45rem 0.9rem',
+                  fontWeight: 700,
+                  cursor: clearingActivityErrors ? 'not-allowed' : 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleClearActivityErrors}
+                disabled={clearingActivityErrors}
+                style={{
+                  border: 'none',
+                  backgroundColor: '#dc2626',
+                  color: '#fff',
+                  borderRadius: '8px',
+                  padding: '0.45rem 0.9rem',
+                  fontWeight: 700,
+                  cursor: clearingActivityErrors ? 'wait' : 'pointer',
+                  opacity: clearingActivityErrors ? 0.75 : 1,
+                }}
+              >
+                {clearingActivityErrors ? 'Clearing...' : 'Yes, Clear'}
               </button>
             </div>
           </div>
