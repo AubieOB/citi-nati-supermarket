@@ -68,16 +68,22 @@ const AdminStocks = ({
     setCurrentPage(1);
 
     if (Array.isArray(cachedProducts) && cachedProducts.length > 0) {
-      setAllProducts(cachedProducts.map((product) => enrichProductStock(product)));
+      const nextProducts = cachedProducts.map((product) => enrichProductStock(product));
+      const nextCategories = [...new Set(nextProducts.map((product) => product.category).filter(Boolean))];
+      setAllProducts(nextProducts);
+      setCategories(nextCategories);
       setLoading(Boolean(cachedProductsMeta?.isLoading));
     } else if (cachedProductsMeta?.lastLoadedAt) {
       setAllProducts([]);
+      setCategories([]);
       setLoading(false);
     } else if (cachedProductsMeta?.isLoading || cachedProductsMeta?.isBackgroundLoading) {
       setAllProducts([]);
+      setCategories([]);
       setLoading(true);
     } else {
       setAllProducts([]);
+      setCategories([]);
       fetchProducts();
     }
 
@@ -87,7 +93,10 @@ const AdminStocks = ({
 
   useEffect(() => {
     if (!Array.isArray(cachedProducts)) return;
-    setAllProducts(cachedProducts.map((product) => enrichProductStock(product)));
+    const nextProducts = cachedProducts.map((product) => enrichProductStock(product));
+    const nextCategories = [...new Set(nextProducts.map((product) => product.category).filter(Boolean))];
+    setAllProducts(nextProducts);
+    setCategories(nextCategories);
     if (cachedProductsMeta?.isLoading || cachedProductsMeta?.isBackgroundLoading) {
       setLoading(cachedProducts.length === 0);
     }
