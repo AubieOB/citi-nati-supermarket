@@ -263,10 +263,9 @@ async function fetchProductsFromPOS(locationCode) {
           p.ProductName,
           ISNULL(p.Barcode,'') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
-          COALESCE(dsb.StockBalance, st.StockQty, pa.LiveQty, 0) AS QuantityAvailable,
+          COALESCE(dsb.StockBalance, pa.LiveQty, 0) AS QuantityAvailable,
           CASE
             WHEN dsb.StockBalance IS NOT NULL THEN 'DailyStockBalance'
-            WHEN st.StockQty IS NOT NULL THEN 'Stocks'
             WHEN pa.LiveQty IS NOT NULL THEN 'ProductActivity'
             ELSE 'NoStockRow'
           END AS StockSource,
@@ -276,7 +275,6 @@ async function fetchProductsFromPOS(locationCode) {
           ) AS SellingPrice
       FROM POS.dbo.productsmaster p
       LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
-      LEFT JOIN POS.dbo.Stocks st ON st.ProductCode = p.ProductCode AND st.LocationCode = @LocationCode
       LEFT JOIN (
           SELECT
               d.ProductCode,
@@ -308,7 +306,7 @@ async function fetchProductsFromPOS(locationCode) {
     if (appConfig.branch.branchCode === 'ZOMBA') {
       console.log(`[POS FETCH] Stock mode: ZOMBA SH-only DailyStockBalance latest snapshot via ROW_NUMBER() with StockDate <= today`);
     } else {
-      console.log(`[POS FETCH] Stock: DailyStockBalance -> Stocks.StockQty -> ProductActivity fallback chain`);
+      console.log(`[POS FETCH] Stock: SUM(QtyIn) - SUM(QtyOut)`);
     }
     console.log(`[POS FETCH] Price: Most recent FPrice (by PriceID DESC)`);
 
@@ -846,7 +844,7 @@ app.get('/pos-sync/products', validateApiKey, requireFeature('enableReportingSyn
       mode: appConfig.branch.branchCode === 'ZOMBA' ? 'SH_ONLY_OPERATIONAL' : 'CONFIGURED_LOCATION_ONLY',
       stockSource: appConfig.branch.branchCode === 'ZOMBA'
         ? 'DailyStockBalance latest snapshot only'
-        : 'DailyStockBalance -> Stocks.StockQty -> ProductActivity fallback',
+        : 'DailyStockBalance -> ProductActivity fallback',
     });
 
     const products = await fetchProductsFromPOS(locationCode);
@@ -1819,7 +1817,7 @@ async function autoSync() {
       mode: appConfig.branch.branchCode === 'ZOMBA' ? 'SH_ONLY_OPERATIONAL' : 'CONFIGURED_LOCATION_ONLY',
       stockSource: appConfig.branch.branchCode === 'ZOMBA'
         ? 'DailyStockBalance latest snapshot only'
-        : 'DailyStockBalance -> Stocks.StockQty -> ProductActivity fallback',
+        : 'DailyStockBalance -> ProductActivity fallback',
     });
 
     const products = await fetchProductsFromPOS(locationCode);
