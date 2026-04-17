@@ -48,7 +48,7 @@ const SIDEBAR_TABS = [
   { id: 'orders', label: 'Orders', icon: 'fa-list', scope: 'online-store' },
   { id: 'refunds', label: 'Online Refunds', icon: 'fa-undo', scope: 'online-store' },
   { id: 'support', label: 'Online Support', icon: 'fa-life-ring', scope: 'online-store' },
-  { id: 'quotations', label: 'Quotations', icon: 'fa-file-invoice', scope: 'online-store' },
+  { id: 'quotations', label: 'Quotations', icon: 'fa-file-invoice', scope: 'business' },
   { id: 'sales', label: 'Online Sales', icon: 'fa-dollar-sign', scope: 'online-store' },
   { id: 'users', label: 'Online Users', icon: 'fa-users', scope: 'online-store' },
   { id: 'drivers', label: 'Derivery Drivers', icon: 'fa-car', scope: 'online-store' },

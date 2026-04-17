@@ -29,14 +29,6 @@ const AdminCashiers = () => {
     fetchCashiers();
   }, []);
 
-  // 30-second polling for real-time cashier list updates
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchCashiers();
-    }, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
   useEffect(() => {
     let resizeObserver;
 
