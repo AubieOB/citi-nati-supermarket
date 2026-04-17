@@ -153,12 +153,16 @@ const getMessages = async (req, res) => {
     }
 
     if (String(includeStockAlerts || '').toLowerCase() !== 'true') {
-      where.NOT = {
-        entityType: 'product',
-        errorCode: {
-          in: ['low_stock', 'out_of_stock'],
+      where.AND = [
+        {
+          OR: [
+            { entityType: null },
+            { entityType: { not: 'product' } },
+            { errorCode: null },
+            { errorCode: { notIn: ['low_stock', 'out_of_stock'] } },
+          ],
         },
-      };
+      ];
     }
 
     const scopedBranchWhere = buildBranchScopeWhere(branchCode || locationCode);
