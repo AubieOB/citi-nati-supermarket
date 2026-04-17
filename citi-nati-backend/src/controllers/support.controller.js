@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const { notifySupportTicketCreated } = require('../utils/messageService.js');
 
 const prisma = new PrismaClient();
 
@@ -40,6 +41,8 @@ const createTicket = async (req, res) => {
         }
       }
     });
+
+    await notifySupportTicketCreated(ticket);
 
     // Emit Socket.io event to notify admins of new ticket in real-time
     if (global.io) {

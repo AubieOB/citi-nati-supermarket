@@ -220,6 +220,36 @@ const notifyRefundRequired = async (order, reason) => {
   }
 };
 
+const notifySupportTicketCreated = async (ticket) => {
+  try {
+    const subject = ticket?.subject || 'New Support Ticket';
+    const userName = ticket?.user?.name || ticket?.userName || 'Unknown User';
+    const userEmail = ticket?.user?.email || ticket?.userEmail || 'N/A';
+    const preview = String(ticket?.message || '').trim();
+    const clippedPreview = preview.length > 140 ? `${preview.slice(0, 140)}...` : preview;
+
+    await createMessage(
+      'support_ticket',
+      `New Support Ticket: ${subject}`,
+      `From: ${userName} (${userEmail})${clippedPreview ? `\n${clippedPreview}` : ''}`,
+      {
+        sourceModule: 'support',
+        entityType: 'support_ticket',
+        entityId: ticket?.id != null ? String(ticket.id) : null,
+        errorCode: 'support_ticket_open',
+        dedupeKey: `support_ticket|support|ticket|${ticket?.id != null ? String(ticket.id) : 'unknown'}|open`,
+        statusMetadata: {
+          priority: ticket?.priority || null,
+          status: ticket?.status || null,
+          userId: ticket?.user?.id || ticket?.userId || null,
+        },
+      }
+    );
+  } catch (error) {
+    console.error('[MESSAGE SERVICE] Error notifying support ticket created:', error);
+  }
+};
+
 module.exports = {
   notifyNewUserRegistration,
   notifyPaymentSuccess,
@@ -230,4 +260,5 @@ module.exports = {
   notifyLowStock,
   createSystemAlert,
   notifyRefundRequired,
+  notifySupportTicketCreated,
 };
