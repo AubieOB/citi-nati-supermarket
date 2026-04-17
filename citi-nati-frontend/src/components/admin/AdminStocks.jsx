@@ -25,7 +25,12 @@ import '../../css/admin-responsive-filters.css';
  * - Set low stock alerts
  */
 
-const AdminStocks = ({ selectedLocationCode = 'BT' }) => {
+const AdminStocks = ({
+  selectedLocationCode = 'BT',
+  cachedProducts = [],
+  cachedProductsMeta = {},
+  onRefreshProductsCache,
+}) => {
   // `products` is deprecated; we now rely on `allProducts` for everything.
   // previously products was only used in stats cards which caused counts to be wrong
   const [allProducts, setAllProducts] = useState([]); // Store all products for client-side filtering
@@ -61,11 +66,32 @@ const AdminStocks = ({ selectedLocationCode = 'BT' }) => {
     setFilterCategory('all');
     setStockStatusFilter('all');
     setCurrentPage(1);
-    setAllProducts([]);
-    fetchProducts();
+
+    if (Array.isArray(cachedProducts) && cachedProducts.length > 0) {
+      setAllProducts(cachedProducts.map((product) => enrichProductStock(product)));
+      setLoading(Boolean(cachedProductsMeta?.isLoading));
+    } else if (cachedProductsMeta?.lastLoadedAt) {
+      setAllProducts([]);
+      setLoading(false);
+    } else if (cachedProductsMeta?.isLoading || cachedProductsMeta?.isBackgroundLoading) {
+      setAllProducts([]);
+      setLoading(true);
+    } else {
+      setAllProducts([]);
+      fetchProducts();
+    }
+
     const cleanup = setupSocketListeners();
     return cleanup;
-  }, [selectedLocationCode]);
+  }, [selectedLocationCode, cachedProducts, cachedProductsMeta]);
+
+  useEffect(() => {
+    if (!Array.isArray(cachedProducts)) return;
+    setAllProducts(cachedProducts.map((product) => enrichProductStock(product)));
+    if (cachedProductsMeta?.isLoading || cachedProductsMeta?.isBackgroundLoading) {
+      setLoading(cachedProducts.length === 0);
+    }
+  }, [cachedProducts, cachedProductsMeta]);
 
   /**
    * Real-time stock updates via Socket.io
