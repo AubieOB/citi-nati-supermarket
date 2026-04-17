@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { getSocket } from '../../utils/socket.js';
 import api from '../../utils/api.js';
 
-const STOREFRONT_LOCATION_CODE = String(import.meta.env.VITE_STOREFRONT_LOCATION_CODE || 'BT').trim().toUpperCase();
-
 /**
  * 🎉 PROMOTION BANNER
  * Displays global or category-specific promotions at the top of the page
@@ -100,10 +98,6 @@ const PromotionBanner = ({ category = null }) => {
       }
 
       const handlePromotionUpdated = (promotionData) => {
-        const promotionLocationCode = String(promotionData?.locationCode || '').trim().toUpperCase();
-        if (promotionLocationCode && promotionLocationCode !== STOREFRONT_LOCATION_CODE) {
-          return;
-        }
         console.log('[PromotionBanner] 🎯 Promotion updated:', promotionData.type, 'enabled:', promotionData.enabled);
         
         // Check if it's a global promotion update
