@@ -55,7 +55,7 @@ const AdminInbox = ({ selectedLocationCode = 'BT' }) => {
   useEffect(() => {
     fetchMessages();
     // Poll for new messages every 30 seconds
-    const interval = setInterval(fetchMessages, 30000);
+    const interval = setInterval(() => fetchMessages({ silent: true }), 30000);
     return () => clearInterval(interval);
   }, [selectedLocationCode]);
 
@@ -254,9 +254,9 @@ const AdminInbox = ({ selectedLocationCode = 'BT' }) => {
     };
   }, []);
 
-  const fetchMessages = async () => {
+  const fetchMessages = async ({ silent = false } = {}) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       const response = await api.get('/admin/messages', {
         params: {
@@ -271,7 +271,7 @@ const AdminInbox = ({ selectedLocationCode = 'BT' }) => {
       console.error('Error fetching messages:', err);
       setError(err.response?.data?.error || 'Failed to load messages');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -764,7 +764,7 @@ const AdminInbox = ({ selectedLocationCode = 'BT' }) => {
             {filteredMessages.length} / {totalMessages || messages.length} messages
           </div>
         </div>
-        <div style={{ height: `${Math.max(filterBarHeight - 8, 0)}px` }}></div>
+        <div style={{ height: `${Math.max(filterBarHeight - 24, 0)}px` }}></div>
         </>
       )}
 
