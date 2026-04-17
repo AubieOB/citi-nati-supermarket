@@ -810,7 +810,8 @@ const AdminInbox = () => {
           flexDirection: 'column',
           gap: '1rem',
           overflowY: 'auto',
-          paddingTop: '0.45rem',
+          marginTop: '1.25rem',
+          paddingTop: '0.25rem',
           paddingBottom: '0.5rem',
         }}>
           {filteredMessages.map((message) => {
