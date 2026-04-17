@@ -221,7 +221,7 @@ async function fetchProductsFromPOS(locationCode) {
     const LOCATION_CODE = appConfig.branch.branchCode === 'ZOMBA' ? 'SH' : configuredLocationCode;
 
     // Zomba operational rule: SH-only stock from latest DailyStockBalance snapshot.
-    // Blantyre/other branches use legacy stockdetails formula pattern.
+    // Blantyre/other branches use latest DailyStockBalance with ProductActivity fallback.
     const query = appConfig.branch.branchCode === 'ZOMBA'
       ? `
       WITH latest_stock AS (
@@ -258,23 +258,50 @@ async function fetchProductsFromPOS(locationCode) {
       ORDER BY p.ProductCode
     `
       : `
+      WITH latest_stock_blantyre AS (
+        SELECT
+          ProductCode,
+          StockBalance,
+          ROW_NUMBER() OVER (
+            PARTITION BY ProductCode
+            ORDER BY StockDate DESC
+          ) AS rn
+        FROM POS.dbo.DailyStockBalance
+        WHERE LocationCode = @LocationCode
+          AND StockDate = (
+              SELECT MAX(StockDate)
+              FROM POS.dbo.DailyStockBalance
+              WHERE LocationCode = @LocationCode
+            )
+      )
       SELECT 
           p.ProductCode,
           p.ProductName,
           ISNULL(p.Barcode,'') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
-          ISNULL((
-              SELECT SUM(sd.StockQty - sd.StockOut)
-              FROM POS.dbo.stockdetails sd
-              WHERE sd.ProductCode = p.ProductCode
-          ), 0) AS QuantityAvailable,
-          'StockDetailsFormula' AS StockSource,
+          COALESCE(dsb.StockBalance, pa.LiveQty, 0) AS QuantityAvailable,
+          CASE
+            WHEN dsb.StockBalance IS NOT NULL THEN 'DailyStockBalance'
+            WHEN pa.LiveQty IS NOT NULL THEN 'ProductActivity'
+            ELSE 'NoStockRow'
+          END AS StockSource,
           ISNULL(
               (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC),
               (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode ORDER BY PriceID DESC)
           ) AS SellingPrice
       FROM POS.dbo.productsmaster p
       LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
+      LEFT JOIN (
+          SELECT ProductCode, StockBalance
+          FROM latest_stock_blantyre
+          WHERE rn = 1
+      ) dsb ON p.ProductCode = dsb.ProductCode
+      OUTER APPLY (
+          SELECT ISNULL(SUM(pa.QtyIn), 0) - ISNULL(SUM(pa.QtyOut), 0) AS LiveQty
+          FROM POS.dbo.ProductActivity pa
+          WHERE pa.ProductCode = p.ProductCode
+            AND pa.LocationCode = @LocationCode
+      ) pa
       ORDER BY p.ProductCode
     `;
 
@@ -288,7 +315,7 @@ async function fetchProductsFromPOS(locationCode) {
     if (appConfig.branch.branchCode === 'ZOMBA') {
       console.log(`[POS FETCH] Stock mode: ZOMBA SH-only DailyStockBalance latest snapshot via ROW_NUMBER() with StockDate <= today`);
     } else {
-      console.log(`[POS FETCH] Stock: legacy formula SUM(stockdetails.StockQty - stockdetails.StockOut)`);
+      console.log(`[POS FETCH] Stock: DailyStockBalance -> ProductActivity fallback`);
     }
     console.log(`[POS FETCH] Price: Most recent FPrice (by PriceID DESC)`);
 
