@@ -810,7 +810,7 @@ const AdminInbox = () => {
           flexDirection: 'column',
           gap: '1rem',
           overflowY: 'auto',
-          marginTop: '6.5rem',
+          marginTop: '5rem',
           paddingTop: '0.25rem',
           paddingBottom: '0.5rem',
         }}>
