@@ -956,7 +956,14 @@ const AdminDashboard = () => {
             {activeTab === 'emergency-sales-reports' && <AdminEmergencySalesReports selectedLocationCode={selectedOperationalLocationCode} />}
             {activeTab === 'system' && <AdminSystem />}
             {activeTab === 'security' && <AdminSecurity />}
-            {activeTab === 'promotions' && <AdminPromotions selectedLocationCode={selectedOperationalLocationCode} />}
+            {activeTab === 'promotions' && (
+              <AdminPromotions
+                selectedLocationCode={selectedOperationalLocationCode}
+                cachedProducts={activeLocationCachedProducts}
+                cachedProductsMeta={activeLocationCachedProductsMeta}
+                onRefreshProductsCache={handleRefreshAdminProductsCache}
+              />
+            )}
             {activeTab === 'pos-management' && (
               <AdminPOSManagement
                 selectedLocationCode={selectedOperationalLocationCode}

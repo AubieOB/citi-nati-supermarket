@@ -21,7 +21,12 @@ function createDefaultPromotionsState() {
   };
 }
 
-const AdminPromotions = ({ selectedLocationCode = 'BT' }) => {
+const AdminPromotions = ({
+  selectedLocationCode = 'BT',
+  cachedProducts = [],
+  cachedProductsMeta = {},
+  onRefreshProductsCache,
+}) => {
   const [categories, setCategories] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -38,6 +43,12 @@ const AdminPromotions = ({ selectedLocationCode = 'BT' }) => {
   const textPrimary = isAdminDarkTheme ? '#f8fafc' : '#333';
   const textSecondary = isAdminDarkTheme ? '#cbd5e1' : '#666';
   const selectedLocationLabel = selectedLocationCode === 'ZA' ? 'Zomba' : 'Blantyre';
+  const hasSharedProductsCache = Array.isArray(cachedProducts) && (
+    cachedProducts.length > 0
+    || Boolean(cachedProductsMeta?.lastLoadedAt)
+    || Boolean(cachedProductsMeta?.isLoading)
+    || Boolean(cachedProductsMeta?.isBackgroundLoading)
+  );
 
   const clearSearch = () => {
     setSearchTerm('');
@@ -76,9 +87,27 @@ const AdminPromotions = ({ selectedLocationCode = 'BT' }) => {
     setShowPreview(false);
     setPreviewProducts([]);
     setPromotions(createDefaultPromotionsState());
-    fetchPromotionCatalog();
+
+    if (Array.isArray(cachedProducts) && cachedProducts.length > 0) {
+      const uniqueCategories = [...new Set(cachedProducts.map((p) => p.category).filter(Boolean))].sort();
+      setAllProducts(cachedProducts);
+      setCategories(uniqueCategories);
+    } else if (!hasSharedProductsCache) {
+      fetchPromotionCatalog();
+    } else {
+      setAllProducts([]);
+      setCategories([]);
+    }
+
     fetchCurrentPromotions();
-  }, [selectedLocationCode]);
+  }, [selectedLocationCode, cachedProducts, hasSharedProductsCache]);
+
+  useEffect(() => {
+    if (!hasSharedProductsCache) return;
+    const uniqueCategories = [...new Set(cachedProducts.map((p) => p.category).filter(Boolean))].sort();
+    setAllProducts(cachedProducts);
+    setCategories(uniqueCategories);
+  }, [cachedProducts, hasSharedProductsCache]);
 
   useEffect(() => {
     let resizeObserver;
@@ -158,6 +187,11 @@ const AdminPromotions = ({ selectedLocationCode = 'BT' }) => {
     catalogRequestIdRef.current = requestId;
 
     try {
+      if (typeof onRefreshProductsCache === 'function') {
+        await onRefreshProductsCache();
+        return;
+      }
+
       const perPage = 100;
       const fetchProductsPage = async (pageNumber) => {
         return api.get(`/products?page=${pageNumber}&pageSize=${perPage}&locationCode=${encodeURIComponent(selectedLocationCode)}`);
