@@ -373,10 +373,8 @@ const AdminDashboard = () => {
   React.useEffect(() => {
     const activeScope = TAB_SCOPE_BY_ID[activeTab];
     if (!activeScope) return;
-    if (sidebarScope !== 'all' && sidebarScope !== activeScope) {
-      setSidebarScope(activeScope);
-    }
-  }, [activeTab, sidebarScope]);
+    setSidebarScope(activeScope);
+  }, [activeTab]);
 
   const handleTabSelect = useCallback((tabId) => {
     setActiveTab(tabId);
