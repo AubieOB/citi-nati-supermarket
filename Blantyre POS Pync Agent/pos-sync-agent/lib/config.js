@@ -25,16 +25,18 @@ function normalizeString(value, fallback = '') {
 }
 
 function buildBranchConfig() {
-  const branchCode = normalizeString(process.env.BRANCH_CODE, 'BLANTYRE');
+  const branchCode = normalizeString(process.env.BRANCH_CODE, 'ZOMBA').toUpperCase();
   const branchName = normalizeString(process.env.BRANCH_NAME, branchCode);
-  const locationId = normalizeString(process.env.LOCATION_ID, '1');
+  const locationId = normalizeString(process.env.LOCATION_ID, '2');
   const syncSourceCode = normalizeString(process.env.SYNC_SOURCE_CODE, `${branchCode}_POS_01`);
+  const logPrefix = normalizeString(process.env.SYNC_LOG_PREFIX, `[${branchCode} SYNC]`);
 
   return {
     branchCode,
     branchName,
     locationId,
     syncSourceCode,
+    logPrefix,
   };
 }
 
@@ -84,6 +86,8 @@ function buildConfig() {
       user: sqlUser,
       password: sqlPassword,
       locationCode: normalizeString(process.env.POS_LOCATION_CODE, 'SH').toUpperCase(),
+      connectionTimeoutMs: parseInteger(process.env.POS_DB_CONNECTION_TIMEOUT_MS, 30000),
+      requestTimeoutMs: parseInteger(process.env.POS_DB_REQUEST_TIMEOUT_MS, 120000),
     },
     polling: {
       reportingSyncIntervalMs: pollingIntervalMs,
@@ -114,7 +118,9 @@ function buildConfig() {
     backendReportingEndpoint: normalizeString(process.env.REPORTING_BACKEND_ENDPOINT, '/api/pos-sync/reporting/invoices'),
     backendLatestProductCostEndpoint: normalizeString(process.env.REPORTING_LATEST_COST_ENDPOINT, '/api/pos-sync/reporting/latest-product-costs'),
     batchSize: parseInteger(process.env.REPORTING_BATCH_SIZE, 100),
+    latestCostBatchSize: parseInteger(process.env.REPORTING_LATEST_COST_BATCH_SIZE, 500),
     pollingIntervalMs: parseInteger(process.env.REPORTING_POLLING_INTERVAL_MS, parseInteger(process.env.POLLING_INTERVAL_MS || process.env.SYNC_INTERVAL_MS, 60000)),
+    latestCostSyncIntervalMs: parseInteger(process.env.REPORTING_LATEST_COST_INTERVAL_MS, 300000),
     limitToRecentDays: parseNonNegativeInteger(process.env.REPORTING_LIMIT_TO_RECENT_DAYS, 0),
   };
 
@@ -130,6 +136,7 @@ function getSyncMetadata(config, extra = {}) {
     branchCode: config.branch.branchCode,
     branchName: config.branch.branchName,
     locationId: config.branch.locationId,
+    locationCode: config.posDb.locationCode,
     syncSourceCode: config.branch.syncSourceCode,
     syncedAt: new Date().toISOString(),
     ...extra,

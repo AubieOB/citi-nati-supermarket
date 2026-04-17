@@ -1,13 +1,17 @@
 const sql = require('mssql');
 const axios = require('axios');
 const { getSyncMetadata } = require('./config');
+const { enrichRowWithSubLocation, getSubLocationByCode } = require('./sub-locations');
 
 class ReportingSyncService {
   constructor(config, state) {
     this.config = config;
     this.state = state;
-    this.branchTag = `[BRANCH:${config.branch.branchCode}|REPORTING]`;
+    this.branchTag = config.branch.logPrefix || `[${config.branch.branchCode} SYNC]`;
     this.latestCostColumnConfig = null;
+    this.invoiceHasQuoteNo = null;
+    this.invoiceDetailsColumnSupport = null;
+    this.lastLatestCostSyncAt = 0;
   }
 
   async getTableColumns(pool, tableName) {
@@ -53,13 +57,67 @@ class ReportingSyncService {
     return this.latestCostColumnConfig;
   }
 
+  async resolveInvoiceQuoteNoSupport(pool) {
+    if (this.invoiceHasQuoteNo !== null) {
+      return this.invoiceHasQuoteNo;
+    }
+
+    try {
+      const invoiceColumns = await this.getTableColumns(pool, 'invoice');
+      this.invoiceHasQuoteNo = invoiceColumns.has('QuoteNo');
+      console.log(`${this.branchTag} [SCHEMA] invoice.QuoteNo present: ${this.invoiceHasQuoteNo}`);
+    } catch (error) {
+      // Keep sync running even if schema introspection fails.
+      this.invoiceHasQuoteNo = false;
+      console.warn(`${this.branchTag} [SCHEMA][WARN] Could not detect invoice.QuoteNo, defaulting to absent: ${error.message}`);
+    }
+
+    return this.invoiceHasQuoteNo;
+  }
+
+  async resolveInvoiceDetailsColumnSupport(pool) {
+    if (this.invoiceDetailsColumnSupport) {
+      return this.invoiceDetailsColumnSupport;
+    }
+
+    try {
+      const invoiceDetailsColumns = await this.getTableColumns(pool, 'invoicedetails');
+      this.invoiceDetailsColumnSupport = {
+        hasCostPrice: invoiceDetailsColumns.has('CostPrice'),
+        hasGrnDate: invoiceDetailsColumns.has('GrnDate'),
+      };
+      console.log(`${this.branchTag} [SCHEMA] invoicedetails optional columns`, this.invoiceDetailsColumnSupport);
+    } catch (error) {
+      // Keep sync running even if schema introspection fails.
+      this.invoiceDetailsColumnSupport = {
+        hasCostPrice: false,
+        hasGrnDate: false,
+      };
+      console.warn(`${this.branchTag} [SCHEMA][WARN] Could not detect invoicedetails optional columns, defaulting to absent: ${error.message}`);
+    }
+
+    return this.invoiceDetailsColumnSupport;
+  }
+
   async fetchInvoiceHeaders(pool, batchSize = 100) {
     try {
       const lastSyncedInvoiceNo = this.state.getLastSyncedInvoiceNo();
+      const hasQuoteNo = await this.resolveInvoiceQuoteNoSupport(pool);
+      const reportingConfig = this.config && this.config.reporting ? this.config.reporting : {};
+      const recentDays = Number(reportingConfig.limitToRecentDays || 0);
+      const useRecentWindow = Number.isFinite(recentDays) && recentDays > 0;
 
       const request = pool.request();
       request.input('lastSyncedInvoiceNo', sql.Int, lastSyncedInvoiceNo);
       request.input('batchSize', sql.Int, batchSize);
+      if (useRecentWindow) {
+        request.input('recentDays', sql.Int, recentDays);
+      }
+
+      const quoteNoSelect = hasQuoteNo ? ',\n            QuoteNo' : '';
+      const recentWindowPredicate = useRecentWindow
+        ? '\n          AND InvoiceDate >= DATEADD(DAY, -@recentDays, CAST(GETDATE() AS date))'
+        : '';
 
       const query = `
         SELECT TOP (@batchSize)
@@ -96,14 +154,17 @@ class ReportingSyncService {
             Bank_Name,
             Bank_CARD_HOLDER,
             Bank_CARD_NO,
-            Bank_CARD_EXPIARY,
-            QuoteNo
+            Bank_CARD_EXPIARY${quoteNoSelect}
         FROM invoice
         WHERE InvoiceNo > @lastSyncedInvoiceNo
+        ${recentWindowPredicate}
         ORDER BY InvoiceNo ASC
       `;
 
       const result = await request.query(query);
+      if (useRecentWindow) {
+        console.log(`${this.branchTag} [FETCH] Recent-window mode active: last ${recentDays} day(s)`);
+      }
       console.log(`${this.branchTag} [FETCH] Fetched ${result.recordset.length} invoice headers`);
 
       return result.recordset || [];
@@ -119,6 +180,7 @@ class ReportingSyncService {
     }
 
     try {
+      const columnSupport = await this.resolveInvoiceDetailsColumnSupport(pool);
       const request = pool.request();
 
       // Build parameterized IN clause for invoice codes
@@ -126,6 +188,9 @@ class ReportingSyncService {
       invoiceCodes.forEach((code, idx) => {
         request.input(`invoiceCode${idx}`, sql.Int, code);
       });
+
+      const costPriceSelect = columnSupport.hasCostPrice ? ',\n            CostPrice' : '';
+      const grnDateSelect = columnSupport.hasGrnDate ? ',\n            GrnDate' : '';
 
       const query = `
         SELECT
@@ -150,9 +215,7 @@ class ReportingSyncService {
             LevyAmount,
             Printed,
             Sub_Qty,
-            DiscountAmount,
-            CostPrice,
-            GrnDate
+            DiscountAmount${costPriceSelect}${grnDateSelect}
         FROM invoicedetails
         WHERE InvoiceCode IN (${placeholders})
         ORDER BY InvoiceCode ASC, InvDetailID ASC
@@ -179,6 +242,8 @@ class ReportingSyncService {
 
   normalizeInvoiceRow(row) {
     if (!row) return null;
+
+    const invoiceSubLocation = getSubLocationByCode(row.LocationCode);
 
     return {
       invoiceNo: Number(row.InvoiceNo),
@@ -216,11 +281,19 @@ class ReportingSyncService {
       bankCardNo: row.Bank_CARD_NO || null,
       bankCardExpiry: row.Bank_CARD_EXPIARY || null,
       quoteNo: row.QuoteNo || null,
+      branchCode: this.config.branch.branchCode,
+      branchName: this.config.branch.branchName,
+      locationId: this.config.branch.locationId,
+      locationCode: row.LocationCode || this.config.posDb.locationCode,
+      subLocationName: (invoiceSubLocation && invoiceSubLocation.name) || null,
+      subLocationCategory: (invoiceSubLocation && invoiceSubLocation.category) || null,
     };
   }
 
   normalizeDetailRow(row) {
     if (!row) return null;
+
+    const detailSubLocation = getSubLocationByCode(row.LocationCode);
 
     return {
       invDetailId: Number(row.InvDetailID),
@@ -241,6 +314,11 @@ class ReportingSyncService {
       fPrice: Number(row.FPrice || 0),
       uploadStatus: row.UploadStatus || null,
       locationCode: row.LocationCode || null,
+      subLocationName: (detailSubLocation && detailSubLocation.name) || null,
+      subLocationCategory: (detailSubLocation && detailSubLocation.category) || null,
+      branchCode: this.config.branch.branchCode,
+      branchName: this.config.branch.branchName,
+      locationId: this.config.branch.locationId,
       levyRate: Number(row.LevyRate || 0),
       levyAmount: Number(row.LevyAmount || 0),
       printed: row.Printed || null,
@@ -356,7 +434,10 @@ class ReportingSyncService {
     const rows = (result.recordset || []).map((row) => ({
       productCode: row.ProductCode == null ? null : String(row.ProductCode).trim(),
       productName: row.ProductName == null ? null : String(row.ProductName).trim(),
-      locationCode: row.LocationCode == null ? null : String(row.LocationCode).trim(),
+      locationCode: row.LocationCode == null ? this.config.posDb.locationCode : String(row.LocationCode).trim(),
+      branchCode: this.config.branch.branchCode,
+      branchName: this.config.branch.branchName,
+      locationId: this.config.branch.locationId,
       latestGrnNo: row.LatestGRNNo == null ? null : String(row.LatestGRNNo).trim(),
       latestGrnReference: row.LatestGRNReference == null ? null : String(row.LatestGRNReference).trim(),
       latestGrnDate: row.LatestGRNDate instanceof Date ? row.LatestGRNDate.toISOString() : (row.LatestGRNDate || null),
@@ -378,7 +459,7 @@ class ReportingSyncService {
       const endpoint = this.config.reporting.backendLatestProductCostEndpoint || '/api/pos-sync/reporting/latest-product-costs';
       const fullUrl = `${this.config.backend.baseUrl}${endpoint}`;
       const metadata = getSyncMetadata(this.config);
-      const batchSize = 500;
+      const batchSize = this.config.reporting.latestCostBatchSize || 500;
       let sent = 0;
 
       for (let index = 0; index < latestProductCosts.length; index += batchSize) {
@@ -419,6 +500,8 @@ class ReportingSyncService {
       let invoiceCount = 0;
       let detailCount = 0;
       let checkpoint = this.state.getLastSyncedInvoiceNo();
+      let latestProductCostCount = 0;
+      let latestProductCostThrottled = false;
 
       // Fetch invoice headers
       const headers = await this.fetchInvoiceHeaders(pool, batchSize);
@@ -450,16 +533,32 @@ class ReportingSyncService {
         detailCount = sendResult.detailCount;
       }
 
-      const latestProductCosts = await this.fetchLatestProductCosts(pool);
-      const latestCostResult = await this.sendLatestProductCostsToBackend(latestProductCosts);
+      const latestCostSyncIntervalMs = this.config.reporting.latestCostSyncIntervalMs || 0;
+      const now = Date.now();
+      const dueForLatestCostSync = !this.lastLatestCostSyncAt || latestCostSyncIntervalMs <= 0 || (now - this.lastLatestCostSyncAt) >= latestCostSyncIntervalMs;
 
-      console.log(`${this.branchTag} [SYNC] ✅ Sync batch complete: ${invoiceCount} invoices, ${latestCostResult.productCount} latest cost rows, checkpoint=${checkpoint}`);
+      if (dueForLatestCostSync) {
+        const latestProductCosts = await this.fetchLatestProductCosts(pool);
+        const latestCostResult = await this.sendLatestProductCostsToBackend(latestProductCosts);
+        latestProductCostCount = latestCostResult.productCount;
+        this.lastLatestCostSyncAt = Date.now();
+      } else {
+        latestProductCostThrottled = true;
+        const remainingMs = Math.max(0, latestCostSyncIntervalMs - (now - this.lastLatestCostSyncAt));
+        console.log(`${this.branchTag} [LATEST COST] Skipping full latest-cost sync for ${Math.ceil(remainingMs / 1000)}s (interval ${Math.round(latestCostSyncIntervalMs / 1000)}s)`);
+      }
+
+      const latestCostSummary = latestProductCostThrottled
+        ? 'latest cost sync throttled'
+        : `${latestProductCostCount} latest cost rows`;
+      console.log(`${this.branchTag} [SYNC] ✅ Sync batch complete: ${invoiceCount} invoices, ${latestCostSummary}, checkpoint=${checkpoint}`);
 
       return {
         success: true,
         invoiceCount,
         detailCount,
-        latestProductCostCount: latestCostResult.productCount,
+        latestProductCostCount,
+        latestProductCostThrottled,
         checkpoint,
       };
     } catch (error) {

@@ -3,12 +3,10 @@ const priceUpdates = require('./price-updates');
 const productNameUpdates = require('./product-name-updates');
 const stockUpdates = require('./stock-updates');
 const invoiceWriteback = require('./invoice-writeback');
-const { buildConfig } = require('./config');
 
 async function executeUpdatePrice(pool, payload) {
-  const config = buildConfig();
   const productCode = payload.productCode;
-  const locationCode = payload.locationCode || config.posDb.locationCode;
+  const locationCode = payload.locationCode || process.env.POS_LOCATION_CODE || 'SH';
   const priceTypeCode = payload.priceTypeCode || null;
   const newPrice = Number(payload.newPrice);
 
@@ -56,6 +54,20 @@ async function executeUpdatePrice(pool, payload) {
     }
     throw error;
   }
+}
+
+function isLikelyNonRetryableProductNameError(message) {
+  const text = String(message || '').toLowerCase();
+  return (
+    text.includes('permission')
+    || text.includes('denied')
+    || text.includes('invalid column')
+    || text.includes('invalid object')
+    || text.includes('schema')
+    || text.includes('does not exist')
+    || text.includes('missing productcode')
+    || text.includes('exceeds max length')
+  );
 }
 
 async function executeUpdateProductName(pool, payload, commandId) {
@@ -113,20 +125,6 @@ async function executeUpdateProductName(pool, payload, commandId) {
   }
 }
 
-function isLikelyNonRetryableProductNameError(message) {
-  const text = String(message || '').toLowerCase();
-  return (
-    text.includes('permission')
-    || text.includes('denied')
-    || text.includes('invalid column')
-    || text.includes('invalid object')
-    || text.includes('schema')
-    || text.includes('does not exist')
-    || text.includes('missing productcode')
-    || text.includes('exceeds max length')
-  );
-}
-
 function isLikelyNonRetryableStockError(message) {
   const text = String(message || '').toLowerCase();
   return (
@@ -142,9 +140,8 @@ function isLikelyNonRetryableStockError(message) {
 }
 
 async function executeUpdateStock(pool, payload, commandId) {
-  const config = buildConfig();
   const productCode = payload.productCode;
-  const locationCode = payload.locationCode || config.posDb.locationCode;
+  const locationCode = payload.locationCode || process.env.POS_LOCATION_CODE || 'SH';
   const oldStock = Number(payload.oldStock);
   const newStock = Number(payload.newStock);
   const qtyReduction = Number(payload.qtyReduction);
@@ -238,11 +235,10 @@ function isLikelyNonRetryablePromotionError(message) {
 }
 
 async function executeApplyPromotion(pool, payload, commandId) {
-  const config = buildConfig();
   console.log('[PROMO COMMAND] APPLY_PROMOTION start', {
     commandId,
     productCode: payload.productCode,
-    locationCode: payload.locationCode || config.posDb.locationCode,
+    locationCode: payload.locationCode || process.env.POS_LOCATION_CODE || 'SH',
     priceTypeCode: payload.priceTypeCode || 'RT',
     promotionalPrice: Number(payload.promotionalPrice),
     reasonCode: payload.reasonCode || 'EXPIRY_CLEARANCE',
@@ -262,7 +258,7 @@ async function executeApplyPromotion(pool, payload, commandId) {
       commandId,
       action: 'APPLY_PROMOTION',
       productCode: payload.productCode,
-      locationCode: payload.locationCode || config.posDb.locationCode,
+      locationCode: payload.locationCode || process.env.POS_LOCATION_CODE || 'SH',
       priceTypeCode: payload.priceTypeCode || 'RT',
       promotionalPrice: Number(payload.promotionalPrice),
       priceId: resultSummary?.insertedRow?.priceId,
@@ -283,7 +279,7 @@ async function executeApplyPromotion(pool, payload, commandId) {
         commandId,
         action: 'APPLY_PROMOTION',
         productCode: payload.productCode,
-        locationCode: payload.locationCode || config.posDb.locationCode,
+        locationCode: payload.locationCode || process.env.POS_LOCATION_CODE || 'SH',
         priceTypeCode: payload.priceTypeCode || 'RT',
         promotionalPrice: Number(payload.promotionalPrice),
         error: error.message,
@@ -295,7 +291,7 @@ async function executeApplyPromotion(pool, payload, commandId) {
       commandId,
       action: 'APPLY_PROMOTION',
       productCode: payload.productCode,
-      locationCode: payload.locationCode || config.posDb.locationCode,
+      locationCode: payload.locationCode || process.env.POS_LOCATION_CODE || 'SH',
       priceTypeCode: payload.priceTypeCode || 'RT',
       promotionalPrice: Number(payload.promotionalPrice),
       error: error.message,
@@ -305,11 +301,10 @@ async function executeApplyPromotion(pool, payload, commandId) {
 }
 
 async function executeRevertPromotion(pool, payload, commandId) {
-  const config = buildConfig();
   console.log('[PROMO COMMAND] REVERT_PROMOTION start', {
     commandId,
     productCode: payload.productCode,
-    locationCode: payload.locationCode || config.posDb.locationCode,
+    locationCode: payload.locationCode || process.env.POS_LOCATION_CODE || 'SH',
     priceTypeCode: payload.priceTypeCode || 'RT',
     restorePrice: payload.restorePrice == null ? null : Number(payload.restorePrice),
     reasonCode: payload.reasonCode || 'EXPIRY_CLEARANCE',
@@ -329,7 +324,7 @@ async function executeRevertPromotion(pool, payload, commandId) {
       commandId,
       action: 'REVERT_PROMOTION',
       productCode: payload.productCode,
-      locationCode: payload.locationCode || config.posDb.locationCode,
+      locationCode: payload.locationCode || process.env.POS_LOCATION_CODE || 'SH',
       priceTypeCode: payload.priceTypeCode || 'RT',
       restorePrice: payload.restorePrice == null ? null : Number(payload.restorePrice),
       priceId: resultSummary?.insertedRow?.priceId,
@@ -350,7 +345,7 @@ async function executeRevertPromotion(pool, payload, commandId) {
         commandId,
         action: 'REVERT_PROMOTION',
         productCode: payload.productCode,
-        locationCode: payload.locationCode || config.posDb.locationCode,
+        locationCode: payload.locationCode || process.env.POS_LOCATION_CODE || 'SH',
         priceTypeCode: payload.priceTypeCode || 'RT',
         restorePrice: payload.restorePrice == null ? null : Number(payload.restorePrice),
         error: error.message,
@@ -362,7 +357,7 @@ async function executeRevertPromotion(pool, payload, commandId) {
       commandId,
       action: 'REVERT_PROMOTION',
       productCode: payload.productCode,
-      locationCode: payload.locationCode || config.posDb.locationCode,
+      locationCode: payload.locationCode || process.env.POS_LOCATION_CODE || 'SH',
       priceTypeCode: payload.priceTypeCode || 'RT',
       restorePrice: payload.restorePrice == null ? null : Number(payload.restorePrice),
       error: error.message,
@@ -447,40 +442,23 @@ async function executeWriteInvoice(pool, payload, commandId) {
 }
 
 async function executeCommand(pool, command) {
-  const config = buildConfig();
-  const { features } = config;
   const { commandType, payload } = command;
 
   switch (commandType) {
     case 'UPDATE_PRICE':
-      if (!features.enablePriceSync) {
-        throw new Error('NON_RETRYABLE: UPDATE_PRICE command disabled by ENABLE_PRICE_SYNC=false');
-      }
       return executeUpdatePrice(pool, payload);
     case 'UPDATE_PRODUCT_NAME':
-      if (!features.enableProductNameSync) {
+      if (process.env.ENABLE_PRODUCT_NAME_SYNC === 'false') {
         throw new Error('NON_RETRYABLE: UPDATE_PRODUCT_NAME command disabled by ENABLE_PRODUCT_NAME_SYNC=false');
       }
       return executeUpdateProductName(pool, payload, command.id);
     case 'UPDATE_STOCK':
-      if (!features.enableStockWriteback || !features.enableManualStockSync) {
-        throw new Error('NON_RETRYABLE: UPDATE_STOCK command disabled by stock/manual feature flags');
-      }
       return executeUpdateStock(pool, payload, command.id);
     case 'APPLY_PROMOTION':
-      if (!features.enablePromotionSync) {
-        throw new Error('NON_RETRYABLE: APPLY_PROMOTION command disabled by ENABLE_PROMOTION_SYNC=false');
-      }
       return executeApplyPromotion(pool, payload, command.id);
     case 'REVERT_PROMOTION':
-      if (!features.enablePromotionSync) {
-        throw new Error('NON_RETRYABLE: REVERT_PROMOTION command disabled by ENABLE_PROMOTION_SYNC=false');
-      }
       return executeRevertPromotion(pool, payload, command.id);
     case 'WRITE_INVOICE':
-      if (!features.enableOnlineOrderWriteback || !features.enableInvoiceWriteback) {
-        throw new Error('NON_RETRYABLE: WRITE_INVOICE command disabled by writeback feature flags');
-      }
       return executeWriteInvoice(pool, payload, command.id);
     default:
       throw new Error(`Unsupported command type: ${commandType}`);

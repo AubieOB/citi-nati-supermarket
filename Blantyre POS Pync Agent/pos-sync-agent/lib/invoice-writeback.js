@@ -6,8 +6,6 @@
 
 const sql = require('mssql');
 
-let invoiceDetailsColumnSupportCache = null;
-
 function createScopedRequest(request) {
   if (request && request.transaction) {
     return new sql.Request(request.transaction);
@@ -32,36 +30,6 @@ function normalizeTime(invoiceTime) {
     return invoiceTime.slice(0, 8);
   }
   return new Date().toTimeString().slice(0, 8);
-}
-
-async function resolveInvoiceDetailsColumnSupport(request) {
-  if (invoiceDetailsColumnSupportCache) {
-    return invoiceDetailsColumnSupportCache;
-  }
-
-  try {
-    const schemaRequest = createScopedRequest(request);
-    const result = await schemaRequest.query(`
-      SELECT COLUMN_NAME
-      FROM INFORMATION_SCHEMA.COLUMNS
-      WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'invoicedetails'
-    `);
-
-    const columns = new Set(
-      (result.recordset || []).map((row) => String(row.COLUMN_NAME || '').trim().toLowerCase()),
-    );
-
-    invoiceDetailsColumnSupportCache = {
-      hasCostPrice: columns.has('costprice'),
-    };
-
-    console.log('[INVOICE] optional invoicedetails column support:', invoiceDetailsColumnSupportCache);
-    return invoiceDetailsColumnSupportCache;
-  } catch (error) {
-    invoiceDetailsColumnSupportCache = { hasCostPrice: false };
-    console.warn(`[INVOICE][SCHEMA][WARN] Could not detect optional invoicedetails columns. Defaulting CostPrice to absent: ${error.message}`);
-    return invoiceDetailsColumnSupportCache;
-  }
 }
 
 async function findExistingInvoiceByRefNo(request, refNo) {
@@ -368,7 +336,6 @@ async function insertInvoiceHeader(request, invoiceHeader) {
  */
 async function insertInvoiceDetails(request, invoiceCode, items, locationCode) {
   try {
-    const detailColumnSupport = await resolveInvoiceDetailsColumnSupport(request);
     let insertedCount = 0;
     const detailIds = [];
     const detailInsertColumns = [
@@ -385,11 +352,8 @@ async function insertInvoiceDetails(request, invoiceCode, items, locationCode) {
       'UploadStatus',
       'ProductName',
       'LocationCode',
+      'CostPrice',
     ];
-
-    if (detailColumnSupport.hasCostPrice) {
-      detailInsertColumns.push('CostPrice');
-    }
 
     console.log('[INVOICE] detail columns being inserted:', detailInsertColumns);
     console.log('[INVOICE] InvDetailID excluded from invoicedetails insert because it is an identity column');
@@ -414,48 +378,38 @@ async function insertInvoiceDetails(request, invoiceCode, items, locationCode) {
         ? Number(amount)
         : Number(qty) * Number(unitPrice);
 
-      const queryColumns = [
-        'InvoiceCode',
-        'ProductCode',
-        'Qty',
-        'PriceTypeCode',
-        'UnitPrice',
-        'Discount',
-        'Amount',
-        'TaxRate',
-        'TaxAmount',
-        'FPrice',
-        'UploadStatus',
-        'ProductName',
-        'LocationCode',
-      ];
-      const queryValues = [
-        '@InvoiceCode',
-        '@ProductCode',
-        '@Qty',
-        '@PriceTypeCode',
-        '@UnitPrice',
-        '@Discount',
-        '@Amount',
-        '@TaxRate',
-        '@TaxAmount',
-        '@FPrice',
-        '0',
-        '@ProductName',
-        '@LocationCode',
-      ];
-
-      if (detailColumnSupport.hasCostPrice) {
-        queryColumns.push('CostPrice');
-        queryValues.push('@CostPrice');
-      }
-
       const query = `
         INSERT INTO POS.dbo.invoicedetails (
-          ${queryColumns.join(',\n          ')}
+          InvoiceCode,
+          ProductCode,
+          Qty,
+          PriceTypeCode,
+          UnitPrice,
+          Discount,
+          Amount,
+          TaxRate,
+          TaxAmount,
+          FPrice,
+          UploadStatus,
+          ProductName,
+          LocationCode,
+          CostPrice
         )
         VALUES (
-          ${queryValues.join(',\n          ')}
+          @InvoiceCode,
+          @ProductCode,
+          @Qty,
+          @PriceTypeCode,
+          @UnitPrice,
+          @Discount,
+          @Amount,
+          @TaxRate,
+          @TaxAmount,
+          @FPrice,
+          0,
+          @ProductName,
+          @LocationCode,
+          @CostPrice
         )
       `;
 
@@ -471,9 +425,7 @@ async function insertInvoiceDetails(request, invoiceCode, items, locationCode) {
       detailRequest.input('FPrice', sql.Decimal(18, 2), Number.isFinite(Number(fPrice)) ? Number(fPrice) : Number(unitPrice));
       detailRequest.input('ProductName', sql.VarChar(255), productName || productCode);
       detailRequest.input('LocationCode', sql.VarChar(10), locationCode);
-      if (detailColumnSupport.hasCostPrice) {
-        detailRequest.input('CostPrice', sql.Decimal(18, 2), Number.isFinite(Number(costPrice)) ? Number(costPrice) : 0);
-      }
+      detailRequest.input('CostPrice', sql.Decimal(18, 2), Number.isFinite(Number(costPrice)) ? Number(costPrice) : 0);
 
       await detailRequest.query(query);
       insertedCount++;
@@ -501,26 +453,6 @@ async function insertInvoiceDetails(request, invoiceCode, items, locationCode) {
  */
 async function writeBackInvoice(request, invoiceData) {
   try {
-    const detailColumnSupport = await resolveInvoiceDetailsColumnSupport(request);
-    const detailSchemaFields = [
-      'InvoiceCode',
-      'ProductCode',
-      'Qty',
-      'PriceTypeCode',
-      'UnitPrice',
-      'Discount',
-      'Amount',
-      'TaxRate',
-      'TaxAmount',
-      'FPrice',
-      'UploadStatus',
-      'ProductName',
-      'LocationCode',
-    ];
-    if (detailColumnSupport.hasCostPrice) {
-      detailSchemaFields.push('CostPrice');
-    }
-
     console.log('[INVOICE] schema fields used (header):', [
       'InvoiceSerialNo',
       'RefNo',
@@ -542,7 +474,22 @@ async function writeBackInvoice(request, invoiceData) {
       'PriceTypeCode',
       'CashSaleNo',
     ]);
-    console.log('[INVOICE] schema fields used (detail):', detailSchemaFields);
+    console.log('[INVOICE] schema fields used (detail):', [
+      'InvoiceCode',
+      'ProductCode',
+      'Qty',
+      'PriceTypeCode',
+      'UnitPrice',
+      'Discount',
+      'Amount',
+      'TaxRate',
+      'TaxAmount',
+      'FPrice',
+      'UploadStatus',
+      'ProductName',
+      'LocationCode',
+      'CostPrice',
+    ]);
 
     const {
       orderId,
