@@ -25,7 +25,12 @@ import '../../css/admin-responsive-filters.css';
  * - Sale status management
  */
 
-const AdminProducts = ({ selectedLocationCode = 'BT' }) => {
+const AdminProducts = ({
+  selectedLocationCode = 'BT',
+  cachedProducts = [],
+  cachedProductsMeta = {},
+  onRefreshProductsCache,
+}) => {
   const MAX_PRODUCT_NAME_LENGTH = 120;
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -411,7 +416,11 @@ const AdminProducts = ({ selectedLocationCode = 'BT' }) => {
       if (activeSubTab === 'expiry-alerts') {
         await fetchPosExpiryAlerts();
       } else {
-        await fetchProducts();
+        if (typeof onRefreshProductsCache === 'function') {
+          await onRefreshProductsCache();
+        } else {
+          await fetchProducts();
+        }
       }
     } finally {
       setIsManualRefreshing(false);
@@ -425,8 +434,46 @@ const AdminProducts = ({ selectedLocationCode = 'BT' }) => {
     setOnSaleOnly(false);
     setCurrentPage(1);
     setExpandedBatchRows({});
+
+    if (Array.isArray(cachedProducts) && cachedProducts.length > 0) {
+      const sortedCached = [...cachedProducts].sort((a, b) => getExpirySeverity(a) - getExpirySeverity(b));
+      setProducts(sortedCached);
+      setLoading(Boolean(cachedProductsMeta?.isLoading));
+      setError(cachedProductsMeta?.error || null);
+      return;
+    }
+
+    if (cachedProductsMeta?.lastLoadedAt) {
+      setProducts([]);
+      setLoading(false);
+      setError(cachedProductsMeta?.error || null);
+      return;
+    }
+
+    if (cachedProductsMeta?.isLoading || cachedProductsMeta?.isBackgroundLoading) {
+      setProducts([]);
+      setLoading(true);
+      setError(null);
+      return;
+    }
+
     fetchProducts();
-  }, [selectedLocationCode]);
+  }, [selectedLocationCode, cachedProducts, cachedProductsMeta]);
+
+  useEffect(() => {
+    if (!Array.isArray(cachedProducts)) return;
+
+    const sortedCached = [...cachedProducts].sort((a, b) => getExpirySeverity(a) - getExpirySeverity(b));
+    setProducts(sortedCached);
+
+    if (cachedProductsMeta?.isLoading || cachedProductsMeta?.isBackgroundLoading) {
+      setLoading(sortedCached.length === 0);
+    }
+
+    if (cachedProductsMeta?.error) {
+      setError(cachedProductsMeta.error);
+    }
+  }, [cachedProducts, cachedProductsMeta]);
 
   useEffect(() => {
     if (activeSubTab === 'expiry-alerts') {
@@ -1139,7 +1186,11 @@ const AdminProducts = ({ selectedLocationCode = 'BT' }) => {
       }
 
       console.log('[ADMIN PRODUCTS] ✅ Product saved successfully');
-      await fetchProducts();
+      if (typeof onRefreshProductsCache === 'function') {
+        await onRefreshProductsCache();
+      } else {
+        await fetchProducts();
+      }
       resetForm();
     } catch (err) {
       console.error('[ADMIN PRODUCTS] ❌ Error saving product:', err);
@@ -1174,7 +1225,11 @@ const AdminProducts = ({ selectedLocationCode = 'BT' }) => {
       async () => {
         try {
           await api.delete(`/products/${id}`);
-          await fetchProducts();
+          if (typeof onRefreshProductsCache === 'function') {
+            await onRefreshProductsCache();
+          } else {
+            await fetchProducts();
+          }
           showSuccess('Success', 'Product deleted successfully');
         } catch (err) {
           console.error('Error deleting product:', err);
