@@ -491,12 +491,15 @@ const AdminDashboard = () => {
 
         {!sidebarCollapsed && (
           <div style={{
-            padding: '0.75rem 1rem 0.65rem',
+            padding: '0.5rem 1rem',
             borderBottom: `1px solid ${isDarkTheme ? '#2e2e2e' : '#ece7f7'}`,
             display: 'flex',
-            flexWrap: 'wrap',
-            gap: '0.45rem',
+            flexWrap: 'nowrap',
+            overflowX: 'auto',
+            overflowY: 'hidden',
+            gap: '0.4rem',
             flexShrink: 0,
+            scrollbarWidth: 'none',
           }}>
             {SIDEBAR_SCOPES.map((scope) => {
               const active = sidebarScope === scope.id;
@@ -509,13 +512,15 @@ const AdminDashboard = () => {
                     backgroundColor: active ? (isDarkTheme ? 'rgba(124, 113, 245, 0.14)' : '#f3f0fa') : 'transparent',
                     color: active ? (isDarkTheme ? '#e3ddff' : '#5B4B8A') : (isDarkTheme ? '#afbdd1' : '#6f668a'),
                     borderRadius: '999px',
-                    padding: '0.38rem 0.7rem',
-                    fontSize: '0.74rem',
+                    padding: '0.3rem 0.55rem',
+                    fontSize: '0.7rem',
                     fontWeight: 700,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '0.38rem',
+                    gap: '0.3rem',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
                   }}
                 >
                   <i className={`fas ${scope.icon}`} style={{ fontSize: '0.7rem' }}></i>
