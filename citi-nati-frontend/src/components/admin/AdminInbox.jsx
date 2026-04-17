@@ -764,7 +764,7 @@ const AdminInbox = ({ selectedLocationCode = 'BT' }) => {
             {filteredMessages.length} / {totalMessages || messages.length} messages
           </div>
         </div>
-        <div style={{ height: `${Math.max(filterBarHeight - 24, 0)}px` }}></div>
+        <div style={{ height: `${Math.max(filterBarHeight - 56, 0)}px` }}></div>
         </>
       )}
 
