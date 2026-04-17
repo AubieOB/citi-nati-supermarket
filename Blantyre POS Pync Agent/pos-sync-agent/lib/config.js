@@ -25,9 +25,9 @@ function normalizeString(value, fallback = '') {
 }
 
 function buildBranchConfig() {
-  const branchCode = normalizeString(process.env.BRANCH_CODE, 'ZOMBA').toUpperCase();
+  const branchCode = normalizeString(process.env.BRANCH_CODE, 'BLANTYRE').toUpperCase();
   const branchName = normalizeString(process.env.BRANCH_NAME, branchCode);
-  const locationId = normalizeString(process.env.LOCATION_ID, '2');
+  const locationId = normalizeString(process.env.LOCATION_ID, '1');
   const syncSourceCode = normalizeString(process.env.SYNC_SOURCE_CODE, `${branchCode}_POS_01`);
   const logPrefix = normalizeString(process.env.SYNC_LOG_PREFIX, `[${branchCode} SYNC]`);
 
