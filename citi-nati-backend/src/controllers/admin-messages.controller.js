@@ -355,6 +355,10 @@ const createMessage = async (type, title, message, referenceOrOptions = null, ma
     const now = new Date();
     const dedupeKey = buildDedupeKey(type, options);
     const lifecycleState = options.lifecycleState || MESSAGE_STATES.ACTIVE;
+    const parsedRecurrenceWindowMs = Number(options.recurrenceWindowMs);
+    const recurrenceWindowMs = Number.isFinite(parsedRecurrenceWindowMs) && parsedRecurrenceWindowMs > 0
+      ? parsedRecurrenceWindowMs
+      : 0;
 
     const baseData = {
       type,
@@ -414,6 +418,15 @@ const createMessage = async (type, title, message, referenceOrOptions = null, ma
     const isUnresolved = unresolvedStates.includes(existing.lifecycleState);
 
     if (isUnresolved) {
+      if (recurrenceWindowMs > 0) {
+        const lastSeenBase = existing.lastSeenAt || existing.updatedAt || existing.createdAt;
+        const msSinceLastSeen = now.getTime() - new Date(lastSeenBase).getTime();
+
+        if (msSinceLastSeen < recurrenceWindowMs) {
+          return existing;
+        }
+      }
+
       const nextState = existing.lifecycleState === MESSAGE_STATES.ACKNOWLEDGED
         ? MESSAGE_STATES.ACKNOWLEDGED
         : MESSAGE_STATES.RECURRING;

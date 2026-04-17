@@ -1,6 +1,12 @@
 const { createMessage } = require('../controllers/admin-messages.controller.js');
 const { enrichProductStock, DEFAULT_LOW_STOCK_THRESHOLD } = require('./stockResolver');
 
+const DEFAULT_SYSTEM_ALERT_RECURRENCE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const parsedSystemAlertRecurrenceWindowMs = Number(process.env.SYSTEM_ALERT_RECURRENCE_WINDOW_MS || DEFAULT_SYSTEM_ALERT_RECURRENCE_WINDOW_MS);
+const SYSTEM_ALERT_RECURRENCE_WINDOW_MS = Number.isFinite(parsedSystemAlertRecurrenceWindowMs) && parsedSystemAlertRecurrenceWindowMs > 0
+  ? parsedSystemAlertRecurrenceWindowMs
+  : DEFAULT_SYSTEM_ALERT_RECURRENCE_WINDOW_MS;
+
 /**
  * Admin Message Service
  * Creates admin inbox messages for various system events
@@ -117,6 +123,7 @@ const createSystemAlert = async (title, message, options = {}) => {
   try {
     await createMessage('system', title, message, {
       sourceModule: 'system',
+      recurrenceWindowMs: SYSTEM_ALERT_RECURRENCE_WINDOW_MS,
       ...options,
     });
   } catch (error) {
@@ -140,6 +147,7 @@ const notifyLowStock = async (product) => {
       entityType: 'product',
       entityId: entityId != null ? String(entityId) : null,
       branchCode: branchCode != null ? String(branchCode) : null,
+      recurrenceWindowMs: SYSTEM_ALERT_RECURRENCE_WINDOW_MS,
       errorCode: stock.stock_status,
       dedupeKey: [
         'system',
