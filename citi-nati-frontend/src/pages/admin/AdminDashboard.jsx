@@ -34,72 +34,39 @@ const ADMIN_DARK_BG = '#1e1e1e';
 const ADMIN_DARK_BORDER = '#333333';
 const ADMIN_DARK_TEXT = '#dbe7f8';
 
-const SIDEBAR_TAB_GROUPS = [
-  {
-    id: 'online-store',
-    label: 'Online Store',
-    icon: 'fa-store',
-    tabs: [
-      { id: 'inbox', label: 'Inbox', icon: 'fa-inbox' },
-      { id: 'orders', label: 'Orders', icon: 'fa-list' },
-      { id: 'refunds', label: 'Refunds', icon: 'fa-undo' },
-      { id: 'support', label: 'Support', icon: 'fa-life-ring' },
-      { id: 'quotations', label: 'Quotations', icon: 'fa-file-invoice' },
-      { id: 'sales', label: 'Online Sales', icon: 'fa-dollar-sign' },
-      { id: 'users', label: 'Users', icon: 'fa-users' },
-      { id: 'drivers', label: 'Drivers', icon: 'fa-car' },
-    ],
-  },
-  {
-    id: 'shared-catalog',
-    label: 'Shared Catalog',
-    icon: 'fa-boxes-stacked',
-    tabs: [
-      { id: 'products', label: 'Products', icon: 'fa-box' },
-      { id: 'stocks', label: 'Stocks', icon: 'fa-warehouse' },
-      { id: 'promotions', label: 'Promotions', icon: 'fa-tags' },
-    ],
-  },
-  {
-    id: 'physical-store',
-    label: 'Physical Store / POS',
-    icon: 'fa-cash-register',
-    tabs: [
-      { id: 'emergency-sales', label: 'Emergency Sale', icon: 'fa-cash-register' },
-      { id: 'emergency-sales-reports', label: 'Emergency Reports', icon: 'fa-file-alt' },
-      { id: 'pos-management', label: 'POS Management', icon: 'fa-database' },
-      { id: 'pos-sync-monitor', label: 'POS Sync Monitor', icon: 'fa-chart-line' },
-      { id: 'cashiers', label: 'Cashiers', icon: 'fa-user-tag' },
-    ],
-  },
-  {
-    id: 'business',
-    label: 'Whole Business',
-    icon: 'fa-briefcase',
-    tabs: [
-      { id: 'business-operations', label: 'Business Operations', icon: 'fa-briefcase' },
-    ],
-  },
-  {
-    id: 'administration',
-    label: 'Administration',
-    icon: 'fa-shield-halved',
-    tabs: [
-      { id: 'system', label: 'System', icon: 'fa-cogs' },
-      { id: 'security', label: 'Security', icon: 'fa-key' },
-    ],
-  },
+const SIDEBAR_SCOPES = [
+  { id: 'all', label: 'All', icon: 'fa-border-all' },
+  { id: 'online-store', label: 'Online', icon: 'fa-store' },
+  { id: 'shared-catalog', label: 'Shared', icon: 'fa-boxes-stacked' },
+  { id: 'physical-store', label: 'POS', icon: 'fa-cash-register' },
+  { id: 'business', label: 'Business', icon: 'fa-briefcase' },
+  { id: 'administration', label: 'Admin', icon: 'fa-shield-halved' },
 ];
 
-const TAB_GROUP_BY_ID = SIDEBAR_TAB_GROUPS.reduce((accumulator, group) => {
-  group.tabs.forEach((tab) => {
-    accumulator[tab.id] = group.id;
-  });
-  return accumulator;
-}, {});
+const SIDEBAR_TABS = [
+  { id: 'inbox', label: 'Inbox', icon: 'fa-inbox', scope: 'online-store' },
+  { id: 'orders', label: 'Orders', icon: 'fa-list', scope: 'online-store' },
+  { id: 'refunds', label: 'Refunds', icon: 'fa-undo', scope: 'online-store' },
+  { id: 'support', label: 'Support', icon: 'fa-life-ring', scope: 'online-store' },
+  { id: 'quotations', label: 'Quotations', icon: 'fa-file-invoice', scope: 'online-store' },
+  { id: 'sales', label: 'Online Sales', icon: 'fa-dollar-sign', scope: 'online-store' },
+  { id: 'users', label: 'Users', icon: 'fa-users', scope: 'online-store' },
+  { id: 'drivers', label: 'Drivers', icon: 'fa-car', scope: 'online-store' },
+  { id: 'products', label: 'Products', icon: 'fa-box', scope: 'shared-catalog' },
+  { id: 'stocks', label: 'Stocks', icon: 'fa-warehouse', scope: 'shared-catalog' },
+  { id: 'promotions', label: 'Promotions', icon: 'fa-tags', scope: 'shared-catalog' },
+  { id: 'emergency-sales', label: 'Emergency Sale', icon: 'fa-cash-register', scope: 'physical-store' },
+  { id: 'emergency-sales-reports', label: 'Emergency Reports', icon: 'fa-file-alt', scope: 'physical-store' },
+  { id: 'pos-management', label: 'POS Management', icon: 'fa-database', scope: 'physical-store' },
+  { id: 'pos-sync-monitor', label: 'POS Sync Monitor', icon: 'fa-chart-line', scope: 'physical-store' },
+  { id: 'cashiers', label: 'Cashiers', icon: 'fa-user-tag', scope: 'physical-store' },
+  { id: 'business-operations', label: 'Business Operations', icon: 'fa-briefcase', scope: 'business' },
+  { id: 'system', label: 'System', icon: 'fa-cogs', scope: 'administration' },
+  { id: 'security', label: 'Security', icon: 'fa-key', scope: 'administration' },
+];
 
-const DEFAULT_EXPANDED_GROUPS = SIDEBAR_TAB_GROUPS.reduce((accumulator, group) => {
-  accumulator[group.id] = group.id === 'online-store' || group.id === 'physical-store';
+const TAB_SCOPE_BY_ID = SIDEBAR_TABS.reduce((accumulator, tab) => {
+  accumulator[tab.id] = tab.scope;
   return accumulator;
 }, {});
 
@@ -284,10 +251,7 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState(() => ({
-    ...DEFAULT_EXPANDED_GROUPS,
-    [TAB_GROUP_BY_ID[initialTab] || 'online-store']: true,
-  }));
+  const [sidebarScope, setSidebarScope] = useState(TAB_SCOPE_BY_ID[initialTab] || 'online-store');
   const [speechAlertsEnabled, setSpeechAlertsPreference] = useState(() => getSpeechAlertsEnabled());
   const [selectedOperationalLocationCode, setSelectedOperationalLocationCode] = useState('BT');
   const [theme, setTheme] = useState(() => {
@@ -407,16 +371,19 @@ const AdminDashboard = () => {
   }, [location.pathname, activeTab]);
 
   React.useEffect(() => {
-    const activeGroupId = TAB_GROUP_BY_ID[activeTab];
-    if (!activeGroupId) return;
-    setExpandedGroups((prev) => ({
-      ...prev,
-      [activeGroupId]: true,
-    }));
-  }, [activeTab]);
+    const activeScope = TAB_SCOPE_BY_ID[activeTab];
+    if (!activeScope) return;
+    if (sidebarScope !== 'all' && sidebarScope !== activeScope) {
+      setSidebarScope(activeScope);
+    }
+  }, [activeTab, sidebarScope]);
 
   const handleTabSelect = useCallback((tabId) => {
     setActiveTab(tabId);
+    const nextScope = TAB_SCOPE_BY_ID[tabId];
+    if (nextScope) {
+      setSidebarScope(nextScope);
+    }
     if (tabId === 'emergency-sales') {
       navigate('/admin/emergency-sales');
     } else if (tabId === 'business-operations') {
@@ -427,12 +394,8 @@ const AdminDashboard = () => {
     setSidebarOpen(false);
   }, [location.pathname, navigate]);
 
-  const toggleGroup = useCallback((groupId) => {
-    setExpandedGroups((prev) => ({
-      ...prev,
-      [groupId]: !prev[groupId],
-    }));
-  }, []);
+  const visibleTabs = SIDEBAR_TABS.filter((tab) => sidebarScope === 'all' || tab.scope === sidebarScope);
+  const selectedScopeMeta = SIDEBAR_SCOPES.find((scope) => scope.id === sidebarScope) || SIDEBAR_SCOPES[0];
 
   return (
     <div className={`admin-dashboard-root ${isDarkTheme ? 'theme-dark' : 'theme-light'}`} data-admin-theme={theme}>
@@ -526,99 +489,103 @@ const AdminDashboard = () => {
           </select>
         </div>
 
+        {!sidebarCollapsed && (
+          <div style={{
+            padding: '0.75rem 1rem 0.65rem',
+            borderBottom: `1px solid ${isDarkTheme ? '#2e2e2e' : '#ece7f7'}`,
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '0.45rem',
+          }}>
+            {SIDEBAR_SCOPES.map((scope) => {
+              const active = sidebarScope === scope.id;
+              return (
+                <button
+                  key={scope.id}
+                  onClick={() => setSidebarScope(scope.id)}
+                  style={{
+                    border: `1px solid ${active ? (isDarkTheme ? '#7c71f5' : '#5B4B8A') : (isDarkTheme ? '#343434' : '#ddd5ee')}`,
+                    backgroundColor: active ? (isDarkTheme ? 'rgba(124, 113, 245, 0.14)' : '#f3f0fa') : 'transparent',
+                    color: active ? (isDarkTheme ? '#e3ddff' : '#5B4B8A') : (isDarkTheme ? '#afbdd1' : '#6f668a'),
+                    borderRadius: '999px',
+                    padding: '0.38rem 0.7rem',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.38rem',
+                  }}
+                >
+                  <i className={`fas ${scope.icon}`} style={{ fontSize: '0.7rem' }}></i>
+                  <span>{scope.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* Sidebar Menu Items Container - Grows to fill space */}
         <div style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '0'
+          padding: '0.4rem 0 0'
         }}>
-          {SIDEBAR_TAB_GROUPS.map((group) => {
-            const groupExpanded = sidebarCollapsed ? true : Boolean(expandedGroups[group.id]);
-            const groupHasActiveTab = group.tabs.some((tab) => tab.id === activeTab);
+          {!sidebarCollapsed && (
+            <div style={{
+              padding: '0.45rem 1.5rem 0.55rem',
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              letterSpacing: '0.05em',
+              color: isDarkTheme ? '#9dafc8' : '#7a7098',
+              textTransform: 'uppercase',
+            }}>
+              {selectedScopeMeta.label}
+            </div>
+          )}
 
-            return (
-              <div key={group.id} style={{ marginBottom: '0.35rem' }}>
-                <button
-                  onClick={() => {
-                    if (!sidebarCollapsed) {
-                      toggleGroup(group.id);
-                    }
-                  }}
-                  title={group.label}
-                  style={{
-                    width: '100%',
-                    padding: sidebarCollapsed ? '0.85rem 0.75rem' : '0.8rem 1.25rem',
-                    border: 'none',
-                    backgroundColor: groupHasActiveTab
-                      ? (isDarkTheme ? 'rgba(124, 113, 245, 0.12)' : '#f3f0fa')
-                      : 'transparent',
-                    color: groupHasActiveTab
-                      ? (isDarkTheme ? '#e4deff' : '#5B4B8A')
-                      : (isDarkTheme ? '#b7c3d5' : '#6f668a'),
-                    cursor: sidebarCollapsed ? 'default' : 'pointer',
-                    fontSize: sidebarCollapsed ? '1rem' : '0.82rem',
-                    fontWeight: '700',
-                    letterSpacing: sidebarCollapsed ? 'normal' : '0.03em',
-                    textAlign: sidebarCollapsed ? 'center' : 'left',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: sidebarCollapsed ? 'center' : 'space-between',
-                    gap: '0.5rem',
-                    borderRadius: sidebarCollapsed ? '0' : '10px',
-                    margin: sidebarCollapsed ? '0' : '0 0.5rem 0.2rem',
-                    transition: 'all 0.2s ease',
-                  }}
-                >
-                  <span style={{ display: 'flex', alignItems: 'center', gap: sidebarCollapsed ? '0' : '0.65rem', justifyContent: sidebarCollapsed ? 'center' : 'flex-start' }}>
-                    <i className={`fas ${group.icon}`} style={{ width: '18px', textAlign: 'center' }}></i>
-                    {!sidebarCollapsed && <span>{group.label}</span>}
-                  </span>
-                  {!sidebarCollapsed && <i className={`fas ${groupExpanded ? 'fa-chevron-up' : 'fa-chevron-down'}`} style={{ fontSize: '0.72rem' }}></i>}
-                </button>
-
-                {groupExpanded && group.tabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => handleTabSelect(tab.id)}
-                    style={{
-                      width: '100%',
-                      padding: sidebarCollapsed ? '0.9rem 0.75rem' : '0.85rem 1.5rem 0.85rem 2.2rem',
-                      border: 'none',
-                      backgroundColor: 'transparent',
-                      borderLeft: activeTab === tab.id
-                        ? `4px solid ${isDarkTheme ? '#7c71f5' : '#5B4B8A'}`
-                        : '4px solid transparent',
-                      color: activeTab === tab.id
-                        ? (isDarkTheme ? '#ddd8ff' : '#5B4B8A')
-                        : (isDarkTheme ? '#a4b2c5' : '#666'),
-                      fontWeight: activeTab === tab.id ? '600' : '500',
-                      cursor: 'pointer',
-                      fontSize: '0.95rem',
-                      transition: 'all 0.2s ease',
-                      textAlign: sidebarCollapsed ? 'center' : 'left',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                      gap: sidebarCollapsed ? '0' : '0.75rem'
-                    }}
-                    onMouseOver={(e) => {
-                      if (activeTab !== tab.id) {
-                        e.currentTarget.style.color = isDarkTheme ? '#d3ccff' : '#5B4B8A';
-                      }
-                    }}
-                    onMouseOut={(e) => {
-                      if (activeTab !== tab.id) {
-                        e.currentTarget.style.color = isDarkTheme ? '#a4b2c5' : '#666';
-                      }
-                    }}
-                  >
-                    <i className={`fas ${tab.icon}`} style={{ width: '20px', textAlign: 'center' }}></i>
-                    {!sidebarCollapsed && <span>{tab.label}</span>}
-                  </button>
-                ))}
-              </div>
-            );
-          })}
+          {visibleTabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => handleTabSelect(tab.id)}
+              style={{
+                width: '100%',
+                padding: sidebarCollapsed ? '0.95rem 0.75rem' : '0.9rem 1.5rem',
+                border: 'none',
+                backgroundColor: activeTab === tab.id
+                  ? (isDarkTheme ? 'rgba(124, 113, 245, 0.10)' : '#faf7ff')
+                  : 'transparent',
+                borderLeft: activeTab === tab.id
+                  ? `4px solid ${isDarkTheme ? '#7c71f5' : '#5B4B8A'}`
+                  : '4px solid transparent',
+                color: activeTab === tab.id
+                  ? (isDarkTheme ? '#ddd8ff' : '#5B4B8A')
+                  : (isDarkTheme ? '#a4b2c5' : '#666'),
+                fontWeight: activeTab === tab.id ? '600' : '500',
+                cursor: 'pointer',
+                fontSize: '0.95rem',
+                transition: 'all 0.2s ease',
+                textAlign: sidebarCollapsed ? 'center' : 'left',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                gap: sidebarCollapsed ? '0' : '0.75rem'
+              }}
+              onMouseOver={(e) => {
+                if (activeTab !== tab.id) {
+                  e.currentTarget.style.color = isDarkTheme ? '#d3ccff' : '#5B4B8A';
+                }
+              }}
+              onMouseOut={(e) => {
+                if (activeTab !== tab.id) {
+                  e.currentTarget.style.color = isDarkTheme ? '#a4b2c5' : '#666';
+                }
+              }}
+            >
+              <i className={`fas ${tab.icon}`} style={{ width: '20px', textAlign: 'center' }}></i>
+              {!sidebarCollapsed && <span>{tab.label}</span>}
+            </button>
+          ))}
         </div>
 
         {/* Sidebar Footer - Preferences and Home Button */}
