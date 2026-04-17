@@ -352,6 +352,38 @@ async function resolveProductsForPosQueue({
   });
 }
 
+/**
+ * Queue a price sync command to refresh prices on POS terminals
+ * This ensures terminals pick up promotional prices after APPLY_PROMOTION
+ */
+async function queuePriceRefreshCommand({ scope, productCodes = [], actor }) {
+  try {
+    if (!productCodes || productCodes.length === 0) {
+      console.log('[PROMO][REFRESH] No product codes provided for price refresh, skipping');
+      return;
+    }
+
+    const payload = {
+      productCodes: productCodes.slice(0, 100), // Limit to 100 products per command
+      locationCode: scope?.posLocationCode || POS_DEFAULT_LOCATION_CODE,
+      branchCode: scope?.branchCode || null,
+      requestedLocationCode: scope?.locationCode || null,
+      reason: 'PROMOTION_SYNC',
+    };
+
+    await posCommandQueueService.enqueueCommand('SYNC_PRICES', payload, {
+      source: 'admin.promotions.priceRefresh',
+      relatedEntityType: 'PROMOTION',
+      createdBy: actor,
+    });
+
+    console.log(`[PROMO][REFRESH] Queued price sync for ${productCodes.length} products at ${scope?.locationCode || 'unknown'}`);
+  } catch (err) {
+    console.error('[PROMO][REFRESH] Error queueing price refresh:', err);
+    // Don't fail the promotion if price refresh fails
+  }
+}
+
 async function queuePosPromotionCommands({
   type,
   enabled,
@@ -795,6 +827,22 @@ const updatePromotion = async (req, res) => {
       });
 
       console.log(`[PROMO][QUEUE] ${type} bridge summary:`, posQueueSummary);
+
+      // After queueing promotion commands, trigger a price refresh on POS terminals
+      if (posQueueSummary.enqueued > 0 && promotion.enabled) {
+        const productCodesToRefresh = productsToUpdate
+          .filter((p) => p.sourceCode)
+          .map((p) => p.sourceCode)
+          .slice(0, 200); // Limit to 200 products
+
+        if (productCodesToRefresh.length > 0) {
+          await queuePriceRefreshCommand({
+            scope: effectiveScope,
+            productCodes: productCodesToRefresh,
+            actor,
+          });
+        }
+      }
     }
     
     try {

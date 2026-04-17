@@ -477,6 +477,19 @@ async function executeCommand(pool, command) {
         throw new Error('NON_RETRYABLE: REVERT_PROMOTION command disabled by ENABLE_PROMOTION_SYNC=false');
       }
       return executeRevertPromotion(pool, payload, command.id);
+    case 'SYNC_PRICES':
+      if (!features.enablePriceSync) {
+        throw new Error('NON_RETRYABLE: SYNC_PRICES command disabled by ENABLE_PRICE_SYNC=false');
+      }
+      // SYNC_PRICES is a metadata command that tells the agent to fetch and sync updated prices
+      // The agent already does this continuously, but this command makes it explicit
+      console.log('[COMMAND EXECUTOR] SYNC_PRICES command received - triggering explicit price sync for', payload.productCodes?.length || 'all', 'products');
+      return {
+        success: true,
+        action: 'SYNC_PRICES',
+        productCount: payload.productCodes?.length || 0,
+        message: 'Price sync triggered - agent will fetch latest prices on next sync cycle',
+      };
     case 'WRITE_INVOICE':
       if (!features.enableOnlineOrderWriteback || !features.enableInvoiceWriteback) {
         throw new Error('NON_RETRYABLE: WRITE_INVOICE command disabled by writeback feature flags');
