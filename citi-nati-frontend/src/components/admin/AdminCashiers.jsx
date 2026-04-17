@@ -214,10 +214,10 @@ const AdminCashiers = () => {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <i className="fas fa-user-tag" style={{ fontSize: '1.2rem', color: '#5B4B8A' }}></i>
-            <h1 style={{ margin: 0, color: '#333', fontSize: '1.15rem' }}>Cashiers Management</h1>
+            <h1 style={{ margin: 0, color: '#333', fontSize: '1.15rem' }}>Emergency Cashiers Management</h1>
           </div>
           <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600' }}>
-            Total cashiers: {cashiers.length}
+            Total emergency cashiers: {cashiers.length}
           </div>
         </div>
         <div style={{ marginTop: '0.75rem' }}>
@@ -226,7 +226,7 @@ const AdminCashiers = () => {
             onClick={() => { resetForm(); setShowForm(!showForm); }}
             style={{ fontSize: '0.85rem', padding: '0.55rem 0.9rem', whiteSpace: 'nowrap' }}
           >
-            {showForm && !editingCashier ? '✕ Cancel' : '+ Create New Cashier'}
+            {showForm && !editingCashier ? '✕ Cancel' : '+ Create New Emergency Cashier'}
           </Button>
         </div>
       </div>

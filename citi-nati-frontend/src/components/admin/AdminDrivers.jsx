@@ -239,10 +239,10 @@ const AdminDrivers = () => {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <i className="fas fa-car" style={{ fontSize: '1.2rem', color: '#5B4B8A' }}></i>
-            <h1 style={{ margin: 0, color: '#333', fontSize: '1.15rem' }}>Drivers Management</h1>
+            <h1 style={{ margin: 0, color: '#333', fontSize: '1.15rem' }}>Derivery Drivers Management</h1>
           </div>
           <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600' }}>
-            Total drivers: {drivers.length}
+            Total derivery drivers: {drivers.length}
           </div>
         </div>
         <div style={{ marginTop: '0.75rem' }}>
@@ -251,7 +251,7 @@ const AdminDrivers = () => {
             onClick={() => setShowForm(!showForm)}
             style={{ fontSize: '0.85rem', padding: '0.55rem 0.9rem', whiteSpace: 'nowrap' }}
           >
-            {showForm ? '✕ Cancel' : '+ Create New Driver'}
+            {showForm ? '✕ Cancel' : '+ Create New Derivery Driver'}
           </Button>
         </div>
       </div>

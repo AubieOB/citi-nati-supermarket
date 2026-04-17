@@ -156,7 +156,7 @@ const AdminRefunds = () => {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <i className="fas fa-undo" style={{ fontSize: '1.2rem', color: '#5B4B8A' }}></i>
-            <h1 style={{ margin: 0, color: '#333', fontSize: '1.15rem' }}>Refunds Management</h1>
+            <h1 style={{ margin: 0, color: '#333', fontSize: '1.15rem' }}>Online Refunds Management</h1>
           </div>
           <button
             onClick={() => window.open('https://dashboard.paychangu.com', '_blank')}
@@ -191,7 +191,7 @@ const AdminRefunds = () => {
           </button>
         </div>
         <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600', marginTop: '0.5rem' }}>
-          Pending refunds: {refunds.length}
+          Pending online refunds: {refunds.length}
         </div>
       </div>
 
@@ -225,7 +225,7 @@ const AdminRefunds = () => {
       <div style={{ marginBottom: '2rem' }}>
         <h2 style={{ color: '#5B4B8A', marginBottom: '0.5rem' }}>
           <i className="fas fa-undo" style={{ marginRight: '0.5rem' }}></i>
-          Pending Refunds
+          Pending Online Refunds
         </h2>
         <p style={{ color: '#666', marginBottom: '1rem' }}>
           Manage customer refunds that require manual processing
@@ -264,7 +264,7 @@ const AdminRefunds = () => {
           color: '#666'
         }}>
           <i className="fas fa-check-circle" style={{ marginRight: '0.5rem', color: '#28a745' }}></i>
-          No pending refunds. All refunds have been processed!
+          No pending online refunds. All refunds have been processed!
         </div>
       ) : (
         <div style={{ display: 'grid', gap: '1rem' }}>

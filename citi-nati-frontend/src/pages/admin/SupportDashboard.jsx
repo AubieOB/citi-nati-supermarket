@@ -490,7 +490,7 @@ const SupportDashboard = () => {
           gap: '0.6rem',
         }}>
           <i className="fas fa-life-ring" style={{ fontSize: '1.2rem', color: '#5B4B8A' }}></i>
-          <h1 style={{ margin: 0, color: textPrimary, fontSize: '1.15rem' }}>Support Tickets</h1>
+          <h1 style={{ margin: 0, color: textPrimary, fontSize: '1.15rem' }}>Online Support Tickets</h1>
         </div>
         <div style={{ color: textSecondary, fontSize: '0.85rem', fontWeight: '600', marginTop: '0.5rem' }}>
           Total: {tickets.length} | Open: {tickets.filter(t => t.status === 'OPEN').length} {unattendedCount > 0 && ` | ⚠️ ${unattendedCount} Unattended`}
