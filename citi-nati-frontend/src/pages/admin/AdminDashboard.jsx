@@ -44,6 +44,8 @@ const SIDEBAR_SCOPES = [
   { id: 'administration', label: 'Admin', icon: 'fa-shield-halved' },
 ];
 
+const OPERATIONAL_LOCATION_CODES = ['BT', 'ZA'];
+
 const SIDEBAR_TABS = [
   { id: 'inbox', label: 'Inbox', icon: 'fa-inbox', scope: 'online-store' },
   { id: 'orders', label: 'Orders', icon: 'fa-list', scope: 'online-store' },
@@ -428,8 +430,10 @@ const AdminDashboard = () => {
   }, [adminProductsCacheMetaByLocation, updateProductsCacheMeta]);
 
   React.useEffect(() => {
-    preloadAdminProductsForLocation(selectedOperationalLocationCode);
-  }, [selectedOperationalLocationCode, preloadAdminProductsForLocation]);
+    OPERATIONAL_LOCATION_CODES.forEach((locationCode) => {
+      preloadAdminProductsForLocation(locationCode);
+    });
+  }, [preloadAdminProductsForLocation]);
 
   /**
    * Handle real-time order updates (for refreshing orders list)
