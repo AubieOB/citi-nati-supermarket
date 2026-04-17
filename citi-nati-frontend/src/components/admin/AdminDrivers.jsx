@@ -26,6 +26,7 @@ const AdminDrivers = () => {
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isRefreshingDrivers, setIsRefreshingDrivers] = useState(false);
   const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
   const [filterBarHeight, setFilterBarHeight] = useState(0);
   const { modal, closeModal, showError, showConfirm } = useModal();
@@ -39,7 +40,7 @@ const AdminDrivers = () => {
   useEffect(() => {
     const handleDriversUpdated = () => {
       console.log('[AdminDrivers] Drivers updated event received, refetching...');
-      fetchDrivers();
+      fetchDrivers({ silent: true });
     };
 
     window.addEventListener('driversUpdated', handleDriversUpdated);
@@ -89,9 +90,9 @@ const AdminDrivers = () => {
     }
   });
 
-  const fetchDrivers = async () => {
+  const fetchDrivers = async ({ silent = false } = {}) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       const response = await api.get('/drivers');
       setDrivers(response.data.drivers || []);
@@ -99,8 +100,15 @@ const AdminDrivers = () => {
       console.error('Error fetching drivers:', err);
       setError(err.response?.data?.error || 'Failed to load drivers');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
+  };
+
+  const handleManualRefresh = async () => {
+    if (isRefreshingDrivers) return;
+    setIsRefreshingDrivers(true);
+    await fetchDrivers({ silent: true });
+    setIsRefreshingDrivers(false);
   };
 
   const handleFormChange = (e) => {
@@ -237,7 +245,7 @@ const AdminDrivers = () => {
             Total derivery drivers: {drivers.length}
           </div>
         </div>
-        <div style={{ marginTop: '0.75rem' }}>
+        <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
           <Button
             variant="primary"
             onClick={() => setShowForm(!showForm)}
@@ -245,6 +253,29 @@ const AdminDrivers = () => {
           >
             {showForm ? '✕ Cancel' : '+ Create New Derivery Driver'}
           </Button>
+          <button
+            type="button"
+            onClick={handleManualRefresh}
+            disabled={isRefreshingDrivers}
+            style={{
+              fontSize: '0.85rem',
+              padding: '0.55rem 0.9rem',
+              whiteSpace: 'nowrap',
+              border: 'none',
+              borderRadius: '6px',
+              backgroundColor: isRefreshingDrivers ? '#6c757d' : '#2563eb',
+              color: '#fff',
+              cursor: isRefreshingDrivers ? 'not-allowed' : 'pointer',
+              fontWeight: 600,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+            }}
+            title="Refresh derivery drivers list"
+          >
+            <i className={`fas ${isRefreshingDrivers ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`}></i>
+            {isRefreshingDrivers ? 'Refreshing...' : 'Refresh'}
+          </button>
         </div>
       </div>
 

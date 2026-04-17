@@ -26,6 +26,7 @@ const AdminUsers = () => {
   const [error, setError] = useState(null);
   const [updatingUserId, setUpdatingUserId] = useState(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isRefreshingUsers, setIsRefreshingUsers] = useState(false);
   const { modal, closeModal, showConfirm, showError, showSuccess } = useModal();
   const filterBarRef = useRef(null);
 
@@ -121,6 +122,13 @@ const AdminUsers = () => {
 
   const clearSearch = () => {
     setSearchTerm('');
+  };
+
+  const handleManualRefresh = async () => {
+    if (isRefreshingUsers) return;
+    setIsRefreshingUsers(true);
+    await fetchUsers();
+    setIsRefreshingUsers(false);
   };
 
   const handleDownloadUsersPdf = async () => {
@@ -424,6 +432,30 @@ const AdminUsers = () => {
         >
           <i className={`fas ${isExportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`}></i>
           {isExportingPdf ? 'Generating PDF...' : 'Download PDF'}
+        </button>
+
+        <button
+          type="button"
+          onClick={handleManualRefresh}
+          disabled={isRefreshingUsers}
+          style={{
+            padding: '0.55rem 0.9rem',
+            border: 'none',
+            borderRadius: '6px',
+            backgroundColor: isRefreshingUsers ? '#6c757d' : '#2563eb',
+            color: '#fff',
+            cursor: isRefreshingUsers ? 'not-allowed' : 'pointer',
+            fontWeight: '600',
+            fontSize: '0.85rem',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            whiteSpace: 'nowrap',
+          }}
+          title="Refresh users list"
+        >
+          <i className={`fas ${isRefreshingUsers ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`}></i>
+          {isRefreshingUsers ? 'Refreshing...' : 'Refresh'}
         </button>
 
         <span style={{ color: '#666', fontSize: '0.9rem', marginLeft: 'auto' }}>

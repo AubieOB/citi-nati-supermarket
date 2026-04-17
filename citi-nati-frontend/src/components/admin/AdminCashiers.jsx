@@ -19,6 +19,7 @@ const AdminCashiers = () => {
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRefreshingCashiers, setIsRefreshingCashiers] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
   const [filterBarHeight, setFilterBarHeight] = useState(0);
@@ -71,9 +72,9 @@ const AdminCashiers = () => {
     }
   });
 
-  const fetchCashiers = async () => {
+  const fetchCashiers = async ({ silent = false } = {}) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       const response = await api.get('/admin/cashiers');
       setCashiers(response.data.cashiers || []);
@@ -81,8 +82,15 @@ const AdminCashiers = () => {
       console.error('Error fetching cashiers:', err);
       setError(err.response?.data?.error || 'Failed to load cashiers');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
+  };
+
+  const handleManualRefresh = async () => {
+    if (isRefreshingCashiers) return;
+    setIsRefreshingCashiers(true);
+    await fetchCashiers({ silent: true });
+    setIsRefreshingCashiers(false);
   };
 
   const handleFormChange = (e) => {
@@ -212,7 +220,7 @@ const AdminCashiers = () => {
             Total emergency cashiers: {cashiers.length}
           </div>
         </div>
-        <div style={{ marginTop: '0.75rem' }}>
+        <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
           <Button
             variant="primary"
             onClick={() => { resetForm(); setShowForm(!showForm); }}
@@ -220,6 +228,29 @@ const AdminCashiers = () => {
           >
             {showForm && !editingCashier ? '✕ Cancel' : '+ Create New Emergency Cashier'}
           </Button>
+          <button
+            type="button"
+            onClick={handleManualRefresh}
+            disabled={isRefreshingCashiers}
+            style={{
+              fontSize: '0.85rem',
+              padding: '0.55rem 0.9rem',
+              whiteSpace: 'nowrap',
+              border: 'none',
+              borderRadius: '6px',
+              backgroundColor: isRefreshingCashiers ? '#6c757d' : '#2563eb',
+              color: '#fff',
+              cursor: isRefreshingCashiers ? 'not-allowed' : 'pointer',
+              fontWeight: 600,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+            }}
+            title="Refresh emergency cashiers list"
+          >
+            <i className={`fas ${isRefreshingCashiers ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`}></i>
+            {isRefreshingCashiers ? 'Refreshing...' : 'Refresh'}
+          </button>
         </div>
       </div>
 
