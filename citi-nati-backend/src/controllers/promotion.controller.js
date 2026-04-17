@@ -216,9 +216,11 @@ function getScopedActiveProductFilter(branchCode, scopedProductCodes = null) {
 }
 
 function parseProductIds(ids = []) {
-  return ids
+  const parsed = ids
     .map((id) => parseInt(id, 10))
     .filter((id) => Number.isInteger(id) && id > 0);
+
+  return Array.from(new Set(parsed));
 }
 
 function getPromotionProductWhere(type, categoryId, selectedProducts, branchCode, scopedProductCodes = null) {
@@ -671,9 +673,21 @@ const updatePromotion = async (req, res) => {
       });
 
       if (scopedSelectedCount !== parsedSelectedProducts.length) {
+        const scopedSelectedIds = await prisma.product.findMany({
+          where: getPromotionProductWhere('selective', null, parsedSelectedProducts, scope.branchCode, scopedProductCodes),
+          select: { id: true },
+        });
+        const scopedIdSet = new Set(scopedSelectedIds.map((product) => product.id));
+        const outOfScopeIds = parsedSelectedProducts.filter((id) => !scopedIdSet.has(id));
+
         return res.status(400).json({
           success: false,
           error: `Selected products must all belong to ${scope.locationCode}/${scope.branchCode}`,
+          details: {
+            selectedCount: parsedSelectedProducts.length,
+            matchedCount: scopedSelectedCount,
+            outOfScopeIds: outOfScopeIds.slice(0, 20),
+          },
         });
       }
     }
@@ -751,9 +765,17 @@ const updatePromotion = async (req, res) => {
           });
 
           if (productsToUpdate.length !== parsedSelectedProducts.length) {
+            const matchedIdSet = new Set(productsToUpdate.map((product) => product.id));
+            const outOfScopeIds = parsedSelectedProducts.filter((id) => !matchedIdSet.has(id));
+
             return res.status(400).json({
               success: false,
               error: `One or more selected products are outside ${scope.locationCode}/${scope.branchCode}`,
+              details: {
+                selectedCount: parsedSelectedProducts.length,
+                matchedCount: productsToUpdate.length,
+                outOfScopeIds: outOfScopeIds.slice(0, 20),
+              },
             });
           }
         }
@@ -877,9 +899,17 @@ const previewPromotion = async (req, res) => {
       });
 
       if (products.length !== parsedSelectedProducts.length) {
+        const matchedIdSet = new Set(products.map((product) => product.id));
+        const outOfScopeIds = parsedSelectedProducts.filter((id) => !matchedIdSet.has(id));
+
         return res.status(400).json({
           success: false,
           error: `Selected products must all belong to ${scope.locationCode}/${scope.branchCode}`,
+          details: {
+            selectedCount: parsedSelectedProducts.length,
+            matchedCount: products.length,
+            outOfScopeIds: outOfScopeIds.slice(0, 20),
+          },
         });
       }
     }
