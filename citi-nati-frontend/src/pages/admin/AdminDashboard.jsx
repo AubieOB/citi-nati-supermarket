@@ -664,6 +664,7 @@ const AdminDashboard = () => {
         }}>
           <button
             onClick={handleToggleSpeechAlerts}
+            title={sidebarCollapsed ? (speechAlertsEnabled ? 'Spoken Alerts On' : 'Spoken Alerts Off') : undefined}
             style={{
               width: '100%',
               padding: '0.75rem 1rem',
@@ -707,7 +708,7 @@ const AdminDashboard = () => {
               gap: sidebarCollapsed ? '0' : '0.5rem',
               transition: 'all 0.2s ease'
             }}
-            title={`Switch to ${isDarkTheme ? 'light' : 'dark'} mode`}
+            title={sidebarCollapsed ? `Switch to ${isDarkTheme ? 'light' : 'dark'} mode` : undefined}
           >
             <i className={`fas ${isDarkTheme ? 'fa-sun' : 'fa-moon'}`}></i>
             {!sidebarCollapsed && <span>{isDarkTheme ? 'Light Mode' : 'Dark Mode'}</span>}
@@ -716,6 +717,7 @@ const AdminDashboard = () => {
           {/* Home Link */}
           <button
             onClick={() => navigate('/')}
+            title={sidebarCollapsed ? 'Home' : undefined}
             style={{
               flex: 1,
               padding: '0.75rem 1rem',
