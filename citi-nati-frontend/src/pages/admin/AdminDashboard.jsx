@@ -1,4 +1,4 @@
-import React, { useState, useCallback, Suspense } from 'react';
+import React, { useState, useCallback, Suspense, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
@@ -252,6 +252,7 @@ const AdminDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarScope, setSidebarScope] = useState(TAB_SCOPE_BY_ID[initialTab] || 'online-store');
+  const scopePillsRef = useRef(null);
   const [speechAlertsEnabled, setSpeechAlertsPreference] = useState(() => getSpeechAlertsEnabled());
   const [selectedOperationalLocationCode, setSelectedOperationalLocationCode] = useState('BT');
   const [theme, setTheme] = useState(() => {
@@ -482,8 +483,17 @@ const AdminDashboard = () => {
               textAlign: sidebarCollapsed ? 'center' : 'left',
             }}
           >
-            <option value="BT">Blantyre</option>
-            <option value="ZA">Zomba</option>
+            {sidebarCollapsed ? (
+              <>
+                <option value="BT">BT</option>
+                <option value="ZA">ZA</option>
+              </>
+            ) : (
+              <>
+                <option value="BT">Blantyre</option>
+                <option value="ZA">Zomba</option>
+              </>
+            )}
           </select>
         </div>
 
@@ -492,13 +502,42 @@ const AdminDashboard = () => {
             padding: '0.5rem 1rem',
             borderBottom: `1px solid ${isDarkTheme ? '#2e2e2e' : '#ece7f7'}`,
             display: 'flex',
-            flexWrap: 'nowrap',
-            overflowX: 'auto',
-            overflowY: 'hidden',
-            gap: '0.4rem',
+            alignItems: 'center',
+            gap: '0.25rem',
             flexShrink: 0,
-            scrollbarWidth: 'none',
           }}>
+            {/* Left scroll arrow */}
+            <button
+              onClick={() => scopePillsRef.current?.scrollBy({ left: -120, behavior: 'smooth' })}
+              style={{
+                flexShrink: 0,
+                border: 'none',
+                background: 'transparent',
+                color: isDarkTheme ? '#9dafc8' : '#8878a9',
+                cursor: 'pointer',
+                padding: '0.2rem 0.15rem',
+                fontSize: '0.72rem',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+              title="Scroll left"
+            >
+              <i className="fas fa-chevron-left"></i>
+            </button>
+            {/* Scrollable pills */}
+            <div
+              ref={scopePillsRef}
+              style={{
+                display: 'flex',
+                flexWrap: 'nowrap',
+                overflowX: 'auto',
+                overflowY: 'hidden',
+                gap: '0.4rem',
+                flex: 1,
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none',
+              }}
+            >
             {SIDEBAR_SCOPES.map((scope) => {
               const active = sidebarScope === scope.id;
               return (
@@ -526,6 +565,25 @@ const AdminDashboard = () => {
                 </button>
               );
             })}
+            </div>
+            {/* Right scroll arrow */}
+            <button
+              onClick={() => scopePillsRef.current?.scrollBy({ left: 120, behavior: 'smooth' })}
+              style={{
+                flexShrink: 0,
+                border: 'none',
+                background: 'transparent',
+                color: isDarkTheme ? '#9dafc8' : '#8878a9',
+                cursor: 'pointer',
+                padding: '0.2rem 0.15rem',
+                fontSize: '0.72rem',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+              title="Scroll right"
+            >
+              <i className="fas fa-chevron-right"></i>
+            </button>
           </div>
         )}
 
