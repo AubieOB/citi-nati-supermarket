@@ -496,6 +496,7 @@ const AdminDashboard = () => {
             display: 'flex',
             flexWrap: 'wrap',
             gap: '0.45rem',
+            flexShrink: 0,
           }}>
             {SIDEBAR_SCOPES.map((scope) => {
               const active = sidebarScope === scope.id;
