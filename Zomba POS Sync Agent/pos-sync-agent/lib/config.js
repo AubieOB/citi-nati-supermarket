@@ -24,20 +24,6 @@ function normalizeString(value, fallback = '') {
   return normalized || fallback;
 }
 
-function parseLocationCodes(rawValue, fallbackCodes) {
-  const source = normalizeString(rawValue, fallbackCodes.join(','));
-  const parsed = source
-    .split(',')
-    .map((value) => String(value || '').trim().toUpperCase())
-    .filter(Boolean);
-
-  if (parsed.length === 0) {
-    return fallbackCodes.slice();
-  }
-
-  return Array.from(new Set(parsed));
-}
-
 function buildBranchConfig() {
   const branchCode = normalizeString(process.env.BRANCH_CODE, 'ZOMBA').toUpperCase();
   const branchName = normalizeString(process.env.BRANCH_NAME, branchCode);
@@ -80,11 +66,6 @@ function buildConfig() {
   const sqlPassword = normalizeString(process.env.POS_DB_PASSWORD, normalizeString(process.env.DB_PASSWORD));
 
   const pollingIntervalMs = parseInteger(process.env.POLLING_INTERVAL_MS || process.env.SYNC_INTERVAL_MS, 60000);
-  const defaultLocationCode = normalizeString(process.env.POS_LOCATION_CODE, 'SH').toUpperCase();
-  const fallbackOperationalCodes = branch.branchCode === 'ZOMBA'
-    ? ['SH', 'BAR', 'RES']
-    : [defaultLocationCode];
-  const operationalLocationCodes = parseLocationCodes(process.env.POS_OPERATIONAL_LOCATION_CODES, fallbackOperationalCodes);
 
   const config = {
     branch,
@@ -104,8 +85,7 @@ function buildConfig() {
       database: sqlDatabase,
       user: sqlUser,
       password: sqlPassword,
-      locationCode: defaultLocationCode,
-      operationalLocationCodes,
+      locationCode: normalizeString(process.env.POS_LOCATION_CODE, 'SH').toUpperCase(),
       connectionTimeoutMs: parseInteger(process.env.POS_DB_CONNECTION_TIMEOUT_MS, 30000),
       requestTimeoutMs: parseInteger(process.env.POS_DB_REQUEST_TIMEOUT_MS, 120000),
     },

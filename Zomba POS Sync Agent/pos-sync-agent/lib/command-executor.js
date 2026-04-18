@@ -5,25 +5,10 @@ const stockUpdates = require('./stock-updates');
 const invoiceWriteback = require('./invoice-writeback');
 const { buildConfig } = require('./config');
 
-function resolveCommandLocationCode(config, payload, commandLabel) {
-  const fallback = String((config && config.posDb && config.posDb.locationCode) || 'SH').trim().toUpperCase();
-  const rawValue = payload && (payload.locationCode || payload.requestedLocationCode || payload.location_code);
-  const normalized = String(rawValue || fallback).trim().toUpperCase();
-  const operationalCodes = (config && config.posDb && Array.isArray(config.posDb.operationalLocationCodes))
-    ? config.posDb.operationalLocationCodes.map((code) => String(code || '').trim().toUpperCase()).filter(Boolean)
-    : [fallback];
-
-  if (operationalCodes.indexOf(normalized) >= 0) {
-    return normalized;
-  }
-
-  throw new Error(`NON_RETRYABLE: ${commandLabel} payload has invalid locationCode (${normalized})`);
-}
-
 async function executeUpdatePrice(pool, payload) {
   const config = buildConfig();
   const productCode = payload.productCode;
-  const locationCode = resolveCommandLocationCode(config, payload, 'UPDATE_PRICE');
+  const locationCode = payload.locationCode || config.posDb.locationCode;
   const priceTypeCode = payload.priceTypeCode || null;
   const newPrice = Number(payload.newPrice);
 
@@ -159,7 +144,7 @@ function isLikelyNonRetryableStockError(message) {
 async function executeUpdateStock(pool, payload, commandId) {
   const config = buildConfig();
   const productCode = payload.productCode;
-  const locationCode = resolveCommandLocationCode(config, payload, 'UPDATE_STOCK');
+  const locationCode = payload.locationCode || config.posDb.locationCode;
   const oldStock = Number(payload.oldStock);
   const newStock = Number(payload.newStock);
   const qtyReduction = Number(payload.qtyReduction);
@@ -254,19 +239,14 @@ function isLikelyNonRetryablePromotionError(message) {
 
 async function executeApplyPromotion(pool, payload, commandId) {
   const config = buildConfig();
-  const locationCode = resolveCommandLocationCode(config, payload, 'APPLY_PROMOTION');
-  const normalizedPayload = {
-    ...payload,
-    locationCode,
-  };
   console.log('[PROMO COMMAND] APPLY_PROMOTION start', {
     commandId,
-    productCode: normalizedPayload.productCode,
-    locationCode,
-    priceTypeCode: normalizedPayload.priceTypeCode || 'RT',
-    promotionalPrice: Number(normalizedPayload.promotionalPrice),
-    reasonCode: normalizedPayload.reasonCode || 'EXPIRY_CLEARANCE',
-    updatePromotionalFlag: normalizedPayload.updatePromotionalFlag === true,
+    productCode: payload.productCode,
+    locationCode: payload.locationCode || config.posDb.locationCode,
+    priceTypeCode: payload.priceTypeCode || 'RT',
+    promotionalPrice: Number(payload.promotionalPrice),
+    reasonCode: payload.reasonCode || 'EXPIRY_CLEARANCE',
+    updatePromotionalFlag: payload.updatePromotionalFlag === true,
   });
 
   const transaction = new sql.Transaction(pool);
@@ -275,16 +255,16 @@ async function executeApplyPromotion(pool, payload, commandId) {
     await transaction.begin();
     const request = new sql.Request(transaction);
 
-    const resultSummary = await priceUpdates.applyPromotionalPrice(request, normalizedPayload);
+    const resultSummary = await priceUpdates.applyPromotionalPrice(request, payload);
 
     await transaction.commit();
     console.log('[PROMO COMMAND] success', {
       commandId,
       action: 'APPLY_PROMOTION',
-      productCode: normalizedPayload.productCode,
-      locationCode,
-      priceTypeCode: normalizedPayload.priceTypeCode || 'RT',
-      promotionalPrice: Number(normalizedPayload.promotionalPrice),
+      productCode: payload.productCode,
+      locationCode: payload.locationCode || config.posDb.locationCode,
+      priceTypeCode: payload.priceTypeCode || 'RT',
+      promotionalPrice: Number(payload.promotionalPrice),
       priceId: (resultSummary && resultSummary.insertedRow && resultSummary.insertedRow.priceId),
     });
     return {
@@ -302,10 +282,10 @@ async function executeApplyPromotion(pool, payload, commandId) {
       console.error('[PROMO COMMAND ERROR] failure', {
         commandId,
         action: 'APPLY_PROMOTION',
-        productCode: normalizedPayload.productCode,
-        locationCode,
-        priceTypeCode: normalizedPayload.priceTypeCode || 'RT',
-        promotionalPrice: Number(normalizedPayload.promotionalPrice),
+        productCode: payload.productCode,
+        locationCode: payload.locationCode || config.posDb.locationCode,
+        priceTypeCode: payload.priceTypeCode || 'RT',
+        promotionalPrice: Number(payload.promotionalPrice),
         error: error.message,
       });
       throw new Error(`NON_RETRYABLE: ${String(error.message || '').replace(/^NON_RETRYABLE:\s*/, '')}`);
@@ -314,10 +294,10 @@ async function executeApplyPromotion(pool, payload, commandId) {
     console.error('[PROMO COMMAND ERROR] failure', {
       commandId,
       action: 'APPLY_PROMOTION',
-      productCode: normalizedPayload.productCode,
-      locationCode,
-      priceTypeCode: normalizedPayload.priceTypeCode || 'RT',
-      promotionalPrice: Number(normalizedPayload.promotionalPrice),
+      productCode: payload.productCode,
+      locationCode: payload.locationCode || config.posDb.locationCode,
+      priceTypeCode: payload.priceTypeCode || 'RT',
+      promotionalPrice: Number(payload.promotionalPrice),
       error: error.message,
     });
     throw error;
@@ -326,19 +306,14 @@ async function executeApplyPromotion(pool, payload, commandId) {
 
 async function executeRevertPromotion(pool, payload, commandId) {
   const config = buildConfig();
-  const locationCode = resolveCommandLocationCode(config, payload, 'REVERT_PROMOTION');
-  const normalizedPayload = {
-    ...payload,
-    locationCode,
-  };
   console.log('[PROMO COMMAND] REVERT_PROMOTION start', {
     commandId,
-    productCode: normalizedPayload.productCode,
-    locationCode,
-    priceTypeCode: normalizedPayload.priceTypeCode || 'RT',
-    restorePrice: normalizedPayload.restorePrice == null ? null : Number(normalizedPayload.restorePrice),
-    reasonCode: normalizedPayload.reasonCode || 'EXPIRY_CLEARANCE',
-    updatePromotionalFlag: normalizedPayload.updatePromotionalFlag === true,
+    productCode: payload.productCode,
+    locationCode: payload.locationCode || config.posDb.locationCode,
+    priceTypeCode: payload.priceTypeCode || 'RT',
+    restorePrice: payload.restorePrice == null ? null : Number(payload.restorePrice),
+    reasonCode: payload.reasonCode || 'EXPIRY_CLEARANCE',
+    updatePromotionalFlag: payload.updatePromotionalFlag === true,
   });
 
   const transaction = new sql.Transaction(pool);
@@ -347,16 +322,16 @@ async function executeRevertPromotion(pool, payload, commandId) {
     await transaction.begin();
     const request = new sql.Request(transaction);
 
-    const resultSummary = await priceUpdates.revertToStandardPrice(request, normalizedPayload);
+    const resultSummary = await priceUpdates.revertToStandardPrice(request, payload);
 
     await transaction.commit();
     console.log('[PROMO COMMAND] success', {
       commandId,
       action: 'REVERT_PROMOTION',
-      productCode: normalizedPayload.productCode,
-      locationCode,
-      priceTypeCode: normalizedPayload.priceTypeCode || 'RT',
-      restorePrice: normalizedPayload.restorePrice == null ? null : Number(normalizedPayload.restorePrice),
+      productCode: payload.productCode,
+      locationCode: payload.locationCode || config.posDb.locationCode,
+      priceTypeCode: payload.priceTypeCode || 'RT',
+      restorePrice: payload.restorePrice == null ? null : Number(payload.restorePrice),
       priceId: (resultSummary && resultSummary.insertedRow && resultSummary.insertedRow.priceId),
     });
     return {
@@ -374,10 +349,10 @@ async function executeRevertPromotion(pool, payload, commandId) {
       console.error('[PROMO COMMAND ERROR] failure', {
         commandId,
         action: 'REVERT_PROMOTION',
-        productCode: normalizedPayload.productCode,
-        locationCode,
-        priceTypeCode: normalizedPayload.priceTypeCode || 'RT',
-        restorePrice: normalizedPayload.restorePrice == null ? null : Number(normalizedPayload.restorePrice),
+        productCode: payload.productCode,
+        locationCode: payload.locationCode || config.posDb.locationCode,
+        priceTypeCode: payload.priceTypeCode || 'RT',
+        restorePrice: payload.restorePrice == null ? null : Number(payload.restorePrice),
         error: error.message,
       });
       throw new Error(`NON_RETRYABLE: ${String(error.message || '').replace(/^NON_RETRYABLE:\s*/, '')}`);
@@ -386,10 +361,10 @@ async function executeRevertPromotion(pool, payload, commandId) {
     console.error('[PROMO COMMAND ERROR] failure', {
       commandId,
       action: 'REVERT_PROMOTION',
-      productCode: normalizedPayload.productCode,
-      locationCode,
-      priceTypeCode: normalizedPayload.priceTypeCode || 'RT',
-      restorePrice: normalizedPayload.restorePrice == null ? null : Number(normalizedPayload.restorePrice),
+      productCode: payload.productCode,
+      locationCode: payload.locationCode || config.posDb.locationCode,
+      priceTypeCode: payload.priceTypeCode || 'RT',
+      restorePrice: payload.restorePrice == null ? null : Number(payload.restorePrice),
       error: error.message,
     });
     throw error;

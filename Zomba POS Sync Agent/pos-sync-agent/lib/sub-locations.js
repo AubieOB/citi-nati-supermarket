@@ -16,11 +16,11 @@ const ZOMBA_SUB_LOCATIONS = {
     description: 'Bar/restaurant operations',
     category: 'hospitality',
   },
-  RES: {
-    code: 'RES',
-    name: 'Restaurant',
-    description: 'Restaurant operations',
-    category: 'hospitality',
+  WH: {
+    code: 'WH',
+    name: 'Warehouse',
+    description: 'Internal warehouse/storage',
+    category: 'internal',
   },
 };
 
@@ -33,10 +33,6 @@ function getSubLocationByCode(locationCode) {
   if (!locationCode) return null;
   const key = String(locationCode).toUpperCase().trim();
   return ZOMBA_SUB_LOCATIONS[key] || null;
-}
-
-function isOperationalLocationCode(locationCode) {
-  return !!getSubLocationByCode(locationCode);
 }
 
 /**
@@ -71,7 +67,6 @@ function enrichRowWithSubLocation(row, branchCode = 'ZOMBA') {
 module.exports = {
   ZOMBA_SUB_LOCATIONS,
   getSubLocationByCode,
-  isOperationalLocationCode,
   getAllSubLocations,
   enrichRowWithSubLocation,
 };
