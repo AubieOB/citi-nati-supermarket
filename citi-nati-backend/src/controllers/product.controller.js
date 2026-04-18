@@ -1068,8 +1068,7 @@ const getProducts = async (req, res) => {
     const shouldIncludePosExpiry = requestedPosExpiry || forceAdminPosExpiry;
     const requestedLocationCode = normalizeScopeCode(locationCode);
     const requestedBranchCode = normalizeScopeCode(branchCode);
-    const isAdmin = isAdminRequest(req);
-    const normalizedLocationCode = requestedLocationCode || (!isAdmin ? getStorefrontLocationCode() : null);
+    const normalizedLocationCode = requestedLocationCode || (!isAdminRequest(req) ? getStorefrontLocationCode() : null);
 
     console.log('[ADMIN PRODUCTS] expiry enrichment decision', {
       includePosExpiryQuery: includePosExpiry,
@@ -1103,7 +1102,7 @@ const getProducts = async (req, res) => {
       enabled: true, // Only show enabled products
     };
 
-    if (!isAdmin) {
+    if (!isAdminRequest(req)) {
       where.hideFromProductsPage = false; // Public storefront only
     }
 
@@ -1125,9 +1124,7 @@ const getProducts = async (req, res) => {
       where.isOnSale = true;
     }
 
-    if (isAdmin && requestedBranchCode) {
-      where.branchCode = requestedBranchCode;
-    } else if (normalizedLocationCode) {
+    if (normalizedLocationCode) {
       const scopedProductCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
       const derivedBranchCode = deriveBranchCodeFromScopeCodes(expandLocationScopeCodes(normalizedLocationCode));
       if (!scopedProductCodes || scopedProductCodes.length === 0) {
@@ -1144,10 +1141,14 @@ const getProducts = async (req, res) => {
         where.sourceCode = {
           in: scopedProductCodes,
         };
-        if (derivedBranchCode) {
+        if (requestedBranchCode) {
+          where.branchCode = requestedBranchCode;
+        } else if (derivedBranchCode) {
           where.branchCode = derivedBranchCode;
         }
       }
+    } else if (requestedBranchCode) {
+      where.branchCode = requestedBranchCode;
     }
 
     // Get total count for pagination metadata

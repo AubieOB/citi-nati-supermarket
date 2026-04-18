@@ -218,7 +218,7 @@ function getScopedActiveProductFilter(branchCode, scopedProductCodes = null) {
     branchCode,
   };
 
-  if (!branchCode && Array.isArray(scopedProductCodes)) {
+  if (Array.isArray(scopedProductCodes)) {
     where.sourceCode = { in: scopedProductCodes };
   }
 
