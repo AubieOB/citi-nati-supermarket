@@ -8,9 +8,15 @@
 
 const { PrismaClient } = require('@prisma/client');
 const posCommandQueueService = require('../services/posCommandQueue.service');
+const {
+  normalizeScopeCode,
+  expandLocationScopeCodes: expandOperationalLocationScopeCodes,
+  deriveBranchCodeFromLocationCode: deriveBranchFromOperationalLocation,
+  ZOMBA_LOCATION_CODES: CORE_ZOMBA_LOCATION_CODES,
+} = require('../utils/operationalScope');
 const prisma = new PrismaClient();
 
-const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH'];
+const ZOMBA_LOCATION_CODES = ['ZA'].concat(CORE_ZOMBA_LOCATION_CODES);
 const POS_DEFAULT_LOCATION_CODE = process.env.POS_LOCATION_CODE || 'BT';
 const POS_DEFAULT_PRICE_TYPE_CODE = process.env.POS_PRICE_TYPE_CODE || 'RT';
 const POS_PROMO_REASON_CODE = 'WEBSITE_PROMOTION';
@@ -31,18 +37,7 @@ const ACTIVE_PRODUCT_FILTER = {
 };
 
 function expandLocationScopeCodes(locationCode) {
-  const normalizedLocationCode = normalizeLocationCode(locationCode);
-  if (!normalizedLocationCode) return [];
-
-  if (normalizedLocationCode === 'BT') {
-    return ['BT'];
-  }
-
-  if (ZOMBA_LOCATION_CODES.includes(normalizedLocationCode)) {
-    return ['SH'];
-  }
-
-  return [normalizedLocationCode];
+  return expandOperationalLocationScopeCodes(locationCode);
 }
 
 async function resolveLocationScopedProductCodesFromSales(scopeCodes = []) {
@@ -165,19 +160,22 @@ async function resolveLocationScopedProductCodes(locationCode) {
 }
 
 function normalizeLocationCode(value) {
-  const normalized = String(value || '').trim().toUpperCase();
-  return normalized || null;
+  return normalizeScopeCode(value);
 }
 
 function deriveBranchCodeFromLocationCode(locationCode) {
-  if (locationCode === 'BT') return 'BLANTYRE';
-  if (locationCode && ZOMBA_LOCATION_CODES.includes(locationCode)) return 'ZOMBA';
-  return null;
+  return deriveBranchFromOperationalLocation(locationCode);
 }
 
 function getDefaultPosLocationCodeForBranch(branchCode, requestedLocationCode) {
   if (branchCode === 'BLANTYRE') return POS_BLANTYRE_SELLING_LOCATION_CODE;
-  if (branchCode === 'ZOMBA') return POS_ZOMBA_SELLING_LOCATION_CODE;
+  if (branchCode === 'ZOMBA') {
+    const normalizedRequested = normalizeLocationCode(requestedLocationCode);
+    if (normalizedRequested && CORE_ZOMBA_LOCATION_CODES.includes(normalizedRequested)) {
+      return normalizedRequested;
+    }
+    return POS_ZOMBA_SELLING_LOCATION_CODE;
+  }
   return normalizeLocationCode(requestedLocationCode) || POS_DEFAULT_LOCATION_CODE;
 }
 

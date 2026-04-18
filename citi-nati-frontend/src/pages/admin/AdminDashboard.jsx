@@ -26,6 +26,7 @@ const AdminBusinessOperations = React.lazy(() => import('../../components/admin/
 import { useOrderUpdates } from '../../hooks/useOrderUpdates.js';
 import { getSpeechAlertsEnabled, setSpeechAlertsEnabled } from '../../utils/notifications.js';
 import api from '../../utils/api.js';
+import { getOperationalScopeOptions, normalizeOperationalScopeCode, resolveOperationalScope } from '../../utils/operationalScope.js';
 import '../../styles/global.css';
 import '../../styles/admin-dashboard.css';
 
@@ -44,7 +45,7 @@ const SIDEBAR_SCOPES = [
   { id: 'administration', label: 'Admin', icon: 'fa-shield-halved' },
 ];
 
-const OPERATIONAL_LOCATION_CODES = ['BT', 'ZA'];
+const OPERATIONAL_SCOPES = getOperationalScopeOptions();
 
 const SIDEBAR_TABS = [
   { id: 'inbox', label: 'Inbox', icon: 'fa-inbox', scope: 'online-store' },
@@ -257,7 +258,7 @@ const AdminDashboard = () => {
   const [sidebarScope, setSidebarScope] = useState(TAB_SCOPE_BY_ID[initialTab] || 'online-store');
   const scopePillsRef = useRef(null);
   const [speechAlertsEnabled, setSpeechAlertsPreference] = useState(() => getSpeechAlertsEnabled());
-  const [selectedOperationalLocationCode, setSelectedOperationalLocationCode] = useState('BT');
+  const [selectedOperationalLocationCode, setSelectedOperationalLocationCode] = useState('BLANTYRE_SH');
   const [adminProductsCacheByLocation, setAdminProductsCacheByLocation] = useState({});
   const [adminProductsCacheMetaByLocation, setAdminProductsCacheMetaByLocation] = useState({});
   const adminProductsFetchRequestRef = useRef({});
@@ -266,7 +267,10 @@ const AdminDashboard = () => {
     return window.localStorage.getItem(ADMIN_THEME_KEY) === 'dark' ? 'dark' : 'light';
   });
   const isDarkTheme = theme === 'dark';
-  const selectedOperationalLocationLabel = selectedOperationalLocationCode === 'ZA' ? 'Zomba' : 'Blantyre';
+  const selectedOperationalScope = resolveOperationalScope(selectedOperationalLocationCode);
+  const selectedOperationalLocationLabel = selectedOperationalScope.label;
+  const selectedOperationalBranchCode = selectedOperationalScope.branchCode;
+  const selectedOperationalPosLocationCode = selectedOperationalScope.locationCode;
   const navigate = useNavigate();
 
   const updateProductsCacheMeta = useCallback((locationCode, patch) => {
@@ -280,7 +284,8 @@ const AdminDashboard = () => {
   }, []);
 
   const preloadAdminProductsForLocation = useCallback(async (locationCode, options = {}) => {
-    const safeLocationCode = String(locationCode || '').trim() || 'BT';
+    const safeLocationCode = normalizeOperationalScopeCode(locationCode);
+    const scope = resolveOperationalScope(safeLocationCode);
     const forceRefresh = options?.force === true;
     const cacheMeta = adminProductsCacheMetaByLocation[safeLocationCode] || {};
 
@@ -302,9 +307,8 @@ const AdminDashboard = () => {
 
     const fetchProductsPage = async (pageNumber) => {
       const params = new URLSearchParams({ page: String(pageNumber), pageSize: String(perPage) });
-      if (safeLocationCode) {
-        params.append('locationCode', safeLocationCode);
-      }
+      params.append('locationCode', scope.locationCode);
+      params.append('branchCode', scope.branchCode);
       return api.get(`/products?${params.toString()}`);
     };
 
@@ -333,9 +337,8 @@ const AdminDashboard = () => {
       if (firstItems.length === 0) {
         try {
           const params = new URLSearchParams({ page: '1', limit: '5000' });
-          if (safeLocationCode) {
-            params.append('locationCode', safeLocationCode);
-          }
+          params.append('locationCode', scope.locationCode);
+          params.append('branchCode', scope.branchCode);
           const adminResp = await api.get(`/admin/pos-products?${params.toString()}`);
           const adminItems = Array.isArray(adminResp?.data?.products)
             ? adminResp.data.products.map(normalizeAdminPosProduct)
@@ -430,8 +433,8 @@ const AdminDashboard = () => {
   }, [adminProductsCacheMetaByLocation, updateProductsCacheMeta]);
 
   React.useEffect(() => {
-    OPERATIONAL_LOCATION_CODES.forEach((locationCode) => {
-      preloadAdminProductsForLocation(locationCode);
+    OPERATIONAL_SCOPES.forEach((scope) => {
+      preloadAdminProductsForLocation(scope.uiCode);
     });
   }, [preloadAdminProductsForLocation]);
 
@@ -645,7 +648,7 @@ const AdminDashboard = () => {
           <select
             id="admin-operational-location"
             value={selectedOperationalLocationCode}
-            onChange={(event) => setSelectedOperationalLocationCode(event.target.value)}
+            onChange={(event) => setSelectedOperationalLocationCode(normalizeOperationalScopeCode(event.target.value))}
             title={`Operational scope: ${selectedOperationalLocationLabel}`}
             style={{
               width: '100%',
@@ -662,13 +665,17 @@ const AdminDashboard = () => {
           >
             {sidebarCollapsed ? (
               <>
-                <option value="BT">BT</option>
-                <option value="ZA">ZA</option>
+                <option value="BLANTYRE_SH">BT SH</option>
+                <option value="ZOMBA_SH">ZA SH</option>
+                <option value="ZOMBA_BAR">ZA BAR</option>
+                <option value="ZOMBA_RES">ZA RES</option>
               </>
             ) : (
               <>
-                <option value="BT">Blantyre</option>
-                <option value="ZA">Zomba</option>
+                <option value="BLANTYRE_SH">Blantyre SH</option>
+                <option value="ZOMBA_SH">Zomba SH</option>
+                <option value="ZOMBA_BAR">Zomba BAR</option>
+                <option value="ZOMBA_RES">Zomba RES</option>
               </>
             )}
           </select>
@@ -938,11 +945,12 @@ const AdminDashboard = () => {
             : undefined}
         >
           <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>Loading...</div>}>
-            {activeTab === 'inbox' && <AdminInbox selectedLocationCode={selectedOperationalLocationCode} />}
-            {activeTab === 'quotations' && <AdminQuotations />}
+            {activeTab === 'inbox' && <AdminInbox selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
+            {activeTab === 'quotations' && <AdminQuotations selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
             {activeTab === 'products' && (
               <AdminProducts
-                selectedLocationCode={selectedOperationalLocationCode}
+                selectedLocationCode={selectedOperationalPosLocationCode}
+                selectedBranchCode={selectedOperationalBranchCode}
                 cachedProducts={activeLocationCachedProducts}
                 cachedProductsMeta={activeLocationCachedProductsMeta}
                 onRefreshProductsCache={handleRefreshAdminProductsCache}
@@ -950,19 +958,21 @@ const AdminDashboard = () => {
             )}
             {activeTab === 'stocks' && (
               <AdminStocks
-                selectedLocationCode={selectedOperationalLocationCode}
+                selectedLocationCode={selectedOperationalPosLocationCode}
+                selectedBranchCode={selectedOperationalBranchCode}
                 cachedProducts={activeLocationCachedProducts}
                 cachedProductsMeta={activeLocationCachedProductsMeta}
                 onRefreshProductsCache={handleRefreshAdminProductsCache}
               />
             )}
-            {activeTab === 'emergency-sales' && <AdminEmergencySales selectedLocationCode={selectedOperationalLocationCode} />}
-            {activeTab === 'emergency-sales-reports' && <AdminEmergencySalesReports selectedLocationCode={selectedOperationalLocationCode} />}
+            {activeTab === 'emergency-sales' && <AdminEmergencySales selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
+            {activeTab === 'emergency-sales-reports' && <AdminEmergencySalesReports selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
             {activeTab === 'system' && <AdminSystem />}
             {activeTab === 'security' && <AdminSecurity />}
             {activeTab === 'promotions' && (
               <AdminPromotions
-                selectedLocationCode={selectedOperationalLocationCode}
+                selectedLocationCode={selectedOperationalPosLocationCode}
+                selectedBranchCode={selectedOperationalBranchCode}
                 cachedProducts={activeLocationCachedProducts}
                 cachedProductsMeta={activeLocationCachedProductsMeta}
                 onRefreshProductsCache={handleRefreshAdminProductsCache}
@@ -970,21 +980,22 @@ const AdminDashboard = () => {
             )}
             {activeTab === 'pos-management' && (
               <AdminPOSManagement
-                selectedLocationCode={selectedOperationalLocationCode}
+                selectedLocationCode={selectedOperationalPosLocationCode}
+                selectedBranchCode={selectedOperationalBranchCode}
                 cachedProducts={activeLocationCachedProducts}
                 cachedProductsMeta={activeLocationCachedProductsMeta}
                 onRefreshProductsCache={handleRefreshAdminProductsCache}
               />
             )}
-            {activeTab === 'pos-sync-monitor' && <AdminPOSSyncMonitor selectedLocationCode={selectedOperationalLocationCode} />}
-            {activeTab === 'orders' && <AdminOrders />}
+            {activeTab === 'pos-sync-monitor' && <AdminPOSSyncMonitor selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
+            {activeTab === 'orders' && <AdminOrders selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
             {activeTab === 'users' && <AdminUsers />}
-            {activeTab === 'sales' && <AdminSales />}
+            {activeTab === 'sales' && <AdminSales selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
             {activeTab === 'business-operations' && <AdminBusinessOperations />}
             {activeTab === 'refunds' && <AdminRefunds />}
             {activeTab === 'support' && <SupportDashboard />}
             {activeTab === 'drivers' && <AdminDrivers />}
-            {activeTab === 'cashiers' && <AdminCashiers />}
+            {activeTab === 'cashiers' && <AdminCashiers selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
           </Suspense>
         </div>
       </div>

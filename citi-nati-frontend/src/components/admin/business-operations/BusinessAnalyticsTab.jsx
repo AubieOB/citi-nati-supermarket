@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../../../utils/api.js';
+import { getOperationalScopeOptions, resolveOperationalScope } from '../../../utils/operationalScope.js';
 
 const AUTO_REFRESH_MS = 300000; // 5 minutes
 const AUTO_REFRESH_DEBOUNCE_MS = 350;
@@ -315,13 +316,6 @@ function toDateSafe(value) {
   return parsed;
 }
 
-function normalizeLocationCodeFromName(name = '') {
-  const normalized = String(name || '').trim().toLowerCase();
-  if (normalized === 'blantyre') return 'BT';
-  if (normalized === 'zomba') return 'ZA';
-  return null;
-}
-
 function parseInvoiceDate(invoice) {
   return toDateSafe(invoice?.invoiceDate || invoice?.invoiceTime || invoice?.createdAt);
 }
@@ -395,21 +389,17 @@ function withScope(params, scope, locations) {
 
   if (String(scope).startsWith('code:')) {
     const code = String(scope).slice(5).trim().toUpperCase();
-    scoped.locationCode = code;
-    if (code === 'BT') {
-      scoped.branchCode = 'BLANTYRE';
-    } else if (['ZA', 'SH', 'BAR', 'WH'].includes(code)) {
-      scoped.branchCode = 'ZOMBA';
-    }
+    const resolved = resolveOperationalScope(code);
+    scoped.locationCode = resolved.locationCode;
+    scoped.branchCode = resolved.branchCode;
     return scoped;
   }
 
   const location = locations.find((row) => String(row.id) === String(scope));
   if (location?.id) scoped.locationId = Number(location.id);
-  // Always send locationCode alongside locationId so the backend can derive
-  // the authoritative branchCode for strict branch scoping.
-  const locationCode = location?.code || normalizeLocationCodeFromName(location?.name || '');
-  if (locationCode) scoped.locationCode = locationCode;
+  const resolved = resolveOperationalScope(location?.code || location?.uiCode || '');
+  if (resolved?.locationCode) scoped.locationCode = resolved.locationCode;
+  if (resolved?.branchCode) scoped.branchCode = resolved.branchCode;
   return scoped;
 }
 
@@ -1354,12 +1344,11 @@ const BusinessAnalyticsTab = ({
 
   const locationOptions = useMemo(() => {
     const rows = (locations || []).map((row) => ({ id: String(row.id), label: row.name }));
-    if (!rows.find((row) => row.label.toLowerCase() === 'blantyre')) {
-      rows.push({ id: 'code:BT', label: 'Blantyre' });
-    }
-    if (!rows.find((row) => row.label.toLowerCase() === 'zomba')) {
-      rows.push({ id: 'code:ZA', label: 'Zomba' });
-    }
+    getOperationalScopeOptions().forEach((scope) => {
+      if (!rows.find((row) => row.label.toLowerCase() === scope.label.toLowerCase())) {
+        rows.push({ id: `code:${scope.locationCode}`, label: scope.label });
+      }
+    });
     return rows;
   }, [locations]);
 

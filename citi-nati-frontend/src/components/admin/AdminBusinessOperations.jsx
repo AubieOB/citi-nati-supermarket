@@ -17,7 +17,15 @@ import BusinessOperationsImportModal from './business-operations/BusinessOperati
 import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
 import { registerBoDialogHandler } from '../../utils/boDialogBus.js';
-import api from '../../utils/api.js';
+import { getOperationalScopeOptions } from '../../utils/operationalScope.js';
+
+const BO_OPERATIONAL_SCOPES = getOperationalScopeOptions().map((scope, index) => ({
+  id: index + 1,
+  code: scope.locationCode,
+  uiCode: scope.uiCode,
+  name: scope.label,
+  branchCode: scope.branchCode,
+}));
 
 const TABS = [
   { id: 'sales-reports', label: 'Sales Reports', icon: 'fa-chart-column' },
@@ -33,13 +41,6 @@ const TABS = [
   { id: 'actions', label: 'Actions', icon: 'fa-triangle-exclamation' },
 ];
 
-function normalizeLocationCode(location) {
-  const name = String(location?.name || '').trim().toLowerCase();
-  if (name === 'blantyre') return 'BT';
-  if (name === 'zomba') return 'ZA';
-  return location?.code ? String(location.code).trim().toUpperCase() : null;
-}
-
 const AdminBusinessOperations = () => {
   const { modal, showModal, closeModal } = useModal();
   const [activeTab, setActiveTab] = useState('sales-reports');
@@ -49,8 +50,8 @@ const AdminBusinessOperations = () => {
   const filterBarRef = useRef(null);
   const [dataRefreshKey, setDataRefreshKey] = useState(0);
   const [drilldownRequests, setDrilldownRequests] = useState({});
-  const [locations, setLocations] = useState([]);
-  const [selectedLocationId, setSelectedLocationId] = useState('all');
+  const [locations] = useState(BO_OPERATIONAL_SCOPES);
+  const [selectedLocationId, setSelectedLocationId] = useState(String(BO_OPERATIONAL_SCOPES[0].id));
   const [locationRefreshKey, setLocationRefreshKey] = useState(0);
 
   useEffect(() => {
@@ -96,39 +97,10 @@ const AdminBusinessOperations = () => {
   });
 
   useEffect(() => {
-    let cancelled = false;
-
-    const loadLocations = async () => {
-      try {
-        const response = await api.get('/business-operations/locations');
-        const locationRows = Array.isArray(response?.data?.data) ? response.data.data : [];
-        if (cancelled) return;
-        setLocations(locationRows.map((location) => ({
-          ...location,
-          code: normalizeLocationCode(location),
-        })));
-      } catch (_error) {
-        if (cancelled) return;
-        setLocations([
-          { id: 1, code: 'BT', name: 'Blantyre' },
-          { id: 2, code: 'ZA', name: 'Zomba' },
-        ]);
-      }
-    };
-
-    loadLocations();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
     setLocationRefreshKey((prev) => prev + 1);
   }, [selectedLocationId]);
 
   const selectedLocation = useMemo(() => {
-    if (selectedLocationId === 'all') return null;
     const asNumber = Number(selectedLocationId);
     return locations.find((location) => Number(location.id) === asNumber) || null;
   }, [locations, selectedLocationId]);
@@ -230,10 +202,9 @@ const AdminBusinessOperations = () => {
                   onChange={(event) => setSelectedLocationId(event.target.value)}
                   className="bo-location-select"
                 >
-                  <option value="all">All Locations</option>
                   {locations.map((location) => (
                     <option key={location.id} value={String(location.id)}>
-                      {location.name}{location.code ? ` (${location.code})` : ''}
+                      {location.name}
                     </option>
                   ))}
                 </select>

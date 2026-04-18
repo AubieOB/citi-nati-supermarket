@@ -1,5 +1,10 @@
 'use strict';
 
+const {
+  deriveBranchCodeFromLocationCode,
+  expandLocationScopeCodes,
+} = require('./operationalScope');
+
 // ---------------------------------------------------------------------------
 // Allowed filter field sets — controls what can be sorted or filtered.
 // ---------------------------------------------------------------------------
@@ -38,24 +43,13 @@ const ALLOWED_PAYMENT_SORT_FIELDS = new Set(['payMethod', 'totalAmount', 'invoic
 
 const ALLOWED_SORT_ORDERS = new Set(['asc', 'desc']);
 
-const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH'];
+const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'ST999', 'WH'];
 const BRANCH_SCOPE_LOCATION_CODES = ['BT', 'ZA'];
 
 const BRANCH_SYNC_SOURCE_PREFIXES = {
   BLANTYRE: ['BLANTYRE', 'BT'],
   ZOMBA: ['ZOMBA', 'ZA'],
 };
-
-// Maps a location code to the branch code stored in SalesInvoice.branchCode.
-// This is the reliable discriminator between branches because it comes directly
-// from the POS sync agent's BRANCH_CODE env variable.
-function deriveBranchCodeFromLocationCode(locationCode) {
-  const normalized = sanitizeStr(locationCode)?.toUpperCase();
-  if (!normalized) return null;
-  if (normalized === 'BT') return 'BLANTYRE';
-  if (ZOMBA_LOCATION_CODES.includes(normalized)) return 'ZOMBA';
-  return null;
-}
 
 function buildBranchScopePredicate(branchCode) {
   const normalizedBranch = sanitizeStr(branchCode)?.toUpperCase();
@@ -283,22 +277,6 @@ function sanitizeStr(val) {
   if (!val || typeof val !== 'string') return null;
   const trimmed = val.trim();
   return trimmed.length > 0 ? trimmed : null;
-}
-
-function expandLocationScopeCodes(locationCode) {
-  const normalized = sanitizeStr(locationCode)?.toUpperCase();
-  if (!normalized) return [];
-
-  if (normalized === 'BT') {
-    return ['BT'];
-  }
-
-  if (ZOMBA_LOCATION_CODES.includes(normalized)) {
-    // Zomba POS scope is anchored to SH.
-    return ['SH'];
-  }
-
-  return [normalized];
 }
 
 function parseOptionalInt(val) {

@@ -55,6 +55,33 @@ let reportingSyncService;
 let expiryBatchCache = null;
 let expiryBatchCachedAt = 0;
 const EXPIRY_BATCH_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const ZOMBA_OPERATIONAL_LOCATION_CODES = ['SH', 'BAR', 'ST999'];
+
+function normalizeOperationalLocationCode(code) {
+  const normalized = String(code || '').trim().toUpperCase();
+  if (!normalized) return null;
+  if (normalized === 'RES') return 'ST999';
+  return normalized;
+}
+
+function parseOperationalLocationCodes(rawCodes) {
+  const source = String(rawCodes || '').trim();
+  if (!source) return [];
+
+  const unique = new Set();
+  const resolved = [];
+  const parts = source.split(',');
+  for (const part of parts) {
+    const normalized = normalizeOperationalLocationCode(part);
+    if (!normalized) continue;
+    if (!ZOMBA_OPERATIONAL_LOCATION_CODES.includes(normalized)) continue;
+    if (unique.has(normalized)) continue;
+    unique.add(normalized);
+    resolved.push(normalized);
+  }
+
+  return resolved;
+}
 
 async function getCachedExpiryBatches() {
   const now = Date.now();
@@ -247,7 +274,7 @@ async function fetchProductsFromPOS(locationCode) {
     // Use ROW_NUMBER() to get the single latest snapshot row per product.
     // No fallback to Stocks, Stocks.StockQty, or ProductActivity — those can cause
     // aggregation across sub-locations and inflate values vs POS stock-balance screen.
-    // For Zomba: LocationCode is always 'SH' (enforced by getOperationalSyncLocations).
+    // For Zomba: LocationCode is selected from configured operational scopes (SH/BAR/ST999).
     const query = `
       WITH latest_stock AS (
         SELECT
@@ -380,8 +407,12 @@ async function fetchProductsFromPOS(locationCode) {
 }
 
 function getOperationalSyncLocations() {
-  // Business rule: Zomba operational dashboard stock must reflect SH only.
   if (appConfig.branch.branchCode === 'ZOMBA') {
+    const configured = parseOperationalLocationCodes(process.env.POS_OPERATIONAL_LOCATION_CODES);
+    if (configured.length > 0) {
+      return configured;
+    }
+
     return ['SH'];
   }
 
@@ -828,7 +859,7 @@ app.get('/pos-sync/products', validateApiKey, requireFeature('enableReportingSyn
       branchCode: appConfig.branch.branchCode,
       configuredLocationCode: appConfig.posDb.locationCode,
       includedLocations: syncLocations,
-      mode: appConfig.branch.branchCode === 'ZOMBA' ? 'SH_ONLY_OPERATIONAL' : 'CONFIGURED_LOCATION_ONLY',
+      mode: appConfig.branch.branchCode === 'ZOMBA' ? 'CONFIGURED_ZOMBA_OPERATIONAL_LOCATIONS' : 'CONFIGURED_LOCATION_ONLY',
       stockSource: 'DailyStockBalance latest snapshot only',
     });
     
@@ -1788,7 +1819,7 @@ async function autoSync() {
       branchCode: appConfig.branch.branchCode,
       configuredLocationCode: appConfig.posDb.locationCode,
       includedLocations: syncLocations,
-      mode: appConfig.branch.branchCode === 'ZOMBA' ? 'SH_ONLY_OPERATIONAL' : 'CONFIGURED_LOCATION_ONLY',
+      mode: appConfig.branch.branchCode === 'ZOMBA' ? 'CONFIGURED_ZOMBA_OPERATIONAL_LOCATIONS' : 'CONFIGURED_LOCATION_ONLY',
       stockSource: 'DailyStockBalance latest snapshot only',
     });
     

@@ -152,7 +152,7 @@ function normalizeScopeCode(value) {
 function deriveBranchCodeFromLocationCode(locationCode) {
   const normalized = normalizeScopeCode(locationCode);
   if (normalized === 'BT') return 'BLANTYRE';
-  if (['ZA', 'SH', 'BAR', 'WH'].includes(normalized)) return 'ZOMBA';
+  if (['ZA', 'SH', 'BAR', 'ST999', 'RES', 'WH'].includes(normalized)) return 'ZOMBA';
   return null;
 }
 
@@ -160,7 +160,9 @@ function expandScopeLocationCodes(locationCode) {
   const normalized = normalizeScopeCode(locationCode);
   if (!normalized) return [];
   if (normalized === 'BT') return ['BT'];
-  if (['ZA', 'SH', 'BAR', 'WH'].includes(normalized)) return ['ZA', 'SH', 'BAR', 'WH'];
+  if (normalized === 'ZA') return ['SH', 'BAR', 'ST999'];
+  if (normalized === 'RES') return ['ST999'];
+  if (['SH', 'BAR', 'ST999', 'WH'].includes(normalized)) return [normalized];
   return [normalized];
 }
 

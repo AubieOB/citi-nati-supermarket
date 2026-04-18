@@ -39,6 +39,12 @@ const {
   getBusinessTimezoneName,
   formatBusinessDateTimeLabel,
 } = require('../utils/businessTime');
+const {
+  normalizeScopeCode,
+  expandLocationScopeCodes: expandOperationalLocationScopeCodes,
+  deriveBranchCodeFromLocationCode,
+  ZOMBA_LOCATION_CODES: CORE_ZOMBA_LOCATION_CODES,
+} = require('../utils/operationalScope');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -47,26 +53,13 @@ const MAINTENANCE_MESSAGE_KEY = 'maintenance_mode_message';
 const DEFAULT_MAINTENANCE_MESSAGE = 'We are currently carrying out maintenance to improve your experience. We apologize for the inconvenience.';
 
 function normalizeLocationCode(value) {
-  const normalized = String(value || '').trim().toUpperCase();
-  return normalized || null;
+  return normalizeScopeCode(value);
 }
 
-const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH'];
+const ZOMBA_LOCATION_CODES = ['ZA'].concat(CORE_ZOMBA_LOCATION_CODES);
 
 function expandLocationScopeCodes(locationCode) {
-  const normalizedLocationCode = normalizeLocationCode(locationCode);
-  if (!normalizedLocationCode) return [];
-
-  if (normalizedLocationCode === 'BT') {
-    return ['BT'];
-  }
-
-  if (ZOMBA_LOCATION_CODES.includes(normalizedLocationCode)) {
-    // Zomba POS writes through SH only.
-    return ['SH'];
-  }
-
-  return [normalizedLocationCode];
+  return expandOperationalLocationScopeCodes(locationCode);
 }
 
 function buildLocationCodeScopeWhere(locationCodes) {
@@ -85,8 +78,10 @@ function buildLocationCodeScopeWhere(locationCodes) {
 }
 
 function deriveBranchCodeFromScopeCodes(scopeCodes = []) {
-  if (scopeCodes.includes('BT')) return 'BLANTYRE';
-  if (scopeCodes.some((code) => ZOMBA_LOCATION_CODES.includes(code))) return 'ZOMBA';
+  for (const code of scopeCodes) {
+    const branchCode = deriveBranchCodeFromLocationCode(code);
+    if (branchCode) return branchCode;
+  }
   return null;
 }
 
@@ -181,7 +176,7 @@ async function resolveLocationScopedProductCodes(locationCode) {
   const salesCodes = await resolveLocationScopedProductCodesFromSales(scopeCodes);
   salesCodes.forEach((code) => scopedCodes.add(code));
 
-  const isZombaScope = scopeCodes.some((code) => ['SH', 'BAR', 'WH'].includes(code));
+  const isZombaScope = scopeCodes.some((code) => CORE_ZOMBA_LOCATION_CODES.includes(code));
   if (isZombaScope) {
     console.log('[ADMIN POS][SCOPE][ZA] code-source diagnostics', {
       scopeCodes,
@@ -1025,13 +1020,13 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
       orderBy: { createdAt: 'desc' },
     });
 
-    const isZombaScope = normalizedLocationCode && ['ZA', 'SH', 'BAR', 'WH'].includes(normalizedLocationCode);
+    const isZombaScope = normalizedLocationCode && ZOMBA_LOCATION_CODES.includes(normalizedLocationCode);
     if (isZombaScope && products.length > 0) {
       const sample = products[0];
-      console.log(`[ZOMBA STOCK][POS_MANAGEMENT] product=${sample.sourceCode || 'UNKNOWN'} source=PersistedProductStock location=SH stock=${Number(sample.stock || 0)}`);
+      console.log(`[ZOMBA STOCK][POS_MANAGEMENT] product=${sample.sourceCode || 'UNKNOWN'} source=PersistedProductStock location=${normalizedLocationCode} stock=${Number(sample.stock || 0)}`);
       const verifyProduct = products.find((row) => String(row.sourceCode || '').trim() === '9501100002174');
       if (verifyProduct) {
-        console.log(`[ZOMBA STOCK][VERIFY][POS_MANAGEMENT] product=9501100002174 source=PersistedProductStock location=SH stock=${Number(verifyProduct.stock || 0)}`);
+        console.log(`[ZOMBA STOCK][VERIFY][POS_MANAGEMENT] product=9501100002174 source=PersistedProductStock location=${normalizedLocationCode} stock=${Number(verifyProduct.stock || 0)}`);
       }
     }
 

@@ -5,6 +5,12 @@ const { notifyLowStock } = require('../utils/messageService');
 const { recordPosSyncEvent } = require('../services/posSyncMonitor.service');
 const { getConfiguredVatRatePercent, getVatSettings, normalizeVatRatePercent, splitInclusiveVatAtRate } = require('../utils/vat');
 const { formatBusinessDateKey, formatBusinessTimeKey } = require('../utils/businessTime');
+const {
+  normalizeScopeCode,
+  expandLocationScopeCodes: expandOperationalLocationScopeCodes,
+  deriveBranchCodeFromLocationCode: deriveBranchFromOperationalLocation,
+  ZOMBA_LOCATION_CODES: CORE_ZOMBA_LOCATION_CODES,
+} = require('../utils/operationalScope');
 
 const prisma = new PrismaClient();
 const EMERGENCY_SALE_MAX_RETRIES = Number.parseInt(process.env.EMERGENCY_SALE_MAX_RETRIES || '10', 10);
@@ -15,16 +21,15 @@ const SYNC_STATUS = {
   FAILED: 'sync_failed',
 };
 
-const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH'];
-const SUPPORTED_LOCATION_CODES = ['BT'].concat(ZOMBA_LOCATION_CODES);
+const ZOMBA_LOCATION_CODES = ['ZA'].concat(CORE_ZOMBA_LOCATION_CODES);
+const SUPPORTED_LOCATION_CODES = ['BT', 'ZA', 'SH', 'BAR', 'ST999', 'RES', 'WH'];
 const SCOPED_PRODUCT_CODES_CACHE_TTL_MS = Number.parseInt(process.env.EMERGENCY_SCOPE_CODES_CACHE_TTL_MS || '30000', 10);
 const EMERGENCY_LOOKUP_CACHE_TTL_MS = Number.parseInt(process.env.EMERGENCY_LOOKUP_CACHE_TTL_MS || '8000', 10);
 const scopedProductCodesCache = new Map();
 const emergencyLookupCache = new Map();
 
 function normalizeLocationCode(value) {
-  const normalized = String(value || '').trim().toUpperCase();
-  return normalized || null;
+  return normalizeScopeCode(value);
 }
 
 function normalizeBranchCode(value) {
@@ -36,9 +41,15 @@ function isZombaLocationCode(locationCode) {
   return !!locationCode && ZOMBA_LOCATION_CODES.includes(locationCode);
 }
 
-function getDefaultAgentLocationCode(branchCode) {
+function getDefaultAgentLocationCode(branchCode, requestedLocationCode) {
   if (branchCode === 'BLANTYRE') return 'BT';
-  if (branchCode === 'ZOMBA') return 'SH';
+  if (branchCode === 'ZOMBA') {
+    const normalizedRequested = normalizeLocationCode(requestedLocationCode);
+    if (normalizedRequested && CORE_ZOMBA_LOCATION_CODES.includes(normalizedRequested)) {
+      return normalizedRequested;
+    }
+    return 'SH';
+  }
   return null;
 }
 
@@ -49,9 +60,7 @@ function getBranchNameFromLocationCode(locationCode) {
 }
 
 function getBranchCodeFromLocationCode(locationCode) {
-  if (locationCode === 'BT') return 'BLANTYRE';
-  if (isZombaLocationCode(locationCode)) return 'ZOMBA';
-  return locationCode || null;
+  return deriveBranchFromOperationalLocation(locationCode) || locationCode || null;
 }
 
 function resolveSaleScopeFromSnapshot(sale) {
@@ -63,19 +72,7 @@ function resolveSaleScopeFromSnapshot(sale) {
 }
 
 function expandLocationScopeCodes(locationCode) {
-  const normalizedLocationCode = normalizeLocationCode(locationCode);
-  if (!normalizedLocationCode) return [];
-
-  if (normalizedLocationCode === 'BT') {
-    return ['BT'];
-  }
-
-  if (ZOMBA_LOCATION_CODES.includes(normalizedLocationCode)) {
-    // Zomba operations are handled via SH in POS.
-    return ['SH'];
-  }
-
-  return [normalizedLocationCode];
+  return expandOperationalLocationScopeCodes(locationCode);
 }
 
 function buildLocationCodeScopeWhere(locationCodes) {
@@ -94,8 +91,10 @@ function buildLocationCodeScopeWhere(locationCodes) {
 }
 
 function deriveBranchCodeFromScopeCodes(scopeCodes = []) {
-  if (scopeCodes.includes('BT')) return 'BLANTYRE';
-  if (scopeCodes.some((code) => ZOMBA_LOCATION_CODES.includes(code))) return 'ZOMBA';
+  for (const code of scopeCodes) {
+    const branchCode = deriveBranchFromOperationalLocation(code);
+    if (branchCode) return branchCode;
+  }
   return null;
 }
 
@@ -250,8 +249,8 @@ async function resolveLocationScopedProductCodes(locationCode) {
   const salesCodes = await resolveLocationScopedProductCodesFromSales(scopeCodes);
   salesCodes.forEach((code) => scopedCodes.add(code));
 
-  if (scopeCodes.some((code) => ['SH', 'BAR', 'WH'].includes(code))) {
-    console.log('[EMERGENCY SALES][SCOPE][ZA] code-source diagnostics', {
+  if (scopeCodes.some((code) => CORE_ZOMBA_LOCATION_CODES.includes(code))) {
+    console.log('[EMERGENCY SALES][SCOPE][ZOMBA] code-source diagnostics', {
       scopeCodes,
       expiryDistinctCount: expiryRows.length,
       latestCostDistinctCount: costCodes.length,
@@ -645,10 +644,10 @@ async function lookupEmergencyProducts(req, res) {
 
     if (isZombaLocationCode(locationCode) && mapped.length > 0) {
       const sample = mapped[0];
-      console.log(`[ZOMBA STOCK][EMERGENCY_LOOKUP] product=${sample.sourceCode || sample.productCode || 'UNKNOWN'} source=PersistedProductStock location=SH stock=${Number(sample.stock || 0)}`);
+      console.log(`[ZOMBA STOCK][EMERGENCY_LOOKUP] product=${sample.sourceCode || sample.productCode || 'UNKNOWN'} source=PersistedProductStock location=${locationCode} stock=${Number(sample.stock || 0)}`);
       const verifyProduct = mapped.find((row) => String(row.sourceCode || row.productCode || '').trim() === '9501100002174');
       if (verifyProduct) {
-        console.log(`[ZOMBA STOCK][VERIFY][EMERGENCY_LOOKUP] product=9501100002174 source=PersistedProductStock location=SH stock=${Number(verifyProduct.stock || 0)}`);
+        console.log(`[ZOMBA STOCK][VERIFY][EMERGENCY_LOOKUP] product=9501100002174 source=PersistedProductStock location=${locationCode} stock=${Number(verifyProduct.stock || 0)}`);
       }
     }
 
@@ -671,14 +670,12 @@ async function createEmergencySale(req, res) {
   try {
     const locationCode = normalizeLocationCode(req.body?.locationCode || req.body?.branchCode || req.query?.locationCode);
     if (!locationCode || !SUPPORTED_LOCATION_CODES.includes(locationCode)) {
-      return res.status(400).json({ success: false, error: 'locationCode is required and must be one of BT, SH, BAR, WH, or ZA' });
+      return res.status(400).json({ success: false, error: 'locationCode is required and must be one of BT, SH, BAR, ST999, WH, RES, or ZA' });
     }
 
     const branchCode = getBranchCodeFromLocationCode(locationCode);
     const branchName = getBranchNameFromLocationCode(locationCode);
-    const posLocationCode = locationCode === 'ZA'
-      ? (getDefaultAgentLocationCode(branchCode) || 'SH')
-      : locationCode;
+    const posLocationCode = getDefaultAgentLocationCode(branchCode, locationCode);
     const scopedProductCodes = await resolveLocationScopedProductCodes(locationCode);
     if (!scopedProductCodes || scopedProductCodes.length === 0) {
       return res.status(400).json({ success: false, error: `No products are available for location ${locationCode}` });
@@ -1140,8 +1137,8 @@ async function getPendingEmergencySalesForPosSync(req, res) {
       if (explicitLocation && SUPPORTED_LOCATION_CODES.includes(explicitLocation)) {
         locationCodes = [explicitLocation];
       } else {
-        // Fetch emergency sales from all possible Zomba sub-locations (ZA is the admin-facing code)
-        locationCodes = ['ZA', 'SH', 'BAR', 'WH'];
+        // Fetch emergency sales from all Zomba location scopes that can appear in payload snapshots.
+        locationCodes = ['ZA', 'SH', 'BAR', 'ST999', 'RES', 'WH'];
       }
     } else if (branchCode === 'BLANTYRE') {
       locationCodes = ['BT'];

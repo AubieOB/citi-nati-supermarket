@@ -3,6 +3,7 @@ import api from '../../utils/api.js';
 import { formatMWK } from '../../utils/currency.js';
 import { getSocket } from '../../utils/socket.js';
 import { notifySuccess, notifyError } from '../../utils/notifications.js';
+import { resolveOperationalScope } from '../../utils/operationalScope.js';
 
 /**
  * 🎯 ADMIN PROMOTIONS MANAGEMENT
@@ -23,6 +24,7 @@ function createDefaultPromotionsState() {
 
 const AdminPromotions = ({
   selectedLocationCode = 'BT',
+  selectedBranchCode = '',
   cachedProducts = [],
   cachedProductsMeta = {},
   onRefreshProductsCache,
@@ -42,7 +44,10 @@ const AdminPromotions = ({
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
   const textPrimary = isAdminDarkTheme ? '#f8fafc' : '#333';
   const textSecondary = isAdminDarkTheme ? '#cbd5e1' : '#666';
-  const selectedLocationLabel = selectedLocationCode === 'ZA' ? 'Zomba' : 'Blantyre';
+  const selectedScope = resolveOperationalScope(selectedLocationCode);
+  const effectiveLocationCode = selectedScope.locationCode;
+  const effectiveBranchCode = selectedBranchCode || selectedScope.branchCode;
+  const selectedLocationLabel = selectedScope.label;
   const hasSharedProductsCache = Array.isArray(cachedProducts) && (
     cachedProducts.length > 0
     || Boolean(cachedProductsMeta?.lastLoadedAt)
@@ -80,7 +85,7 @@ const AdminPromotions = ({
         cleanupSocket();
       }
     };
-  }, [selectedLocationCode]);
+  }, [selectedLocationCode, selectedBranchCode]);
 
   useEffect(() => {
     setSearchTerm('');
@@ -100,7 +105,7 @@ const AdminPromotions = ({
     }
 
     fetchCurrentPromotions();
-  }, [selectedLocationCode, cachedProducts, hasSharedProductsCache]);
+  }, [selectedLocationCode, selectedBranchCode, cachedProducts, hasSharedProductsCache]);
 
   useEffect(() => {
     if (!hasSharedProductsCache) return;
@@ -198,7 +203,7 @@ const AdminPromotions = ({
 
       const perPage = 100;
       const fetchProductsPage = async (pageNumber) => {
-        return api.get(`/products?page=${pageNumber}&pageSize=${perPage}&locationCode=${encodeURIComponent(selectedLocationCode)}`);
+        return api.get(`/products?page=${pageNumber}&pageSize=${perPage}&locationCode=${encodeURIComponent(effectiveLocationCode)}&branchCode=${encodeURIComponent(effectiveBranchCode)}`);
       };
 
       const syncCatalogState = (items) => {
@@ -254,7 +259,7 @@ const AdminPromotions = ({
   const fetchCurrentPromotions = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/admin/promotions?locationCode=${encodeURIComponent(selectedLocationCode)}`);
+      const response = await api.get(`/admin/promotions?locationCode=${encodeURIComponent(effectiveLocationCode)}&branchCode=${encodeURIComponent(effectiveBranchCode)}`);
       if (response.data.promotions) {
         setPromotions(response.data.promotions);
       }
@@ -324,7 +329,8 @@ const AdminPromotions = ({
       // Apply promotion via API
       const response = await api.post(`/admin/promotions/${type}`, {
         ...newPromotion,
-        locationCode: selectedLocationCode,
+        locationCode: effectiveLocationCode,
+        branchCode: effectiveBranchCode,
       });
       
       setPromotions(prev => ({
@@ -347,7 +353,8 @@ const AdminPromotions = ({
     try {
       const payload = {
         ...promotions[type],
-        locationCode: selectedLocationCode,
+        locationCode: effectiveLocationCode,
+        branchCode: effectiveBranchCode,
       };
       
       // For selective, pass selected product IDs

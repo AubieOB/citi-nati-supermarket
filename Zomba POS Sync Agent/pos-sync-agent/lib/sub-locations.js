@@ -16,6 +16,12 @@ const ZOMBA_SUB_LOCATIONS = {
     description: 'Bar/restaurant operations',
     category: 'hospitality',
   },
+  ST999: {
+    code: 'ST999',
+    name: 'Restaurant',
+    description: 'Restaurant operations (mapped from RES alias)',
+    category: 'hospitality',
+  },
   WH: {
     code: 'WH',
     name: 'Warehouse',
@@ -31,7 +37,9 @@ const ZOMBA_SUB_LOCATIONS = {
  */
 function getSubLocationByCode(locationCode) {
   if (!locationCode) return null;
-  const key = String(locationCode).toUpperCase().trim();
+  const key = String(locationCode).toUpperCase().trim() === 'RES'
+    ? 'ST999'
+    : String(locationCode).toUpperCase().trim();
   return ZOMBA_SUB_LOCATIONS[key] || null;
 }
 
