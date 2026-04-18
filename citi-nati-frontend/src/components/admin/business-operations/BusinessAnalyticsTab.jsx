@@ -423,8 +423,20 @@ function withScope(params, scope, locations) {
   return scoped;
 }
 
-function deriveBranchSummaryScopes() {
-  return BO_OPERATIONAL_SCOPES;
+function deriveBranchSummaryCodes(locations = []) {
+  const codes = new Set();
+  const rows = Array.isArray(locations) ? locations : [];
+  for (const row of rows) {
+    const name = String(row?.name || '').trim().toLowerCase();
+    if (name === 'blantyre') {
+      codes.add('SH');
+    } else if (name === 'zomba') {
+      codes.add('SH');
+      codes.add('BAR');
+      codes.add('RES');
+    }
+  }
+  return Array.from(codes);
 }
 
 function getCurrentMonthPeriod() {
@@ -1093,8 +1105,7 @@ const BusinessAnalyticsTab = ({
       const now = new Date();
       const thisYear = now.getFullYear();
 
-      const basePeriodParams = buildParamsForPeriod(selectedPeriod);
-      const periodParams = withScope({ ...basePeriodParams }, effectiveScope, locations);
+      const periodParams = withScope(buildParamsForPeriod(selectedPeriod), effectiveScope, locations);
       const prevPeriodParams = withScope(buildParamsForPeriod(previousPeriod(selectedPeriod)), effectiveScope, locations);
       const monthParams = withScope(buildParamsForPeriod(getCurrentMonthPeriod()), effectiveScope, locations);
       const prevMonthParams = withScope(buildParamsForPeriod(previousPeriod(getCurrentMonthPeriod())), effectiveScope, locations);
@@ -1131,8 +1142,8 @@ const BusinessAnalyticsTab = ({
           })
         : [];
 
-      // Branch/location summaries from explicit operational scopes.
-      const branchScopes = deriveBranchSummaryScopes();
+      // Branch/location summaries from operational BO scope.
+      const branchCodes = deriveBranchSummaryCodes(locations);
 
       // Slot indices in the flat allResponses array
       const FIXED = 8; // 6 summaries + products + users
@@ -1140,7 +1151,7 @@ const BusinessAnalyticsTab = ({
       const YEARLY_SLICE = [MONTHLY_SLICE[1], MONTHLY_SLICE[1] + recentYears.length];
       const QUARTERLY_SLICE = [YEARLY_SLICE[1], YEARLY_SLICE[1] + quarters.length];
       const DAILY_SLICE = [QUARTERLY_SLICE[1], QUARTERLY_SLICE[1] + dailyPeriods.length];
-      const BRANCH_SLICE = [DAILY_SLICE[1], DAILY_SLICE[1] + branchScopes.length];
+      const BRANCH_SLICE = [DAILY_SLICE[1], DAILY_SLICE[1] + branchCodes.length];
 
       const allResponses = await Promise.all([
         // 0-5: fixed period summaries
@@ -1160,8 +1171,8 @@ const BusinessAnalyticsTab = ({
         ...quarters.map((p) => api.get('/business-operations/reports/sales/summary', { params: withScope(buildParamsForPeriod(p), effectiveScope, locations) })),
         // Daily trend (sampled points for short ranges)
         ...dailyPeriods.map((p) => api.get('/business-operations/reports/sales/summary', { params: withScope(buildParamsForPeriod(p), effectiveScope, locations) })),
-        // branch/location summaries (do not stack on top of already scoped params)
-        ...branchScopes.map((row) => api.get('/business-operations/reports/sales/summary', { params: withScope({ ...basePeriodParams }, `scope:${row.scopeId}`, locations) })),
+        // branch/location summaries
+        ...branchCodes.map((code) => api.get('/business-operations/reports/sales/summary', { params: withScope({ ...periodParams }, `code:${code}`, locations) })),
       ]);
 
       const currentSummary = allResponses[0]?.data?.data || {};
@@ -1224,44 +1235,30 @@ const BusinessAnalyticsTab = ({
         return { day: p.startDate, sales: Number(s.netSales || 0), invoices: Number(s.totalInvoices || 0) };
       });
 
-      // Branch performance aggregated from explicit branch+location scope tuples.
-      const branchSummaryMap = new Map();
-      branchScopes.forEach((scopeRow, i) => {
+      // Branch performance from location-scoped summaries
+      // First, get all branch data
+      const allBranchData = branchCodes.map((code, i) => {
         const s = allResponses[BRANCH_SLICE[0] + i]?.data?.data || {};
         const bSales = Number(s.netSales || 0);
         const bInvoices = Number(s.totalInvoices || 0);
-        const key = scopeRow.branchCode;
-
-        const existing = branchSummaryMap.get(key) || {
-          code: scopeRow.branchCode,
-          sales: 0,
-          invoices: 0,
-          locationCodes: new Set(),
+        return {
+          code,
+          sales: bSales,
+          invoices: bInvoices,
+          averageBasket: bInvoices > 0 ? bSales / bInvoices : 0,
         };
-
-        existing.sales += bSales;
-        existing.invoices += bInvoices;
-        existing.locationCodes.add(scopeRow.locationCode);
-        branchSummaryMap.set(key, existing);
       });
-
-      const allBranchData = Array.from(branchSummaryMap.values()).map((row) => ({
-        code: row.code,
-        sales: row.sales,
-        invoices: row.invoices,
-        averageBasket: row.invoices > 0 ? row.sales / row.invoices : 0,
-        locations: Array.from(row.locationCodes),
-      }));
-
+      
+      // Calculate total across all branches for accurate share percentage
       const branchTotalSales = allBranchData.reduce((sum, b) => sum + b.sales, 0);
-
+      
+      // Add contribution share based on combined branch total
       const branchPerformance = allBranchData
         .map((b) => ({
           ...b,
           contributionShare: branchTotalSales > 0 ? (b.sales / branchTotalSales) * 100 : 0,
         }))
-        .filter((b) => b.sales > 0)
-        .sort((a, b) => b.sales - a.sales);
+        .filter((b) => b.sales > 0);
 
       // Rankings from product/user API responses
       // Aggregate products by their category
@@ -1858,7 +1855,7 @@ const BusinessAnalyticsTab = ({
                         {analytics.rankings.branchPerformance.length === 0 ? (
                           <tr><td colSpan={5} style={emptyStyle}>No branch data in this period.</td></tr>
                         ) : analytics.rankings.branchPerformance.map((row, i) => (
-                          <tr key={`${row.code}-${i}`}><td style={tdBold}>{row.code}<span style={{ display: 'block', color: '#94a3b8', fontSize: '0.72rem', fontWeight: 400 }}>{joinLabels(row.locations)}</span></td><td style={tdStyle}>{intFmt(row.invoices)}</td><td style={tdBold}>{money(row.sales)}</td><td style={tdStyle}>{money(row.averageBasket)}</td><td style={{ ...tdStyle, color: '#2563eb', fontWeight: 700 }}>{row.contributionShare.toFixed(1)}%</td></tr>
+                          <tr key={`${row.code}-${i}`}><td style={tdBold}>{row.code}</td><td style={tdStyle}>{intFmt(row.invoices)}</td><td style={tdBold}>{money(row.sales)}</td><td style={tdStyle}>{money(row.averageBasket)}</td><td style={{ ...tdStyle, color: '#2563eb', fontWeight: 700 }}>{row.contributionShare.toFixed(1)}%</td></tr>
                         ))}
                       </tbody>
                     </table>
