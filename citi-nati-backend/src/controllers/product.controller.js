@@ -18,6 +18,7 @@ const ADMIN_EXPIRY_REQUEST_TIMEOUT_MS = 30000;
 const ADMIN_EXPIRY_CACHE_TTL_MS = 5 * 60 * 1000;
 const ADMIN_EXPIRY_ALERTS_REQUEST_TIMEOUT_MS = Number(process.env.ADMIN_EXPIRY_ALERTS_REQUEST_TIMEOUT_MS || 8000);
 const MAX_PRODUCT_NAME_LENGTH = 120;
+const PRODUCT_SCOPE_MAP_SYNC_SOURCE_PREFIX = 'PRODUCT_SCOPE_MAP';
 
 const adminExpiryFetchState = {
   rows: [],
@@ -521,18 +522,125 @@ function deriveBranchCodeFromScopeCodes(scopeCodes = []) {
   return null;
 }
 
+function buildProductScopeMapSyncSourceCode(branchCode, locationCode) {
+  const normalizedBranchCode = normalizeScopeCode(branchCode);
+  const normalizedLocationCode = normalizeScopeCode(locationCode);
+
+  if (!normalizedBranchCode || !normalizedLocationCode) {
+    return null;
+  }
+
+  return `${PRODUCT_SCOPE_MAP_SYNC_SOURCE_PREFIX}:${normalizedBranchCode}:${normalizedLocationCode}`;
+}
+
+async function ensureProductScopeMapSyncSource(branchCode, branchName, locationCode) {
+  const syncSourceCode = buildProductScopeMapSyncSourceCode(branchCode, locationCode);
+  if (!syncSourceCode) {
+    return null;
+  }
+
+  const now = new Date();
+  const normalizedBranchCode = normalizeScopeCode(branchCode);
+  const normalizedBranchName = String(branchName || normalizedBranchCode).trim() || normalizedBranchCode;
+
+  return prisma.salesSyncSource.upsert({
+    where: {
+      syncSourceCode,
+    },
+    create: {
+      branchCode: normalizedBranchCode,
+      branchName: normalizedBranchName,
+      syncSourceCode,
+      lastSeenAt: now,
+    },
+    update: {
+      branchCode: normalizedBranchCode,
+      branchName: normalizedBranchName,
+      lastSeenAt: now,
+      updatedAt: now,
+    },
+    select: {
+      id: true,
+      syncSourceCode: true,
+    },
+  });
+}
+
+async function upsertProductScopeMapEntry({
+  syncSource,
+  branchCode,
+  branchName,
+  locationCode,
+  productCode,
+  productName,
+}) {
+  if (!syncSource?.id || !syncSource?.syncSourceCode || !productCode) {
+    return;
+  }
+
+  const now = new Date();
+  const normalizedBranchCode = normalizeScopeCode(branchCode);
+  const normalizedLocationCode = normalizeScopeCode(locationCode);
+  const normalizedBranchName = String(branchName || normalizedBranchCode).trim() || normalizedBranchCode;
+
+  const payload = {
+    syncSourceId: syncSource.id,
+    branchCode: normalizedBranchCode,
+    branchName: normalizedBranchName,
+    locationCode: normalizedLocationCode,
+    syncSourceCode: syncSource.syncSourceCode,
+    productCode,
+    productName: String(productName || '').trim() || null,
+    latestUnitCost: null,
+    latestGrnNo: null,
+    latestGrnReference: null,
+    latestGrnDate: null,
+    stockDetailId: null,
+    sourceUpdatedAt: now,
+    sourceSyncedAt: now,
+    lastReceivedAt: now,
+  };
+
+  const existing = await prisma.posLatestProductCost.findUnique({
+    where: {
+      syncSourceCode_productCode: {
+        syncSourceCode: syncSource.syncSourceCode,
+        productCode,
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!existing) {
+    await prisma.posLatestProductCost.create({
+      data: {
+        ...payload,
+        firstReceivedAt: now,
+      },
+    });
+    return;
+  }
+
+  await prisma.posLatestProductCost.update({
+    where: {
+      id: existing.id,
+    },
+    data: payload,
+  });
+}
+
 async function resolveLocationScopedProductCodesFromSales(scopeCodes = [], branchCodeHint = null) {
   if (!Array.isArray(scopeCodes) || scopeCodes.length === 0) {
     return [];
   }
 
   const normalizedBranchHint = normalizeScopeCode(branchCodeHint);
-  // Preserve branch-level fallback only for legacy Blantyre rows when no explicit hint is provided.
-  const derivedBranchCode = normalizedBranchHint || (
-    scopeCodes.includes('BT')
-      ? deriveBranchCodeFromScopeCodes(scopeCodes)
-      : null
-  );
+  // Preserve branch-level fallback only for legacy Blantyre rows.
+  const derivedBranchCode = scopeCodes.includes('BT')
+    ? (normalizedBranchHint || deriveBranchCodeFromScopeCodes(scopeCodes))
+    : null;
   const locationCodePredicates = scopeCodes.map((code) => ({
     locationCode: {
       equals: code,
@@ -567,12 +675,10 @@ async function resolveLocationScopedProductCodesFromLatestCosts(scopeCodes = [],
   }
 
   const normalizedBranchHint = normalizeScopeCode(branchCodeHint);
-  // Preserve branch-level fallback only for legacy Blantyre rows when no explicit hint is provided.
-  const derivedBranchCode = normalizedBranchHint || (
-    scopeCodes.includes('BT')
-      ? deriveBranchCodeFromScopeCodes(scopeCodes)
-      : null
-  );
+  // Preserve branch-level fallback only for legacy Blantyre rows.
+  const derivedBranchCode = scopeCodes.includes('BT')
+    ? (normalizedBranchHint || deriveBranchCodeFromScopeCodes(scopeCodes))
+    : null;
   const locationCodePredicates = scopeCodes.map((code) => ({
     locationCode: {
       equals: code,
@@ -2062,6 +2168,8 @@ const syncProductsFromPOSAgent = async (req, res) => {
     const branchName = String(metadata.branchName || req.body.branchName || branchCode).trim() || branchCode;
     const payloadLocationCode = normalizeScopeCode(metadata.locationCode || req.body.locationCode || process.env.POS_LOCATION_CODE || 'SH');
     const syncLogPrefix = `[${branchCode} SYNC]`;
+    const productScopeMapSource = await ensureProductScopeMapSyncSource(branchCode, branchName, payloadLocationCode);
+    const syncedScopeProductCodes = new Set();
 
     if (!products || !Array.isArray(products)) {
       console.error('[POS AGENT PUSH] Invalid products format');
@@ -2195,6 +2303,16 @@ const syncProductsFromPOSAgent = async (req, res) => {
           console.warn(`[POS AGENT PUSH] Image reattach skipped for ${sourceCode}:`, imgErr.message);
         }
 
+        await upsertProductScopeMapEntry({
+          syncSource: productScopeMapSource,
+          branchCode,
+          branchName,
+          locationCode: productLocationCode || payloadLocationCode,
+          productCode: sourceCode,
+          productName: product.name,
+        });
+        syncedScopeProductCodes.add(sourceCode);
+
         await prisma.productExpiryBatch.deleteMany({
           where: {
             productCode: sourceCode,
@@ -2263,6 +2381,19 @@ const syncProductsFromPOSAgent = async (req, res) => {
         errors.push(errorMsg);
         console.error(`${syncLogPrefix} error (product sync): ${errorMsg}`);
       }
+    }
+
+    if (productScopeMapSource?.syncSourceCode) {
+      const staleProductFilter = syncedScopeProductCodes.size > 0
+        ? { productCode: { notIn: Array.from(syncedScopeProductCodes.values()) } }
+        : {};
+
+      await prisma.posLatestProductCost.deleteMany({
+        where: {
+          syncSourceCode: productScopeMapSource.syncSourceCode,
+          ...staleProductFilter,
+        },
+      });
     }
 
     // Emit real-time update to all connected clients
