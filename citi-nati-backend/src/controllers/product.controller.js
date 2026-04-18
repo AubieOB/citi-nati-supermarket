@@ -474,6 +474,23 @@ function normalizeScopeCode(value) {
   return normalizeOperationalScopeCode(value);
 }
 
+function normalizeBranchCodeForIngest(value, fallbackLocationCode = null) {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (normalized === 'BLANTYRE' || normalized === 'BT') return 'BLANTYRE';
+  if (normalized === 'ZOMBA' || normalized === 'ZA') return 'ZOMBA';
+
+  const normalizedScope = normalizeScopeCode(normalized);
+  const derivedFromScope = deriveBranchCodeFromLocationCode(normalizedScope || normalized);
+  if (derivedFromScope) return derivedFromScope;
+
+  if (fallbackLocationCode) {
+    const derivedFromFallback = deriveBranchCodeFromLocationCode(fallbackLocationCode);
+    if (derivedFromFallback) return derivedFromFallback;
+  }
+
+  return normalized || null;
+}
+
 const ZOMBA_LOCATION_CODES = ['ZA'].concat(CORE_ZOMBA_LOCATION_CODES);
 
 function expandLocationScopeCodes(locationCode) {
@@ -2049,9 +2066,20 @@ const syncProductsFromPOSAgent = async (req, res) => {
 
     const { products, metadata = {} } = req.body;
 
-    const branchCode = normalizeScopeCode(req.headers['x-branch-code'] || metadata.branchCode || req.body.branchCode || 'BLANTYRE');
+    const rawPayloadLocationCode = metadata.locationCode
+      || req.body.locationCode
+      || process.env.POS_LOCATION_CODE
+      || 'SH';
+    const normalizedPayloadLocationCode = normalizeScopeCode(rawPayloadLocationCode);
+    const branchCode = normalizeBranchCodeForIngest(
+      req.headers['x-branch-code'] || metadata.branchCode || req.body.branchCode || 'BLANTYRE',
+      normalizedPayloadLocationCode
+    ) || 'BLANTYRE';
     const branchName = String(metadata.branchName || req.body.branchName || branchCode).trim() || branchCode;
-    const payloadLocationCode = normalizeScopeCode(metadata.locationCode || req.body.locationCode || process.env.POS_LOCATION_CODE || 'SH');
+    // Do not silently default Zomba payloads to SH when locationCode is missing.
+    const payloadLocationCode = branchCode === 'ZOMBA'
+      ? normalizeScopeCode(metadata.locationCode || req.body.locationCode || null)
+      : normalizedPayloadLocationCode;
     const syncLogPrefix = `[${branchCode} SYNC]`;
 
     if (!products || !Array.isArray(products)) {
@@ -2068,11 +2096,18 @@ const syncProductsFromPOSAgent = async (req, res) => {
     let skipped = 0;
     const errors = [];
     let zombaIngestSamplesLogged = 0;
+    let zombaResolvedSamplesLogged = 0;
+    const zombaPersistedByLocation = {
+      SH: 0,
+      BAR: 0,
+      ST999: 0,
+    };
 
     for (const product of products) {
       try {
-        const sourceCode = String(product.sourceCode || '').trim();
-        const productLocationCode = normalizeScopeCode(product.locationCode || product.LocationCode || payloadLocationCode);
+        const sourceCode = String(product.productCode || product.ProductCode || product.sourceCode || '').trim();
+        const incomingLocationCode = normalizeScopeCode(product.locationCode || product.LocationCode || null);
+        const productLocationCode = normalizeScopeCode(incomingLocationCode || payloadLocationCode);
         const stockSourceRaw = String(product.stockSource || product.StockSource || '').trim();
         const stockDateRaw = String(product.stockDate || product.StockDate || '').trim() || null;
 
@@ -2083,13 +2118,25 @@ const syncProductsFromPOSAgent = async (req, res) => {
           continue;
         }
 
-        if (branchCode === 'ZOMBA' && zombaIngestSamplesLogged < 5) {
-          console.log('[ZOMBA PRODUCT INGEST SAMPLE]', {
+        if (branchCode === 'ZOMBA' && zombaIngestSamplesLogged < 20) {
+          console.log('[POS PRODUCT INGEST][INCOMING]', {
             productCode: sourceCode,
-            branchCode,
-            locationCode: productLocationCode,
+            productName: String(product.name || ''),
+            incomingBranchCode: String(req.headers['x-branch-code'] || metadata.branchCode || req.body.branchCode || '').trim() || null,
+            incomingLocationCode: String(product.locationCode || product.LocationCode || metadata.locationCode || req.body.locationCode || '').trim() || null,
+            sourceCode: String(product.sourceCode || '').trim() || null,
+            stock: Number(product.stock || 0),
+            price: Number(product.price || 0),
           });
           zombaIngestSamplesLogged += 1;
+        }
+
+        if (branchCode === 'ZOMBA' && !productLocationCode) {
+          skipped++;
+          const rejection = `[ZOMBA STOCK][REJECTED] product=${sourceCode || 'UNKNOWN'} stockDate=${stockDateRaw || 'NULL'} source=${stockSourceRaw || 'Unknown'} location=NULL stock=${Number(product.stock || 0)} reason=MISSING_LOCATION_CODE`;
+          errors.push(rejection);
+          console.warn(rejection);
+          continue;
         }
 
         // Zomba sync accepts true POS location codes; UI decides which operational scopes are exposed.
@@ -2112,6 +2159,16 @@ const syncProductsFromPOSAgent = async (req, res) => {
             console.warn(rejection);
             continue;
           }
+        }
+
+        if (branchCode === 'ZOMBA' && zombaResolvedSamplesLogged < 20) {
+          console.log('[POS PRODUCT INGEST][RESOLVED]', {
+            productCode: sourceCode,
+            resolvedBranchCode: branchCode,
+            resolvedLocationCode: productLocationCode,
+            resolvedSourceCode: sourceCode,
+          });
+          zombaResolvedSamplesLogged += 1;
         }
 
         const existingProduct = await prisma.product.findFirst({
@@ -2221,6 +2278,9 @@ const syncProductsFromPOSAgent = async (req, res) => {
         }
 
         synced++;
+        if (branchCode === 'ZOMBA' && Object.prototype.hasOwnProperty.call(zombaPersistedByLocation, productLocationCode)) {
+          zombaPersistedByLocation[productLocationCode] += 1;
+        }
         
         // Fetch the complete product with all fields for frontend
         const completeProduct = await prisma.product.findUnique({
@@ -2274,6 +2334,14 @@ const syncProductsFromPOSAgent = async (req, res) => {
         errors.push(errorMsg);
         console.error(`${syncLogPrefix} error (product sync): ${errorMsg}`);
       }
+    }
+
+    if (branchCode === 'ZOMBA') {
+      console.log('[POS PRODUCT INGEST][SUMMARY]', {
+        persistedByLocation: zombaPersistedByLocation,
+        synced,
+        skipped,
+      });
     }
 
     // Emit real-time update to all connected clients
