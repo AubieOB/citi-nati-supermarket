@@ -162,7 +162,7 @@ const S = {
 };
 
 /* ═══════════════════════════ Component ═══════════════════════════ */
-const AdminQuotations = ({ selectedBranchCode = '', selectedLocationCode = '' }) => {
+const AdminQuotations = () => {
   const [tab, setTab] = useState('new');
 
   // ── Fixed header layout (matches AdminPromotions / AdminOrders pattern) ──
@@ -236,14 +236,7 @@ const AdminQuotations = ({ selectedBranchCode = '', selectedLocationCode = '' })
     const timer = setTimeout(async () => {
       setProductSearching(true);
       try {
-        const params = new URLSearchParams({ search: term, limit: '15' });
-        if (selectedBranchCode) {
-          params.append('branchCode', selectedBranchCode);
-        }
-        if (selectedLocationCode) {
-          params.append('locationCode', selectedLocationCode);
-        }
-        const res = await api.get(`/admin/pos-products?${params.toString()}`);
+        const res = await api.get(`/admin/pos-products?search=${encodeURIComponent(term)}&limit=15`);
         setProducts(res.data?.products ?? []);
       } catch {
         setProducts([]);
@@ -252,7 +245,7 @@ const AdminQuotations = ({ selectedBranchCode = '', selectedLocationCode = '' })
       }
     }, 250);
     return () => clearTimeout(timer);
-  }, [productSearch, mode, selectedBranchCode, selectedLocationCode]);
+  }, [productSearch, mode]);
 
   /* ── Load quotations ─── */
   const loadQuotations = useCallback(async () => {
