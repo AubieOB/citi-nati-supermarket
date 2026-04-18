@@ -118,7 +118,6 @@ function focusNextWorkspaceField(container, currentField) {
 }
 
 function buildNewForm(selectedLocation) {
-  function buildNewForm(selectedLocation, selectedLocationCode) {
   return {
     id: null,
     intakeRef: '',
@@ -128,7 +127,7 @@ function buildNewForm(selectedLocation) {
     purchaseDate: localDateKey(new Date()),
     receiptReference: '',
     locationId: selectedLocation ? String(selectedLocation.id) : '',
-      locationCode: selectedLocationCode || selectedLocation?.code || '',
+    locationCode: selectedLocation?.code || normalizeLocationCode(selectedLocation),
     locationName: selectedLocation?.name || '',
     overallNotes: '',
     receiptTotalAmount: '',
@@ -196,7 +195,6 @@ function toFormFromRecord(record) {
 }
 
 const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
-  const GoodsIntakeTab = ({ selectedLocationId = null, selectedLocationCode = '', selectedBranchCode = '', locations = [] }) => {
   const workspaceRef = useRef(null);
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
 
@@ -246,7 +244,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
   }, [locations, selectedLocationId]);
 
   const [form, setForm] = useState(() => buildNewForm(selectedLocation));
-    const [form, setForm] = useState(() => buildNewForm(selectedLocation, selectedLocationCode));
   const [saving, setSaving] = useState(false);
   const [activeLookupRow, setActiveLookupRow] = useState(-1);
   const [isIntakeWorkspaceOpen, setIsIntakeWorkspaceOpen] = useState(false);
@@ -257,10 +254,10 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
     setForm((prev) => ({
       ...prev,
       locationId: selectedLocation ? String(selectedLocation.id) : '',
-        locationCode: selectedLocationCode || selectedLocation?.code || '',
+      locationCode: selectedLocation?.code || normalizeLocationCode(selectedLocation),
       locationName: selectedLocation?.name || '',
     }));
-    }, [form.id, selectedLocation, selectedLocationCode]);
+  }, [form.id, selectedLocation]);
 
   const calculatedItems = useMemo(() => form.items.map(withCalculatedLine), [form.items]);
 
@@ -303,8 +300,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
           search: search || undefined,
           status: statusFilter !== DEFAULT_STATUS_FILTER ? statusFilter : undefined,
           locationId: selectedLocationId || undefined,
-            locationCode: selectedLocationCode || undefined,
-          branchCode: selectedBranchCode || undefined,
           startDate: startDate || undefined,
           endDate: endDate || undefined,
         },
@@ -320,7 +315,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
       setListLoading(false);
     }
   }, [endDate, page, search, selectedLocationId, startDate, statusFilter]);
-  }, [endDate, page, search, selectedBranchCode, selectedLocationCode, selectedLocationId, startDate, statusFilter]);
 
   const fetchSuppliers = useCallback(async () => {
     setSupplierLoading(true);
@@ -332,8 +326,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
           sortBy: 'name',
           sortOrder: 'asc',
           locationId: selectedLocationId || undefined,
-          locationCode: selectedLocationCode || undefined,
-          branchCode: selectedBranchCode || undefined,
           status: 'active',
         },
       });
@@ -343,7 +335,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
     } finally {
       setSupplierLoading(false);
     }
-  }, [selectedBranchCode, selectedLocationCode, selectedLocationId]);
+  }, [selectedLocationId]);
 
   useEffect(() => {
     fetchRecords();
@@ -407,8 +399,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
 
   const clearForm = () => {
     setForm(buildNewForm(selectedLocation));
-    setForm(buildNewForm(selectedLocation, selectedLocationCode));
-    setForm(buildNewForm(selectedLocation, selectedLocationCode));
   };
 
   const openWorkspace = ({ reset = false } = {}) => {

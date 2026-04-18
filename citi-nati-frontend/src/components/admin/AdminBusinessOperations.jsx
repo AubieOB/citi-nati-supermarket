@@ -18,7 +18,6 @@ import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
 import { registerBoDialogHandler } from '../../utils/boDialogBus.js';
 import api from '../../utils/api.js';
-import { BO_OPERATIONAL_SCOPES, resolveBoScope } from './business-operations/boScope.js';
 
 const TABS = [
   { id: 'sales-reports', label: 'Sales Reports', icon: 'fa-chart-column' },
@@ -34,12 +33,12 @@ const TABS = [
   { id: 'actions', label: 'Actions', icon: 'fa-triangle-exclamation' },
 ];
 
-const BO_TABS_ALLOW_ALL_SCOPES = new Set([
-  'sales-reports',
-  'monthly-summary',
-  'report-history',
-  'analytics-performance',
-]);
+function normalizeLocationCode(location) {
+  const name = String(location?.name || '').trim().toLowerCase();
+  if (name === 'blantyre') return 'BT';
+  if (name === 'zomba') return 'ZA';
+  return location?.code ? String(location.code).trim().toUpperCase() : null;
+}
 
 const AdminBusinessOperations = () => {
   const { modal, showModal, closeModal } = useModal();
@@ -51,7 +50,7 @@ const AdminBusinessOperations = () => {
   const [dataRefreshKey, setDataRefreshKey] = useState(0);
   const [drilldownRequests, setDrilldownRequests] = useState({});
   const [locations, setLocations] = useState([]);
-  const [selectedScopeId, setSelectedScopeId] = useState('');
+  const [selectedLocationId, setSelectedLocationId] = useState('all');
   const [locationRefreshKey, setLocationRefreshKey] = useState(0);
 
   useEffect(() => {
@@ -104,7 +103,10 @@ const AdminBusinessOperations = () => {
         const response = await api.get('/business-operations/locations');
         const locationRows = Array.isArray(response?.data?.data) ? response.data.data : [];
         if (cancelled) return;
-        setLocations(locationRows);
+        setLocations(locationRows.map((location) => ({
+          ...location,
+          code: normalizeLocationCode(location),
+        })));
       } catch (_error) {
         if (cancelled) return;
         setLocations([
@@ -123,13 +125,16 @@ const AdminBusinessOperations = () => {
 
   useEffect(() => {
     setLocationRefreshKey((prev) => prev + 1);
-    }, [selectedScopeId]);
+  }, [selectedLocationId]);
 
-    const resolvedScope = useMemo(() => resolveBoScope(selectedScopeId, locations), [selectedScopeId, locations]);
-    const selectedLocationIdNumber = resolvedScope.locationId;
-    const selectedLocationCode = resolvedScope.locationCode;
-    const selectedBranchCode = resolvedScope.branchCode;
-    const selectedLocationName = BO_OPERATIONAL_SCOPES.find((s) => s.scopeId === selectedScopeId)?.branchName || '';
+  const selectedLocation = useMemo(() => {
+    if (selectedLocationId === 'all') return null;
+    const asNumber = Number(selectedLocationId);
+    return locations.find((location) => Number(location.id) === asNumber) || null;
+  }, [locations, selectedLocationId]);
+
+  const selectedLocationCode = selectedLocation?.code || '';
+  const selectedLocationIdNumber = selectedLocation ? Number(selectedLocation.id) : null;
 
   const handleImportSuccess = () => {
     setLocationRefreshKey((current) => current + 1);
@@ -183,20 +188,18 @@ const AdminBusinessOperations = () => {
   }, [handleBoDialog]);
 
   const contentByTab = {
-    'sales-reports': <SalesReportsTab drilldownRequest={drilldownRequests['sales-reports']} selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} selectedBranchCode={selectedBranchCode} />,
-    suppliers: <SuppliersTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} selectedBranchCode={selectedBranchCode} locations={locations} />,
-    'goods-intake': <GoodsIntakeTab selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} selectedBranchCode={selectedBranchCode} locations={locations} />,
-    expenses: <ExpensesTab refreshKey={locationRefreshKey} drilldownRequest={drilldownRequests.expenses} selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} selectedBranchCode={selectedBranchCode} locations={locations} />,
-    'monthly-summary': <MonthlySummaryTab refreshKey={locationRefreshKey} onNavigateTab={handleNavigateTab} selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} selectedLocationName={selectedLocationName} selectedBranchCode={selectedBranchCode} />,
-    employees: <EmployeesTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} selectedBranchCode={selectedBranchCode} locations={locations} />,
-    payroll: <PayrollTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} selectedBranchCode={selectedBranchCode} locations={locations} />,
-    'report-history': <ReportHistoryTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} selectedBranchCode={selectedBranchCode} onNavigateTab={handleNavigateTab} />,
-    'sales-balancing': <SalesBalancingTab selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} selectedLocationName={selectedLocationName} selectedBranchCode={selectedBranchCode} />,
-    'analytics-performance': <BusinessAnalyticsTab selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} selectedBranchCode={selectedBranchCode} locations={locations} />,
+    'sales-reports': <SalesReportsTab drilldownRequest={drilldownRequests['sales-reports']} selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} />,
+    suppliers: <SuppliersTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} locations={locations} />,
+    'goods-intake': <GoodsIntakeTab selectedLocationId={selectedLocationIdNumber} locations={locations} />,
+    expenses: <ExpensesTab refreshKey={locationRefreshKey} drilldownRequest={drilldownRequests.expenses} selectedLocationId={selectedLocationIdNumber} locations={locations} />,
+    'monthly-summary': <MonthlySummaryTab refreshKey={locationRefreshKey} onNavigateTab={handleNavigateTab} selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} selectedLocationName={selectedLocation?.name || ''} />,
+    employees: <EmployeesTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} locations={locations} />,
+    payroll: <PayrollTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} locations={locations} />,
+    'report-history': <ReportHistoryTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} onNavigateTab={handleNavigateTab} />,
+    'sales-balancing': <SalesBalancingTab selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} selectedLocationName={selectedLocation?.name || ''} />,
+    'analytics-performance': <BusinessAnalyticsTab selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} locations={locations} />,
     actions: <BusinessOperationsActionsTab />,
   };
-
-  const activeTabRequiresScope = !BO_TABS_ALLOW_ALL_SCOPES.has(activeTab);
 
   return (
     <div className="bo-shell" style={{ position: 'relative' }}>
@@ -223,14 +226,14 @@ const AdminBusinessOperations = () => {
                   Location Scope
                 </span>
                 <select
-                  value={selectedScopeId}
-                  onChange={(event) => setSelectedScopeId(event.target.value)}
+                  value={selectedLocationId}
+                  onChange={(event) => setSelectedLocationId(event.target.value)}
                   className="bo-location-select"
                 >
-                  <option value="">All Locations</option>
-                  {BO_OPERATIONAL_SCOPES.map((scope) => (
-                    <option key={scope.scopeId} value={scope.scopeId}>
-                      {scope.label}
+                  <option value="all">All Locations</option>
+                  {locations.map((location) => (
+                    <option key={location.id} value={String(location.id)}>
+                      {location.name}{location.code ? ` (${location.code})` : ''}
                     </option>
                   ))}
                 </select>
@@ -247,13 +250,7 @@ const AdminBusinessOperations = () => {
       <div style={{ height: `${filterBarHeight}px` }}></div>
 
       <div className="bo-content-grid">
-        {activeTabRequiresScope && !selectedScopeId ? (
-          <div style={{ padding: '1.2rem', borderRadius: '12px', border: '1px solid #e2e8f0', backgroundColor: '#fff', color: '#334155' }}>
-            Select an operational location to continue in this workspace.
-          </div>
-        ) : (
-          contentByTab[activeTab]
-        )}
+        {contentByTab[activeTab]}
       </div>
 
       <BusinessOperationsImportModal

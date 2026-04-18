@@ -44,7 +44,6 @@ function normalizeAmount(value) {
 }
 
 const SalesBalancingTab = ({ selectedLocationId = null, selectedLocationCode = '', selectedLocationName = '' }) => {
-  const SalesBalancingTab = ({ selectedLocationId = null, selectedLocationCode = '', selectedLocationName = '', selectedBranchCode = '' }) => {
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isHistoryModalMaximized, setIsHistoryModalMaximized] = useState(false);
@@ -67,7 +66,6 @@ const SalesBalancingTab = ({ selectedLocationId = null, selectedLocationCode = '
       const response = await api.get('/business-operations/sales-balancing', {
         params: {
           locationId: selectedLocationId,
-            branchCode: selectedBranchCode || undefined,
           status: historyFilter.status !== 'all' ? historyFilter.status : undefined,
           page: historyFilter.page,
           pageSize: 12,
@@ -117,7 +115,6 @@ const SalesBalancingTab = ({ selectedLocationId = null, selectedLocationCode = '
         ...payload,
         locationId: selectedLocationId,
         locationCode: selectedLocationCode || null,
-          branchCode: selectedBranchCode || null,
         locationName: selectedLocationName || null,
       };
 
