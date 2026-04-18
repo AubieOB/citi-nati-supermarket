@@ -616,7 +616,7 @@ async function resolveLocationScopedProductCodes(locationCode) {
   const salesCodes = await resolveLocationScopedProductCodesFromSales(scopeCodes);
   salesCodes.forEach((code) => scopedCodes.add(code));
 
-  const isZombaScope = scopeCodes.some((code) => ['SH', 'BAR', 'RES', 'WH'].includes(code));
+  const isZombaScope = scopeCodes.some((code) => ['SH', 'BAR', 'WH'].includes(code));
   if (isZombaScope) {
     console.log('[PRODUCTS][SCOPE][ZA] code-source diagnostics', {
       scopeCodes,
@@ -630,10 +630,7 @@ async function resolveLocationScopedProductCodes(locationCode) {
   // Keep legacy Blantyre operations usable when historical rows predate location tagging.
   if (scopedCodes.size === 0 && scopeCodes.includes('BT')) {
     const legacyRows = await prisma.product.findMany({
-      where: {
-        branchCode: 'BLANTYRE',
-        sourceCode: { not: null },
-      },
+      where: { sourceCode: { not: null } },
       select: { sourceCode: true },
       distinct: ['sourceCode'],
     });
@@ -1128,30 +1125,8 @@ const getProducts = async (req, res) => {
       where.isOnSale = true;
     }
 
-    if (isAdmin && ((requestedBranchCode && !requestedLocationCode) || (!requestedBranchCode && requestedLocationCode))) {
-      return res.status(400).json({
-        error: 'Admin products scope requires both branchCode and locationCode',
-      });
-    }
-
-    if (isAdmin && requestedBranchCode && requestedLocationCode) {
-      const scopedProductCodes = await resolveLocationScopedProductCodes(requestedLocationCode);
-      if (!scopedProductCodes || scopedProductCodes.length === 0) {
-        return res.status(200).json({
-          products: [],
-          pagination: {
-            total: 0,
-            count: 0,
-            offset: skip,
-            limit: take,
-          },
-        });
-      }
-
+    if (isAdmin && requestedBranchCode) {
       where.branchCode = requestedBranchCode;
-      where.sourceCode = {
-        in: scopedProductCodes,
-      };
     } else if (normalizedLocationCode) {
       const scopedProductCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
       const derivedBranchCode = deriveBranchCodeFromScopeCodes(expandLocationScopeCodes(normalizedLocationCode));
@@ -1214,7 +1189,7 @@ const getProducts = async (req, res) => {
 
     // Debug logging
     console.log(`[PRODUCTS] Retrieved: ${products.length}, Total: ${total}, Category: ${category || 'all'}, Search: ${search || 'none'}`);
-    const isZombaOperationalScope = normalizedLocationCode && ['ZA', 'SH', 'BAR', 'RES', 'WH'].includes(normalizedLocationCode);
+    const isZombaOperationalScope = normalizedLocationCode && ['ZA', 'SH', 'BAR', 'WH'].includes(normalizedLocationCode);
     if (isZombaOperationalScope && products.length > 0) {
       const sample = products[0];
       console.log(`[ZOMBA STOCK][PRODUCTS_PANEL] product=${sample.sourceCode || 'UNKNOWN'} source=PersistedProductStock location=SH stock=${Number(sample.stock || 0)}`);
@@ -1223,21 +1198,13 @@ const getProducts = async (req, res) => {
         console.log(`[ZOMBA STOCK][VERIFY][PRODUCTS_PANEL] product=9501100002174 source=PersistedProductStock location=SH stock=${Number(verifyProduct.stock || 0)}`);
       }
     }
-    if (isAdmin && requestedBranchCode && requestedLocationCode) {
-      const sampleRows = products.slice(0, 5).map((row) => ({
-        id: row.id,
-        sourceCode: row.sourceCode,
-        branchCode: row.branchCode,
-      }));
-
-      console.log('[PRODUCTS][SCOPE] strict response diagnostics', {
-        requestedBranchCode,
-        requestedLocationCode,
+    if (normalizedLocationCode && ['ZA', 'SH', 'BAR', 'WH'].includes(normalizedLocationCode)) {
+      console.log('[PRODUCTS][ZA] response diagnostics', {
+        requestedLocationCode: normalizedLocationCode,
         totalCount: total,
         pageRowCount: products.length,
         skip,
         take,
-        sampleRows,
       });
     }
 
@@ -2067,7 +2034,14 @@ const syncProductsFromPOSAgent = async (req, res) => {
           continue;
         }
 
-        // Keep the reported POS location for diagnostics and downstream scope data.
+        // Zomba operational rule: only SH stock is accepted for persisted product stock.
+        if (branchCode === 'ZOMBA' && productLocationCode !== 'SH') {
+          skipped++;
+          const rejection = `[ZOMBA STOCK][REJECTED] product=${sourceCode} stockDate=${stockDateRaw || 'NULL'} source=${stockSourceRaw || 'Unknown'} location=${productLocationCode || 'NULL'} stock=${Number(product.stock || 0)} reason=NON_SH_LOCATION`;
+          errors.push(rejection);
+          console.warn(rejection);
+          continue;
+        }
 
         // Guard against legacy calculated/fallback payloads for Zomba operational stock.
         if (branchCode === 'ZOMBA' && stockSourceRaw) {
