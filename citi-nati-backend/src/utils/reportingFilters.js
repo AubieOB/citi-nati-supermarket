@@ -38,7 +38,7 @@ const ALLOWED_PAYMENT_SORT_FIELDS = new Set(['payMethod', 'totalAmount', 'invoic
 
 const ALLOWED_SORT_ORDERS = new Set(['asc', 'desc']);
 
-const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'RES', 'WH'];
+const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH'];
 const BRANCH_SCOPE_LOCATION_CODES = ['BT', 'ZA'];
 
 const BRANCH_SYNC_SOURCE_PREFIXES = {
@@ -293,9 +293,9 @@ function expandLocationScopeCodes(locationCode) {
     return ['BT'];
   }
 
-  if (normalized === 'ZA') {
-    // Branch-level ZA should include all known Zomba operational sources.
-    return ['SH', 'BAR', 'RES', 'WH'];
+  if (ZOMBA_LOCATION_CODES.includes(normalized)) {
+    // Zomba POS scope is anchored to SH.
+    return ['SH'];
   }
 
   return [normalized];

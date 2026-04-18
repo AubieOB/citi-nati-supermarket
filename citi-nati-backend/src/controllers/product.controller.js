@@ -469,7 +469,7 @@ function normalizeScopeCode(value) {
   return normalized || null;
 }
 
-const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'RES', 'WH'];
+const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH'];
 
 function expandLocationScopeCodes(locationCode) {
   const normalizedLocationCode = normalizeScopeCode(locationCode);
@@ -479,9 +479,9 @@ function expandLocationScopeCodes(locationCode) {
     return ['BT'];
   }
 
-  if (normalizedLocationCode === 'ZA') {
-    // Branch-level ZA should include all known Zomba operational sources.
-    return ['SH', 'BAR', 'RES', 'WH'];
+  if (ZOMBA_LOCATION_CODES.includes(normalizedLocationCode)) {
+    // Zomba POS sales are transacted through SH.
+    return ['SH'];
   }
 
   return [normalizedLocationCode];
@@ -1062,12 +1062,11 @@ const getProducts = async (req, res) => {
 
     // Extract query parameters for filtering and pagination
     // Support both offset-based (offset, limit) and page-based (page, pageSize) for backwards compatibility
-    const { search, category, onSale, page, pageSize, offset, limit, includePosExpiry, locationCode, branchCode } = req.query;
+    const { search, category, onSale, page, pageSize, offset, limit, includePosExpiry, locationCode } = req.query;
     const requestedPosExpiry = String(includePosExpiry || '').trim().toLowerCase() === 'true';
     const forceAdminPosExpiry = shouldForceAdminExpiryEnrichment(req);
     const shouldIncludePosExpiry = requestedPosExpiry || forceAdminPosExpiry;
     const requestedLocationCode = normalizeScopeCode(locationCode);
-    const requestedBranchCode = normalizeScopeCode(branchCode);
     const normalizedLocationCode = requestedLocationCode || (!isAdminRequest(req) ? getStorefrontLocationCode() : null);
 
     console.log('[ADMIN PRODUCTS] expiry enrichment decision', {
@@ -1141,14 +1140,10 @@ const getProducts = async (req, res) => {
         where.sourceCode = {
           in: scopedProductCodes,
         };
-        if (requestedBranchCode) {
-          where.branchCode = requestedBranchCode;
-        } else if (derivedBranchCode) {
+        if (derivedBranchCode) {
           where.branchCode = derivedBranchCode;
         }
       }
-    } else if (requestedBranchCode) {
-      where.branchCode = requestedBranchCode;
     }
 
     // Get total count for pagination metadata

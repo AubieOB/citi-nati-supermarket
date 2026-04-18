@@ -10,7 +10,7 @@ const { PrismaClient } = require('@prisma/client');
 const posCommandQueueService = require('../services/posCommandQueue.service');
 const prisma = new PrismaClient();
 
-const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'RES', 'WH'];
+const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH'];
 const POS_DEFAULT_LOCATION_CODE = process.env.POS_LOCATION_CODE || 'BT';
 const POS_DEFAULT_PRICE_TYPE_CODE = process.env.POS_PRICE_TYPE_CODE || 'RT';
 const POS_PROMO_REASON_CODE = 'WEBSITE_PROMOTION';
@@ -38,8 +38,8 @@ function expandLocationScopeCodes(locationCode) {
     return ['BT'];
   }
 
-  if (normalizedLocationCode === 'ZA') {
-    return ['SH', 'BAR', 'RES', 'WH'];
+  if (ZOMBA_LOCATION_CODES.includes(normalizedLocationCode)) {
+    return ['SH'];
   }
 
   return [normalizedLocationCode];

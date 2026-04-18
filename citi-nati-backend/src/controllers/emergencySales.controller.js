@@ -15,7 +15,7 @@ const SYNC_STATUS = {
   FAILED: 'sync_failed',
 };
 
-const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'RES', 'WH'];
+const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH'];
 const SUPPORTED_LOCATION_CODES = ['BT'].concat(ZOMBA_LOCATION_CODES);
 const SCOPED_PRODUCT_CODES_CACHE_TTL_MS = Number.parseInt(process.env.EMERGENCY_SCOPE_CODES_CACHE_TTL_MS || '30000', 10);
 const EMERGENCY_LOOKUP_CACHE_TTL_MS = Number.parseInt(process.env.EMERGENCY_LOOKUP_CACHE_TTL_MS || '8000', 10);
@@ -70,9 +70,9 @@ function expandLocationScopeCodes(locationCode) {
     return ['BT'];
   }
 
-  if (normalizedLocationCode === 'ZA') {
-    // Branch-level ZA should include all known Zomba operational sources.
-    return ['SH', 'BAR', 'RES', 'WH'];
+  if (ZOMBA_LOCATION_CODES.includes(normalizedLocationCode)) {
+    // Zomba operations are handled via SH in POS.
+    return ['SH'];
   }
 
   return [normalizedLocationCode];
