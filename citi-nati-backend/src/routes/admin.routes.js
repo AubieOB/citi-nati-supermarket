@@ -181,7 +181,7 @@ async function resolveLocationScopedProductCodes(locationCode) {
   const salesCodes = await resolveLocationScopedProductCodesFromSales(scopeCodes);
   salesCodes.forEach((code) => scopedCodes.add(code));
 
-  const isZombaScope = scopeCodes.some((code) => ['SH', 'BAR', 'WH'].includes(code));
+  const isZombaScope = scopeCodes.some((code) => ['SH', 'BAR', 'RES', 'WH'].includes(code));
   if (isZombaScope) {
     console.log('[ADMIN POS][SCOPE][ZA] code-source diagnostics', {
       scopeCodes,
@@ -194,7 +194,10 @@ async function resolveLocationScopedProductCodes(locationCode) {
 
   if (scopedCodes.size === 0 && scopeCodes.includes('BT')) {
     const legacyRows = await prisma.product.findMany({
-      where: { sourceCode: { not: null } },
+      where: {
+        branchCode: 'BLANTYRE',
+        sourceCode: { not: null },
+      },
       select: { sourceCode: true },
       distinct: ['sourceCode'],
     });
@@ -970,16 +973,20 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
     const normalizedLocationCode = normalizeLocationCode(locationCode);
     const normalizedBranchCode = String(branchCode || '').trim().toUpperCase() || null;
 
+    if ((normalizedBranchCode && !normalizedLocationCode) || (!normalizedBranchCode && normalizedLocationCode)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Operational scope requires both branchCode and locationCode',
+      });
+    }
+
     // Build where clause
     const where = {
       sourceCode: { not: null }, // Only POS products
     };
 
-    if (normalizedBranchCode) {
-      where.branchCode = normalizedBranchCode;
-    } else if (normalizedLocationCode) {
+    if (normalizedBranchCode && normalizedLocationCode) {
       const scopedProductCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
-      const derivedBranchCode = deriveBranchCodeFromScopeCodes(expandLocationScopeCodes(normalizedLocationCode));
       if (!scopedProductCodes || scopedProductCodes.length === 0) {
         return res.json({
           success: true,
@@ -990,10 +997,8 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
           totalPages: 0,
         });
       } else {
+        where.branchCode = normalizedBranchCode;
         where.sourceCode = { in: scopedProductCodes };
-        if (derivedBranchCode) {
-          where.branchCode = derivedBranchCode;
-        }
       }
     }
 
@@ -1028,7 +1033,25 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
       orderBy: { createdAt: 'desc' },
     });
 
-    const isZombaScope = normalizedLocationCode && ['ZA', 'SH', 'BAR', 'WH'].includes(normalizedLocationCode);
+    const isZombaScope = normalizedLocationCode && ['ZA', 'SH', 'BAR', 'RES', 'WH'].includes(normalizedLocationCode);
+        if (normalizedBranchCode && normalizedLocationCode) {
+          const sampleRows = products.slice(0, 5).map((row) => ({
+            id: row.id,
+            sourceCode: row.sourceCode,
+            branchCode: row.branchCode,
+          }));
+
+          console.log('[ADMIN POS][SCOPE] strict response diagnostics', {
+            requestedBranchCode: normalizedBranchCode,
+            requestedLocationCode: normalizedLocationCode,
+            totalCount: total,
+            pageRowCount: products.length,
+            skip,
+            limit: parseInt(limit),
+            sampleRows,
+          });
+        }
+
     if (isZombaScope && products.length > 0) {
       const sample = products[0];
       console.log(`[ZOMBA STOCK][POS_MANAGEMENT] product=${sample.sourceCode || 'UNKNOWN'} source=PersistedProductStock location=SH stock=${Number(sample.stock || 0)}`);

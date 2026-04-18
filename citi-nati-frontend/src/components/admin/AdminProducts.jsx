@@ -647,6 +647,13 @@ const AdminProducts = ({
     fetchRequestIdRef.current = requestId;
 
     try {
+      if (!selectedBranchCode || !selectedLocationCode) {
+        setProducts([]);
+        setLoading(false);
+        setError(selectedBranchCode || selectedLocationCode ? 'Operational scope is incomplete. Select both branch and location.' : null);
+        return;
+      }
+
       setError(null);
       setLoading(true);
 
