@@ -609,7 +609,7 @@ async function resolveLocationScopedProductCodes(locationCode) {
 
   const isZombaScope = scopeCodes.some((code) => CORE_ZOMBA_LOCATION_CODES.includes(code));
   if (isZombaScope) {
-    console.log('[PRODUCTS][SCOPE][ZA] code-source diagnostics', {
+    console.log('[PRODUCTS][SCOPE][ZOMBA] code-source diagnostics', {
       scopeCodes,
       expiryDistinctCount: expiryRows.length,
       latestCostDistinctCount: costCodes.length,
@@ -630,6 +630,25 @@ async function resolveLocationScopedProductCodes(locationCode) {
       .map((row) => normalizeProductCode(row.sourceCode))
       .filter(Boolean)
       .forEach((code) => scopedCodes.add(code));
+  }
+
+  // Zomba fallback: if no activity-table records exist yet for the requested
+  // Zomba location, fall back to all products stored with branchCode='ZOMBA'.
+  // The Product table is the primary source for POS-synced products.
+  if (scopedCodes.size === 0 && isZombaScope) {
+    const zombaRows = await prisma.product.findMany({
+      where: { branchCode: 'ZOMBA', sourceCode: { not: null } },
+      select: { sourceCode: true },
+      distinct: ['sourceCode'],
+    });
+    zombaRows
+      .map((row) => normalizeProductCode(row.sourceCode))
+      .filter(Boolean)
+      .forEach((code) => scopedCodes.add(code));
+    console.log('[PRODUCTS][ZOMBA_SCOPE][FALLBACK] fell back to Product table branchCode=ZOMBA', {
+      scopeCodes,
+      fallbackCodeCount: scopedCodes.size,
+    });
   }
 
   return Array.from(scopedCodes.values());
@@ -1117,7 +1136,20 @@ const getProducts = async (req, res) => {
     if (normalizedLocationCode) {
       const scopedProductCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
       const derivedBranchCode = deriveBranchCodeFromScopeCodes(expandLocationScopeCodes(normalizedLocationCode));
+      const rawLocationParam = String(locationCode || '').trim().toUpperCase();
+      const resWasMapped = rawLocationParam === 'RES' && normalizedLocationCode === 'ST999';
+      console.log('[PRODUCT QUERY]', {
+        uiLocation: locationCode || '(none)',
+        resolvedLocationCode: normalizedLocationCode,
+        resolvedBranchCode: derivedBranchCode,
+        resAlias: resWasMapped ? 'RES->ST999' : null,
+        scopedCodeCount: scopedProductCodes ? scopedProductCodes.length : 0,
+      });
       if (!scopedProductCodes || scopedProductCodes.length === 0) {
+        console.warn('[PRODUCT QUERY] no scoped product codes found - returning empty result', {
+          normalizedLocationCode,
+          derivedBranchCode,
+        });
         return res.status(200).json({
           products: [],
           pagination: {
@@ -1176,6 +1208,10 @@ const getProducts = async (req, res) => {
 
     // Debug logging
     console.log(`[PRODUCTS] Retrieved: ${products.length}, Total: ${total}, Category: ${category || 'all'}, Search: ${search || 'none'}`);
+    if (normalizedLocationCode) {
+      const sampleRow = products[0];
+      console.log(`[PRODUCT QUERY] uiLocation=${locationCode || '(none)'} branchCode=${where.branchCode || '(any)'} locationCode=${normalizedLocationCode} matchedRows=${total} pageRows=${products.length}${sampleRow ? ` sample=${sampleRow.sourceCode || sampleRow.name}` : ''}`);
+    }
     const isZombaOperationalScope = normalizedLocationCode && ZOMBA_LOCATION_CODES.includes(normalizedLocationCode);
     if (isZombaOperationalScope && products.length > 0) {
       const sample = products[0];

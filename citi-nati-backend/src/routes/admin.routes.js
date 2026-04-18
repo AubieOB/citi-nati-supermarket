@@ -178,7 +178,7 @@ async function resolveLocationScopedProductCodes(locationCode) {
 
   const isZombaScope = scopeCodes.some((code) => CORE_ZOMBA_LOCATION_CODES.includes(code));
   if (isZombaScope) {
-    console.log('[ADMIN POS][SCOPE][ZA] code-source diagnostics', {
+    console.log('[ADMIN POS][SCOPE][ZOMBA] code-source diagnostics', {
       scopeCodes,
       expiryDistinctCount: expiryRows.length,
       latestCostDistinctCount: costCodes.length,
@@ -198,6 +198,24 @@ async function resolveLocationScopedProductCodes(locationCode) {
       .map((row) => String(row.sourceCode || '').trim())
       .filter(Boolean)
       .forEach((code) => scopedCodes.add(code));
+  }
+
+  // Zomba fallback: if no activity-table records exist yet for the requested
+  // Zomba location, fall back to all products stored with branchCode='ZOMBA'.
+  if (scopedCodes.size === 0 && isZombaScope) {
+    const zombaRows = await prisma.product.findMany({
+      where: { branchCode: 'ZOMBA', sourceCode: { not: null } },
+      select: { sourceCode: true },
+      distinct: ['sourceCode'],
+    });
+    zombaRows
+      .map((row) => String(row.sourceCode || '').trim())
+      .filter(Boolean)
+      .forEach((code) => scopedCodes.add(code));
+    console.log('[ADMIN POS][ZOMBA_SCOPE][FALLBACK] fell back to Product table branchCode=ZOMBA', {
+      scopeCodes,
+      fallbackCodeCount: scopedCodes.size,
+    });
   }
 
   return Array.from(scopedCodes.values());
@@ -972,6 +990,15 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
     if (normalizedLocationCode) {
       const scopedProductCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
       const derivedBranchCode = deriveBranchCodeFromScopeCodes(expandLocationScopeCodes(normalizedLocationCode));
+      const rawParam = String(locationCode || '').trim().toUpperCase();
+      const resWasMapped = rawParam === 'RES' && normalizedLocationCode === 'ST999';
+      console.log('[PRODUCT QUERY][POS_MANAGEMENT]', {
+        uiLocation: locationCode || '(none)',
+        resolvedLocationCode: normalizedLocationCode,
+        resolvedBranchCode: derivedBranchCode,
+        resAlias: resWasMapped ? 'RES->ST999' : null,
+        scopedCodeCount: scopedProductCodes ? scopedProductCodes.length : 0,
+      });
       if (!scopedProductCodes || scopedProductCodes.length === 0) {
         return res.json({
           success: true,

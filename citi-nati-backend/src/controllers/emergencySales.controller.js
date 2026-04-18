@@ -249,7 +249,8 @@ async function resolveLocationScopedProductCodes(locationCode) {
   const salesCodes = await resolveLocationScopedProductCodesFromSales(scopeCodes);
   salesCodes.forEach((code) => scopedCodes.add(code));
 
-  if (scopeCodes.some((code) => CORE_ZOMBA_LOCATION_CODES.includes(code))) {
+  const isZombaScope = scopeCodes.some((code) => CORE_ZOMBA_LOCATION_CODES.includes(code));
+  if (isZombaScope) {
     console.log('[EMERGENCY SALES][SCOPE][ZOMBA] code-source diagnostics', {
       scopeCodes,
       expiryDistinctCount: expiryRows.length,
@@ -270,6 +271,24 @@ async function resolveLocationScopedProductCodes(locationCode) {
       .map((row) => String(row.sourceCode || '').trim())
       .filter(Boolean)
       .forEach((code) => scopedCodes.add(code));
+  }
+
+  // Zomba fallback: if no activity-table records exist yet for the requested
+  // Zomba location, fall back to all products stored with branchCode='ZOMBA'.
+  if (scopedCodes.size === 0 && isZombaScope) {
+    const zombaRows = await prisma.product.findMany({
+      where: { branchCode: 'ZOMBA', sourceCode: { not: null } },
+      select: { sourceCode: true },
+      distinct: ['sourceCode'],
+    });
+    zombaRows
+      .map((row) => String(row.sourceCode || '').trim())
+      .filter(Boolean)
+      .forEach((code) => scopedCodes.add(code));
+    console.log('[EMERGENCY SALES][ZOMBA_SCOPE][FALLBACK] fell back to Product table branchCode=ZOMBA', {
+      scopeCodes,
+      fallbackCodeCount: scopedCodes.size,
+    });
   }
 
   const codes = Array.from(scopedCodes.values());
