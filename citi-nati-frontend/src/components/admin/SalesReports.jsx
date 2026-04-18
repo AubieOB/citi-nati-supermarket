@@ -9,7 +9,7 @@ import {
 } from '../../utils/pdfReports.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 
-const SalesReports = ({ refreshTrigger }) => {
+const SalesReports = ({ refreshTrigger, selectedBranchCode = '', selectedLocationCode = '' }) => {
   const { token } = useAuth();
 
   const [salesDays, setSalesDays] = useState([]);
@@ -80,7 +80,14 @@ const SalesReports = ({ refreshTrigger }) => {
 
         const perPage = 100;
         const fetchProductsPage = async (pageNumber) => {
-          return api.get(`/products?page=${pageNumber}&pageSize=${perPage}`);
+          const params = new URLSearchParams({ page: String(pageNumber), pageSize: String(perPage) });
+          if (selectedBranchCode) {
+            params.append('branchCode', selectedBranchCode);
+          }
+          if (selectedLocationCode) {
+            params.append('locationCode', selectedLocationCode);
+          }
+          return api.get(`/products?${params.toString()}`);
         };
 
         const firstProductsResponse = await fetchProductsPage(1);
@@ -135,7 +142,7 @@ const SalesReports = ({ refreshTrigger }) => {
     };
 
     fetchData();
-  }, [token, refreshTrigger]);
+  }, [token, refreshTrigger, selectedBranchCode, selectedLocationCode]);
 
   const filteredSalesDays = useMemo(() => {
     if (!fromDate && !toDate) return salesDays;

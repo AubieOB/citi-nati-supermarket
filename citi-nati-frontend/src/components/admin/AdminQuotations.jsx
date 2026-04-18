@@ -162,7 +162,7 @@ const S = {
 };
 
 /* ═══════════════════════════ Component ═══════════════════════════ */
-const AdminQuotations = () => {
+const AdminQuotations = ({ selectedBranchCode = '', selectedLocationCode = '' }) => {
   const [tab, setTab] = useState('new');
 
   // ── Fixed header layout (matches AdminPromotions / AdminOrders pattern) ──
@@ -236,7 +236,14 @@ const AdminQuotations = () => {
     const timer = setTimeout(async () => {
       setProductSearching(true);
       try {
-        const res = await api.get(`/admin/pos-products?search=${encodeURIComponent(term)}&limit=15`);
+        const params = new URLSearchParams({ search: term, limit: '15' });
+        if (selectedBranchCode) {
+          params.append('branchCode', selectedBranchCode);
+        }
+        if (selectedLocationCode) {
+          params.append('locationCode', selectedLocationCode);
+        }
+        const res = await api.get(`/admin/pos-products?${params.toString()}`);
         setProducts(res.data?.products ?? []);
       } catch {
         setProducts([]);
@@ -245,7 +252,7 @@ const AdminQuotations = () => {
       }
     }, 250);
     return () => clearTimeout(timer);
-  }, [productSearch, mode]);
+  }, [productSearch, mode, selectedBranchCode, selectedLocationCode]);
 
   /* ── Load quotations ─── */
   const loadQuotations = useCallback(async () => {

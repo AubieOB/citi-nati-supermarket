@@ -981,7 +981,12 @@ const AdminDashboard = () => {
                 selectedBranchCode={selectedOperationalBranchCode}
               />
             )}
-            {activeTab === 'quotations' && <AdminQuotations />}
+            {activeTab === 'quotations' && (
+              <AdminQuotations
+                selectedBranchCode={selectedOperationalBranchCode}
+                selectedLocationCode={selectedOperationalLocationCode}
+              />
+            )}
             {activeTab === 'products' && (
               <AdminProducts
                 selectedBranchCode={selectedOperationalBranchCode}
@@ -1041,7 +1046,12 @@ const AdminDashboard = () => {
             )}
             {activeTab === 'orders' && <AdminOrders />}
             {activeTab === 'users' && <AdminUsers />}
-            {activeTab === 'sales' && <AdminSales />}
+            {activeTab === 'sales' && (
+              <AdminSales
+                selectedBranchCode={selectedOperationalBranchCode}
+                selectedLocationCode={selectedOperationalLocationCode}
+              />
+            )}
             {activeTab === 'business-operations' && <AdminBusinessOperations />}
             {activeTab === 'refunds' && <AdminRefunds />}
             {activeTab === 'support' && <SupportDashboard />}

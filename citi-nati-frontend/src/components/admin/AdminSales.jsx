@@ -7,7 +7,7 @@ import { getCurrentSalesDay } from '../../utils/salesService.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { getSocket } from '../../utils/socket.js';
 
-const AdminSales = () => {
+const AdminSales = ({ selectedBranchCode = '', selectedLocationCode = '' }) => {
   const { user, token } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [currentSalesDay, setCurrentSalesDay] = useState(null);
@@ -171,7 +171,11 @@ const AdminSales = () => {
       )}
 
       {activeTab === 'reports' && (
-        <SalesReports refreshTrigger={refreshTrigger} />
+        <SalesReports
+          refreshTrigger={refreshTrigger}
+          selectedBranchCode={selectedBranchCode}
+          selectedLocationCode={selectedLocationCode}
+        />
       )}
       </div>
     </div>
