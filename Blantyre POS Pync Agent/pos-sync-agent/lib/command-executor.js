@@ -237,6 +237,8 @@ function isLikelyNonRetryablePromotionError(message) {
 async function executeApplyPromotion(pool, payload, commandId) {
   console.log('[PROMO COMMAND] APPLY_PROMOTION start', {
     commandId,
+    branchCode: payload.branchCode || null,
+    requestedLocationCode: payload.requestedLocationCode || null,
     productCode: payload.productCode,
     locationCode: payload.locationCode || process.env.POS_LOCATION_CODE || 'SH',
     priceTypeCode: payload.priceTypeCode || 'RT',
@@ -257,11 +259,15 @@ async function executeApplyPromotion(pool, payload, commandId) {
     console.log('[PROMO COMMAND] success', {
       commandId,
       action: 'APPLY_PROMOTION',
+      branchCode: payload.branchCode || null,
+      requestedLocationCode: payload.requestedLocationCode || null,
       productCode: payload.productCode,
       locationCode: payload.locationCode || process.env.POS_LOCATION_CODE || 'SH',
       priceTypeCode: payload.priceTypeCode || 'RT',
       promotionalPrice: Number(payload.promotionalPrice),
       priceId: resultSummary?.insertedRow?.priceId,
+      writtenPriceTypes: resultSummary?.targetPriceTypes || (resultSummary?.priceTypeCode ? [resultSummary.priceTypeCode] : []),
+      latestRowsAfterWrite: resultSummary?.sourceDiagnosticsAfter?.recentRows || [],
     });
     return {
       message: 'Promotion write executed in productprices',
@@ -278,6 +284,8 @@ async function executeApplyPromotion(pool, payload, commandId) {
       console.error('[PROMO COMMAND ERROR] failure', {
         commandId,
         action: 'APPLY_PROMOTION',
+        branchCode: payload.branchCode || null,
+        requestedLocationCode: payload.requestedLocationCode || null,
         productCode: payload.productCode,
         locationCode: payload.locationCode || process.env.POS_LOCATION_CODE || 'SH',
         priceTypeCode: payload.priceTypeCode || 'RT',
@@ -290,6 +298,8 @@ async function executeApplyPromotion(pool, payload, commandId) {
     console.error('[PROMO COMMAND ERROR] failure', {
       commandId,
       action: 'APPLY_PROMOTION',
+      branchCode: payload.branchCode || null,
+      requestedLocationCode: payload.requestedLocationCode || null,
       productCode: payload.productCode,
       locationCode: payload.locationCode || process.env.POS_LOCATION_CODE || 'SH',
       priceTypeCode: payload.priceTypeCode || 'RT',
@@ -303,6 +313,8 @@ async function executeApplyPromotion(pool, payload, commandId) {
 async function executeRevertPromotion(pool, payload, commandId) {
   console.log('[PROMO COMMAND] REVERT_PROMOTION start', {
     commandId,
+    branchCode: payload.branchCode || null,
+    requestedLocationCode: payload.requestedLocationCode || null,
     productCode: payload.productCode,
     locationCode: payload.locationCode || process.env.POS_LOCATION_CODE || 'SH',
     priceTypeCode: payload.priceTypeCode || 'RT',
@@ -323,11 +335,15 @@ async function executeRevertPromotion(pool, payload, commandId) {
     console.log('[PROMO COMMAND] success', {
       commandId,
       action: 'REVERT_PROMOTION',
+      branchCode: payload.branchCode || null,
+      requestedLocationCode: payload.requestedLocationCode || null,
       productCode: payload.productCode,
       locationCode: payload.locationCode || process.env.POS_LOCATION_CODE || 'SH',
       priceTypeCode: payload.priceTypeCode || 'RT',
       restorePrice: payload.restorePrice == null ? null : Number(payload.restorePrice),
       priceId: resultSummary?.insertedRow?.priceId,
+      writtenPriceTypes: resultSummary?.targetPriceTypes || (resultSummary?.priceTypeCode ? [resultSummary.priceTypeCode] : []),
+      latestRowsAfterWrite: resultSummary?.sourceDiagnosticsAfter?.recentRows || [],
     });
     return {
       message: 'Promotion revert executed in productprices',
@@ -344,6 +360,8 @@ async function executeRevertPromotion(pool, payload, commandId) {
       console.error('[PROMO COMMAND ERROR] failure', {
         commandId,
         action: 'REVERT_PROMOTION',
+        branchCode: payload.branchCode || null,
+        requestedLocationCode: payload.requestedLocationCode || null,
         productCode: payload.productCode,
         locationCode: payload.locationCode || process.env.POS_LOCATION_CODE || 'SH',
         priceTypeCode: payload.priceTypeCode || 'RT',
@@ -356,6 +374,8 @@ async function executeRevertPromotion(pool, payload, commandId) {
     console.error('[PROMO COMMAND ERROR] failure', {
       commandId,
       action: 'REVERT_PROMOTION',
+      branchCode: payload.branchCode || null,
+      requestedLocationCode: payload.requestedLocationCode || null,
       productCode: payload.productCode,
       locationCode: payload.locationCode || process.env.POS_LOCATION_CODE || 'SH',
       priceTypeCode: payload.priceTypeCode || 'RT',

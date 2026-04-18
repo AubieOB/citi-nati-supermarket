@@ -14,6 +14,16 @@ const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH'];
 const POS_DEFAULT_LOCATION_CODE = process.env.POS_LOCATION_CODE || 'BT';
 const POS_DEFAULT_PRICE_TYPE_CODE = process.env.POS_PRICE_TYPE_CODE || 'RT';
 const POS_PROMO_REASON_CODE = 'WEBSITE_PROMOTION';
+const POS_BLANTYRE_SELLING_LOCATION_CODE = normalizeLocationCode(
+  process.env.POS_BLANTYRE_SELLING_LOCATION_CODE
+  || process.env.POS_BLANTYRE_PROMOTION_LOCATION_CODE
+  || 'SH'
+) || 'SH';
+const POS_ZOMBA_SELLING_LOCATION_CODE = normalizeLocationCode(
+  process.env.POS_ZOMBA_SELLING_LOCATION_CODE
+  || process.env.POS_ZOMBA_PROMOTION_LOCATION_CODE
+  || 'SH'
+) || 'SH';
 
 const ACTIVE_PRODUCT_FILTER = {
   isActive: true,
@@ -166,8 +176,8 @@ function deriveBranchCodeFromLocationCode(locationCode) {
 }
 
 function getDefaultPosLocationCodeForBranch(branchCode, requestedLocationCode) {
-  if (branchCode === 'BLANTYRE') return 'BT';
-  if (branchCode === 'ZOMBA') return 'SH';
+  if (branchCode === 'BLANTYRE') return POS_BLANTYRE_SELLING_LOCATION_CODE;
+  if (branchCode === 'ZOMBA') return POS_ZOMBA_SELLING_LOCATION_CODE;
   return normalizeLocationCode(requestedLocationCode) || POS_DEFAULT_LOCATION_CODE;
 }
 
@@ -385,6 +395,14 @@ async function queuePosPromotionCommands({
     id: p.id,
     sourceCode: p.sourceCode || null,
   })));
+  console.log(`[PROMO][QUEUE] ${type} location mapping:`, {
+    branchCode: scope?.branchCode || null,
+    requestedLocationCode: scope?.locationCode || null,
+    posLocationCodeUsedForWriteback: scope?.posLocationCode || POS_DEFAULT_LOCATION_CODE,
+    defaultBlantyreSellingLocation: POS_BLANTYRE_SELLING_LOCATION_CODE,
+    defaultZombaSellingLocation: POS_ZOMBA_SELLING_LOCATION_CODE,
+    priceTypeCode: POS_DEFAULT_PRICE_TYPE_CODE,
+  });
 
   let enqueued = 0;
   let skippedNoSourceCode = 0;
