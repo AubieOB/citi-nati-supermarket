@@ -149,16 +149,35 @@ function normalizeScopeCode(value) {
   return normalized || null;
 }
 
-function eventMatchesSelectedScope(event, selectedBranchCode, selectedLocationCode) {
-  const scopeBranchCode = normalizeScopeCode(selectedBranchCode);
-  const scopeLocationCode = normalizeScopeCode(selectedLocationCode);
-  if (!scopeBranchCode || !scopeLocationCode) return false;
+function deriveBranchCodeFromLocationCode(locationCode) {
+  const normalized = normalizeScopeCode(locationCode);
+  if (normalized === 'BT') return 'BLANTYRE';
+  if (['ZA', 'SH', 'BAR', 'WH'].includes(normalized)) return 'ZOMBA';
+  return null;
+}
+
+function expandScopeLocationCodes(locationCode) {
+  const normalized = normalizeScopeCode(locationCode);
+  if (!normalized) return [];
+  if (normalized === 'BT') return ['BT'];
+  if (['ZA', 'SH', 'BAR', 'WH'].includes(normalized)) return ['ZA', 'SH', 'BAR', 'WH'];
+  return [normalized];
+}
+
+function eventMatchesSelectedScope(event, selectedLocationCode) {
+  const scopeBranchCode = deriveBranchCodeFromLocationCode(selectedLocationCode);
+  const scopeLocationCodes = expandScopeLocationCodes(selectedLocationCode);
+  if (!scopeBranchCode && scopeLocationCodes.length === 0) return true;
 
   const metadata = event?.metadata && typeof event.metadata === 'object' ? event.metadata : {};
-  const eventBranchCode = normalizeScopeCode(metadata.branchCode || null);
+  const eventBranchCode = deriveBranchCodeFromLocationCode(metadata.branchCode)
+    || deriveBranchCodeFromLocationCode(metadata.locationCode)
+    || normalizeScopeCode(metadata.branchCode || null);
   const eventLocationCode = normalizeScopeCode(metadata.locationCode || null);
 
-  return eventBranchCode === scopeBranchCode && eventLocationCode === scopeLocationCode;
+  if (scopeBranchCode && eventBranchCode === scopeBranchCode) return true;
+  if (eventLocationCode && scopeLocationCodes.includes(eventLocationCode)) return true;
+  return false;
 }
 
 function toHourBucketKey(value) {
@@ -259,7 +278,7 @@ function FailureBar({ items = [] }) {
   );
 }
 
-export default function AdminPOSSyncMonitor({ selectedLocationCode = '', selectedBranchCode = '', selectedScopeLabel = '' }) {
+export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
   const [activeTab, setActiveTab] = useState('overview');
   const [monitor, setMonitor] = useState(null);
@@ -320,7 +339,6 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = '', selecte
         params: {
           hours: 24,
           limit: 40,
-          ...(selectedBranchCode && { branchCode: selectedBranchCode }),
           ...(selectedLocationCode && { locationCode: selectedLocationCode }),
         },
       });
@@ -331,7 +349,7 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = '', selecte
       setLoading(false);
       setRefreshing(false);
     }
-  }, [selectedLocationCode, selectedBranchCode]);
+  }, [selectedLocationCode]);
 
   const scheduleRefresh = useCallback(() => {
     if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
@@ -370,7 +388,7 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = '', selecte
     if (!socket) return undefined;
 
     const handlePosSyncEvent = (event) => {
-      if (!eventMatchesSelectedScope(event, selectedBranchCode, selectedLocationCode)) {
+      if (!eventMatchesSelectedScope(event, selectedLocationCode)) {
         return;
       }
 
@@ -417,14 +435,13 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = '', selecte
 
     socket.on('posSyncEvent', handlePosSyncEvent);
     return () => socket.off('posSyncEvent', handlePosSyncEvent);
-  }, [scheduleRefresh, selectedLocationCode, selectedBranchCode]);
+  }, [scheduleRefresh, selectedLocationCode]);
 
   // ── Actions ────────────────────────────────────────────────────
   const handleManualSync = async () => {
     try {
       setManualSyncing(true);
       const response = await api.post('/admin/pos-sync/manual-sync', {
-        branchCode: selectedBranchCode,
         locationCode: selectedLocationCode,
       });
       const result = response.data?.result || {};
@@ -440,9 +457,7 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = '', selecte
   const handleClearFailedCommands = async () => {
     try {
       setClearingFailedCommands(true);
-      const response = await api.delete('/admin/pos-sync/failed-commands', {
-        data: { branchCode: selectedBranchCode, locationCode: selectedLocationCode },
-      });
+      const response = await api.delete('/admin/pos-sync/failed-commands');
       notifySuccess(`Cleared ${response.data?.deletedCount ?? 0} failed command(s)`, 3500);
       await fetchMonitorData(false);
     } catch (error) {
@@ -457,7 +472,7 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = '', selecte
     try {
       setClearingActivityErrors(true);
       const response = await api.delete('/admin/pos-sync/failed-events', {
-        data: { branchCode: selectedBranchCode, locationCode: selectedLocationCode },
+        data: { locationCode: selectedLocationCode },
       });
       notifySuccess(`Cleared ${response.data?.deletedCount ?? 0} failed activity event(s)`, 3500);
       await fetchMonitorData(false);
@@ -476,7 +491,6 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = '', selecte
       const nextEnabled = !monitor.config.enabled;
       await api.post('/admin/pos-sync/toggle', {
         enabled: nextEnabled,
-        branchCode: selectedBranchCode,
         locationCode: selectedLocationCode,
       });
       notifySuccess(`POS sync ${nextEnabled ? 'enabled' : 'disabled'}`, 3000);
@@ -532,7 +546,7 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = '', selecte
                 Agent: {summary.agentHealthy ? 'reachable' : 'unreachable'}
               </span>
               <span style={S.badge('#f1f5f9', '#475569')}>
-                Scope: {selectedScopeLabel || `${selectedBranchCode} ${selectedLocationCode}`.trim()} ({selectedBranchCode}/{selectedLocationCode})
+                Scope: {selectedLocationCode === 'ZA' ? 'Zomba' : 'Blantyre'} ({selectedLocationCode})
               </span>
               <span style={S.badge('#f1f5f9', '#475569')}>
                 Last event: {rel(summary.lastEventAt)}

@@ -24,8 +24,7 @@ import '../../styles/global.css';
  */
 
 const AdminPOSManagement = ({
-  selectedLocationCode = '',
-  selectedBranchCode = '',
+  selectedLocationCode = 'BT',
   cachedProducts = [],
   cachedProductsMeta = {},
   onRefreshProductsCache,
@@ -84,9 +83,6 @@ const AdminPOSManagement = ({
         params.append('limit', String(perPage));
         if (selectedLocationCode) {
           params.append('locationCode', selectedLocationCode);
-        }
-        if (selectedBranchCode) {
-          params.append('branchCode', selectedBranchCode);
         }
         return api.get(`/admin/pos-products?${params.toString()}`);
       };
@@ -316,7 +312,7 @@ const AdminPOSManagement = ({
   // Initial fetch
   useEffect(() => {
     fetchProducts('', 1, 'all');
-  }, [selectedLocationCode, selectedBranchCode]);
+  }, [selectedLocationCode]);
 
   useEffect(() => {
     if (!hasSharedProductsCache) return;
@@ -379,10 +375,9 @@ const AdminPOSManagement = ({
             if (product) {
               await api.put(`/admin/pos-products/${productId}/visibility`, {
                 hideFromProductsPage: hideFromProducts,
-                branchCode: selectedBranchCode,
                 locationCode: selectedLocationCode,
               }, {
-                params: { locationCode: selectedLocationCode, branchCode: selectedBranchCode },
+                params: { locationCode: selectedLocationCode },
               });
             }
           }
@@ -413,10 +408,9 @@ const AdminPOSManagement = ({
     try {
       const response = await api.put(`/admin/pos-products/${productId}/visibility`, {
         hideFromProductsPage: !hideFromProductsPage,
-        branchCode: selectedBranchCode,
         locationCode: selectedLocationCode,
       }, {
-        params: { locationCode: selectedLocationCode, branchCode: selectedBranchCode },
+        params: { locationCode: selectedLocationCode },
       });
 
       if (response.data.success) {
@@ -452,8 +446,8 @@ const AdminPOSManagement = ({
       try {
         setLoading(true);
         const response = await api.delete('/admin/pos-products/delete-selected', {
-          params: { locationCode: selectedLocationCode, branchCode: selectedBranchCode },
-          data: { productIds: Array.from(selectedProducts), locationCode: selectedLocationCode, branchCode: selectedBranchCode },
+          params: { locationCode: selectedLocationCode },
+          data: { productIds: Array.from(selectedProducts) },
         });
 
         if (response.data.success) {
@@ -484,8 +478,8 @@ const AdminPOSManagement = ({
       try {
         setLoading(true);
         const response = await api.delete('/admin/pos-products/delete-all', {
-          params: { locationCode: selectedLocationCode, branchCode: selectedBranchCode },
-          data: { locationCode: selectedLocationCode, branchCode: selectedBranchCode },
+          params: { locationCode: selectedLocationCode },
+          data: { locationCode: selectedLocationCode },
         });
 
         if (response.data.success) {

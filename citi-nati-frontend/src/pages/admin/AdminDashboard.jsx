@@ -1,4 +1,4 @@
-import React, { useState, useCallback, Suspense, useRef, useMemo } from 'react';
+import React, { useState, useCallback, Suspense, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
@@ -44,22 +44,7 @@ const SIDEBAR_SCOPES = [
   { id: 'administration', label: 'Admin', icon: 'fa-shield-halved' },
 ];
 
-const OPERATIONAL_LOCATION_SCOPES = [
-  { id: 'BLANTYRE_SH', label: 'Blantyre SH', branchCode: 'BLANTYRE', locationCode: 'SH', shortLabel: 'BL-SH' },
-  { id: 'ZOMBA_SH', label: 'Zomba SH', branchCode: 'ZOMBA', locationCode: 'SH', shortLabel: 'ZA-SH' },
-  { id: 'ZOMBA_BAR', label: 'Zomba BAR', branchCode: 'ZOMBA', locationCode: 'BAR', shortLabel: 'ZA-BAR' },
-  { id: 'ZOMBA_RES', label: 'Zomba RES', branchCode: 'ZOMBA', locationCode: 'RES', shortLabel: 'ZA-RES' },
-];
-
-const LOCATION_SCOPED_TABS = new Set([
-  'products',
-  'stocks',
-  'promotions',
-  'emergency-sales',
-  'emergency-sales-reports',
-  'pos-management',
-  'pos-sync-monitor',
-]);
+const OPERATIONAL_LOCATION_CODES = ['BT', 'ZA'];
 
 const SIDEBAR_TABS = [
   { id: 'inbox', label: 'Inbox', icon: 'fa-inbox', scope: 'online-store' },
@@ -272,7 +257,7 @@ const AdminDashboard = () => {
   const [sidebarScope, setSidebarScope] = useState(TAB_SCOPE_BY_ID[initialTab] || 'online-store');
   const scopePillsRef = useRef(null);
   const [speechAlertsEnabled, setSpeechAlertsPreference] = useState(() => getSpeechAlertsEnabled());
-  const [selectedOperationalScopeId, setSelectedOperationalScopeId] = useState('');
+  const [selectedOperationalLocationCode, setSelectedOperationalLocationCode] = useState('BT');
   const [adminProductsCacheByLocation, setAdminProductsCacheByLocation] = useState({});
   const [adminProductsCacheMetaByLocation, setAdminProductsCacheMetaByLocation] = useState({});
   const adminProductsFetchRequestRef = useRef({});
@@ -281,15 +266,7 @@ const AdminDashboard = () => {
     return window.localStorage.getItem(ADMIN_THEME_KEY) === 'dark' ? 'dark' : 'light';
   });
   const isDarkTheme = theme === 'dark';
-  const selectedOperationalScope = useMemo(() => {
-    return OPERATIONAL_LOCATION_SCOPES.find((scope) => scope.id === selectedOperationalScopeId) || null;
-  }, [selectedOperationalScopeId]);
-  const selectedOperationalLocationCode = selectedOperationalScope?.locationCode || '';
-  const selectedOperationalBranchCode = selectedOperationalScope?.branchCode || '';
-  const selectedOperationalLocationLabel = selectedOperationalScope?.label || 'Not selected';
-  const selectedOperationalScopeCacheKey = selectedOperationalScope
-    ? `${selectedOperationalBranchCode}:${selectedOperationalLocationCode}`
-    : '';
+  const selectedOperationalLocationLabel = selectedOperationalLocationCode === 'ZA' ? 'Zomba' : 'Blantyre';
   const navigate = useNavigate();
 
   const updateProductsCacheMeta = useCallback((locationCode, patch) => {
@@ -302,15 +279,10 @@ const AdminDashboard = () => {
     }));
   }, []);
 
-  const preloadAdminProductsForLocation = useCallback(async (scope, options = {}) => {
-    const safeLocationCode = String(scope?.locationCode || '').trim().toUpperCase();
-    const safeBranchCode = String(scope?.branchCode || '').trim().toUpperCase();
-    if (!safeLocationCode || !safeBranchCode) {
-      return;
-    }
-    const cacheKey = `${safeBranchCode}:${safeLocationCode}`;
+  const preloadAdminProductsForLocation = useCallback(async (locationCode, options = {}) => {
+    const safeLocationCode = String(locationCode || '').trim() || 'BT';
     const forceRefresh = options?.force === true;
-    const cacheMeta = adminProductsCacheMetaByLocation[cacheKey] || {};
+    const cacheMeta = adminProductsCacheMetaByLocation[safeLocationCode] || {};
 
     if (!forceRefresh) {
       if (cacheMeta.isLoading || cacheMeta.isBackgroundLoading) {
@@ -322,7 +294,7 @@ const AdminDashboard = () => {
     }
 
     const requestId = Date.now();
-    adminProductsFetchRequestRef.current[cacheKey] = requestId;
+    adminProductsFetchRequestRef.current[safeLocationCode] = requestId;
 
     const perPage = 100;
     let page = 1;
@@ -330,8 +302,9 @@ const AdminDashboard = () => {
 
     const fetchProductsPage = async (pageNumber) => {
       const params = new URLSearchParams({ page: String(pageNumber), pageSize: String(perPage) });
-      params.append('locationCode', safeLocationCode);
-      params.append('branchCode', safeBranchCode);
+      if (safeLocationCode) {
+        params.append('locationCode', safeLocationCode);
+      }
       return api.get(`/products?${params.toString()}`);
     };
 
@@ -348,7 +321,7 @@ const AdminDashboard = () => {
     });
 
     try {
-      updateProductsCacheMeta(cacheKey, {
+      updateProductsCacheMeta(safeLocationCode, {
         isLoading: true,
         isBackgroundLoading: false,
         error: null,
@@ -376,16 +349,16 @@ const AdminDashboard = () => {
         allItems = firstItems;
       }
 
-      if (adminProductsFetchRequestRef.current[cacheKey] !== requestId) {
+      if (adminProductsFetchRequestRef.current[safeLocationCode] !== requestId) {
         return;
       }
 
       setAdminProductsCacheByLocation((prev) => ({
         ...prev,
-        [cacheKey]: allItems,
+        [safeLocationCode]: allItems,
       }));
 
-      updateProductsCacheMeta(cacheKey, {
+      updateProductsCacheMeta(safeLocationCode, {
         isLoading: false,
         isBackgroundLoading: firstItems.length === perPage,
         error: null,
@@ -404,15 +377,15 @@ const AdminDashboard = () => {
               }
 
               allItems = allItems.concat(items);
-              if (adminProductsFetchRequestRef.current[cacheKey] !== requestId) {
+              if (adminProductsFetchRequestRef.current[safeLocationCode] !== requestId) {
                 return;
               }
 
               setAdminProductsCacheByLocation((prev) => ({
                 ...prev,
-                [cacheKey]: allItems,
+                [safeLocationCode]: allItems,
               }));
-              updateProductsCacheMeta(cacheKey, {
+              updateProductsCacheMeta(safeLocationCode, {
                 isBackgroundLoading: true,
                 lastLoadedAt: Date.now(),
               });
@@ -424,20 +397,20 @@ const AdminDashboard = () => {
               page += 1;
             }
 
-            if (adminProductsFetchRequestRef.current[cacheKey] !== requestId) {
+            if (adminProductsFetchRequestRef.current[safeLocationCode] !== requestId) {
               return;
             }
 
-            updateProductsCacheMeta(cacheKey, {
+            updateProductsCacheMeta(safeLocationCode, {
               isBackgroundLoading: false,
               lastLoadedAt: Date.now(),
             });
           } catch (bgErr) {
             console.warn('[AdminDashboard] Background products loading error:', bgErr.message);
-            if (adminProductsFetchRequestRef.current[cacheKey] !== requestId) {
+            if (adminProductsFetchRequestRef.current[safeLocationCode] !== requestId) {
               return;
             }
-            updateProductsCacheMeta(cacheKey, {
+            updateProductsCacheMeta(safeLocationCode, {
               isBackgroundLoading: false,
             });
           }
@@ -445,10 +418,10 @@ const AdminDashboard = () => {
       }
     } catch (error) {
       console.error('[AdminDashboard] Failed to preload admin products cache:', error);
-      if (adminProductsFetchRequestRef.current[cacheKey] !== requestId) {
+      if (adminProductsFetchRequestRef.current[safeLocationCode] !== requestId) {
         return;
       }
-      updateProductsCacheMeta(cacheKey, {
+      updateProductsCacheMeta(safeLocationCode, {
         isLoading: false,
         isBackgroundLoading: false,
         error: error?.response?.data?.error || error.message || 'Failed to load products',
@@ -457,8 +430,8 @@ const AdminDashboard = () => {
   }, [adminProductsCacheMetaByLocation, updateProductsCacheMeta]);
 
   React.useEffect(() => {
-    OPERATIONAL_LOCATION_SCOPES.forEach((scope) => {
-      preloadAdminProductsForLocation(scope);
+    OPERATIONAL_LOCATION_CODES.forEach((locationCode) => {
+      preloadAdminProductsForLocation(locationCode);
     });
   }, [preloadAdminProductsForLocation]);
 
@@ -594,18 +567,11 @@ const AdminDashboard = () => {
 
   const visibleTabs = SIDEBAR_TABS.filter((tab) => sidebarScope === 'all' || tab.scope === sidebarScope);
   const selectedScopeMeta = SIDEBAR_SCOPES.find((scope) => scope.id === sidebarScope) || SIDEBAR_SCOPES[0];
-  const activeLocationCachedProducts = selectedOperationalScopeCacheKey
-    ? (adminProductsCacheByLocation[selectedOperationalScopeCacheKey] || [])
-    : [];
-  const activeLocationCachedProductsMeta = selectedOperationalScopeCacheKey
-    ? (adminProductsCacheMetaByLocation[selectedOperationalScopeCacheKey] || {})
-    : {};
+  const activeLocationCachedProducts = adminProductsCacheByLocation[selectedOperationalLocationCode] || [];
+  const activeLocationCachedProductsMeta = adminProductsCacheMetaByLocation[selectedOperationalLocationCode] || {};
   const handleRefreshAdminProductsCache = useCallback(async () => {
-    if (!selectedOperationalScope) return;
-    await preloadAdminProductsForLocation(selectedOperationalScope, { force: true });
-  }, [preloadAdminProductsForLocation, selectedOperationalScope]);
-
-  const activeTabRequiresOperationalScope = LOCATION_SCOPED_TABS.has(activeTab);
+    await preloadAdminProductsForLocation(selectedOperationalLocationCode, { force: true });
+  }, [preloadAdminProductsForLocation, selectedOperationalLocationCode]);
 
   return (
     <div className={`admin-dashboard-root ${isDarkTheme ? 'theme-dark' : 'theme-light'}`} data-admin-theme={theme}>
@@ -678,8 +644,8 @@ const AdminDashboard = () => {
           )}
           <select
             id="admin-operational-location"
-            value={selectedOperationalScopeId}
-            onChange={(event) => setSelectedOperationalScopeId(event.target.value)}
+            value={selectedOperationalLocationCode}
+            onChange={(event) => setSelectedOperationalLocationCode(event.target.value)}
             title={`Operational scope: ${selectedOperationalLocationLabel}`}
             style={{
               width: '100%',
@@ -694,12 +660,17 @@ const AdminDashboard = () => {
               textAlign: sidebarCollapsed ? 'center' : 'left',
             }}
           >
-            <option value="">Select location...</option>
-            {OPERATIONAL_LOCATION_SCOPES.map((scope) => (
-              <option key={scope.id} value={scope.id}>
-                {sidebarCollapsed ? scope.shortLabel : scope.label}
-              </option>
-            ))}
+            {sidebarCollapsed ? (
+              <>
+                <option value="BT">BT</option>
+                <option value="ZA">ZA</option>
+              </>
+            ) : (
+              <>
+                <option value="BT">Blantyre</option>
+                <option value="ZA">Zomba</option>
+              </>
+            )}
           </select>
         </div>
 
@@ -966,22 +937,11 @@ const AdminDashboard = () => {
               }
             : undefined}
         >
-          {activeTabRequiresOperationalScope && !selectedOperationalScope ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: isDarkTheme ? '#b9c5d8' : '#5a5a5a' }}>
-              Select an operational location (branch + location) to load this panel.
-            </div>
-          ) : (
           <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>Loading...</div>}>
-            {activeTab === 'inbox' && (
-              <AdminInbox
-                selectedLocationCode={selectedOperationalLocationCode}
-                selectedBranchCode={selectedOperationalBranchCode}
-              />
-            )}
+            {activeTab === 'inbox' && <AdminInbox selectedLocationCode={selectedOperationalLocationCode} />}
             {activeTab === 'quotations' && <AdminQuotations />}
             {activeTab === 'products' && (
               <AdminProducts
-                selectedBranchCode={selectedOperationalBranchCode}
                 selectedLocationCode={selectedOperationalLocationCode}
                 cachedProducts={activeLocationCachedProducts}
                 cachedProductsMeta={activeLocationCachedProductsMeta}
@@ -990,30 +950,18 @@ const AdminDashboard = () => {
             )}
             {activeTab === 'stocks' && (
               <AdminStocks
-                selectedBranchCode={selectedOperationalBranchCode}
                 selectedLocationCode={selectedOperationalLocationCode}
                 cachedProducts={activeLocationCachedProducts}
                 cachedProductsMeta={activeLocationCachedProductsMeta}
                 onRefreshProductsCache={handleRefreshAdminProductsCache}
               />
             )}
-            {activeTab === 'emergency-sales' && (
-              <AdminEmergencySales
-                selectedBranchCode={selectedOperationalBranchCode}
-                selectedLocationCode={selectedOperationalLocationCode}
-              />
-            )}
-            {activeTab === 'emergency-sales-reports' && (
-              <AdminEmergencySalesReports
-                selectedBranchCode={selectedOperationalBranchCode}
-                selectedLocationCode={selectedOperationalLocationCode}
-              />
-            )}
+            {activeTab === 'emergency-sales' && <AdminEmergencySales selectedLocationCode={selectedOperationalLocationCode} />}
+            {activeTab === 'emergency-sales-reports' && <AdminEmergencySalesReports selectedLocationCode={selectedOperationalLocationCode} />}
             {activeTab === 'system' && <AdminSystem />}
             {activeTab === 'security' && <AdminSecurity />}
             {activeTab === 'promotions' && (
               <AdminPromotions
-                selectedBranchCode={selectedOperationalBranchCode}
                 selectedLocationCode={selectedOperationalLocationCode}
                 cachedProducts={activeLocationCachedProducts}
                 cachedProductsMeta={activeLocationCachedProductsMeta}
@@ -1022,20 +970,13 @@ const AdminDashboard = () => {
             )}
             {activeTab === 'pos-management' && (
               <AdminPOSManagement
-                selectedBranchCode={selectedOperationalBranchCode}
                 selectedLocationCode={selectedOperationalLocationCode}
                 cachedProducts={activeLocationCachedProducts}
                 cachedProductsMeta={activeLocationCachedProductsMeta}
                 onRefreshProductsCache={handleRefreshAdminProductsCache}
               />
             )}
-            {activeTab === 'pos-sync-monitor' && (
-              <AdminPOSSyncMonitor
-                selectedBranchCode={selectedOperationalBranchCode}
-                selectedLocationCode={selectedOperationalLocationCode}
-                selectedScopeLabel={selectedOperationalLocationLabel}
-              />
-            )}
+            {activeTab === 'pos-sync-monitor' && <AdminPOSSyncMonitor selectedLocationCode={selectedOperationalLocationCode} />}
             {activeTab === 'orders' && <AdminOrders />}
             {activeTab === 'users' && <AdminUsers />}
             {activeTab === 'sales' && <AdminSales />}
@@ -1045,7 +986,6 @@ const AdminDashboard = () => {
             {activeTab === 'drivers' && <AdminDrivers />}
             {activeTab === 'cashiers' && <AdminCashiers />}
           </Suspense>
-          )}
         </div>
       </div>
     </div>
