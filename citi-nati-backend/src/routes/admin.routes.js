@@ -975,7 +975,9 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
       sourceCode: { not: null }, // Only POS products
     };
 
-    if (normalizedLocationCode) {
+    if (normalizedBranchCode) {
+      where.branchCode = normalizedBranchCode;
+    } else if (normalizedLocationCode) {
       const scopedProductCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
       const derivedBranchCode = deriveBranchCodeFromScopeCodes(expandLocationScopeCodes(normalizedLocationCode));
       if (!scopedProductCodes || scopedProductCodes.length === 0) {
@@ -989,14 +991,10 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
         });
       } else {
         where.sourceCode = { in: scopedProductCodes };
-        if (normalizedBranchCode) {
-          where.branchCode = normalizedBranchCode;
-        } else if (derivedBranchCode) {
+        if (derivedBranchCode) {
           where.branchCode = derivedBranchCode;
         }
       }
-    } else if (normalizedBranchCode) {
-      where.branchCode = normalizedBranchCode;
     }
 
     if (search) {
@@ -1068,8 +1066,22 @@ router.put('/pos-products/:id/visibility', verifyTokenMiddleware, verifyAdmin, a
     const { id } = req.params;
     const { hideFromProductsPage } = req.body;
     const normalizedLocationCode = normalizeLocationCode(req.query.locationCode || req.body?.locationCode);
+    const normalizedBranchCode = String(req.query.branchCode || req.body?.branchCode || '').trim().toUpperCase() || null;
 
-    if (normalizedLocationCode) {
+    if (normalizedBranchCode) {
+      const product = await prisma.product.findUnique({
+        where: { id: parseInt(id) },
+        select: { branchCode: true },
+      });
+
+      if (!product) {
+        return res.status(404).json({ success: false, error: 'Product not found' });
+      }
+
+      if (String(product.branchCode || '').trim().toUpperCase() !== normalizedBranchCode) {
+        return res.status(400).json({ success: false, error: 'Product is not available in the selected branch scope' });
+      }
+    } else if (normalizedLocationCode) {
       const product = await prisma.product.findUnique({
         where: { id: parseInt(id) },
         select: { sourceCode: true },
@@ -1172,6 +1184,7 @@ router.delete('/pos-products/delete-selected', verifyTokenMiddleware, verifyAdmi
   try {
     const { productIds } = req.body;
     const normalizedLocationCode = normalizeLocationCode(req.query.locationCode || req.body?.locationCode);
+    const normalizedBranchCode = String(req.query.branchCode || req.body?.branchCode || '').trim().toUpperCase() || null;
 
     if (!Array.isArray(productIds) || productIds.length === 0) {
       return res.status(400).json({
@@ -1185,7 +1198,9 @@ router.delete('/pos-products/delete-selected', verifyTokenMiddleware, verifyAdmi
       sourceCode: { not: null }, // Only allow deleting POS products
     };
 
-    if (normalizedLocationCode) {
+    if (normalizedBranchCode) {
+      where.branchCode = normalizedBranchCode;
+    } else if (normalizedLocationCode) {
       const scopedCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
       const derivedBranchCode = deriveBranchCodeFromScopeCodes(expandLocationScopeCodes(normalizedLocationCode));
       if (!scopedCodes || scopedCodes.length === 0) {
@@ -1224,11 +1239,14 @@ router.delete('/pos-products/delete-selected', verifyTokenMiddleware, verifyAdmi
 router.delete('/pos-products/delete-all', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
   try {
     const normalizedLocationCode = normalizeLocationCode(req.query.locationCode || req.body?.locationCode);
+    const normalizedBranchCode = String(req.query.branchCode || req.body?.branchCode || '').trim().toUpperCase() || null;
     const where = {
       sourceCode: { not: null }, // Only POS products
     };
 
-    if (normalizedLocationCode) {
+    if (normalizedBranchCode) {
+      where.branchCode = normalizedBranchCode;
+    } else if (normalizedLocationCode) {
       const scopedCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
       const derivedBranchCode = deriveBranchCodeFromScopeCodes(expandLocationScopeCodes(normalizedLocationCode));
       if (!scopedCodes || scopedCodes.length === 0) {
