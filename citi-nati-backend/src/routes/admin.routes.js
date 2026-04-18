@@ -96,10 +96,12 @@ async function resolveLocationScopedProductCodesFromSales(scopeCodes = [], branc
   }
 
   const normalizedBranchHint = normalizeLocationCode(branchCodeHint);
-  // Preserve branch-level fallback only for legacy Blantyre rows.
-  const derivedBranchCode = scopeCodes.includes('BT')
-    ? (normalizedBranchHint || deriveBranchCodeFromScopeCodes(scopeCodes))
-    : null;
+  // Preserve branch-level fallback only for legacy Blantyre rows when no explicit hint is provided.
+  const derivedBranchCode = normalizedBranchHint || (
+    scopeCodes.includes('BT')
+      ? deriveBranchCodeFromScopeCodes(scopeCodes)
+      : null
+  );
   const locationPredicates = scopeCodes.map((code) => ({
     locationCode: {
       equals: code,
@@ -132,10 +134,12 @@ async function resolveLocationScopedProductCodesFromLatestCosts(scopeCodes = [],
   }
 
   const normalizedBranchHint = normalizeLocationCode(branchCodeHint);
-  // Preserve branch-level fallback only for legacy Blantyre rows.
-  const derivedBranchCode = scopeCodes.includes('BT')
-    ? (normalizedBranchHint || deriveBranchCodeFromScopeCodes(scopeCodes))
-    : null;
+  // Preserve branch-level fallback only for legacy Blantyre rows when no explicit hint is provided.
+  const derivedBranchCode = normalizedBranchHint || (
+    scopeCodes.includes('BT')
+      ? deriveBranchCodeFromScopeCodes(scopeCodes)
+      : null
+  );
   const locationPredicates = scopeCodes.map((code) => ({
     locationCode: {
       equals: code,
