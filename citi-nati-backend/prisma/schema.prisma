@@ -78,7 +78,7 @@ model Product {
   createdAt               DateTime   @default(now())
   updatedAt               DateTime   @updatedAt
 
-  @@unique([branchCode, sourceCode, locationCode])
+  @@unique([branchCode, locationCode, sourceCode])
   @@index([branchCode])
   @@index([enabled])
   @@index([category])

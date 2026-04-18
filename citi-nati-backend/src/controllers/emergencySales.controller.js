@@ -22,7 +22,7 @@ const SYNC_STATUS = {
 };
 
 const ZOMBA_LOCATION_CODES = ['ZA'].concat(CORE_ZOMBA_LOCATION_CODES);
-const SUPPORTED_LOCATION_CODES = ['BT', 'ZA', 'SH', 'BAR', 'ST999', 'RES', 'WH'];
+const SUPPORTED_LOCATION_CODES = ['BT', 'ZA', 'SH', 'BAR', 'ST999', 'WH'];
 const SCOPED_PRODUCT_CODES_CACHE_TTL_MS = Number.parseInt(process.env.EMERGENCY_SCOPE_CODES_CACHE_TTL_MS || '30000', 10);
 const EMERGENCY_LOOKUP_CACHE_TTL_MS = Number.parseInt(process.env.EMERGENCY_LOOKUP_CACHE_TTL_MS || '8000', 10);
 const scopedProductCodesCache = new Map();
@@ -703,7 +703,7 @@ async function createEmergencySale(req, res) {
   try {
     const locationCode = normalizeLocationCode(req.body?.locationCode || req.body?.branchCode || req.query?.locationCode);
     if (!locationCode || !SUPPORTED_LOCATION_CODES.includes(locationCode)) {
-      return res.status(400).json({ success: false, error: 'locationCode is required and must be one of BT, SH, BAR, ST999, WH, RES, or ZA' });
+      return res.status(400).json({ success: false, error: 'locationCode is required and must be one of BT, SH, BAR, ST999, WH, or ZA' });
     }
 
     const branchCode = getBranchCodeFromLocationCode(locationCode);
@@ -1170,8 +1170,8 @@ async function getPendingEmergencySalesForPosSync(req, res) {
       if (explicitLocation && SUPPORTED_LOCATION_CODES.includes(explicitLocation)) {
         locationCodes = [explicitLocation];
       } else {
-        // Fetch emergency sales from all Zomba location scopes that can appear in payload snapshots.
-        locationCodes = ['ZA', 'SH', 'BAR', 'ST999', 'RES', 'WH'];
+        // Fetch emergency sales from all canonical Zomba location scopes that can appear in payload snapshots.
+        locationCodes = ['ZA', 'SH', 'BAR', 'ST999', 'WH'];
       }
     } else if (branchCode === 'BLANTYRE') {
       locationCodes = ['BT'];

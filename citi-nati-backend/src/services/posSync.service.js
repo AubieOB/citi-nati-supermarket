@@ -16,6 +16,10 @@ const { notifyLowStock } = require('../utils/messageService');
 const { enrichProductStock } = require('../utils/stockResolver');
 const { emitProductUpdate } = require('../utils/socket');
 const productImageMappingService = require('./productImageMapping.service');
+const {
+  normalizeScopeCode,
+  ZOMBA_OPERATIONAL_LOCATION_CODES,
+} = require('../utils/operationalScope');
 
 const prisma = new PrismaClient();
 const DEFAULT_POS_BRANCH_CODE = String(process.env.POS_BRANCH_CODE || process.env.BRANCH_CODE || 'BLANTYRE').trim().toUpperCase();
@@ -69,6 +73,10 @@ const POS_AGENT_TIMEOUT_MS = Number.isFinite(parsedPosAgentTimeoutMs) && parsedP
 const POS_SYNC_SETTINGS_CACHE_MS = 10000;
 let cachedPosSyncEnabled = ENABLE_POS_SYNC;
 let posSyncSettingsLoadedAt = 0;
+
+function normalizePosLocationCode(value) {
+  return normalizeScopeCode(value);
+}
 
 /**
  * Axios instance for POS Agent communication
@@ -205,13 +213,22 @@ async function syncProductsFromPOS() {
     for (const posProduct of posProducts) {
       try {
         const productCode = String(posProduct.ProductCode || '').trim();
-        const productLocationCode = String(posProduct.LocationCode || posProduct.locationCode || process.env.POS_LOCATION_CODE || '').trim().toUpperCase() || null;
+        const productLocationCode = normalizePosLocationCode(
+          posProduct.LocationCode
+          || posProduct.locationCode
+          || process.env.POS_LOCATION_CODE
+          || (DEFAULT_POS_BRANCH_CODE === 'BLANTYRE' ? 'BT' : null)
+        );
         const stockSource = String(posProduct.StockSource || posProduct.stockSource || 'Unknown').trim();
         const stockDate = String(posProduct.StockDate || posProduct.stockDate || '').trim() || null;
 
-        if (DEFAULT_POS_BRANCH_CODE === 'ZOMBA' && productLocationCode && productLocationCode !== 'SH') {
+        if (
+          DEFAULT_POS_BRANCH_CODE === 'ZOMBA'
+          && productLocationCode
+          && !ZOMBA_OPERATIONAL_LOCATION_CODES.includes(productLocationCode)
+        ) {
           skipped++;
-          const rejection = `[ZOMBA STOCK][REJECTED][MANUAL_SYNC] product=${productCode || 'UNKNOWN'} stockDate=${stockDate || 'NULL'} source=${stockSource} location=${productLocationCode} stock=${Number(posProduct.QuantityAvailable || 0)} reason=NON_SH_LOCATION`;
+          const rejection = `[ZOMBA STOCK][REJECTED][MANUAL_SYNC] product=${productCode || 'UNKNOWN'} stockDate=${stockDate || 'NULL'} source=${stockSource} location=${productLocationCode} stock=${Number(posProduct.QuantityAvailable || 0)} reason=UNSUPPORTED_LOCATION_CODE`;
           errors.push({ code: productCode || null, error: rejection });
           console.warn(rejection);
           continue;
@@ -225,6 +242,7 @@ async function syncProductsFromPOS() {
           stock: posProduct.QuantityAvailable || 0,
           category: 'POS Import', // Default category for synced products
           sourceCode: posProduct.ProductCode, // Store original POS code
+          locationCode: productLocationCode,
           barcode: posProduct.Barcode || null,
           image: null, // POS doesn't provide images - but products will still trigger low stock alerts
           isOnSale: false,
@@ -247,6 +265,7 @@ async function syncProductsFromPOS() {
           where: {
             sourceCode: posProduct.ProductCode,
             branchCode: DEFAULT_POS_BRANCH_CODE,
+            locationCode: productLocationCode,
           },
         });
 
