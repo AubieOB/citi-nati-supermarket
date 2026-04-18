@@ -38,6 +38,7 @@ const TAB_EXPENSES = 'expenses';
 const TAB_CATEGORIES = 'categories';
 
 const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocationId = null, locations = [] }) => {
+  const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocationId = null, selectedLocationCode = '', selectedBranchCode = '', locations = [] }) => {
   const initialRange = getCurrentMonthRange();
 
   // Sub-tab
@@ -97,7 +98,9 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
     startDate: filters.startDate || undefined,
     endDate: filters.endDate || undefined,
     locationId: selectedLocationId || undefined,
-  }), [expensePage, filters.endDate, filters.expenseCategoryId, filters.search, filters.startDate, selectedLocationId]);
+    locationCode: selectedLocationCode || undefined,
+    branchCode: selectedBranchCode || undefined,
+  }), [expensePage, filters.endDate, filters.expenseCategoryId, filters.search, filters.startDate, selectedBranchCode, selectedLocationCode, selectedLocationId]);
 
   const fetchCategories = useCallback(async () => {
     setCategoriesLoading(true);
@@ -193,8 +196,18 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
     setExpenseError('');
     try {
       const res = expenseModal.expense
-        ? await api.put(`/business-operations/expenses/${expenseModal.expense.id}`, { ...payload, locationId: payload.locationId ?? selectedLocationId ?? undefined })
-        : await api.post('/business-operations/expenses', { ...payload, locationId: payload.locationId ?? selectedLocationId ?? undefined });
+        ? await api.put(`/business-operations/expenses/${expenseModal.expense.id}`, {
+          ...payload,
+          locationId: payload.locationId ?? selectedLocationId ?? undefined,
+          locationCode: selectedLocationCode || undefined,
+          branchCode: selectedBranchCode || undefined,
+        })
+        : await api.post('/business-operations/expenses', {
+          ...payload,
+          locationId: payload.locationId ?? selectedLocationId ?? undefined,
+          locationCode: selectedLocationCode || undefined,
+          branchCode: selectedBranchCode || undefined,
+        });
 
       const saved = res.data?.data || null;
       setExpenseModal({ open: false, expense: null });
@@ -277,6 +290,8 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
           startDate: filters.startDate,
           endDate: filters.endDate,
           locationId: selectedLocationId,
+          locationCode: selectedLocationCode,
+          branchCode: selectedBranchCode,
         },
       });
     } catch (error) {
@@ -286,7 +301,7 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
       if (format === 'excel') setExportingExcel(false);
       if (format === 'pdf') setExportingPdf(false);
     }
-  }, [activeTab, categories, expenses, filters, selectedLocationId, summary]);
+  }, [activeTab, categories, expenses, filters, selectedBranchCode, selectedLocationCode, selectedLocationId, summary]);
 
   useEffect(() => {
     const anySubModal = expenseModal.open || categoryModal.open;

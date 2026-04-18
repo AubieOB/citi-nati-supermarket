@@ -24,6 +24,7 @@ const getApiError = (err, fallback) =>
   err?.response?.data?.error || err?.response?.data?.message || err?.message || fallback;
 
 const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] }) => {
+  const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, selectedLocationCode = '', selectedBranchCode = '', locations = [] }) => {
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
   const themedCardStyle = isAdminDarkTheme
     ? {
@@ -86,6 +87,8 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
       if (search.trim()) params.search = search.trim();
       if (statusFilter) params.status = statusFilter;
       if (selectedLocationId) params.locationId = selectedLocationId;
+      if (selectedLocationCode) params.locationCode = selectedLocationCode;
+      if (selectedBranchCode) params.branchCode = selectedBranchCode;
       const res = await api.get('/business-operations/employees', { params });
       const payload = res.data;
       const list = Array.isArray(payload?.data) ? payload.data : Array.isArray(payload?.employees) ? payload.employees : [];
@@ -98,7 +101,7 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
     } finally {
       setListLoading(false);
     }
-  }, [page, search, selectedLocationId, statusFilter]);
+  }, [page, search, selectedBranchCode, selectedLocationCode, selectedLocationId, statusFilter]);
 
   // ── Fetch employee detail + salary history ──
   const fetchDetail = useCallback(async (id) => {
@@ -196,10 +199,20 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
     try {
       let saved;
       if (employeeModal.employee) {
-        const res = await api.put(`/business-operations/employees/${employeeModal.employee.id}`, { ...payload, locationId: payload.locationId ?? selectedLocationId ?? undefined });
+        const res = await api.put(`/business-operations/employees/${employeeModal.employee.id}`, {
+          ...payload,
+          locationId: payload.locationId ?? selectedLocationId ?? undefined,
+          locationCode: selectedLocationCode || undefined,
+          branchCode: selectedBranchCode || undefined,
+        });
         saved = res.data;
       } else {
-        const res = await api.post('/business-operations/employees', { ...payload, locationId: payload.locationId ?? selectedLocationId ?? undefined });
+        const res = await api.post('/business-operations/employees', {
+          ...payload,
+          locationId: payload.locationId ?? selectedLocationId ?? undefined,
+          locationCode: selectedLocationCode || undefined,
+          branchCode: selectedBranchCode || undefined,
+        });
         saved = res.data;
       }
       setEmployeeModal({ open: false, employee: null });
@@ -267,6 +280,8 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
           search,
           statusFilter,
           selectedLocationId,
+          selectedLocationCode,
+          selectedBranchCode,
         });
         return;
       }
@@ -279,6 +294,8 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
           search,
           status: statusFilter,
           locationId: selectedLocationId,
+          locationCode: selectedLocationCode,
+          branchCode: selectedBranchCode,
         },
       });
     } catch (error) {

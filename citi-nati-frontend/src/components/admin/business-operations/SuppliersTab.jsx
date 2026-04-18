@@ -51,7 +51,7 @@ const INITIAL_DETAIL_STATE = {
   transactionPagination: null,
 };
 
-const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] }) => {
+const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, selectedLocationCode = '', selectedBranchCode = '', locations = [] }) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -118,6 +118,8 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
           search: search || undefined,
           status: statusFilter || undefined,
           locationId: selectedLocationId || undefined,
+          locationCode: selectedLocationCode || undefined,
+          branchCode: selectedBranchCode || undefined,
         },
       });
 
@@ -130,7 +132,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
     } finally {
       setListLoading(false);
     }
-  }, [page, search, selectedLocationId, statusFilter]);
+  }, [page, search, selectedBranchCode, selectedLocationCode, selectedLocationId, statusFilter]);
 
   const fetchSupplierDetail = useCallback(async (supplierId, nextTransactionPage = 1) => {
     if (!supplierId) {
@@ -157,6 +159,8 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
             sortBy: 'transactionDate',
             sortOrder: 'desc',
             locationId: selectedLocationId || undefined,
+            locationCode: selectedLocationCode || undefined,
+            branchCode: selectedBranchCode || undefined,
           },
         }),
       ]);
@@ -176,7 +180,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
       setDetailLoading(false);
       setTransactionsLoading(false);
     }
-  }, [selectedLocationId]);
+  }, [selectedBranchCode, selectedLocationCode, selectedLocationId]);
 
   const refreshData = useCallback(async ({ selectedId = selectedSupplierId, nextTransactionPage = transactionPage } = {}) => {
     await fetchSuppliers();
@@ -230,8 +234,18 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
 
     try {
       const response = supplierModalState.supplier
-        ? await api.put(`/business-operations/suppliers/${supplierModalState.supplier.id}`, { ...payload, locationId: payload.locationId ?? selectedLocationId ?? undefined })
-        : await api.post('/business-operations/suppliers', { ...payload, locationId: payload.locationId ?? selectedLocationId ?? undefined });
+        ? await api.put(`/business-operations/suppliers/${supplierModalState.supplier.id}`, {
+          ...payload,
+          locationId: payload.locationId ?? selectedLocationId ?? undefined,
+          locationCode: selectedLocationCode || undefined,
+          branchCode: selectedBranchCode || undefined,
+        })
+        : await api.post('/business-operations/suppliers', {
+          ...payload,
+          locationId: payload.locationId ?? selectedLocationId ?? undefined,
+          locationCode: selectedLocationCode || undefined,
+          branchCode: selectedBranchCode || undefined,
+        });
 
       const savedSupplier = response.data?.data || null;
       setSupplierModalState({ open: false, supplier: null });
@@ -255,8 +269,18 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
 
     try {
       await (transactionModalState.transaction
-        ? api.put(`/business-operations/suppliers/transactions/${transactionModalState.transaction.id}`, { ...payload, locationId: payload.locationId ?? selectedLocationId ?? undefined })
-        : api.post('/business-operations/suppliers/transactions', { ...payload, locationId: payload.locationId ?? selectedLocationId ?? undefined }));
+        ? api.put(`/business-operations/suppliers/transactions/${transactionModalState.transaction.id}`, {
+          ...payload,
+          locationId: payload.locationId ?? selectedLocationId ?? undefined,
+          locationCode: selectedLocationCode || undefined,
+          branchCode: selectedBranchCode || undefined,
+        })
+        : api.post('/business-operations/suppliers/transactions', {
+          ...payload,
+          locationId: payload.locationId ?? selectedLocationId ?? undefined,
+          locationCode: selectedLocationCode || undefined,
+          branchCode: selectedBranchCode || undefined,
+        }));
 
       setTransactionModalState({ open: false, transaction: null });
       setTransactionPage(1);
@@ -339,6 +363,8 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
           status: statusFilter,
           supplierId: selectedSupplierId,
           locationId: selectedLocationId,
+          locationCode: selectedLocationCode,
+          branchCode: selectedBranchCode,
         },
       });
     } catch (error) {

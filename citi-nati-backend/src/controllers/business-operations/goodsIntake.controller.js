@@ -132,6 +132,7 @@ async function listGoodsIntakes(req, res) {
     const status = req.query.status ? String(req.query.status).trim().toLowerCase() : null;
     const supplierId = toInt(req.query.supplierId);
     const locationId = toInt(req.query.locationId);
+      const locationCode = req.query.locationCode ? String(req.query.locationCode).trim().toUpperCase() : null;
     const startDate = req.query.startDate ? toDate(req.query.startDate) : null;
     const endDate = req.query.endDate ? toDate(req.query.endDate) : null;
 
@@ -141,6 +142,7 @@ async function listGoodsIntakes(req, res) {
         status,
         supplierId,
         locationId,
+          locationCode,
         startDate,
         endDate,
       },

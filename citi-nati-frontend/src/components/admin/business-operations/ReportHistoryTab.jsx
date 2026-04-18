@@ -45,7 +45,7 @@ function getCurrentMonthParams() {
   };
 }
 
-const ZOMBA_LOCATION_CODES_FE = ['ZA', 'SH', 'BAR', 'WH'];
+const ZOMBA_LOCATION_CODES_FE = ['ZA', 'SH', 'BAR', 'RES'];
 
 function deriveBranchCodeFromLocationCode(locationCode) {
   const code = String(locationCode || '').trim().toUpperCase();
@@ -78,6 +78,7 @@ const activityTabStyle = (active) => ({
 });
 
 const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedLocationCode = '', onNavigateTab }) => {
+  const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedLocationCode = '', selectedBranchCode = '', onNavigateTab }) => {
   const [state, setState] = useState({
     loading: true,
     error: '',
@@ -111,13 +112,12 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedL
       };
     });
     const normalizedLocationCode = String(selectedLocationCode || '').trim().toUpperCase();
-    const derivedBranchCode = deriveBranchCodeFromLocationCode(normalizedLocationCode);
 
     const monthParams = {
       ...getCurrentMonthParams(),
       ...(selectedLocationId && { locationId: selectedLocationId }),
       ...(normalizedLocationCode && { locationCode: normalizedLocationCode }),
-      ...(derivedBranchCode && { branchCode: derivedBranchCode }),
+      ...((selectedBranchCode || deriveBranchCodeFromLocationCode(normalizedLocationCode)) && { branchCode: selectedBranchCode || deriveBranchCodeFromLocationCode(normalizedLocationCode) }),
     };
 
     try {
@@ -164,7 +164,7 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedL
         };
       });
     }
-  }, [selectedLocationCode, selectedLocationId]);
+  }, [selectedBranchCode, selectedLocationCode, selectedLocationId]);
 
   useEffect(() => {
     fetchActivity();

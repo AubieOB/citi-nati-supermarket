@@ -14,7 +14,7 @@ import NetSummaryCard from './monthly-summary/NetSummaryCard.jsx';
 const AUTO_REFRESH_MS = 30000;
 const AUTO_REFRESH_DEBOUNCE_MS = 350;
 
-const ZOMBA_LOCATION_CODES_FE = ['ZA', 'SH', 'BAR', 'WH'];
+const ZOMBA_LOCATION_CODES_FE = ['ZA', 'SH', 'BAR', 'RES'];
 function deriveBranchCodeFromLocationCode(locationCode) {
   const code = String(locationCode || '').trim().toUpperCase();
   if (!code) return '';
@@ -85,6 +85,14 @@ const MonthlySummaryTab = ({
   selectedLocationCode = '',
   selectedLocationName = '',
 }) => {
+  const MonthlySummaryTab = ({
+    refreshKey = 0,
+    onNavigateTab,
+    selectedLocationId = null,
+    selectedLocationCode = '',
+    selectedLocationName = '',
+    selectedBranchCode = '',
+  }) => {
   const [showControls, setShowControls] = useState(false);
   const [isInsightsModalOpen, setIsInsightsModalOpen] = useState(false);
   const [isInsightsModalMaximized, setIsInsightsModalMaximized] = useState(false);
@@ -168,8 +176,8 @@ const MonthlySummaryTab = ({
     if (selectedLocationCode.trim()) {
       const normalizedCode = selectedLocationCode.trim().toUpperCase();
       params.locationCode = normalizedCode;
-      const branchCode = deriveBranchCodeFromLocationCode(normalizedCode);
-      if (branchCode) params.branchCode = branchCode;
+        const branchCode = selectedBranchCode || deriveBranchCodeFromLocationCode(normalizedCode);
+        if (branchCode) params.branchCode = branchCode;
     }
 
     try {
@@ -193,7 +201,7 @@ const MonthlySummaryTab = ({
         return { loading: false, error: nextError, summary: null, payments: [] };
       });
     }
-  }, [activeRange.endDate, activeRange.startDate, filters.month, filters.periodType, filters.year, selectedLocationCode, selectedLocationId]);
+  }, [activeRange.endDate, activeRange.startDate, filters.month, filters.periodType, filters.year, selectedBranchCode, selectedLocationCode, selectedLocationId]);
 
   const fetchExpenses = useCallback(async ({ background = false } = {}) => {
     setExpensesState((prev) => ({
@@ -211,8 +219,8 @@ const MonthlySummaryTab = ({
     if (selectedLocationCode.trim()) {
       const normalizedCode = selectedLocationCode.trim().toUpperCase();
       params.locationCode = normalizedCode;
-      const branchCode = deriveBranchCodeFromLocationCode(normalizedCode);
-      if (branchCode) params.branchCode = branchCode;
+        const branchCode = selectedBranchCode || deriveBranchCodeFromLocationCode(normalizedCode);
+        if (branchCode) params.branchCode = branchCode;
     }
 
     try {
@@ -227,7 +235,7 @@ const MonthlySummaryTab = ({
         return { loading: false, error: nextError, summary: null };
       });
     }
-  }, [activeRange.endDate, activeRange.startDate, selectedLocationCode, selectedLocationId]);
+  }, [activeRange.endDate, activeRange.startDate, selectedBranchCode, selectedLocationCode, selectedLocationId]);
 
   const fetchPayroll = useCallback(async ({ background = false } = {}) => {
     setPayrollState((prev) => ({
@@ -468,7 +476,8 @@ const MonthlySummaryTab = ({
     endDate: activeRange.endDate,
     locationCode: selectedLocationCode?.trim() || '',
     locationId: selectedLocationId || '',
-  }), [activeRange.endDate, activeRange.startDate, filters.month, filters.periodType, filters.year, selectedLocationCode, selectedLocationId]);
+    branchCode: selectedBranchCode || '',
+    }), [activeRange.endDate, activeRange.startDate, filters.month, filters.periodType, filters.year, selectedBranchCode, selectedLocationCode, selectedLocationId]);
 
   const handleExport = async (format) => {
     if (format === 'excel') setExportingExcel(true);

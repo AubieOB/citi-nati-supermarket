@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../../../utils/api.js';
+import { BO_OPERATIONAL_SCOPES, resolveBoScope } from './boScope.js';
 
 const AUTO_REFRESH_MS = 300000; // 5 minutes
 const AUTO_REFRESH_DEBOUNCE_MS = 350;
@@ -393,12 +394,21 @@ function withScope(params, scope, locations) {
   const scoped = { ...params };
   if (scope === 'all') return scoped;
 
+  if (String(scope).startsWith('scope:')) {
+    const scopeId = String(scope).slice(6).trim();
+    const resolved = resolveBoScope(scopeId, locations);
+    if (resolved.locationId) scoped.locationId = resolved.locationId;
+    if (resolved.locationCode) scoped.locationCode = resolved.locationCode;
+    if (resolved.branchCode) scoped.branchCode = resolved.branchCode;
+    return scoped;
+  }
+
   if (String(scope).startsWith('code:')) {
     const code = String(scope).slice(5).trim().toUpperCase();
     scoped.locationCode = code;
     if (code === 'BT') {
       scoped.branchCode = 'BLANTYRE';
-    } else if (['ZA', 'SH', 'BAR', 'WH'].includes(code)) {
+    } else if (['ZA', 'BAR', 'RES', 'WH'].includes(code)) {
       scoped.branchCode = 'ZOMBA';
     }
     return scoped;
@@ -411,6 +421,22 @@ function withScope(params, scope, locations) {
   const locationCode = location?.code || normalizeLocationCodeFromName(location?.name || '');
   if (locationCode) scoped.locationCode = locationCode;
   return scoped;
+}
+
+function deriveBranchSummaryCodes(locations = []) {
+  const codes = new Set();
+  const rows = Array.isArray(locations) ? locations : [];
+  for (const row of rows) {
+    const name = String(row?.name || '').trim().toLowerCase();
+    if (name === 'blantyre') {
+      codes.add('SH');
+    } else if (name === 'zomba') {
+      codes.add('SH');
+      codes.add('BAR');
+      codes.add('RES');
+    }
+  }
+  return Array.from(codes);
 }
 
 function getCurrentMonthPeriod() {
@@ -954,6 +980,7 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, effectiveScope, locat
 const BusinessAnalyticsTab = ({
   selectedLocationId = null,
   selectedLocationCode = '',
+  selectedBranchCode = '',
   locations = [],
 }) => {
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
@@ -1018,23 +1045,36 @@ const BusinessAnalyticsTab = ({
 
   const effectiveScope = useMemo(() => {
     if (scope === 'inherit') {
+      if (selectedBranchCode && selectedLocationCode) {
+        const inheritedScope = BO_OPERATIONAL_SCOPES.find(
+          (row) => row.branchCode === selectedBranchCode && row.locationCode === selectedLocationCode,
+        );
+        if (inheritedScope) return `scope:${inheritedScope.scopeId}`;
+      }
       return selectedLocationId ? String(selectedLocationId) : 'all';
     }
     return scope;
-  }, [scope, selectedLocationId]);
+  }, [scope, selectedBranchCode, selectedLocationCode, selectedLocationId]);
 
   const scopeLabel = useMemo(() => {
     if (scope === 'inherit') {
       if (!selectedLocationId) return 'All Locations (inherits BO scope)';
       const inherited = locations.find((row) => Number(row.id) === Number(selectedLocationId));
-      if (inherited) return `${inherited.name} (inherits BO scope)`;
+      if (inherited && selectedLocationCode) {
+        return `${inherited.name} - ${selectedLocationCode} (inherits BO scope)`;
+      }
       return selectedLocationCode ? `${selectedLocationCode} (inherits BO scope)` : 'Selected BO scope';
     }
 
     if (scope === 'all') return 'All Locations';
+    if (String(scope).startsWith('scope:')) {
+      const scopeId = String(scope).slice(6).trim();
+      const scopeRow = BO_OPERATIONAL_SCOPES.find((row) => row.scopeId === scopeId);
+      return scopeRow ? scopeRow.label : 'Selected operational scope';
+    }
     const selected = locations.find((row) => String(row.id) === String(scope));
     return selected ? selected.name : 'Selected location';
-  }, [locations, scope, selectedLocationId]);
+  }, [locations, scope, selectedLocationId, selectedLocationCode]);
 
   const selectedPeriod = useMemo(() => {
     const period = {
@@ -1102,8 +1142,8 @@ const BusinessAnalyticsTab = ({
           })
         : [];
 
-      // Branch summaries (BT + ZA)
-      const branchCodes = ['BT', 'ZA'];
+      // Branch/location summaries from operational BO scope.
+      const branchCodes = deriveBranchSummaryCodes(locations);
 
       // Slot indices in the flat allResponses array
       const FIXED = 8; // 6 summaries + products + users
@@ -1131,7 +1171,7 @@ const BusinessAnalyticsTab = ({
         ...quarters.map((p) => api.get('/business-operations/reports/sales/summary', { params: withScope(buildParamsForPeriod(p), effectiveScope, locations) })),
         // Daily trend (sampled points for short ranges)
         ...dailyPeriods.map((p) => api.get('/business-operations/reports/sales/summary', { params: withScope(buildParamsForPeriod(p), effectiveScope, locations) })),
-        // last 2: branch summaries (BT, ZA)
+        // branch/location summaries
         ...branchCodes.map((code) => api.get('/business-operations/reports/sales/summary', { params: withScope({ ...periodParams }, `code:${code}`, locations) })),
       ]);
 
@@ -1353,15 +1393,8 @@ const BusinessAnalyticsTab = ({
   }, [computeAnalytics]);
 
   const locationOptions = useMemo(() => {
-    const rows = (locations || []).map((row) => ({ id: String(row.id), label: row.name }));
-    if (!rows.find((row) => row.label.toLowerCase() === 'blantyre')) {
-      rows.push({ id: 'code:BT', label: 'Blantyre' });
-    }
-    if (!rows.find((row) => row.label.toLowerCase() === 'zomba')) {
-      rows.push({ id: 'code:ZA', label: 'Zomba' });
-    }
-    return rows;
-  }, [locations]);
+    return BO_OPERATIONAL_SCOPES.map((row) => ({ id: `scope:${row.scopeId}`, label: row.label }));
+  }, []);
 
   const activeToolConfig = useMemo(
     () => ANALYSIS_TOOLS.find((tool) => tool.id === activeTool) || ANALYSIS_TOOLS[0],
@@ -1414,10 +1447,10 @@ const BusinessAnalyticsTab = ({
       }
 
       if (preset === 'branch-compare') {
-        const bt = analytics.rankings.branchPerformance.find((row) => row.code === 'BT');
-        const za = analytics.rankings.branchPerformance.find((row) => row.code === 'ZA');
-        next.periodAValue = bt?.sales || 0;
-        next.periodBValue = za?.sales || 0;
+        const first = analytics.rankings.branchPerformance[0];
+        const second = analytics.rankings.branchPerformance[1];
+        next.periodAValue = first?.sales || 0;
+        next.periodBValue = second?.sales || 0;
       }
 
       return next;

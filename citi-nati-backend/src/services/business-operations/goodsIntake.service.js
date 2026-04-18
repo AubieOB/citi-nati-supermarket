@@ -74,6 +74,7 @@ function toWhereFilters(filters = {}) {
 
   if (filters.status) where.status = normalizeStatus(filters.status);
   if (filters.locationId) where.locationId = filters.locationId;
+    if (filters.locationCode) where.locationCode = { equals: filters.locationCode, mode: 'insensitive' };
   if (filters.supplierId) where.supplierId = filters.supplierId;
 
   if (filters.search) {

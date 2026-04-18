@@ -185,7 +185,7 @@ function buildReportParams(filters, extras = {}) {
 
 // Maps known BO location codes to the branchCode stored in SalesInvoice.
 // Must match the deriveBranchCodeFromLocationCode logic in reportingFilters.js.
-const ZOMBA_LOCATION_CODES_FE = ['ZA', 'SH', 'BAR', 'WH'];
+const ZOMBA_LOCATION_CODES_FE = ['ZA', 'SH', 'BAR', 'RES'];
 function deriveBranchCodeFromLocationCode(locationCode) {
   const code = String(locationCode || '').trim().toUpperCase();
   if (!code) return '';
@@ -212,7 +212,7 @@ const ErrorState = ({ message }) => (
   </div>
 );
 
-const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, selectedLocationCode = '' }) => {
+const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, selectedLocationCode = '', selectedBranchCode = '' }) => {
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
@@ -281,7 +281,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
     setFilters((prev) => {
       const nextLocationId = selectedLocationId ? String(selectedLocationId) : '';
       const nextLocationCode = selectedLocationId ? String(selectedLocationCode || '').trim().toUpperCase() : '';
-      const nextBranchCode = deriveBranchCodeFromLocationCode(nextLocationCode);
+        const nextBranchCode = selectedLocationId ? (selectedBranchCode || deriveBranchCodeFromLocationCode(nextLocationCode)) : '';
       if (prev.locationId === nextLocationId && prev.locationCode === nextLocationCode && prev.branchCode === nextBranchCode) return prev;
       return {
         ...prev,
@@ -291,7 +291,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
       };
     });
     setViewState(DEFAULT_VIEW_STATE);
-  }, [selectedLocationCode, selectedLocationId]);
+    }, [selectedBranchCode, selectedLocationCode, selectedLocationId]);
 
   const updateFilter = useCallback((key, value) => {
     setFilters((prev) => {
