@@ -994,27 +994,45 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
     };
 
     if (normalizedLocationCode) {
-      const scopedProductCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
-      const derivedBranchCode = deriveBranchCodeFromScopeCodes(expandLocationScopeCodes(normalizedLocationCode));
+      const scopeCodes = expandLocationScopeCodes(normalizedLocationCode);
+      const derivedBranchCode = deriveBranchCodeFromScopeCodes(scopeCodes);
       const rawParam = String(locationCode || '').trim().toUpperCase();
-      const resWasMapped = rawParam === 'RES' && normalizedLocationCode === 'ST999';
-      console.log('[PRODUCT QUERY][POS_MANAGEMENT]', {
-        uiLocation: locationCode || '(none)',
-        resolvedLocationCode: normalizedLocationCode,
-        resolvedBranchCode: derivedBranchCode,
-        resAlias: resWasMapped ? 'RES->ST999' : null,
-        scopedCodeCount: scopedProductCodes ? scopedProductCodes.length : 0,
-      });
-      if (!scopedProductCodes || scopedProductCodes.length === 0) {
-        return res.json({
-          success: true,
-          products: [],
-          total: 0,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          totalPages: 0,
+      const resWasMapped = (rawParam === 'RES' || rawParam === 'ZOMBA_RES') && normalizedLocationCode === 'ST999';
+
+      if (derivedBranchCode === 'ZOMBA') {
+        const resolvedLocationCode = scopeCodes[0] || normalizedLocationCode;
+        where.branchCode = 'ZOMBA';
+        where.locationCode = {
+          equals: resolvedLocationCode,
+          mode: 'insensitive',
+        };
+        where.sourceCode = { not: null };
+
+        console.log('[PRODUCT QUERY][POS_MANAGEMENT]', {
+          uiLocation: locationCode || '(none)',
+          branchCode: 'ZOMBA',
+          locationCode: resolvedLocationCode,
+          resAlias: resWasMapped ? 'RES->ST999' : null,
         });
       } else {
+        const scopedProductCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
+        console.log('[PRODUCT QUERY][POS_MANAGEMENT]', {
+          uiLocation: locationCode || '(none)',
+          branchCode: derivedBranchCode || '(any)',
+          locationCode: normalizedLocationCode,
+          scopedCodeCount: scopedProductCodes ? scopedProductCodes.length : 0,
+        });
+        if (!scopedProductCodes || scopedProductCodes.length === 0) {
+          return res.json({
+            success: true,
+            products: [],
+            total: 0,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            totalPages: 0,
+          });
+        }
+
         where.sourceCode = { in: scopedProductCodes };
         if (derivedBranchCode) {
           where.branchCode = derivedBranchCode;
@@ -1041,6 +1059,7 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
       select: {
         id: true,
         branchCode: true,
+        locationCode: true,
         name: true,
         sourceCode: true,
         category: true,
@@ -1052,6 +1071,8 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    console.log('[PRODUCT RESULT COUNT]', products.length);
 
     const isZombaScope = normalizedLocationCode && ZOMBA_LOCATION_CODES.includes(normalizedLocationCode);
     if (isZombaScope && products.length > 0) {

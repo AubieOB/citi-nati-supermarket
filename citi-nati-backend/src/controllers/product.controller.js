@@ -1140,35 +1140,52 @@ const getProducts = async (req, res) => {
     }
 
     if (normalizedLocationCode) {
-      const scopedProductCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
-      const derivedBranchCode = deriveBranchCodeFromScopeCodes(expandLocationScopeCodes(normalizedLocationCode));
+      const scopeCodes = expandLocationScopeCodes(normalizedLocationCode);
+      const derivedBranchCode = deriveBranchCodeFromScopeCodes(scopeCodes);
       const rawLocationParam = String(locationCode || '').trim().toUpperCase();
-      const resWasMapped = rawLocationParam === 'RES' && normalizedLocationCode === 'ST999';
-      console.log('[PRODUCT QUERY]', {
-        uiLocation: locationCode || '(none)',
-        resolvedLocationCode: normalizedLocationCode,
-        resolvedBranchCode: derivedBranchCode,
-        resAlias: resWasMapped ? 'RES->ST999' : null,
-        scopedCodeCount: scopedProductCodes ? scopedProductCodes.length : 0,
-      });
-      if (!scopedProductCodes || scopedProductCodes.length === 0) {
-        console.warn('[PRODUCT QUERY] no scoped product codes found - returning empty result', {
-          normalizedLocationCode,
-          derivedBranchCode,
-        });
-        return res.status(200).json({
-          products: [],
-          pagination: {
-            total: 0,
-            count: 0,
-            offset: skip,
-            limit: take,
-          },
+      const resWasMapped = (rawLocationParam === 'RES' || rawLocationParam === 'ZOMBA_RES') && normalizedLocationCode === 'ST999';
+
+      // Keep legacy behavior for Blantyre, but enforce strict branch+location reads for Zomba.
+      if (derivedBranchCode === 'ZOMBA') {
+        const resolvedLocationCode = scopeCodes[0] || normalizedLocationCode;
+        where.branchCode = 'ZOMBA';
+        where.locationCode = {
+          equals: resolvedLocationCode,
+          mode: 'insensitive',
+        };
+        where.sourceCode = { not: null };
+
+        console.log('[PRODUCT QUERY]', {
+          uiLocation: locationCode || '(none)',
+          branchCode: 'ZOMBA',
+          locationCode: resolvedLocationCode,
+          resAlias: resWasMapped ? 'RES->ST999' : null,
         });
       } else {
-        where.sourceCode = {
-          in: scopedProductCodes,
-        };
+        const scopedProductCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
+        console.log('[PRODUCT QUERY]', {
+          uiLocation: locationCode || '(none)',
+          branchCode: derivedBranchCode || '(any)',
+          locationCode: normalizedLocationCode,
+          scopedCodeCount: scopedProductCodes ? scopedProductCodes.length : 0,
+        });
+        if (!scopedProductCodes || scopedProductCodes.length === 0) {
+          console.warn('[PRODUCT QUERY] no scoped product codes found - returning empty result', {
+            normalizedLocationCode,
+            derivedBranchCode,
+          });
+          return res.status(200).json({
+            products: [],
+            pagination: {
+              total: 0,
+              count: 0,
+              offset: skip,
+              limit: take,
+            },
+          });
+        }
+
+        where.sourceCode = { in: scopedProductCodes };
         if (derivedBranchCode) {
           where.branchCode = derivedBranchCode;
         }
@@ -1186,6 +1203,7 @@ const getProducts = async (req, res) => {
       select: {
         id: true,
         branchCode: true,
+        locationCode: true,
         name: true,
         sourceCode: true,
         price: true,
@@ -1214,6 +1232,7 @@ const getProducts = async (req, res) => {
 
     // Debug logging
     console.log(`[PRODUCTS] Retrieved: ${products.length}, Total: ${total}, Category: ${category || 'all'}, Search: ${search || 'none'}`);
+    console.log('[PRODUCT RESULT COUNT]', products.length);
     if (normalizedLocationCode) {
       const sampleRow = products[0];
       console.log(`[PRODUCT QUERY] uiLocation=${locationCode || '(none)'} branchCode=${where.branchCode || '(any)'} locationCode=${normalizedLocationCode} matchedRows=${total} pageRows=${products.length}${sampleRow ? ` sample=${sampleRow.sourceCode || sampleRow.name}` : ''}`);
@@ -2048,6 +2067,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
     let synced = 0;
     let skipped = 0;
     const errors = [];
+    let zombaIngestSamplesLogged = 0;
 
     for (const product of products) {
       try {
@@ -2061,6 +2081,15 @@ const syncProductsFromPOSAgent = async (req, res) => {
           skipped++;
           errors.push(`Missing required fields for product: ${JSON.stringify(product)}`);
           continue;
+        }
+
+        if (branchCode === 'ZOMBA' && zombaIngestSamplesLogged < 5) {
+          console.log('[ZOMBA PRODUCT INGEST SAMPLE]', {
+            productCode: sourceCode,
+            branchCode,
+            locationCode: productLocationCode,
+          });
+          zombaIngestSamplesLogged += 1;
         }
 
         // Zomba sync accepts true POS location codes; UI decides which operational scopes are exposed.

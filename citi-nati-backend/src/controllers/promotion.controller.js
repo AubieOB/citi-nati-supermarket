@@ -210,14 +210,24 @@ function resolvePromotionScope(req) {
   };
 }
 
-function getScopedActiveProductFilter(branchCode, scopedProductCodes = null) {
+function getScopedActiveProductFilter(branchCode, locationCode = null, scopedProductCodes = null) {
   const where = {
     ...ACTIVE_PRODUCT_FILTER,
     branchCode,
   };
 
-  if (Array.isArray(scopedProductCodes)) {
+  const normalizedLocationCode = normalizeLocationCode(locationCode);
+  if (branchCode === 'ZOMBA' && normalizedLocationCode) {
+    where.locationCode = {
+      equals: normalizedLocationCode,
+      mode: 'insensitive',
+    };
+  }
+
+  if (Array.isArray(scopedProductCodes) && scopedProductCodes.length > 0) {
     where.sourceCode = { in: scopedProductCodes };
+  } else if (branchCode === 'ZOMBA' && normalizedLocationCode) {
+    where.sourceCode = { not: null };
   }
 
   return where;
@@ -231,8 +241,8 @@ function parseProductIds(ids = []) {
   return Array.from(new Set(parsed));
 }
 
-function getPromotionProductWhere(type, categoryId, selectedProducts, branchCode, scopedProductCodes = null) {
-  const baseWhere = getScopedActiveProductFilter(branchCode, scopedProductCodes);
+function getPromotionProductWhere(type, categoryId, selectedProducts, branchCode, locationCode = null, scopedProductCodes = null) {
+  const baseWhere = getScopedActiveProductFilter(branchCode, locationCode, scopedProductCodes);
 
   if (type === 'global') {
     return { ...baseWhere };
@@ -308,7 +318,7 @@ async function resolveProductsForPosQueue({
 
   if (type === 'global') {
     return prisma.product.findMany({
-      where: getPromotionProductWhere('global', null, [], scopedBranchCode, scopedProductCodes),
+      where: getPromotionProductWhere('global', null, [], scopedBranchCode, scope?.locationCode || null, scopedProductCodes),
       select: {
         id: true,
         name: true,
@@ -327,7 +337,7 @@ async function resolveProductsForPosQueue({
     }
 
     return prisma.product.findMany({
-      where: getPromotionProductWhere('category', categoryToUse, [], scopedBranchCode, scopedProductCodes),
+      where: getPromotionProductWhere('category', categoryToUse, [], scopedBranchCode, scope?.locationCode || null, scopedProductCodes),
       select: {
         id: true,
         name: true,
@@ -350,7 +360,7 @@ async function resolveProductsForPosQueue({
   }
 
   return prisma.product.findMany({
-    where: getPromotionProductWhere('selective', null, selectiveIds, scopedBranchCode, scopedProductCodes),
+    where: getPromotionProductWhere('selective', null, selectiveIds, scopedBranchCode, scope?.locationCode || null, scopedProductCodes),
     select: {
       id: true,
       name: true,
@@ -685,12 +695,12 @@ const updatePromotion = async (req, res) => {
       }
 
       const scopedSelectedCount = await prisma.product.count({
-        where: getPromotionProductWhere('selective', null, parsedSelectedProducts, scope.branchCode, scopedProductCodes),
+        where: getPromotionProductWhere('selective', null, parsedSelectedProducts, scope.branchCode, scope.locationCode, scopedProductCodes),
       });
 
       if (scopedSelectedCount !== parsedSelectedProducts.length) {
         const scopedSelectedIds = await prisma.product.findMany({
-          where: getPromotionProductWhere('selective', null, parsedSelectedProducts, scope.branchCode, scopedProductCodes),
+          where: getPromotionProductWhere('selective', null, parsedSelectedProducts, scope.branchCode, scope.locationCode, scopedProductCodes),
           select: { id: true },
         });
         const scopedIdSet = new Set(scopedSelectedIds.map((product) => product.id));
@@ -711,7 +721,7 @@ const updatePromotion = async (req, res) => {
     // First, reset all products (remove promotional pricing) if disabling
     if (!enabled) {
       await prisma.product.updateMany({
-        where: getScopedActiveProductFilter(scope.branchCode, scopedProductCodes),
+        where: getScopedActiveProductFilter(scope.branchCode, scope.locationCode, scopedProductCodes),
         data: {
           discountPrice: null,
           isOnSale: false,
@@ -768,16 +778,16 @@ const updatePromotion = async (req, res) => {
     if (enabled) {
       if (type === 'global') {
         productsToUpdate = await prisma.product.findMany({
-          where: getPromotionProductWhere('global', null, [], scope.branchCode, scopedProductCodes),
+          where: getPromotionProductWhere('global', null, [], scope.branchCode, scope.locationCode, scopedProductCodes),
         });
       } else if (type === 'category') {
         productsToUpdate = await prisma.product.findMany({
-          where: getPromotionProductWhere('category', categoryId, [], scope.branchCode, scopedProductCodes),
+          where: getPromotionProductWhere('category', categoryId, [], scope.branchCode, scope.locationCode, scopedProductCodes),
         });
       } else if (type === 'selective') {
         if (parsedSelectedProducts.length > 0) {
           productsToUpdate = await prisma.product.findMany({
-            where: getPromotionProductWhere('selective', null, parsedSelectedProducts, scope.branchCode, scopedProductCodes),
+            where: getPromotionProductWhere('selective', null, parsedSelectedProducts, scope.branchCode, scope.locationCode, scopedProductCodes),
           });
 
           if (productsToUpdate.length !== parsedSelectedProducts.length) {
@@ -889,7 +899,7 @@ const previewPromotion = async (req, res) => {
     if (type === 'global') {
       // Get all products
       products = await prisma.product.findMany({
-        where: getPromotionProductWhere('global', null, [], scope.branchCode, scopedProductCodes),
+        where: getPromotionProductWhere('global', null, [], scope.branchCode, scope.locationCode, scopedProductCodes),
       });
     } else if (type === 'category') {
       // Get products in specific category
@@ -900,7 +910,7 @@ const previewPromotion = async (req, res) => {
         });
       }
       products = await prisma.product.findMany({
-        where: getPromotionProductWhere('category', categoryId, [], scope.branchCode, scopedProductCodes),
+        where: getPromotionProductWhere('category', categoryId, [], scope.branchCode, scope.locationCode, scopedProductCodes),
       });
     } else if (type === 'selective') {
       // Get selected products
@@ -911,7 +921,7 @@ const previewPromotion = async (req, res) => {
         });
       }
       products = await prisma.product.findMany({
-        where: getPromotionProductWhere('selective', null, parsedSelectedProducts, scope.branchCode, scopedProductCodes),
+        where: getPromotionProductWhere('selective', null, parsedSelectedProducts, scope.branchCode, scope.locationCode, scopedProductCodes),
       });
 
       if (products.length !== parsedSelectedProducts.length) {
@@ -991,18 +1001,18 @@ const applyPromotion = async (req, res) => {
 
       if (promotion.type === 'global') {
         products = await prisma.product.findMany({
-          where: getPromotionProductWhere('global', null, [], scope.branchCode, scopedProductCodes),
+          where: getPromotionProductWhere('global', null, [], scope.branchCode, scope.locationCode, scopedProductCodes),
         });
       } else if (promotion.type === 'category') {
         products = await prisma.product.findMany({
-          where: getPromotionProductWhere('category', promotion.categoryId, [], scope.branchCode, scopedProductCodes),
+          where: getPromotionProductWhere('category', promotion.categoryId, [], scope.branchCode, scope.locationCode, scopedProductCodes),
         });
       } else if (promotion.type === 'selective') {
         // Use selectedProductIds from database
         const selectedIds = parseProductIds(promotion.selectedProductIds || []);
         if (selectedIds.length === 0) continue; // Skip if no products selected
         products = await prisma.product.findMany({
-          where: getPromotionProductWhere('selective', null, selectedIds, scope.branchCode, scopedProductCodes),
+          where: getPromotionProductWhere('selective', null, selectedIds, scope.branchCode, scope.locationCode, scopedProductCodes),
         });
       }
 
@@ -1056,7 +1066,7 @@ const removePromotion = async (req, res) => {
 
     // Reset all product discount prices
     await prisma.product.updateMany({
-      where: getScopedActiveProductFilter(scope.branchCode, await resolveLocationScopedProductCodes(scope.locationCode)),
+      where: getScopedActiveProductFilter(scope.branchCode, scope.locationCode, await resolveLocationScopedProductCodes(scope.locationCode)),
       data: {
         discountPrice: null,
         isOnSale: false,

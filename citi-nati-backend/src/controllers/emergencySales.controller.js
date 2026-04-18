@@ -589,26 +589,32 @@ async function lookupEmergencyProducts(req, res) {
     const isZombaScope = isZombaLocationCode(locationCode);
     let scopedProductCodes = null;
 
-    if (!isZombaScope) {
+    if (isZombaScope) {
+      console.log('[PRODUCT QUERY]', {
+        uiLocation: req.query.locationCode || req.query.branchCode || '(none)',
+        branchCode: 'ZOMBA',
+        locationCode,
+      });
+    } else {
       scopedProductCodes = await resolveLocationScopedProductCodes(locationCode);
       if (!scopedProductCodes || scopedProductCodes.length === 0) {
         return res.status(200).json({ success: true, products: [] });
       }
+      console.log('[PRODUCT QUERY]', {
+        uiLocation: req.query.locationCode || req.query.branchCode || '(none)',
+        branchCode: derivedBranchCode || '(any)',
+        locationCode,
+      });
     }
-
-    console.log('[EMERGENCY SALES][LOOKUP] scope', {
-      locationCode,
-      derivedBranchCode,
-      scopedProductCodeCount: Array.isArray(scopedProductCodes) ? scopedProductCodes.length : null,
-      mode: isZombaScope ? 'ZOMBA_FAST_PATH' : 'SCOPED_CODES_PATH',
-      query,
-    });
 
     const baseWhere = {
       enabled: true,
       ...(derivedBranchCode ? { branchCode: derivedBranchCode } : {}),
       ...(isZombaScope
-        ? { sourceCode: { not: null } }
+        ? {
+            locationCode: { equals: locationCode, mode: 'insensitive' },
+            sourceCode: { not: null },
+          }
         : { sourceCode: { in: scopedProductCodes } }),
     };
 
@@ -645,6 +651,8 @@ async function lookupEmergencyProducts(req, res) {
         { name: 'asc' },
       ],
     });
+
+    console.log('[PRODUCT RESULT COUNT]', products.length);
 
     const mapped = products
       .map((product) => {
