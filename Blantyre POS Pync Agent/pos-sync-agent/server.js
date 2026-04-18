@@ -1555,6 +1555,7 @@ app.get('/pos-sync/promotion-preview/:productCode', validateApiKey, async (req, 
       locationCode,
       priceTypeCode,
       latestPriceRow: preview.latestPriceRow,
+      sourceDiagnostics: preview.sourceDiagnostics,
     });
   } catch (err) {
     console.error('[PROMO] Error in /pos-sync/promotion-preview:', err.message);
@@ -1589,6 +1590,7 @@ app.get('/pos-sync/get-resolved-price/:productCode', validateApiKey, async (req,
       priceDate: resolvedPrice.priceDate,
       locationCode: resolvedPrice.locationCode,
       priceTypeCode: resolvedPrice.priceTypeCode,
+      sourceDiagnostics: resolvedPrice.sourceDiagnostics,
     });
   } catch (err) {
     console.error('[PROMO] Error in /pos-sync/get-resolved-price:', err.message);
