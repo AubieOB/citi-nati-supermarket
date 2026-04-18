@@ -49,6 +49,7 @@ model Product {
   id                      Int        @id @default(autoincrement())
   branchCode              String     @default("BLANTYRE") @map("branch_code")
   sourceCode              String?
+  locationCode            String?    @map("location_code") // POS location code: BT, SH, BAR, ST999, WH, etc.
   name                    String
   price                   Float
   originalPrice           Float?
@@ -77,7 +78,7 @@ model Product {
   createdAt               DateTime   @default(now())
   updatedAt               DateTime   @updatedAt
 
-  @@unique([branchCode, sourceCode])
+  @@unique([branchCode, sourceCode, locationCode])
   @@index([branchCode])
   @@index([enabled])
   @@index([category])

@@ -633,11 +633,17 @@ async function resolveLocationScopedProductCodes(locationCode) {
   }
 
   // Zomba fallback: if no activity-table records exist yet for the requested
-  // Zomba location, fall back to all products stored with branchCode='ZOMBA'.
-  // The Product table is the primary source for POS-synced products.
+  // Zomba location, fall back to products stored with branchCode='ZOMBA' AND
+  // the specific locationCode (SH/BAR/ST999). The Product table is the primary
+  // source for POS-synced products.
   if (scopedCodes.size === 0 && isZombaScope) {
+    const locationWhere = buildLocationCodeScopeWhere(scopeCodes);
     const zombaRows = await prisma.product.findMany({
-      where: { branchCode: 'ZOMBA', sourceCode: { not: null } },
+      where: { 
+        branchCode: 'ZOMBA', 
+        sourceCode: { not: null },
+        ...(locationWhere || {})
+      },
       select: { sourceCode: true },
       distinct: ['sourceCode'],
     });
@@ -645,7 +651,7 @@ async function resolveLocationScopedProductCodes(locationCode) {
       .map((row) => normalizeProductCode(row.sourceCode))
       .filter(Boolean)
       .forEach((code) => scopedCodes.add(code));
-    console.log('[PRODUCTS][ZOMBA_SCOPE][FALLBACK] fell back to Product table branchCode=ZOMBA', {
+    console.log('[PRODUCTS][ZOMBA_SCOPE][FALLBACK] fell back to Product table branchCode=ZOMBA + locationCodes', {
       scopeCodes,
       fallbackCodeCount: scopedCodes.size,
     });
@@ -2141,6 +2147,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
           barcode: product.barcode || '',
           expiryDate: nearestExpiryDate,
           expiryBatchCount: normalizedBatches.length,
+          locationCode: productLocationCode,
           ...(branchCode === 'ZOMBA' ? { hideFromProductsPage: true } : {}),
           updatedAt: new Date(),
         };
