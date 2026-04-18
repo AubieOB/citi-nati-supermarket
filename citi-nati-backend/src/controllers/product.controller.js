@@ -2089,6 +2089,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
           where: {
             sourceCode,
             branchCode,
+            locationCode: productLocationCode,
           },
           select: {
             id: true,
@@ -2096,6 +2097,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
             stock: true,
             sourceCode: true,
             branchCode: true,
+            locationCode: true,
             lowStockThreshold: true,
             overrideActive: true,
             overrideStock: true,
