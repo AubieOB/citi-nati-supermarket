@@ -23,7 +23,8 @@ const buildFullName = (emp) =>
 const getApiError = (err, fallback) =>
   err?.response?.data?.error || err?.response?.data?.message || err?.message || fallback;
 
-const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, selectedLocationCode = '', selectedBranchCode = '', locations = [] }) => {
+const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] }) => {
+  const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, selectedLocationCode = '', selectedBranchCode = '', locations = [] }) => {
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
   const themedCardStyle = isAdminDarkTheme
     ? {

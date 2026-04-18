@@ -37,7 +37,8 @@ function getCurrentMonthRange() {
 const TAB_EXPENSES = 'expenses';
 const TAB_CATEGORIES = 'categories';
 
-const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocationId = null, selectedLocationCode = '', selectedBranchCode = '', locations = [] }) => {
+const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocationId = null, locations = [] }) => {
+  const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocationId = null, selectedLocationCode = '', selectedBranchCode = '', locations = [] }) => {
   const initialRange = getCurrentMonthRange();
 
   // Sub-tab

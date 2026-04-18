@@ -117,7 +117,8 @@ function focusNextWorkspaceField(container, currentField) {
   }
 }
 
-function buildNewForm(selectedLocation, selectedLocationCode = '') {
+function buildNewForm(selectedLocation) {
+  function buildNewForm(selectedLocation, selectedLocationCode) {
   return {
     id: null,
     intakeRef: '',
@@ -127,7 +128,7 @@ function buildNewForm(selectedLocation, selectedLocationCode = '') {
     purchaseDate: localDateKey(new Date()),
     receiptReference: '',
     locationId: selectedLocation ? String(selectedLocation.id) : '',
-    locationCode: selectedLocationCode || selectedLocation?.code || '',
+      locationCode: selectedLocationCode || selectedLocation?.code || '',
     locationName: selectedLocation?.name || '',
     overallNotes: '',
     receiptTotalAmount: '',
@@ -194,7 +195,8 @@ function toFormFromRecord(record) {
   };
 }
 
-const GoodsIntakeTab = ({ selectedLocationId = null, selectedLocationCode = '', selectedBranchCode = '', locations = [] }) => {
+const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
+  const GoodsIntakeTab = ({ selectedLocationId = null, selectedLocationCode = '', selectedBranchCode = '', locations = [] }) => {
   const workspaceRef = useRef(null);
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
 
@@ -243,7 +245,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedLocationCode = '', 
     return locations.find((location) => Number(location.id) === Number(selectedLocationId)) || null;
   }, [locations, selectedLocationId]);
 
-  const [form, setForm] = useState(() => buildNewForm(selectedLocation, selectedLocationCode));
+  const [form, setForm] = useState(() => buildNewForm(selectedLocation));
+    const [form, setForm] = useState(() => buildNewForm(selectedLocation, selectedLocationCode));
   const [saving, setSaving] = useState(false);
   const [activeLookupRow, setActiveLookupRow] = useState(-1);
   const [isIntakeWorkspaceOpen, setIsIntakeWorkspaceOpen] = useState(false);
@@ -254,10 +257,10 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedLocationCode = '', 
     setForm((prev) => ({
       ...prev,
       locationId: selectedLocation ? String(selectedLocation.id) : '',
-      locationCode: selectedLocationCode || selectedLocation?.code || '',
+        locationCode: selectedLocationCode || selectedLocation?.code || '',
       locationName: selectedLocation?.name || '',
     }));
-  }, [form.id, selectedLocation, selectedLocationCode]);
+    }, [form.id, selectedLocation, selectedLocationCode]);
 
   const calculatedItems = useMemo(() => form.items.map(withCalculatedLine), [form.items]);
 
@@ -300,7 +303,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedLocationCode = '', 
           search: search || undefined,
           status: statusFilter !== DEFAULT_STATUS_FILTER ? statusFilter : undefined,
           locationId: selectedLocationId || undefined,
-          locationCode: selectedLocationCode || undefined,
+            locationCode: selectedLocationCode || undefined,
           branchCode: selectedBranchCode || undefined,
           startDate: startDate || undefined,
           endDate: endDate || undefined,
@@ -316,6 +319,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedLocationCode = '', 
     } finally {
       setListLoading(false);
     }
+  }, [endDate, page, search, selectedLocationId, startDate, statusFilter]);
   }, [endDate, page, search, selectedBranchCode, selectedLocationCode, selectedLocationId, startDate, statusFilter]);
 
   const fetchSuppliers = useCallback(async () => {
@@ -351,7 +355,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedLocationCode = '', 
 
   useEffect(() => {
     setPage(1);
-  }, [endDate, search, selectedBranchCode, selectedLocationCode, selectedLocationId, startDate, statusFilter]);
+  }, [search, statusFilter, startDate, endDate, selectedLocationId]);
 
   useEffect(() => {
     if (!isIntakeWorkspaceOpen) return;
@@ -402,12 +406,14 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedLocationCode = '', 
   };
 
   const clearForm = () => {
+    setForm(buildNewForm(selectedLocation));
+    setForm(buildNewForm(selectedLocation, selectedLocationCode));
     setForm(buildNewForm(selectedLocation, selectedLocationCode));
   };
 
   const openWorkspace = ({ reset = false } = {}) => {
     if (reset) {
-      setForm(buildNewForm(selectedLocation, selectedLocationCode));
+      setForm(buildNewForm(selectedLocation));
     }
     setIsIntakeWorkspaceMaximized(false);
     setIsIntakeWorkspaceOpen(true);

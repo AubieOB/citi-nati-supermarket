@@ -84,8 +84,15 @@ const MonthlySummaryTab = ({
   selectedLocationId = null,
   selectedLocationCode = '',
   selectedLocationName = '',
-  selectedBranchCode = '',
 }) => {
+  const MonthlySummaryTab = ({
+    refreshKey = 0,
+    onNavigateTab,
+    selectedLocationId = null,
+    selectedLocationCode = '',
+    selectedLocationName = '',
+    selectedBranchCode = '',
+  }) => {
   const [showControls, setShowControls] = useState(false);
   const [isInsightsModalOpen, setIsInsightsModalOpen] = useState(false);
   const [isInsightsModalMaximized, setIsInsightsModalMaximized] = useState(false);

@@ -43,7 +43,8 @@ function normalizeAmount(value) {
   return Number(parsed.toFixed(2));
 }
 
-const SalesBalancingTab = ({ selectedLocationId = null, selectedLocationCode = '', selectedLocationName = '', selectedBranchCode = '' }) => {
+const SalesBalancingTab = ({ selectedLocationId = null, selectedLocationCode = '', selectedLocationName = '' }) => {
+  const SalesBalancingTab = ({ selectedLocationId = null, selectedLocationCode = '', selectedLocationName = '', selectedBranchCode = '' }) => {
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isHistoryModalMaximized, setIsHistoryModalMaximized] = useState(false);
