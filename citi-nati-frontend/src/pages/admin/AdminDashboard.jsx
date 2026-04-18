@@ -360,6 +360,9 @@ const AdminDashboard = () => {
       if (firstItems.length === 0) {
         try {
           const params = new URLSearchParams({ page: '1', limit: '5000' });
+          if (safeBranchCode) {
+            params.append('branchCode', safeBranchCode);
+          }
           if (safeLocationCode) {
             params.append('locationCode', safeLocationCode);
           }

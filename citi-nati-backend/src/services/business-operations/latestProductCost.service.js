@@ -15,7 +15,7 @@ function roundMoney(value, decimals = 2) {
   return Number(parsed.toFixed(decimals));
 }
 
-const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH'];
+const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'RES', 'WH'];
 const BRANCH_SCOPE_LOCATION_CODES = ['BT', 'ZA'];
 
 const BRANCH_SYNC_SOURCE_PREFIXES = {

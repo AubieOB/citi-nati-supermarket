@@ -51,7 +51,7 @@ function normalizeLocationCode(value) {
   return normalized || null;
 }
 
-const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH'];
+const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'RES', 'WH'];
 
 function expandLocationScopeCodes(locationCode) {
   const normalizedLocationCode = normalizeLocationCode(locationCode);
@@ -61,9 +61,9 @@ function expandLocationScopeCodes(locationCode) {
     return ['BT'];
   }
 
-  if (ZOMBA_LOCATION_CODES.includes(normalizedLocationCode)) {
-    // Zomba POS writes through SH only.
-    return ['SH'];
+  if (normalizedLocationCode === 'ZA') {
+    // Branch-level ZA should include all known Zomba operational sources.
+    return ['SH', 'BAR', 'RES', 'WH'];
   }
 
   return [normalizedLocationCode];
@@ -965,9 +965,10 @@ router.post('/pos-promotions/revert', verifyTokenMiddleware, verifyAdmin, revert
  */
 router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
   try {
-    const { search = '', page = 1, limit = 5000, locationCode } = req.query;
+    const { search = '', page = 1, limit = 5000, locationCode, branchCode } = req.query;
     const skip = (page - 1) * limit;
     const normalizedLocationCode = normalizeLocationCode(locationCode);
+    const normalizedBranchCode = String(branchCode || '').trim().toUpperCase() || null;
 
     // Build where clause
     const where = {
@@ -988,10 +989,14 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
         });
       } else {
         where.sourceCode = { in: scopedProductCodes };
-        if (derivedBranchCode) {
+        if (normalizedBranchCode) {
+          where.branchCode = normalizedBranchCode;
+        } else if (derivedBranchCode) {
           where.branchCode = derivedBranchCode;
         }
       }
+    } else if (normalizedBranchCode) {
+      where.branchCode = normalizedBranchCode;
     }
 
     if (search) {
