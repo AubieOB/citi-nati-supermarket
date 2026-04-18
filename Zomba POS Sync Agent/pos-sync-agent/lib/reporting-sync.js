@@ -388,9 +388,14 @@ class ReportingSyncService {
 
   async fetchLatestProductCosts(pool) {
     const columnConfig = await this.resolveLatestCostColumnConfig(pool);
-    const request = pool.request();
-    request.input('LocationCode', sql.VarChar(10), this.config.posDb.locationCode);
-
+    const configuredLocations = Array.isArray(this.config.posDb.operationalLocationCodes)
+      ? this.config.posDb.operationalLocationCodes
+      : [this.config.posDb.locationCode];
+    const locationCodes = Array.from(new Set(
+      configuredLocations
+        .map((code) => String(code || '').trim().toUpperCase())
+        .filter(Boolean),
+    ));
     const query = `
       WITH ranked_costs AS (
         SELECT
@@ -430,23 +435,31 @@ class ReportingSyncService {
       ORDER BY ProductCode ASC
     `;
 
-    const result = await request.query(query);
-    const rows = (result.recordset || []).map((row) => ({
-      productCode: row.ProductCode == null ? null : String(row.ProductCode).trim(),
-      productName: row.ProductName == null ? null : String(row.ProductName).trim(),
-      locationCode: row.LocationCode == null ? this.config.posDb.locationCode : String(row.LocationCode).trim(),
-      branchCode: this.config.branch.branchCode,
-      branchName: this.config.branch.branchName,
-      locationId: this.config.branch.locationId,
-      latestGrnNo: row.LatestGRNNo == null ? null : String(row.LatestGRNNo).trim(),
-      latestGrnReference: row.LatestGRNReference == null ? null : String(row.LatestGRNReference).trim(),
-      latestGrnDate: row.LatestGRNDate instanceof Date ? row.LatestGRNDate.toISOString() : (row.LatestGRNDate || null),
-      latestUnitCost: row.LatestUnitCost == null ? null : Number(row.LatestUnitCost),
-      stockDetailId: row.StockDetailID == null ? null : String(row.StockDetailID).trim(),
-      sourceUpdatedAt: row.LatestGRNDate instanceof Date ? row.LatestGRNDate.toISOString() : (row.LatestGRNDate || null),
-    })).filter((row) => row.productCode);
+    const rows = [];
+    for (const locationCode of locationCodes) {
+      const request = pool.request();
+      request.input('LocationCode', sql.VarChar(10), locationCode);
+      const result = await request.query(query);
+      const locationRows = (result.recordset || []).map((row) => ({
+        productCode: row.ProductCode == null ? null : String(row.ProductCode).trim(),
+        productName: row.ProductName == null ? null : String(row.ProductName).trim(),
+        locationCode: row.LocationCode == null ? locationCode : String(row.LocationCode).trim(),
+        branchCode: this.config.branch.branchCode,
+        branchName: this.config.branch.branchName,
+        locationId: this.config.branch.locationId,
+        latestGrnNo: row.LatestGRNNo == null ? null : String(row.LatestGRNNo).trim(),
+        latestGrnReference: row.LatestGRNReference == null ? null : String(row.LatestGRNReference).trim(),
+        latestGrnDate: row.LatestGRNDate instanceof Date ? row.LatestGRNDate.toISOString() : (row.LatestGRNDate || null),
+        latestUnitCost: row.LatestUnitCost == null ? null : Number(row.LatestUnitCost),
+        stockDetailId: row.StockDetailID == null ? null : String(row.StockDetailID).trim(),
+        sourceUpdatedAt: row.LatestGRNDate instanceof Date ? row.LatestGRNDate.toISOString() : (row.LatestGRNDate || null),
+      })).filter((row) => row.productCode);
 
-    console.log(`${this.branchTag} [LATEST COST] Fetched ${rows.length} latest product cost rows`);
+      rows.push(...locationRows);
+      console.log(`${this.branchTag} [LATEST COST] Fetched ${locationRows.length} rows for location ${locationCode}`);
+    }
+
+    console.log(`${this.branchTag} [LATEST COST] Fetched ${rows.length} latest product cost rows across ${locationCodes.join(', ')}`);
     return rows;
   }
 

@@ -51,22 +51,53 @@ let pool;
 let reportingSyncState;
 let reportingSyncService;
 
-/** Expiry batch cache - refreshed every 5 minutes so heavy view query doesn't block every 15s product push tick */
-let expiryBatchCache = null;
-let expiryBatchCachedAt = 0;
+/** Expiry batch cache keyed by location - refreshed every 5 minutes */
+let expiryBatchCache = {};
+let expiryBatchCachedAt = {};
 const EXPIRY_BATCH_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-async function getCachedExpiryBatches() {
-  const now = Date.now();
-  if (expiryBatchCache && (now - expiryBatchCachedAt) < EXPIRY_BATCH_CACHE_TTL_MS) {
-    console.log(`[POS FETCH][EXPIRY] using cached expiry batch map (age=${Math.round((now - expiryBatchCachedAt) / 1000)}s, size=${expiryBatchCache.size})`);
-    return expiryBatchCache;
+function getOperationalSyncLocations() {
+  const configured = Array.isArray(appConfig.posDb.operationalLocationCodes)
+    ? appConfig.posDb.operationalLocationCodes
+      .map((code) => String(code || '').trim().toUpperCase())
+      .filter(Boolean)
+    : [];
+
+  if (configured.length > 0) {
+    return Array.from(new Set(configured));
   }
-  console.log('[POS FETCH][EXPIRY] refreshing expiry batch cache...');
-  const freshMap = await buildActiveExpiryBatchesFromPOS();
-  expiryBatchCache = freshMap;
-  expiryBatchCachedAt = Date.now();
-  console.log(`[POS FETCH][EXPIRY] expiry batch cache refreshed: ${freshMap.size} products`);
+
+  return [String(appConfig.posDb.locationCode || 'SH').trim().toUpperCase()];
+}
+
+function normalizeOperationalLocationCode(rawValue) {
+  const fallbackLocation = String(appConfig.posDb.locationCode || 'SH').trim().toUpperCase();
+  const normalized = String(rawValue || fallbackLocation).trim().toUpperCase();
+  const allowedLocations = getOperationalSyncLocations();
+
+  if (allowedLocations.indexOf(normalized) >= 0) {
+    return normalized;
+  }
+
+  return null;
+}
+
+async function getCachedExpiryBatches(locationCode) {
+  const cacheKey = String(locationCode || appConfig.posDb.locationCode || 'SH').trim().toUpperCase();
+  const now = Date.now();
+  const cachedMap = expiryBatchCache[cacheKey];
+  const cachedAt = expiryBatchCachedAt[cacheKey] || 0;
+
+  if (cachedMap && (now - cachedAt) < EXPIRY_BATCH_CACHE_TTL_MS) {
+    console.log(`[POS FETCH][EXPIRY] using cached expiry batch map for ${cacheKey} (age=${Math.round((now - cachedAt) / 1000)}s, size=${cachedMap.size})`);
+    return cachedMap;
+  }
+
+  console.log(`[POS FETCH][EXPIRY] refreshing expiry batch cache for ${cacheKey}...`);
+  const freshMap = await buildActiveExpiryBatchesFromPOS(cacheKey);
+  expiryBatchCache[cacheKey] = freshMap;
+  expiryBatchCachedAt[cacheKey] = Date.now();
+  console.log(`[POS FETCH][EXPIRY] expiry batch cache refreshed for ${cacheKey}: ${freshMap.size} products`);
   return freshMap;
 }
 
@@ -241,45 +272,29 @@ async function fetchProductsFromPOS(locationCode) {
     if (!pool) await initializePool();
 
     // Use provided location code or fall back to environment
-    const LOCATION_CODE = locationCode || appConfig.posDb.locationCode;
+    const LOCATION_CODE = normalizeOperationalLocationCode(locationCode || appConfig.posDb.locationCode);
+    if (!LOCATION_CODE) {
+      throw new Error(`Invalid operational locationCode: ${locationCode}`);
+    }
 
-    // Operational stock source: ONLY DailyStockBalance for the given LocationCode.
-    // Use ROW_NUMBER() to get the single latest snapshot row per product.
-    // No fallback to Stocks, Stocks.StockQty, or ProductActivity — those can cause
-    // aggregation across sub-locations and inflate values vs POS stock-balance screen.
-    // For Zomba: LocationCode is always 'SH' (enforced by getOperationalSyncLocations).
+    // Reference logic aligned with the stable Blantyre agent:
+    // Stock = SUM(QtyIn) - SUM(QtyOut) from ProductActivity scoped by LocationCode.
     const query = `
-      WITH latest_stock AS (
-        SELECT
-          ProductCode,
-          StockDate,
-          StockBalance,
-          ROW_NUMBER() OVER (
-            PARTITION BY ProductCode
-            ORDER BY StockDate DESC
-          ) AS rn
-        FROM POS.dbo.DailyStockBalance
-        WHERE LocationCode = @LocationCode
-          AND CAST(StockDate AS date) <= CAST(GETDATE() AS date)
-      )
-      SELECT
+      SELECT 
           p.ProductCode,
           p.ProductName,
-          ISNULL(p.Barcode, '') AS Barcode,
+          ISNULL(p.Barcode,'') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
-          ls.StockDate,
-          ISNULL(ls.StockBalance, 0) AS QuantityAvailable,
-          CASE
-            WHEN ls.StockBalance IS NOT NULL THEN 'DailyStockBalance'
-            ELSE 'NoStockRow'
-          END AS StockSource,
+          ISNULL(SUM(pa.QtyIn), 0) - ISNULL(SUM(pa.QtyOut), 0) AS QuantityAvailable,
+          'ProductActivity' AS StockSource,
           ISNULL(
               (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC),
               (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode ORDER BY PriceID DESC)
           ) AS SellingPrice
       FROM POS.dbo.productsmaster p
       LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
-      LEFT JOIN latest_stock ls ON ls.ProductCode = p.ProductCode AND ls.rn = 1
+      LEFT JOIN POS.dbo.ProductActivity pa ON p.ProductCode = pa.ProductCode AND pa.LocationCode = @LocationCode
+      GROUP BY p.ProductCode, p.ProductName, p.Barcode, pt.ProductTypeName
       ORDER BY p.ProductCode
     `;
 
@@ -290,7 +305,7 @@ async function fetchProductsFromPOS(locationCode) {
     console.log(`${SYNC_LOG_PREFIX} [DEBUG] selected location: ${LOCATION_CODE}`);
     console.log(`${SYNC_LOG_PREFIX} [DEBUG] locationCode used in query: ${LOCATION_CODE}`);
     console.log(`${SYNC_LOG_PREFIX} fetched ${result.recordset.length} products from location ${LOCATION_CODE}`);
-    console.log(`${SYNC_LOG_PREFIX} stock mode: DailyStockBalance latest snapshot via ROW_NUMBER() (SH-only, StockDate <= today, no Stocks/ProductActivity fallback)`);
+    console.log(`${SYNC_LOG_PREFIX} stock mode: ProductActivity SUM(QtyIn)-SUM(QtyOut) scoped by LocationCode`);
     console.log(`${SYNC_LOG_PREFIX} price mode: latest FPrice by PriceID DESC`);
 
     const stockSourceSummary = result.recordset.reduce((acc, row) => {
@@ -307,15 +322,14 @@ async function fetchProductsFromPOS(locationCode) {
     if (result.recordset.length > 0) {
       console.log(`${SYNC_LOG_PREFIX} [DEBUG] sample product stock (locationCode=${LOCATION_CODE}):`);
       result.recordset.slice(0, 5).forEach(product => {
-        const stockDateLabel = product.StockDate ? new Date(product.StockDate).toISOString().slice(0, 10) : 'NULL';
-        console.log(`${SYNC_LOG_PREFIX} [DEBUG]  ${product.ProductCode}: ${product.ProductName} | stockDate=${stockDateLabel} | stock=${product.QuantityAvailable} | source=${product.StockSource} | price=${product.SellingPrice}`);
+        console.log(`${SYNC_LOG_PREFIX} [DEBUG]  ${product.ProductCode}: ${product.ProductName} | stock=${product.QuantityAvailable} | source=${product.StockSource} | price=${product.SellingPrice}`);
       });
     }
 
     // Enrich each product with active expiry batches from the same SQL Server.
     // Use the 5-minute cache so the heavy vw_WillExpire_Products view query does not
     // block every 15-second product-push tick (preventing isAutoSyncRunning from releasing).
-    const expiryBatchesMap = await getCachedExpiryBatches();
+    const expiryBatchesMap = await getCachedExpiryBatches(LOCATION_CODE);
     let enrichedWithExpiry = 0;
     const enrichedRecords = result.recordset.map(product => {
       const code = String(product.ProductCode || '').trim();
@@ -377,15 +391,6 @@ async function fetchProductsFromPOS(locationCode) {
     console.error('[POS FETCH] Error fetching products:', err.message);
     return [];
   }
-}
-
-function getOperationalSyncLocations() {
-  // Business rule: Zomba operational dashboard stock must reflect SH only.
-  if (appConfig.branch.branchCode === 'ZOMBA') {
-    return ['SH'];
-  }
-
-  return [appConfig.posDb.locationCode];
 }
 
 function reconcileBatchesWithLiveStock(batches, liveStockQty) {
@@ -820,7 +825,7 @@ app.get('/pos-sync/products', validateApiKey, requireFeature('enableReportingSyn
   try {
     console.log('[POS SYNC] /pos-sync/products endpoint called');
     
-    // Fetch products from operational location scope only.
+    // Fetch products from configured operational location scope.
     const allProducts = [];
     const syncLocations = getOperationalSyncLocations();
     
@@ -828,8 +833,8 @@ app.get('/pos-sync/products', validateApiKey, requireFeature('enableReportingSyn
       branchCode: appConfig.branch.branchCode,
       configuredLocationCode: appConfig.posDb.locationCode,
       includedLocations: syncLocations,
-      mode: appConfig.branch.branchCode === 'ZOMBA' ? 'SH_ONLY_OPERATIONAL' : 'CONFIGURED_LOCATION_ONLY',
-      stockSource: 'DailyStockBalance latest snapshot only',
+      mode: 'CONFIGURED_OPERATIONAL_LOCATIONS',
+      stockSource: 'ProductActivity SUM(QtyIn)-SUM(QtyOut)',
     });
     
     for (const locationCode of syncLocations) {
@@ -1070,52 +1075,46 @@ app.get('/pos-sync/categories', validateApiKey, async (req, res) => {
 
 /**
  * GET /pos-sync/stock-by-location
- * Fetch stock quantities by location (uses DailyStockBalance for real inventory)
+ * Fetch stock quantities by location using ProductActivity
  * Returns ProductCode, LocationCode, and current available stock
  */
 app.get('/pos-sync/stock-by-location', validateApiKey, async (req, res) => {
   try {
     if (!pool) await initializePool();
 
-    const LOCATION_CODE = 'SH';
+    const requestedLocationCode = req.query && req.query.locationCode;
+    const LOCATION_CODE = normalizeOperationalLocationCode(requestedLocationCode || appConfig.posDb.locationCode);
+
+    if (!LOCATION_CODE) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid locationCode for operational stock query',
+        allowedLocationCodes: getOperationalSyncLocations(),
+      });
+    }
 
     const query = `
-      WITH latest_sh_stock AS (
-        SELECT
-          ProductCode,
-          LocationCode,
-          StockDate,
-          StockBalance,
-          ROW_NUMBER() OVER (
-            PARTITION BY ProductCode
-            ORDER BY StockDate DESC
-          ) AS rn
-        FROM POS.dbo.DailyStockBalance
-        WHERE LocationCode = @LocationCode
-          AND CAST(StockDate AS date) <= CAST(GETDATE() AS date)
-      )
       SELECT 
-          s.ProductCode,
+          p.ProductCode,
           p.ProductName,
-          s.LocationCode,
-          s.StockBalance AS AvailableStock,
-          s.StockDate,
-          'DailyStockBalance' AS StockSource
-      FROM latest_sh_stock s
-      INNER JOIN POS.dbo.productsmaster p 
-          ON s.ProductCode = p.ProductCode
-      WHERE s.rn = 1
-      ORDER BY s.ProductCode
+          @LocationCode AS LocationCode,
+          ISNULL(SUM(pa.QtyIn), 0) - ISNULL(SUM(pa.QtyOut), 0) AS AvailableStock,
+          'ProductActivity' AS StockSource
+      FROM POS.dbo.productsmaster p
+      LEFT JOIN POS.dbo.ProductActivity pa
+          ON p.ProductCode = pa.ProductCode
+         AND pa.LocationCode = @LocationCode
+      GROUP BY p.ProductCode, p.ProductName
+      ORDER BY p.ProductCode
     `;
 
     const request = pool.request();
     request.input('LocationCode', sql.VarChar(10), LOCATION_CODE);
     const result = await request.query(query);
 
-    console.log(`[/pos-sync/stock-by-location] Fetched stock for ${result.recordset.length} products at location ${LOCATION_CODE} using latest DailyStockBalance <= today`);
+    console.log(`[/pos-sync/stock-by-location] Fetched stock for ${result.recordset.length} products at location ${LOCATION_CODE} using ProductActivity`);
     result.recordset.slice(0, 5).forEach((row) => {
-      const stockDateLabel = row.StockDate ? new Date(row.StockDate).toISOString().slice(0, 10) : 'NULL';
-      console.log(`[ZOMBA STOCK] product=${row.ProductCode} source=DailyStockBalance location=${row.LocationCode} stockDate=${stockDateLabel} stock=${Number(row.AvailableStock || 0)}`);
+      console.log(`[ZOMBA STOCK] product=${row.ProductCode} source=ProductActivity location=${row.LocationCode} stock=${Number(row.AvailableStock || 0)}`);
     });
 
     res.json({
@@ -1180,8 +1179,22 @@ app.post('/pos-sync/write-invoice', validateApiKey, requireAllFeatures(['enableO
 
     if (!pool) await initializePool();
 
+    const invoiceLocationCode = normalizeOperationalLocationCode(req.body && req.body.locationCode);
+    if (!invoiceLocationCode) {
+      return res.status(400).json({
+        success: false,
+        error: 'locationCode is required and must be a valid operational location',
+        allowedLocationCodes: getOperationalSyncLocations(),
+      });
+    }
+
+    const invoicePayload = {
+      ...req.body,
+      locationCode: invoiceLocationCode,
+    };
+
     // Validate input
-    const validation = transactionManager.validateInvoiceData(req.body);
+    const validation = transactionManager.validateInvoiceData(invoicePayload);
     if (!validation.valid) {
       return res.status(400).json({
         success: false,
@@ -1195,8 +1208,8 @@ app.post('/pos-sync/write-invoice', validateApiKey, requireAllFeatures(['enableO
       // Validate stock availability before proceeding
       const stockValidation = await stockUpdates.validateStockAvailability(
         request,
-        req.body.items,
-        req.body.locationCode
+        invoicePayload.items,
+        invoicePayload.locationCode
       );
 
       if (!stockValidation.valid) {
@@ -1204,10 +1217,10 @@ app.post('/pos-sync/write-invoice', validateApiKey, requireAllFeatures(['enableO
       }
 
       // Write back invoice
-      const invoiceResult = await invoiceWriteback.writeBackInvoice(request, req.body);
+      const invoiceResult = await invoiceWriteback.writeBackInvoice(request, invoicePayload);
 
       // Update stock for all items
-      await stockUpdates.updateStockForInvoiceItems(request, req.body.items, req.body.locationCode);
+      await stockUpdates.updateStockForInvoiceItems(request, invoicePayload.items, invoicePayload.locationCode);
 
       return invoiceResult;
     });
@@ -1269,10 +1282,24 @@ app.post('/pos-sync/update-stock', validateApiKey, requireAllFeatures(['enableSt
 
     // Validate each update
     const errors = [];
+    const normalizedUpdates = [];
     for (let i = 0; i < updates.length; i++) {
-      const validation = transactionManager.validateStockData(updates[i]);
+      const normalizedLocationCode = normalizeOperationalLocationCode(updates[i] && updates[i].locationCode);
+      if (!normalizedLocationCode) {
+        errors.push(`Update ${i}: invalid locationCode`);
+        continue;
+      }
+
+      const normalizedUpdate = {
+        ...updates[i],
+        locationCode: normalizedLocationCode,
+      };
+
+      const validation = transactionManager.validateStockData(normalizedUpdate);
       if (!validation.valid) {
         errors.push(`Update ${i}: ${validation.errors.join(', ')}`);
+      } else {
+        normalizedUpdates.push(normalizedUpdate);
       }
     }
 
@@ -1292,7 +1319,7 @@ app.post('/pos-sync/update-stock', validateApiKey, requireAllFeatures(['enableSt
         failedItems: [],
       };
 
-      for (const update of updates) {
+      for (const update of normalizedUpdates) {
         try {
           await stockUpdates.reduceStockOnSale(
             request,
@@ -1364,6 +1391,15 @@ app.post('/pos-sync/update-prices', validateApiKey, requireFeature('enablePriceS
     if (!pool) await initializePool();
 
     const { updates, locationCode } = req.body;
+    const normalizedLocationCode = normalizeOperationalLocationCode(locationCode || appConfig.posDb.locationCode);
+
+    if (!normalizedLocationCode) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid locationCode for price update',
+        allowedLocationCodes: getOperationalSyncLocations(),
+      });
+    }
 
     if (!Array.isArray(updates) || updates.length === 0) {
       return res.status(400).json({
@@ -1391,7 +1427,7 @@ app.post('/pos-sync/update-prices', validateApiKey, requireFeature('enablePriceS
 
     // Execute transaction
     const result = await transactionManager.executeTransaction(pool, async (request) => {
-      return await priceUpdates.updateBulkPrices(request, updates, locationCode || 'SH');
+      return await priceUpdates.updateBulkPrices(request, updates, normalizedLocationCode);
     });
 
     if (!result.success) {
@@ -1440,7 +1476,7 @@ app.post('/pos-sync/apply-promotion', validateApiKey, requireFeature('enableProm
 
     const productCode = req.body.productCode;
     const promotionalPrice = Number(req.body.promotionalPrice != null ? req.body.promotionalPrice : req.body.promoPrice);
-    const locationCode = req.body.locationCode;
+    const locationCode = normalizeOperationalLocationCode(req.body.locationCode || appConfig.posDb.locationCode);
     const priceTypeCode = req.body.priceTypeCode;
     const reasonCode = req.body.reasonCode;
     const updatePromotionalFlag = req.body.updatePromotionalFlag;
@@ -1456,10 +1492,18 @@ app.post('/pos-sync/apply-promotion', validateApiKey, requireFeature('enableProm
       });
     }
 
+    if (!locationCode) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid locationCode for promotion apply',
+        allowedLocationCodes: getOperationalSyncLocations(),
+      });
+    }
+
     console.log('[PROMO] /apply-promotion validation success:', {
       productCode,
       promotionalPrice,
-      locationCode: locationCode || 'SH',
+      locationCode,
       priceTypeCode: priceTypeCode || 'RT',
       reasonCode: reasonCode || 'EXPIRY_CLEARANCE',
       updatePromotionalFlag: updatePromotionalFlag === true,
@@ -1471,7 +1515,7 @@ app.post('/pos-sync/apply-promotion', validateApiKey, requireFeature('enableProm
       return priceUpdates.applyPromotionalPrice(request, {
         productCode,
         promotionalPrice,
-        locationCode: locationCode || 'SH',
+        locationCode,
         priceTypeCode: priceTypeCode || 'RT',
         reasonCode: reasonCode || 'EXPIRY_CLEARANCE',
         updatePromotionalFlag: updatePromotionalFlag === true,
@@ -1533,7 +1577,7 @@ app.post('/pos-sync/revert-promotion', validateApiKey, requireFeature('enablePro
     if (!pool) await initializePool();
 
     const productCode = req.body.productCode;
-    const locationCode = req.body.locationCode;
+    const locationCode = normalizeOperationalLocationCode(req.body.locationCode || appConfig.posDb.locationCode);
     const priceTypeCode = req.body.priceTypeCode;
     const restorePriceValue = req.body.restorePrice != null ? req.body.restorePrice : req.body.originalPrice;
     const restorePrice = restorePriceValue == null ? null : Number(restorePriceValue);
@@ -1562,9 +1606,17 @@ app.post('/pos-sync/revert-promotion', validateApiKey, requireFeature('enablePro
       });
     }
 
+    if (!locationCode) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid locationCode for promotion revert',
+        allowedLocationCodes: getOperationalSyncLocations(),
+      });
+    }
+
     console.log('[PROMO] /revert-promotion validation success:', {
       productCode,
-      locationCode: locationCode || 'SH',
+      locationCode,
       priceTypeCode: priceTypeCode || 'RT',
       restorePrice,
       reasonCode: reasonCode || 'EXPIRY_CLEARANCE',
@@ -1576,7 +1628,7 @@ app.post('/pos-sync/revert-promotion', validateApiKey, requireFeature('enablePro
     const result = await transactionManager.executeTransaction(pool, async (request) => {
       return priceUpdates.revertToStandardPrice(request, {
         productCode,
-        locationCode: locationCode || 'SH',
+        locationCode,
         priceTypeCode: priceTypeCode || 'RT',
         restorePrice,
         reasonCode: reasonCode || 'EXPIRY_CLEARANCE',
@@ -1630,8 +1682,16 @@ app.get('/pos-sync/promotion-preview/:productCode', validateApiKey, requireFeatu
     if (!pool) await initializePool();
 
     const { productCode } = req.params;
-    const locationCode = req.query.locationCode || appConfig.posDb.locationCode;
+    const locationCode = normalizeOperationalLocationCode((req.query && req.query.locationCode) || appConfig.posDb.locationCode);
     const priceTypeCode = req.query.priceTypeCode || 'RT';
+
+    if (!locationCode) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid locationCode for promotion preview',
+        allowedLocationCodes: getOperationalSyncLocations(),
+      });
+    }
 
     const request = pool.request();
     const preview = await priceUpdates.previewPromotionPrice(request, productCode, locationCode, priceTypeCode);
@@ -1669,8 +1729,16 @@ app.get('/pos-sync/get-resolved-price/:productCode', validateApiKey, requireFeat
     if (!pool) await initializePool();
 
     const { productCode } = req.params;
-    const locationCode = req.query.locationCode || appConfig.posDb.locationCode;
+    const locationCode = normalizeOperationalLocationCode((req.query && req.query.locationCode) || appConfig.posDb.locationCode);
     const priceTypeCode = req.query.priceTypeCode || 'RT';
+
+    if (!locationCode) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid locationCode for resolved price lookup',
+        allowedLocationCodes: getOperationalSyncLocations(),
+      });
+    }
     const request = pool.request();
     const resolvedPrice = await priceUpdates.getResolvedPrice(request, productCode, locationCode, priceTypeCode);
 
@@ -1780,7 +1848,7 @@ async function autoSync() {
 
   isAutoSyncRunning = true;
   try {
-    // Fetch products from operational location scope only.
+    // Fetch products from configured operational location scope.
     const allProducts = [];
     const syncLocations = getOperationalSyncLocations();
     
@@ -1788,8 +1856,8 @@ async function autoSync() {
       branchCode: appConfig.branch.branchCode,
       configuredLocationCode: appConfig.posDb.locationCode,
       includedLocations: syncLocations,
-      mode: appConfig.branch.branchCode === 'ZOMBA' ? 'SH_ONLY_OPERATIONAL' : 'CONFIGURED_LOCATION_ONLY',
-      stockSource: 'DailyStockBalance latest snapshot only',
+      mode: 'CONFIGURED_OPERATIONAL_LOCATIONS',
+      stockSource: 'ProductActivity SUM(QtyIn)-SUM(QtyOut)',
     });
     
     for (const locationCode of syncLocations) {
@@ -1927,12 +1995,28 @@ async function writeEmergencySaleToPos(sale) {
     throw new Error('NON_RETRYABLE: emergency sale payload missing');
   }
 
+  const payload = {
+    ...sale.payload,
+  };
+
+  const candidateLocationCode = payload.locationCode
+    || payload.LocationCode
+    || sale.locationCode
+    || sale.location_code;
+  const normalizedLocationCode = normalizeOperationalLocationCode(candidateLocationCode);
+
+  if (!normalizedLocationCode) {
+    throw new Error('NON_RETRYABLE: emergency sale missing valid operational locationCode');
+  }
+
+  payload.locationCode = normalizedLocationCode;
+
   const transaction = new sql.Transaction(pool);
 
   try {
     await transaction.begin();
     const request = new sql.Request(transaction);
-    const resultSummary = await invoiceWriteback.writeBackInvoice(request, sale.payload);
+    const resultSummary = await invoiceWriteback.writeBackInvoice(request, payload);
     await transaction.commit();
     return resultSummary;
   } catch (error) {

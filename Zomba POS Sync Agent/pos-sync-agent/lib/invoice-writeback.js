@@ -5,6 +5,7 @@
  */
 
 const sql = require('mssql');
+const { buildConfig } = require('./config');
 
 let invoiceDetailsColumnSupportCache = null;
 
@@ -501,6 +502,7 @@ async function insertInvoiceDetails(request, invoiceCode, items, locationCode) {
  */
 async function writeBackInvoice(request, invoiceData) {
   try {
+    const config = buildConfig();
     const detailColumnSupport = await resolveInvoiceDetailsColumnSupport(request);
     const detailSchemaFields = [
       'InvoiceCode',
@@ -566,12 +568,23 @@ async function writeBackInvoice(request, invoiceData) {
       items,
     } = invoiceData;
 
+    const normalizedLocationCode = String(locationCode || '').trim().toUpperCase();
+    const resolvedLocationCode = normalizedLocationCode || String(config.posDb.locationCode || '').trim().toUpperCase();
+
     if (!orderId) {
       throw new Error('NON_RETRYABLE: orderId is required');
     }
 
     if (!Array.isArray(items) || items.length === 0) {
       throw new Error('NON_RETRYABLE: items must be a non-empty array');
+    }
+
+    if (!resolvedLocationCode) {
+      throw new Error('NON_RETRYABLE: locationCode is required for invoice write-back');
+    }
+
+    if (config.branch && config.branch.branchCode === 'ZOMBA' && !normalizedLocationCode) {
+      throw new Error('NON_RETRYABLE: locationCode is required for ZOMBA invoice write-back');
     }
 
     console.log(`[INVOICE] WRITE_INVOICE start orderId=${orderId} reference=${reference} items=${items.length}`);
@@ -612,7 +625,7 @@ async function writeBackInvoice(request, invoiceData) {
       invoiceDate: safeInvoiceDate,
       invoiceTime: safeInvoiceDate,
       customerCode: String('CASH').slice(0, 15),
-      locationCode: String('SH').slice(0, 6),
+      locationCode: String(resolvedLocationCode).slice(0, 6),
       grossSale: Number(grossSale) || 0,
       vat: Number(vat) || 0,
       discount: Number(discount) || 0,
@@ -634,7 +647,7 @@ async function writeBackInvoice(request, invoiceData) {
       request,
       invoiceCode,
       items,
-      'SH'
+      resolvedLocationCode
     );
     const itemCount = detailResult.insertedCount;
 
