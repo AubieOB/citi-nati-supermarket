@@ -521,15 +521,18 @@ function deriveBranchCodeFromScopeCodes(scopeCodes = []) {
   return null;
 }
 
-async function resolveLocationScopedProductCodesFromSales(scopeCodes = []) {
+async function resolveLocationScopedProductCodesFromSales(scopeCodes = [], branchCodeHint = null) {
   if (!Array.isArray(scopeCodes) || scopeCodes.length === 0) {
     return [];
   }
 
-  // Preserve branch-level fallback only for legacy Blantyre rows.
-  const derivedBranchCode = scopeCodes.includes('BT')
-    ? deriveBranchCodeFromScopeCodes(scopeCodes)
-    : null;
+  const normalizedBranchHint = normalizeScopeCode(branchCodeHint);
+  // Preserve branch-level fallback only for legacy Blantyre rows when no explicit hint is provided.
+  const derivedBranchCode = normalizedBranchHint || (
+    scopeCodes.includes('BT')
+      ? deriveBranchCodeFromScopeCodes(scopeCodes)
+      : null
+  );
   const locationCodePredicates = scopeCodes.map((code) => ({
     locationCode: {
       equals: code,
@@ -558,15 +561,18 @@ async function resolveLocationScopedProductCodesFromSales(scopeCodes = []) {
     .filter(Boolean);
 }
 
-async function resolveLocationScopedProductCodesFromLatestCosts(scopeCodes = []) {
+async function resolveLocationScopedProductCodesFromLatestCosts(scopeCodes = [], branchCodeHint = null) {
   if (!Array.isArray(scopeCodes) || scopeCodes.length === 0) {
     return [];
   }
 
-  // Preserve branch-level fallback only for legacy Blantyre rows.
-  const derivedBranchCode = scopeCodes.includes('BT')
-    ? deriveBranchCodeFromScopeCodes(scopeCodes)
-    : null;
+  const normalizedBranchHint = normalizeScopeCode(branchCodeHint);
+  // Preserve branch-level fallback only for legacy Blantyre rows when no explicit hint is provided.
+  const derivedBranchCode = normalizedBranchHint || (
+    scopeCodes.includes('BT')
+      ? deriveBranchCodeFromScopeCodes(scopeCodes)
+      : null
+  );
   const locationCodePredicates = scopeCodes.map((code) => ({
     locationCode: {
       equals: code,
@@ -592,9 +598,10 @@ async function resolveLocationScopedProductCodesFromLatestCosts(scopeCodes = [])
     .filter(Boolean);
 }
 
-async function resolveLocationScopedProductCodes(locationCode) {
+async function resolveLocationScopedProductCodes(locationCode, branchCodeHint = null) {
   const scopeCodes = expandLocationScopeCodes(locationCode);
   if (scopeCodes.length === 0) return null;
+  const normalizedBranchHint = normalizeScopeCode(branchCodeHint);
 
   const scopedWhere = buildLocationCodeScopeWhere(scopeCodes);
 
@@ -610,10 +617,27 @@ async function resolveLocationScopedProductCodes(locationCode) {
       .filter(Boolean)
   );
 
-  const costCodes = await resolveLocationScopedProductCodesFromLatestCosts(scopeCodes);
+  if (normalizedBranchHint && scopedCodes.size > 0) {
+    const expiryBranchRows = await prisma.product.findMany({
+      where: {
+        branchCode: normalizedBranchHint,
+        sourceCode: { in: Array.from(scopedCodes.values()) },
+      },
+      select: { sourceCode: true },
+      distinct: ['sourceCode'],
+    });
+
+    scopedCodes.clear();
+    expiryBranchRows
+      .map((row) => normalizeProductCode(row.sourceCode))
+      .filter(Boolean)
+      .forEach((code) => scopedCodes.add(code));
+  }
+
+  const costCodes = await resolveLocationScopedProductCodesFromLatestCosts(scopeCodes, normalizedBranchHint);
   costCodes.forEach((code) => scopedCodes.add(code));
 
-  const salesCodes = await resolveLocationScopedProductCodesFromSales(scopeCodes);
+  const salesCodes = await resolveLocationScopedProductCodesFromSales(scopeCodes, normalizedBranchHint);
   salesCodes.forEach((code) => scopedCodes.add(code));
 
   const isZombaScope = scopeCodes.some((code) => ['SH', 'BAR', 'RES', 'WH'].includes(code));
@@ -1135,7 +1159,7 @@ const getProducts = async (req, res) => {
     }
 
     if (isAdmin && requestedBranchCode && requestedLocationCode) {
-      const scopedProductCodes = await resolveLocationScopedProductCodes(requestedLocationCode);
+      const scopedProductCodes = await resolveLocationScopedProductCodes(requestedLocationCode, requestedBranchCode);
       if (!scopedProductCodes || scopedProductCodes.length === 0) {
         return res.status(200).json({
           products: [],
@@ -2358,7 +2382,7 @@ const getCategories = async (req, res) => {
     };
 
     if (effectiveLocationCode) {
-      const scopedProductCodes = await resolveLocationScopedProductCodes(effectiveLocationCode);
+      const scopedProductCodes = await resolveLocationScopedProductCodes(effectiveLocationCode, normalizeScopeCode(req.query.branchCode));
       const derivedBranchCode = deriveBranchCodeFromScopeCodes(expandLocationScopeCodes(effectiveLocationCode));
       if (!scopedProductCodes || scopedProductCodes.length === 0) {
         return res.status(200).json({ categories: [] });
