@@ -26,7 +26,8 @@ import '../../css/admin-responsive-filters.css';
  */
 
 const AdminStocks = ({
-  selectedLocationCode = 'BT',
+  selectedLocationCode = '',
+  selectedBranchCode = '',
   cachedProducts = [],
   cachedProductsMeta = {},
   onRefreshProductsCache,
@@ -89,7 +90,7 @@ const AdminStocks = ({
 
     const cleanup = setupSocketListeners();
     return cleanup;
-  }, [selectedLocationCode, cachedProducts, cachedProductsMeta]);
+  }, [selectedLocationCode, selectedBranchCode, cachedProducts, cachedProductsMeta]);
 
   useEffect(() => {
     if (!Array.isArray(cachedProducts)) return;
@@ -181,6 +182,9 @@ const AdminStocks = ({
 
       // Load first page immediately
       const firstParams = new URLSearchParams({ page: '1', pageSize: '100' });
+      if (selectedBranchCode) {
+        firstParams.append('branchCode', selectedBranchCode);
+      }
       if (selectedLocationCode) {
         firstParams.append('locationCode', selectedLocationCode);
       }
@@ -209,6 +213,9 @@ const AdminStocks = ({
 
           while (true) {
             const params = new URLSearchParams({ page: String(page), pageSize: String(perPage) });
+            if (selectedBranchCode) {
+              params.append('branchCode', selectedBranchCode);
+            }
             if (selectedLocationCode) {
               params.append('locationCode', selectedLocationCode);
             }
@@ -257,6 +264,11 @@ const AdminStocks = ({
 
       const response = await api.put(`/products/${selectedProduct.id}`, {
         stock: newStock
+      }, {
+        params: {
+          ...(selectedBranchCode && { branchCode: selectedBranchCode }),
+          ...(selectedLocationCode && { locationCode: selectedLocationCode }),
+        },
       });
 
       // Update local state (allProducts list used for filtering/pagination)
@@ -323,10 +335,14 @@ const AdminStocks = ({
         overrideActive: pendingOverrideActive,
         overrideStock: pendingOverrideActive ? parseInt(pendingOverrideStock, 10) : null,
         overrideReason: pendingOverrideReason.trim() || null,
+        ...(selectedBranchCode && { branchCode: selectedBranchCode }),
+        ...(selectedLocationCode && { locationCode: selectedLocationCode }),
       });
 
       const thresholdResponse = await api.patch(`/products/${overrideProduct.id}/stock-threshold`, {
         low_stock_threshold: parseInt(pendingLowStockThreshold, 10),
+        ...(selectedBranchCode && { branchCode: selectedBranchCode }),
+        ...(selectedLocationCode && { locationCode: selectedLocationCode }),
       });
 
       const updatedProduct = thresholdResponse?.data?.product || response.data.product;

@@ -92,9 +92,13 @@ function safeParseJson(value, fallback) {
   }
 }
 
-const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocationCode = 'BT' }) => {
+const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocationCode = '', selectedBranchCode = '' }) => {
   const { user } = useAuth();
-  const previousLocationCodeRef = useRef(selectedLocationCode);
+  const currentScopeKey = useMemo(
+    () => `${String(selectedBranchCode || '').trim().toUpperCase()}|${String(selectedLocationCode || '').trim().toUpperCase()}`,
+    [selectedBranchCode, selectedLocationCode]
+  );
+  const previousScopeKeyRef = useRef(currentScopeKey);
 
   const rootRef = useRef(null);
   const hiddenBarcodeInputRef = useRef(null);
@@ -143,16 +147,16 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
 
   const draftStorageKey = useMemo(() => {
     const userId = user?.id || user?.email || 'anonymous';
-    return `emergency-sales-draft:${apiBase}:${userId}:${selectedLocationCode || 'BT'}`;
-  }, [apiBase, user, selectedLocationCode]);
+    return `emergency-sales-draft:${apiBase}:${userId}:${currentScopeKey || 'UNSCOPED'}`;
+  }, [apiBase, user, currentScopeKey]);
 
   useEffect(() => {
-    if (previousLocationCodeRef.current === selectedLocationCode) {
+    if (previousScopeKeyRef.current === currentScopeKey) {
       return;
     }
 
-    const previousLocationCode = previousLocationCodeRef.current;
-    previousLocationCodeRef.current = selectedLocationCode;
+    const previousScopeKey = previousScopeKeyRef.current;
+    previousScopeKeyRef.current = currentScopeKey;
 
     // Reset volatile state so previous location data never bleeds into current scope.
     setSearchModalOpen(false);
@@ -167,10 +171,10 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
     lookupCacheRef.current.clear();
 
     console.log('[EMERGENCY SALES UI] location switched', {
-      from: previousLocationCode,
-      to: selectedLocationCode,
+      from: previousScopeKey,
+      to: currentScopeKey,
     });
-  }, [selectedLocationCode]);
+  }, [currentScopeKey]);
 
   const subtotal = useMemo(
     () => toMoney(cart.reduce((sum, line) => sum + toMoney(line.qty * line.unitPrice), 0)),
@@ -215,6 +219,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
           page: 1,
           pageSize: isAdminScope ? 200 : 20,
           status: 'all',
+          ...(selectedBranchCode && { branchCode: selectedBranchCode }),
           ...(selectedLocationCode && { locationCode: selectedLocationCode }),
         },
       });
@@ -230,7 +235,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
     } catch (error) {
       notifyError(`Failed to load emergency sales: ${error.response?.data?.error || error.message}`, 3000);
     }
-  }, [apiBase, selectedLocationCode]);
+  }, [apiBase, selectedLocationCode, selectedBranchCode]);
 
   useEffect(() => {
     fetchEmergencySales();
@@ -364,14 +369,18 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
     const trimmed = String(query || '').trim();
     if (!trimmed) return [];
 
-    const cacheKey = `${String(selectedLocationCode || '').toUpperCase()}|${trimmed.toLowerCase()}`;
+    const cacheKey = `${String(selectedBranchCode || '').toUpperCase()}|${String(selectedLocationCode || '').toUpperCase()}|${trimmed.toLowerCase()}`;
     const cached = lookupCacheRef.current.get(cacheKey);
     if (cached && (Date.now() - cached.cachedAt) < 8000) {
       return cached.products;
     }
 
     const response = await api.get(`/${apiBase}/lookup`, {
-      params: { q: trimmed, locationCode: selectedLocationCode },
+      params: {
+        q: trimmed,
+        ...(selectedBranchCode && { branchCode: selectedBranchCode }),
+        ...(selectedLocationCode && { locationCode: selectedLocationCode }),
+      },
     });
 
     const products = response.data?.products || [];
@@ -381,7 +390,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
     });
 
     return products;
-  }, [apiBase, selectedLocationCode]);
+  }, [apiBase, selectedLocationCode, selectedBranchCode]);
 
   const lookupAndAddFromScan = useCallback(async (scanValue) => {
     const query = String(scanValue || '').trim();
@@ -695,6 +704,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
         discount: discountValue,
         tendered_amount: tendered,
         payment_method: paymentMethod,
+        branchCode: selectedBranchCode,
         locationCode: selectedLocationCode,
       });
 
@@ -720,7 +730,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
     } finally {
       setIsSubmittingSale(false);
     }
-  }, [apiBase, cart, clearInvoice, discountValue, fetchEmergencySales, paymentMethod, printReceipt, tendered, selectedLocationCode]);
+  }, [apiBase, cart, clearInvoice, discountValue, fetchEmergencySales, paymentMethod, printReceipt, tendered, selectedLocationCode, selectedBranchCode]);
 
   const updateLineQty = useCallback((lineId, nextQtyRaw) => {
     const nextQty = Math.max(0, parseInt(nextQtyRaw, 10) || 0);

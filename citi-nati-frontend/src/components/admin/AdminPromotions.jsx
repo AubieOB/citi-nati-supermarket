@@ -22,7 +22,8 @@ function createDefaultPromotionsState() {
 }
 
 const AdminPromotions = ({
-  selectedLocationCode = 'BT',
+  selectedLocationCode = '',
+  selectedBranchCode = '',
   cachedProducts = [],
   cachedProductsMeta = {},
   onRefreshProductsCache,
@@ -42,7 +43,7 @@ const AdminPromotions = ({
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
   const textPrimary = isAdminDarkTheme ? '#f8fafc' : '#333';
   const textSecondary = isAdminDarkTheme ? '#cbd5e1' : '#666';
-  const selectedLocationLabel = selectedLocationCode === 'ZA' ? 'Zomba' : 'Blantyre';
+  const selectedLocationLabel = [selectedBranchCode, selectedLocationCode].filter(Boolean).join(' / ') || 'Not selected';
   const hasSharedProductsCache = Array.isArray(cachedProducts) && (
     cachedProducts.length > 0
     || Boolean(cachedProductsMeta?.lastLoadedAt)
@@ -80,7 +81,7 @@ const AdminPromotions = ({
         cleanupSocket();
       }
     };
-  }, [selectedLocationCode]);
+  }, [selectedLocationCode, selectedBranchCode]);
 
   useEffect(() => {
     setSearchTerm('');
@@ -164,8 +165,14 @@ const AdminPromotions = ({
       }
 
       const handlePromotionUpdated = (updatedPromotion) => {
+        const promotionBranchCode = String(updatedPromotion?.branchCode || '').trim().toUpperCase();
         const promotionLocationCode = String(updatedPromotion?.locationCode || '').trim().toUpperCase();
-        if (promotionLocationCode && promotionLocationCode !== String(selectedLocationCode || '').trim().toUpperCase()) {
+        const scopeBranchCode = String(selectedBranchCode || '').trim().toUpperCase();
+        const scopeLocationCode = String(selectedLocationCode || '').trim().toUpperCase();
+        if (promotionBranchCode && promotionBranchCode !== scopeBranchCode) {
+          return;
+        }
+        if (promotionLocationCode && promotionLocationCode !== scopeLocationCode) {
           return;
         }
         console.log('[AdminPromotions] Promotion updated via Socket.io:', updatedPromotion.type);
@@ -198,7 +205,14 @@ const AdminPromotions = ({
 
       const perPage = 100;
       const fetchProductsPage = async (pageNumber) => {
-        return api.get(`/products?page=${pageNumber}&pageSize=${perPage}&locationCode=${encodeURIComponent(selectedLocationCode)}`);
+        const params = new URLSearchParams({ page: String(pageNumber), pageSize: String(perPage) });
+        if (selectedBranchCode) {
+          params.append('branchCode', selectedBranchCode);
+        }
+        if (selectedLocationCode) {
+          params.append('locationCode', selectedLocationCode);
+        }
+        return api.get(`/products?${params.toString()}`);
       };
 
       const syncCatalogState = (items) => {
@@ -254,7 +268,14 @@ const AdminPromotions = ({
   const fetchCurrentPromotions = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/admin/promotions?locationCode=${encodeURIComponent(selectedLocationCode)}`);
+      const params = new URLSearchParams();
+      if (selectedBranchCode) {
+        params.append('branchCode', selectedBranchCode);
+      }
+      if (selectedLocationCode) {
+        params.append('locationCode', selectedLocationCode);
+      }
+      const response = await api.get(`/admin/promotions?${params.toString()}`);
       if (response.data.promotions) {
         setPromotions(response.data.promotions);
       }
@@ -324,6 +345,7 @@ const AdminPromotions = ({
       // Apply promotion via API
       const response = await api.post(`/admin/promotions/${type}`, {
         ...newPromotion,
+        branchCode: selectedBranchCode,
         locationCode: selectedLocationCode,
       });
       
@@ -347,6 +369,7 @@ const AdminPromotions = ({
     try {
       const payload = {
         ...promotions[type],
+        branchCode: selectedBranchCode,
         locationCode: selectedLocationCode,
       };
       

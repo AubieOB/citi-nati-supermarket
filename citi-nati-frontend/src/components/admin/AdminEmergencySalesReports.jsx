@@ -81,7 +81,7 @@ function statusColor(status) {
   return '#b06c00';
 }
 
-const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
+const AdminEmergencySalesReports = ({ selectedLocationCode = '', selectedBranchCode = '' }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
   const [retryingSaleId, setRetryingSaleId] = useState(null);
@@ -121,6 +121,7 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
           endDate: nextFilters.endDate || undefined,
           product: nextFilters.product || undefined,
           cashier: nextFilters.cashier || undefined,
+          ...(selectedBranchCode && { branchCode: selectedBranchCode }),
           ...(selectedLocationCode && { locationCode: selectedLocationCode }),
         },
       });
@@ -138,7 +139,7 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
     } finally {
       setLoading(false);
     }
-  }, [selectedLocationCode]);
+  }, [selectedLocationCode, selectedBranchCode]);
 
   useEffect(() => {
     fetchReportSales(filters);
@@ -505,7 +506,10 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
 
     try {
       setRetryingSaleId(sale.id);
-      await api.post(`/admin/emergency-sales/${sale.id}/retry-sync`);
+      await api.post(`/admin/emergency-sales/${sale.id}/retry-sync`, {
+        ...(selectedBranchCode && { branchCode: selectedBranchCode }),
+        ...(selectedLocationCode && { locationCode: selectedLocationCode }),
+      });
       notifySuccess(`Retry queued for ${saleRef}`, 2500);
       await fetchReportSales(filters);
     } catch (error) {

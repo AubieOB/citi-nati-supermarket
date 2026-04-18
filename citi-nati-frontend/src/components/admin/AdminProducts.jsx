@@ -26,7 +26,8 @@ import '../../css/admin-responsive-filters.css';
  */
 
 const AdminProducts = ({
-  selectedLocationCode = 'BT',
+  selectedLocationCode = '',
+  selectedBranchCode = '',
   cachedProducts = [],
   cachedProductsMeta = {},
   onRefreshProductsCache,
@@ -394,7 +395,12 @@ const AdminProducts = ({
     try {
       setPosExpiryLoading(true);
       setPosExpiryError('');
-      const response = await api.get('/admin/expiry-batches');
+      const response = await api.get('/admin/expiry-batches', {
+        params: {
+          ...(selectedBranchCode && { branchCode: selectedBranchCode }),
+          ...(selectedLocationCode && { locationCode: selectedLocationCode }),
+        },
+      });
       const rows = Array.isArray(response?.data?.data) ? response.data.data : [];
       setPosExpiryItems(rows.map(mapPosExpiryToAlert));
       posExpiryFetchedAtRef.current = Date.now();
@@ -458,7 +464,7 @@ const AdminProducts = ({
     }
 
     fetchProducts();
-  }, [selectedLocationCode, cachedProducts, cachedProductsMeta]);
+  }, [selectedLocationCode, selectedBranchCode, cachedProducts, cachedProductsMeta]);
 
   useEffect(() => {
     if (!Array.isArray(cachedProducts)) return;
@@ -651,6 +657,9 @@ const AdminProducts = ({
 
       const fetchProductsPage = async (pageNumber) => {
         const params = new URLSearchParams({ page: String(pageNumber), pageSize: String(perPage) });
+        if (selectedBranchCode) {
+          params.append('branchCode', selectedBranchCode);
+        }
         if (selectedLocationCode) {
           params.append('locationCode', selectedLocationCode);
         }
@@ -688,6 +697,9 @@ const AdminProducts = ({
         try {
           console.warn('[ADMIN PRODUCTS UI] /products returned 0; trying /admin/pos-products fallback');
           const params = new URLSearchParams({ page: '1', limit: '5000' });
+          if (selectedBranchCode) {
+            params.append('branchCode', selectedBranchCode);
+          }
           if (selectedLocationCode) {
             params.append('locationCode', selectedLocationCode);
           }
@@ -803,13 +815,14 @@ const AdminProducts = ({
   useEffect(() => {
     console.log('[ADMIN PRODUCTS UI] render diagnostics', {
       selectedLocationCode,
+      selectedBranchCode,
       totalFetched: products.length,
       totalFiltered: filteredProducts.length,
       totalPaginated: paginatedProducts.length,
       currentPage,
       pageSize,
     });
-  }, [selectedLocationCode, products.length, filteredProducts.length, paginatedProducts.length, currentPage]);
+  }, [selectedLocationCode, selectedBranchCode, products.length, filteredProducts.length, paginatedProducts.length, currentPage]);
 
   // Get unique categories for filter dropdown
   const categories = [...new Set(products.map(p => p.category))].sort();
@@ -1013,7 +1026,7 @@ const AdminProducts = ({
       window.removeEventListener('resize', updateFilterBarLayout);
       if (resizeObserver) resizeObserver.disconnect();
     };
-  }, [selectedLocationCode]);
+  }, [selectedLocationCode, selectedBranchCode]);
 
   // Handle category change
   const handleCategoryChange = (value) => {
@@ -1132,6 +1145,13 @@ const AdminProducts = ({
       if (formData.expiryDate) {
         formPayload.append('expiryDate', formData.expiryDate);
       }
+
+      if (selectedBranchCode) {
+        formPayload.append('branchCode', selectedBranchCode);
+      }
+      if (selectedLocationCode) {
+        formPayload.append('locationCode', selectedLocationCode);
+      }
       
       // Optional: original price (for promotions display)
       const resolvedOriginalPrice = formData.originalPrice || formData.price;
@@ -1157,6 +1177,10 @@ const AdminProducts = ({
         console.log('[ADMIN PRODUCTS] ✏️ Updating product:', editingId);
         const response = await api.put(`/products/${editingId}`, formPayload, {
           headers: { 'Content-Type': 'multipart/form-data' },
+          params: {
+            ...(selectedBranchCode && { branchCode: selectedBranchCode }),
+            ...(selectedLocationCode && { locationCode: selectedLocationCode }),
+          },
         });
 
         const summary = response.data?.posWritebackSummary;
@@ -1181,6 +1205,10 @@ const AdminProducts = ({
         console.log('[ADMIN PRODUCTS] ➕ Creating new product');
         await api.post('/products', formPayload, {
           headers: { 'Content-Type': 'multipart/form-data' },
+          params: {
+            ...(selectedBranchCode && { branchCode: selectedBranchCode }),
+            ...(selectedLocationCode && { locationCode: selectedLocationCode }),
+          },
         });
         showSuccess('Success', `Product "${formData.name.trim()}" created successfully`);
       }
@@ -1224,7 +1252,12 @@ const AdminProducts = ({
       'Are you sure you want to delete this product? This action cannot be undone.',
       async () => {
         try {
-          await api.delete(`/products/${id}`);
+          await api.delete(`/products/${id}`, {
+            params: {
+              ...(selectedBranchCode && { branchCode: selectedBranchCode }),
+              ...(selectedLocationCode && { locationCode: selectedLocationCode }),
+            },
+          });
           if (typeof onRefreshProductsCache === 'function') {
             await onRefreshProductsCache();
           } else {
