@@ -42,8 +42,7 @@ const reduceSummary = (entries = []) => entries.reduce((acc, entry) => {
   totalLoanDeductionAmount: 0,
 });
 
-const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] }) => {
-  const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, selectedLocationCode = '', selectedBranchCode = '', locations = [] }) => {
+const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, selectedLocationCode = '', selectedBranchCode = '', locations = [] }) => {
   const [showPeriodFilters, setShowPeriodFilters] = useState(false);
   const [showPolicyPanel, setShowPolicyPanel] = useState(false);
   const [isPayrollWorkspaceModalOpen, setIsPayrollWorkspaceModalOpen] = useState(false);

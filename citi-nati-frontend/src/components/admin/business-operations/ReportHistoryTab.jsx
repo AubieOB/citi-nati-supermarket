@@ -77,8 +77,7 @@ const activityTabStyle = (active) => ({
   cursor: 'pointer',
 });
 
-const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedLocationCode = '', onNavigateTab }) => {
-  const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedLocationCode = '', selectedBranchCode = '', onNavigateTab }) => {
+const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedLocationCode = '', selectedBranchCode = '', onNavigateTab }) => {
   const [state, setState] = useState({
     loading: true,
     error: '',
