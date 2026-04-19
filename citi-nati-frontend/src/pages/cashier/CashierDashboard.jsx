@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import AdminEmergencySales from '../../components/admin/AdminEmergencySales.jsx';
 import Modal from '../../components/common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
+import { normalizeOperationalScopeCode, resolveOperationalScope } from '../../utils/operationalScope.js';
 import '../../styles/global.css';
 import '../../styles/admin-dashboard.css';
 
@@ -21,34 +22,36 @@ const CashierDashboard = () => {
   const { user, logout } = useAuth();
   const { modal, showConfirm, closeModal } = useModal();
   
-  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [selectedScopeCode, setSelectedScopeCode] = useState(null);
   const [showLocationModal, setShowLocationModal] = useState(true);
   const [showWarningModal, setShowWarningModal] = useState(false);
-  const [pendingLocation, setPendingLocation] = useState(null);
+  const [pendingScopeCode, setPendingScopeCode] = useState(null);
+  const selectedScope = selectedScopeCode ? resolveOperationalScope(selectedScopeCode) : null;
+  const pendingScope = pendingScopeCode ? resolveOperationalScope(pendingScopeCode) : null;
 
   // Load location selection from session storage (persists during session)
   useEffect(() => {
     const storedLocation = sessionStorage.getItem('cashier-selected-location');
     if (storedLocation) {
-      setSelectedLocation(storedLocation);
+      setSelectedScopeCode(normalizeOperationalScopeCode(storedLocation));
       setShowLocationModal(false);
     }
   }, []);
 
-  const handleLocationSelect = (location) => {
-    setPendingLocation(location);
+  const handleLocationSelect = (scopeCode) => {
+    setPendingScopeCode(normalizeOperationalScopeCode(scopeCode));
     setShowLocationModal(false);
     setShowWarningModal(true);
   };
 
   const handleConfirmLocation = () => {
-    setSelectedLocation(pendingLocation);
-    sessionStorage.setItem('cashier-selected-location', pendingLocation);
+    setSelectedScopeCode(pendingScopeCode);
+    sessionStorage.setItem('cashier-selected-location', pendingScopeCode);
     setShowWarningModal(false);
   };
 
   const handleCancelLocation = () => {
-    setPendingLocation(null);
+    setPendingScopeCode(null);
     setShowWarningModal(false);
     setShowLocationModal(true);
   };
@@ -80,7 +83,7 @@ const CashierDashboard = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
           <i className="fas fa-cash-register" style={{ fontSize: '1.1rem' }}></i>
           <span style={{ fontWeight: '700', fontSize: '1rem' }}>Citi-Nati POS — Cashier</span>
-          {selectedLocation && (
+          {selectedScope && (
             <span style={{ 
               marginLeft: '1rem', 
               fontSize: '0.85rem', 
@@ -93,7 +96,7 @@ const CashierDashboard = () => {
               gap: '0.4rem'
             }}>
               <i className="fas fa-location-dot" style={{ fontSize: '0.9rem' }}></i>
-              {selectedLocation === 'ZA' ? 'Zomba' : 'Blantyre'}
+              {selectedScope.label}
             </span>
           )}
         </div>
@@ -124,10 +127,10 @@ const CashierDashboard = () => {
       </div>
 
       {/* POS Panel - only show if location is selected */}
-      {selectedLocation ? (
+      {selectedScope ? (
         <div style={{ flex: 1, overflow: 'hidden', padding: '0.75rem' }}>
           <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>Loading POS...</div>}>
-            <AdminEmergencySales apiBase="cashier/emergency-sales" selectedLocationCode={selectedLocation} />
+            <AdminEmergencySales apiBase="cashier/emergency-sales" selectedLocationCode={selectedScope.locationCode} />
           </Suspense>
         </div>
       ) : (
@@ -180,11 +183,10 @@ const CashierDashboard = () => {
               Please select which location you are working at today. You will only be able to sell products for the selected location.
             </p>
             
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1.5rem' }}>
               <button
-                onClick={() => handleLocationSelect('ZA')}
+                onClick={() => handleLocationSelect('ZOMBA_SH')}
                 style={{
-                  flex: 1,
                   padding: '1rem',
                   backgroundColor: '#d4a574',
                   color: '#fff',
@@ -203,12 +205,57 @@ const CashierDashboard = () => {
                 onMouseLeave={(e) => { e.target.style.backgroundColor = '#d4a574'; e.target.style.transform = 'translateY(0)'; }}
               >
                 <i className="fas fa-location-dot" style={{ fontSize: '1.1rem' }}></i>
-                Zomba (ZA)
+                Zomba SH
               </button>
               <button
-                onClick={() => handleLocationSelect('BT')}
+                onClick={() => handleLocationSelect('ZOMBA_BAR')}
                 style={{
-                  flex: 1,
+                  padding: '1rem',
+                  backgroundColor: '#c78f52',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.6rem'
+                }}
+                onMouseEnter={(e) => { e.target.style.backgroundColor = '#b87e40'; e.target.style.transform = 'translateY(-2px)'; }}
+                onMouseLeave={(e) => { e.target.style.backgroundColor = '#c78f52'; e.target.style.transform = 'translateY(0)'; }}
+              >
+                <i className="fas fa-location-dot" style={{ fontSize: '1.1rem' }}></i>
+                Zomba BAR
+              </button>
+              <button
+                onClick={() => handleLocationSelect('ZOMBA_RES')}
+                style={{
+                  padding: '1rem',
+                  backgroundColor: '#b06f2e',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.6rem'
+                }}
+                onMouseEnter={(e) => { e.target.style.backgroundColor = '#9c5f24'; e.target.style.transform = 'translateY(-2px)'; }}
+                onMouseLeave={(e) => { e.target.style.backgroundColor = '#b06f2e'; e.target.style.transform = 'translateY(0)'; }}
+              >
+                <i className="fas fa-location-dot" style={{ fontSize: '1.1rem' }}></i>
+                Zomba RES
+              </button>
+              <button
+                onClick={() => handleLocationSelect('BLANTYRE_SH')}
+                style={{
                   padding: '1rem',
                   backgroundColor: '#4a90e2',
                   color: '#fff',
@@ -227,7 +274,7 @@ const CashierDashboard = () => {
                 onMouseLeave={(e) => { e.target.style.backgroundColor = '#4a90e2'; e.target.style.transform = 'translateY(0)'; }}
               >
                 <i className="fas fa-location-dot" style={{ fontSize: '1.1rem' }}></i>
-                Blantyre (BT)
+                Blantyre SH
               </button>
             </div>
           </div>
@@ -235,7 +282,7 @@ const CashierDashboard = () => {
       )}
 
       {/* Location Confirmation Warning Modal */}
-      {showWarningModal && pendingLocation && (
+      {showWarningModal && pendingScope && (
         <div style={{
           position: 'fixed',
           inset: 0,
@@ -293,7 +340,7 @@ const CashierDashboard = () => {
                 gap: '0.5rem'
               }}>
                 <i className="fas fa-location-dot" style={{ fontSize: '1.2rem' }}></i>
-                {pendingLocation === 'ZA' ? 'Zomba' : 'Blantyre'}
+                {pendingScope.label}
               </p>
               <p style={{ 
                 color: '#666', 
