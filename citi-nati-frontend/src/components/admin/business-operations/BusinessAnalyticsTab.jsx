@@ -1905,9 +1905,6 @@ const BusinessAnalyticsTab = ({
               Growth tracking, performance trends, and contribution insights by period, branch, category, and team.
             </p>
           </div>
-          <div style={{ color: refreshing ? '#2563eb' : '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
-            {refreshing ? 'Auto-refreshing...' : 'Auto-refresh every 5 min'}
-          </div>
         </div>
 
         <div style={{ marginTop: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.7rem' }}>
