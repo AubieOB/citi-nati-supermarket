@@ -588,6 +588,54 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
     return chips;
   }, [summaryMeta]);
 
+  const fetchAllRowsForView = useCallback(async (viewId) => {
+    if (viewId === 'summary' || viewId === 'payments') {
+      return null;
+    }
+
+    const endpointByView = {
+      invoices: '/business-operations/reports/sales/invoices',
+      products: '/business-operations/reports/sales/products',
+      users: '/business-operations/reports/sales/users',
+    };
+
+    const stateByView = {
+      invoices: invoicesState,
+      products: productsState,
+      users: usersState,
+    };
+
+    const endpoint = endpointByView[viewId];
+    const stateForView = stateByView[viewId];
+
+    if (!endpoint || !stateForView) {
+      return null;
+    }
+
+    const currentRows = Array.isArray(stateForView.data) ? stateForView.data : [];
+    const totalPages = Number(stateForView.pagination?.totalPages || 1);
+    if (totalPages <= 1) {
+      return currentRows;
+    }
+
+    const rows = [];
+    const pageSize = Number(stateForView.pagination?.pageSize || stateForView.pagination?.take || viewState?.[viewId]?.pageSize || 20);
+    const viewConfig = viewState?.[viewId] || {};
+
+    for (let page = 1; page <= totalPages; page += 1) {
+      const params = buildReportParams(filters, {
+        ...viewConfig,
+        page,
+        pageSize,
+      });
+      const response = await api.get(endpoint, { params });
+      const pageRows = Array.isArray(response.data?.data) ? response.data.data : [];
+      rows.push(...pageRows);
+    }
+
+    return rows;
+  }, [filters, invoicesState, productsState, usersState, viewState]);
+
   const handleExport = useCallback(async (format) => {
     if (format === 'excel') setExportingExcel(true);
     if (format === 'pdf') setExportingPdf(true);
@@ -607,6 +655,58 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
           throw new Error('Please wait for the active report data to finish loading before exporting.');
         }
 
+        let exportInvoicesState = invoicesState;
+        let exportProductsState = productsState;
+        let exportUsersState = usersState;
+
+        if (activeView === 'invoices') {
+          const allInvoiceRows = await fetchAllRowsForView('invoices');
+          if (Array.isArray(allInvoiceRows)) {
+            exportInvoicesState = {
+              ...invoicesState,
+              data: allInvoiceRows,
+              pagination: {
+                ...(invoicesState.pagination || {}),
+                page: 1,
+                total: allInvoiceRows.length,
+                totalPages: 1,
+              },
+            };
+          }
+        }
+
+        if (activeView === 'products') {
+          const allProductRows = await fetchAllRowsForView('products');
+          if (Array.isArray(allProductRows)) {
+            exportProductsState = {
+              ...productsState,
+              data: allProductRows,
+              pagination: {
+                ...(productsState.pagination || {}),
+                page: 1,
+                total: allProductRows.length,
+                totalPages: 1,
+              },
+            };
+          }
+        }
+
+        if (activeView === 'users') {
+          const allUserRows = await fetchAllRowsForView('users');
+          if (Array.isArray(allUserRows)) {
+            exportUsersState = {
+              ...usersState,
+              data: allUserRows,
+              pagination: {
+                ...(usersState.pagination || {}),
+                page: 1,
+                total: allUserRows.length,
+                totalPages: 1,
+              },
+            };
+          }
+        }
+
         exportActiveSalesReportPdf({
           activeView,
           activeViewLabel: activeViewLabelForExport,
@@ -614,9 +714,9 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
           resolvedDateRange: summaryMeta?.dateRange || null,
           summaryMetaLine,
           summary,
-          invoicesState,
-          productsState,
-          usersState,
+          invoicesState: exportInvoicesState,
+          productsState: exportProductsState,
+          usersState: exportUsersState,
           paymentsState,
         });
         return;
@@ -635,7 +735,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
       if (format === 'excel') setExportingExcel(false);
       if (format === 'pdf') setExportingPdf(false);
     }
-  }, [activeView, filters, invoicesState, paymentsState, productsState, summary, summaryLoading, summaryMeta, summaryMetaLine, usersState]);
+  }, [activeView, fetchAllRowsForView, filters, invoicesState, paymentsState, productsState, summary, summaryLoading, summaryMeta, summaryMetaLine, usersState]);
 
   const handleExportFullWorkbook = useCallback(async () => {
     setExportingFullWorkbook(true);
