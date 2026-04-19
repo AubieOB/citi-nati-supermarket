@@ -273,14 +273,6 @@ const AdminSystem = () => {
             />
           </div>
 
-          <div style={{ color: '#64748b', fontSize: '0.85rem' }}>
-            VAT rate is fixed at {configuredVatRatePercent.toFixed(1)}%. This toggle only turns that rate on or off.
-          </div>
-
-          <div style={{ color: '#475569', fontSize: '0.9rem', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', borderRadius: '8px', padding: '0.75rem 0.85rem' }}>
-            Business clock source: <strong>{businessTime.timezoneName}</strong> ({businessTime.offsetLabel}) | Live: <strong>{businessNowDisplay || formatBusinessNow(Number(businessTime.offsetMinutes || 120)) || 'N/A'}</strong>
-          </div>
-
           <button
             type="button"
             onClick={handleSave}
