@@ -1073,7 +1073,7 @@ const AdminStocks = ({
                         justifyContent: 'center',
                         flexWrap: 'wrap',
                       }}>
-                        {canManageStocks ? (
+                        {canManageStocks && (
                           <button
                             onClick={() => openOverrideModal(product)}
                             title="Set Website Stock Override"
