@@ -2414,7 +2414,7 @@ const AdminProducts = ({
                       )}
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'center', minWidth: '160px' }}>
-                      {canManageProducts ? (
+                      {canManageProducts && (
                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
                           <button
                             onClick={() => handleEdit(product)}
