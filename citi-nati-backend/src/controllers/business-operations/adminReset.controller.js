@@ -86,7 +86,7 @@ async function wipeAllData(req, res) {
 
     const valid = await bcrypt.compare(securityKey, adminUser.adminSecurityKeyHash);
     if (!valid) {
-      return res.status(401).json({ success: false, message: 'Invalid admin security key.' });
+      return res.status(403).json({ success: false, message: 'Invalid admin security key.' });
     }
 
     const actor = adminUser.email || String(req.user?.userId || 'admin');
