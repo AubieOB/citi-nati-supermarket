@@ -204,7 +204,6 @@ const AdminSystem = () => {
         gap: '1.25rem',
       }}>
       <div style={{ backgroundColor: '#fff', borderRadius: '10px', padding: '1.5rem', boxShadow: '0 2px 10px rgba(0,0,0,0.08)' }}>
-        <h2 style={{ marginTop: 0, color: '#333', marginBottom: '1rem' }}>System Configuration</h2>
         <p style={{ color: '#666', marginBottom: '1.25rem' }}>
           Control website-wide behavior. Maintenance mode blocks public access and shows an apology screen while keeping admin access available.
         </p>
