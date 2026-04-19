@@ -11,6 +11,7 @@ import { useAuth } from './context/AuthContext.jsx';
 import { initSocket, identifySocket } from './utils/socket.js';
 import api, { initializeAuth } from './utils/api.js';
 import { useGlobalNotifications } from './hooks/useGlobalNotifications.js';
+import { PERMISSION_KEYS, hasPermission } from './utils/permissions.js';
 
 // Public Pages (lazy loaded)
 const Home = React.lazy(() => import('./pages/public/Home.jsx'));
@@ -136,7 +137,7 @@ function AppInner() {
   const loadingFallback = <div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>Loading...</div>;
   const isMaintenanceRoute = location.pathname === '/maintenance';
   const isExemptPath = MAINTENANCE_EXEMPT_PATHS.some((path) => location.pathname === path || location.pathname.startsWith(`${path}/`));
-  const isAdminDuringMaintenance = user?.role === 'admin';
+  const isAdminDuringMaintenance = hasPermission(user, PERMISSION_KEYS.ADMIN_DASHBOARD_ACCESS);
 
   if (!maintenanceState.checked) {
     return loadingFallback;
@@ -205,7 +206,7 @@ function AppInner() {
           <Route
             path="/admin"
             element={
-              <ProtectedRoute allowedRoles={["admin"]}>
+              <ProtectedRoute requiredPermission={PERMISSION_KEYS.ADMIN_DASHBOARD_ACCESS}>
                 <Suspense fallback={loadingFallback}>
                   <AdminDashboard />
                 </Suspense>
@@ -216,7 +217,7 @@ function AppInner() {
           <Route
             path="/admin/emergency-sales"
             element={
-              <ProtectedRoute allowedRoles={["admin"]}>
+              <ProtectedRoute requiredPermission={PERMISSION_KEYS.ADMIN_DASHBOARD_ACCESS}>
                 <Suspense fallback={loadingFallback}>
                   <AdminDashboard />
                 </Suspense>
@@ -227,7 +228,7 @@ function AppInner() {
           <Route
             path="/admin/business-operations"
             element={
-              <ProtectedRoute allowedRoles={["admin"]}>
+              <ProtectedRoute requiredPermission={PERMISSION_KEYS.ADMIN_DASHBOARD_ACCESS}>
                 <Suspense fallback={loadingFallback}>
                   <AdminDashboard />
                 </Suspense>

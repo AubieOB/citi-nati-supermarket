@@ -5,6 +5,7 @@ const { generateToken } = require('../utils/jwt');
 const { notifyNewUserRegistration } = require('../utils/messageService');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/emailService');
 const { generateVerificationCode } = require('../utils/verificationCode');
+const { getEffectivePermissionsForUser } = require('../security/userPermissions.service');
 
 const prisma = new PrismaClient();
 
@@ -57,6 +58,19 @@ const clearAuthCookie = (res) => {
   });
 };
 
+const buildAuthUserPayload = async (user) => {
+  const effectivePermissions = await getEffectivePermissionsForUser(user.id, user.role);
+
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    emailVerified: user.emailVerified,
+    permissions: effectivePermissions,
+  };
+};
+
 /**
  * LOGIN ENDPOINT
  * Allows users to login regardless of email verification status
@@ -91,15 +105,11 @@ const login = async (req, res) => {
     const token = generateToken(user.id, user.role, user.email);
     setAuthCookie(res, token);
 
+    const authUser = await buildAuthUserPayload(user);
+
     return res.json({
       token,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        emailVerified: user.emailVerified,
-      },
+      user: authUser,
     });
   } catch (err) {
     console.error('[AUTH] Login error:', err);
@@ -472,16 +482,12 @@ const resetPassword = async (req, res) => {
     const token = generateToken(updatedUser.id, updatedUser.role, updatedUser.email);
     setAuthCookie(res, token);
 
+    const authUser = await buildAuthUserPayload(updatedUser);
+
     return res.json({
       message: 'Password reset successful. You are now logged in.',
       token,
-      user: {
-        id: updatedUser.id,
-        email: updatedUser.email,
-        name: updatedUser.name,
-        role: updatedUser.role,
-        emailVerified: updatedUser.emailVerified,
-      },
+      user: authUser,
     });
   } catch (err) {
     console.error('[AUTH] Reset password error:', err);
@@ -524,15 +530,11 @@ const googleAuth = async (req, res) => {
       const jwtToken = generateToken(user.id, user.role, user.email);
       setAuthCookie(res, jwtToken);
 
+      const authUser = await buildAuthUserPayload(user);
+
       return res.json({
         token: jwtToken,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          emailVerified: user.emailVerified,
-        },
+        user: authUser,
         isNewUser: false,
       });
     }
@@ -564,16 +566,12 @@ const googleAuth = async (req, res) => {
     const jwtToken = generateToken(newUser.id, newUser.role, newUser.email);
     setAuthCookie(res, jwtToken);
 
+    const authUser = await buildAuthUserPayload(newUser);
+
     return res.status(201).json({
       message: 'User registered and logged in successfully',
       token: jwtToken,
-      user: {
-        id: newUser.id,
-        name: newUser.name,
-        email: newUser.email,
-        role: newUser.role,
-        emailVerified: newUser.emailVerified,
-      },
+      user: authUser,
       isNewUser: true,
     });
   } catch (err) {
@@ -598,6 +596,36 @@ const logout = async (req, res) => {
   }
 };
 
+const getSession = async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        emailVerified: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const authUser = await buildAuthUserPayload(user);
+    return res.json({ user: authUser });
+  } catch (err) {
+    console.error('[AUTH] Session fetch error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 module.exports = {
   login,
   register,
@@ -607,4 +635,5 @@ module.exports = {
   forgotPassword,
   resetPassword,
   logout,
+  getSession,
 };

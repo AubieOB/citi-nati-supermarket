@@ -27,6 +27,8 @@ import { useOrderUpdates } from '../../hooks/useOrderUpdates.js';
 import { getSpeechAlertsEnabled, setSpeechAlertsEnabled } from '../../utils/notifications.js';
 import api from '../../utils/api.js';
 import { filterProductsForOperationalLocation, getOperationalScopeOptions, normalizeOperationalScopeCode, resolveOperationalScope } from '../../utils/operationalScope.js';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { PERMISSION_KEYS, hasPermission } from '../../utils/permissions.js';
 import '../../styles/global.css';
 import '../../styles/admin-dashboard.css';
 
@@ -48,25 +50,25 @@ const SIDEBAR_SCOPES = [
 const OPERATIONAL_SCOPES = getOperationalScopeOptions();
 
 const SIDEBAR_TABS = [
-  { id: 'inbox', label: 'Inbox', icon: 'fa-inbox', scope: 'online-store' },
-  { id: 'orders', label: 'Orders', icon: 'fa-list', scope: 'online-store' },
-  { id: 'refunds', label: 'Online Refunds', icon: 'fa-undo', scope: 'online-store' },
-  { id: 'support', label: 'Online Support', icon: 'fa-life-ring', scope: 'online-store' },
-  { id: 'quotations', label: 'Quotations', icon: 'fa-file-invoice', scope: 'business' },
-  { id: 'sales', label: 'Online Sales', icon: 'fa-dollar-sign', scope: 'online-store' },
-  { id: 'users', label: 'Online Users', icon: 'fa-users', scope: 'online-store' },
-  { id: 'drivers', label: 'Derivery Drivers', icon: 'fa-car', scope: 'online-store' },
-  { id: 'products', label: 'Products', icon: 'fa-box', scope: 'shared-catalog' },
-  { id: 'stocks', label: 'Stocks', icon: 'fa-warehouse', scope: 'shared-catalog' },
-  { id: 'promotions', label: 'Promotions', icon: 'fa-tags', scope: 'shared-catalog' },
-  { id: 'emergency-sales', label: 'Emergency Sale', icon: 'fa-cash-register', scope: 'physical-store' },
-  { id: 'emergency-sales-reports', label: 'Emergency Reports', icon: 'fa-file-alt', scope: 'physical-store' },
-  { id: 'pos-management', label: 'POS Management', icon: 'fa-database', scope: 'physical-store' },
-  { id: 'pos-sync-monitor', label: 'POS Sync Monitor', icon: 'fa-chart-line', scope: 'physical-store' },
-  { id: 'cashiers', label: 'Emergency Cashiers', icon: 'fa-user-tag', scope: 'physical-store' },
-  { id: 'business-operations', label: 'Business Operations', icon: 'fa-briefcase', scope: 'business' },
-  { id: 'system', label: 'System', icon: 'fa-cogs', scope: 'administration' },
-  { id: 'security', label: 'Security', icon: 'fa-key', scope: 'administration' },
+  { id: 'inbox', label: 'Inbox', icon: 'fa-inbox', scope: 'online-store', permission: PERMISSION_KEYS.ADMIN_INBOX_VIEW },
+  { id: 'orders', label: 'Orders', icon: 'fa-list', scope: 'online-store', permission: PERMISSION_KEYS.ADMIN_ORDERS_VIEW },
+  { id: 'refunds', label: 'Online Refunds', icon: 'fa-undo', scope: 'online-store', permission: PERMISSION_KEYS.ADMIN_REFUNDS_MANAGE },
+  { id: 'support', label: 'Online Support', icon: 'fa-life-ring', scope: 'online-store', permission: PERMISSION_KEYS.ADMIN_SUPPORT_MANAGE },
+  { id: 'quotations', label: 'Quotations', icon: 'fa-file-invoice', scope: 'business', permission: PERMISSION_KEYS.ADMIN_QUOTATIONS_MANAGE },
+  { id: 'sales', label: 'Online Sales', icon: 'fa-dollar-sign', scope: 'online-store', permission: PERMISSION_KEYS.ADMIN_SALES_VIEW },
+  { id: 'users', label: 'Online Users', icon: 'fa-users', scope: 'online-store', permission: PERMISSION_KEYS.ADMIN_USERS_VIEW },
+  { id: 'drivers', label: 'Derivery Drivers', icon: 'fa-car', scope: 'online-store', permission: PERMISSION_KEYS.ADMIN_DRIVERS_MANAGE },
+  { id: 'products', label: 'Products', icon: 'fa-box', scope: 'shared-catalog', permission: PERMISSION_KEYS.ADMIN_PRODUCTS_VIEW },
+  { id: 'stocks', label: 'Stocks', icon: 'fa-warehouse', scope: 'shared-catalog', permission: PERMISSION_KEYS.ADMIN_STOCKS_MANAGE },
+  { id: 'promotions', label: 'Promotions', icon: 'fa-tags', scope: 'shared-catalog', permission: PERMISSION_KEYS.ADMIN_PROMOTIONS_MANAGE },
+  { id: 'emergency-sales', label: 'Emergency Sale', icon: 'fa-cash-register', scope: 'physical-store', permission: PERMISSION_KEYS.ADMIN_EMERGENCY_SALES_MANAGE },
+  { id: 'emergency-sales-reports', label: 'Emergency Reports', icon: 'fa-file-alt', scope: 'physical-store', permission: PERMISSION_KEYS.ADMIN_EMERGENCY_REPORTS_VIEW },
+  { id: 'pos-management', label: 'POS Management', icon: 'fa-database', scope: 'physical-store', permission: PERMISSION_KEYS.ADMIN_POS_MANAGEMENT },
+  { id: 'pos-sync-monitor', label: 'POS Sync Monitor', icon: 'fa-chart-line', scope: 'physical-store', permission: PERMISSION_KEYS.ADMIN_POS_SYNC_MANAGE },
+  { id: 'cashiers', label: 'Emergency Cashiers', icon: 'fa-user-tag', scope: 'physical-store', permission: PERMISSION_KEYS.ADMIN_CASHIERS_MANAGE },
+  { id: 'business-operations', label: 'Business Operations', icon: 'fa-briefcase', scope: 'business', permission: PERMISSION_KEYS.ADMIN_BUSINESS_OPERATIONS_VIEW },
+  { id: 'system', label: 'System', icon: 'fa-cogs', scope: 'administration', permission: PERMISSION_KEYS.ADMIN_SYSTEM_MANAGE },
+  { id: 'security', label: 'Security', icon: 'fa-key', scope: 'administration', permission: PERMISSION_KEYS.ADMIN_SECURITY_MANAGE },
 ];
 
 const TAB_SCOPE_BY_ID = SIDEBAR_TABS.reduce((accumulator, tab) => {
@@ -246,6 +248,7 @@ const applyInlineDarkOverrides = (element) => {
  */
 
 const AdminDashboard = () => {
+  const { user } = useAuth();
   const location = useLocation();
   const initialTab = location.pathname === '/admin/emergency-sales'
     ? 'emergency-sales'
@@ -540,23 +543,48 @@ const AdminDashboard = () => {
     };
   }, [theme, activeTab]);
 
+  const allowedTabs = SIDEBAR_TABS.filter((tab) => hasPermission(user, tab.permission));
+  const defaultAllowedTabId = allowedTabs[0]?.id || 'inbox';
+
   React.useEffect(() => {
-    if (location.pathname === '/admin/emergency-sales' && activeTab !== 'emergency-sales') {
+    if (!allowedTabs.some((tab) => tab.id === activeTab)) {
+      setActiveTab(defaultAllowedTabId);
+    }
+  }, [activeTab, allowedTabs, defaultAllowedTabId]);
+
+  React.useEffect(() => {
+    if (location.pathname === '/admin/emergency-sales' && activeTab !== 'emergency-sales' && hasPermission(user, PERMISSION_KEYS.ADMIN_EMERGENCY_SALES_MANAGE)) {
       setActiveTab('emergency-sales');
       return;
     }
 
-    if (location.pathname === '/admin/business-operations' && activeTab !== 'business-operations') {
+    if (location.pathname === '/admin/business-operations' && activeTab !== 'business-operations' && hasPermission(user, PERMISSION_KEYS.ADMIN_BUSINESS_OPERATIONS_VIEW)) {
       setActiveTab('business-operations');
       return;
     }
 
-    if (location.pathname === '/admin' && (activeTab === 'emergency-sales' || activeTab === 'business-operations')) {
-      setActiveTab('inbox');
+    if (location.pathname === '/admin/emergency-sales' && !hasPermission(user, PERMISSION_KEYS.ADMIN_EMERGENCY_SALES_MANAGE)) {
+      navigate('/admin');
+      return;
     }
-  }, [location.pathname, activeTab]);
+
+    if (location.pathname === '/admin/business-operations' && !hasPermission(user, PERMISSION_KEYS.ADMIN_BUSINESS_OPERATIONS_VIEW)) {
+      navigate('/admin');
+      return;
+    }
+
+    if (location.pathname === '/admin' && (activeTab === 'emergency-sales' || activeTab === 'business-operations')) {
+      setActiveTab(defaultAllowedTabId);
+    }
+  }, [location.pathname, activeTab, defaultAllowedTabId, navigate, user]);
 
   const handleTabSelect = useCallback((tabId) => {
+    const selectedTab = SIDEBAR_TABS.find((tab) => tab.id === tabId);
+    if (!selectedTab || !hasPermission(user, selectedTab.permission)) {
+      toast.error('You do not have access to that section');
+      return;
+    }
+
     setActiveTab(tabId);
     if (tabId === 'emergency-sales') {
       navigate('/admin/emergency-sales');
@@ -566,9 +594,9 @@ const AdminDashboard = () => {
       navigate('/admin');
     }
     setSidebarOpen(false);
-  }, [location.pathname, navigate]);
+  }, [location.pathname, navigate, user]);
 
-  const visibleTabs = SIDEBAR_TABS.filter((tab) => sidebarScope === 'all' || tab.scope === sidebarScope);
+  const visibleTabs = allowedTabs.filter((tab) => sidebarScope === 'all' || tab.scope === sidebarScope);
   const selectedScopeMeta = SIDEBAR_SCOPES.find((scope) => scope.id === sidebarScope) || SIDEBAR_SCOPES[0];
   const activeLocationCachedProducts = adminProductsCacheByLocation[selectedOperationalLocationCode] || [];
   const activeLocationCachedProductsMeta = adminProductsCacheMetaByLocation[selectedOperationalLocationCode] || {};

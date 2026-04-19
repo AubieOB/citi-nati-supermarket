@@ -2,11 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import api from '../utils/api.js';
+import { PERMISSION_KEYS, hasPermission } from '../utils/permissions.js';
 
 /**
  * 🔐 Protected Route Component
  * 
- * Protects routes that require authentication and/or specific roles.
+ * Protects routes that require authentication, roles, and optional permissions.
  * 
  * Usage:
  *   <ProtectedRoute>
@@ -18,7 +19,7 @@ import api from '../utils/api.js';
  *   </ProtectedRoute>
  */
 
-const ProtectedRoute = ({ children, allowedRoles }) => {
+const ProtectedRoute = ({ children, allowedRoles, requiredPermission }) => {
   const { isAuthenticated, user, isLoading } = useAuth();
   const [checkingSecurityKey, setCheckingSecurityKey] = useState(false);
   const [securityStatusLoaded, setSecurityStatusLoaded] = useState(false);
@@ -29,8 +30,10 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   const [verifyingKey, setVerifyingKey] = useState(false);
 
   const requiresAdminSecurityGate = useMemo(() => {
-    return Boolean(allowedRoles?.includes('admin') && user?.role === 'admin');
-  }, [allowedRoles, user?.role]);
+    const requiresAdminRole = Boolean(allowedRoles?.includes('admin'));
+    const requiresAdminPermissionGate = requiredPermission === PERMISSION_KEYS.ADMIN_DASHBOARD_ACCESS;
+    return Boolean((requiresAdminRole || requiresAdminPermissionGate) && user?.role === 'admin');
+  }, [allowedRoles, requiredPermission, user?.role]);
 
   const requiresDriverSecurityGate = useMemo(() => {
     return Boolean(allowedRoles?.includes('driver') && user?.role === 'driver');
@@ -132,6 +135,10 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 
   // Authenticated but role not allowed: redirect to home
   if (allowedRoles && !allowedRoles.includes(user?.role)) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (requiredPermission && !hasPermission(user, requiredPermission)) {
     return <Navigate to="/" replace />;
   }
 

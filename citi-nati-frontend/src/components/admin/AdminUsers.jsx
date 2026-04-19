@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
 import { generateAdminUsersTablePDF } from '../../utils/pdfReports.js';
+import { PERMISSION_KEYS, hasPermission } from '../../utils/permissions.js';
 import '../../css/admin-responsive-filters.css';
 
 /**
@@ -27,12 +28,34 @@ const AdminUsers = () => {
   const [updatingUserId, setUpdatingUserId] = useState(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isRefreshingUsers, setIsRefreshingUsers] = useState(false);
+  const [permissionCatalog, setPermissionCatalog] = useState([]);
+  const [editingPermissionsUser, setEditingPermissionsUser] = useState(null);
+  const [permissionForm, setPermissionForm] = useState({});
+  const [permissionReason, setPermissionReason] = useState('');
+  const [loadingPermissions, setLoadingPermissions] = useState(false);
+  const [savingPermissions, setSavingPermissions] = useState(false);
   const { modal, closeModal, showConfirm, showError, showSuccess } = useModal();
   const filterBarRef = useRef(null);
+  const canManagePermissions = hasPermission(loggedInUser, PERMISSION_KEYS.ADMIN_USERS_MANAGE_PERMISSIONS);
 
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  useEffect(() => {
+    if (!canManagePermissions) return;
+
+    const loadPermissionCatalog = async () => {
+      try {
+        const response = await api.get('/admin/permissions/catalog');
+        setPermissionCatalog(response.data?.groups || []);
+      } catch (err) {
+        console.error('Error fetching permissions catalog:', err);
+      }
+    };
+
+    loadPermissionCatalog();
+  }, [canManagePermissions]);
 
   // Listen for user updates from other components (e.g., AdminDrivers)
   useEffect(() => {
@@ -149,6 +172,73 @@ const AdminUsers = () => {
       showError('PDF export failed', 'Unable to generate users PDF. Please try again.');
     } finally {
       setIsExportingPdf(false);
+    }
+  };
+
+  const openPermissionsEditor = async (targetUser) => {
+    if (!canManagePermissions) return;
+
+    try {
+      setLoadingPermissions(true);
+      const response = await api.get(`/admin/users/${targetUser.id}/permissions`);
+      setEditingPermissionsUser(targetUser);
+      setPermissionForm(response.data?.explicitPermissions || {});
+      setPermissionReason('');
+    } catch (err) {
+      showError('Error', err.response?.data?.error || 'Failed to load user permissions');
+    } finally {
+      setLoadingPermissions(false);
+    }
+  };
+
+  const closePermissionsEditor = () => {
+    setEditingPermissionsUser(null);
+    setPermissionForm({});
+    setPermissionReason('');
+  };
+
+  const updatePermissionValue = (key, mode) => {
+    setPermissionForm((prev) => {
+      const next = { ...prev };
+      if (mode === 'default') {
+        delete next[key];
+      } else if (mode === 'allow') {
+        next[key] = true;
+      } else if (mode === 'deny') {
+        next[key] = false;
+      }
+      return next;
+    });
+  };
+
+  const savePermissions = async () => {
+    if (!editingPermissionsUser) return;
+
+    try {
+      setSavingPermissions(true);
+      const updates = [];
+
+      permissionCatalog.forEach((group) => {
+        (group.permissions || []).forEach((permission) => {
+          const explicitValue = Object.prototype.hasOwnProperty.call(permissionForm, permission.key)
+            ? permissionForm[permission.key]
+            : null;
+          updates.push({ key: permission.key, allowed: explicitValue });
+        });
+      });
+
+      await api.put(`/admin/users/${editingPermissionsUser.id}/permissions`, {
+        permissions: updates,
+        reason: permissionReason,
+      });
+
+      showSuccess('Success', 'Permissions saved successfully');
+      closePermissionsEditor();
+      fetchUsers();
+    } catch (err) {
+      showError('Error', err.response?.data?.error || 'Failed to save user permissions');
+    } finally {
+      setSavingPermissions(false);
     }
   };
 
@@ -526,23 +616,44 @@ const AdminUsers = () => {
                   {formatDate(u.createdAt)}
                 </td>
                 <td style={{ padding: '1rem', textAlign: 'center' }}>
-                  <button
-                    onClick={() => deleteUserConfirm(u.id)}
-                    disabled={!canDeleteUser(u.id)}
-                    style={{
-                      padding: '0.35rem 0.6rem',
-                      backgroundColor: canDeleteUser(u.id) ? '#dc3545' : '#ccc',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: canDeleteUser(u.id) ? 'pointer' : 'not-allowed',
-                      fontSize: '0.82rem',
-                      whiteSpace: 'nowrap',
-                    }}
-                    title={!canDeleteUser(u.id) ? 'Cannot delete your own account' : ''}
-                  >
-                    Delete
-                  </button>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {canManagePermissions && (
+                      <button
+                        onClick={() => openPermissionsEditor(u)}
+                        disabled={loadingPermissions || u.id === loggedInUser?.id}
+                        style={{
+                          padding: '0.35rem 0.6rem',
+                          backgroundColor: u.id === loggedInUser?.id ? '#a9b0b8' : '#0ea5e9',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: u.id === loggedInUser?.id ? 'not-allowed' : 'pointer',
+                          fontSize: '0.82rem',
+                          whiteSpace: 'nowrap',
+                        }}
+                        title={u.id === loggedInUser?.id ? 'You cannot edit your own overrides' : 'Edit permissions'}
+                      >
+                        Permissions
+                      </button>
+                    )}
+                    <button
+                      onClick={() => deleteUserConfirm(u.id)}
+                      disabled={!canDeleteUser(u.id)}
+                      style={{
+                        padding: '0.35rem 0.6rem',
+                        backgroundColor: canDeleteUser(u.id) ? '#dc3545' : '#ccc',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: canDeleteUser(u.id) ? 'pointer' : 'not-allowed',
+                        fontSize: '0.82rem',
+                        whiteSpace: 'nowrap',
+                      }}
+                      title={!canDeleteUser(u.id) ? 'Cannot delete your own account' : ''}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -573,6 +684,135 @@ const AdminUsers = () => {
         cancelText={modal.cancelText}
         showCancelButton={modal.showCancelButton}
       />
+
+      {editingPermissionsUser && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.42)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1200,
+            padding: '1rem',
+          }}
+        >
+          <div
+            style={{
+              width: 'min(900px, 100%)',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              backgroundColor: '#fff',
+              borderRadius: '10px',
+              padding: '1rem 1rem 1.25rem',
+              boxShadow: '0 14px 28px rgba(0,0,0,0.2)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <h3 style={{ margin: 0 }}>Permission Overrides: {editingPermissionsUser.name}</h3>
+              <button
+                type="button"
+                onClick={closePermissionsEditor}
+                style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '1.1rem' }}
+                title="Close"
+              >
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+
+            <p style={{ marginTop: 0, color: '#5f6368' }}>
+              Select <strong>Default</strong> to use role defaults, <strong>Allow</strong> to grant, or <strong>Deny</strong> to explicitly block.
+            </p>
+
+            <div style={{ display: 'grid', gap: '0.8rem' }}>
+              {permissionCatalog.map((group) => (
+                <div key={group.id} style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '0.75rem' }}>
+                  <h4 style={{ marginTop: 0, marginBottom: '0.6rem', color: '#1f2937' }}>{group.label}</h4>
+                  {(group.permissions || []).map((permission) => {
+                    const explicitValue = Object.prototype.hasOwnProperty.call(permissionForm, permission.key)
+                      ? permissionForm[permission.key]
+                      : null;
+
+                    return (
+                      <div key={permission.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.4rem 0', borderTop: '1px solid #f3f4f6' }}>
+                        <div>
+                          <div style={{ fontWeight: 600 }}>{permission.label}</div>
+                          <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>{permission.key}</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.35rem' }}>
+                          <button
+                            type="button"
+                            onClick={() => updatePermissionValue(permission.key, 'default')}
+                            style={{
+                              border: '1px solid #d1d5db',
+                              backgroundColor: explicitValue === null ? '#111827' : '#fff',
+                              color: explicitValue === null ? '#fff' : '#111827',
+                              borderRadius: '6px',
+                              padding: '0.25rem 0.6rem',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Default
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updatePermissionValue(permission.key, 'allow')}
+                            style={{
+                              border: '1px solid #16a34a',
+                              backgroundColor: explicitValue === true ? '#16a34a' : '#fff',
+                              color: explicitValue === true ? '#fff' : '#166534',
+                              borderRadius: '6px',
+                              padding: '0.25rem 0.6rem',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Allow
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updatePermissionValue(permission.key, 'deny')}
+                            style={{
+                              border: '1px solid #dc2626',
+                              backgroundColor: explicitValue === false ? '#dc2626' : '#fff',
+                              color: explicitValue === false ? '#fff' : '#991b1b',
+                              borderRadius: '6px',
+                              padding: '0.25rem 0.6rem',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Deny
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+
+            <div style={{ marginTop: '0.75rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.35rem', fontWeight: 600 }}>Reason (optional)</label>
+              <textarea
+                value={permissionReason}
+                onChange={(e) => setPermissionReason(e.target.value)}
+                rows={2}
+                placeholder="Reason for permission override change"
+                style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: '6px', padding: '0.55rem' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '0.85rem' }}>
+              <Button type="button" variant="secondary" onClick={closePermissionsEditor}>
+                Cancel
+              </Button>
+              <Button type="button" onClick={savePermissions} disabled={savingPermissions}>
+                {savingPermissions ? 'Saving...' : 'Save Permissions'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -5,6 +5,7 @@ import { useCart } from '../../context/CartContext.jsx';
 import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
 import logo from '../../assets/citi-nati-logo.png.png';
+import { getDashboardPathForUser } from '../../utils/permissions.js';
 import '../../styles/global.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 
@@ -118,20 +119,18 @@ const Header = () => {
     // Debug: Log auth state
     console.log("Auth state:", { isAuthenticated, role: user?.role });
 
-    if (user.role === 'admin') {
+    const dashboardPath = getDashboardPathForUser(user);
+    if (!dashboardPath) return null;
+
+    if (dashboardPath === '/admin') {
       return { path: '/admin', label: 'Admin Dashboard' };
     }
 
-    if (user.role === 'driver') {
+    if (dashboardPath === '/driver') {
       return { path: '/driver', label: 'Driver Dashboard' };
     }
 
-    if (user.role === 'cashier') {
-      return { path: '/cashier', label: 'Cashier Dashboard' };
-    }
-
-    // USER role doesn't have dashboard
-    return null;
+    return { path: '/cashier', label: 'Cashier Dashboard' };
   };
 
   // Get initials from user name (first letter of first name + first letter of last name)

@@ -45,6 +45,9 @@ const {
   deriveBranchCodeFromLocationCode,
   ZOMBA_LOCATION_CODES: CORE_ZOMBA_LOCATION_CODES,
 } = require('../utils/operationalScope');
+const { PERMISSION_GROUPS, ALL_PERMISSION_KEYS, ROLE_DEFAULT_PERMISSIONS, isValidPermissionKey } = require('../security/permissions');
+const { getPermissionSnapshotForUser } = require('../security/userPermissions.service');
+const { requirePermission } = require('../middleware/permissions.middleware');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -242,7 +245,7 @@ router.get('/test', verifyTokenMiddleware, verifyAdmin, (req, res) => {
     success: true,
     message: 'Admin access granted',
     user: { 
-      id: req.user.id, 
+      id: req.user.userId,
       email: req.user.email,
       role: req.user.role 
     }
@@ -691,6 +694,176 @@ router.get('/users', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
 });
 
 /**
+ * GET /api/admin/permissions/catalog
+ * Get permission groups and role defaults for admin permission editor UI.
+ */
+router.get(
+  '/permissions/catalog',
+  verifyTokenMiddleware,
+  verifyAdmin,
+  requirePermission('admin.users.manage_permissions'),
+  async (_req, res) => {
+    try {
+      return res.json({
+        success: true,
+        groups: PERMISSION_GROUPS,
+        allPermissionKeys: ALL_PERMISSION_KEYS,
+        roleDefaults: ROLE_DEFAULT_PERMISSIONS,
+      });
+    } catch (err) {
+      console.error('[ADMIN PERMISSIONS] Failed to load catalog:', err);
+      return res.status(500).json({ error: 'Failed to load permissions catalog' });
+    }
+  }
+);
+
+/**
+ * GET /api/admin/users/:userId/permissions
+ * Get explicit and effective permission values for one user.
+ */
+router.get(
+  '/users/:userId/permissions',
+  verifyTokenMiddleware,
+  verifyAdmin,
+  requirePermission('admin.users.manage_permissions'),
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, name: true, email: true, role: true },
+      });
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const snapshot = await getPermissionSnapshotForUser(user.id, user.role);
+      return res.json({
+        success: true,
+        user,
+        ...snapshot,
+      });
+    } catch (err) {
+      console.error('[ADMIN PERMISSIONS] Failed to fetch user permissions:', err);
+      return res.status(500).json({ error: 'Failed to fetch user permissions' });
+    }
+  }
+);
+
+/**
+ * PUT /api/admin/users/:userId/permissions
+ * Upsert per-user permission overrides.
+ * Body: { permissions: [{ key, allowed }], reason?: string }
+ */
+router.put(
+  '/users/:userId/permissions',
+  verifyTokenMiddleware,
+  verifyAdmin,
+  requirePermission('admin.users.manage_permissions'),
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { permissions, reason } = req.body;
+
+      if (!Array.isArray(permissions)) {
+        return res.status(400).json({ error: 'permissions must be an array' });
+      }
+
+      const adminUserId = req.user.userId;
+      if (userId === adminUserId) {
+        return res.status(400).json({ error: 'You cannot edit your own permission overrides' });
+      }
+
+      const targetUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, role: true },
+      });
+
+      if (!targetUser) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const existingOverrides = await prisma.userPermission.findMany({
+        where: { userId },
+        select: { permissionKey: true, allowed: true },
+      });
+      const existingMap = new Map(existingOverrides.map((item) => [item.permissionKey, item.allowed]));
+
+      const normalizedUpdates = [];
+      for (const entry of permissions) {
+        const key = String(entry?.key || '').trim();
+        if (!isValidPermissionKey(key)) {
+          return res.status(400).json({ error: `Invalid permission key: ${key}` });
+        }
+
+        const rawAllowed = entry?.allowed;
+        const allowed = rawAllowed === null || rawAllowed === undefined ? null : Boolean(rawAllowed);
+        normalizedUpdates.push({ key, allowed });
+      }
+
+      await prisma.$transaction(async (tx) => {
+        for (const update of normalizedUpdates) {
+          const previousValue = existingMap.has(update.key) ? existingMap.get(update.key) : null;
+          const hasChanged = previousValue !== update.allowed;
+
+          if (!hasChanged) {
+            continue;
+          }
+
+          if (update.allowed === null) {
+            await tx.userPermission.deleteMany({
+              where: { userId, permissionKey: update.key },
+            });
+          } else {
+            await tx.userPermission.upsert({
+              where: {
+                userId_permissionKey: {
+                  userId,
+                  permissionKey: update.key,
+                },
+              },
+              update: {
+                allowed: update.allowed,
+              },
+              create: {
+                userId,
+                permissionKey: update.key,
+                allowed: update.allowed,
+              },
+            });
+          }
+
+          await tx.permissionAuditLog.create({
+            data: {
+              actorUserId: adminUserId,
+              targetUserId: userId,
+              permissionKey: update.key,
+              previousValue,
+              newValue: update.allowed,
+              reason: typeof reason === 'string' ? reason.trim().slice(0, 500) : null,
+              metadata: {
+                roleAtChange: targetUser.role,
+              },
+            },
+          });
+        }
+      });
+
+      const snapshot = await getPermissionSnapshotForUser(targetUser.id, targetUser.role);
+      return res.json({
+        success: true,
+        message: 'User permissions updated successfully',
+        ...snapshot,
+      });
+    } catch (err) {
+      console.error('[ADMIN PERMISSIONS] Failed to update user permissions:', err);
+      return res.status(500).json({ error: 'Failed to update user permissions' });
+    }
+  }
+);
+
+/**
  * PUT /api/admin/users/:userId/role
  * Update user role (user, admin, driver, cashier)
  * Protected: Admin only
@@ -705,7 +878,7 @@ router.put('/users/:userId/role', verifyTokenMiddleware, verifyAdmin, async (req
     }
 
     // Prevent changing own role
-    if (userId === req.user.id) {
+    if (userId === req.user.userId) {
       return res.status(400).json({ error: 'Cannot change your own role' });
     }
 
@@ -775,7 +948,7 @@ router.delete('/users/:userId', verifyTokenMiddleware, verifyAdmin, async (req, 
     const { userId } = req.params;
 
     // Prevent deleting self
-    if (userId === req.user.id) {
+    if (userId === req.user.userId) {
       return res.status(400).json({ error: 'Cannot delete your own account' });
     }
 

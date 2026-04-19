@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect } from 'react';
 import api, { setAuthToken, clearAuthToken } from '../utils/api.js';
 import tokenStorage from '../utils/tokenStorage.js';
+import { hasPermission as hasPermissionForUser } from '../utils/permissions.js';
 
 /**
  * 🔐 GLOBAL AUTH CONTEXT
@@ -31,7 +32,7 @@ export const AuthProvider = ({ children }) => {
    * If yes, restore it and set axios header
    */
   useEffect(() => {
-    const initializeAuth = () => {
+    const initializeAuth = async () => {
       try {
         const storedToken = tokenStorage.getToken();
         const storedUser = tokenStorage.getUser();
@@ -43,6 +44,18 @@ export const AuthProvider = ({ children }) => {
 
           // ✅ Set axios default header
           setAuthToken(storedToken);
+
+          // Refresh user snapshot from backend so permission changes are reflected.
+          try {
+            const sessionResponse = await api.get('/auth/session');
+            const latestUser = sessionResponse.data?.user;
+            if (latestUser) {
+              tokenStorage.setUser(latestUser);
+              setUser(latestUser);
+            }
+          } catch (sessionErr) {
+            console.warn('Session refresh failed, using cached user:', sessionErr?.response?.data?.error || sessionErr.message);
+          }
 
           console.log('✓ Auth restored from localStorage');
         } else {
@@ -122,6 +135,7 @@ export const AuthProvider = ({ children }) => {
     isLoading,
     login,
     logout,
+    hasPermission: (permissionKey) => hasPermissionForUser(user, permissionKey),
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

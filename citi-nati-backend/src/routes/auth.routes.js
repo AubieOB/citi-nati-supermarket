@@ -1,11 +1,13 @@
 const express = require('express');
-const { login, register, googleAuth, verifyEmail, resendVerificationCode, forgotPassword, resetPassword, logout } = require('../controllers/auth.controller');
+const { login, register, googleAuth, verifyEmail, resendVerificationCode, forgotPassword, resetPassword, logout, getSession } = require('../controllers/auth.controller');
+const { verifyTokenMiddleware } = require('../middleware/auth.middleware');
 
 const router = express.Router();
 
 // Email/Password Authentication
 router.post('/login', login);
 router.post('/logout', logout);
+router.get('/session', verifyTokenMiddleware, getSession);
 router.post('/register', register);
 
 // Email Verification

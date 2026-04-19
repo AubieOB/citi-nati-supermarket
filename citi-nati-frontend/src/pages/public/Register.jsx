@@ -6,6 +6,7 @@ import Button from '../../components/ui/Button.jsx';
 import api from '../../utils/api.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { userValidation } from '../../utils/backendAlignment.js';
+import { getDashboardPathForUser } from '../../utils/permissions.js';
 import '../../styles/global.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 
@@ -119,7 +120,7 @@ const Register = () => {
         login(user, token);
         setSuccess(response.data.isNewUser ? 'Account created and logged in!' : 'Logged in successfully!');
         setTimeout(() => {
-          navigate(user.role === 'admin' ? '/admin' : '/products');
+          navigate(getDashboardPathForUser(user) || '/products');
         }, 500);
       } catch (err) {
         setError(err.response?.data?.error || 'Authentication failed. Please try again.');

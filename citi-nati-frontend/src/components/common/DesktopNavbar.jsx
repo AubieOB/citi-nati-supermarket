@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useCart } from '../../context/CartContext.jsx';
+import { getDashboardPathForUser } from '../../utils/permissions.js';
 import logo from '../../assets/citi-nati-logo.png.png';
 
 const DesktopNavbar = ({ onCartClick, onAccountClick, navigate }) => {
@@ -13,15 +14,7 @@ const DesktopNavbar = ({ onCartClick, onAccountClick, navigate }) => {
     return location.pathname === path;
   };
 
-  const getDashboardPath = () => {
-    if (!user) return null;
-    if (user.role === 'admin') return '/admin';
-    if (user.role === 'driver') return '/driver';
-    if (user.role === 'cashier') return '/cashier';
-    return null;
-  };
-
-  const dashboardPath = getDashboardPath();
+  const dashboardPath = getDashboardPathForUser(user);
 
   const handleLogoClick = () => {
     navigate('/');
@@ -80,7 +73,7 @@ const DesktopNavbar = ({ onCartClick, onAccountClick, navigate }) => {
         {/* My Orders or Dashboard */}
         {isAuthenticated ? (
           <>
-            {user?.role === 'user' ? (
+            {!dashboardPath ? (
               <Link 
                 to="/my-orders" 
                 className={`desktop-navbar__item desktop-navbar__item--icon ${isActive('/my-orders') ? 'desktop-navbar__item--active' : ''}`}
@@ -94,16 +87,16 @@ const DesktopNavbar = ({ onCartClick, onAccountClick, navigate }) => {
                 to={dashboardPath} 
                 className={`desktop-navbar__item desktop-navbar__item--icon ${isActive(dashboardPath) ? 'desktop-navbar__item--active' : ''}`}
                 aria-label={
-                  user?.role === 'admin'
+                  dashboardPath === '/admin'
                     ? 'Admin Dashboard'
-                    : user?.role === 'driver'
+                    : dashboardPath === '/driver'
                       ? 'Driver Dashboard'
                       : 'Cashier Dashboard'
                 }
                 title={
-                  user?.role === 'admin'
+                  dashboardPath === '/admin'
                     ? 'Admin Dashboard'
-                    : user?.role === 'driver'
+                    : dashboardPath === '/driver'
                       ? 'Driver Dashboard'
                       : 'Cashier Dashboard'
                 }

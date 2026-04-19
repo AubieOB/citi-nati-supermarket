@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useCart } from '../../context/CartContext.jsx';
+import { getDashboardPathForUser } from '../../utils/permissions.js';
 
 const MobileBottomNav = ({ onCartClick, onAccountClick }) => {
   const location = useLocation();
@@ -12,15 +13,7 @@ const MobileBottomNav = ({ onCartClick, onAccountClick }) => {
     return location.pathname === path;
   };
 
-  const getDashboardPath = () => {
-    if (!user) return null;
-    if (user.role === 'admin') return '/admin';
-    if (user.role === 'driver') return '/driver';
-    if (user.role === 'cashier') return '/cashier';
-    return null;
-  };
-
-  const dashboardPath = getDashboardPath();
+  const dashboardPath = getDashboardPathForUser(user);
 
   return (
     <nav className="mobile-bottom-nav" role="navigation" aria-label="Mobile bottom navigation">
@@ -67,7 +60,7 @@ const MobileBottomNav = ({ onCartClick, onAccountClick }) => {
       {/* My Orders or Dashboard */}
       {isAuthenticated ? (
         <>
-          {user?.role === 'user' ? (
+          {!dashboardPath ? (
             <Link 
               to="/my-orders" 
               className={`mobile-bottom-nav__item ${isActive('/my-orders') ? 'mobile-bottom-nav__item--active' : ''}`}
@@ -82,16 +75,16 @@ const MobileBottomNav = ({ onCartClick, onAccountClick }) => {
               to={dashboardPath} 
               className={`mobile-bottom-nav__item ${isActive(dashboardPath) ? 'mobile-bottom-nav__item--active' : ''}`}
               aria-label={
-                user?.role === 'admin'
+                dashboardPath === '/admin'
                   ? 'Admin Dashboard'
-                  : user?.role === 'driver'
+                  : dashboardPath === '/driver'
                     ? 'Driver Dashboard'
                     : 'Cashier Dashboard'
               }
               title={
-                user?.role === 'admin'
+                dashboardPath === '/admin'
                   ? 'Admin Dashboard'
-                  : user?.role === 'driver'
+                  : dashboardPath === '/driver'
                     ? 'Driver Dashboard'
                     : 'Cashier Dashboard'
               }

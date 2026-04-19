@@ -6,6 +6,7 @@ import Button from '../../components/ui/Button.jsx';
 import api from '../../utils/api.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { userValidation } from '../../utils/backendAlignment.js';
+import { getDashboardPathForUser } from '../../utils/permissions.js';
 import '../../styles/global.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 
@@ -46,16 +47,8 @@ const Login = () => {
       // ✅ STORE: Use AuthContext to save auth state
       login(user, token);
 
-      // ✅ REDIRECT: Route based on role
-      if (user.role === 'admin') {
-        navigate('/admin');
-      } else if (user.role === 'driver') {
-        navigate('/driver');
-      } else if (user.role === 'cashier') {
-        navigate('/cashier');
-      } else {
-        navigate('/');
-      }
+      // ✅ REDIRECT: Route based on permissions/role
+      navigate(getDashboardPathForUser(user) || '/');
     } catch (err) {
       // ❌ ERROR HANDLING
       if (err.response?.status === 400) {
@@ -87,16 +80,7 @@ const Login = () => {
 
         login(user, token);
 
-        // Redirect based on role
-        if (user.role === 'admin') {
-          navigate('/admin');
-        } else if (user.role === 'driver') {
-          navigate('/driver');
-        } else if (user.role === 'cashier') {
-          navigate('/cashier');
-        } else {
-          navigate('/');
-        }
+        navigate(getDashboardPathForUser(user) || '/');
       } catch (err) {
         console.error('Google login error:', err);
         setError(err.response?.data?.error || 'Google login failed. Please try again.');
