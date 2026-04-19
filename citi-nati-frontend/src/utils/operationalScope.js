@@ -65,9 +65,28 @@ function toLegacyLocationCode(value) {
   return resolveOperationalScope(value).locationCode;
 }
 
+function filterProductsForOperationalLocation(products, value) {
+  if (!Array.isArray(products) || products.length === 0) return [];
+
+  const scope = resolveOperationalScope(value);
+  if (!scope || scope.branchCode !== 'ZOMBA') {
+    return products;
+  }
+
+  const expectedBranchCode = scope.branchCode;
+  const expectedLocationCode = scope.locationCode;
+
+  return products.filter((product) => {
+    const productBranchCode = String(product?.branchCode || '').trim().toUpperCase();
+    const productLocationCode = String(product?.locationCode || '').trim().toUpperCase();
+    return productBranchCode === expectedBranchCode && productLocationCode === expectedLocationCode;
+  });
+}
+
 export {
   normalizeOperationalScopeCode,
   resolveOperationalScope,
   getOperationalScopeOptions,
   toLegacyLocationCode,
+  filterProductsForOperationalLocation,
 };

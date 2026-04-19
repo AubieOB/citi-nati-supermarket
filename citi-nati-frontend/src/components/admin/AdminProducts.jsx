@@ -12,6 +12,7 @@ import {
   resolveEffectiveStock,
   resolveStockStatus,
 } from '../../utils/stockResolver.js';
+import { filterProductsForOperationalLocation } from '../../utils/operationalScope.js';
 import '../../css/admin-responsive-filters.css';
 
 /**
@@ -436,7 +437,8 @@ const AdminProducts = ({
     setExpandedBatchRows({});
 
     if (Array.isArray(cachedProducts) && cachedProducts.length > 0) {
-      const sortedCached = [...cachedProducts].sort((a, b) => getExpirySeverity(a) - getExpirySeverity(b));
+      const scopedCachedProducts = filterProductsForOperationalLocation(cachedProducts, selectedLocationCode);
+      const sortedCached = [...scopedCachedProducts].sort((a, b) => getExpirySeverity(a) - getExpirySeverity(b));
       setProducts(sortedCached);
       setLoading(Boolean(cachedProductsMeta?.isLoading));
       setError(cachedProductsMeta?.error || null);
@@ -463,7 +465,8 @@ const AdminProducts = ({
   useEffect(() => {
     if (!Array.isArray(cachedProducts)) return;
 
-    const sortedCached = [...cachedProducts].sort((a, b) => getExpirySeverity(a) - getExpirySeverity(b));
+    const scopedCachedProducts = filterProductsForOperationalLocation(cachedProducts, selectedLocationCode);
+    const sortedCached = [...scopedCachedProducts].sort((a, b) => getExpirySeverity(a) - getExpirySeverity(b));
     setProducts(sortedCached);
 
     if (cachedProductsMeta?.isLoading || cachedProductsMeta?.isBackgroundLoading) {
@@ -697,13 +700,13 @@ const AdminProducts = ({
             : [];
 
           console.log('[ADMIN PRODUCTS UI] /admin/pos-products fallback count', adminItems.length);
-          all = adminItems;
+          all = filterProductsForOperationalLocation(adminItems, selectedLocationCode);
         } catch (adminFallbackErr) {
           console.warn('[ADMIN PRODUCTS UI] /admin/pos-products fallback failed', adminFallbackErr?.response?.data || adminFallbackErr.message);
           all = firstItems;
         }
       } else {
-        all = all.concat(firstItems);
+        all = filterProductsForOperationalLocation(all.concat(firstItems), selectedLocationCode);
       }
 
       console.log('[ADMIN PRODUCTS UI] first product row', firstItems[0] || null);
@@ -741,7 +744,7 @@ const AdminProducts = ({
               const items = resp.data.products || [];
               if (items.length === 0) break;
               
-              all = all.concat(items);
+              all = filterProductsForOperationalLocation(all.concat(items), selectedLocationCode);
               
               // Re-sort and update state
               sorted = all.sort((a, b) => {

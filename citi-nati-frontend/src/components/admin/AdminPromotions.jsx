@@ -3,7 +3,7 @@ import api from '../../utils/api.js';
 import { formatMWK } from '../../utils/currency.js';
 import { getSocket } from '../../utils/socket.js';
 import { notifySuccess, notifyError } from '../../utils/notifications.js';
-import { resolveOperationalScope } from '../../utils/operationalScope.js';
+import { filterProductsForOperationalLocation, resolveOperationalScope } from '../../utils/operationalScope.js';
 
 /**
  * 🎯 ADMIN PROMOTIONS MANAGEMENT
@@ -94,8 +94,9 @@ const AdminPromotions = ({
     setPromotions(createDefaultPromotionsState());
 
     if (Array.isArray(cachedProducts) && cachedProducts.length > 0) {
-      const uniqueCategories = [...new Set(cachedProducts.map((p) => p.category).filter(Boolean))].sort();
-      setAllProducts(cachedProducts);
+      const scopedCachedProducts = filterProductsForOperationalLocation(cachedProducts, effectiveLocationCode);
+      const uniqueCategories = [...new Set(scopedCachedProducts.map((p) => p.category).filter(Boolean))].sort();
+      setAllProducts(scopedCachedProducts);
       setCategories(uniqueCategories);
     } else if (!hasSharedProductsCache) {
       fetchPromotionCatalog();
@@ -109,10 +110,11 @@ const AdminPromotions = ({
 
   useEffect(() => {
     if (!hasSharedProductsCache) return;
-    const uniqueCategories = [...new Set(cachedProducts.map((p) => p.category).filter(Boolean))].sort();
-    setAllProducts(cachedProducts);
+    const scopedCachedProducts = filterProductsForOperationalLocation(cachedProducts, effectiveLocationCode);
+    const uniqueCategories = [...new Set(scopedCachedProducts.map((p) => p.category).filter(Boolean))].sort();
+    setAllProducts(scopedCachedProducts);
     setCategories(uniqueCategories);
-  }, [cachedProducts, hasSharedProductsCache]);
+  }, [cachedProducts, hasSharedProductsCache, effectiveLocationCode]);
 
   useEffect(() => {
     let resizeObserver;
@@ -207,13 +209,17 @@ const AdminPromotions = ({
       };
 
       const syncCatalogState = (items) => {
-        const uniqueCategories = [...new Set(items.map((p) => p.category).filter(Boolean))].sort();
-        setAllProducts(items);
+        const scopedItems = filterProductsForOperationalLocation(items, effectiveLocationCode);
+        const uniqueCategories = [...new Set(scopedItems.map((p) => p.category).filter(Boolean))].sort();
+        setAllProducts(scopedItems);
         setCategories(uniqueCategories);
       };
 
       const firstResponse = await fetchProductsPage(1);
-      let all = Array.isArray(firstResponse?.data?.products) ? firstResponse.data.products : [];
+      let all = filterProductsForOperationalLocation(
+        Array.isArray(firstResponse?.data?.products) ? firstResponse.data.products : [],
+        effectiveLocationCode
+      );
 
       if (catalogRequestIdRef.current !== requestId) {
         return;
@@ -232,7 +238,7 @@ const AdminPromotions = ({
                 break;
               }
 
-              all = all.concat(items);
+              all = filterProductsForOperationalLocation(all.concat(items), effectiveLocationCode);
               if (catalogRequestIdRef.current !== requestId) {
                 return;
               }

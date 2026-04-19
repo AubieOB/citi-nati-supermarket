@@ -13,6 +13,7 @@ import {
   resolveLowStockThreshold,
   resolveStockStatus,
 } from '../../utils/stockResolver.js';
+import { filterProductsForOperationalLocation } from '../../utils/operationalScope.js';
 import '../../css/admin-responsive-filters.css';
 
 /**
@@ -68,7 +69,8 @@ const AdminStocks = ({
     setCurrentPage(1);
 
     if (Array.isArray(cachedProducts) && cachedProducts.length > 0) {
-      const nextProducts = cachedProducts.map((product) => enrichProductStock(product));
+      const scopedCachedProducts = filterProductsForOperationalLocation(cachedProducts, selectedLocationCode);
+      const nextProducts = scopedCachedProducts.map((product) => enrichProductStock(product));
       const nextCategories = [...new Set(nextProducts.map((product) => product.category).filter(Boolean))];
       setAllProducts(nextProducts);
       setCategories(nextCategories);
@@ -93,7 +95,8 @@ const AdminStocks = ({
 
   useEffect(() => {
     if (!Array.isArray(cachedProducts)) return;
-    const nextProducts = cachedProducts.map((product) => enrichProductStock(product));
+    const scopedCachedProducts = filterProductsForOperationalLocation(cachedProducts, selectedLocationCode);
+    const nextProducts = scopedCachedProducts.map((product) => enrichProductStock(product));
     const nextCategories = [...new Set(nextProducts.map((product) => product.category).filter(Boolean))];
     setAllProducts(nextProducts);
     setCategories(nextCategories);
@@ -185,7 +188,8 @@ const AdminStocks = ({
         firstParams.append('locationCode', selectedLocationCode);
       }
       const res1 = await api.get(`/products?${firstParams.toString()}`);
-      const firstBatch = (res1.data.products || []).map((product) => enrichProductStock(product));
+      const firstBatch = filterProductsForOperationalLocation(res1.data.products || [], selectedLocationCode)
+        .map((product) => enrichProductStock(product));
 
       if (fetchRequestIdRef.current !== requestId) {
         return;
@@ -215,7 +219,10 @@ const AdminStocks = ({
             const res = await api.get(`/products?${params.toString()}`);
             const items = res.data.products || [];
             if (items.length === 0) break;
-            collected = collected.concat(items.map((product) => enrichProductStock(product)));
+            collected = filterProductsForOperationalLocation(
+              collected.concat(items.map((product) => enrichProductStock(product))),
+              selectedLocationCode
+            );
             if (items.length < perPage) break;
             page += 1;
           }

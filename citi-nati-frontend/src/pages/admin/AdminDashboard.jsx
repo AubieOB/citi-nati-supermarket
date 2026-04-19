@@ -26,7 +26,7 @@ const AdminBusinessOperations = React.lazy(() => import('../../components/admin/
 import { useOrderUpdates } from '../../hooks/useOrderUpdates.js';
 import { getSpeechAlertsEnabled, setSpeechAlertsEnabled } from '../../utils/notifications.js';
 import api from '../../utils/api.js';
-import { getOperationalScopeOptions, normalizeOperationalScopeCode, resolveOperationalScope } from '../../utils/operationalScope.js';
+import { filterProductsForOperationalLocation, getOperationalScopeOptions, normalizeOperationalScopeCode, resolveOperationalScope } from '../../utils/operationalScope.js';
 import '../../styles/global.css';
 import '../../styles/admin-dashboard.css';
 
@@ -343,13 +343,13 @@ const AdminDashboard = () => {
           const adminItems = Array.isArray(adminResp?.data?.products)
             ? adminResp.data.products.map(normalizeAdminPosProduct)
             : [];
-          allItems = adminItems;
+          allItems = filterProductsForOperationalLocation(adminItems, safeLocationCode);
         } catch (fallbackErr) {
           console.warn('[AdminDashboard] /admin/pos-products fallback failed:', fallbackErr?.response?.data || fallbackErr.message);
           allItems = [];
         }
       } else {
-        allItems = firstItems;
+        allItems = filterProductsForOperationalLocation(firstItems, safeLocationCode);
       }
 
       if (adminProductsFetchRequestRef.current[safeLocationCode] !== requestId) {
@@ -360,6 +360,13 @@ const AdminDashboard = () => {
         ...prev,
         [safeLocationCode]: allItems,
       }));
+
+      console.log('[ADMIN DASHBOARD][PRODUCT SCOPE]', {
+        uiScope: safeLocationCode,
+        branchCode: scope.branchCode,
+        locationCode: scope.locationCode,
+        cachedCount: allItems.length,
+      });
 
       updateProductsCacheMeta(safeLocationCode, {
         isLoading: false,
@@ -379,7 +386,7 @@ const AdminDashboard = () => {
                 break;
               }
 
-              allItems = allItems.concat(items);
+              allItems = filterProductsForOperationalLocation(allItems.concat(items), safeLocationCode);
               if (adminProductsFetchRequestRef.current[safeLocationCode] !== requestId) {
                 return;
               }

@@ -6,6 +6,7 @@ import { useModal } from '../../hooks/useModal.js';
 import { formatMWK } from '../../utils/currency.js';
 import Pagination from '../../components/ui/Pagination.jsx';
 import { getSocket } from '../../utils/socket.js';
+import { filterProductsForOperationalLocation } from '../../utils/operationalScope.js';
 import '../../styles/global.css';
 
 /**
@@ -88,10 +89,11 @@ const AdminPOSManagement = ({
       };
 
       const syncLocalState = (allItems) => {
-        const uniqueCategories = [...new Set(allItems.map((p) => p.category).filter(Boolean))];
+        const scopedItems = filterProductsForOperationalLocation(allItems, selectedLocationCode);
+        const uniqueCategories = [...new Set(scopedItems.map((p) => p.category).filter(Boolean))];
         setCategories(uniqueCategories.sort());
 
-        const filteredItems = applyCategoryFilter(allItems, categoryFilter);
+        const filteredItems = applyCategoryFilter(scopedItems, categoryFilter);
         const nextTotalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
 
         setProducts(filteredItems);
@@ -130,7 +132,10 @@ const AdminPOSManagement = ({
         return;
       }
 
-      let allItems = Array.isArray(firstResponse.data.products) ? firstResponse.data.products : [];
+      let allItems = filterProductsForOperationalLocation(
+        Array.isArray(firstResponse.data.products) ? firstResponse.data.products : [],
+        selectedLocationCode
+      );
       if (fetchRequestIdRef.current !== requestId) {
         return;
       }
@@ -154,7 +159,7 @@ const AdminPOSManagement = ({
                 break;
               }
 
-              allItems = allItems.concat(pageItems);
+              allItems = filterProductsForOperationalLocation(allItems.concat(pageItems), selectedLocationCode);
               if (fetchRequestIdRef.current !== requestId) {
                 return;
               }
