@@ -376,12 +376,6 @@ const BusinessOperationsImportModal = ({ isOpen, onClose, onImportSuccess, onVie
         >
           <div>
             <h2 style={{ margin: 0, color: '#0f172a', fontSize: '1.25rem' }}>Import Excel Workbook</h2>
-            <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>
-              {currentStep === STEPS.SELECT_TYPE && 'Step 1 of 3: Choose workbook type'}
-              {currentStep === STEPS.UPLOAD_FILE && 'Step 1 of 3: Select and upload file'}
-              {currentStep === STEPS.SELECT_SECTIONS && 'Step 2 of 3: Select sections to import'}
-              {currentStep === STEPS.RESULTS && 'Import complete'}
-            </p>
           </div>
           <button
             type="button"

@@ -28,9 +28,7 @@ const ComingSoonTabPanel = ({ title, description }) => {
         <i className="fas fa-layer-group"></i>
       </div>
       <h3 style={{ margin: 0, color: '#1e293b', fontSize: '1.25rem' }}>{title}</h3>
-      <p style={{ margin: '0.75rem 0 0', color: '#64748b', lineHeight: 1.6, maxWidth: '700px' }}>
-        {description || 'This section is being prepared. The page structure is in place so imported records and future workflows can be added here without changing the Business Operations workspace.'}
-      </p>
+      {description ? <p style={{ margin: '0.75rem 0 0', color: '#64748b', lineHeight: 1.6, maxWidth: '700px' }}>{description}</p> : null}
     </div>
   );
 };

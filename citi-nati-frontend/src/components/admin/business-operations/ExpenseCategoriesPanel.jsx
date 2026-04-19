@@ -47,9 +47,6 @@ const ExpenseCategoriesPanel = ({ categories, loading, error, onAddCategory, onE
       <div style={{ padding: '1rem 1.05rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
         <div>
           <strong style={{ color: '#0f172a' }}>Expense Categories</strong>
-          <p style={{ margin: '0.3rem 0 0', color: '#64748b', fontSize: '0.87rem' }}>
-            Manage categories used to organize expense entries.
-          </p>
         </div>
         <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <select

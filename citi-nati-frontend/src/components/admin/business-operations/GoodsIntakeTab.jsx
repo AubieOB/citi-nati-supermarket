@@ -679,7 +679,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
         </div>
 
         <div style={{ marginTop: '1rem', display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Entry helpers:</span>
           <button type="button" onClick={addLine} style={{ border: '1px solid #93c5fd', background: '#eff6ff', color: '#1d4ed8', borderRadius: '8px', padding: '0.35rem 0.7rem', fontWeight: 600, cursor: 'pointer' }}>Add Row</button>
           <span style={{ fontSize: '0.78rem', color: missingBarcodeCount ? '#b45309' : '#64748b' }}>Missing barcode: {missingBarcodeCount}</span>
           <span style={{ fontSize: '0.78rem', color: missingExpiryCount ? '#b45309' : '#64748b' }}>Missing expiry: {missingExpiryCount}</span>
