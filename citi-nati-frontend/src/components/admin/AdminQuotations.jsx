@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../../utils/api.js';
 import { generateQuotationPDF } from '../../utils/pdfReports.js';
+import { exportQuotationReportImage } from '../../utils/quotationImageExport.js';
 import toast from 'react-hot-toast';
 
 /* ─────────────────────────── helpers ─────────────────────────── */
@@ -434,6 +435,15 @@ const AdminQuotations = () => {
     window.open(`https://wa.me/?text=${encodeURIComponent(lines)}`, '_blank', 'noopener');
   };
 
+  const handleExportImage = async (q, format = 'png') => {
+    try {
+      await exportQuotationReportImage({ quotation: q, title: 'Quotation', format });
+    } catch (error) {
+      console.error('Image export error:', error);
+      toast.error('Failed to generate image. Please try again.');
+    }
+  };
+
   /* ── Filtered quotations ─── */
   const filteredQuotations = quotations.filter((q) => {
     const s = search.toLowerCase();
@@ -690,6 +700,12 @@ const AdminQuotations = () => {
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <button style={S.btn()} onClick={() => generateQuotationPDF(q)} title="Download PDF">
                     <i className="fas fa-file-pdf"></i> PDF
+                  </button>
+                  <button style={S.btn('#6b7280', true)} onClick={() => handleExportImage(q, 'png')} title="Export as PNG image">
+                    <i className="fas fa-image"></i> PNG
+                  </button>
+                  <button style={S.btn('#6b7280', true)} onClick={() => handleExportImage(q, 'jpg')} title="Export as JPG image">
+                    <i className="fas fa-image"></i> JPG
                   </button>
                   <button style={S.btn('#25D366')} onClick={() => handleWhatsApp(q)} title="Share via WhatsApp">
                     <i className="fab fa-whatsapp"></i> Share
