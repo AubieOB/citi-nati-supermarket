@@ -213,6 +213,27 @@ const AdminUsers = () => {
     });
   };
 
+  const getPermissionCatalogKeys = () => permissionCatalog.flatMap((group) =>
+    (group.permissions || []).map((permission) => permission.key)
+  );
+
+  const applyBulkPermissionMode = (mode) => {
+    const permissionKeys = getPermissionCatalogKeys();
+
+    if (permissionKeys.length === 0) return;
+
+    setPermissionForm(() => {
+      if (mode === 'default') {
+        return {};
+      }
+
+      return permissionKeys.reduce((next, key) => {
+        next[key] = mode === 'allow';
+        return next;
+      }, {});
+    });
+  };
+
   const savePermissions = async () => {
     if (!editingPermissionsUser) return;
 
@@ -735,6 +756,54 @@ const AdminUsers = () => {
             <p style={{ marginTop: '-0.25rem', marginBottom: '0.75rem', color: '#6b7280', fontSize: '0.84rem' }}>
               Parent access does not automatically grant all children. Assign tab, section, and action permissions explicitly.
             </p>
+
+            <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
+              <button
+                type="button"
+                onClick={() => applyBulkPermissionMode('allow')}
+                style={{
+                  border: '1px solid #16a34a',
+                  backgroundColor: '#16a34a',
+                  color: '#fff',
+                  borderRadius: '6px',
+                  padding: '0.45rem 0.8rem',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                Allow All
+              </button>
+              <button
+                type="button"
+                onClick={() => applyBulkPermissionMode('deny')}
+                style={{
+                  border: '1px solid #dc2626',
+                  backgroundColor: '#dc2626',
+                  color: '#fff',
+                  borderRadius: '6px',
+                  padding: '0.45rem 0.8rem',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                Deny All
+              </button>
+              <button
+                type="button"
+                onClick={() => applyBulkPermissionMode('default')}
+                style={{
+                  border: '1px solid #d1d5db',
+                  backgroundColor: '#fff',
+                  color: '#111827',
+                  borderRadius: '6px',
+                  padding: '0.45rem 0.8rem',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                Restore Defaults
+              </button>
+            </div>
 
             <div style={{ display: 'grid', gap: '0.8rem' }}>
               {permissionCatalog.map((group) => (
