@@ -255,8 +255,11 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [sidebarScope, setSidebarScope] = useState(TAB_SCOPE_BY_ID[initialTab] || 'online-store');
+  const [sidebarScope, setSidebarScope] = useState('all');
   const scopePillsRef = useRef(null);
+  const isScopePillsDraggingRef = useRef(false);
+  const scopePillsDragStartXRef = useRef(0);
+  const scopePillsStartScrollLeftRef = useRef(0);
   const [speechAlertsEnabled, setSpeechAlertsPreference] = useState(() => getSpeechAlertsEnabled());
   const [selectedOperationalLocationCode, setSelectedOperationalLocationCode] = useState('BLANTYRE_SH');
   const [adminProductsCacheByLocation, setAdminProductsCacheByLocation] = useState({});
@@ -553,18 +556,8 @@ const AdminDashboard = () => {
     }
   }, [location.pathname, activeTab]);
 
-  React.useEffect(() => {
-    const activeScope = TAB_SCOPE_BY_ID[activeTab];
-    if (!activeScope) return;
-    setSidebarScope(activeScope);
-  }, [activeTab]);
-
   const handleTabSelect = useCallback((tabId) => {
     setActiveTab(tabId);
-    const nextScope = TAB_SCOPE_BY_ID[tabId];
-    if (nextScope) {
-      setSidebarScope(nextScope);
-    }
     if (tabId === 'emergency-sales') {
       navigate('/admin/emergency-sales');
     } else if (tabId === 'business-operations') {
@@ -690,11 +683,11 @@ const AdminDashboard = () => {
 
         {!sidebarCollapsed && (
           <div style={{
-            padding: '0.5rem 1rem',
+            padding: '0.5rem 0',
             borderBottom: `1px solid ${isDarkTheme ? '#2e2e2e' : '#ece7f7'}`,
             display: 'flex',
             alignItems: 'center',
-            gap: '0.25rem',
+            justifyContent: 'space-between',
             flexShrink: 0,
           }}>
             {/* Left scroll arrow */}
@@ -706,7 +699,7 @@ const AdminDashboard = () => {
                 background: 'transparent',
                 color: isDarkTheme ? '#9dafc8' : '#8878a9',
                 cursor: 'pointer',
-                padding: '0.2rem 0.15rem',
+                padding: '0.2rem 0.45rem',
                 fontSize: '0.72rem',
                 display: 'flex',
                 alignItems: 'center',
@@ -718,6 +711,33 @@ const AdminDashboard = () => {
             {/* Scrollable pills */}
             <div
               ref={scopePillsRef}
+              onMouseDown={(event) => {
+                if (!scopePillsRef.current) return;
+                isScopePillsDraggingRef.current = true;
+                scopePillsDragStartXRef.current = event.clientX;
+                scopePillsStartScrollLeftRef.current = scopePillsRef.current.scrollLeft;
+                scopePillsRef.current.style.cursor = 'grabbing';
+                scopePillsRef.current.style.userSelect = 'none';
+              }}
+              onMouseMove={(event) => {
+                if (!isScopePillsDraggingRef.current || !scopePillsRef.current) return;
+                event.preventDefault();
+                const deltaX = event.clientX - scopePillsDragStartXRef.current;
+                scopePillsRef.current.scrollLeft = scopePillsStartScrollLeftRef.current - deltaX;
+              }}
+              onMouseUp={() => {
+                isScopePillsDraggingRef.current = false;
+                if (!scopePillsRef.current) return;
+                scopePillsRef.current.style.cursor = 'grab';
+                scopePillsRef.current.style.userSelect = 'auto';
+              }}
+              onMouseLeave={() => {
+                isScopePillsDraggingRef.current = false;
+                if (!scopePillsRef.current) return;
+                scopePillsRef.current.style.cursor = 'grab';
+                scopePillsRef.current.style.userSelect = 'auto';
+              }}
+              onDragStart={(event) => event.preventDefault()}
               style={{
                 display: 'flex',
                 flexWrap: 'nowrap',
@@ -727,6 +747,7 @@ const AdminDashboard = () => {
                 flex: 1,
                 scrollbarWidth: 'none',
                 msOverflowStyle: 'none',
+                cursor: 'grab',
               }}
             >
             {SIDEBAR_SCOPES.map((scope) => {
@@ -766,7 +787,7 @@ const AdminDashboard = () => {
                 background: 'transparent',
                 color: isDarkTheme ? '#9dafc8' : '#8878a9',
                 cursor: 'pointer',
-                padding: '0.2rem 0.15rem',
+                padding: '0.2rem 0.45rem',
                 fontSize: '0.72rem',
                 display: 'flex',
                 alignItems: 'center',

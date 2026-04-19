@@ -1999,15 +1999,6 @@ const AdminProducts = ({
 
           {/* Results Count */}
           <div style={{
-            fontSize: '0.82rem',
-            color: textSecondary,
-            fontWeight: '600',
-            minWidth: '180px',
-            textAlign: 'right',
-          }}>
-            Manual refresh only
-          </div>
-          <div style={{
             fontSize: '0.9rem',
             color: textSecondary,
             minWidth: '100px',
@@ -2093,16 +2084,6 @@ const AdminProducts = ({
             <i className={`fas ${isManualRefreshing ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`}></i>
             {isManualRefreshing ? 'Refreshing...' : 'Refresh'}
           </button>
-
-          <div style={{
-            fontSize: '0.82rem',
-            color: textSecondary,
-            fontWeight: '600',
-            minWidth: '180px',
-            textAlign: 'right',
-          }}>
-            Manual refresh only
-          </div>
 
           <div style={{
             marginLeft: 'auto',
