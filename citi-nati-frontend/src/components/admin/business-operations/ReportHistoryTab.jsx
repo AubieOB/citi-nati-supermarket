@@ -348,7 +348,7 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedL
   }, [selectedLocationId]);
 
   return (
-    <div style={{ display: 'grid', gridTemplateRows: 'auto auto 1fr', gap: '1rem', height: 'calc(100vh - 230px)', maxHeight: 'calc(100vh - 230px)', overflow: 'hidden' }}>
+    <div style={{ display: 'grid', gridTemplateRows: 'auto auto auto', gap: '1rem' }}>
       <div style={{ ...cardStyle, padding: '1.2rem 1.3rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
           <div>

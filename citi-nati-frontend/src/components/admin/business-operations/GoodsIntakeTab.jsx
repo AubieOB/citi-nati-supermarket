@@ -779,7 +779,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
   );
 
   return (
-    <div style={{ display: 'grid', gridTemplateRows: 'auto 1fr', gap: '1rem', width: '100%', minWidth: 0, height: 'calc(100vh - 230px)', maxHeight: 'calc(100vh - 230px)', overflow: 'hidden' }}>
+    <div style={{ display: 'grid', gap: '1rem', width: '100%', minWidth: 0 }}>
       <section style={{ ...themedCardStyle, padding: '1rem', width: '100%', minWidth: 0 }}>
         <div style={{ display: 'grid', gap: '0.9rem', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
           <button
