@@ -84,7 +84,25 @@ const MonthlySummaryTab = ({
   selectedLocationId = null,
   selectedLocationCode = '',
   selectedLocationName = '',
+  permissions = {},
 }) => {
+  const canViewOverviewCards = permissions.canViewOverviewCards !== false;
+  const canViewSalesOverview = permissions.canViewSalesOverview !== false;
+  const canViewExpensesOverview = permissions.canViewExpensesOverview !== false;
+  const canViewPayrollOverview = permissions.canViewPayrollOverview !== false;
+  const canViewSuppliersOverview = permissions.canViewSuppliersOverview !== false;
+  const canViewNetOverview = permissions.canViewNetOverview !== false;
+  const canOpenSalesReports = permissions.canOpenSalesReports !== false;
+  const canOpenExpenses = permissions.canOpenExpenses !== false;
+  const canOpenPayroll = permissions.canOpenPayroll !== false;
+  const canOpenSuppliers = permissions.canOpenSuppliers !== false;
+  const canExport = permissions.canExport !== false;
+  const canViewAnySummarySection = canViewOverviewCards
+    || canViewSalesOverview
+    || canViewExpensesOverview
+    || canViewPayrollOverview
+    || canViewSuppliersOverview
+    || canViewNetOverview;
   const [showControls, setShowControls] = useState(false);
   const [isInsightsModalOpen, setIsInsightsModalOpen] = useState(false);
   const [isInsightsModalMaximized, setIsInsightsModalMaximized] = useState(false);
@@ -527,7 +545,7 @@ const MonthlySummaryTab = ({
             <strong style={{ color: '#0f172a' }}>Insights Workspaces</strong>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '0.75rem' }}>
-            <button
+            {canViewAnySummarySection ? <button
               type="button"
               title="Click to open"
               onClick={() => { setIsInsightsModalMaximized(false); setIsInsightsModalOpen(true); }}
@@ -551,11 +569,19 @@ const MonthlySummaryTab = ({
               <span style={{ color: '#0f172a', fontWeight: 800, fontSize: '0.95rem' }}>Monthly Insights Workspace</span>
               <span style={{ color: '#64748b', fontSize: '0.82rem', lineHeight: 1.45 }}>Review monthly sales, expenses, payroll, and supplier trends.</span>
             </button>
+            : (
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: '14px', padding: '0.95rem 1rem', backgroundColor: '#fff' }}>
+                <strong style={{ color: '#0f172a' }}>No Permitted Sections</strong>
+                <p style={{ margin: '0.45rem 0 0', color: '#64748b', fontSize: '0.84rem' }}>
+                  Monthly Summary sections are not assigned to your account.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {isInsightsModalOpen && (
+      {isInsightsModalOpen && canViewAnySummarySection && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: isInsightsModalMaximized ? '0.35rem' : '1rem' }}>
           <div style={{ ...cardStyle, width: isInsightsModalMaximized ? 'calc(100vw - 0.7rem)' : 'min(1240px, 97vw)', height: isInsightsModalMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'auto', borderRadius: isInsightsModalMaximized ? '10px' : '18px', padding: '0.95rem' }}>
             <div style={{ position: 'sticky', top: '-0.95rem', zIndex: 5, backgroundColor: '#fff', margin: '-0.95rem -0.95rem 0.75rem', padding: '0.95rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)' }}>
@@ -569,7 +595,7 @@ const MonthlySummaryTab = ({
                       Auto-refreshing...
                     </span>
                   )}
-                  <button
+                  {canExport && <button
                     type="button"
                     onClick={() => handleExport('pdf')}
                     disabled={anyLoading || exportingExcel || exportingPdf || Boolean(validationError)}
@@ -577,8 +603,8 @@ const MonthlySummaryTab = ({
                   >
                     <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.42rem' }}></i>
                     Export PDF
-                  </button>
-                  <button
+                  </button>}
+                  {canExport && <button
                     type="button"
                     onClick={() => handleExport('excel')}
                     disabled={anyLoading || exportingExcel || exportingPdf || Boolean(validationError)}
@@ -586,7 +612,7 @@ const MonthlySummaryTab = ({
                   >
                     <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.42rem' }}></i>
                     Export Excel
-                  </button>
+                  </button>}
                   <button
                     type="button"
                     onClick={() => setShowControls((prev) => !prev)}
@@ -644,40 +670,44 @@ const MonthlySummaryTab = ({
               </div>
             </div>
 
-            <SummaryCards cards={summaryCards} />
+            {canViewOverviewCards && <SummaryCards cards={summaryCards} />}
 
             <div style={{ display: 'grid', gap: '0.9rem' }}>
-              <SalesSummarySection
+              {canViewSalesOverview && <SalesSummarySection
                 loading={salesState.loading}
                 error={salesState.error}
                 summary={salesState.summary}
                 payments={salesState.payments}
-                onOpen={() => onNavigateTab?.('sales-reports', drilldownPayload)}
+                onOpen={canOpenSalesReports ? () => onNavigateTab?.('sales-reports', drilldownPayload) : null}
               />
 
-              <ExpensesSummarySection
+              }
+              {canViewExpensesOverview && <ExpensesSummarySection
                 loading={expensesState.loading}
                 error={expensesState.error}
                 summary={expensesState.summary}
-                onOpen={() => onNavigateTab?.('expenses', drilldownPayload)}
+                onOpen={canOpenExpenses ? () => onNavigateTab?.('expenses', drilldownPayload) : null}
               />
 
-              <PayrollSummarySection
+              }
+              {canViewPayrollOverview && <PayrollSummarySection
                 loading={payrollState.loading}
                 error={payrollState.error}
                 data={payrollState.data}
-                onOpen={() => onNavigateTab?.('payroll', drilldownPayload)}
+                onOpen={canOpenPayroll ? () => onNavigateTab?.('payroll', drilldownPayload) : null}
               />
 
-              <SupplierSummarySection
+              }
+              {canViewSuppliersOverview && <SupplierSummarySection
                 loading={supplierState.loading}
                 error={supplierState.error}
                 data={supplierState.data}
-                onOpen={() => onNavigateTab?.('suppliers', drilldownPayload)}
+                onOpen={canOpenSuppliers ? () => onNavigateTab?.('suppliers', drilldownPayload) : null}
               />
+              }
             </div>
 
-            <div style={{ marginTop: '0.9rem' }}>
+            {canViewNetOverview && <div style={{ marginTop: '0.9rem' }}>
               <NetSummaryCard
                 sales={money(salesTotal)}
                 expenses={money(expensesTotal)}
@@ -687,7 +717,16 @@ const MonthlySummaryTab = ({
                 rawNetValue={netPosition}
                 isComplete={sectionComplete}
               />
-            </div>
+            </div>}
+
+            {!canViewAnySummarySection && (
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: '14px', padding: '1rem', backgroundColor: '#fff' }}>
+                <strong style={{ color: '#0f172a' }}>No permitted sections</strong>
+                <p style={{ margin: '0.45rem 0 0', color: '#64748b' }}>
+                  You do not have access to any Monthly Summary sections.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}

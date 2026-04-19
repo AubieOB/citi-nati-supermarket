@@ -225,15 +225,22 @@ const ErrorState = ({ message }) => (
   </div>
 );
 
-const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, selectedLocationCode = '' }) => {
+const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, selectedLocationCode = '', permissions = {} }) => {
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
+  const canViewSummary = permissions.canViewSummary !== false;
+  const canViewSalesBy = permissions.canViewSalesBy !== false;
+  const canExportReports = permissions.canExportReports !== false;
+  const canImportReports = permissions.canImportReports !== false;
+  const canExportFullWorkbook = permissions.canExportFullWorkbook !== false;
+  const canImportFullWorkbook = permissions.canImportFullWorkbook !== false;
+  const hasAnyVisibleSection = canViewSummary || canViewSalesBy;
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isReportModalMaximized, setIsReportModalMaximized] = useState(false);
   const [showSummaryFilters, setShowSummaryFilters] = useState(false);
   const [showWorkspaceFilters, setShowWorkspaceFilters] = useState(false);
-  const [activeSection, setActiveSection] = useState('summary');
-  const [activeView, setActiveView] = useState('summary');
+  const [activeSection, setActiveSection] = useState(canViewSummary ? 'summary' : 'sales-by');
+  const [activeView, setActiveView] = useState(canViewSummary ? 'summary' : 'invoices');
   const [viewState, setViewState] = useState(DEFAULT_VIEW_STATE);
 
   const [summary, setSummary] = useState(null);
@@ -269,6 +276,20 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
   const queryKey = useMemo(() => JSON.stringify(filters), [filters]);
 
   useEffect(() => {
+    if (!canViewSummary && activeSection === 'summary') {
+      setActiveSection('sales-by');
+      setActiveView((prev) => (prev === 'summary' ? 'invoices' : prev));
+      setIsReportModalOpen(false);
+    }
+
+    if (!canViewSalesBy && activeSection === 'sales-by') {
+      setActiveSection('summary');
+      setActiveView('summary');
+      setIsReportModalOpen(false);
+    }
+  }, [activeSection, canViewSalesBy, canViewSummary]);
+
+  useEffect(() => {
     if (!drilldownRequest?.token) return;
 
     setFilters((prev) => {
@@ -286,9 +307,14 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
     });
 
     setViewState(DEFAULT_VIEW_STATE);
-    setActiveSection('summary');
-    setActiveView('summary');
-  }, [drilldownRequest]);
+    if (canViewSummary) {
+      setActiveSection('summary');
+      setActiveView('summary');
+    } else if (canViewSalesBy) {
+      setActiveSection('sales-by');
+      setActiveView('invoices');
+    }
+  }, [canViewSalesBy, canViewSummary, drilldownRequest]);
 
   useEffect(() => {
     setFilters((prev) => {
@@ -651,6 +677,11 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
   }, [filters, invoicesState, productsState, usersState, viewState]);
 
   const handleExport = useCallback(async (format) => {
+    if (!canExportReports) {
+      await boAlert({ title: 'Access denied', message: 'You do not have permission to export sales reports.', type: 'warning' });
+      return;
+    }
+
     if (format === 'excel') setExportingExcel(true);
     if (format === 'pdf') setExportingPdf(true);
 
@@ -749,9 +780,14 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
       if (format === 'excel') setExportingExcel(false);
       if (format === 'pdf') setExportingPdf(false);
     }
-  }, [activeView, fetchAllRowsForView, filters, invoicesState, paymentsState, productsState, summary, summaryLoading, summaryMeta, summaryMetaLine, usersState]);
+  }, [activeView, canExportReports, fetchAllRowsForView, filters, invoicesState, paymentsState, productsState, summary, summaryLoading, summaryMeta, summaryMetaLine, usersState]);
 
   const handleExportFullWorkbook = useCallback(async () => {
+    if (!canExportFullWorkbook) {
+      await boAlert({ title: 'Access denied', message: 'You do not have permission to export full workbooks.', type: 'warning' });
+      return;
+    }
+
     setExportingFullWorkbook(true);
     try {
       await downloadFullBusinessWorkbook({
@@ -769,12 +805,13 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
     } finally {
       setExportingFullWorkbook(false);
     }
-  }, [filters.branchCode, filters.endDate, filters.startDate, filters.syncSourceCode, selectedLocationId]);
+  }, [canExportFullWorkbook, filters.branchCode, filters.endDate, filters.startDate, filters.syncSourceCode, selectedLocationId]);
 
   const handleChooseImportWorkbook = useCallback(() => {
+    if (!canImportFullWorkbook && !canImportReports) return;
     if (importingFullWorkbook) return;
     fullWorkbookInputRef.current?.click();
-  }, [importingFullWorkbook]);
+  }, [canImportFullWorkbook, canImportReports, importingFullWorkbook]);
 
   const handleImportWorkbookFileChange = useCallback(async (event) => {
     const file = event.target.files?.[0];
@@ -1131,7 +1168,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
         onChange={handleImportWorkbookFileChange}
       />
       <div style={{ display: 'flex', gap: '0.55rem', overflowX: 'auto' }}>
-        <button
+        {canViewSummary && <button
           type="button"
           onClick={() => {
             setActiveSection('summary');
@@ -1143,8 +1180,8 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
         >
           <i className="fas fa-chart-pie"></i>
           Summary
-        </button>
-        <button
+        </button>}
+        {canViewSalesBy && <button
           type="button"
           onClick={() => {
             setActiveSection('sales-by');
@@ -1158,10 +1195,10 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
         >
           <i className="fas fa-chart-column"></i>
           Sales by Dimension
-        </button>
+        </button>}
       </div>
 
-      {activeSection === 'summary' && (
+      {activeSection === 'summary' && canViewSummary && (
         <>
           <div style={{ ...baseCardStyle, padding: '0.8rem 0.95rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             <button
@@ -1179,7 +1216,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
                   Auto-refreshing...
                 </span>
               )}
-              <button
+              {canExportReports && <button
                 type="button"
                 onClick={() => handleExport('pdf')}
                 disabled={summaryLoading || exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook}
@@ -1187,8 +1224,8 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
               >
                 <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.42rem' }}></i>
                 Export PDF
-              </button>
-              <button
+              </button>}
+              {canExportReports && <button
                 type="button"
                 onClick={() => handleExport('excel')}
                 disabled={summaryLoading || exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook}
@@ -1196,8 +1233,8 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
               >
                 <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.42rem' }}></i>
                 Export Excel
-              </button>
-              <button
+              </button>}
+              {canExportFullWorkbook && <button
                 type="button"
                 onClick={handleExportFullWorkbook}
                 disabled={summaryLoading || exportingFullWorkbook || importingFullWorkbook || exportingExcel || exportingPdf}
@@ -1205,8 +1242,8 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
               >
                 <i className={`fas ${exportingFullWorkbook ? 'fa-spinner fa-spin' : 'fa-file-arrow-down'}`} style={{ marginRight: '0.42rem' }}></i>
                 Export Full Workbook
-              </button>
-              <button
+              </button>}
+              {(canImportFullWorkbook || canImportReports) && <button
                 type="button"
                 onClick={handleChooseImportWorkbook}
                 disabled={summaryLoading || importingFullWorkbook || exportingFullWorkbook || exportingExcel || exportingPdf}
@@ -1214,7 +1251,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
               >
                 <i className={`fas ${importingFullWorkbook ? 'fa-spinner fa-spin' : 'fa-file-arrow-up'}`} style={{ marginRight: '0.42rem' }}></i>
                 Import Full Workbook
-              </button>
+              </button>}
             </div>
           </div>
 
@@ -1232,16 +1269,25 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
         </>
       )}
 
-      {activeSection === 'sales-by' && renderSalesByNavigator()}
+      {activeSection === 'sales-by' && canViewSalesBy && renderSalesByNavigator()}
 
-      {activeView !== 'summary' && isReportModalOpen && (
+      {!hasAnyVisibleSection && (
+        <div style={{ ...baseCardStyle, padding: '1rem 1.1rem' }}>
+          <strong style={{ color: '#0f172a' }}>No Permitted Sections</strong>
+          <p style={{ margin: '0.45rem 0 0', color: '#64748b' }}>
+            Your account does not currently have access to Sales Reports sections.
+          </p>
+        </div>
+      )}
+
+      {activeView !== 'summary' && isReportModalOpen && canViewSalesBy && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: isReportModalMaximized ? '0.35rem' : '1rem' }}>
           <div style={{ ...baseCardStyle, width: isReportModalMaximized ? 'calc(100vw - 0.7rem)' : 'min(1240px, 97vw)', height: isReportModalMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'auto', borderRadius: isReportModalMaximized ? '10px' : '18px', padding: '0.9rem' }}>
             <div style={{ position: 'sticky', top: '-0.9rem', zIndex: 5, backgroundColor: '#fff', margin: '-0.9rem -0.9rem 0.75rem', padding: '0.9rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <strong style={{ color: '#0f172a' }}>{activeViewLabel}</strong>
                 <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
-                  <button
+                  {canExportReports && <button
                     type="button"
                     onClick={() => handleExport('pdf')}
                     disabled={summaryLoading || exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook}
@@ -1249,8 +1295,8 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
                   >
                     <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.42rem' }}></i>
                     Export PDF
-                  </button>
-                  <button
+                  </button>}
+                  {canExportReports && <button
                     type="button"
                     onClick={() => handleExport('excel')}
                     disabled={summaryLoading || exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook}
@@ -1258,8 +1304,8 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
                   >
                     <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.42rem' }}></i>
                     Export Excel
-                  </button>
-                  <button
+                  </button>}
+                  {canExportFullWorkbook && <button
                     type="button"
                     onClick={handleExportFullWorkbook}
                     disabled={summaryLoading || exportingFullWorkbook || importingFullWorkbook || exportingExcel || exportingPdf}
@@ -1267,8 +1313,8 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
                   >
                     <i className={`fas ${exportingFullWorkbook ? 'fa-spinner fa-spin' : 'fa-file-arrow-down'}`} style={{ marginRight: '0.42rem' }}></i>
                     Export Full Workbook
-                  </button>
-                  <button
+                  </button>}
+                  {(canImportFullWorkbook || canImportReports) && <button
                     type="button"
                     onClick={handleChooseImportWorkbook}
                     disabled={summaryLoading || importingFullWorkbook || exportingFullWorkbook || exportingExcel || exportingPdf}
@@ -1276,7 +1322,7 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
                   >
                     <i className={`fas ${importingFullWorkbook ? 'fa-spinner fa-spin' : 'fa-file-arrow-up'}`} style={{ marginRight: '0.42rem' }}></i>
                     Import Full Workbook
-                  </button>
+                  </button>}
                   <button
                     type="button"
                     onClick={() => setShowWorkspaceFilters((prev) => !prev)}

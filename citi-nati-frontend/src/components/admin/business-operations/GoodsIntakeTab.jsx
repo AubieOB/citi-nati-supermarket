@@ -194,9 +194,15 @@ function toFormFromRecord(record) {
   };
 }
 
-const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
+const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions = {} }) => {
   const workspaceRef = useRef(null);
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
+  const canViewForm = permissions.canViewForm !== false;
+  const canViewHistory = permissions.canViewHistory !== false;
+  const canCreate = permissions.canCreate !== false;
+  const canEdit = permissions.canEdit !== false;
+  const canDelete = permissions.canDelete !== false;
+  const canExport = permissions.canExport !== false;
 
   const themedCardStyle = useMemo(() => ({
     ...cardStyle,
@@ -369,10 +375,12 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
   };
 
   const addLine = () => {
+    if (!(canCreate || canEdit)) return;
     setForm((prev) => ({ ...prev, items: [...prev.items, createEmptyLine()] }));
   };
 
   const duplicateLine = (index) => {
+    if (!(canCreate || canEdit)) return;
     setForm((prev) => {
       const source = prev.items[index] || createEmptyLine();
       const clone = {
@@ -388,6 +396,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
   };
 
   const removeLine = (index) => {
+    if (!(canCreate || canEdit)) return;
     setForm((prev) => {
       if (prev.items.length <= 1) return { ...prev, items: [createEmptyLine()] };
       return {
@@ -402,6 +411,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
   };
 
   const openWorkspace = ({ reset = false } = {}) => {
+    if (!canViewForm) return;
     if (reset) {
       setForm(buildNewForm(selectedLocation));
     }
@@ -426,6 +436,16 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
   };
 
   const saveRecord = async (status = 'draft') => {
+    const isEditingExisting = Boolean(form.id);
+    if ((isEditingExisting && !canEdit) || (!isEditingExisting && !canCreate)) {
+      await boAlert({
+        title: 'Access denied',
+        message: 'You do not have permission to perform this action.',
+        type: 'warning',
+      });
+      return;
+    }
+
     const validationError = validateBeforeSave();
     if (validationError) {
       await boAlert({ title: 'Validation Error', message: validationError, type: 'warning' });
@@ -472,6 +492,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
   };
 
   const handleEditRecord = async (recordId) => {
+    if (!(canEdit && canViewForm)) return;
     try {
       const response = await api.get(`/business-operations/goods-intake/${recordId}`);
       const data = response.data?.data;
@@ -484,6 +505,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
   };
 
   const handleDeleteRecord = async (record) => {
+    if (!canDelete) return;
     const confirmed = await boConfirm({
       title: 'Delete Record',
       message: `Delete Goods Intake ${record.intakeRef}? This cannot be undone.`,
@@ -504,6 +526,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
   };
 
   const handleExportRecord = async (recordId) => {
+    if (!canExport) return;
     try {
       const response = await api.get(`/business-operations/goods-intake/${recordId}`);
       const data = response.data?.data;
@@ -577,20 +600,26 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <button type="button" onClick={() => clearForm()} style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #cbd5e1', background: isAdminDarkTheme ? '#0f172a' : '#fff', color: isAdminDarkTheme ? '#e2e8f0' : '#0f172a', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}>
-              New Record
-            </button>
-            {form.id && (
+            {canCreate && (
+              <button type="button" onClick={() => clearForm()} style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #cbd5e1', background: isAdminDarkTheme ? '#0f172a' : '#fff', color: isAdminDarkTheme ? '#e2e8f0' : '#0f172a', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}>
+                New Record
+              </button>
+            )}
+            {form.id && canExport && (
               <button type="button" onClick={() => handleExportRecord(form.id)} style={{ border: isAdminDarkTheme ? '1px solid #2f7f58' : '1px solid #bbf7d0', background: isAdminDarkTheme ? '#153828' : '#f0fdf4', color: isAdminDarkTheme ? '#91e0b4' : '#166534', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}>
                 Export PDF
               </button>
             )}
-            <button type="button" onClick={() => saveRecord('draft')} disabled={saving} style={{ border: isAdminDarkTheme ? '1px solid #365f98' : '1px solid #dbeafe', background: isAdminDarkTheme ? '#18273f' : '#eff6ff', color: isAdminDarkTheme ? '#b9d7ff' : '#1d4ed8', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}>
-              {saving ? 'Saving...' : 'Save Draft'}
-            </button>
-            <button type="button" onClick={() => saveRecord('finalized')} disabled={saving} style={{ border: 'none', background: '#0f766e', color: '#fff', borderRadius: '8px', padding: '0.45rem 0.9rem', fontWeight: 700, cursor: 'pointer' }}>
-              {saving ? 'Saving...' : 'Finalize Intake'}
-            </button>
+            {((form.id && canEdit) || (!form.id && canCreate)) && (
+              <button type="button" onClick={() => saveRecord('draft')} disabled={saving} style={{ border: isAdminDarkTheme ? '1px solid #365f98' : '1px solid #dbeafe', background: isAdminDarkTheme ? '#18273f' : '#eff6ff', color: isAdminDarkTheme ? '#b9d7ff' : '#1d4ed8', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}>
+                {saving ? 'Saving...' : 'Save Draft'}
+              </button>
+            )}
+            {((form.id && canEdit) || (!form.id && canCreate)) && (
+              <button type="button" onClick={() => saveRecord('finalized')} disabled={saving} style={{ border: 'none', background: '#0f766e', color: '#fff', borderRadius: '8px', padding: '0.45rem 0.9rem', fontWeight: 700, cursor: 'pointer' }}>
+                {saving ? 'Saving...' : 'Finalize Intake'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -679,7 +708,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
         </div>
 
         <div style={{ marginTop: '1rem', display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <button type="button" onClick={addLine} style={{ border: '1px solid #93c5fd', background: '#eff6ff', color: '#1d4ed8', borderRadius: '8px', padding: '0.35rem 0.7rem', fontWeight: 600, cursor: 'pointer' }}>Add Row</button>
+          {(canCreate || canEdit) && <button type="button" onClick={addLine} style={{ border: '1px solid #93c5fd', background: '#eff6ff', color: '#1d4ed8', borderRadius: '8px', padding: '0.35rem 0.7rem', fontWeight: 600, cursor: 'pointer' }}>Add Row</button>}
           <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Checks:</span>
           <span style={{ fontSize: '0.78rem', color: missingBarcodeCount ? '#b45309' : '#64748b' }}>Missing barcode: {missingBarcodeCount}</span>
           <span style={{ fontSize: '0.78rem', color: missingExpiryCount ? '#b45309' : '#64748b' }}>Missing expiry: {missingExpiryCount}</span>
@@ -744,10 +773,12 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
                       <input value={line.lineNotes || ''} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'lineNotes', event.target.value)} style={tableInputStyle} />
                     </td>
                     <td style={{ minWidth: '130px', padding: '0 0.35rem' }}>
-                      <div style={{ display: 'flex', gap: '0.35rem' }}>
-                        <button type="button" onClick={() => duplicateLine(index)} style={{ border: '1px solid #cbd5e1', background: '#fff', borderRadius: '8px', padding: '0.3rem 0.55rem', fontWeight: 600, cursor: 'pointer' }}>Dup</button>
-                        <button type="button" onClick={() => removeLine(index)} style={{ border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', borderRadius: '8px', padding: '0.3rem 0.55rem', fontWeight: 600, cursor: 'pointer' }}>Del</button>
-                      </div>
+                      {(canCreate || canEdit) && (
+                        <div style={{ display: 'flex', gap: '0.35rem' }}>
+                          <button type="button" onClick={() => duplicateLine(index)} style={{ border: '1px solid #cbd5e1', background: '#fff', borderRadius: '8px', padding: '0.3rem 0.55rem', fontWeight: 600, cursor: 'pointer' }}>Dup</button>
+                          <button type="button" onClick={() => removeLine(index)} style={{ border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', borderRadius: '8px', padding: '0.3rem 0.55rem', fontWeight: 600, cursor: 'pointer' }}>Del</button>
+                        </div>
+                      )}
                       {activeLookupRow === index && <div style={{ marginTop: '0.25rem', fontSize: '0.72rem', color: '#2563eb' }}>Looking up...</div>}
                     </td>
                   </tr>
@@ -780,7 +811,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
 
   return (
     <div style={{ display: 'grid', gap: '1rem', width: '100%', minWidth: 0 }}>
-      <section style={{ ...themedCardStyle, padding: '1rem', width: '100%', minWidth: 0 }}>
+      {canViewForm && (
+        <section style={{ ...themedCardStyle, padding: '1rem', width: '100%', minWidth: 0 }}>
         <div style={{ display: 'grid', gap: '0.9rem', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
           <button
             type="button"
@@ -840,8 +872,10 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
             </div>
           </button>
         </div>
-      </section>
+        </section>
+      )}
 
+      {canViewHistory && (
       <section style={{ ...themedCardStyle, padding: '1rem', width: '100%', minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <h3 style={{ margin: 0, color: colors.text }}>Purchase Intake History</h3>
@@ -896,9 +930,9 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
                   <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, fontWeight: 700, color: colors.strongText }}>{money(record.totalCost)}</td>
                   <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}` }}>
                     <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                      <button type="button" onClick={() => handleEditRecord(record.id)} style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #cbd5e1', background: isAdminDarkTheme ? '#0f172a' : '#fff', color: isAdminDarkTheme ? '#e2e8f0' : '#0f172a', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>Edit</button>
-                      <button type="button" onClick={() => handleExportRecord(record.id)} style={{ border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>PDF</button>
-                      <button type="button" onClick={() => handleDeleteRecord(record)} style={{ border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 600, cursor: 'pointer' }}>Delete</button>
+                      {canEdit && canViewForm && <button type="button" onClick={() => handleEditRecord(record.id)} style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #cbd5e1', background: isAdminDarkTheme ? '#0f172a' : '#fff', color: isAdminDarkTheme ? '#e2e8f0' : '#0f172a', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>Edit</button>}
+                      {canExport && <button type="button" onClick={() => handleExportRecord(record.id)} style={{ border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>PDF</button>}
+                      {canDelete && <button type="button" onClick={() => handleDeleteRecord(record)} style={{ border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 600, cursor: 'pointer' }}>Delete</button>}
                     </div>
                   </td>
                 </tr>
@@ -919,8 +953,18 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
           </div>
         )}
       </section>
+      )}
 
-      {isIntakeWorkspaceOpen && (
+      {!canViewForm && !canViewHistory && (
+        <section style={{ ...themedCardStyle, padding: '1rem', width: '100%', minWidth: 0 }}>
+          <h3 style={{ marginTop: 0, marginBottom: '0.4rem', color: colors.strongText }}>No Permitted Sections</h3>
+          <p style={{ margin: 0, color: colors.mutedText }}>
+            You do not currently have access to Goods Intake form or history sections.
+          </p>
+        </section>
+      )}
+
+      {isIntakeWorkspaceOpen && canViewForm && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: isIntakeWorkspaceMaximized ? '0.35rem' : '1rem' }}>
           <div style={{ ...themedCardStyle, width: isIntakeWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1480px, 98vw)', height: isIntakeWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isIntakeWorkspaceMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column', padding: '0.95rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>

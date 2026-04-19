@@ -12,7 +12,7 @@ const SalesSummarySection = ({ loading, error, summary, payments, onOpen }) => {
         <div>
           <strong style={{ color: '#0f172a' }}>Sales Overview</strong>
         </div>
-        <button type="button" onClick={onOpen} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '8px', padding: '0.43rem 0.72rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.8rem' }}>Open Sales Reports</button>
+        {typeof onOpen === 'function' && <button type="button" onClick={onOpen} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '8px', padding: '0.43rem 0.72rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.8rem' }}>Open Sales Reports</button>}
       </div>
 
       {error ? <MonthlySummaryEmptyState title="Sales data unavailable" message={error} icon="fa-triangle-exclamation" /> : null}

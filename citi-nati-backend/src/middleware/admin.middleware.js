@@ -39,7 +39,7 @@ const resolveRequiredPermission = (req) => {
     if (rawUrl.includes('/permissions')) return PERMISSIONS.ADMIN_USERS_MANAGE_PERMISSIONS;
     if (rawUrl.endsWith('/role')) return PERMISSIONS.ADMIN_USERS_MANAGE_ROLES;
     if (method === 'DELETE') return PERMISSIONS.ADMIN_USERS_DELETE;
-    return PERMISSIONS.ADMIN_USERS_VIEW;
+    return PERMISSIONS.ADMIN_USERS_MANAGEMENT_ACCESS;
   }
 
   if (rawUrl.startsWith('/api/admin/orders')) {
@@ -51,7 +51,7 @@ const resolveRequiredPermission = (req) => {
   }
 
   if (rawUrl.startsWith('/api/admin/promotions')) {
-    return PERMISSIONS.ADMIN_PROMOTIONS_MANAGE;
+    return isWriteMethod(method) ? PERMISSIONS.ADMIN_PROMOTIONS_MANAGE : PERMISSIONS.ADMIN_PROMOTIONS_ACCESS;
   }
 
   if (rawUrl.startsWith('/api/admin/security-key') || rawUrl.startsWith('/api/admin/security/')) {
@@ -71,7 +71,7 @@ const resolveRequiredPermission = (req) => {
   }
 
   if (rawUrl.startsWith('/api/admin/emergency-sales')) {
-    return PERMISSIONS.ADMIN_EMERGENCY_SALES_MANAGE;
+    return PERMISSIONS.ADMIN_EMERGENCY_SALES_ACCESS;
   }
 
   if (rawUrl.startsWith('/api/admin/quotations')) {
@@ -87,16 +87,63 @@ const resolveRequiredPermission = (req) => {
   }
 
   if (rawUrl.startsWith('/api/business-operations')) {
-    if (rawUrl.includes('/goods-intake')) return PERMISSIONS.ADMIN_GOODS_INTAKE_MANAGE;
-    if (rawUrl.includes('/payroll')) return PERMISSIONS.ADMIN_PAYROLL_MANAGE;
-    if (rawUrl.includes('/employees')) return PERMISSIONS.ADMIN_EMPLOYEES_MANAGE;
-    if (rawUrl.includes('/expenses')) return PERMISSIONS.ADMIN_EXPENSES_MANAGE;
-    if (rawUrl.includes('/imports') || rawUrl.includes('/export')) return PERMISSIONS.ADMIN_IMPORT_EXPORT_MANAGE;
-    return PERMISSIONS.ADMIN_BUSINESS_OPERATIONS_VIEW;
+    if (rawUrl.includes('/admin/wipe-all-data')) return PERMISSIONS.BO_ACTIONS_WIPE_DATA;
+
+    if (rawUrl.includes('/reports/sales/')) {
+      if (rawUrl.includes('/summary')) return PERMISSIONS.BO_SALES_REPORTS_SUMMARY_VIEW;
+      return PERMISSIONS.BO_SALES_REPORTS_VIEW;
+    }
+
+    if (rawUrl.includes('/goods-intake')) {
+      if (method === 'POST') return PERMISSIONS.BO_GOODS_INTAKE_CREATE;
+      if (method === 'PUT' || method === 'PATCH') return PERMISSIONS.BO_GOODS_INTAKE_EDIT;
+      if (method === 'DELETE') return PERMISSIONS.BO_GOODS_INTAKE_DELETE;
+      return PERMISSIONS.BO_GOODS_INTAKE_HISTORY_VIEW;
+    }
+
+    if (rawUrl.includes('/suppliers')) {
+      if (isWriteMethod(method)) return PERMISSIONS.ADMIN_IMPORT_EXPORT_MANAGE;
+      return PERMISSIONS.BO_SUPPLIERS_VIEW;
+    }
+
+    if (rawUrl.includes('/expenses')) {
+      if (isWriteMethod(method)) return PERMISSIONS.ADMIN_EXPENSES_MANAGE;
+      return PERMISSIONS.BO_EXPENSES_VIEW;
+    }
+
+    if (rawUrl.includes('/employees')) {
+      if (isWriteMethod(method)) return PERMISSIONS.ADMIN_EMPLOYEES_MANAGE;
+      return PERMISSIONS.BO_EMPLOYEES_VIEW;
+    }
+
+    if (rawUrl.includes('/payroll')) {
+      if (isWriteMethod(method)) return PERMISSIONS.ADMIN_PAYROLL_MANAGE;
+      return PERMISSIONS.BO_PAYROLL_VIEW;
+    }
+
+    if (rawUrl.includes('/sales-balancing')) {
+      return method === 'GET' ? PERMISSIONS.BO_SALES_BALANCING_VIEW : PERMISSIONS.ADMIN_IMPORT_EXPORT_MANAGE;
+    }
+
+    if (rawUrl.includes('/export/full-workbook')) {
+      return PERMISSIONS.BO_SALES_REPORTS_FULL_WORKBOOK_EXPORT;
+    }
+
+    if (rawUrl.includes('/export')) {
+      return PERMISSIONS.BO_SALES_REPORTS_EXPORT;
+    }
+
+    if (rawUrl.includes('/imports') || rawUrl.includes('/import')) {
+      return PERMISSIONS.BO_SALES_REPORTS_FULL_WORKBOOK_IMPORT;
+    }
+
+    if (rawUrl.includes('/locations')) return PERMISSIONS.ADMIN_BUSINESS_OPERATIONS_ACCESS;
+
+    return PERMISSIONS.ADMIN_BUSINESS_OPERATIONS_ACCESS;
   }
 
   if (rawUrl.startsWith('/api/products')) {
-    return isWriteMethod(method) ? PERMISSIONS.ADMIN_PRODUCTS_MANAGE : PERMISSIONS.ADMIN_PRODUCTS_VIEW;
+    return isWriteMethod(method) ? PERMISSIONS.ADMIN_PRODUCTS_MANAGE : PERMISSIONS.ADMIN_PRODUCTS_ACCESS;
   }
 
   return PERMISSIONS.ADMIN_DASHBOARD_ACCESS;

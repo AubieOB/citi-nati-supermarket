@@ -23,8 +23,9 @@ const subTabStyle = (active) => ({
   gap: '0.45rem',
 });
 
-const BusinessOperationsActionsTab = () => {
+const BusinessOperationsActionsTab = ({ permissions = {} }) => {
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
+  const canWipeData = permissions.canWipeData !== false;
   const [activeSubtab, setActiveSubtab] = useState('create');
   const [isWipeModalOpen, setIsWipeModalOpen] = useState(false);
   const [wipeSecurityKey, setWipeSecurityKey] = useState('');
@@ -82,7 +83,7 @@ const BusinessOperationsActionsTab = () => {
         </button>
       </div>
 
-      {activeSubtab === 'create' && (
+      {activeSubtab === 'create' && canWipeData && (
         <div style={{ ...baseCardStyle, borderColor: isAdminDarkTheme ? '#5b2f36' : '#fecaca', backgroundColor: isAdminDarkTheme ? '#23171b' : '#fff7f7' }}>
           <div style={{ padding: '1rem 1.1rem', display: 'grid', gap: '0.75rem' }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', color: isAdminDarkTheme ? '#ff8d99' : '#b91c1c', fontWeight: 900, textTransform: 'uppercase', fontSize: '0.78rem', letterSpacing: '0.05em' }}>
@@ -105,6 +106,15 @@ const BusinessOperationsActionsTab = () => {
               Wipe All BO Data
             </button>
           </div>
+        </div>
+      )}
+
+      {!canWipeData && (
+        <div style={{ ...baseCardStyle, padding: '1rem 1.1rem' }}>
+          <strong style={{ color: '#0f172a' }}>No Permitted Actions</strong>
+          <p style={{ margin: '0.45rem 0 0', color: '#64748b' }}>
+            Destructive Business Operations actions are not assigned to your account.
+          </p>
         </div>
       )}
 

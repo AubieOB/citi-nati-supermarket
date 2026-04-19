@@ -12,7 +12,7 @@ const ExpensesSummarySection = ({ loading, error, summary, onOpen }) => {
         <div>
           <strong style={{ color: '#0f172a' }}>Expenses Overview</strong>
         </div>
-        <button type="button" onClick={onOpen} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '8px', padding: '0.43rem 0.72rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.8rem' }}>Open Expenses</button>
+        {typeof onOpen === 'function' && <button type="button" onClick={onOpen} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '8px', padding: '0.43rem 0.72rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.8rem' }}>Open Expenses</button>}
       </div>
 
       {error ? <MonthlySummaryEmptyState title="Expenses data unavailable" message={error} icon="fa-triangle-exclamation" /> : null}

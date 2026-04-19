@@ -56,17 +56,17 @@ const SIDEBAR_TABS = [
   { id: 'support', label: 'Online Support', icon: 'fa-life-ring', scope: 'online-store', permission: PERMISSION_KEYS.ADMIN_SUPPORT_MANAGE },
   { id: 'quotations', label: 'Quotations', icon: 'fa-file-invoice', scope: 'business', permission: PERMISSION_KEYS.ADMIN_QUOTATIONS_MANAGE },
   { id: 'sales', label: 'Online Sales', icon: 'fa-dollar-sign', scope: 'online-store', permission: PERMISSION_KEYS.ADMIN_SALES_VIEW },
-  { id: 'users', label: 'Online Users', icon: 'fa-users', scope: 'online-store', permission: PERMISSION_KEYS.ADMIN_USERS_VIEW },
+  { id: 'users', label: 'Online Users', icon: 'fa-users', scope: 'online-store', permission: PERMISSION_KEYS.USERS_MANAGEMENT_ACCESS },
   { id: 'drivers', label: 'Derivery Drivers', icon: 'fa-car', scope: 'online-store', permission: PERMISSION_KEYS.ADMIN_DRIVERS_MANAGE },
-  { id: 'products', label: 'Products', icon: 'fa-box', scope: 'shared-catalog', permission: PERMISSION_KEYS.ADMIN_PRODUCTS_VIEW },
-  { id: 'stocks', label: 'Stocks', icon: 'fa-warehouse', scope: 'shared-catalog', permission: PERMISSION_KEYS.ADMIN_STOCKS_MANAGE },
-  { id: 'promotions', label: 'Promotions', icon: 'fa-tags', scope: 'shared-catalog', permission: PERMISSION_KEYS.ADMIN_PROMOTIONS_MANAGE },
-  { id: 'emergency-sales', label: 'Emergency Sale', icon: 'fa-cash-register', scope: 'physical-store', permission: PERMISSION_KEYS.ADMIN_EMERGENCY_SALES_MANAGE },
+  { id: 'products', label: 'Products', icon: 'fa-box', scope: 'shared-catalog', permission: PERMISSION_KEYS.PRODUCTS_ACCESS },
+  { id: 'stocks', label: 'Stocks', icon: 'fa-warehouse', scope: 'shared-catalog', permission: PERMISSION_KEYS.STOCKS_ACCESS },
+  { id: 'promotions', label: 'Promotions', icon: 'fa-tags', scope: 'shared-catalog', permission: PERMISSION_KEYS.PROMOTIONS_ACCESS },
+  { id: 'emergency-sales', label: 'Emergency Sale', icon: 'fa-cash-register', scope: 'physical-store', permission: PERMISSION_KEYS.EMERGENCY_SALES_ACCESS },
   { id: 'emergency-sales-reports', label: 'Emergency Reports', icon: 'fa-file-alt', scope: 'physical-store', permission: PERMISSION_KEYS.ADMIN_EMERGENCY_REPORTS_VIEW },
   { id: 'pos-management', label: 'POS Management', icon: 'fa-database', scope: 'physical-store', permission: PERMISSION_KEYS.ADMIN_POS_MANAGEMENT },
   { id: 'pos-sync-monitor', label: 'POS Sync Monitor', icon: 'fa-chart-line', scope: 'physical-store', permission: PERMISSION_KEYS.ADMIN_POS_SYNC_MANAGE },
   { id: 'cashiers', label: 'Emergency Cashiers', icon: 'fa-user-tag', scope: 'physical-store', permission: PERMISSION_KEYS.ADMIN_CASHIERS_MANAGE },
-  { id: 'business-operations', label: 'Business Operations', icon: 'fa-briefcase', scope: 'business', permission: PERMISSION_KEYS.ADMIN_BUSINESS_OPERATIONS_VIEW },
+  { id: 'business-operations', label: 'Business Operations', icon: 'fa-briefcase', scope: 'business', permission: PERMISSION_KEYS.BUSINESS_OPERATIONS_ACCESS },
   { id: 'system', label: 'System', icon: 'fa-cogs', scope: 'administration', permission: PERMISSION_KEYS.ADMIN_SYSTEM_MANAGE },
   { id: 'security', label: 'Security', icon: 'fa-key', scope: 'administration', permission: PERMISSION_KEYS.ADMIN_SECURITY_MANAGE },
 ];
@@ -553,22 +553,22 @@ const AdminDashboard = () => {
   }, [activeTab, allowedTabs, defaultAllowedTabId]);
 
   React.useEffect(() => {
-    if (location.pathname === '/admin/emergency-sales' && activeTab !== 'emergency-sales' && hasPermission(user, PERMISSION_KEYS.ADMIN_EMERGENCY_SALES_MANAGE)) {
+    if (location.pathname === '/admin/emergency-sales' && activeTab !== 'emergency-sales' && hasPermission(user, PERMISSION_KEYS.EMERGENCY_SALES_ACCESS)) {
       setActiveTab('emergency-sales');
       return;
     }
 
-    if (location.pathname === '/admin/business-operations' && activeTab !== 'business-operations' && hasPermission(user, PERMISSION_KEYS.ADMIN_BUSINESS_OPERATIONS_VIEW)) {
+    if (location.pathname === '/admin/business-operations' && activeTab !== 'business-operations' && hasPermission(user, PERMISSION_KEYS.BUSINESS_OPERATIONS_ACCESS)) {
       setActiveTab('business-operations');
       return;
     }
 
-    if (location.pathname === '/admin/emergency-sales' && !hasPermission(user, PERMISSION_KEYS.ADMIN_EMERGENCY_SALES_MANAGE)) {
+    if (location.pathname === '/admin/emergency-sales' && !hasPermission(user, PERMISSION_KEYS.EMERGENCY_SALES_ACCESS)) {
       navigate('/admin');
       return;
     }
 
-    if (location.pathname === '/admin/business-operations' && !hasPermission(user, PERMISSION_KEYS.ADMIN_BUSINESS_OPERATIONS_VIEW)) {
+    if (location.pathname === '/admin/business-operations' && !hasPermission(user, PERMISSION_KEYS.BUSINESS_OPERATIONS_ACCESS)) {
       navigate('/admin');
       return;
     }

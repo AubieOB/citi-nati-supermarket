@@ -724,6 +724,9 @@ const AdminUsers = () => {
             <p style={{ marginTop: 0, color: '#5f6368' }}>
               Select <strong>Default</strong> to use role defaults, <strong>Allow</strong> to grant, or <strong>Deny</strong> to explicitly block.
             </p>
+            <p style={{ marginTop: '-0.25rem', marginBottom: '0.75rem', color: '#6b7280', fontSize: '0.84rem' }}>
+              Parent access does not automatically grant all children. Assign tab, section, and action permissions explicitly.
+            </p>
 
             <div style={{ display: 'grid', gap: '0.8rem' }}>
               {permissionCatalog.map((group) => (
@@ -733,12 +736,29 @@ const AdminUsers = () => {
                     const explicitValue = Object.prototype.hasOwnProperty.call(permissionForm, permission.key)
                       ? permissionForm[permission.key]
                       : null;
+                    const level = String(permission.level || 'action').toLowerCase();
+                    const levelColor = level === 'panel'
+                      ? '#7c3aed'
+                      : level === 'tab'
+                        ? '#2563eb'
+                        : level === 'section'
+                          ? '#0f766e'
+                          : '#6b7280';
+                    const indent = level === 'panel' ? 0 : level === 'tab' ? 10 : level === 'section' ? 20 : 30;
 
                     return (
-                      <div key={permission.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.4rem 0', borderTop: '1px solid #f3f4f6' }}>
+                      <div key={permission.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.4rem 0', borderTop: '1px solid #f3f4f6', marginLeft: `${indent}px` }}>
                         <div>
-                          <div style={{ fontWeight: 600 }}>{permission.label}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                            <span style={{ fontWeight: 600 }}>{permission.label}</span>
+                            <span style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#fff', backgroundColor: levelColor, borderRadius: '999px', padding: '0.12rem 0.45rem' }}>
+                              {level}
+                            </span>
+                          </div>
                           <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>{permission.key}</div>
+                          {permission.parentKey && (
+                            <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Parent: {permission.parentKey}</div>
+                          )}
                         </div>
                         <div style={{ display: 'flex', gap: '0.35rem' }}>
                           <button
