@@ -1898,16 +1898,8 @@ const BusinessAnalyticsTab = ({
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
       <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.9rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-          <div>
-            <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.12rem' }}>Business Analytics & Performance</h3>
-            <p style={{ margin: '0.38rem 0 0', color: '#64748b', fontSize: '0.9rem', lineHeight: 1.5 }}>
-              Growth tracking, performance trends, and contribution insights by period, branch, category, and team.
-            </p>
-          </div>
-        </div>
-
-        <div style={{ marginTop: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.7rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.9rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.12rem' }}>Business Analytics & Performance</h3>
           <button
             type="button"
             onClick={() => {
@@ -1920,6 +1912,9 @@ const BusinessAnalyticsTab = ({
             Refresh Analytics
           </button>
         </div>
+        <p style={{ margin: '0.38rem 0 0', color: '#64748b', fontSize: '0.9rem', lineHeight: 1.5 }}>
+          Growth tracking, performance trends, and contribution insights by period, branch, category, and team.
+        </p>
       </div>
 
       {error && (
