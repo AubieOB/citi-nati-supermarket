@@ -801,9 +801,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
                 <div style={{ marginTop: '0.4rem', fontSize: '1.2rem', fontWeight: 800, color: colors.strongText, lineHeight: 1.25 }}>
                   Register Intake For "{selectedSupplierName}"
                 </div>
-                <div style={{ marginTop: '0.45rem', fontSize: '0.86rem', color: colors.mutedText, maxWidth: '34rem' }}>
-                  Open the full intake workspace in a modal to capture supplier receipt lines, expiry dates, costs, and selling prices without squeezing the table into the main page.
-                </div>
               </div>
               <div style={{ width: '42px', height: '42px', borderRadius: '14px', background: isAdminDarkTheme ? '#7c6cb0' : '#5b4b8a', color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
                 <i className="fas fa-arrow-up-right-from-square" />
@@ -829,9 +826,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [] }) => {
                 <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: isAdminDarkTheme ? '#93c5fd' : '#1d4ed8', fontWeight: 800 }}>Quick Start</div>
                 <div style={{ marginTop: '0.4rem', fontSize: '1.2rem', fontWeight: 800, color: colors.strongText, lineHeight: 1.25 }}>
                   Start A Fresh Goods Intake
-                </div>
-                <div style={{ marginTop: '0.45rem', fontSize: '0.86rem', color: colors.mutedText }}>
-                  Reset the current draft and open a clean modal workspace for a new supplier receipt.
                 </div>
               </div>
               <div style={{ width: '42px', height: '42px', borderRadius: '14px', background: isAdminDarkTheme ? '#3b82f6' : '#2563eb', color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0 }}>

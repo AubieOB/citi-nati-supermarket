@@ -452,12 +452,12 @@ const MonthlySummaryTab = ({
   const anyLoading = salesState.loading || expensesState.loading || payrollState.loading || supplierState.loading;
 
   const summaryCards = useMemo(() => ([
-    { label: 'Total Sales', value: money(salesTotal), note: 'Net sales for selected period.', tone: '#0369a1' },
-    { label: 'Total Expenses', value: money(expensesTotal), note: 'Expense outflow in selected period.', tone: '#b45309' },
-    { label: 'Total Payroll', value: money(payrollTotal), note: 'Net payroll paid in selected period.', tone: '#7c3aed' },
-    { label: 'Supplier Payments', value: money(supplierPaymentsTotal), note: 'Supplier payment outflow in selected period.', tone: '#15803d' },
-    { label: 'Supplier Debt', value: money(supplierDebtTotal), note: 'Current outstanding supplier balances.', tone: '#be123c' },
-    { label: 'Net Position', value: money(netPosition), note: netPosition >= 0 ? 'Profit (approx.)' : 'Loss (approx.)', tone: netPosition >= 0 ? '#166534' : '#b91c1c' },
+    { label: 'Total Sales', value: money(salesTotal), tone: '#0369a1' },
+    { label: 'Total Expenses', value: money(expensesTotal), tone: '#b45309' },
+    { label: 'Total Payroll', value: money(payrollTotal), tone: '#7c3aed' },
+    { label: 'Supplier Payments', value: money(supplierPaymentsTotal), tone: '#15803d' },
+    { label: 'Supplier Debt', value: money(supplierDebtTotal), tone: '#be123c' },
+    { label: 'Net Position', value: money(netPosition), tone: netPosition >= 0 ? '#166534' : '#b91c1c' },
   ]), [expensesTotal, netPosition, payrollTotal, salesTotal, supplierDebtTotal, supplierPaymentsTotal]);
 
   const drilldownPayload = useMemo(() => ({
@@ -525,9 +525,6 @@ const MonthlySummaryTab = ({
         <div style={{ display: 'grid', gap: '0.78rem' }}>
           <div>
             <strong style={{ color: '#0f172a' }}>Insights Workspaces</strong>
-            <p style={{ margin: '0.3rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>
-              Launch executive monthly insights and cross-module performance views.
-            </p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '0.75rem' }}>
             <button
@@ -552,7 +549,6 @@ const MonthlySummaryTab = ({
                 <i className="fas fa-chart-line" />
               </span>
               <span style={{ color: '#0f172a', fontWeight: 800, fontSize: '0.95rem' }}>Monthly Insights Workspace</span>
-              <span style={{ color: '#64748b', fontSize: '0.84rem', lineHeight: 1.45 }}>Analyze sales, expenses, payroll, and supplier performance in one view.</span>
             </button>
           </div>
         </div>
@@ -628,9 +624,6 @@ const MonthlySummaryTab = ({
                         Management Dashboard
                       </div>
                       <h3 style={{ margin: '0.38rem 0 0', color: '#0f172a', fontSize: '1.16rem' }}>Monthly Summary</h3>
-                      <p style={{ margin: '0.4rem 0 0', color: '#64748b', lineHeight: 1.55, fontSize: '0.9rem' }}>
-                        Executive overview combining Sales, Expenses, Payroll, and Suppliers to estimate business performance at a glance.
-                      </p>
                     </div>
 
                     <SummaryFiltersBar

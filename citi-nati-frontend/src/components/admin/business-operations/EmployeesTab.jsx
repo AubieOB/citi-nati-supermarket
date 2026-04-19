@@ -306,9 +306,6 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
             <i className="fas fa-users" style={{ color: '#5B4B8A', marginRight: '0.55rem' }} />
             Employees
           </h2>
-          <p style={{ margin: '0.2rem 0 0', color: '#64748b', fontSize: '0.87rem' }}>
-            Manage staff, employment details, and salary structures
-          </p>
         </div>
       </div>
 
@@ -324,9 +321,6 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
         <div style={{ display: 'grid', gap: '0.78rem' }}>
           <div>
             <strong style={{ color: '#0f172a' }}>Employee Workspaces</strong>
-            <p style={{ margin: '0.3rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>
-              Open the employee register workspace to manage profiles and salary structures.
-            </p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '0.75rem' }}>
             <button
@@ -351,7 +345,6 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
                 <i className="fas fa-users" />
               </span>
               <span style={{ color: '#0f172a', fontWeight: 800, fontSize: '0.95rem' }}>Employee Register Workspace</span>
-              <span style={{ color: '#64748b', fontSize: '0.84rem', lineHeight: 1.45 }}>Manage staff details, salary history, and employment status.</span>
             </button>
           </div>
         </div>
@@ -365,7 +358,6 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <div>
                   <strong style={{ color: '#0f172a', fontSize: '1rem' }}>Employees Workspace</strong>
-                  <p style={{ margin: '0.22rem 0 0', color: '#64748b', fontSize: '0.84rem' }}>Modern profile management, salary history, and quick employee operations.</p>
                 </div>
                 <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
                   <button
@@ -460,7 +452,6 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
               <div style={{ ...themedCardStyle, overflow: 'hidden', borderRadius: '16px', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                 <div style={{ padding: '0.88rem 1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
                   <strong style={{ color: '#0f172a' }}>Employee Register</strong>
-                  <p style={{ margin: '0.26rem 0 0', color: '#64748b', fontSize: '0.84rem' }}>Select any row to inspect full profile and salary history.</p>
                 </div>
                 <div style={{ minHeight: 0, overflowY: 'auto' }}>
                   <div style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '0.52rem 0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
@@ -487,7 +478,6 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
               <div style={{ ...themedCardStyle, overflow: 'hidden', borderRadius: '16px', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                 <div style={{ padding: '0.88rem 1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
                   <strong style={{ color: '#0f172a' }}>Employee Insight Panel</strong>
-                  <p style={{ margin: '0.26rem 0 0', color: '#64748b', fontSize: '0.84rem' }}>View profile details, employment fields, and salary structures.</p>
                 </div>
                 <div style={{ minHeight: 0, overflowY: 'auto' }}>
                   <div style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '0.52rem 0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>

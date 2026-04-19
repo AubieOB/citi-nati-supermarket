@@ -11,10 +11,10 @@ const cardBaseStyle = {
 };
 
 const stats = ({ totalEmployees, activeCount, inactiveCount, departmentCount }) => ([
-  { label: 'Total Employees', value: totalEmployees, note: 'Records in the current list context.', color: '#0f172a' },
-  { label: 'Active', value: activeCount, note: 'Employees currently marked active.', color: '#166534' },
-  { label: 'Inactive / Terminated', value: inactiveCount, note: 'Employees not currently active.', color: '#475569' },
-  { label: 'Departments', value: departmentCount, note: 'Distinct departments represented.', color: '#0f172a' },
+  { label: 'Total Employees', value: totalEmployees, color: '#0f172a' },
+  { label: 'Active', value: activeCount, color: '#166534' },
+  { label: 'Inactive / Terminated', value: inactiveCount, color: '#475569' },
+  { label: 'Departments', value: departmentCount, color: '#0f172a' },
 ]);
 
 const EmployeeSummaryCards = ({ totalEmployees = 0, activeCount = 0, inactiveCount = 0, departmentCount = 0 }) => (
@@ -25,7 +25,6 @@ const EmployeeSummaryCards = ({ totalEmployees = 0, activeCount = 0, inactiveCou
           {item.label}
         </span>
         <strong style={{ fontSize: '1.4rem', color: item.color, lineHeight: 1.1, whiteSpace: 'nowrap' }}>{Number(item.value || 0).toLocaleString('en-US')}</strong>
-        <span style={{ color: '#64748b', fontSize: '0.82rem' }}>{item.note}</span>
       </div>
     ))}
   </div>

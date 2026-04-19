@@ -384,9 +384,6 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
         <div style={{ display: 'grid', gap: '0.78rem' }}>
           <div>
             <strong style={{ color: '#0f172a' }}>Supplier Workspaces</strong>
-            <p style={{ margin: '0.3rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>
-              Open supplier register and balance operations from the launcher card.
-            </p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '0.75rem' }}>
             <button
@@ -411,7 +408,6 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
                 <i className="fas fa-truck-field" />
               </span>
               <span style={{ color: '#0f172a', fontWeight: 800, fontSize: '0.95rem' }}>Supplier Register Workspace</span>
-              <span style={{ color: '#64748b', fontSize: '0.84rem', lineHeight: 1.45 }}>Manage suppliers, balances, and transaction history records.</span>
             </button>
           </div>
         </div>
@@ -425,7 +421,6 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', flexWrap: 'wrap' }}>
                   <div>
                     <h2 style={{ margin: 0, color: '#0f172a', fontSize: '1.15rem', fontWeight: 800 }}>Suppliers Workspace</h2>
-                    <p style={{ margin: '0.28rem 0 0', color: '#64748b', fontSize: '0.86rem' }}>Manage supplier records, balance position, and transaction activity from one view.</p>
                   </div>
                   <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', alignItems: 'center' }}>
                   <button
@@ -533,7 +528,6 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
                     <div style={{ ...cardStyle, overflow: 'hidden' }}>
                       <div style={{ padding: '1rem 1.05rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
                         <strong style={{ color: '#0f172a' }}>Supplier Register</strong>
-                        <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>Select a supplier to inspect balance history, edit details, or record transactions.</p>
                       </div>
                       <SuppliersList
                         suppliers={suppliers}

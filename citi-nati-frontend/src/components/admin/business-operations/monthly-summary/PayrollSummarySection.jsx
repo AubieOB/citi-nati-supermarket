@@ -8,7 +8,6 @@ const PayrollSummarySection = ({ loading, error, data, onOpen }) => (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
       <div>
         <strong style={{ color: '#0f172a' }}>Payroll Overview</strong>
-        <p style={{ margin: '0.22rem 0 0', color: '#64748b', fontSize: '0.82rem' }}>Payroll costs and employee payout coverage for selected period.</p>
       </div>
       <button type="button" onClick={onOpen} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '8px', padding: '0.43rem 0.72rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.8rem' }}>Open Payroll</button>
     </div>

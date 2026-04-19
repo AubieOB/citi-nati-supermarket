@@ -1064,9 +1064,6 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
         <div style={{ display: 'grid', gap: '0.85rem' }}>
           <div>
             <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.03rem' }}>Sales by Dimension</h3>
-            <p style={{ margin: '0.3rem 0 0', color: '#64748b', fontSize: '0.9rem' }}>
-              Open a report dimension below to inspect detailed sales analytics with the current filters.
-            </p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.8rem' }}>
             {SALES_BY_CARDS.map((card) => (

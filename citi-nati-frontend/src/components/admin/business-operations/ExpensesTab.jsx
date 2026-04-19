@@ -316,9 +316,6 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
         <div style={{ display: 'grid', gap: '0.78rem' }}>
           <div>
             <strong style={{ color: '#0f172a' }}>Expense Workspaces</strong>
-            <p style={{ margin: '0.3rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>
-              Choose a workspace card to open register operations or category management.
-            </p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '0.75rem' }}>
             <button
@@ -349,7 +346,6 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
                 <i className="fas fa-list-ul" />
               </span>
               <span style={{ color: '#0f172a', fontWeight: 800, fontSize: '0.95rem' }}>Expense Register</span>
-              <span style={{ color: '#64748b', fontSize: '0.84rem', lineHeight: 1.45 }}>Track entries, apply filters, and manage expense records.</span>
             </button>
 
             <button
@@ -382,7 +378,6 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
               <span style={{ color: '#0f172a', fontWeight: 800, fontSize: '0.95rem' }}>
                 Expense Categories {categories.length > 0 ? `(${categories.length})` : ''}
               </span>
-              <span style={{ color: '#64748b', fontSize: '0.84rem', lineHeight: 1.45 }}>Maintain category codes, labels, and active status.</span>
             </button>
           </div>
         </div>
@@ -396,7 +391,6 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', flexWrap: 'wrap' }}>
                   <div>
                     <h2 style={{ margin: 0, color: '#0f172a', fontSize: '1.15rem', fontWeight: 800 }}>Expense Register Workspace</h2>
-                    <p style={{ margin: '0.28rem 0 0', color: '#64748b', fontSize: '0.86rem' }}>Track expense entries, inspect details, and maintain audit-ready records.</p>
                   </div>
                   <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', alignItems: 'center' }}>
                   <button
@@ -534,9 +528,6 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
                       <div style={{ padding: '1rem 1.05rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                         <div>
                           <strong style={{ color: '#0f172a' }}>Expense Register</strong>
-                          <p style={{ margin: '0.3rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>
-                            Select a row to view full details or click Edit inline.
-                          </p>
                         </div>
                         <button
                           type="button"
