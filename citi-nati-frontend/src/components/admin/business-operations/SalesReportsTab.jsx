@@ -823,18 +823,6 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
     }
   }, [activeView, fetchInvoices, fetchPayments, fetchProducts, fetchSummary, fetchUsers, selectedLocationId]);
 
-  const activeFilterCount = useMemo(() => {
-    const baseline = {
-      ...DEFAULT_FILTERS,
-      locationId: selectedLocationId ? String(selectedLocationId) : '',
-      locationCode: selectedLocationId ? String(selectedLocationCode || '').trim().toUpperCase() : '',
-    };
-
-    return Object.keys(filters).reduce((count, key) => {
-      return filters[key] !== baseline[key] ? count + 1 : count;
-    }, 0);
-  }, [filters, selectedLocationCode, selectedLocationId]);
-
   const activeViewLabel = useMemo(
     () => REPORT_VIEWS.find((view) => view.id === activeView)?.label || 'Report',
     [activeView],
@@ -1188,9 +1176,6 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
               {showSummaryFilters ? 'Hide Filters' : 'Show Filters'}
             </button>
             <div style={{ display: 'flex', gap: '0.55rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              <div style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
-                {showSummaryFilters ? 'Summary filters are visible.' : `Summary filters hidden${activeFilterCount > 0 ? ` • ${activeFilterCount} active` : ''}.`}
-              </div>
               {autoRefreshing && (
                 <span style={{ color: '#2563eb', fontSize: '0.82rem', fontWeight: 700 }}>
                   <i className="fas fa-rotate-right fa-spin" style={{ marginRight: '0.35rem' }}></i>
