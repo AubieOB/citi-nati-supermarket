@@ -641,8 +641,8 @@ const AdminUsers = () => {
                   {formatDate(u.createdAt)}
                 </td>
                 {(canManagePermissions || canDeleteUsers) && (
-                  <td style={{ padding: '1rem', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <td style={{ padding: '1rem', textAlign: 'right' }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', flexWrap: 'wrap' }}>
                     {canManagePermissions && u.role === 'admin' && (
                       <button
                         onClick={() => openPermissionsEditor(u)}
