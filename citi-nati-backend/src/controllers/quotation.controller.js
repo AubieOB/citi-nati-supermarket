@@ -10,6 +10,27 @@ function toMoney(value) {
   return Number(parsed.toFixed(2));
 }
 
+function normalizeScopeCode(value, fallback = '') {
+  const normalized = String(value || '').trim().toUpperCase();
+  return normalized || fallback;
+}
+
+function getScopeFromRequest(req) {
+  const queryBranchCode = normalizeScopeCode(req.query?.branchCode);
+  const queryLocationCode = normalizeScopeCode(req.query?.locationCode);
+  const bodyBranchCode = normalizeScopeCode(req.body?.branchCode);
+  const bodyLocationCode = normalizeScopeCode(req.body?.locationCode);
+
+  const branchCode = queryBranchCode || bodyBranchCode;
+  const locationCode = queryLocationCode || bodyLocationCode;
+
+  return {
+    branchCode,
+    locationCode,
+    isValid: Boolean(branchCode && locationCode),
+  };
+}
+
 function generateQuotationRef() {
   const now = new Date();
   const yyyy = String(now.getFullYear());
@@ -89,6 +110,11 @@ const createQuotation = async (req, res) => {
     const subtotal = toMoney(sanitizedItems.reduce((sum, i) => sum + i.lineTotal, 0));
     const discountValue = toMoney(discount);
     const total = toMoney(Math.max(0, subtotal - discountValue));
+    const scope = getScopeFromRequest(req);
+
+    if (!scope.isValid) {
+      return res.status(400).json({ error: 'branchCode and locationCode are required' });
+    }
 
     const quotation = await prisma.quotation.create({
       data: {
@@ -101,6 +127,8 @@ const createQuotation = async (req, res) => {
         subtotal,
         discount: discountValue,
         total,
+        branchCode: scope.branchCode,
+        locationCode: scope.locationCode,
         validUntil: validUntil ? new Date(validUntil) : null,
         createdBy: req.user?.email || req.user?.id || 'admin',
         items: {
@@ -129,7 +157,15 @@ const createQuotation = async (req, res) => {
 const listQuotations = async (req, res) => {
   try {
     const { search, limit, offset = 0 } = req.query;
-    const where = {};
+    const scope = getScopeFromRequest(req);
+    if (!scope.isValid) {
+      return res.status(400).json({ error: 'branchCode and locationCode are required' });
+    }
+
+    const where = {
+      branchCode: scope.branchCode,
+      locationCode: scope.locationCode,
+    };
     if (search) {
       where.OR = [
         { clientName: { contains: String(search), mode: 'insensitive' } },
@@ -166,9 +202,17 @@ const getQuotation = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id' });
+    const scope = getScopeFromRequest(req);
+    if (!scope.isValid) {
+      return res.status(400).json({ error: 'branchCode and locationCode are required' });
+    }
 
-    const quotation = await prisma.quotation.findUnique({
-      where: { id },
+    const quotation = await prisma.quotation.findFirst({
+      where: {
+        id,
+        branchCode: scope.branchCode,
+        locationCode: scope.locationCode,
+      },
       include: { items: true },
     });
     if (!quotation) return res.status(404).json({ error: 'Quotation not found' });
@@ -190,8 +234,18 @@ const updateQuotation = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id' });
+    const scope = getScopeFromRequest(req);
+    if (!scope.isValid) {
+      return res.status(400).json({ error: 'branchCode and locationCode are required' });
+    }
 
-    const existing = await prisma.quotation.findUnique({ where: { id } });
+    const existing = await prisma.quotation.findFirst({
+      where: {
+        id,
+        branchCode: scope.branchCode,
+        locationCode: scope.locationCode,
+      },
+    });
     if (!existing) return res.status(404).json({ error: 'Quotation not found' });
 
     const {
@@ -244,6 +298,8 @@ const updateQuotation = async (req, res) => {
         subtotal,
         discount: discountValue,
         total,
+        branchCode: scope.branchCode,
+        locationCode: scope.locationCode,
         validUntil: validUntil !== undefined ? (validUntil ? new Date(validUntil) : null) : undefined,
         ...(sanitizedItems && {
           items: { create: sanitizedItems },
@@ -271,8 +327,18 @@ const deleteQuotation = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id' });
+    const scope = getScopeFromRequest(req);
+    if (!scope.isValid) {
+      return res.status(400).json({ error: 'branchCode and locationCode are required' });
+    }
 
-    const existing = await prisma.quotation.findUnique({ where: { id } });
+    const existing = await prisma.quotation.findFirst({
+      where: {
+        id,
+        branchCode: scope.branchCode,
+        locationCode: scope.locationCode,
+      },
+    });
     if (!existing) return res.status(404).json({ error: 'Quotation not found' });
 
     await prisma.quotation.delete({ where: { id } });

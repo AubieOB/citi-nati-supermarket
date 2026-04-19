@@ -414,6 +414,8 @@ model EmergencySaleItem {
 model Quotation {
   id            Int             @id @default(autoincrement())
   quotationRef  String          @unique @map("quotation_ref")
+  branchCode    String          @default("BLANTYRE") @map("branch_code")
+  locationCode  String          @default("BT") @map("location_code")
   clientName    String          @map("client_name")
   clientEmail   String?         @map("client_email")
   clientPhone   String?         @map("client_phone")
@@ -430,6 +432,7 @@ model Quotation {
 
   @@index([clientName])
   @@index([createdAt])
+  @@index([branchCode, locationCode, createdAt])
   @@map("quotations")
 }
 

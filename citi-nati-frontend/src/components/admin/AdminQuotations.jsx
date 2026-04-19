@@ -194,7 +194,7 @@ const S = {
 };
 
 /* ═══════════════════════════ Component ═══════════════════════════ */
-const AdminQuotations = () => {
+const AdminQuotations = ({ selectedLocationCode = 'BT', selectedBranchCode = 'BLANTYRE' }) => {
   const [tab, setTab] = useState('new');
 
   // ── Fixed header layout (matches AdminPromotions / AdminOrders pattern) ──
@@ -264,6 +264,11 @@ const AdminQuotations = () => {
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState(null);
 
+  const operationalScope = {
+    locationCode: String(selectedLocationCode || '').trim().toUpperCase(),
+    branchCode: String(selectedBranchCode || '').trim().toUpperCase(),
+  };
+
   /* ── Search products (system mode, search-on-type) ─── */
   useEffect(() => {
     if (mode !== 'system') return;
@@ -287,7 +292,7 @@ const AdminQuotations = () => {
   const loadQuotations = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get('/admin/quotations');
+      const res = await api.get('/admin/quotations', { params: operationalScope });
       const rows = res.data?.quotations ?? res.data ?? [];
       setQuotations(rows.map((row) => withVatMeta(row, vatSettings)));
     } catch {
@@ -295,7 +300,7 @@ const AdminQuotations = () => {
     } finally {
       setLoading(false);
     }
-  }, [vatSettings]);
+  }, [operationalScope.branchCode, operationalScope.locationCode, vatSettings]);
 
   useEffect(() => {
     if (tab === 'view') loadQuotations();
@@ -371,6 +376,7 @@ const AdminQuotations = () => {
     setSaving(true);
     try {
       const payload = {
+        ...operationalScope,
         clientName: form.clientName.trim(),
         clientEmail: form.clientEmail.trim() || null,
         clientPhone: form.clientPhone.trim() || null,
@@ -403,7 +409,7 @@ const AdminQuotations = () => {
   const handleDelete = async (id, ref) => {
     if (!window.confirm(`Delete quotation ${ref}?`)) return;
     try {
-      await api.delete(`/admin/quotations/${id}`);
+      await api.delete(`/admin/quotations/${id}`, { params: operationalScope });
       toast.success('Quotation deleted');
       setQuotations((prev) => prev.filter((q) => q.id !== id));
     } catch {
@@ -456,6 +462,11 @@ const AdminQuotations = () => {
       {/* Fixed header */}
       <div ref={headerRef} style={fixedHeaderStyle}>
         <h1 style={S.title}><i className="fas fa-file-invoice" style={{ marginRight: '0.5rem' }}></i>Quotations</h1>
+        <div style={{ marginTop: '0.55rem' }}>
+          <span style={S.badge('#0f766e')}>
+            Location Scope: {operationalScope.branchCode || 'N/A'} / {operationalScope.locationCode || 'N/A'}
+          </span>
+        </div>
         <div style={S.tabs}>
           <button style={S.tab(tab === 'new')} onClick={() => setTab('new')}>
             <i className="fas fa-plus-circle" style={{ marginRight: '0.4rem' }}></i>New Quotation
