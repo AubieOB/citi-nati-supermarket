@@ -643,7 +643,7 @@ const AdminUsers = () => {
                 {(canManagePermissions || canDeleteUsers) && (
                   <td style={{ padding: '1rem', textAlign: 'center' }}>
                     <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    {canManagePermissions && (
+                    {canManagePermissions && u.role === 'admin' && (
                       <button
                         onClick={() => openPermissionsEditor(u)}
                         disabled={loadingPermissions || u.id === loggedInUser?.id}
