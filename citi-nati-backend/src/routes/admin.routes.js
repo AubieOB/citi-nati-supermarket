@@ -12,7 +12,7 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const { verifyTokenMiddleware } = require('../middleware/auth.middleware');
-const { verifyAdmin } = require('../middleware/admin.middleware');
+const { verifyAdmin, verifyAdminRole } = require('../middleware/admin.middleware');
 const { PrismaClient } = require('@prisma/client');
 const { getRefundPendingOrders, markOrderAsRefunded } = require('../controllers/order.controller');
 const { getCurrentPromotions, updatePromotion, previewPromotion, applyPromotion, removePromotion } = require('../controllers/promotion.controller');
@@ -458,8 +458,9 @@ router.delete('/pos-sync/failed-events', verifyTokenMiddleware, verifyAdmin, cle
 /**
  * GET /api/admin/security-key/status
  * Returns whether current admin has configured a security key
+ * Uses verifyAdminRole to allow access even if user lacks ADMIN_DASHBOARD_ACCESS permission
  */
-router.get('/security-key/status', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+router.get('/security-key/status', verifyTokenMiddleware, verifyAdminRole, async (req, res) => {
   try {
     const adminUser = await prisma.user.findUnique({
       where: { id: req.user.userId },
@@ -483,8 +484,9 @@ router.get('/security-key/status', verifyTokenMiddleware, verifyAdmin, async (re
 /**
  * POST /api/admin/security-key/verify
  * Verify security key before allowing admin dashboard access
+ * Uses verifyAdminRole to allow access even if user lacks ADMIN_DASHBOARD_ACCESS permission
  */
-router.post('/security-key/verify', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+router.post('/security-key/verify', verifyTokenMiddleware, verifyAdminRole, async (req, res) => {
   try {
     const { securityKey } = req.body;
 

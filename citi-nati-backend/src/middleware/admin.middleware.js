@@ -8,6 +8,25 @@ const { getEffectivePermissionsForUser } = require('../security/userPermissions.
 
 const isWriteMethod = (method) => ['POST', 'PUT', 'PATCH', 'DELETE'].includes(String(method || '').toUpperCase());
 
+/**
+ * Lightweight admin verification for security key endpoints
+ * Only checks authentication and admin role, bypasses permission checks
+ * This allows admins to verify their key even if permissions are denied
+ */
+const verifyAdminRole = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ message: "Unauthorized. User not found." });
+  }
+
+  const userRole = String(req.user.role || '').toLowerCase();
+
+  if (!['admin', 'super_admin'].includes(userRole)) {
+    return res.status(403).json({ message: 'Forbidden. Admin role required.' });
+  }
+
+  return next();
+};
+
 const resolveRequiredPermission = (req) => {
   const method = String(req.method || '').toUpperCase();
   const rawUrl = String(req.originalUrl || '').toLowerCase().split('?')[0];
@@ -143,4 +162,4 @@ const verifyAdmin = async (req, res, next) => {
   }
 };
 
-module.exports = { verifyAdmin };
+module.exports = { verifyAdmin, verifyAdminRole };
