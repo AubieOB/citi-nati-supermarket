@@ -90,7 +90,7 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedL
   const [exporting, setExporting] = useState({});
   const [activeActivity, setActiveActivity] = useState('sales');
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
-  const [showQuickExports, setShowQuickExports] = useState(false);
+  const [isQuickExportsModalOpen, setIsQuickExportsModalOpen] = useState(false);
   const [autoRefreshing, setAutoRefreshing] = useState(false);
   const autoRefreshIntervalRef = useRef(null);
   const autoRefreshTimeoutRef = useRef(null);
@@ -382,57 +382,23 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedL
       </div>
 
       <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', marginBottom: showQuickExports ? '0.75rem' : 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
           <div>
             <strong style={{ color: '#0f172a' }}>Quick Exports</strong>
             <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>Generate on-demand Excel or PDF exports across all operations modules.</p>
           </div>
           <button
             type="button"
-            onClick={() => setShowQuickExports((prev) => !prev)}
+            onClick={() => setIsQuickExportsModalOpen(true)}
             style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.44rem 0.72rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
           >
-            <i className={`fas ${showQuickExports ? 'fa-chevron-up' : 'fa-chevron-down'}`} style={{ marginRight: '0.35rem' }}></i>
-            {showQuickExports ? 'Hide' : 'Show'}
+            <i className="fas fa-up-right-from-square" style={{ marginRight: '0.35rem' }}></i>
+            Open Exports
           </button>
         </div>
-        {showQuickExports && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
-            {quickExports.map((item) => {
-              const exportingPdf = Boolean(exporting[`${item.module}:pdf`]);
-              const exportingExcel = Boolean(exporting[`${item.module}:excel`]);
-              const disabled = exportingPdf || exportingExcel;
-              return (
-                <div key={item.id} style={{ border: '1px solid #e2e8f0', borderRadius: '14px', padding: '0.85rem 0.9rem', display: 'grid', gap: '0.6rem', backgroundColor: '#fff' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-                    <span style={{ display: 'inline-flex', width: '30px', height: '30px', borderRadius: '9px', alignItems: 'center', justifyContent: 'center', backgroundColor: `${item.tone}1A`, color: item.tone }}>
-                      <i className={`fas ${item.icon}`}></i>
-                    </span>
-                    <strong style={{ color: '#0f172a', fontSize: '0.92rem' }}>{item.title}</strong>
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
-                    <button type="button" onClick={() => handleExport({ module: item.module, type: item.type, format: 'pdf' })} disabled={disabled} style={exportButtonStyle(disabled)}>
-                      <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.35rem' }}></i>
-                      PDF
-                    </button>
-                    <button type="button" onClick={() => handleExport({ module: item.module, type: item.type, format: 'excel' })} disabled={disabled} style={exportButtonStyle(disabled)}>
-                      <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.35rem' }}></i>
-                      Excel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onNavigateTab?.(item.tabId)}
-                      style={{ ...exportButtonStyle(false), borderColor: '#bfdbfe', color: '#1d4ed8' }}
-                    >
-                      <i className="fas fa-up-right-from-square" style={{ marginRight: '0.35rem' }}></i>
-                      Open
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <div style={{ marginTop: '0.7rem', color: '#64748b', fontSize: '0.86rem' }}>
+          Open the exports modal to run PDF/Excel reports by module.
+        </div>
       </div>
 
       {state.error ? (
@@ -511,6 +477,85 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedL
 
             <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem', flex: 1, minHeight: 0, overflowY: 'auto' }}>
               {renderActivityContent()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isQuickExportsModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.45)',
+            zIndex: 170,
+            display: 'grid',
+            placeItems: 'center',
+            padding: '0.85rem',
+          }}
+          onClick={() => setIsQuickExportsModalOpen(false)}
+        >
+          <div
+            style={{
+              ...cardStyle,
+              width: 'min(1020px, 96vw)',
+              maxHeight: 'min(80vh, 760px)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              borderRadius: '18px',
+            }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div style={{ padding: '0.95rem 1.05rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
+              <div>
+                <strong style={{ color: '#0f172a' }}>Quick Exports</strong>
+                <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.85rem' }}>Generate on-demand Excel or PDF exports across all operations modules.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsQuickExportsModalOpen(false)}
+                style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.4rem 0.65rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.8rem' }}
+              >
+                <i className="fas fa-times" style={{ marginRight: '0.35rem' }}></i>
+                Close
+              </button>
+            </div>
+
+            <div style={{ padding: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem', overflowY: 'auto' }}>
+              {quickExports.map((item) => {
+                const exportingPdf = Boolean(exporting[`${item.module}:pdf`]);
+                const exportingExcel = Boolean(exporting[`${item.module}:excel`]);
+                const disabled = exportingPdf || exportingExcel;
+                return (
+                  <div key={item.id} style={{ border: '1px solid #e2e8f0', borderRadius: '14px', padding: '0.85rem 0.9rem', display: 'grid', gap: '0.6rem', backgroundColor: '#fff' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                      <span style={{ display: 'inline-flex', width: '30px', height: '30px', borderRadius: '9px', alignItems: 'center', justifyContent: 'center', backgroundColor: `${item.tone}1A`, color: item.tone }}>
+                        <i className={`fas ${item.icon}`}></i>
+                      </span>
+                      <strong style={{ color: '#0f172a', fontSize: '0.92rem' }}>{item.title}</strong>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
+                      <button type="button" onClick={() => handleExport({ module: item.module, type: item.type, format: 'pdf' })} disabled={disabled} style={exportButtonStyle(disabled)}>
+                        <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.35rem' }}></i>
+                        PDF
+                      </button>
+                      <button type="button" onClick={() => handleExport({ module: item.module, type: item.type, format: 'excel' })} disabled={disabled} style={exportButtonStyle(disabled)}>
+                        <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.35rem' }}></i>
+                        Excel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onNavigateTab?.(item.tabId)}
+                        style={{ ...exportButtonStyle(false), borderColor: '#bfdbfe', color: '#1d4ed8' }}
+                      >
+                        <i className="fas fa-up-right-from-square" style={{ marginRight: '0.35rem' }}></i>
+                        Open
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
