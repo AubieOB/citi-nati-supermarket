@@ -28,7 +28,9 @@ const ComingSoonTabPanel = ({ title, description }) => {
         <i className="fas fa-layer-group"></i>
       </div>
       <h3 style={{ margin: 0, color: '#1e293b', fontSize: '1.25rem' }}>{title}</h3>
-      {description ? <p style={{ margin: '0.75rem 0 0', color: '#64748b', lineHeight: 1.6, maxWidth: '700px' }}>{description}</p> : null}
+      <p style={{ margin: '0.75rem 0 0', color: '#64748b', lineHeight: 1.6, maxWidth: '700px' }}>
+        {description || 'This section is coming soon.'}
+      </p>
     </div>
   );
 };
