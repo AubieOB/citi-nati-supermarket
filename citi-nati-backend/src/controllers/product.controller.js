@@ -1250,32 +1250,6 @@ const getProducts = async (req, res) => {
     // Debug logging
     console.log(`[PRODUCTS] Retrieved: ${products.length}, Total: ${total}, Category: ${category || 'all'}, Search: ${search || 'none'}`);
     console.log('[PRODUCT RESULT COUNT]', products.length);
-    
-    // Enhanced diagnostics for location-specific filtering
-    if (normalizedLocationCode && ZOMBA_LOCATION_CODES.includes(normalizedLocationCode)) {
-      const resolvedLocationCode = where.locationCode?.equals || normalizedLocationCode;
-      
-      // Get total Zomba products count before location filtering
-      const totalZombaProducts = await prisma.product.count({
-        where: { branchCode: 'ZOMBA', sourceCode: { not: null } },
-      });
-      
-      console.log('[PRODUCT FILTER]', {
-        uiLocation: locationCode || '(none)',
-        resolvedLocationCode,
-        totalZombaProductsBefore: totalZombaProducts,
-        totalAfterLocationFilter: total,
-        pageRowCount: products.length,
-        filteringWorking: totalZombaProducts > total ? 'YES - Location filtering active' : 'NO - All Zomba products returned',
-      });
-      
-      // Sample product from results
-      if (products.length > 0) {
-        const sample = products[0];
-        console.log(`[PRODUCT FILTER][SAMPLE] location=${resolvedLocationCode} product=${sample.sourceCode || sample.name} stock=${sample.stock}`);
-      }
-    }
-    
     if (normalizedLocationCode) {
       const sampleRow = products[0];
       console.log(`[PRODUCT QUERY] uiLocation=${locationCode || '(none)'} branchCode=${where.branchCode || '(any)'} locationCode=${normalizedLocationCode} matchedRows=${total} pageRows=${products.length}${sampleRow ? ` sample=${sampleRow.sourceCode || sampleRow.name}` : ''}`);

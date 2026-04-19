@@ -1074,26 +1074,7 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
 
     console.log('[PRODUCT RESULT COUNT]', products.length);
 
-    // Enhanced diagnostics for location-specific filtering
     const isZombaScope = normalizedLocationCode && ZOMBA_LOCATION_CODES.includes(normalizedLocationCode);
-    if (isZombaScope) {
-      const resolvedLocationCode = where.locationCode?.equals || normalizedLocationCode;
-      
-      // Get total Zomba products before location filtering
-      const totalZombaProducts = await prisma.product.count({
-        where: { branchCode: 'ZOMBA', sourceCode: { not: null } },
-      });
-      
-      console.log('[PRODUCT FILTER]', {
-        uiLocation: locationCode || '(none)',
-        resolvedLocationCode,
-        totalZombaProductsBefore: totalZombaProducts,
-        totalAfterLocationFilter: total,
-        pageRowCount: products.length,
-        filteringWorking: totalZombaProducts > total ? 'YES - Location filtering active' : 'NO - All Zomba products returned',
-      });
-    }
-
     if (isZombaScope && products.length > 0) {
       const sample = products[0];
       console.log(`[ZOMBA STOCK][POS_MANAGEMENT] product=${sample.sourceCode || 'UNKNOWN'} source=PersistedProductStock location=${normalizedLocationCode} stock=${Number(sample.stock || 0)}`);

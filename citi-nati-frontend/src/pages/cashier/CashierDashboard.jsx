@@ -41,18 +41,6 @@ const CashierDashboard = () => {
     setShowWarningModal(true);
   };
 
-  /**
-   * Format location code for display
-   * Maps: SH → 'Zomba SH', BAR → 'Zomba BAR', ST999 → 'Zomba RES', BT → 'Blantyre'
-   */
-  const formatLocationLabel = (code) => {
-    if (code === 'SH') return 'Zomba SH';
-    if (code === 'BAR') return 'Zomba BAR';
-    if (code === 'ST999') return 'Zomba RES';
-    if (code === 'BT') return 'Blantyre';
-    return code;
-  };
-
   const handleConfirmLocation = () => {
     setSelectedLocation(pendingLocation);
     sessionStorage.setItem('cashier-selected-location', pendingLocation);
@@ -105,7 +93,7 @@ const CashierDashboard = () => {
               gap: '0.4rem'
             }}>
               <i className="fas fa-location-dot" style={{ fontSize: '0.9rem' }}></i>
-              {formatLocationLabel(selectedLocation)}
+              {selectedLocation === 'ZA' ? 'Zomba' : 'Blantyre'}
             </span>
           )}
         </div>
@@ -163,7 +151,7 @@ const CashierDashboard = () => {
             backgroundColor: '#fff',
             borderRadius: '12px',
             padding: '2rem',
-            maxWidth: '500px',
+            maxWidth: '450px',
             width: '90%',
             boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
           }}>
@@ -192,10 +180,11 @@ const CashierDashboard = () => {
               Please select which location you are working at today. You will only be able to sell products for the selected location.
             </p>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
               <button
-                onClick={() => handleLocationSelect('SH')}
+                onClick={() => handleLocationSelect('ZA')}
                 style={{
+                  flex: 1,
                   padding: '1rem',
                   backgroundColor: '#d4a574',
                   color: '#fff',
@@ -214,60 +203,12 @@ const CashierDashboard = () => {
                 onMouseLeave={(e) => { e.target.style.backgroundColor = '#d4a574'; e.target.style.transform = 'translateY(0)'; }}
               >
                 <i className="fas fa-location-dot" style={{ fontSize: '1.1rem' }}></i>
-                Zomba SH
+                Zomba (ZA)
               </button>
-
-              <button
-                onClick={() => handleLocationSelect('BAR')}
-                style={{
-                  padding: '1rem',
-                  backgroundColor: '#d4a574',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '1rem',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.6rem'
-                }}
-                onMouseEnter={(e) => { e.target.style.backgroundColor = '#c59563'; e.target.style.transform = 'translateY(-2px)'; }}
-                onMouseLeave={(e) => { e.target.style.backgroundColor = '#d4a574'; e.target.style.transform = 'translateY(0)'; }}
-              >
-                <i className="fas fa-location-dot" style={{ fontSize: '1.1rem' }}></i>
-                Zomba BAR
-              </button>
-
-              <button
-                onClick={() => handleLocationSelect('ST999')}
-                style={{
-                  padding: '1rem',
-                  backgroundColor: '#d4a574',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '1rem',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.6rem'
-                }}
-                onMouseEnter={(e) => { e.target.style.backgroundColor = '#c59563'; e.target.style.transform = 'translateY(-2px)'; }}
-                onMouseLeave={(e) => { e.target.style.backgroundColor = '#d4a574'; e.target.style.transform = 'translateY(0)'; }}
-              >
-                <i className="fas fa-lock" style={{ fontSize: '1.1rem', marginRight: '0.2rem' }}></i>
-                Zomba RES
-              </button>
-
               <button
                 onClick={() => handleLocationSelect('BT')}
                 style={{
+                  flex: 1,
                   padding: '1rem',
                   backgroundColor: '#4a90e2',
                   color: '#fff',
@@ -280,14 +221,13 @@ const CashierDashboard = () => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '0.6rem',
-                  marginTop: '0.5rem'
+                  gap: '0.6rem'
                 }}
                 onMouseEnter={(e) => { e.target.style.backgroundColor = '#3a7bc8'; e.target.style.transform = 'translateY(-2px)'; }}
                 onMouseLeave={(e) => { e.target.style.backgroundColor = '#4a90e2'; e.target.style.transform = 'translateY(0)'; }}
               >
                 <i className="fas fa-location-dot" style={{ fontSize: '1.1rem' }}></i>
-                Blantyre
+                Blantyre (BT)
               </button>
             </div>
           </div>
@@ -353,7 +293,7 @@ const CashierDashboard = () => {
                 gap: '0.5rem'
               }}>
                 <i className="fas fa-location-dot" style={{ fontSize: '1.2rem' }}></i>
-                {formatLocationLabel(pendingLocation)}
+                {pendingLocation === 'ZA' ? 'Zomba' : 'Blantyre'}
               </p>
               <p style={{ 
                 color: '#666', 

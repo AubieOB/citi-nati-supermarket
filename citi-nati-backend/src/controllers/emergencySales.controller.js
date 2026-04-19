@@ -654,21 +654,6 @@ async function lookupEmergencyProducts(req, res) {
 
     console.log('[PRODUCT RESULT COUNT]', products.length);
 
-    // Enhanced diagnostics for location-specific filtering
-    if (isZombaLocationCode(locationCode)) {
-      // Get total Zomba products before filtering
-      const totalZombaProducts = await prisma.product.count({
-        where: { branchCode: 'ZOMBA', sourceCode: { not: null }, enabled: true },
-      });
-      
-      console.log('[PRODUCT FILTER]', {
-        uiLocation: locationCode,
-        totalZombaProductsBefore: totalZombaProducts,
-        totalAfterLocationFilter: products.length,
-        filteringWorking: totalZombaProducts > products.length ? 'YES - Location filtering active' : 'NO - All Zomba products returned',
-      });
-    }
-
     const mapped = products
       .map((product) => {
         const enriched = enrichProductStock(product);
