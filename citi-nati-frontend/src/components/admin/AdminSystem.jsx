@@ -266,8 +266,8 @@ const AdminSystem = () => {
             <textarea
               value={maintenanceMessage}
               onChange={(event) => setMaintenanceMessage(event.target.value)}
-              rows={5}
-              style={{ width: '100%', padding: '0.85rem', borderRadius: '8px', border: '1px solid #ddd', resize: 'vertical' }}
+              rows={1}
+              style={{ width: '100%', padding: '0.7rem 0.85rem', borderRadius: '8px', border: '1px solid #ddd', resize: 'vertical', minHeight: '42px' }}
               placeholder={DEFAULT_MESSAGE}
             />
           </div>
