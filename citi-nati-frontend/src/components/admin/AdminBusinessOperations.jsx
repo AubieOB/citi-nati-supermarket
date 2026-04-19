@@ -114,6 +114,7 @@ const AdminBusinessOperations = () => {
   const selectedLocationCode = selectedLocation?.code || '';
   const selectedLocationIdNumber = selectedLocation ? Number(selectedLocation.id) : null;
   const selectedLocationName = selectedLocation?.name || 'All Locations';
+  const isAllLocationsSelected = String(selectedLocationId || '') === BO_ALL_LOCATIONS_SCOPE_ID;
 
   const handleImportSuccess = () => {
     setLocationRefreshKey((current) => current + 1);
@@ -198,6 +199,29 @@ const AdminBusinessOperations = () => {
             <div className="bo-filter-title">
               <i className="fas fa-briefcase"></i>
               Business Operations
+              {isAllLocationsSelected && (
+                <span
+                  style={{
+                    marginLeft: '0.65rem',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.02em',
+                    textTransform: 'uppercase',
+                    color: '#0f766e',
+                    background: '#ccfbf1',
+                    border: '1px solid #5eead4',
+                    borderRadius: '999px',
+                    padding: '0.2rem 0.55rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                  }}
+                  title="Reports and BO actions are running in combined mode for all locations"
+                >
+                  <i className="fas fa-layer-group" style={{ fontSize: '0.7rem' }}></i>
+                  All Locations Active
+                </span>
+              )}
             </div>
               <div className="bo-filter-actions">
               <label className="bo-location-control">
