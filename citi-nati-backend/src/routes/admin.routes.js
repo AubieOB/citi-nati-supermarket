@@ -48,6 +48,8 @@ const {
 const { PERMISSION_GROUPS, ALL_PERMISSION_KEYS, ROLE_DEFAULT_PERMISSIONS, isValidPermissionKey } = require('../security/permissions');
 const { getPermissionSnapshotForUser } = require('../security/userPermissions.service');
 const { requirePermission } = require('../middleware/permissions.middleware');
+const { validateStrongPassword } = require('../utils/passwordPolicy');
+const { recordAuditLog } = require('../services/auditLog.service');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -853,6 +855,18 @@ router.put(
       });
 
       const snapshot = await getPermissionSnapshotForUser(targetUser.id, targetUser.role);
+      await recordAuditLog({
+        req,
+        actorUserId: adminUserId,
+        action: 'ADMIN_PERMISSION_OVERRIDES_UPDATED',
+        resourceType: 'USER',
+        resourceId: targetUser.id,
+        status: 'SUCCESS',
+        metadata: {
+          updatedPermissionCount: normalizedUpdates.length,
+          reason: typeof reason === 'string' ? reason.trim().slice(0, 500) : null,
+        },
+      });
       return res.json({
         success: true,
         message: 'User permissions updated successfully',
@@ -904,6 +918,19 @@ router.put('/users/:userId/role', verifyTokenMiddleware, verifyAdmin, async (req
         role: true,
         createdAt: true,
       }
+    });
+
+    await recordAuditLog({
+      req,
+      actorUserId: req.user?.userId,
+      action: 'ADMIN_USER_ROLE_UPDATED',
+      resourceType: 'USER',
+      resourceId: user.id,
+      status: 'SUCCESS',
+      metadata: {
+        previousRole: userBefore.role,
+        newRole: role,
+      },
     });
 
     // If changing role TO driver, ensure Driver record exists
@@ -978,6 +1005,19 @@ router.delete('/users/:userId', verifyTokenMiddleware, verifyAdmin, async (req, 
     // - SalesDay relationships
     await prisma.user.delete({
       where: { id: userId },
+    });
+
+    await recordAuditLog({
+      req,
+      actorUserId: req.user?.userId,
+      action: 'ADMIN_USER_DELETED',
+      resourceType: 'USER',
+      resourceId: existingUser.id,
+      status: 'SUCCESS',
+      metadata: {
+        email: existingUser.email,
+        role: existingUser.role,
+      },
     });
 
     console.log('[ADMIN] User permanently deleted:', { 
@@ -1511,8 +1551,9 @@ router.post('/cashiers', verifyTokenMiddleware, verifyAdmin, async (req, res) =>
       return res.status(400).json({ success: false, error: 'Name, email, and password are required' });
     }
 
-    if (password.length < 6) {
-      return res.status(400).json({ success: false, error: 'Password must be at least 6 characters' });
+    const passwordValidation = validateStrongPassword(password);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ success: false, error: passwordValidation.errors[0] });
     }
 
     const existing = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
@@ -1532,6 +1573,16 @@ router.post('/cashiers', verifyTokenMiddleware, verifyAdmin, async (req, res) =>
         isActive: true,
       },
       select: { id: true, name: true, email: true, createdAt: true },
+    });
+
+    await recordAuditLog({
+      req,
+      actorUserId: req.user?.userId,
+      action: 'ADMIN_CASHIER_CREATED',
+      resourceType: 'USER',
+      resourceId: cashier.id,
+      status: 'SUCCESS',
+      metadata: { role: 'cashier', email: cashier.email },
     });
 
     return res.status(201).json({ success: true, cashier });
@@ -1574,8 +1625,9 @@ router.put('/cashiers/:userId', verifyTokenMiddleware, verifyAdmin, async (req, 
     }
 
     if (password) {
-      if (password.length < 6) {
-        return res.status(400).json({ success: false, error: 'Password must be at least 6 characters' });
+      const passwordValidation = validateStrongPassword(password);
+      if (!passwordValidation.valid) {
+        return res.status(400).json({ success: false, error: passwordValidation.errors[0] });
       }
       updateData.passwordHash = await bcrypt.hash(password, 10);
     }
@@ -1588,6 +1640,16 @@ router.put('/cashiers/:userId', verifyTokenMiddleware, verifyAdmin, async (req, 
       where: { id: cashier.id },
       data: updateData,
       select: { id: true, name: true, email: true, createdAt: true },
+    });
+
+    await recordAuditLog({
+      req,
+      actorUserId: req.user?.userId,
+      action: 'ADMIN_CASHIER_UPDATED',
+      resourceType: 'USER',
+      resourceId: updated.id,
+      status: 'SUCCESS',
+      metadata: { updatedFields: Object.keys(updateData) },
     });
 
     return res.json({ success: true, cashier: updated });
@@ -1613,6 +1675,16 @@ router.delete('/cashiers/:userId', verifyTokenMiddleware, verifyAdmin, async (re
     }
 
     await prisma.user.delete({ where: { id: cashier.id } });
+
+    await recordAuditLog({
+      req,
+      actorUserId: req.user?.userId,
+      action: 'ADMIN_CASHIER_DELETED',
+      resourceType: 'USER',
+      resourceId: cashier.id,
+      status: 'SUCCESS',
+      metadata: { name: cashier.name },
+    });
 
     return res.json({ success: true, message: `Cashier account "${cashier.name}" deleted successfully` });
   } catch (err) {

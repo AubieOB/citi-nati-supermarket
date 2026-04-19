@@ -1,15 +1,26 @@
 const bcrypt = require('bcrypt');
 const { PrismaClient } = require('@prisma/client');
 const axios = require('axios');
-const { generateToken } = require('../utils/jwt');
 const { notifyNewUserRegistration } = require('../utils/messageService');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/emailService');
 const { generateVerificationCode } = require('../utils/verificationCode');
 const { getEffectivePermissionsForUser } = require('../security/userPermissions.service');
+const { validateStrongPassword } = require('../utils/passwordPolicy');
+const logger = require('../utils/logger');
+const { recordAuditLog } = require('../services/auditLog.service');
+const {
+  issueAuthSession,
+  issueAccessTokenCookie,
+  clearAuthCookies,
+  revokeRefreshTokenFromRequest,
+  revokeAllUserRefreshTokens,
+  consumeRefreshToken,
+} = require('../services/authSession.service');
 
 const prisma = new PrismaClient();
 
-const AUTH_COOKIE_NAME = 'auth_token';
+const MAX_FAILED_LOGIN_ATTEMPTS = Math.max(3, parseInt(process.env.MAX_FAILED_LOGIN_ATTEMPTS || '5', 10) || 5);
+const LOGIN_LOCKOUT_MINUTES = Math.max(1, parseInt(process.env.LOGIN_LOCKOUT_MINUTES || '15', 10) || 15);
 
 const getEmailFailureResponse = (emailResult, defaultMessage) => {
   if (emailResult?.errorCode === 'EMAIL_PROVIDER_CREDITS_EXCEEDED') {
@@ -35,28 +46,62 @@ const getEmailFailureResponse = (emailResult, defaultMessage) => {
   };
 };
 
-const getCookieOptions = () => {
-  const isProduction = process.env.NODE_ENV === 'production';
+function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
 
-  return {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? 'none' : 'lax',
-    maxAge: 24 * 60 * 60 * 1000,
-    path: '/',
-  };
-};
+function isAccountLocked(user) {
+  return Boolean(user?.lockedUntil && new Date(user.lockedUntil) > new Date());
+}
 
-const setAuthCookie = (res, token) => {
-  res.cookie(AUTH_COOKIE_NAME, token, getCookieOptions());
-};
+async function registerFailedLoginAttempt(user, req, reason = 'INVALID_CREDENTIALS') {
+  if (!user?.id) {
+    return null;
+  }
 
-const clearAuthCookie = (res) => {
-  res.clearCookie(AUTH_COOKIE_NAME, {
-    ...getCookieOptions(),
-    maxAge: undefined,
+  const nextAttempts = (user.failedLoginAttempts || 0) + 1;
+  const shouldLock = nextAttempts >= MAX_FAILED_LOGIN_ATTEMPTS;
+  const lockedUntil = shouldLock
+    ? new Date(Date.now() + LOGIN_LOCKOUT_MINUTES * 60 * 1000)
+    : null;
+
+  const updatedUser = await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      failedLoginAttempts: nextAttempts,
+      lockedUntil,
+    },
   });
-};
+
+  await recordAuditLog({
+    req,
+    actorUserId: user.id,
+    action: shouldLock ? 'AUTH_LOGIN_LOCKED' : 'AUTH_LOGIN_FAILED',
+    resourceType: 'USER',
+    resourceId: user.id,
+    status: 'FAILURE',
+    metadata: {
+      reason,
+      failedLoginAttempts: nextAttempts,
+      lockedUntil,
+    },
+  });
+
+  return updatedUser;
+}
+
+async function clearFailedLoginState(userId) {
+  if (!userId) return;
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      failedLoginAttempts: 0,
+      lockedUntil: null,
+      lastLoginAt: new Date(),
+    },
+  });
+}
 
 const buildAuthUserPayload = async (user) => {
   const effectivePermissions = await getEffectivePermissionsForUser(user.id, user.role);
@@ -78,42 +123,85 @@ const buildAuthUserPayload = async (user) => {
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    const normalizedEmail = normalizeEmail(email);
 
-    if (!email || !password) {
+    if (!normalizedEmail || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    console.log(`[AUTH] Login attempt for: ${email}`);
-
-    // Find user in users table only (not pending)
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
 
     if (!user) {
+      await recordAuditLog({
+        req,
+        action: 'AUTH_LOGIN_FAILED',
+        resourceType: 'USER',
+        resourceId: normalizedEmail,
+        status: 'FAILURE',
+        metadata: { reason: 'UNKNOWN_EMAIL' },
+      });
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    // Verify password
+    if (!user.isActive) {
+      await recordAuditLog({
+        req,
+        actorUserId: user.id,
+        action: 'AUTH_LOGIN_BLOCKED',
+        resourceType: 'USER',
+        resourceId: user.id,
+        status: 'FAILURE',
+        metadata: { reason: 'INACTIVE_ACCOUNT' },
+      });
+      return res.status(403).json({ error: 'Account is disabled' });
+    }
+
+    if (isAccountLocked(user)) {
+      await recordAuditLog({
+        req,
+        actorUserId: user.id,
+        action: 'AUTH_LOGIN_BLOCKED',
+        resourceType: 'USER',
+        resourceId: user.id,
+        status: 'FAILURE',
+        metadata: { reason: 'ACCOUNT_LOCKED', lockedUntil: user.lockedUntil },
+      });
+      return res.status(423).json({ error: 'Account temporarily locked. Please try again later.' });
+    }
+
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
 
     if (!isPasswordValid) {
+      const updatedUser = await registerFailedLoginAttempt(user, req);
+      if (updatedUser?.lockedUntil && new Date(updatedUser.lockedUntil) > new Date()) {
+        return res.status(423).json({ error: 'Account temporarily locked. Please try again later.' });
+      }
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    console.log(`[AUTH] ✅ Login successful for: ${email}`);
+    await clearFailedLoginState(user.id);
 
-    // Generate JWT token
-    const token = generateToken(user.id, user.role, user.email);
-    setAuthCookie(res, token);
+    const { accessToken } = await issueAuthSession(res, user, req);
 
     const authUser = await buildAuthUserPayload(user);
 
+    await recordAuditLog({
+      req,
+      actorUserId: user.id,
+      action: 'AUTH_LOGIN_SUCCESS',
+      resourceType: 'USER',
+      resourceId: user.id,
+      status: 'SUCCESS',
+      metadata: { role: user.role },
+    });
+
     return res.json({
-      token,
+      token: accessToken,
       user: authUser,
     });
   } catch (err) {
-    console.error('[AUTH] Login error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    logger.error('[AUTH] Login error', err);
+    return res.status(500).json({ error: 'Something went wrong' });
   }
 };
 
@@ -125,24 +213,28 @@ const login = async (req, res) => {
 const register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
+    const normalizedEmail = normalizeEmail(email);
 
     // Validate fields
-    if (!name || !email || !password) {
+    if (!name || !normalizedEmail || !password) {
       return res.status(400).json({
         error: 'Name, email, and password are required',
       });
     }
 
-    console.log(`[AUTH] Registration attempt for: ${email}`);
+    const passwordValidation = validateStrongPassword(password);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ error: passwordValidation.errors[0] });
+    }
 
     // Check if email already exists in users table
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (existingUser) {
       return res.status(400).json({ error: 'Email is already registered' });
     }
 
     // Delete any old pending registration for this email (allow fresh registration)
-    await prisma.pendingUser.deleteMany({ where: { email } });
+    await prisma.pendingUser.deleteMany({ where: { email: normalizedEmail } });
 
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
@@ -151,13 +243,11 @@ const register = async (req, res) => {
     const verificationCode = generateVerificationCode();
     const verificationCodeExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
-    console.log(`[AUTH] Generated verification code for: ${email}`);
-
     // FIRST: Send email via SendGrid
-    const emailResult = await sendVerificationEmail(email, verificationCode);
+    const emailResult = await sendVerificationEmail(normalizedEmail, verificationCode);
 
     if (!emailResult.success) {
-      console.error(`[AUTH] ❌ Failed to send verification email to ${email}`);
+      logger.error('[AUTH] Failed to send verification email', { email: normalizedEmail, code: emailResult?.errorCode });
       const emailFailure = getEmailFailureResponse(
         emailResult,
         'Failed to send verification email. Please try again.',
@@ -168,32 +258,28 @@ const register = async (req, res) => {
       });
     }
 
-    console.log(`[AUTH] ✅ Verification email sent to: ${email}`);
-
     // SECOND: Only store in pending_users AFTER successful email send
     const newPendingUser = await prisma.pendingUser.create({
       data: {
         name,
-        email,
+        email: normalizedEmail,
         passwordHash,
         verificationCode,
         verificationCodeExpiry,
       },
     });
 
-    console.log(`[AUTH] ✅ User stored in pending_users: ${email}`);
-
     return res.status(201).json({
       message: 'Registration successful. Please check your email for the verification code.',
       user: {
-        email: email,
+        email: normalizedEmail,
       },
       requiresVerification: true,
     });
   } catch (err) {
-    console.error('[AUTH] Registration error:', err);
+    logger.error('[AUTH] Registration error', err);
     return res.status(500).json({
-      error: 'Internal server error during registration',
+      error: 'Something went wrong',
     });
   }
 };
@@ -205,17 +291,16 @@ const register = async (req, res) => {
 const verifyEmail = async (req, res) => {
   try {
     const { email, code } = req.body;
+    const normalizedEmail = normalizeEmail(email);
 
-    if (!email || !code) {
+    if (!normalizedEmail || !code) {
       return res.status(400).json({
         error: 'Email and verification code are required',
       });
     }
 
-    console.log(`[AUTH] Email verification attempt for: ${email}`);
-
     // Find in pending_users
-    const pendingUser = await prisma.pendingUser.findUnique({ where: { email } });
+    const pendingUser = await prisma.pendingUser.findUnique({ where: { email: normalizedEmail } });
 
     if (!pendingUser) {
       return res.status(404).json({
@@ -236,8 +321,6 @@ const verifyEmail = async (req, res) => {
       });
     }
 
-    console.log(`[AUTH] ✓ Verification code valid for: ${email}`);
-
     // Move user from pending_users to users table
     const newUser = await prisma.user.create({
       data: {
@@ -249,12 +332,8 @@ const verifyEmail = async (req, res) => {
       },
     });
 
-    console.log(`[AUTH] ✅ User moved to users table: ${email}`);
-
     // Delete from pending_users
-    await prisma.pendingUser.delete({ where: { email } });
-
-    console.log(`[AUTH] ✅ Removed from pending_users: ${email}`);
+    await prisma.pendingUser.delete({ where: { email: normalizedEmail } });
 
     // Notify admin
     await notifyNewUserRegistration(newUser);
@@ -266,8 +345,8 @@ const verifyEmail = async (req, res) => {
       requiresLogin: true,
     });
   } catch (err) {
-    console.error('[AUTH] Email verification error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    logger.error('[AUTH] Email verification error', err);
+    return res.status(500).json({ error: 'Something went wrong' });
   }
 };
 
@@ -278,15 +357,14 @@ const verifyEmail = async (req, res) => {
 const resendVerificationCode = async (req, res) => {
   try {
     const { email } = req.body;
+    const normalizedEmail = normalizeEmail(email);
 
-    if (!email) {
+    if (!normalizedEmail) {
       return res.status(400).json({ error: 'Email is required' });
     }
 
-    console.log(`[AUTH] Resend verification code request for: ${email}`);
-
     // Check in pending_users
-    const pendingUser = await prisma.pendingUser.findUnique({ where: { email } });
+    const pendingUser = await prisma.pendingUser.findUnique({ where: { email: normalizedEmail } });
 
     if (!pendingUser) {
       // Don't reveal if email exists
@@ -299,13 +377,11 @@ const resendVerificationCode = async (req, res) => {
     const newCode = generateVerificationCode();
     const codeExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
-    console.log(`[AUTH] Generated new verification code for: ${email}`);
-
     // Send email
-    const emailResult = await sendVerificationEmail(email, newCode);
+    const emailResult = await sendVerificationEmail(normalizedEmail, newCode);
 
     if (!emailResult.success) {
-      console.error(`[AUTH] ❌ Failed to resend verification email to ${email}`);
+      logger.error('[AUTH] Failed to resend verification email', { email: normalizedEmail, code: emailResult?.errorCode });
       const emailFailure = getEmailFailureResponse(
         emailResult,
         'Failed to send verification email. Please try again.',
@@ -316,11 +392,9 @@ const resendVerificationCode = async (req, res) => {
       });
     }
 
-    console.log(`[AUTH] ✅ New verification email sent to: ${email}`);
-
     // Update pending user with new code
     await prisma.pendingUser.update({
-      where: { email },
+      where: { email: normalizedEmail },
       data: {
         verificationCode: newCode,
         verificationCodeExpiry: codeExpiry,
@@ -331,8 +405,8 @@ const resendVerificationCode = async (req, res) => {
       message: 'A new verification code has been sent to your email',
     });
   } catch (err) {
-    console.error('[AUTH] Resend verification code error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    logger.error('[AUTH] Resend verification code error', err);
+    return res.status(500).json({ error: 'Something went wrong' });
   }
 };
 
@@ -343,15 +417,14 @@ const resendVerificationCode = async (req, res) => {
 const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
+    const normalizedEmail = normalizeEmail(email);
 
-    if (!email) {
+    if (!normalizedEmail) {
       return res.status(400).json({ error: 'Email is required' });
     }
 
-    console.log(`[AUTH] Forgot password request for: ${email}`);
-
     // Check if user exists
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
 
     if (!user) {
       // Don't reveal if email exists (security best practice)
@@ -361,32 +434,28 @@ const forgotPassword = async (req, res) => {
     }
 
     // Delete any existing reset records for this email
-    await prisma.passwordReset.deleteMany({ where: { email } });
+    await prisma.passwordReset.deleteMany({ where: { email: normalizedEmail } });
 
     // Generate reset code
     const resetCode = generateVerificationCode();
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
-    console.log(`[AUTH] Generated password reset code for: ${email}`);
-
     // Create password reset record
     const resetRecord = await prisma.passwordReset.create({
       data: {
-        email,
+        email: normalizedEmail,
         resetCode,
         expiresAt,
       },
     });
 
-    console.log(`[AUTH] Password reset record created for: ${email}`);
-
     // Send email
-    const emailResult = await sendPasswordResetEmail(email, resetCode);
+    const emailResult = await sendPasswordResetEmail(normalizedEmail, resetCode);
 
     if (!emailResult.success) {
       // Delete the reset record if email fails
       await prisma.passwordReset.delete({ where: { id: resetRecord.id } });
-      console.error(`[AUTH] ❌ Failed to send password reset email to ${email}`);
+      logger.error('[AUTH] Failed to send password reset email', { email: normalizedEmail, code: emailResult?.errorCode });
       const emailFailure = getEmailFailureResponse(
         emailResult,
         'Failed to send reset email. Please try again.',
@@ -397,14 +466,12 @@ const forgotPassword = async (req, res) => {
       });
     }
 
-    console.log(`[AUTH] ✅ Password reset email sent to: ${email}`);
-
     return res.json({
       message: 'Password reset code sent to your email',
     });
   } catch (err) {
-    console.error('[AUTH] Forgot password error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    logger.error('[AUTH] Forgot password error', err);
+    return res.status(500).json({ error: 'Something went wrong' });
   }
 };
 
@@ -415,17 +482,21 @@ const forgotPassword = async (req, res) => {
 const resetPassword = async (req, res) => {
   try {
     const { email, code, newPassword } = req.body;
+    const normalizedEmail = normalizeEmail(email);
 
-    if (!email || !code || !newPassword) {
+    if (!normalizedEmail || !code || !newPassword) {
       return res.status(400).json({
         error: 'Email, reset code, and new password are required',
       });
     }
 
-    console.log(`[AUTH] Password reset attempt for: ${email}`);
+    const passwordValidation = validateStrongPassword(newPassword);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ error: passwordValidation.errors[0] });
+    }
 
     // Find password reset record
-    const resetRecord = await prisma.passwordReset.findUnique({ where: { email } });
+    const resetRecord = await prisma.passwordReset.findUnique({ where: { email: normalizedEmail } });
 
     if (!resetRecord) {
       return res.status(404).json({
@@ -448,10 +519,8 @@ const resetPassword = async (req, res) => {
       });
     }
 
-    console.log(`[AUTH] ✓ Reset code valid for: ${email}`);
-
     // Find user
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -469,29 +538,38 @@ const resetPassword = async (req, res) => {
 
     // Update password
     const updatedUser = await prisma.user.update({
-      where: { email },
-      data: { passwordHash },
+      where: { email: normalizedEmail },
+      data: {
+        passwordHash,
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+      },
     });
-
-    console.log(`[AUTH] ✅ Password reset successful for: ${email}`);
 
     // Delete reset record
     await prisma.passwordReset.delete({ where: { id: resetRecord.id } });
 
-    // Generate JWT token for automatic login
-    const token = generateToken(updatedUser.id, updatedUser.role, updatedUser.email);
-    setAuthCookie(res, token);
+    const { accessToken } = await issueAuthSession(res, updatedUser, req);
 
     const authUser = await buildAuthUserPayload(updatedUser);
 
+    await recordAuditLog({
+      req,
+      actorUserId: updatedUser.id,
+      action: 'AUTH_PASSWORD_RESET',
+      resourceType: 'USER',
+      resourceId: updatedUser.id,
+      status: 'SUCCESS',
+    });
+
     return res.json({
       message: 'Password reset successful. You are now logged in.',
-      token,
+      token: accessToken,
       user: authUser,
     });
   } catch (err) {
-    console.error('[AUTH] Reset password error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    logger.error('[AUTH] Reset password error', err);
+    return res.status(500).json({ error: 'Something went wrong' });
   }
 };
 
@@ -507,8 +585,6 @@ const googleAuth = async (req, res) => {
       return res.status(400).json({ error: 'Token is required' });
     }
 
-    console.log('[AUTH] Google OAuth authentication attempt');
-
     // Fetch user info from Google
     const response = await axios.get('https://www.googleapis.com/oauth2/v2/userinfo', {
       headers: {
@@ -518,29 +594,30 @@ const googleAuth = async (req, res) => {
 
     const { email, name } = response.data;
 
-    console.log(`[AUTH] Google info retrieved for: ${email}`);
-
     // Check if user already exists in users table
     let user = await prisma.user.findUnique({ where: { email } });
 
     if (user) {
-      // User exists - log them in
-      console.log(`[AUTH] ✅ Google user found, logging in: ${email}`);
-
-      const jwtToken = generateToken(user.id, user.role, user.email);
-      setAuthCookie(res, jwtToken);
+      await clearFailedLoginState(user.id);
+      const { accessToken } = await issueAuthSession(res, user, req);
 
       const authUser = await buildAuthUserPayload(user);
 
+      await recordAuditLog({
+        req,
+        actorUserId: user.id,
+        action: 'AUTH_GOOGLE_LOGIN_SUCCESS',
+        resourceType: 'USER',
+        resourceId: user.id,
+        status: 'SUCCESS',
+      });
+
       return res.json({
-        token: jwtToken,
+        token: accessToken,
         user: authUser,
         isNewUser: false,
       });
     }
-
-    // User doesn't exist - create new account
-    console.log(`[AUTH] Google user not found, creating new account: ${email}`);
 
     // Create a random password for Google users (they won't use it)
     const randomPassword = Math.random().toString(36).slice(-16);
@@ -558,24 +635,30 @@ const googleAuth = async (req, res) => {
       },
     });
 
-    console.log(`[AUTH] ✅ New Google user created: ${email}`);
-
     // Notify admin
     await notifyNewUserRegistration(newUser);
 
-    const jwtToken = generateToken(newUser.id, newUser.role, newUser.email);
-    setAuthCookie(res, jwtToken);
+    const { accessToken } = await issueAuthSession(res, newUser, req);
 
     const authUser = await buildAuthUserPayload(newUser);
 
+    await recordAuditLog({
+      req,
+      actorUserId: newUser.id,
+      action: 'AUTH_GOOGLE_REGISTER',
+      resourceType: 'USER',
+      resourceId: newUser.id,
+      status: 'SUCCESS',
+    });
+
     return res.status(201).json({
       message: 'User registered and logged in successfully',
-      token: jwtToken,
+      token: accessToken,
       user: authUser,
       isNewUser: true,
     });
   } catch (err) {
-    console.error('[AUTH] Google auth error:', err.response?.data || err.message);
+    logger.error('[AUTH] Google auth error', err.response?.data || err.message);
     return res.status(401).json({
       error: 'Invalid token or authentication failed',
     });
@@ -588,11 +671,41 @@ const googleAuth = async (req, res) => {
  */
 const logout = async (req, res) => {
   try {
-    clearAuthCookie(res);
+    await revokeRefreshTokenFromRequest(req);
+    clearAuthCookies(res);
     return res.json({ success: true, message: 'Logged out successfully' });
   } catch (err) {
-    console.error('[AUTH] Logout error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    logger.error('[AUTH] Logout error', err);
+    return res.status(500).json({ error: 'Something went wrong' });
+  }
+};
+
+const refreshSession = async (req, res) => {
+  try {
+    const user = await consumeRefreshToken(req);
+
+    if (!user) {
+      clearAuthCookies(res);
+      return res.status(401).json({ error: 'Session expired', code: 'SESSION_EXPIRED' });
+    }
+
+    const { accessToken } = await issueAuthSession(res, user, req);
+    const authUser = await buildAuthUserPayload(user);
+
+    await recordAuditLog({
+      req,
+      actorUserId: user.id,
+      action: 'AUTH_REFRESH_SUCCESS',
+      resourceType: 'USER',
+      resourceId: user.id,
+      status: 'SUCCESS',
+    });
+
+    return res.json({ token: accessToken, user: authUser });
+  } catch (err) {
+    logger.error('[AUTH] Refresh session error', err);
+    clearAuthCookies(res);
+    return res.status(500).json({ error: 'Something went wrong' });
   }
 };
 
@@ -619,10 +732,11 @@ const getSession = async (req, res) => {
     }
 
     const authUser = await buildAuthUserPayload(user);
-    return res.json({ user: authUser });
+    const accessToken = issueAccessTokenCookie(res, user);
+    return res.json({ user: authUser, token: accessToken });
   } catch (err) {
-    console.error('[AUTH] Session fetch error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    logger.error('[AUTH] Session fetch error', err);
+    return res.status(500).json({ error: 'Something went wrong' });
   }
 };
 
@@ -635,5 +749,6 @@ module.exports = {
   forgotPassword,
   resetPassword,
   logout,
+  refreshSession,
   getSession,
 };

@@ -26,49 +26,50 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  /**
-   * Initialize auth on app load
-   * Check if token exists in localStorage
-   * If yes, restore it and set axios header
-   */
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        const storedToken = tokenStorage.getToken();
-        const storedUser = tokenStorage.getUser();
+        const restoreFromSession = async () => {
+          const sessionResponse = await api.get('/auth/session');
+          return {
+            token: sessionResponse.data?.token || null,
+            user: sessionResponse.data?.user || null,
+          };
+        };
 
-        if (storedToken && storedUser) {
-          // ✅ Token exists: Restore auth state
-          setToken(storedToken);
-          setUser(storedUser);
+        let session = null;
 
-          // ✅ Set axios default header
-          setAuthToken(storedToken);
-
-          // Refresh user snapshot from backend so permission changes are reflected.
-          try {
-            const sessionResponse = await api.get('/auth/session');
-            const latestUser = sessionResponse.data?.user;
-            if (latestUser) {
-              tokenStorage.setUser(latestUser);
-              setUser(latestUser);
-            }
-          } catch (sessionErr) {
-            console.warn('Session refresh failed, using cached user:', sessionErr?.response?.data?.error || sessionErr.message);
+        try {
+          session = await restoreFromSession();
+        } catch (sessionErr) {
+          if (sessionErr?.response?.status === 401) {
+            const refreshResponse = await api.post('/auth/refresh');
+            session = {
+              token: refreshResponse.data?.token || null,
+              user: refreshResponse.data?.user || null,
+            };
+          } else {
+            throw sessionErr;
           }
+        }
 
-          console.log('✓ Auth restored from localStorage');
+        if (session?.token && session?.user) {
+          tokenStorage.setToken(session.token);
+          tokenStorage.setUser(session.user);
+          setAuthToken(session.token);
+          setToken(session.token);
+          setUser(session.user);
         } else {
-          // ❌ No token: User not authenticated
+          clearAuthToken();
           setToken(null);
           setUser(null);
         }
       } catch (err) {
-        console.error('❌ Auth initialization error:', err);
+        console.warn('Auth initialization failed:', err?.response?.data?.error || err.message);
+        clearAuthToken();
         setToken(null);
         setUser(null);
       } finally {
-        // ✅ Mark initialization complete
         setIsLoading(false);
       }
     };
@@ -105,7 +106,6 @@ export const AuthProvider = ({ children }) => {
     setToken(userToken);
     setUser(userData);
 
-    console.log('✓ User logged in:', userData.email);
   };
 
   /**
@@ -125,7 +125,6 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
     setUser(null);
 
-    console.log('✓ User logged out');
   };
 
   const value = {

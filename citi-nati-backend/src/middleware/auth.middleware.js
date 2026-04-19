@@ -1,4 +1,5 @@
-const { verifyToken } = require('../utils/jwt');
+const { verifyTokenDetailed } = require('../utils/jwt');
+const logger = require('../utils/logger');
 
 const extractTokenFromCookies = (cookieHeader) => {
   if (!cookieHeader || typeof cookieHeader !== 'string') {
@@ -21,17 +22,20 @@ const verifyTokenMiddleware = (req, res, next) => {
   const token = bearerToken || cookieToken;
 
   if (!token) {
-    return res.status(401).json({ error: 'No token provided' });
+    return res.status(401).json({ error: 'Authentication required', code: 'NO_TOKEN' });
   }
 
-  const decoded = verifyToken(token);
+  const verification = verifyTokenDetailed(token);
 
-  if (!decoded) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
+  if (!verification.valid) {
+    return res.status(401).json({
+      error: verification.code === 'TOKEN_EXPIRED' ? 'Session expired' : 'Invalid token',
+      code: verification.code,
+    });
   }
 
-  req.user = decoded;
-  console.log('[AUTH] Token verified for user:', { userId: req.user.userId, role: req.user.role, email: req.user.email });
+  req.user = verification.payload;
+  logger.debug('[AUTH] Token verified', { userId: req.user.userId, role: req.user.role });
   next();
 };
 

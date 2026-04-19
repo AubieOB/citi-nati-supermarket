@@ -1,68 +1,31 @@
 /**
- * 💾 TOKEN STORAGE UTILITY
+ * In-memory auth token cache.
  * 
- * Manages localStorage for token and user data.
- * Single source of truth for auth-related localStorage operations.
- * 
- * Do NOT store password or sensitive data.
- * Do NOT decode token manually.
- * Backend is source of truth for user role and permissions.
+ * Sensitive auth material is intentionally not persisted in localStorage.
+ * Session continuity comes from HTTP-only cookies managed by the backend.
  */
 
+let currentToken = null;
+let currentUser = null;
+
 export const tokenStorage = {
-  /**
-   * Save token to localStorage
-   */
   setToken: (token) => {
-    if (token) {
-      localStorage.setItem('token', token);
-    }
+    currentToken = token || null;
   },
 
-  /**
-   * Get token from localStorage
-   */
-  getToken: () => {
-    return localStorage.getItem('token');
-  },
+  getToken: () => currentToken,
 
-  /**
-   * Save user object to localStorage
-   * Shape: { id, email, name, role }
-   */
   setUser: (user) => {
-    if (user) {
-      localStorage.setItem('user', JSON.stringify(user));
-    }
+    currentUser = user || null;
   },
 
-  /**
-   * Get user object from localStorage
-   */
-  getUser: () => {
-    const userStr = localStorage.getItem('user');
-    if (!userStr) return null;
-    try {
-      return JSON.parse(userStr);
-    } catch (err) {
-      console.error('Failed to parse user from localStorage');
-      return null;
-    }
-  },
+  getUser: () => currentUser,
 
-  /**
-   * Check if user is logged in (token exists)
-   */
-  isLoggedIn: () => {
-    return !!localStorage.getItem('token');
-  },
+  isLoggedIn: () => Boolean(currentToken),
 
-  /**
-   * Clear all auth data (logout)
-   */
   clear: () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    currentToken = null;
+    currentUser = null;
   },
 };
 

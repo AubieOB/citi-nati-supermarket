@@ -34,6 +34,9 @@ model User {
   role                    String   @default("user")
   isActive                Boolean  @default(true)
   emailVerified           Boolean  @default(false)
+  failedLoginAttempts     Int      @default(0)
+  lockedUntil             DateTime?
+  lastLoginAt             DateTime?
   verificationCode        String?
   verificationCodeExpiry  DateTime?
   passwordResetCode       String?
@@ -44,8 +47,48 @@ model User {
   permissions             UserPermission[]
   permissionAuditLogsAuthored PermissionAuditLog[] @relation("PermissionAuditActor")
   permissionAuditLogsTargeted PermissionAuditLog[] @relation("PermissionAuditTarget")
+  refreshTokens           RefreshToken[]
+  securityAuditLogs       SecurityAuditLog[] @relation("SecurityAuditActor")
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
+}
+
+model RefreshToken {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  tokenHash  String   @unique @map("token_hash")
+  expiresAt  DateTime @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+  lastUsedAt DateTime? @map("last_used_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@index([revokedAt])
+  @@map("refresh_tokens")
+}
+
+model SecurityAuditLog {
+  id          String   @id @default(uuid())
+  actorUserId String?  @map("actor_user_id")
+  action      String
+  resourceType String  @map("resource_type")
+  resourceId  String?  @map("resource_id")
+  status      String   @default("SUCCESS")
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  actorUser User? @relation("SecurityAuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
+  @@index([resourceType, resourceId])
+  @@map("security_audit_logs")
 }
 
 model UserPermission {

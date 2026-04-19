@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -27,8 +28,24 @@ const adminQuotationsRoutes = require('./routes/admin.quotations.routes');
 const posSyncRoutes = require('./routes/posSync.routes');
 const cashierRoutes = require('./routes/cashier.routes');
 const businessOperationsRoutes = require('./routes/businessOperations.routes');
+const logger = require('./utils/logger');
+const { adminRateLimiter, posAgentRateLimiter } = require('./middleware/rateLimit.middleware');
 
 const prisma = new PrismaClient();
+
+function parseAllowedOrigins() {
+  const configured = String(process.env.CORS_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  return Array.from(new Set([
+    'http://localhost:3000',
+    'http://localhost:5173',
+    process.env.FRONTEND_URL || 'http://localhost:3000',
+    ...configured,
+  ].filter(Boolean)));
+}
 
 async function start() {
   try {
@@ -42,32 +59,20 @@ async function start() {
     uploadDirs.forEach(dir => {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
-        console.log('[STARTUP] Created upload directory:', dir);
+        logger.info('[STARTUP] Created upload directory', { dir });
       }
     });
 
-    // Log DATABASE_URL for verification
-    console.log('DATABASE_URL:', process.env.DATABASE_URL ? `Connected to: ${process.env.DATABASE_URL.split('@')[1] || 'local'}` : 'NOT SET');
-    
     // Connect to the database before starting the server
     await prisma.$connect();
-    console.log('Connected to the database via Prisma');
-
-    // Log current users on startup
-    const usersOnStartup = await prisma.user.findMany({
-      select: { id: true, email: true, role: true }
-    });
-    console.log('[DEBUG STARTUP] Users in database:', usersOnStartup);
+    logger.info('Connected to the database via Prisma');
 
     const app = express();
     const server = http.createServer(app);
+    app.set('trust proxy', 1);
     
     // CORS configuration for Socket.io
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://localhost:5173',
-      process.env.FRONTEND_URL || 'http://localhost:3000'
-    ];
+    const allowedOrigins = parseAllowedOrigins();
     
     const io = new Server(server, {
       cors: {
@@ -365,6 +370,23 @@ async function start() {
 
     // Middleware
     app.use(cookieParser());
+    app.use(helmet({
+      contentSecurityPolicy: {
+        useDefaults: true,
+        directives: {
+          defaultSrc: ["'self'"],
+          connectSrc: ["'self'", ...allowedOrigins],
+          imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
+          scriptSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          frameAncestors: ["'none'"],
+        },
+      },
+      crossOriginEmbedderPolicy: false,
+      hsts: process.env.NODE_ENV === 'production'
+        ? { maxAge: 31536000, includeSubDomains: true, preload: true }
+        : false,
+    }));
     app.use(express.json({ limit: '10mb' }));
     app.use(express.urlencoded({ limit: '10mb', extended: true }));
     
@@ -374,7 +396,7 @@ async function start() {
         if (!origin || allowedOrigins.includes(origin)) {
           callback(null, true);
         } else {
-          console.warn('[CORS] Rejected origin:', origin);
+          logger.warn('[CORS] Rejected origin', { origin });
           callback(new Error('Not allowed by CORS'));
         }
       },
@@ -383,7 +405,7 @@ async function start() {
       allowedHeaders: ['Content-Type', 'Authorization']
     };
     
-    console.log('[CORS] Allowed origins:', allowedOrigins);
+    logger.info('[CORS] Allowed origins configured', { allowedOrigins });
     app.use(cors(corsOptions));
     app.use('/uploads', express.static('uploads'));
 
@@ -392,8 +414,9 @@ async function start() {
       return res.json({ status: 'OK', bootstrap: 'enabled' });
     });
 
-    // ⚠️  TEMPORARY SETUP ENDPOINT - DELETE AFTER FIRST LOGIN
-    app.use('/api/setup', adminSetupRoutes);
+    if (process.env.ENABLE_INSECURE_ADMIN_SETUP === 'true' && process.env.NODE_ENV !== 'production') {
+      app.use('/api/setup', adminSetupRoutes);
+    }
 
     // Auth routes
     app.use('/api/auth', authRoutes);
@@ -405,10 +428,10 @@ async function start() {
     app.use('/api/admin', adminBootstrapRoutes);
 
     // Admin routes (protected)
-    app.use('/api/admin', adminRoutes);
+    app.use('/api/admin', adminRateLimiter, adminRoutes);
 
     // Admin Messages routes
-    app.use('/api/admin/messages', adminMessagesRoutes);
+    app.use('/api/admin/messages', adminRateLimiter, adminMessagesRoutes);
 
     // Products routes
     app.use('/api/products', productsRoutes);
@@ -435,22 +458,22 @@ async function start() {
     app.use('/api/support', supportRoutes);
 
     // POS command queue routes (polled by local POS Sync Agent)
-    app.use('/api/pos-commands', posCommandsRoutes);
+    app.use('/api/pos-commands', posAgentRateLimiter, posCommandsRoutes);
 
     // Emergency sale cashier/monitoring routes (admin-only)
-    app.use('/api/admin/emergency-sales', adminEmergencySalesRoutes);
+    app.use('/api/admin/emergency-sales', adminRateLimiter, adminEmergencySalesRoutes);
 
     // Quotations routes (admin-only)
-    app.use('/api/admin/quotations', adminQuotationsRoutes);
+    app.use('/api/admin/quotations', adminRateLimiter, adminQuotationsRoutes);
 
     // Emergency sale sync fetch/ack routes (POS agent secret protected)
-    app.use('/api/pos-sync', posSyncRoutes);
+    app.use('/api/pos-sync', posAgentRateLimiter, posSyncRoutes);
 
     // Cashier role routes (PIN + emergency sales for cashier)
     app.use('/api/cashier', cashierRoutes);
 
     // Business Operations reporting endpoints (admin-protected)
-    app.use('/api/business-operations', businessOperationsRoutes);
+    app.use('/api/business-operations', adminRateLimiter, businessOperationsRoutes);
 
     // Ensure unknown API routes never return HTML to API clients
     app.use('/api', (req, res) => {

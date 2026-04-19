@@ -14,6 +14,7 @@ import axios from 'axios';
 import { tokenStorage } from './tokenStorage.js';
 
 let isHandlingSessionExpiry = false;
+let refreshPromise = null;
 
 const SESSION_EXPIRY_PATTERNS = [
   /invalid\s+or\s+expired\s+token/i,
@@ -76,32 +77,60 @@ api.interceptors.request.use(
  */
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     const status = error?.response?.status;
     const requestUrl = String(error?.config?.url || '');
+    const originalRequest = error?.config;
     const hasToken = Boolean(tokenStorage.getToken());
-    const isAuthRequest = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register');
+    const isAuthRequest = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register') || requestUrl.includes('/auth/refresh');
     const sessionExpired = isSessionExpiryError(error);
+
+    if (status === 401 && sessionExpired && !isAuthRequest && originalRequest && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      try {
+        refreshPromise = refreshPromise || api.post('/auth/refresh');
+        const refreshResponse = await refreshPromise;
+        const nextToken = refreshResponse.data?.token;
+        const nextUser = refreshResponse.data?.user;
+
+        if (nextToken) {
+          setAuthToken(nextToken);
+          if (nextUser) {
+            tokenStorage.setUser(nextUser);
+          }
+          originalRequest.headers = originalRequest.headers || {};
+          originalRequest.headers.Authorization = `Bearer ${nextToken}`;
+          return api(originalRequest);
+        }
+      } catch (refreshError) {
+        delete api.defaults.headers.common.Authorization;
+        tokenStorage.clear();
+
+        if (typeof window !== 'undefined' && !isHandlingSessionExpiry) {
+          isHandlingSessionExpiry = true;
+          try {
+            window.dispatchEvent(new CustomEvent('app:session-expired', {
+              detail: {
+                message: 'Session expired. Please login again.',
+                redirectTo: '/login?reason=session-expired',
+              },
+            }));
+          } catch (dispatchError) {
+            console.warn('[API] Failed to dispatch session-expired event:', dispatchError);
+          }
+        }
+
+        return Promise.reject(refreshError);
+      } finally {
+        refreshPromise = null;
+      }
+    }
 
     if (status === 401 && hasToken && !isAuthRequest && sessionExpired && !isHandlingSessionExpiry) {
       isHandlingSessionExpiry = true;
-
-      // Clear local auth immediately so app state stops sending stale token.
       delete api.defaults.headers.common.Authorization;
       tokenStorage.clear();
-
-      if (typeof window !== 'undefined') {
-        try {
-          window.dispatchEvent(new CustomEvent('app:session-expired', {
-            detail: {
-              message: 'Session expired. Please login again.',
-              redirectTo: '/login?reason=session-expired',
-            },
-          }));
-        } catch (dispatchError) {
-          console.warn('[API] Failed to dispatch session-expired event:', dispatchError);
-        }
-      }
     }
 
     return Promise.reject(error);
@@ -115,10 +144,7 @@ api.interceptors.response.use(
 export const initializeAuth = () => {
   const token = tokenStorage.getToken();
   if (token) {
-    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    console.log('[API] Authorization header set from localStorage');
-  } else {
-    console.log('[API] No token found in localStorage');
+    api.defaults.headers.common.Authorization = `Bearer ${token}`;
   }
 };
 
@@ -128,9 +154,8 @@ export const initializeAuth = () => {
  */
 export const setAuthToken = (token) => {
   if (token) {
-    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    api.defaults.headers.common.Authorization = `Bearer ${token}`;
     tokenStorage.setToken(token);
-    console.log('[API] Authorization header updated with new token');
   }
 };
 
@@ -139,9 +164,9 @@ export const setAuthToken = (token) => {
  * Called on logout
  */
 export const clearAuthToken = () => {
-  delete api.defaults.headers.common['Authorization'];
+  delete api.defaults.headers.common.Authorization;
   tokenStorage.clear();
-  console.log('[API] Authorization header cleared');
+  isHandlingSessionExpiry = false;
 };
 
 export default api;

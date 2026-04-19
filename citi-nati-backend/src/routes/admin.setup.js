@@ -14,6 +14,8 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const { PrismaClient } = require('@prisma/client');
+const { validateStrongPassword } = require('../utils/passwordPolicy');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -29,6 +31,10 @@ const prisma = new PrismaClient();
  */
 router.get('/create-admin', async (req, res) => {
   try {
+    if (process.env.NODE_ENV === 'production' || process.env.ENABLE_INSECURE_ADMIN_SETUP !== 'true') {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
     // Check if admin already exists
     const adminExists = await prisma.user.findFirst({
       where: { role: 'admin' }
@@ -66,7 +72,7 @@ router.get('/create-admin', async (req, res) => {
       }
     });
 
-    console.log('[SETUP] ✅ Hardcoded admin account created:', adminUser.email);
+    logger.warn('[SETUP] Hardcoded admin account created', { email: adminUser.email });
 
     return res.status(201).json({
       success: true,
@@ -80,7 +86,7 @@ router.get('/create-admin', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('[SETUP] Error:', err.message);
+    logger.error('[SETUP] Error', err);
     
     if (err.code === 'P2002') {
       return res.status(400).json({
@@ -90,7 +96,7 @@ router.get('/create-admin', async (req, res) => {
 
     res.status(500).json({
       error: 'Failed to create admin account',
-      message: err.message
+      message: 'Something went wrong'
     });
   }
 });

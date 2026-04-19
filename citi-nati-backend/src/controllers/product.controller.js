@@ -20,6 +20,7 @@ const prisma = new PrismaClient();
 const MIN_VALID_EXPIRY_DATE = new Date('2000-01-01T00:00:00.000Z');
 
 const productImageMappingService = require('../services/productImageMapping.service');
+const { recordAuditLog } = require('../services/auditLog.service');
 const ADMIN_EXPIRY_REQUEST_TIMEOUT_MS = 30000;
 const ADMIN_EXPIRY_CACHE_TTL_MS = 5 * 60 * 1000;
 const ADMIN_EXPIRY_ALERTS_REQUEST_TIMEOUT_MS = Number(process.env.ADMIN_EXPIRY_ALERTS_REQUEST_TIMEOUT_MS || 8000);
@@ -1071,6 +1072,20 @@ const createProduct = async (req, res) => {
     // Format product with computed fields
     const formattedProduct = formatProduct(product, req, true);
 
+    await recordAuditLog({
+      req,
+      actorUserId: req.user?.userId || null,
+      action: 'PRODUCT_CREATED',
+      resourceType: 'PRODUCT',
+      resourceId: product.id,
+      status: 'SUCCESS',
+      metadata: {
+        name: product.name,
+        price: product.price,
+        stock: product.stock,
+      },
+    });
+
     return res.status(201).json({
       message: 'Product created successfully',
       product: formattedProduct,
@@ -1797,6 +1812,20 @@ const updateProduct = async (req, res) => {
       console.warn('[PRODUCT UPDATE] Could not emit socket event:', socketErr.message);
     }
 
+    await recordAuditLog({
+      req,
+      actorUserId: req.user?.userId || null,
+      action: 'PRODUCT_UPDATED',
+      resourceType: 'PRODUCT',
+      resourceId: updatedProduct.id,
+      status: 'SUCCESS',
+      metadata: {
+        updatedFields: Object.keys(updateData),
+        changedFields: [...new Set(changedFields)],
+        posWritebackSummary,
+      },
+    });
+
     return res.status(200).json({
       message: 'Product updated successfully',
       product: formattedProduct,
@@ -1895,6 +1924,22 @@ const setStockOverride = async (req, res) => {
       console.warn('[STOCK OVERRIDE] Socket emit failed:', socketErr.message);
     }
 
+    await recordAuditLog({
+      req,
+      actorUserId: req.user?.userId || null,
+      action: 'PRODUCT_STOCK_OVERRIDE_UPDATED',
+      resourceType: 'PRODUCT',
+      resourceId: updatedProduct.id,
+      status: 'SUCCESS',
+      metadata: {
+        overrideActive,
+        overrideStock: overrideStockValue,
+        overrideReason,
+        previousOverrideActive,
+        previousOverrideStock,
+      },
+    });
+
     return res.json({
       success: true,
       product: formatProduct(updatedProduct, req, true),
@@ -1960,6 +2005,18 @@ const updateProductStockThreshold = async (req, res) => {
       console.warn('[STOCK THRESHOLD] Socket emit failed:', socketErr.message);
     }
 
+    await recordAuditLog({
+      req,
+      actorUserId: req.user?.userId || null,
+      action: 'PRODUCT_STOCK_THRESHOLD_UPDATED',
+      resourceType: 'PRODUCT',
+      resourceId: updated.id,
+      status: 'SUCCESS',
+      metadata: {
+        lowStockThreshold: parsedThreshold,
+      },
+    });
+
     return res.status(200).json({
       success: true,
       message: 'Low stock threshold updated successfully',
@@ -1993,6 +2050,19 @@ const deleteProduct = async (req, res) => {
     // CASCADE constraints will automatically delete related CartItems and OrderItems
     await prisma.product.delete({
       where: { id },
+    });
+
+    await recordAuditLog({
+      req,
+      actorUserId: req.user?.userId || null,
+      action: 'PRODUCT_DELETED',
+      resourceType: 'PRODUCT',
+      resourceId: existingProduct.id,
+      status: 'SUCCESS',
+      metadata: {
+        name: existingProduct.name,
+        sourceCode: existingProduct.sourceCode,
+      },
     });
 
     console.log('[DEBUG DELETE] Product deleted successfully:', id);

@@ -9,6 +9,7 @@ const { cacheWebhookEvent } = require('../utils/webhookCache');
 const posCommandQueueService = require('../services/posCommandQueue.service');
 const { splitInclusiveVatAtRate, getVatRatePercent, normalizeVatRatePercent, roundMoney } = require('../utils/vat');
 const { formatBusinessDateKey, formatBusinessTimeKey } = require('../utils/businessTime');
+const { recordAuditLog } = require('../services/auditLog.service');
 
 const prisma = new PrismaClient();
 
@@ -765,8 +766,30 @@ const handleWebhook = async (req, res) => {
           orderId: result.id,
           itemCount: writeInvoicePayload.items.length,
         });
+
+        await recordAuditLog({
+          action: 'POS_INVOICE_WRITEBACK_QUEUED',
+          resourceType: 'ORDER',
+          resourceId: result.id,
+          status: 'SUCCESS',
+          metadata: {
+            commandId: queuedWriteInvoice.id,
+            itemCount: writeInvoicePayload.items.length,
+            paymentReference: reference,
+          },
+        });
       }
     } catch (queueErr) {
+      await recordAuditLog({
+        action: 'POS_INVOICE_WRITEBACK_QUEUE_FAILED',
+        resourceType: 'ORDER',
+        resourceId: result.id,
+        status: 'FAILURE',
+        metadata: {
+          paymentReference: reference,
+          error: queueErr.message,
+        },
+      });
       console.error('[POS COMMAND QUEUE ERROR] failed to queue WRITE_INVOICE:', {
         orderId: result.id,
         error: queueErr.message,

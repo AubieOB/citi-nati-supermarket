@@ -8,6 +8,8 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const { PrismaClient } = require('@prisma/client');
+const { validateStrongPassword } = require('../utils/passwordPolicy');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -20,13 +22,17 @@ const prisma = new PrismaClient();
  */
 router.get('/setup', async (req, res) => {
   try {
+    if (process.env.NODE_ENV === 'production' || process.env.ENABLE_INSECURE_ADMIN_SETUP !== 'true') {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
     // Check if admin already exists
     const adminExists = await prisma.user.findFirst({
       where: { role: 'admin' }
     });
 
     if (adminExists) {
-      console.log('[SETUP] Admin already exists');
+      logger.warn('[SETUP] Admin already exists');
       return res.status(409).json({ 
         error: 'Admin already exists',
         email: adminExists.email
@@ -59,7 +65,7 @@ router.get('/setup', async (req, res) => {
       }
     });
 
-    console.log('[SETUP] ✅ Hardcoded admin created:', admin.email);
+    logger.warn('[SETUP] Hardcoded admin created', { email: admin.email });
 
     return res.status(201).json({
       success: true,
@@ -72,7 +78,7 @@ router.get('/setup', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('[SETUP] Error:', err.message);
+    logger.error('[SETUP] Error', err);
     res.status(500).json({ error: 'Setup failed' });
   }
 });
@@ -86,7 +92,7 @@ router.post('/bootstrap', async (req, res) => {
     // Check if bootstrap is enabled
     const bootstrapSecret = process.env.ADMIN_BOOTSTRAP_SECRET;
     if (!bootstrapSecret) {
-      console.log('[BOOTSTRAP] Endpoint disabled: ADMIN_BOOTSTRAP_SECRET not set');
+      logger.warn('[BOOTSTRAP] Endpoint disabled: ADMIN_BOOTSTRAP_SECRET not set');
       return res.status(404).json({ error: 'Not found' });
     }
 
@@ -95,7 +101,7 @@ router.post('/bootstrap', async (req, res) => {
     const providedSecret = authHeader?.replace('Bearer ', '');
 
     if (!providedSecret || providedSecret !== bootstrapSecret) {
-      console.warn('[BOOTSTRAP] Unauthorized attempt - invalid or missing secret');
+      logger.warn('[BOOTSTRAP] Unauthorized attempt - invalid or missing secret');
       return res.status(401).json({ error: 'Unauthorized - invalid secret' });
     }
 
@@ -105,7 +111,7 @@ router.post('/bootstrap', async (req, res) => {
     });
 
     if (adminExists) {
-      console.log('[BOOTSTRAP] Attempt denied - admin already exists:', adminExists.email);
+      logger.warn('[BOOTSTRAP] Attempt denied - admin already exists', { email: adminExists.email });
       return res.status(409).json({ 
         error: 'Admin already exists',
         message: 'Bootstrap can only be used once',
@@ -117,14 +123,14 @@ router.post('/bootstrap', async (req, res) => {
     const { email, password, name } = req.body;
 
     if (!email || !password) {
-      console.warn('[BOOTSTRAP] Missing required fields');
+      logger.warn('[BOOTSTRAP] Missing required fields');
       return res.status(400).json({ error: 'Missing email or password' });
     }
 
-    // Validate password strength
-    if (password.length < 8) {
-      console.warn('[BOOTSTRAP] Password too weak (length < 8)');
-      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    const passwordValidation = validateStrongPassword(password);
+    if (!passwordValidation.valid) {
+      logger.warn('[BOOTSTRAP] Weak password rejected');
+      return res.status(400).json({ error: passwordValidation.errors[0] });
     }
 
     // Check if email already exists
@@ -133,16 +139,14 @@ router.post('/bootstrap', async (req, res) => {
     });
 
     if (emailExists) {
-      console.warn('[BOOTSTRAP] Email already in use:', email);
+      logger.warn('[BOOTSTRAP] Email already in use', { email });
       return res.status(400).json({ error: 'Email already exists in system' });
     }
 
     // Hash password with bcrypt
-    console.log('[BOOTSTRAP] Hashing password...');
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create admin user
-    console.log('[BOOTSTRAP] Creating admin account:', email);
     const adminUser = await prisma.user.create({
       data: {
         name: name || 'System Administrator',
@@ -161,7 +165,7 @@ router.post('/bootstrap', async (req, res) => {
       }
     });
 
-    console.log('[BOOTSTRAP] ✅ SUCCESS - Admin account created:', adminUser.email);
+    logger.info('[BOOTSTRAP] Admin account created', { email: adminUser.email });
 
     return res.status(201).json({
       success: true,
@@ -171,7 +175,7 @@ router.post('/bootstrap', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('[BOOTSTRAP] Error:', err.message);
+    logger.error('[BOOTSTRAP] Error', err);
     
     if (err.code === 'P2002') {
       return res.status(400).json({ 
@@ -181,7 +185,7 @@ router.post('/bootstrap', async (req, res) => {
 
     res.status(500).json({ 
       error: 'Failed to create admin account',
-      message: err.message 
+      message: 'Something went wrong' 
     });
   }
 });

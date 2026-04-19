@@ -1,6 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const { emitOrderStatusUpdated, emitOrderUpdated } = require('../utils/socket');
+const { validateStrongPassword } = require('../utils/passwordPolicy');
 
 const prisma = new PrismaClient();
 
@@ -17,6 +18,11 @@ const createDriverWithAccount = async (req, res) => {
       return res.status(400).json({
         error: 'Name, email, and password are required',
       });
+    }
+
+    const passwordValidation = validateStrongPassword(password);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ error: passwordValidation.errors[0] });
     }
 
     // Check if user already exists

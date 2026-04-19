@@ -7,8 +7,11 @@ const {
   listCommands,
   getCommandStats,
 } = require('../controllers/posCommands.controller');
+const { requireTrustedAgent } = require('../middleware/agentAuth.middleware');
 
 const router = express.Router();
+
+router.use(requireTrustedAgent);
 
 router.post('/poll', pollCommands);
 router.post('/:id/complete', completeCommand);
