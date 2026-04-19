@@ -89,6 +89,7 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedL
   });
   const [exporting, setExporting] = useState({});
   const [activeActivity, setActiveActivity] = useState('sales');
+  const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
   const [showQuickExports, setShowQuickExports] = useState(false);
   const [autoRefreshing, setAutoRefreshing] = useState(false);
   const autoRefreshIntervalRef = useRef(null);
@@ -254,6 +255,80 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedL
 
   const activeActivityMeta = activityTabs.find((tab) => tab.id === activeActivity) || activityTabs[0];
 
+  const openActivityModal = useCallback((activityId) => {
+    setActiveActivity(activityId);
+    setIsActivityModalOpen(true);
+  }, []);
+
+  const renderActivityContent = useCallback(() => {
+    if (activeActivity === 'sales') {
+      if (!state.invoices.length) return <EmptyState message="No sales invoices available right now." />;
+      return state.invoices.map((invoice) => (
+        <div key={invoice.id} style={{ border: '1px solid #e2e8f0', borderRadius: '14px', padding: '0.9rem' }}>
+          <strong style={{ color: '#0f172a' }}>{invoice.sourceInvoiceNo || invoice.refNo || `Invoice ${invoice.id}`}</strong>
+          <div style={{ marginTop: '0.25rem', color: '#64748b', fontSize: '0.84rem' }}>{formatDate(invoice.invoiceDate)} • {invoice.userName || 'Unknown cashier'} • {invoice.branchCode || 'No branch'}</div>
+          <div style={{ marginTop: '0.45rem', color: '#0f172a', fontWeight: 800 }}>{money(invoice.netSale)}</div>
+        </div>
+      ));
+    }
+
+    if (activeActivity === 'expenses') {
+      if (!state.expenses.length) return <EmptyState message="No expenses available right now." />;
+      return state.expenses.map((expense) => (
+        <div key={expense.id} style={{ border: '1px solid #e2e8f0', borderRadius: '14px', padding: '0.9rem' }}>
+          <strong style={{ color: '#0f172a' }}>{expense.description || expense.expenseCategory?.name || 'Expense entry'}</strong>
+          <div style={{ marginTop: '0.25rem', color: '#64748b', fontSize: '0.84rem' }}>{formatDate(expense.expenseDate)} • {expense.expenseCategory?.name || 'No category'}</div>
+          <div style={{ marginTop: '0.45rem', color: '#0f172a', fontWeight: 800 }}>{money(expense.amount)}</div>
+        </div>
+      ));
+    }
+
+    if (activeActivity === 'suppliers') {
+      if (!state.supplierTransactions.length) return <EmptyState message="No supplier transactions available right now." />;
+      return state.supplierTransactions.map((transaction) => (
+        <div key={transaction.id} style={{ border: '1px solid #e2e8f0', borderRadius: '14px', padding: '0.9rem' }}>
+          <strong style={{ color: '#0f172a' }}>{transaction.supplier?.name || 'Unknown supplier'}</strong>
+          <div style={{ marginTop: '0.25rem', color: '#64748b', fontSize: '0.84rem' }}>{formatDate(transaction.transactionDate)} • {transaction.transactionType || 'Unknown type'}</div>
+          <div style={{ marginTop: '0.45rem', color: '#0f172a', fontWeight: 800 }}>{money(transaction.amount)}</div>
+        </div>
+      ));
+    }
+
+    if (activeActivity === 'payroll') {
+      if (!state.payrollPeriods.length) return <EmptyState message="No payroll timeline available right now." />;
+      return (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: 'left', padding: '0.82rem 0.9rem', color: '#475569', fontSize: '0.76rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>Period</th>
+                <th style={{ textAlign: 'left', padding: '0.82rem 0.9rem', color: '#475569', fontSize: '0.76rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>Mode</th>
+                <th style={{ textAlign: 'left', padding: '0.82rem 0.9rem', color: '#475569', fontSize: '0.76rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>Status</th>
+                <th style={{ textAlign: 'left', padding: '0.82rem 0.9rem', color: '#475569', fontSize: '0.76rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {state.payrollPeriods.map((period, index) => (
+                <tr key={period.id} style={{ backgroundColor: index % 2 === 0 ? '#fff' : '#fcfdff' }}>
+                  <td style={{ padding: '0.86rem 0.9rem', borderBottom: '1px solid #eef2f7', color: '#0f172a' }}>{period.description || `Period ${period.id}`}</td>
+                  <td style={{ padding: '0.86rem 0.9rem', borderBottom: '1px solid #eef2f7', color: '#334155', textTransform: 'capitalize' }}>{String(period.payrollMode || '').replace('_', ' ') || '—'}</td>
+                  <td style={{ padding: '0.86rem 0.9rem', borderBottom: '1px solid #eef2f7' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', borderRadius: '999px', padding: '0.22rem 0.58rem', fontSize: '0.76rem', fontWeight: 700, backgroundColor: period.status === 'finalized' ? '#dcfce7' : '#e2e8f0', color: period.status === 'finalized' ? '#166534' : '#334155' }}>
+                      {period.status || 'draft'}
+                    </span>
+                  </td>
+                  <td style={{ padding: '0.86rem 0.9rem', borderBottom: '1px solid #eef2f7', color: '#334155' }}>{formatDate(period.createdAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    return null;
+  }, [activeActivity, state.expenses, state.invoices, state.payrollPeriods, state.supplierTransactions]);
+
   const handleExport = useCallback(async ({ module, type, format }) => {
     const key = `${module}:${format}`;
     setExporting((current) => ({ ...current, [key]: true }));
@@ -368,86 +443,75 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedL
         <div style={{ ...cardStyle, overflow: 'hidden', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '1rem 1.1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
             <strong style={{ color: '#0f172a' }}>Recent Activity</strong>
-            <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>{activeActivityMeta.description}</p>
+            <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>
+              Click a pill to open recent records in a modal.
+            </p>
           </div>
 
           <div style={{ padding: '0.8rem 1rem', borderBottom: '1px solid #eef2f7', display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
             {activityTabs.map((tab) => (
-              <button key={tab.id} type="button" onClick={() => setActiveActivity(tab.id)} style={activityTabStyle(activeActivity === tab.id)}>
+              <button key={tab.id} type="button" onClick={() => openActivityModal(tab.id)} style={activityTabStyle(activeActivity === tab.id)}>
                 {tab.label} ({tab.count})
               </button>
             ))}
           </div>
+          <div style={{ padding: '1rem 1.1rem', color: '#64748b', fontSize: '0.88rem' }}>
+            Select any activity pill above to view records in a modal window.
+          </div>
+        </div>
+      )}
 
-          <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem', flex: 1, minHeight: 0, overflowY: 'auto' }}>
-            {activeActivity === 'sales' && (
-              !state.invoices.length ? (
-                <EmptyState message="No sales invoices available right now." />
-              ) : state.invoices.map((invoice) => (
-                <div key={invoice.id} style={{ border: '1px solid #e2e8f0', borderRadius: '14px', padding: '0.9rem' }}>
-                  <strong style={{ color: '#0f172a' }}>{invoice.sourceInvoiceNo || invoice.refNo || `Invoice ${invoice.id}`}</strong>
-                  <div style={{ marginTop: '0.25rem', color: '#64748b', fontSize: '0.84rem' }}>{formatDate(invoice.invoiceDate)} • {invoice.userName || 'Unknown cashier'} • {invoice.branchCode || 'No branch'}</div>
-                  <div style={{ marginTop: '0.45rem', color: '#0f172a', fontWeight: 800 }}>{money(invoice.netSale)}</div>
-                </div>
-              ))
-            )}
+      {isActivityModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.45)',
+            zIndex: 170,
+            display: 'grid',
+            placeItems: 'center',
+            padding: '0.85rem',
+          }}
+          onClick={() => setIsActivityModalOpen(false)}
+        >
+          <div
+            style={{
+              ...cardStyle,
+              width: 'min(980px, 96vw)',
+              height: 'min(78vh, 720px)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              borderRadius: '18px',
+            }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div style={{ padding: '0.95rem 1.05rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
+              <div>
+                <strong style={{ color: '#0f172a' }}>Recent Activity: {activeActivityMeta.label}</strong>
+                <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.85rem' }}>{activeActivityMeta.description}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsActivityModalOpen(false)}
+                style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.4rem 0.65rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.8rem' }}
+              >
+                <i className="fas fa-times" style={{ marginRight: '0.35rem' }}></i>
+                Close
+              </button>
+            </div>
 
-            {activeActivity === 'expenses' && (
-              !state.expenses.length ? (
-                <EmptyState message="No expenses available right now." />
-              ) : state.expenses.map((expense) => (
-                <div key={expense.id} style={{ border: '1px solid #e2e8f0', borderRadius: '14px', padding: '0.9rem' }}>
-                  <strong style={{ color: '#0f172a' }}>{expense.description || expense.expenseCategory?.name || 'Expense entry'}</strong>
-                  <div style={{ marginTop: '0.25rem', color: '#64748b', fontSize: '0.84rem' }}>{formatDate(expense.expenseDate)} • {expense.expenseCategory?.name || 'No category'}</div>
-                  <div style={{ marginTop: '0.45rem', color: '#0f172a', fontWeight: 800 }}>{money(expense.amount)}</div>
-                </div>
-              ))
-            )}
+            <div style={{ padding: '0.8rem 1rem', borderBottom: '1px solid #eef2f7', display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
+              {activityTabs.map((tab) => (
+                <button key={tab.id} type="button" onClick={() => setActiveActivity(tab.id)} style={activityTabStyle(activeActivity === tab.id)}>
+                  {tab.label} ({tab.count})
+                </button>
+              ))}
+            </div>
 
-            {activeActivity === 'suppliers' && (
-              !state.supplierTransactions.length ? (
-                <EmptyState message="No supplier transactions available right now." />
-              ) : state.supplierTransactions.map((transaction) => (
-                <div key={transaction.id} style={{ border: '1px solid #e2e8f0', borderRadius: '14px', padding: '0.9rem' }}>
-                  <strong style={{ color: '#0f172a' }}>{transaction.supplier?.name || 'Unknown supplier'}</strong>
-                  <div style={{ marginTop: '0.25rem', color: '#64748b', fontSize: '0.84rem' }}>{formatDate(transaction.transactionDate)} • {transaction.transactionType || 'Unknown type'}</div>
-                  <div style={{ marginTop: '0.45rem', color: '#0f172a', fontWeight: 800 }}>{money(transaction.amount)}</div>
-                </div>
-              ))
-            )}
-
-            {activeActivity === 'payroll' && (
-              !state.payrollPeriods.length ? (
-                <EmptyState message="No payroll timeline available right now." />
-              ) : (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr>
-                        <th style={{ textAlign: 'left', padding: '0.82rem 0.9rem', color: '#475569', fontSize: '0.76rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>Period</th>
-                        <th style={{ textAlign: 'left', padding: '0.82rem 0.9rem', color: '#475569', fontSize: '0.76rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>Mode</th>
-                        <th style={{ textAlign: 'left', padding: '0.82rem 0.9rem', color: '#475569', fontSize: '0.76rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>Status</th>
-                        <th style={{ textAlign: 'left', padding: '0.82rem 0.9rem', color: '#475569', fontSize: '0.76rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>Created</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {state.payrollPeriods.map((period, index) => (
-                        <tr key={period.id} style={{ backgroundColor: index % 2 === 0 ? '#fff' : '#fcfdff' }}>
-                          <td style={{ padding: '0.86rem 0.9rem', borderBottom: '1px solid #eef2f7', color: '#0f172a' }}>{period.description || `Period ${period.id}`}</td>
-                          <td style={{ padding: '0.86rem 0.9rem', borderBottom: '1px solid #eef2f7', color: '#334155', textTransform: 'capitalize' }}>{String(period.payrollMode || '').replace('_', ' ') || '—'}</td>
-                          <td style={{ padding: '0.86rem 0.9rem', borderBottom: '1px solid #eef2f7' }}>
-                            <span style={{ display: 'inline-flex', alignItems: 'center', borderRadius: '999px', padding: '0.22rem 0.58rem', fontSize: '0.76rem', fontWeight: 700, backgroundColor: period.status === 'finalized' ? '#dcfce7' : '#e2e8f0', color: period.status === 'finalized' ? '#166534' : '#334155' }}>
-                              {period.status || 'draft'}
-                            </span>
-                          </td>
-                          <td style={{ padding: '0.86rem 0.9rem', borderBottom: '1px solid #eef2f7', color: '#334155' }}>{formatDate(period.createdAt)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )
-            )}
+            <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem', flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              {renderActivityContent()}
+            </div>
           </div>
         </div>
       )}
