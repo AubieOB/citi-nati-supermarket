@@ -37,6 +37,8 @@ const AdminUsers = () => {
   const { modal, closeModal, showConfirm, showError, showSuccess } = useModal();
   const filterBarRef = useRef(null);
   const canManagePermissions = hasPermission(loggedInUser, PERMISSION_KEYS.ADMIN_USERS_MANAGE_PERMISSIONS);
+  const canManageRoles = hasPermission(loggedInUser, PERMISSION_KEYS.ADMIN_USERS_MANAGE_ROLES);
+  const canDeleteUsers = hasPermission(loggedInUser, PERMISSION_KEYS.ADMIN_USERS_DELETE);
 
   useEffect(() => {
     fetchUsers();
@@ -594,23 +596,37 @@ const AdminUsers = () => {
                 </td>
                 <td style={{ padding: '1rem' }}>{u.email}</td>
                 <td style={{ padding: '1rem', textAlign: 'center' }}>
-                  <select
-                    value={u.role}
-                    onChange={(e) => updateUserRole(u.id, e.target.value)}
-                    disabled={updatingUserId === u.id}
-                    style={{
-                      padding: '0.5rem',
+                  {canManageRoles ? (
+                    <select
+                      value={u.role}
+                      onChange={(e) => updateUserRole(u.id, e.target.value)}
+                      disabled={updatingUserId === u.id}
+                      style={{
+                        padding: '0.5rem',
+                        borderRadius: '4px',
+                        border: 'none',
+                        backgroundColor: u.role === 'admin' ? '#e8f4f8' : u.role === 'driver' ? '#f0f8ff' : u.role === 'cashier' ? '#fff7e8' : '#fff',
+                        fontWeight: u.role === 'admin' || u.role === 'driver' || u.role === 'cashier' ? '600' : '400',
+                      }}
+                    >
+                      <option value="user">User</option>
+                      <option value="admin">Admin</option>
+                      <option value="driver">Driver</option>
+                      <option value="cashier">Cashier</option>
+                    </select>
+                  ) : (
+                    <span style={{
+                      padding: '0.35rem 0.6rem',
                       borderRadius: '4px',
-                      border: 'none',
-                      backgroundColor: u.role === 'admin' ? '#e8f4f8' : u.role === 'driver' ? '#f0f8ff' : u.role === 'cashier' ? '#fff7e8' : '#fff',
-                      fontWeight: u.role === 'admin' || u.role === 'driver' || u.role === 'cashier' ? '600' : '400',
-                    }}
-                  >
-                    <option value="user">User</option>
-                    <option value="admin">Admin</option>
-                    <option value="driver">Driver</option>
-                    <option value="cashier">Cashier</option>
-                  </select>
+                      backgroundColor: '#f3f4f6',
+                      color: '#4b5563',
+                      fontWeight: 600,
+                      fontSize: '0.82rem',
+                      textTransform: 'capitalize',
+                    }}>
+                      {u.role}
+                    </span>
+                  )}
                 </td>
                 <td style={{ padding: '1rem', textAlign: 'center', fontSize: '0.9rem' }}>
                   {formatDate(u.createdAt)}
@@ -636,23 +652,25 @@ const AdminUsers = () => {
                         Permissions
                       </button>
                     )}
-                    <button
-                      onClick={() => deleteUserConfirm(u.id)}
-                      disabled={!canDeleteUser(u.id)}
-                      style={{
-                        padding: '0.35rem 0.6rem',
-                        backgroundColor: canDeleteUser(u.id) ? '#dc3545' : '#ccc',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: canDeleteUser(u.id) ? 'pointer' : 'not-allowed',
-                        fontSize: '0.82rem',
-                        whiteSpace: 'nowrap',
-                      }}
-                      title={!canDeleteUser(u.id) ? 'Cannot delete your own account' : ''}
-                    >
-                      Delete
-                    </button>
+                    {canDeleteUsers && (
+                      <button
+                        onClick={() => deleteUserConfirm(u.id)}
+                        disabled={!canDeleteUser(u.id)}
+                        style={{
+                          padding: '0.35rem 0.6rem',
+                          backgroundColor: canDeleteUser(u.id) ? '#dc3545' : '#ccc',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: canDeleteUser(u.id) ? 'pointer' : 'not-allowed',
+                          fontSize: '0.82rem',
+                          whiteSpace: 'nowrap',
+                        }}
+                        title={!canDeleteUser(u.id) ? 'Cannot delete your own account' : ''}
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

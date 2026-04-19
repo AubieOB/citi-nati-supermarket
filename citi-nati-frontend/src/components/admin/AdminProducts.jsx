@@ -13,6 +13,8 @@ import {
   resolveStockStatus,
 } from '../../utils/stockResolver.js';
 import { filterProductsForOperationalLocation } from '../../utils/operationalScope.js';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { PERMISSION_KEYS, hasPermission } from '../../utils/permissions.js';
 import '../../css/admin-responsive-filters.css';
 
 /**
@@ -32,6 +34,7 @@ const AdminProducts = ({
   cachedProductsMeta = {},
   onRefreshProductsCache,
 }) => {
+  const { user: loggedInUser } = useAuth();
   const MAX_PRODUCT_NAME_LENGTH = 120;
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -88,6 +91,7 @@ const AdminProducts = ({
   const textPrimary = isAdminDarkTheme ? '#f8fafc' : '#111827';
   const textSecondary = isAdminDarkTheme ? '#cbd5e1' : '#666';
   const textMuted = isAdminDarkTheme ? '#94a3b8' : '#999';
+  const canManageProducts = hasPermission(loggedInUser, PERMISSION_KEYS.ADMIN_PRODUCTS_MANAGE);
 
   const voiceDigitMap = {
     zero: '0',
@@ -1092,6 +1096,11 @@ const AdminProducts = ({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!canManageProducts) {
+      showError('Access denied', 'You do not have permission to manage products.');
+      return;
+    }
     
     const validationError = validateForm();
     if (validationError) {
@@ -1114,6 +1123,11 @@ const AdminProducts = ({
   };
 
   const submitProduct = async () => {
+    if (!canManageProducts) {
+      showError('Access denied', 'You do not have permission to manage products.');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setFormError('');
@@ -1204,6 +1218,10 @@ const AdminProducts = ({
   };
 
   const handleEdit = (product) => {
+    if (!canManageProducts) {
+      return;
+    }
+
     setFormData({
       name: product.name,
       price: product.price.toString(),
@@ -1222,6 +1240,11 @@ const AdminProducts = ({
   };
 
   const handleDelete = async (id) => {
+    if (!canManageProducts) {
+      showError('Access denied', 'You do not have permission to manage products.');
+      return;
+    }
+
     showConfirm(
       'Delete Product?',
       'Are you sure you want to delete this product? This action cannot be undone.',
@@ -1312,7 +1335,7 @@ const AdminProducts = ({
       )}
 
       {/* Create/Edit Form */}
-      {showForm && (
+      {showForm && canManageProducts && (
         <div
           ref={formSectionRef}
           style={{
@@ -1682,7 +1705,7 @@ const AdminProducts = ({
                     })}
                   </div>
 
-                  {card.sourceProduct ? (
+                  {card.sourceProduct && canManageProducts ? (
                     <button
                       onClick={() => {
                         handleEdit(card.sourceProduct);
@@ -1703,7 +1726,7 @@ const AdminProducts = ({
                     </button>
                   ) : (
                     <div style={{ fontSize: '0.8rem', color: textSecondary, marginTop: '0.9rem' }}>
-                      POS item (manage from POS sync tools)
+                      {card.sourceProduct ? 'Read-only access' : 'POS item (manage from POS sync tools)'}
                     </div>
                   )}
                 </div>
@@ -1942,27 +1965,29 @@ const AdminProducts = ({
             <span style={{ fontWeight: onSaleOnly ? '600' : '400' }}>Promotions</span>
           </label>
 
-          <button
-            onClick={handleDownloadProductsPdf}
-            disabled={isExportingPdf}
-            style={{
-              padding: '0.6rem 1rem',
-              border: 'none',
-              borderRadius: '6px',
-              backgroundColor: isExportingPdf ? '#6c757d' : '#2D8659',
-              color: '#fff',
-              fontSize: '0.9rem',
-              fontWeight: '600',
-              cursor: isExportingPdf ? 'not-allowed' : 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-            }}
-            title="Download products table PDF"
-          >
-            <i className={`fas ${isExportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`}></i>
-            {isExportingPdf ? 'Generating PDF...' : 'Download PDF'}
-          </button>
+          {canManageProducts && (
+            <button
+              onClick={handleDownloadProductsPdf}
+              disabled={isExportingPdf}
+              style={{
+                padding: '0.6rem 1rem',
+                border: 'none',
+                borderRadius: '6px',
+                backgroundColor: isExportingPdf ? '#6c757d' : '#2D8659',
+                color: '#fff',
+                fontSize: '0.9rem',
+                fontWeight: '600',
+                cursor: isExportingPdf ? 'not-allowed' : 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+              }}
+              title="Download products table PDF"
+            >
+              <i className={`fas ${isExportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`}></i>
+              {isExportingPdf ? 'Generating PDF...' : 'Download PDF'}
+            </button>
+          )}
 
           <button
             onClick={handleManualRefresh}
@@ -1987,7 +2012,7 @@ const AdminProducts = ({
           </button>
 
           {/* Create Product Button */}
-          {!showForm && (
+          {!showForm && canManageProducts && (
             <Button
               variant="primary"
               onClick={() => setShowForm(true)}
@@ -2389,42 +2414,46 @@ const AdminProducts = ({
                       )}
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'center', minWidth: '160px' }}>
-                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-                        <button
-                          onClick={() => handleEdit(product)}
-                          style={{
-                            padding: '0.4rem 0.6rem',
-                            backgroundColor: '#007bff',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '0.8rem',
-                            fontWeight: '500',
-                            flex: '1',
-                            minWidth: '60px',
-                          }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(product.id)}
-                          style={{
-                            padding: '0.4rem 0.6rem',
-                            backgroundColor: '#dc3545',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '0.8rem',
-                            fontWeight: '500',
-                            flex: '1',
-                            minWidth: '60px',
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </div>
+                      {canManageProducts ? (
+                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                          <button
+                            onClick={() => handleEdit(product)}
+                            style={{
+                              padding: '0.4rem 0.6rem',
+                              backgroundColor: '#007bff',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '0.8rem',
+                              fontWeight: '500',
+                              flex: '1',
+                              minWidth: '60px',
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(product.id)}
+                            style={{
+                              padding: '0.4rem 0.6rem',
+                              backgroundColor: '#dc3545',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '0.8rem',
+                              fontWeight: '500',
+                              flex: '1',
+                              minWidth: '60px',
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      ) : (
+                        <span style={{ color: textMuted, fontSize: '0.82rem' }}>Read only</span>
+                      )}
                     </td>
                   </tr>
                 );

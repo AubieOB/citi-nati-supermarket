@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import api from '../../utils/api.js';
 import { useModal } from '../../hooks/useModal.js';
 import Modal from '../common/Modal.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { PERMISSION_KEYS, hasPermission } from '../../utils/permissions.js';
 
 const emptyFormState = {
   currentSecurityKey: '',
@@ -34,6 +36,7 @@ const validateSecurityForm = ({ hasExistingKey, formData, showError, label }) =>
 };
 
 const AdminSecurity = () => {
+  const { user: loggedInUser } = useAuth();
   const [loading, setLoading] = useState(true);
   const [savingAdmin, setSavingAdmin] = useState(false);
   const [savingDriver, setSavingDriver] = useState(false);
@@ -57,6 +60,7 @@ const AdminSecurity = () => {
   const [filterBarHeight, setFilterBarHeight] = useState(0);
   const { modal, showError, showSuccess, closeModal } = useModal();
   const filterBarRef = useRef(null);
+  const canManageSecurity = hasPermission(loggedInUser, PERMISSION_KEYS.ADMIN_SECURITY_MANAGE);
 
   useEffect(() => {
     const fetchStatus = async () => {
@@ -205,6 +209,11 @@ const AdminSecurity = () => {
   const handleAdminSubmit = async (event) => {
     event.preventDefault();
 
+    if (!canManageSecurity) {
+      showError('Access denied', 'You do not have permission to manage security keys.');
+      return;
+    }
+
     const isValid = validateSecurityForm({
       hasExistingKey: hasAdminSecurityKey,
       formData: adminFormData,
@@ -240,6 +249,11 @@ const AdminSecurity = () => {
 
   const handleDriverSubmit = async (event) => {
     event.preventDefault();
+
+    if (!canManageSecurity) {
+      showError('Access denied', 'You do not have permission to manage security keys.');
+      return;
+    }
 
     if (!selectedDriverId) {
       showError('Validation', 'Select a driver account first');
@@ -285,6 +299,11 @@ const AdminSecurity = () => {
 
   const handleCashierSubmit = async (event) => {
     event.preventDefault();
+
+    if (!canManageSecurity) {
+      showError('Access denied', 'You do not have permission to manage security keys.');
+      return;
+    }
 
     if (!selectedCashierId) {
       showError('Validation', 'Select a cashier account first');
@@ -419,6 +438,7 @@ const AdminSecurity = () => {
               name="securityKey"
               value={adminFormData.securityKey}
               onChange={(event) => handleInputChange(event, 'admin')}
+              disabled={!canManageSecurity}
               placeholder="Enter new key"
               style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #ddd' }}
             />
@@ -438,15 +458,15 @@ const AdminSecurity = () => {
 
           <button
             type="submit"
-            disabled={savingAdmin}
+            disabled={savingAdmin || !canManageSecurity}
             style={{
               border: 'none',
               borderRadius: '6px',
               padding: '0.8rem 1rem',
-              backgroundColor: savingAdmin ? '#8898aa' : '#2D8659',
+              backgroundColor: (savingAdmin || !canManageSecurity) ? '#8898aa' : '#2D8659',
               color: '#fff',
               fontWeight: 600,
-              cursor: savingAdmin ? 'not-allowed' : 'pointer'
+              cursor: (savingAdmin || !canManageSecurity) ? 'not-allowed' : 'pointer'
             }}
           >
             {savingAdmin ? 'Saving...' : hasAdminSecurityKey ? 'Change Admin Security Key' : 'Set Admin Security Key'}

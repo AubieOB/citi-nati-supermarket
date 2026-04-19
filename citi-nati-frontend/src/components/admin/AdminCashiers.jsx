@@ -3,6 +3,8 @@ import Button from '../ui/Button.jsx';
 import api from '../../utils/api.js';
 import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { PERMISSION_KEYS, hasPermission } from '../../utils/permissions.js';
 
 /**
  * 🏪 ADMIN CASHIERS MANAGEMENT
@@ -11,6 +13,7 @@ import { useModal } from '../../hooks/useModal.js';
  * Cashiers can log in and access the POS (Emergency Sales) panel.
  */
 const AdminCashiers = () => {
+  const { user: loggedInUser } = useAuth();
   const [cashiers, setCashiers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -25,6 +28,7 @@ const AdminCashiers = () => {
   const [filterBarHeight, setFilterBarHeight] = useState(0);
   const { modal, closeModal, showError, showConfirm } = useModal();
   const filterBarRef = useRef(null);
+  const canManageCashiers = hasPermission(loggedInUser, PERMISSION_KEYS.ADMIN_CASHIERS_MANAGE);
 
   useEffect(() => {
     fetchCashiers();
@@ -221,13 +225,15 @@ const AdminCashiers = () => {
           </div>
         </div>
         <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-          <Button
-            variant="primary"
-            onClick={() => { resetForm(); setShowForm(!showForm); }}
-            style={{ fontSize: '0.85rem', padding: '0.55rem 0.9rem', whiteSpace: 'nowrap' }}
-          >
-            {showForm && !editingCashier ? '✕ Cancel' : '+ Create New Emergency Cashier'}
-          </Button>
+          {canManageCashiers && (
+            <Button
+              variant="primary"
+              onClick={() => { resetForm(); setShowForm(!showForm); }}
+              style={{ fontSize: '0.85rem', padding: '0.55rem 0.9rem', whiteSpace: 'nowrap' }}
+            >
+              {showForm && !editingCashier ? '✕ Cancel' : '+ Create New Emergency Cashier'}
+            </Button>
+          )}
           <button
             type="button"
             onClick={handleManualRefresh}
@@ -263,7 +269,7 @@ const AdminCashiers = () => {
         padding: '1rem',
       }}>
         {/* Create / Edit Form */}
-        {showForm && (
+        {showForm && canManageCashiers && (
           <div style={{
             backgroundColor: '#f8f9fa',
             padding: '1.5rem',
@@ -423,40 +429,44 @@ const AdminCashiers = () => {
                       {cashier.createdAt ? new Date(cashier.createdAt).toLocaleDateString() : '-'}
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'center' }}>
-                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                        <button
-                          onClick={() => handleEditClick(cashier)}
-                          style={{
-                            padding: '0.35rem 0.6rem',
-                            backgroundColor: '#007bff',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '0.82rem',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          <i className="fas fa-edit" style={{ marginRight: '0.3rem' }}></i>
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(cashier.id, cashier.name)}
-                          style={{
-                            padding: '0.35rem 0.6rem',
-                            backgroundColor: '#dc3545',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '0.82rem',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          <i className="fas fa-trash" style={{ marginRight: '0.3rem' }}></i>
-                          Delete
-                        </button>
-                      </div>
+                      {canManageCashiers ? (
+                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                          <button
+                            onClick={() => handleEditClick(cashier)}
+                            style={{
+                              padding: '0.35rem 0.6rem',
+                              backgroundColor: '#007bff',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '0.82rem',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            <i className="fas fa-edit" style={{ marginRight: '0.3rem' }}></i>
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(cashier.id, cashier.name)}
+                            style={{
+                              padding: '0.35rem 0.6rem',
+                              backgroundColor: '#dc3545',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '0.82rem',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            <i className="fas fa-trash" style={{ marginRight: '0.3rem' }}></i>
+                            Delete
+                          </button>
+                        </div>
+                      ) : (
+                        <span style={{ color: '#9ca3af', fontSize: '0.82rem' }}>Read only</span>
+                      )}
                     </td>
                   </tr>
                 ))}

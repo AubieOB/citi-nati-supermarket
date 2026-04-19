@@ -3,6 +3,8 @@ import Button from '../ui/Button.jsx';
 import api from '../../utils/api.js';
 import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { PERMISSION_KEYS, hasPermission } from '../../utils/permissions.js';
 
 /**
  * 🚗 ADMIN DRIVERS MANAGEMENT
@@ -11,6 +13,7 @@ import { useModal } from '../../hooks/useModal.js';
  */
 
 const AdminDrivers = () => {
+  const { user: loggedInUser } = useAuth();
   const [drivers, setDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -31,6 +34,7 @@ const AdminDrivers = () => {
   const [filterBarHeight, setFilterBarHeight] = useState(0);
   const { modal, closeModal, showError, showConfirm } = useModal();
   const filterBarRef = useRef(null);
+  const canManageDrivers = hasPermission(loggedInUser, PERMISSION_KEYS.ADMIN_DRIVERS_MANAGE);
 
   useEffect(() => {
     fetchDrivers();
@@ -246,13 +250,15 @@ const AdminDrivers = () => {
           </div>
         </div>
         <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-          <Button
-            variant="primary"
-            onClick={() => setShowForm(!showForm)}
-            style={{ fontSize: '0.85rem', padding: '0.55rem 0.9rem', whiteSpace: 'nowrap' }}
-          >
-            {showForm ? '✕ Cancel' : '+ Create New Derivery Driver'}
-          </Button>
+          {canManageDrivers && (
+            <Button
+              variant="primary"
+              onClick={() => setShowForm(!showForm)}
+              style={{ fontSize: '0.85rem', padding: '0.55rem 0.9rem', whiteSpace: 'nowrap' }}
+            >
+              {showForm ? '✕ Cancel' : '+ Create New Derivery Driver'}
+            </Button>
+          )}
           <button
             type="button"
             onClick={handleManualRefresh}
@@ -288,7 +294,7 @@ const AdminDrivers = () => {
         padding: '1rem',
       }}>
         {/* Create Form */}
-        {showForm && (
+        {showForm && canManageDrivers && (
           <div style={{
             backgroundColor: '#f8f9fa',
             padding: '1.5rem',
@@ -516,41 +522,47 @@ const AdminDrivers = () => {
                           }}>
                             {driver.phone || '(No phone number)'}
                           </span>
-                          <button
-                            onClick={() => handleEditPhoneClick(driver.id, driver.phone)}
-                            style={{
-                              padding: '0.35rem 0.6rem',
-                              backgroundColor: '#007bff',
-                              color: '#fff',
-                              border: 'none',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              fontSize: '0.82rem',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            Edit
-                          </button>
+                          {canManageDrivers && (
+                            <button
+                              onClick={() => handleEditPhoneClick(driver.id, driver.phone)}
+                              style={{
+                                padding: '0.35rem 0.6rem',
+                                backgroundColor: '#007bff',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '0.82rem',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              Edit
+                            </button>
+                          )}
                         </div>
                       )}
                     </td>
                     <td style={{ padding: '1rem' }}>{driver.email || 'N/A'}</td>
                     <td style={{ padding: '1rem', textAlign: 'center' }}>
-                      <button
-                        onClick={() => handleDelete(driver.id)}
-                        style={{
-                          padding: '0.35rem 0.6rem',
-                          backgroundColor: '#dc3545',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '0.82rem',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        Delete
-                      </button>
+                      {canManageDrivers ? (
+                        <button
+                          onClick={() => handleDelete(driver.id)}
+                          style={{
+                            padding: '0.35rem 0.6rem',
+                            backgroundColor: '#dc3545',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '0.82rem',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          Delete
+                        </button>
+                      ) : (
+                        <span style={{ color: '#9ca3af', fontSize: '0.82rem' }}>Read only</span>
+                      )}
                     </td>
                   </tr>
                 ))}

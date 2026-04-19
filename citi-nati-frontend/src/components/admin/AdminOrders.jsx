@@ -9,6 +9,8 @@ import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
 import { notifySuccess, notifyError } from '../../utils/notifications.js';
 import { generateAdminOrdersTablePDF } from '../../utils/pdfReports.js';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { PERMISSION_KEYS, hasPermission } from '../../utils/permissions.js';
 import '../../css/admin-responsive-filters.css';
 
 /**
@@ -18,6 +20,7 @@ import '../../css/admin-responsive-filters.css';
  */
 
 const AdminOrders = () => {
+  const { user: loggedInUser } = useAuth();
   const [orders, setOrders] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -34,11 +37,14 @@ const AdminOrders = () => {
   const { modal, closeModal, showError, showSuccess, showConfirm } = useModal();
   const [updatingStatus, setUpdatingStatus] = useState(null);
   const filterBarRef = useRef(null);
+  const canManageOrders = hasPermission(loggedInUser, PERMISSION_KEYS.ADMIN_ORDERS_MANAGE);
 
   useEffect(() => {
     fetchOrders();
-    fetchDrivers();
-  }, []);
+    if (canManageOrders) {
+      fetchDrivers();
+    }
+  }, [canManageOrders]);
 
   /**
    * Real-time order updates via Socket.io
@@ -588,28 +594,30 @@ const AdminOrders = () => {
               </button>
             )}
 
-            <button
-              type="button"
-              onClick={downloadOrdersPDF}
-              style={{
-                padding: '0.55rem 0.9rem',
-                border: 'none',
-                borderRadius: '6px',
-                backgroundColor: '#5B4B8A',
-                color: '#fff',
-                cursor: 'pointer',
-                fontWeight: '600',
-                fontSize: '0.85rem',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                whiteSpace: 'nowrap',
-              }}
-              title="Download filtered orders as PDF"
-            >
-              <i className="fas fa-file-pdf"></i>
-              Download PDF
-            </button>
+            {canManageOrders && (
+              <button
+                type="button"
+                onClick={downloadOrdersPDF}
+                style={{
+                  padding: '0.55rem 0.9rem',
+                  border: 'none',
+                  borderRadius: '6px',
+                  backgroundColor: '#5B4B8A',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '0.85rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  whiteSpace: 'nowrap',
+                }}
+                title="Download filtered orders as PDF"
+              >
+                <i className="fas fa-file-pdf"></i>
+                Download PDF
+              </button>
+            )}
 
             <span style={{ color: '#666', fontSize: '0.9rem', marginLeft: 'auto' }}>
               {filteredOrders.length} / {orders.length} orders
@@ -672,32 +680,36 @@ const AdminOrders = () => {
                             {formatMWK(order.total)}
                           </td>
                           <td style={{ padding: '1rem', textAlign: 'center' }}>
-                            <select
-                              value={order.status}
-                              onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                              disabled={updatingStatus === order.id}
-                              style={{
-                                padding: '0.5rem',
-                                borderRadius: '4px',
-                                border: 'none',
-                                backgroundColor: order.status === 'PENDING' ? '#fff3cd'
-                                  : order.status === 'CONFIRMED' ? '#cfe2ff'
-                                  : order.status === 'DELIVERED' ? '#d1e7dd'
-                                  : '#f8d7da',
-                              }}
-                            >
-                              <option value="PENDING">PENDING</option>
-                              <option value="CONFIRMED">CONFIRMED</option>
-                              <option value="DELIVERED">DELIVERED</option>
-                              <option value="CANCELLED">CANCELLED</option>
-                            </select>
+                            {canManageOrders ? (
+                              <select
+                                value={order.status}
+                                onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                                disabled={updatingStatus === order.id}
+                                style={{
+                                  padding: '0.5rem',
+                                  borderRadius: '4px',
+                                  border: 'none',
+                                  backgroundColor: order.status === 'PENDING' ? '#fff3cd'
+                                    : order.status === 'CONFIRMED' ? '#cfe2ff'
+                                    : order.status === 'DELIVERED' ? '#d1e7dd'
+                                    : '#f8d7da',
+                                }}
+                              >
+                                <option value="PENDING">PENDING</option>
+                                <option value="CONFIRMED">CONFIRMED</option>
+                                <option value="DELIVERED">DELIVERED</option>
+                                <option value="CANCELLED">CANCELLED</option>
+                              </select>
+                            ) : (
+                              <span style={{ fontWeight: 600, color: '#4b5563' }}>{order.status}</span>
+                            )}
                           </td>
                           <td style={{ padding: '1rem', textAlign: 'center' }}>
                             {order.driverId ? (
                               <span style={{ color: '#4caf50', fontWeight: '600' }}>
                                 {order.driver?.name}
                               </span>
-                            ) : (
+                            ) : canManageOrders ? (
                               <select
                                 onChange={(e) => assignDriver(order.id, e.target.value)}
                                 style={{
@@ -713,6 +725,8 @@ const AdminOrders = () => {
                                   </option>
                                 ))}
                               </select>
+                            ) : (
+                              <span style={{ color: '#9ca3af', fontSize: '0.85rem' }}>Unassigned</span>
                             )}
                           </td>
                           <td style={{ padding: '1rem', fontSize: '0.9rem' }}>
@@ -792,32 +806,36 @@ const AdminOrders = () => {
                             {formatMWK(order.total)}
                           </td>
                           <td style={{ padding: '1rem', textAlign: 'center' }}>
-                            <select
-                              value={order.status}
-                              onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                              disabled={updatingStatus === order.id}
-                              style={{
-                                padding: '0.5rem',
-                                borderRadius: '4px',
-                                border: 'none',
-                                backgroundColor: order.status === 'PENDING' ? '#fff3cd'
-                                  : order.status === 'CONFIRMED' ? '#cfe2ff'
-                                  : order.status === 'DELIVERED' ? '#d1e7dd'
-                                  : '#f8d7da',
-                              }}
-                            >
-                              <option value="PENDING">PENDING</option>
-                              <option value="CONFIRMED">CONFIRMED</option>
-                              <option value="DELIVERED">DELIVERED</option>
-                              <option value="CANCELLED">CANCELLED</option>
-                            </select>
+                            {canManageOrders ? (
+                              <select
+                                value={order.status}
+                                onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                                disabled={updatingStatus === order.id}
+                                style={{
+                                  padding: '0.5rem',
+                                  borderRadius: '4px',
+                                  border: 'none',
+                                  backgroundColor: order.status === 'PENDING' ? '#fff3cd'
+                                    : order.status === 'CONFIRMED' ? '#cfe2ff'
+                                    : order.status === 'DELIVERED' ? '#d1e7dd'
+                                    : '#f8d7da',
+                                }}
+                              >
+                                <option value="PENDING">PENDING</option>
+                                <option value="CONFIRMED">CONFIRMED</option>
+                                <option value="DELIVERED">DELIVERED</option>
+                                <option value="CANCELLED">CANCELLED</option>
+                              </select>
+                            ) : (
+                              <span style={{ fontWeight: 600, color: '#4b5563' }}>{order.status}</span>
+                            )}
                           </td>
                           <td style={{ padding: '1rem', textAlign: 'center' }}>
                             {order.driverId ? (
                               <span style={{ color: '#4caf50', fontWeight: '600' }}>
                                 {order.driver?.name}
                               </span>
-                            ) : (
+                            ) : canManageOrders ? (
                               <select
                                 onChange={(e) => assignDriver(order.id, e.target.value)}
                                 style={{
@@ -833,6 +851,8 @@ const AdminOrders = () => {
                                   </option>
                                 ))}
                               </select>
+                            ) : (
+                              <span style={{ color: '#9ca3af', fontSize: '0.85rem' }}>Unassigned</span>
                             )}
                           </td>
                           <td style={{ padding: '1rem', fontSize: '0.9rem' }}>

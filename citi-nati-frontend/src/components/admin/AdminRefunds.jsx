@@ -4,6 +4,8 @@ import api from '../../utils/api.js';
 import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
 import { getSocket } from '../../utils/socket.js';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { PERMISSION_KEYS, hasPermission } from '../../utils/permissions.js';
 
 /**
  * 💰 ADMIN REFUNDS MANAGEMENT
@@ -13,6 +15,7 @@ import { getSocket } from '../../utils/socket.js';
  */
 
 const AdminRefunds = () => {
+  const { user: loggedInUser } = useAuth();
   const [refunds, setRefunds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -22,6 +25,7 @@ const AdminRefunds = () => {
   const [filterBarHeight, setFilterBarHeight] = useState(0);
   const { modal, closeModal, showConfirm } = useModal();
   const filterBarRef = useRef(null);
+  const canManageRefunds = hasPermission(loggedInUser, PERMISSION_KEYS.ADMIN_REFUNDS_MANAGE);
 
   useEffect(() => {
     fetchPendingRefunds();
@@ -102,6 +106,10 @@ const AdminRefunds = () => {
   };
 
   const handleApproveRefund = (refundId) => {
+    if (!canManageRefunds) {
+      return;
+    }
+
     setSelectedRefundId(refundId);
     setApprovalNote('');
     
@@ -419,14 +427,20 @@ const AdminRefunds = () => {
 
               {/* Actions */}
               <div style={{ display: 'flex', gap: '1rem' }}>
-                <Button
-                  variant="primary"
-                  onClick={() => handleApproveRefund(refund.id)}
-                  style={{ flex: 1, fontSize: '0.85rem', padding: '0.55rem 0.9rem', whiteSpace: 'nowrap' }}
-                >
-                  <i className="fas fa-check-circle" style={{ marginRight: '0.5rem' }}></i>
-                  Mark as Refunded
-                </Button>
+                {canManageRefunds ? (
+                  <Button
+                    variant="primary"
+                    onClick={() => handleApproveRefund(refund.id)}
+                    style={{ flex: 1, fontSize: '0.85rem', padding: '0.55rem 0.9rem', whiteSpace: 'nowrap' }}
+                  >
+                    <i className="fas fa-check-circle" style={{ marginRight: '0.5rem' }}></i>
+                    Mark as Refunded
+                  </Button>
+                ) : (
+                  <div style={{ flex: 1, color: '#9ca3af', fontSize: '0.85rem', textAlign: 'center' }}>
+                    Read-only access
+                  </div>
+                )}
               </div>
             </div>
           ))}

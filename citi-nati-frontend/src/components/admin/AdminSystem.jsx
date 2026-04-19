@@ -2,6 +2,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import api from '../../utils/api.js';
 import { useModal } from '../../hooks/useModal.js';
 import Modal from '../common/Modal.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { PERMISSION_KEYS, hasPermission } from '../../utils/permissions.js';
 
 const DEFAULT_MESSAGE = 'We are currently carrying out maintenance to improve your experience. We apologize for the inconvenience.';
 const DEFAULT_VAT_RATE = 16.5;
@@ -27,6 +29,7 @@ const formatBusinessNow = (offsetMinutes = 120) => {
 };
 
 const AdminSystem = () => {
+  const { user: loggedInUser } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
@@ -39,6 +42,7 @@ const AdminSystem = () => {
   const [filterBarHeight, setFilterBarHeight] = useState(0);
   const { modal, showError, showSuccess, closeModal } = useModal();
   const filterBarRef = useRef(null);
+  const canManageSystem = hasPermission(loggedInUser, PERMISSION_KEYS.ADMIN_SYSTEM_MANAGE);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -117,6 +121,11 @@ const AdminSystem = () => {
   }, [businessTime]);
 
   const handleSave = async () => {
+    if (!canManageSystem) {
+      showError('Access denied', 'You do not have permission to update system settings.');
+      return;
+    }
+
     try {
       setSaving(true);
       const response = await api.put('/admin/system/maintenance', {
@@ -229,7 +238,8 @@ const AdminSystem = () => {
               type="checkbox"
               checked={maintenanceMode}
               onChange={(event) => setMaintenanceMode(event.target.checked)}
-              style={{ width: '22px', height: '22px', cursor: 'pointer' }}
+              disabled={!canManageSystem}
+              style={{ width: '22px', height: '22px', cursor: canManageSystem ? 'pointer' : 'not-allowed' }}
             />
           </label>
 
@@ -255,7 +265,8 @@ const AdminSystem = () => {
               type="checkbox"
               checked={vatEnabled}
               onChange={(event) => setVatEnabled(event.target.checked)}
-              style={{ width: '22px', height: '22px', cursor: 'pointer' }}
+              disabled={!canManageSystem}
+              style={{ width: '22px', height: '22px', cursor: canManageSystem ? 'pointer' : 'not-allowed' }}
             />
           </label>
 
@@ -266,6 +277,7 @@ const AdminSystem = () => {
             <textarea
               value={maintenanceMessage}
               onChange={(event) => setMaintenanceMessage(event.target.value)}
+              disabled={!canManageSystem}
               rows={1}
               style={{ width: '100%', padding: '0.7rem 0.85rem', borderRadius: '8px', border: '1px solid #ddd', resize: 'vertical', minHeight: '42px' }}
               placeholder={DEFAULT_MESSAGE}
@@ -275,18 +287,18 @@ const AdminSystem = () => {
           <button
             type="button"
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || !canManageSystem}
             style={{
               border: 'none',
               borderRadius: '8px',
               padding: '0.85rem 1rem',
-              backgroundColor: saving ? '#94a3b8' : '#5B4B8A',
+              backgroundColor: (saving || !canManageSystem) ? '#94a3b8' : '#5B4B8A',
               color: '#fff',
               fontWeight: 700,
-              cursor: saving ? 'not-allowed' : 'pointer'
+              cursor: (saving || !canManageSystem) ? 'not-allowed' : 'pointer'
             }}
           >
-            {saving ? 'Saving...' : 'Save System Settings'}
+            {!canManageSystem ? 'Read-only access' : saving ? 'Saving...' : 'Save System Settings'}
           </button>
         </div>
       </div>

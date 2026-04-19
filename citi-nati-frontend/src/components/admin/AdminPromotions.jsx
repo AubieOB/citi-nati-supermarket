@@ -4,6 +4,8 @@ import { formatMWK } from '../../utils/currency.js';
 import { getSocket } from '../../utils/socket.js';
 import { notifySuccess, notifyError } from '../../utils/notifications.js';
 import { filterProductsForOperationalLocation, resolveOperationalScope } from '../../utils/operationalScope.js';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { PERMISSION_KEYS, hasPermission } from '../../utils/permissions.js';
 
 /**
  * 🎯 ADMIN PROMOTIONS MANAGEMENT
@@ -29,6 +31,7 @@ const AdminPromotions = ({
   cachedProductsMeta = {},
   onRefreshProductsCache,
 }) => {
+  const { user: loggedInUser } = useAuth();
   const [categories, setCategories] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -54,6 +57,7 @@ const AdminPromotions = ({
     || Boolean(cachedProductsMeta?.isLoading)
     || Boolean(cachedProductsMeta?.isBackgroundLoading)
   );
+  const canManagePromotions = hasPermission(loggedInUser, PERMISSION_KEYS.ADMIN_PROMOTIONS_MANAGE);
 
   const clearSearch = () => {
     setSearchTerm('');
@@ -320,6 +324,11 @@ const AdminPromotions = ({
   };
 
   const handleTogglePromotion = async (type) => {
+    if (!canManagePromotions) {
+      notifyError('You do not have permission to update promotions', 2500);
+      return;
+    }
+
     try {
       const newPromotion = {
         ...promotions[type],
@@ -422,6 +431,7 @@ const AdminPromotions = ({
           </div>
           <button
             onClick={() => handleTogglePromotion(type)}
+            disabled={!canManagePromotions}
             style={{
               padding: '0.75rem 1.5rem',
               borderRadius: '4px',
@@ -429,9 +439,10 @@ const AdminPromotions = ({
               backgroundColor: isActive ? '#4CAF50' : '#ccc',
               color: '#fff',
               fontWeight: '600',
-              cursor: 'pointer',
+              cursor: canManagePromotions ? 'pointer' : 'not-allowed',
               transition: 'all 0.3s ease',
               fontSize: '0.9rem',
+              opacity: canManagePromotions ? 1 : 0.6,
             }}
             onMouseOver={(e) => {
               e.target.style.opacity = '0.9';

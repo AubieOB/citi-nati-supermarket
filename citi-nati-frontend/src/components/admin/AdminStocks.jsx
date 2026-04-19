@@ -14,6 +14,8 @@ import {
   resolveStockStatus,
 } from '../../utils/stockResolver.js';
 import { filterProductsForOperationalLocation } from '../../utils/operationalScope.js';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { PERMISSION_KEYS, hasPermission } from '../../utils/permissions.js';
 import '../../css/admin-responsive-filters.css';
 
 /**
@@ -32,6 +34,7 @@ const AdminStocks = ({
   cachedProductsMeta = {},
   onRefreshProductsCache,
 }) => {
+  const { user: loggedInUser } = useAuth();
   // `products` is deprecated; we now rely on `allProducts` for everything.
   // previously products was only used in stats cards which caused counts to be wrong
   const [allProducts, setAllProducts] = useState([]); // Store all products for client-side filtering
@@ -61,6 +64,7 @@ const AdminStocks = ({
   const filterBarRef = useRef(null);
   const fetchRequestIdRef = useRef(0);
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
+  const canManageStocks = hasPermission(loggedInUser, PERMISSION_KEYS.ADMIN_STOCKS_MANAGE);
 
   useEffect(() => {
     setSearchTerm('');
@@ -639,29 +643,31 @@ const AdminStocks = ({
             Stock Management
           </h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <button
-              onClick={downloadStocksPDF}
-              title="Download stocks as PDF"
-              style={{
-                padding: '0.6rem 1rem',
-                borderRadius: '4px',
-                border: 'none',
-                backgroundColor: '#5B4B8A',
-                color: '#fff',
-                cursor: 'pointer',
-                fontWeight: '600',
-                fontSize: '0.9rem',
-                transition: 'all 0.2s ease',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-              }}
-              onMouseOver={(e) => e.target.style.opacity = '0.8'}
-              onMouseOut={(e) => e.target.style.opacity = '1'}
-            >
-              <i className="fas fa-file-pdf"></i>
-              Download PDF
-            </button>
+            {canManageStocks && (
+              <button
+                onClick={downloadStocksPDF}
+                title="Download stocks as PDF"
+                style={{
+                  padding: '0.6rem 1rem',
+                  borderRadius: '4px',
+                  border: 'none',
+                  backgroundColor: '#5B4B8A',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '0.9rem',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                }}
+                onMouseOver={(e) => e.target.style.opacity = '0.8'}
+                onMouseOut={(e) => e.target.style.opacity = '1'}
+              >
+                <i className="fas fa-file-pdf"></i>
+                Download PDF
+              </button>
+            )}
             <span style={{ color: '#666', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <i className="fas fa-filter" style={{ color: '#5B4B8A' }}></i>
               Filters
@@ -1067,27 +1073,31 @@ const AdminStocks = ({
                         justifyContent: 'center',
                         flexWrap: 'wrap',
                       }}>
-                        <button
-                          onClick={() => openOverrideModal(product)}
-                          title="Set Website Stock Override"
-                          style={{
-                            padding: '0.35rem 0.6rem',
-                            borderRadius: '4px',
-                            border: hasOverride ? '2px solid #5B4B8A' : '1px solid #5B4B8A',
-                            backgroundColor: hasOverride ? '#5B4B8A' : '#fff',
-                            color: hasOverride ? '#fff' : '#5B4B8A',
-                            cursor: 'pointer',
-                            fontWeight: '600',
-                            fontSize: '0.82rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          <i className="fas fa-sliders-h"></i>
-                          Override
-                        </button>
+                        {canManageStocks ? (
+                          <button
+                            onClick={() => openOverrideModal(product)}
+                            title="Set Website Stock Override"
+                            style={{
+                              padding: '0.35rem 0.6rem',
+                              borderRadius: '4px',
+                              border: hasOverride ? '2px solid #5B4B8A' : '1px solid #5B4B8A',
+                              backgroundColor: hasOverride ? '#5B4B8A' : '#fff',
+                              color: hasOverride ? '#fff' : '#5B4B8A',
+                              cursor: 'pointer',
+                              fontWeight: '600',
+                              fontSize: '0.82rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            <i className="fas fa-sliders-h"></i>
+                            Override
+                          </button>
+                        ) : (
+                          <span style={{ color: '#9ca3af', fontSize: '0.82rem' }}>Read only</span>
+                        )}
                       </div>
                     </td>
                   </tr>
