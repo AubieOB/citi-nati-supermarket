@@ -492,7 +492,7 @@ function drawPdfSummaryCards(doc, cards, context) {
       const fill = hexToRgb(card.fill || '#F8FAFC');
       const accent = hexToRgb(card.accent || PDF_BRAND_PURPLE);
 
-      doc.roundedRect(x, y, cardWidth, cardHeight, 4, 4).fillAndStroke(fill, '#E2E8F0');
+      doc.roundedRect(x, y, cardWidth, cardHeight, 4, 4).fill(fill);
       doc
         .fillColor('#6B7280')
         .font('Helvetica-Bold')
@@ -517,7 +517,7 @@ function drawPdfInfoBand(doc, items, context) {
   const height = 16 + (items.length * 10);
   const y = doc.y;
 
-  doc.roundedRect(margin, y, width, height, 4, 4).fillAndStroke('#F5F5F5', '#E5E7EB');
+  doc.roundedRect(margin, y, width, height, 4, 4).fill('#F5F5F5');
 
   let cursorY = y + 8;
   items.forEach((item) => {
@@ -542,7 +542,7 @@ function drawPdfNoDataMessage(doc, message, context) {
   const width = doc.page.width - (margin * 2);
   const y = doc.y;
 
-  doc.roundedRect(margin, y, width, 42, 6).fillAndStroke('#F8FAFC', '#CBD5E1');
+  doc.roundedRect(margin, y, width, 42, 6).fill('#F8FAFC');
   doc
     .fillColor(PDF_MUTED)
     .font('Helvetica-Oblique')
@@ -559,7 +559,7 @@ function drawPdfSectionTitle(doc, title, context) {
   const width = doc.page.width - (margin * 2);
   const y = doc.y;
 
-  doc.roundedRect(margin, y, width, 18, 3, 3).fillAndStroke('#F8FAFC', '#E2E8F0');
+  doc.roundedRect(margin, y, width, 18, 3, 3).fill('#F8FAFC');
   doc
     .fillColor(PDF_SLATE)
     .font('Helvetica-Bold')
@@ -580,19 +580,19 @@ function drawPdfTable(doc, columns, rows, context) {
   const availableWidth = doc.page.width - (margin * 2);
   const totalWeight = columns.reduce((sum, column) => sum + (column.weight || 1), 0);
   const widths = columns.map((column) => (availableWidth * (column.weight || 1)) / totalWeight);
-  const headerHeight = 18;
-  const rowHeight = 18;
+  const headerHeight = 20;
+  const rowHeight = 20;
 
   const drawTableHeader = () => {
     let x = margin;
     const y = doc.y;
 
     columns.forEach((column, index) => {
-      doc.rect(x, y, widths[index], headerHeight).fillAndStroke(PDF_BRAND_GREEN, '#D1D5DB');
+      doc.rect(x, y, widths[index], headerHeight).fill(PDF_BRAND_GREEN);
       doc
         .fillColor('#FFFFFF')
         .font('Helvetica-Bold')
-        .fontSize(8.2)
+        .fontSize(8.6)
         .text(column.header, x + 4, y + 5, { width: widths[index] - 8, ellipsis: true });
       x += widths[index];
     });
@@ -615,11 +615,11 @@ function drawPdfTable(doc, columns, rows, context) {
 
     columns.forEach((column, index) => {
       const value = row[column.key] === null || row[column.key] === undefined ? '' : String(row[column.key]);
-      doc.rect(x, y, widths[index], rowHeight).fillAndStroke(fillColor, '#E5E7EB');
+      doc.rect(x, y, widths[index], rowHeight).fill(fillColor);
       doc
         .fillColor(PDF_SLATE)
         .font('Helvetica')
-        .fontSize(8)
+        .fontSize(8.6)
         .text(value, x + 4, y + 5, {
           width: widths[index] - 8,
           align: column.align || 'left',
@@ -1375,7 +1375,7 @@ async function buildExcelBuffer(report) {
 
 async function buildPdfBuffer(report) {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true, compress: true, pdfVersion: '1.7' });
     const chunks = [];
     const context = createPdfContext(report);
 

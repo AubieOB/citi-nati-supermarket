@@ -91,9 +91,10 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedL
   const [activeActivity, setActiveActivity] = useState('sales');
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
   const [isQuickExportsModalOpen, setIsQuickExportsModalOpen] = useState(false);
-  const [autoRefreshing, setAutoRefreshing] = useState(false);
+  const [manualRefreshing, setManualRefreshing] = useState(false);
   const autoRefreshIntervalRef = useRef(null);
   const autoRefreshTimeoutRef = useRef(null);
+  const refreshInFlightRef = useRef(false);
 
   const fetchActivity = useCallback(async ({ background = false } = {}) => {
     setState((current) => {
@@ -173,12 +174,26 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedL
 
   const runAutoRefresh = useCallback(async () => {
     if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+    if (refreshInFlightRef.current) return;
 
-    setAutoRefreshing(true);
+    refreshInFlightRef.current = true;
     try {
       await fetchActivity({ background: true });
     } finally {
-      setAutoRefreshing(false);
+      refreshInFlightRef.current = false;
+    }
+  }, [fetchActivity]);
+
+  const handleManualRefresh = useCallback(async () => {
+    if (refreshInFlightRef.current) return;
+
+    refreshInFlightRef.current = true;
+    setManualRefreshing(true);
+    try {
+      await fetchActivity({ background: true });
+    } finally {
+      setManualRefreshing(false);
+      refreshInFlightRef.current = false;
     }
   }, [fetchActivity]);
 
@@ -357,17 +372,17 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedL
               Monitor recent operational reporting activity across sales, expenses, suppliers, payroll, and run instant exports from one unified workspace.
             </p>
             <p style={{ margin: '0.25rem 0 0', color: '#475569', lineHeight: 1.5, fontSize: '0.82rem', fontWeight: 700 }}>
-              Auto-refresh runs every 30 seconds while this tab is visible.
+              Smart background refresh runs every 30 seconds while this tab is visible.
             </p>
           </div>
           <button
             type="button"
-            onClick={fetchActivity}
-            disabled={state.loading || autoRefreshing}
-            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.7rem 1rem', fontWeight: 700, cursor: state.loading || autoRefreshing ? 'not-allowed' : 'pointer' }}
+            onClick={handleManualRefresh}
+            disabled={state.loading || manualRefreshing}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.7rem 1rem', fontWeight: 700, cursor: state.loading || manualRefreshing ? 'not-allowed' : 'pointer' }}
           >
-            <i className={`fas ${state.loading || autoRefreshing ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`} style={{ marginRight: '0.45rem' }}></i>
-            {autoRefreshing ? 'Auto-refreshing...' : 'Refresh'}
+            <i className={`fas ${state.loading || manualRefreshing ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`} style={{ marginRight: '0.45rem' }}></i>
+            {manualRefreshing ? 'Refreshing...' : 'Refresh'}
           </button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.9rem', marginTop: '1rem' }}>
@@ -420,9 +435,6 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedL
                 {tab.label} ({tab.count})
               </button>
             ))}
-          </div>
-          <div style={{ padding: '1rem 1.1rem', color: '#64748b', fontSize: '0.88rem' }}>
-            Select any activity pill above to view records in a modal window.
           </div>
         </div>
       )}
