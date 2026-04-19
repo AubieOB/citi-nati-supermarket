@@ -15,6 +15,37 @@ import { tokenStorage } from './tokenStorage.js';
 
 let isHandlingSessionExpiry = false;
 
+const SESSION_EXPIRY_PATTERNS = [
+  /invalid\s+or\s+expired\s+token/i,
+  /token\s+expired/i,
+  /jwt\s+expired/i,
+  /no\s+token\s+provided/i,
+  /session\s+expired/i,
+  /invalid\s+token/i,
+  /not\s+authenticated/i,
+  /unauthorized\.\s*user\s+not\s+found/i,
+];
+
+const extractApiErrorText = (error) => {
+  const payload = error?.response?.data;
+  if (!payload) return '';
+  return String(payload.error || payload.message || payload.detail || '').trim();
+};
+
+const isSessionExpiryError = (error) => {
+  const status = error?.response?.status;
+  if (status !== 401) return false;
+
+  const payloadCode = String(error?.response?.data?.code || '').trim().toUpperCase();
+  if (payloadCode === 'TOKEN_EXPIRED' || payloadCode === 'SESSION_EXPIRED' || payloadCode === 'INVALID_TOKEN') {
+    return true;
+  }
+
+  const message = extractApiErrorText(error);
+  if (!message) return false;
+  return SESSION_EXPIRY_PATTERNS.some((pattern) => pattern.test(message));
+};
+
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api',
   withCredentials: true,
@@ -50,8 +81,9 @@ api.interceptors.response.use(
     const requestUrl = String(error?.config?.url || '');
     const hasToken = Boolean(tokenStorage.getToken());
     const isAuthRequest = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register');
+    const sessionExpired = isSessionExpiryError(error);
 
-    if (status === 401 && hasToken && !isAuthRequest && !isHandlingSessionExpiry) {
+    if (status === 401 && hasToken && !isAuthRequest && sessionExpired && !isHandlingSessionExpiry) {
       isHandlingSessionExpiry = true;
 
       // Clear local auth immediately so app state stops sending stale token.
@@ -60,13 +92,15 @@ api.interceptors.response.use(
 
       if (typeof window !== 'undefined') {
         try {
-          window.dispatchEvent(new CustomEvent('app:session-expired'));
+          window.dispatchEvent(new CustomEvent('app:session-expired', {
+            detail: {
+              message: 'Session expired. Please login again.',
+              redirectTo: '/login?reason=session-expired',
+            },
+          }));
         } catch (dispatchError) {
           console.warn('[API] Failed to dispatch session-expired event:', dispatchError);
         }
-
-        // Force a clean route transition to login to recover quickly.
-        window.location.assign('/login?reason=session-expired');
       }
     }
 

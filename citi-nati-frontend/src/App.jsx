@@ -6,6 +6,7 @@ import Layout from './components/layout/Layout.jsx';
 import ChunkErrorBoundary from './components/ChunkErrorBoundary.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import ScrollToTop from './components/ScrollToTop.jsx';
+import SessionExpiredModal from './components/SessionExpiredModal.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 import { initSocket, identifySocket } from './utils/socket.js';
 import api, { initializeAuth } from './utils/api.js';
@@ -278,6 +279,7 @@ function App() {
     <GoogleOAuthProvider clientId={googleClientId || 'placeholder'}>
       <>
         <Toaster position="top-right" />
+        <SessionExpiredModal />
         <Router>
           <ScrollToTop />
           <Layout>
