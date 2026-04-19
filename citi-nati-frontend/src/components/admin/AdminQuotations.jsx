@@ -277,7 +277,14 @@ const AdminQuotations = ({ selectedLocationCode = 'BT', selectedBranchCode = 'BL
     const timer = setTimeout(async () => {
       setProductSearching(true);
       try {
-        const res = await api.get(`/admin/pos-products?search=${encodeURIComponent(term)}&limit=15`);
+        const res = await api.get('/admin/pos-products', {
+          params: {
+            search: term,
+            limit: 15,
+            locationCode: operationalScope.locationCode,
+            branchCode: operationalScope.branchCode,
+          },
+        });
         setProducts(res.data?.products ?? []);
       } catch {
         setProducts([]);
@@ -286,7 +293,7 @@ const AdminQuotations = ({ selectedLocationCode = 'BT', selectedBranchCode = 'BL
       }
     }, 250);
     return () => clearTimeout(timer);
-  }, [productSearch, mode]);
+  }, [mode, operationalScope.branchCode, operationalScope.locationCode, productSearch]);
 
   /* ── Load quotations ─── */
   const loadQuotations = useCallback(async () => {
