@@ -345,6 +345,7 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
                 <i className="fas fa-users" />
               </span>
               <span style={{ color: '#0f172a', fontWeight: 800, fontSize: '0.95rem' }}>Employee Register Workspace</span>
+              <span style={{ color: '#64748b', fontSize: '0.82rem', lineHeight: 1.45 }}>Add employees, update profiles, and review salary records.</span>
             </button>
           </div>
         </div>

@@ -408,6 +408,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
                 <i className="fas fa-truck-field" />
               </span>
               <span style={{ color: '#0f172a', fontWeight: 800, fontSize: '0.95rem' }}>Supplier Register Workspace</span>
+              <span style={{ color: '#64748b', fontSize: '0.82rem', lineHeight: 1.45 }}>Manage suppliers, balances, and payment activity in one view.</span>
             </button>
           </div>
         </div>

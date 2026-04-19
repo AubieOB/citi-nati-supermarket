@@ -346,6 +346,7 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
                 <i className="fas fa-list-ul" />
               </span>
               <span style={{ color: '#0f172a', fontWeight: 800, fontSize: '0.95rem' }}>Expense Register</span>
+              <span style={{ color: '#64748b', fontSize: '0.82rem', lineHeight: 1.45 }}>Capture expenses, attach details, and track spending entries.</span>
             </button>
 
             <button
@@ -378,6 +379,7 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
               <span style={{ color: '#0f172a', fontWeight: 800, fontSize: '0.95rem' }}>
                 Expense Categories {categories.length > 0 ? `(${categories.length})` : ''}
               </span>
+              <span style={{ color: '#64748b', fontSize: '0.82rem', lineHeight: 1.45 }}>Create categories to keep expense reporting clean and searchable.</span>
             </button>
           </div>
         </div>

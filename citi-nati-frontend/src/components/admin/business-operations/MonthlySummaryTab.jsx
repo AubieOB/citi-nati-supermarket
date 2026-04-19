@@ -549,6 +549,7 @@ const MonthlySummaryTab = ({
                 <i className="fas fa-chart-line" />
               </span>
               <span style={{ color: '#0f172a', fontWeight: 800, fontSize: '0.95rem' }}>Monthly Insights Workspace</span>
+              <span style={{ color: '#64748b', fontSize: '0.82rem', lineHeight: 1.45 }}>Review monthly sales, expenses, payroll, and supplier trends.</span>
             </button>
           </div>
         </div>
