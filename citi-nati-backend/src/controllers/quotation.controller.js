@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { PrismaClient } = require('@prisma/client');
+const { getVatSettings, splitInclusiveVatAtRate } = require('../utils/vat');
 
 const prisma = new PrismaClient();
 
@@ -16,6 +17,26 @@ function generateQuotationRef() {
   const dd = String(now.getDate()).padStart(2, '0');
   const suffix = crypto.randomBytes(3).toString('hex').toUpperCase();
   return `QT-${yyyy}${mm}${dd}-${suffix}`;
+}
+
+function withVatMeta(quotation, vatSettings) {
+  if (!quotation) return quotation;
+
+  const normalizedRate = Number(vatSettings?.configuredRatePercent || 0);
+  const vatEnabled = Boolean(vatSettings?.enabled);
+  const ratePercent = vatEnabled ? normalizedRate : 0;
+  const split = splitInclusiveVatAtRate(Number(quotation.total || 0), ratePercent, {
+    vatEnabled,
+    configuredVatRatePercent: normalizedRate,
+  });
+
+  return {
+    ...quotation,
+    vatEnabled,
+    vatRatePercent: split.vatRatePercent,
+    configuredVatRatePercent: normalizedRate,
+    vatAmount: split.vatAmount,
+  };
 }
 
 /**
@@ -89,7 +110,9 @@ const createQuotation = async (req, res) => {
       include: { items: true },
     });
 
-    return res.status(201).json({ success: true, quotation });
+    const vatSettings = await getVatSettings();
+
+    return res.status(201).json({ success: true, quotation: withVatMeta(quotation, vatSettings) });
   } catch (err) {
     if (err.message && err.message.startsWith('Item ')) {
       return res.status(400).json({ error: err.message });
@@ -122,12 +145,13 @@ const listQuotations = async (req, res) => {
     };
     if (limit) queryOptions.take = parseInt(limit, 10);
 
-    const [quotations, total] = await Promise.all([
+    const [quotations, total, vatSettings] = await Promise.all([
       prisma.quotation.findMany(queryOptions),
       prisma.quotation.count({ where }),
+      getVatSettings(),
     ]);
 
-    return res.json({ quotations, total });
+    return res.json({ quotations: quotations.map((quotation) => withVatMeta(quotation, vatSettings)), total });
   } catch (err) {
     console.error('[QUOTATION] List error:', err.message);
     return res.status(500).json({ error: 'Failed to fetch quotations' });
@@ -149,7 +173,9 @@ const getQuotation = async (req, res) => {
     });
     if (!quotation) return res.status(404).json({ error: 'Quotation not found' });
 
-    return res.json({ quotation });
+    const vatSettings = await getVatSettings();
+
+    return res.json({ quotation: withVatMeta(quotation, vatSettings) });
   } catch (err) {
     console.error('[QUOTATION] Get error:', err.message);
     return res.status(500).json({ error: 'Failed to fetch quotation' });
@@ -226,7 +252,9 @@ const updateQuotation = async (req, res) => {
       include: { items: true },
     });
 
-    return res.json({ success: true, quotation });
+    const vatSettings = await getVatSettings();
+
+    return res.json({ success: true, quotation: withVatMeta(quotation, vatSettings) });
   } catch (err) {
     if (err.message && err.message.startsWith('Item ')) {
       return res.status(400).json({ error: err.message });

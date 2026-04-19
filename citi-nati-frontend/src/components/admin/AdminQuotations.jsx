@@ -10,6 +10,37 @@ const fmt = (v) =>
     maximumFractionDigits: 2,
   })}`;
 
+const DEFAULT_VAT_RATE_PERCENT = 16.5;
+
+const calculateInclusiveVat = (grossAmount, ratePercent, enabled = true) => {
+  const gross = Number(grossAmount || 0);
+  const rate = enabled ? Number(ratePercent || 0) : 0;
+  if (!Number.isFinite(gross) || gross <= 0 || !Number.isFinite(rate) || rate <= 0) return 0;
+  return Number((gross - ((gross * 100) / (100 + rate))).toFixed(2));
+};
+
+const withVatMeta = (quotation, vatSettings) => {
+  if (!quotation) return quotation;
+  const vatEnabled = quotation.vatEnabled ?? vatSettings.enabled;
+  const configuredVatRatePercent = Number(
+    quotation.configuredVatRatePercent
+      ?? quotation.vatRatePercent
+      ?? vatSettings.configuredVatRatePercent
+      ?? DEFAULT_VAT_RATE_PERCENT
+  );
+  const vatAmount = Number.isFinite(Number(quotation.vatAmount))
+    ? Number(quotation.vatAmount)
+    : calculateInclusiveVat(quotation.total, configuredVatRatePercent, vatEnabled);
+
+  return {
+    ...quotation,
+    vatEnabled,
+    configuredVatRatePercent,
+    vatRatePercent: vatEnabled ? configuredVatRatePercent : 0,
+    vatAmount,
+  };
+};
+
 const emptyItem = () => ({
   _key: Math.random(),
   productId: null,
@@ -221,6 +252,10 @@ const AdminQuotations = () => {
   const [productSearch, setProductSearch] = useState('');
   const [productSearching, setProductSearching] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [vatSettings, setVatSettings] = useState({
+    enabled: true,
+    configuredVatRatePercent: DEFAULT_VAT_RATE_PERCENT,
+  });
 
   // ── View quotations state ──────────────────────────────────────
   const [quotations, setQuotations] = useState([]);
@@ -252,17 +287,38 @@ const AdminQuotations = () => {
     setLoading(true);
     try {
       const res = await api.get('/admin/quotations');
-      setQuotations(res.data?.quotations ?? res.data ?? []);
+      const rows = res.data?.quotations ?? res.data ?? [];
+      setQuotations(rows.map((row) => withVatMeta(row, vatSettings)));
     } catch {
       toast.error('Failed to load quotations');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [vatSettings]);
 
   useEffect(() => {
     if (tab === 'view') loadQuotations();
   }, [tab, loadQuotations]);
+
+  useEffect(() => {
+    const loadVatSettings = async () => {
+      try {
+        const response = await api.get('/system/status');
+        setVatSettings({
+          enabled: response.data?.vatEnabled !== false,
+          configuredVatRatePercent: Number(
+            response.data?.configuredVatRatePercent
+              || response.data?.vatRatePercent
+              || DEFAULT_VAT_RATE_PERCENT
+          ),
+        });
+      } catch {
+        setVatSettings({ enabled: true, configuredVatRatePercent: DEFAULT_VAT_RATE_PERCENT });
+      }
+    };
+
+    loadVatSettings();
+  }, []);
 
   /* ── Item helpers ─── */
   const updateItem = (key, field, value) => {
@@ -300,6 +356,10 @@ const AdminQuotations = () => {
 
   const subtotal = form.items.reduce((s, it) => s + Number(it.lineTotal || 0), 0);
   const total = Math.max(0, subtotal - Number(form.discount || 0));
+  const vatAmount = calculateInclusiveVat(total, vatSettings.configuredVatRatePercent, vatSettings.enabled);
+  const vatLabel = vatSettings.enabled
+    ? `VAT (${Number(vatSettings.configuredVatRatePercent || 0).toFixed(1)}%, included)`
+    : 'VAT (disabled)';
 
   /* ── Submit ─── */
   const handleSubmit = async (e) => {
@@ -326,7 +386,7 @@ const AdminQuotations = () => {
         })),
       };
       const res = await api.post('/admin/quotations', payload);
-      const created = res.data?.quotation ?? res.data;
+      const created = withVatMeta(res.data?.quotation ?? res.data, vatSettings);
       toast.success(`Quotation ${created.quotationRef} created!`);
       setForm(emptyForm());
       // Auto-download PDF
@@ -363,6 +423,7 @@ const AdminQuotations = () => {
       '',
       `Subtotal: MWK ${Number(q.subtotal).toLocaleString()}`,
       Number(q.discount) > 0 ? `Discount: -MWK ${Number(q.discount).toLocaleString()}` : null,
+      `${q.vatEnabled === false ? 'VAT (disabled)' : `VAT (${Number(q.configuredVatRatePercent || 0).toFixed(1)}%, included)`}: MWK ${Number(q.vatAmount || 0).toLocaleString()}`,
       `*TOTAL: MWK ${Number(q.total).toLocaleString()}*`,
       '',
       q.notes ? `Notes: ${q.notes}` : null,
@@ -564,6 +625,7 @@ const AdminQuotations = () => {
                 {Number(form.discount) > 0 && (
                   <div style={{ marginBottom: 4, fontSize: '0.9rem', color: '#c0392b' }}>Discount: <strong>-{fmt(form.discount)}</strong></div>
                 )}
+                <div style={{ marginBottom: 4, fontSize: '0.9rem', color: '#b91c1c' }}>{vatLabel}: <strong>{fmt(vatAmount)}</strong></div>
                 <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#5B4B8A', borderTop: '2px solid #5B4B8A', paddingTop: '6px', marginTop: '6px' }}>
                   TOTAL: {fmt(total)}
                 </div>
@@ -675,6 +737,12 @@ const AdminQuotations = () => {
                           <td style={{ ...S.td, textAlign: 'right', color: '#c0392b', fontWeight: 600 }}>-{fmt(q.discount)}</td>
                         </tr>
                       )}
+                      <tr>
+                        <td colSpan={4} style={{ ...S.td, textAlign: 'right', color: '#b91c1c' }}>
+                          {q.vatEnabled === false ? 'VAT (disabled)' : `VAT (${Number(q.configuredVatRatePercent || 0).toFixed(1)}%, included)`}
+                        </td>
+                        <td style={{ ...S.td, textAlign: 'right', color: '#b91c1c', fontWeight: 600 }}>{fmt(q.vatAmount)}</td>
+                      </tr>
                       <tr style={{ background: '#f0ebff' }}>
                         <td colSpan={4} style={{ ...S.td, textAlign: 'right', fontWeight: 700, color: '#5B4B8A' }}>TOTAL</td>
                         <td style={{ ...S.td, textAlign: 'right', fontWeight: 700, color: '#5B4B8A', fontSize: '1rem' }}>{fmt(q.total)}</td>

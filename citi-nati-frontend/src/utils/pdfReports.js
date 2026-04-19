@@ -1421,6 +1421,23 @@ export const generateQuotationPDF = async (quotation) => {
   const fmt = (v) =>
     `MWK ${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+  const vatEnabled = quotation?.vatEnabled !== false;
+  const configuredVatRatePercent = Number(
+    quotation?.configuredVatRatePercent
+      ?? quotation?.vatRatePercent
+      ?? 16.5
+  );
+  const fallbackVatAmount = (() => {
+    const gross = Number(quotation?.total || 0);
+    if (!vatEnabled || !Number.isFinite(configuredVatRatePercent) || configuredVatRatePercent <= 0 || gross <= 0) {
+      return 0;
+    }
+    return Number((gross - ((gross * 100) / (100 + configuredVatRatePercent))).toFixed(2));
+  })();
+  const vatAmount = Number.isFinite(Number(quotation?.vatAmount))
+    ? Number(quotation.vatAmount)
+    : fallbackVatAmount;
+
   const tableRows = (quotation.items || []).map((item, idx) => [
     String(idx + 1),
     item.productName + (item.description ? `\n${item.description}` : ''),
@@ -1473,6 +1490,10 @@ export const generateQuotationPDF = async (quotation) => {
   if (Number(quotation.discount) > 0) {
     drawTotalRow('Discount:', `-${fmt(quotation.discount)}`);
   }
+  drawTotalRow(
+    vatEnabled ? `VAT (${configuredVatRatePercent.toFixed(1)}%, included):` : 'VAT (disabled):',
+    fmt(vatAmount)
+  );
   drawTotalRow('GRAND TOTAL:', fmt(quotation.total), true, true);
 
   y += 4;
