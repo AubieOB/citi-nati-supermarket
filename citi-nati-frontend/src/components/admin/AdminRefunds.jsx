@@ -427,7 +427,7 @@ const AdminRefunds = () => {
 
               {/* Actions */}
               <div style={{ display: 'flex', gap: '1rem' }}>
-                {canManageRefunds ? (
+                {canManageRefunds && (
                   <Button
                     variant="primary"
                     onClick={() => handleApproveRefund(refund.id)}
@@ -436,10 +436,6 @@ const AdminRefunds = () => {
                     <i className="fas fa-check-circle" style={{ marginRight: '0.5rem' }}></i>
                     Mark as Refunded
                   </Button>
-                ) : (
-                  <div style={{ flex: 1, color: '#9ca3af', fontSize: '0.85rem', textAlign: 'center' }}>
-                    Read-only access
-                  </div>
                 )}
               </div>
             </div>

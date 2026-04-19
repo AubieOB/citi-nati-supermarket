@@ -1095,8 +1095,6 @@ const AdminStocks = ({
                             <i className="fas fa-sliders-h"></i>
                             Override
                           </button>
-                        ) : (
-                          <span style={{ color: '#9ca3af', fontSize: '0.82rem' }}>Read only</span>
                         )}
                       </div>
                     </td>

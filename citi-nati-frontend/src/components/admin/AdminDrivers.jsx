@@ -476,7 +476,7 @@ const AdminDrivers = () => {
                   <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>Name</th>
                   <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>Phone</th>
                   <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>Email</th>
-                  <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600' }}>Actions</th>
+                  {canManageDrivers && <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600' }}>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -543,8 +543,8 @@ const AdminDrivers = () => {
                       )}
                     </td>
                     <td style={{ padding: '1rem' }}>{driver.email || 'N/A'}</td>
-                    <td style={{ padding: '1rem', textAlign: 'center' }}>
-                      {canManageDrivers ? (
+                    {canManageDrivers && (
+                      <td style={{ padding: '1rem', textAlign: 'center' }}>
                         <button
                           onClick={() => handleDelete(driver.id)}
                           style={{
@@ -560,10 +560,8 @@ const AdminDrivers = () => {
                         >
                           Delete
                         </button>
-                      ) : (
-                        <span style={{ color: '#9ca3af', fontSize: '0.82rem' }}>Read only</span>
-                      )}
-                    </td>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

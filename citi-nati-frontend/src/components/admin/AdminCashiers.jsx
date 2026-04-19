@@ -414,7 +414,7 @@ const AdminCashiers = () => {
                   <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>Name</th>
                   <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>Email</th>
                   <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>Created</th>
-                  <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600' }}>Actions</th>
+                  {canManageCashiers && <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600' }}>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -428,8 +428,8 @@ const AdminCashiers = () => {
                     <td style={{ padding: '1rem', color: '#888', fontSize: '0.85rem' }}>
                       {cashier.createdAt ? new Date(cashier.createdAt).toLocaleDateString() : '-'}
                     </td>
-                    <td style={{ padding: '1rem', textAlign: 'center' }}>
-                      {canManageCashiers ? (
+                    {canManageCashiers && (
+                      <td style={{ padding: '1rem', textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
                           <button
                             onClick={() => handleEditClick(cashier)}
@@ -464,10 +464,8 @@ const AdminCashiers = () => {
                             Delete
                           </button>
                         </div>
-                      ) : (
-                        <span style={{ color: '#9ca3af', fontSize: '0.82rem' }}>Read only</span>
-                      )}
-                    </td>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

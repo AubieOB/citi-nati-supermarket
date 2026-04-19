@@ -284,22 +284,24 @@ const AdminSystem = () => {
             />
           </div>
 
+          {canManageSystem && (
           <button
             type="button"
             onClick={handleSave}
-            disabled={saving || !canManageSystem}
+            disabled={saving}
             style={{
               border: 'none',
               borderRadius: '8px',
               padding: '0.85rem 1rem',
-              backgroundColor: (saving || !canManageSystem) ? '#94a3b8' : '#5B4B8A',
+              backgroundColor: saving ? '#94a3b8' : '#5B4B8A',
               color: '#fff',
               fontWeight: 700,
-              cursor: (saving || !canManageSystem) ? 'not-allowed' : 'pointer'
+              cursor: saving ? 'not-allowed' : 'pointer'
             }}
           >
-            {!canManageSystem ? 'Read-only access' : saving ? 'Saving...' : 'Save System Settings'}
+            {saving ? 'Saving...' : 'Save System Settings'}
           </button>
+          )}
         </div>
       </div>
       </div>

@@ -570,9 +570,9 @@ const AdminUsers = () => {
             <tr>
               <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>Name</th>
               <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>Email</th>
-              <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600' }}>Role</th>
+              {canManageRoles && <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600' }}>Role</th>}
               <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600' }}>Joined</th>
-              <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600' }}>Actions</th>
+              {(canManagePermissions || canDeleteUsers) && <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600' }}>Actions</th>}
             </tr>
           </thead>
           <tbody>
@@ -595,8 +595,8 @@ const AdminUsers = () => {
                   )}
                 </td>
                 <td style={{ padding: '1rem' }}>{u.email}</td>
-                <td style={{ padding: '1rem', textAlign: 'center' }}>
-                  {canManageRoles ? (
+                {canManageRoles && (
+                  <td style={{ padding: '1rem', textAlign: 'center' }}>
                     <select
                       value={u.role}
                       onChange={(e) => updateUserRole(u.id, e.target.value)}
@@ -614,25 +614,14 @@ const AdminUsers = () => {
                       <option value="driver">Driver</option>
                       <option value="cashier">Cashier</option>
                     </select>
-                  ) : (
-                    <span style={{
-                      padding: '0.35rem 0.6rem',
-                      borderRadius: '4px',
-                      backgroundColor: '#f3f4f6',
-                      color: '#4b5563',
-                      fontWeight: 600,
-                      fontSize: '0.82rem',
-                      textTransform: 'capitalize',
-                    }}>
-                      {u.role}
-                    </span>
-                  )}
-                </td>
+                  </td>
+                )}
                 <td style={{ padding: '1rem', textAlign: 'center', fontSize: '0.9rem' }}>
                   {formatDate(u.createdAt)}
                 </td>
-                <td style={{ padding: '1rem', textAlign: 'center' }}>
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {(canManagePermissions || canDeleteUsers) && (
+                  <td style={{ padding: '1rem', textAlign: 'center' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                     {canManagePermissions && (
                       <button
                         onClick={() => openPermissionsEditor(u)}
@@ -673,6 +662,7 @@ const AdminUsers = () => {
                     )}
                   </div>
                 </td>
+                )}
               </tr>
             ))}
           </tbody>

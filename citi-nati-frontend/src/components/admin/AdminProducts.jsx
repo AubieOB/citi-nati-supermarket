@@ -2451,8 +2451,6 @@ const AdminProducts = ({
                             Delete
                           </button>
                         </div>
-                      ) : (
-                        <span style={{ color: textMuted, fontSize: '0.82rem' }}>Read only</span>
                       )}
                     </td>
                   </tr>
