@@ -68,6 +68,19 @@ function getPeriodText(filters = {}, resolvedDateRange = null) {
   return 'Current selection';
 }
 
+function getLocationScopeText(filters = {}) {
+  const locationCode = String(filters.locationCode || '').trim().toUpperCase();
+  if (locationCode) return locationCode;
+
+  const locationId = String(filters.locationId || '').trim();
+  if (locationId) return `Location #${locationId}`;
+
+  const branchCode = String(filters.branchCode || '').trim().toUpperCase();
+  if (branchCode) return `Branch ${branchCode} (all locations)`;
+
+  return 'All Locations (Combined)';
+}
+
 function toRgb(hex) {
   const normalized = String(hex || '').replace('#', '');
   const value = normalized.length === 3
@@ -97,13 +110,11 @@ function buildMetadataRows(filters = {}, resolvedDateRange = null, summaryMetaLi
   const rows = [
     ['Period Type', titleCase(filters.periodType || 'month')],
     ['Reporting Period', getPeriodText(filters, resolvedDateRange)],
+    ['Location Scope', getLocationScopeText(filters)],
   ];
 
   const optionalKeys = [
-    'branchCode',
-    'locationCode',
     'syncSourceCode',
-    'locationId',
     'userName',
     'productCode',
     'productName',

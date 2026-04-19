@@ -276,6 +276,12 @@ const kvRows = (filters = {}) => Object.entries(filters)
   .filter(([, value]) => value !== null && value !== undefined && String(value) !== '')
   .map(([key, value]) => [titleCase(key), String(value)]);
 
+const locationScopeText = ({ selectedLocationId = null, selectedLocationCode = '' } = {}) => {
+  if (selectedLocationCode) return String(selectedLocationCode).trim().toUpperCase();
+  if (selectedLocationId) return `Location #${selectedLocationId}`;
+  return 'All Locations (Combined)';
+};
+
 const periodFromRange = ({ startDate, endDate }) => {
   if (!startDate && !endDate) return 'Current selection';
   return `${startDate || '-'} to ${endDate || '-'}`;
@@ -304,7 +310,7 @@ export function exportExpensesPdf({
   const metadataRows = [
     ['Tab', isCategories ? 'Expense Categories' : 'Expense List'],
     ['Period', periodFromRange(filters)],
-    ['Location', selectedLocationId ? `Location #${selectedLocationId}` : 'All locations'],
+    ['Location Scope', locationScopeText({ selectedLocationId })],
     ...kvRows({ search: filters.search, expenseCategoryId: filters.expenseCategoryId }),
   ];
 
@@ -367,7 +373,7 @@ export function exportEmployeesPdf({ employees, pagination, search, statusFilter
 
   const metadataRows = [
     ['Page Total', fmtCount(pagination?.total || employees.length)],
-    ['Location', selectedLocationId ? `Location #${selectedLocationId}` : 'All locations'],
+    ['Location Scope', locationScopeText({ selectedLocationId })],
     ...kvRows({ search, status: statusFilter }),
   ];
 
@@ -428,7 +434,7 @@ export function exportPayrollPdf({
     ['Selected Period', selectedPeriod?.description || 'None selected'],
     ['Payroll Mode', selectedPeriod?.payrollMode || '-'],
     ['Status', selectedPeriod?.status || '-'],
-    ['Location', selectedLocationId ? `Location #${selectedLocationId}` : 'All locations'],
+    ['Location Scope', locationScopeText({ selectedLocationId })],
     ...kvRows(periodFilters),
   ];
 
@@ -509,7 +515,7 @@ export function exportSuppliersPdf({
     ['Page Total', fmtCount(pagination?.total || suppliers.length)],
     ['Active on Page', fmtCount(activeSuppliers)],
     ['Selected Supplier', selectedSupplier?.name || 'None selected'],
-    ['Location', selectedLocationId ? `Location #${selectedLocationId}` : 'All locations'],
+    ['Location Scope', locationScopeText({ selectedLocationId })],
     ...kvRows({ search, status: statusFilter }),
   ];
 
@@ -574,7 +580,7 @@ export function exportMonthlySummaryPdf({
   const metadataRows = [
     ['Period Type', titleCase(filters.periodType)],
     ['Reporting Period', periodText],
-    ['Location', selectedLocationId ? `Location #${selectedLocationId}` : (selectedLocationCode || 'All locations')],
+    ['Location Scope', locationScopeText({ selectedLocationId, selectedLocationCode })],
   ];
 
   const dataTable = {

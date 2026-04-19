@@ -194,6 +194,19 @@ function deriveBranchCodeFromLocationCode(locationCode) {
   return '';
 }
 
+function resolveLocationScopeLabel(filters = {}, selectedLocationId = null, selectedLocationCode = '') {
+  const locationCode = String(filters.locationCode || selectedLocationCode || '').trim().toUpperCase();
+  if (locationCode) return locationCode;
+
+  const locationId = String(filters.locationId || selectedLocationId || '').trim();
+  if (locationId) return `Location #${locationId}`;
+
+  const branchCode = String(filters.branchCode || '').trim().toUpperCase();
+  if (branchCode) return `Branch ${branchCode} (all locations)`;
+
+  return 'All Locations (Combined)';
+}
+
 function statusMessage(type) {
   if (type === 'invoices') return 'No invoices matched the selected filters.';
   if (type === 'products') return 'No product aggregates matched the selected filters.';
@@ -582,11 +595,12 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
     if (summaryMeta?.dateRange?.startDate && summaryMeta?.dateRange?.endDate) {
       chips.push(`${summaryMeta.dateRange.startDate} to ${summaryMeta.dateRange.endDate}`);
     }
+    chips.push(`Location Scope: ${resolveLocationScopeLabel(filters, selectedLocationId, selectedLocationCode)}`);
     if (summaryMeta?.filters?.branchCode) chips.push(`Branch: ${summaryMeta.filters.branchCode}`);
     if (summaryMeta?.filters?.locationCode) chips.push(`Location: ${summaryMeta.filters.locationCode}`);
     if (summaryMeta?.filters?.syncSourceCode) chips.push(`Source: ${summaryMeta.filters.syncSourceCode}`);
     return chips;
-  }, [summaryMeta]);
+  }, [filters, selectedLocationCode, selectedLocationId, summaryMeta]);
 
   const fetchAllRowsForView = useCallback(async (viewId) => {
     if (viewId === 'summary' || viewId === 'payments') {

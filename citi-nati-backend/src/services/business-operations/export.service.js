@@ -383,13 +383,28 @@ function getReportPeriodText(report) {
   return 'Current selection';
 }
 
+function getLocationScopeText(filters = {}) {
+  const locationCode = String(filters.locationCode || '').trim().toUpperCase();
+  if (locationCode) return locationCode;
+
+  const locationId = String(filters.locationId || '').trim();
+  if (locationId) return `Location #${locationId}`;
+
+  const branchCode = String(filters.branchCode || '').trim().toUpperCase();
+  if (branchCode) return `Branch ${branchCode} (all locations)`;
+
+  return 'All Locations (Combined)';
+}
+
 function buildAppliedFilterText(filters = {}) {
-  const ignored = new Set(['periodType', 'date', 'month', 'year', 'quarter', 'startDate', 'endDate']);
+  const ignored = new Set(['periodType', 'date', 'month', 'year', 'quarter', 'startDate', 'endDate', 'locationId', 'locationCode', 'branchCode']);
   const entries = Object.entries(filters)
     .filter(([key, value]) => !ignored.has(key) && value !== null && value !== undefined && value !== '')
     .map(([key, value]) => `${titleCase(key)}: ${value}`);
 
-  return entries.length ? entries.join(', ') : 'None (selected period only)';
+  entries.unshift(`Location Scope: ${getLocationScopeText(filters)}`);
+
+  return entries.length ? entries.join(', ') : 'Location Scope: All Locations (Combined)';
 }
 
 function createPdfContext(report) {
