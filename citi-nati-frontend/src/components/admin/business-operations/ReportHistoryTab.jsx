@@ -246,10 +246,10 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedL
   }, [runAutoRefresh]);
 
   const snapshotCards = useMemo(() => ([
-    { label: 'Net Sales This Month', value: money(state.salesSummary?.netSales), note: 'Latest monthly reporting snapshot.' },
-    { label: 'Invoices This Month', value: Number(state.salesSummary?.totalInvoices || 0).toLocaleString('en-US'), note: 'Invoice count in the current month.' },
-    { label: 'Recent Expenses', value: state.expenses.length.toLocaleString('en-US'), note: 'Latest expense rows visible now.' },
-    { label: 'Supplier Events', value: state.supplierTransactions.length.toLocaleString('en-US'), note: 'Recent supplier transaction events.' },
+    { label: 'Net Sales This Month', value: money(state.salesSummary?.netSales) },
+    { label: 'Invoices This Month', value: Number(state.salesSummary?.totalInvoices || 0).toLocaleString('en-US') },
+    { label: 'Recent Expenses', value: state.expenses.length.toLocaleString('en-US') },
+    { label: 'Supplier Events', value: state.supplierTransactions.length.toLocaleString('en-US') },
   ]), [state.expenses.length, state.salesSummary?.netSales, state.salesSummary?.totalInvoices, state.supplierTransactions.length]);
 
   const quickExports = useMemo(() => ([
@@ -262,10 +262,10 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedL
   ]), []);
 
   const activityTabs = useMemo(() => ([
-    { id: 'sales', label: 'Sales', count: state.invoices.length, description: 'Most recent sales invoices from the current month reporting window.' },
-    { id: 'expenses', label: 'Expenses', count: state.expenses.length, description: 'Newest imported expense records across the operations workspace.' },
-    { id: 'suppliers', label: 'Suppliers', count: state.supplierTransactions.length, description: 'Latest supplier ledger movement currently recorded.' },
-    { id: 'payroll', label: 'Payroll', count: state.payrollPeriods.length, description: 'Latest payroll periods created in the operations module.' },
+    { id: 'sales', label: 'Sales', count: state.invoices.length },
+    { id: 'expenses', label: 'Expenses', count: state.expenses.length },
+    { id: 'suppliers', label: 'Suppliers', count: state.supplierTransactions.length },
+    { id: 'payroll', label: 'Payroll', count: state.payrollPeriods.length },
   ]), [state.expenses.length, state.invoices.length, state.payrollPeriods.length, state.supplierTransactions.length]);
 
   const activeActivityMeta = activityTabs.find((tab) => tab.id === activeActivity) || activityTabs[0];
@@ -368,12 +368,6 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedL
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
           <div>
             <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.15rem' }}>Report History</h3>
-            <p style={{ margin: '0.45rem 0 0', color: '#64748b', lineHeight: 1.6, maxWidth: '860px' }}>
-              Monitor recent operational reporting activity across sales, expenses, suppliers, payroll, and run instant exports from one unified workspace.
-            </p>
-            <p style={{ margin: '0.25rem 0 0', color: '#475569', lineHeight: 1.5, fontSize: '0.82rem', fontWeight: 700 }}>
-              Smart background refresh runs every 30 seconds while this tab is visible.
-            </p>
           </div>
           <button
             type="button"
@@ -390,7 +384,6 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedL
             <div key={item.label} style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
               <div style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>{item.label}</div>
               <div style={{ marginTop: '0.35rem', fontSize: '1.36rem', lineHeight: 1.1, letterSpacing: '-0.01em', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap' }}>{item.value}</div>
-              <div style={{ marginTop: '0.3rem', color: '#64748b', fontSize: '0.84rem' }}>{item.note}</div>
             </div>
           ))}
         </div>
@@ -400,7 +393,6 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedL
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
           <div>
             <strong style={{ color: '#0f172a' }}>Quick Exports</strong>
-            <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>Generate on-demand Excel or PDF exports across all operations modules.</p>
           </div>
           <button
             type="button"
@@ -410,9 +402,6 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedL
             <i className="fas fa-up-right-from-square" style={{ marginRight: '0.35rem' }}></i>
             Open Exports
           </button>
-        </div>
-        <div style={{ marginTop: '0.7rem', color: '#64748b', fontSize: '0.86rem' }}>
-          Open the exports modal to run PDF/Excel reports by module.
         </div>
       </div>
 
@@ -424,9 +413,6 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedL
         <div style={{ ...cardStyle, overflow: 'hidden', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '1rem 1.1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
             <strong style={{ color: '#0f172a' }}>Recent Activity</strong>
-            <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>
-              Click a pill to open recent records in a modal.
-            </p>
           </div>
 
           <div style={{ padding: '0.8rem 1rem', borderBottom: '1px solid #eef2f7', display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
@@ -467,7 +453,6 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedL
             <div style={{ padding: '0.95rem 1.05rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
               <div>
                 <strong style={{ color: '#0f172a' }}>Recent Activity: {activeActivityMeta.label}</strong>
-                <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.85rem' }}>{activeActivityMeta.description}</p>
               </div>
               <button
                 type="button"
@@ -522,7 +507,6 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedL
             <div style={{ padding: '0.95rem 1.05rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
               <div>
                 <strong style={{ color: '#0f172a' }}>Quick Exports</strong>
-                <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.85rem' }}>Generate on-demand Excel or PDF exports across all operations modules.</p>
               </div>
               <button
                 type="button"
