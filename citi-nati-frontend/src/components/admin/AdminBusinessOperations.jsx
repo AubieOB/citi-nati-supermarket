@@ -27,6 +27,8 @@ const BO_OPERATIONAL_SCOPES = getOperationalScopeOptions().map((scope, index) =>
   branchCode: scope.branchCode,
 }));
 
+const BO_ALL_LOCATIONS_SCOPE_ID = 'all';
+
 const TABS = [
   { id: 'sales-reports', label: 'Sales Reports', icon: 'fa-chart-column' },
   { id: 'suppliers', label: 'Suppliers', icon: 'fa-truck-field' },
@@ -51,7 +53,7 @@ const AdminBusinessOperations = () => {
   const [dataRefreshKey, setDataRefreshKey] = useState(0);
   const [drilldownRequests, setDrilldownRequests] = useState({});
   const [locations] = useState(BO_OPERATIONAL_SCOPES);
-  const [selectedLocationId, setSelectedLocationId] = useState(String(BO_OPERATIONAL_SCOPES[0].id));
+  const [selectedLocationId, setSelectedLocationId] = useState(BO_ALL_LOCATIONS_SCOPE_ID);
   const [locationRefreshKey, setLocationRefreshKey] = useState(0);
 
   useEffect(() => {
@@ -101,12 +103,17 @@ const AdminBusinessOperations = () => {
   }, [selectedLocationId]);
 
   const selectedLocation = useMemo(() => {
+    if (String(selectedLocationId || '') === BO_ALL_LOCATIONS_SCOPE_ID) {
+      return null;
+    }
+
     const asNumber = Number(selectedLocationId);
     return locations.find((location) => Number(location.id) === asNumber) || null;
   }, [locations, selectedLocationId]);
 
   const selectedLocationCode = selectedLocation?.code || '';
   const selectedLocationIdNumber = selectedLocation ? Number(selectedLocation.id) : null;
+  const selectedLocationName = selectedLocation?.name || 'All Locations';
 
   const handleImportSuccess = () => {
     setLocationRefreshKey((current) => current + 1);
@@ -164,11 +171,11 @@ const AdminBusinessOperations = () => {
     suppliers: <SuppliersTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} locations={locations} />,
     'goods-intake': <GoodsIntakeTab selectedLocationId={selectedLocationIdNumber} locations={locations} />,
     expenses: <ExpensesTab refreshKey={locationRefreshKey} drilldownRequest={drilldownRequests.expenses} selectedLocationId={selectedLocationIdNumber} locations={locations} />,
-    'monthly-summary': <MonthlySummaryTab refreshKey={locationRefreshKey} onNavigateTab={handleNavigateTab} selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} selectedLocationName={selectedLocation?.name || ''} />,
+    'monthly-summary': <MonthlySummaryTab refreshKey={locationRefreshKey} onNavigateTab={handleNavigateTab} selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} selectedLocationName={selectedLocationName} />,
     employees: <EmployeesTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} locations={locations} />,
     payroll: <PayrollTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} locations={locations} />,
     'report-history': <ReportHistoryTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} onNavigateTab={handleNavigateTab} />,
-    'sales-balancing': <SalesBalancingTab selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} selectedLocationName={selectedLocation?.name || ''} />,
+    'sales-balancing': <SalesBalancingTab selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} selectedLocationName={selectedLocationName} />,
     'analytics-performance': <BusinessAnalyticsTab selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} locations={locations} />,
     actions: <BusinessOperationsActionsTab />,
   };
@@ -202,6 +209,7 @@ const AdminBusinessOperations = () => {
                   onChange={(event) => setSelectedLocationId(event.target.value)}
                   className="bo-location-select"
                 >
+                  <option value={BO_ALL_LOCATIONS_SCOPE_ID}>All Locations (Combined)</option>
                   {locations.map((location) => (
                     <option key={location.id} value={String(location.id)}>
                       {location.name}
