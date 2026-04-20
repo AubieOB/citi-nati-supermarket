@@ -83,6 +83,7 @@ const MOBILE_SAFE_TAB_IDS = new Set([
   'emergency-sales',
   'emergency-sales-reports',
   'pos-sync-monitor',
+  'business-operations',
   'system',
   'security',
 ]);
@@ -97,7 +98,6 @@ const MOBILE_BLOCKED_MESSAGE_BY_TAB = {
   quotations: 'Quotation management is desktop-only on mobile.',
   'pos-management': 'POS management is desktop-only on mobile.',
   cashiers: 'Cashier account management is desktop-only on mobile.',
-  'business-operations': 'Business operations tools are desktop-only on mobile.',
   refunds: 'Refund management is desktop-only on mobile.',
   support: 'Support management is desktop-only on mobile.',
 };
