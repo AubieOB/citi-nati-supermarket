@@ -20,7 +20,7 @@ const {
 const prisma = new PrismaClient();
 
 const MAX_FAILED_LOGIN_ATTEMPTS = Math.max(3, parseInt(process.env.MAX_FAILED_LOGIN_ATTEMPTS || '5', 10) || 5);
-const LOGIN_LOCKOUT_MINUTES = Math.max(1, parseInt(process.env.LOGIN_LOCKOUT_MINUTES || '15', 10) || 15);
+const LOGIN_LOCKOUT_MINUTES = Math.max(1, parseInt(process.env.LOGIN_LOCKOUT_MINUTES || '5', 10) || 5);
 
 const getEmailFailureResponse = (emailResult, defaultMessage) => {
   if (emailResult?.errorCode === 'EMAIL_PROVIDER_CREDITS_EXCEEDED') {
@@ -157,6 +157,11 @@ const login = async (req, res) => {
     }
 
     if (isAccountLocked(user)) {
+      const lockedUntilTime = new Date(user.lockedUntil).getTime();
+      const remainingSeconds = Math.max(1, Math.ceil((lockedUntilTime - Date.now()) / 1000));
+      const remainingMinutes = Math.max(1, Math.ceil(remainingSeconds / 60));
+      const errorMessage = `Too many failed login attempts. Account locked. Please try again after ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'}.`;
+      
       await recordAuditLog({
         req,
         actorUserId: user.id,
@@ -166,7 +171,13 @@ const login = async (req, res) => {
         status: 'FAILURE',
         metadata: { reason: 'ACCOUNT_LOCKED', lockedUntil: user.lockedUntil },
       });
-      return res.status(423).json({ error: 'Account temporarily locked. Please try again later.' });
+      
+      res.set('Retry-After', String(remainingSeconds));
+      return res.status(429).json({ 
+        error: errorMessage,
+        retryAfterSeconds: remainingSeconds,
+        retryAfterMinutes: remainingMinutes,
+      });
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
@@ -174,7 +185,17 @@ const login = async (req, res) => {
     if (!isPasswordValid) {
       const updatedUser = await registerFailedLoginAttempt(user, req);
       if (updatedUser?.lockedUntil && new Date(updatedUser.lockedUntil) > new Date()) {
-        return res.status(423).json({ error: 'Account temporarily locked. Please try again later.' });
+        const lockedUntilTime = new Date(updatedUser.lockedUntil).getTime();
+        const remainingSeconds = Math.max(1, Math.ceil((lockedUntilTime - Date.now()) / 1000));
+        const remainingMinutes = Math.max(1, Math.ceil(remainingSeconds / 60));
+        const errorMessage = `Too many failed login attempts. Account locked. Please try again after ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'}.`;
+        
+        res.set('Retry-After', String(remainingSeconds));
+        return res.status(429).json({ 
+          error: errorMessage,
+          retryAfterSeconds: remainingSeconds,
+          retryAfterMinutes: remainingMinutes,
+        });
       }
       return res.status(401).json({ error: 'Invalid email or password' });
     }
