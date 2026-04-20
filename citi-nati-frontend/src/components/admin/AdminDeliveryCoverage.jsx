@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import api from '../../utils/api.js';
 
 const emptyForm = {
@@ -32,8 +32,10 @@ const fieldStyle = {
   padding: '0.62rem 0.7rem',
   fontSize: '0.92rem',
   color: '#0f172a',
-  backgroundColor: '#f8fafc',
+  backgroundColor: '#ffffff',
+  boxShadow: 'inset 0 1px 2px rgba(15, 23, 42, 0.04)',
   outline: 'none',
+  transition: 'border-color 0.16s ease, box-shadow 0.16s ease',
   boxSizing: 'border-box',
 };
 
@@ -69,6 +71,9 @@ const AdminDeliveryCoverage = () => {
     status: 'idle',
     message: '',
   });
+  const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
+  const [filterBarHeight, setFilterBarHeight] = useState(0);
+  const filterBarRef = useRef(null);
 
   const districtOptions = useMemo(() => {
     const base = masterDistricts.map((entry) => entry.district);
@@ -125,6 +130,48 @@ const AdminDeliveryCoverage = () => {
     fetchMasterLocations();
     fetchZones();
   }, []);
+
+  useEffect(() => {
+    let resizeObserver;
+
+    const updateFilterBarLayout = () => {
+      const contentArea = document.querySelector('.admin-content-area');
+      if (!contentArea) return;
+
+      const rect = contentArea.getBoundingClientRect();
+      const mobileTopOffset = 56;
+
+      setFilterBarLayout({
+        left: rect.left,
+        width: rect.width,
+        top: window.innerWidth <= 768 ? mobileTopOffset : 0,
+      });
+
+      if (filterBarRef.current) {
+        setFilterBarHeight(filterBarRef.current.offsetHeight);
+      }
+    };
+
+    updateFilterBarLayout();
+    window.addEventListener('resize', updateFilterBarLayout);
+
+    const contentArea = document.querySelector('.admin-content-area');
+    if (contentArea && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(updateFilterBarLayout);
+      resizeObserver.observe(contentArea);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateFilterBarLayout);
+      if (resizeObserver) resizeObserver.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (filterBarRef.current) {
+      setFilterBarHeight(filterBarRef.current.offsetHeight);
+    }
+  });
 
   const resetForm = () => {
     setForm(emptyForm);
@@ -292,31 +339,42 @@ const AdminDeliveryCoverage = () => {
     }
   };
 
+  const filterBarSpacerHeight = filterBarHeight > 0 ? filterBarHeight + 8 : 0;
+
   return (
-    <div style={{ padding: '0.95rem', background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 45%)' }}>
-      <div style={{
-        ...cardStyle,
-        position: 'sticky',
-        top: '-0.95rem',
-        zIndex: 5,
-        margin: '-0.95rem -0.95rem 1rem',
-        borderRadius: 0,
-        borderLeft: 'none',
-        borderRight: 'none',
-        borderTop: 'none',
-        boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)',
-        padding: '0.95rem',
-      }}>
-        <h2 style={{ margin: 0, fontSize: '1.15rem', color: '#0f172a', fontWeight: 800 }}>
+    <div style={{ position: 'relative' }}>
+      <div
+        ref={filterBarRef}
+        className="admin-filter-bar-fixed admin-mobile-filter-bar"
+        style={{
+          position: 'fixed',
+          top: `${filterBarLayout.top}px`,
+          left: `${filterBarLayout.left}px`,
+          width: `${filterBarLayout.width}px`,
+          zIndex: 80,
+          backgroundColor: '#fff',
+          border: '1px solid #e2e8f0',
+          borderRadius: '8px',
+          boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)',
+          boxSizing: 'border-box',
+          overflow: 'hidden',
+          padding: '0.82rem 1rem',
+        }}
+      >
+        <h2 style={{ margin: 0, fontSize: '1.12rem', color: '#0f172a', fontWeight: 800 }}>
           Delivery Coverage
         </h2>
-        <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>
+        <p style={{ margin: '0.32rem 0 0', color: '#64748b', fontSize: '0.86rem' }}>
           Activate or deactivate predefined Malawi delivery areas with optional GPS radius enforcement.
         </p>
-        <p style={{ margin: '0.42rem 0 0', color: '#0f172a', fontSize: '0.83rem', fontWeight: 700 }}>
-          Malawi districts: {masterDistricts.length} | Active delivery areas: {activeAreaCount}
+        <p style={{ margin: '0.38rem 0 0', color: '#0f172a', fontSize: '0.82rem', fontWeight: 700 }}>
+          Malawi districts: {masterDistricts.length} | Active delivery areas: {activeAreaCount} | Configured zones: {zones.length}
         </p>
       </div>
+
+      <div style={{ height: filterBarSpacerHeight }} />
+
+      <div style={{ padding: '0.95rem', background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 45%)' }}>
 
       {error && (
         <div style={{ marginBottom: '0.9rem', padding: '0.75rem', borderRadius: '10px', border: '1px solid #fecaca', background: '#fef2f2', color: '#b91c1c' }}>
@@ -338,7 +396,7 @@ const AdminDeliveryCoverage = () => {
           gap: '0.8rem',
           alignContent: 'start',
         }}>
-          <h3 style={{ margin: 0, fontSize: '1rem', color: '#0f172a', fontWeight: 700 }}>
+          <h3 style={{ margin: 0, fontSize: '1rem', color: '#0f172a', fontWeight: 700, letterSpacing: '0.01em' }}>
             {editingZoneId ? 'Edit Delivery Zone' : 'Add Delivery Zone'}
           </h3>
 
@@ -410,11 +468,11 @@ const AdminDeliveryCoverage = () => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.55rem' }}>
             <label style={labelStyle}>
               Latitude
-              <input type="number" step="0.000001" name="latitude" value={form.latitude} onChange={handleInputChange} style={fieldStyle} />
+              <input type="number" step="0.000001" name="latitude" value={form.latitude} onChange={handleInputChange} style={fieldStyle} placeholder="e.g. -15.7867" />
             </label>
             <label style={labelStyle}>
               Longitude
-              <input type="number" step="0.000001" name="longitude" value={form.longitude} onChange={handleInputChange} style={fieldStyle} />
+              <input type="number" step="0.000001" name="longitude" value={form.longitude} onChange={handleInputChange} style={fieldStyle} placeholder="e.g. 35.0058" />
             </label>
           </div>
 
@@ -434,11 +492,11 @@ const AdminDeliveryCoverage = () => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.55rem' }}>
             <label style={labelStyle}>
               Radius (km)
-              <input type="number" step="0.1" name="radiusKm" value={form.radiusKm} onChange={handleInputChange} style={fieldStyle} />
+              <input type="number" step="0.1" name="radiusKm" value={form.radiusKm} onChange={handleInputChange} style={fieldStyle} placeholder="e.g. 4.5" />
             </label>
             <label style={labelStyle}>
               Delivery Fee (MWK)
-              <input type="number" step="0.01" name="deliveryFee" value={form.deliveryFee} onChange={handleInputChange} style={fieldStyle} />
+              <input type="number" step="0.01" name="deliveryFee" value={form.deliveryFee} onChange={handleInputChange} style={fieldStyle} placeholder="e.g. 2500" />
             </label>
           </div>
 
@@ -494,7 +552,7 @@ const AdminDeliveryCoverage = () => {
               <tbody>
                 {zones.map((zone) => (
                   <tr key={zone.id}>
-                    <td style={{ padding: '0.45rem 0.35rem', borderBottom: '1px solid #f1f5f9' }}>{zone.district}</td>
+                    <td style={{ padding: '0.45rem 0.35rem', borderBottom: '1px solid #f1f5f9' }}>{districtLabel(zone.district)}</td>
                     <td style={{ padding: '0.45rem 0.35rem', borderBottom: '1px solid #f1f5f9' }}>{zone.area}</td>
                     <td style={{ padding: '0.45rem 0.35rem', borderBottom: '1px solid #f1f5f9' }}>
                       <span style={{
@@ -531,6 +589,7 @@ const AdminDeliveryCoverage = () => {
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   );
