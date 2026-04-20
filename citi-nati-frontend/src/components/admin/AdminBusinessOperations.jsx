@@ -277,7 +277,7 @@ const AdminBusinessOperations = () => {
           boxSizing: 'border-box',
         }}
       >
-          <div className="bo-filter-header">
+          <div className="bo-filter-header" style={{ flexWrap: isMobileViewport ? 'wrap' : 'nowrap' }}>
             <div className="bo-filter-title">
               <i className="fas fa-briefcase"></i>
               Business Operations
@@ -305,7 +305,7 @@ const AdminBusinessOperations = () => {
                 </span>
               )}
             </div>
-              <div className="bo-filter-actions">
+              <div className="bo-filter-actions" style={{ marginLeft: isMobileViewport ? 0 : 'auto', justifyContent: isMobileViewport ? 'space-between' : 'flex-end', flexWrap: isMobileViewport ? 'wrap' : 'nowrap' }}>
               <label className="bo-location-control">
                 <span className="bo-location-label">
                   Location Scope

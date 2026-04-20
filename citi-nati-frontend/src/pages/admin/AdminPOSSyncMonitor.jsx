@@ -537,7 +537,7 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
       <div ref={headerRef} className={`admin-filter-bar-fixed ${isMobileViewport ? 'admin-mobile-filter-bar' : ''}`} style={fixedHeaderStyle}>
         {/* Title row */}
         <div className={isMobileViewport ? 'admin-mobile-filter-top-row' : ''} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: isMobileViewport ? 'wrap' : 'nowrap', gap: '0.75rem', marginBottom: isMobileViewport ? '0.75rem' : '1rem' }}>
-          <div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <h2 style={{ margin: 0, color: '#5B4B8A', fontSize: '1.4rem', fontWeight: 700 }}>
               <i className="fas fa-chart-line" style={{ marginRight: '0.5rem', opacity: 0.8 }} />
               POS Sync Monitor
@@ -578,7 +578,7 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
             </div>
           </div>
 
-          <div className={isMobileViewport ? 'admin-mobile-filter-actions' : ''} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
+          <div className={isMobileViewport ? 'admin-mobile-filter-actions' : ''} style={{ display: 'flex', flexWrap: isMobileViewport ? 'wrap' : 'nowrap', gap: '0.5rem', alignItems: 'center', marginLeft: isMobileViewport ? 0 : 'auto', justifyContent: isMobileViewport ? 'flex-start' : 'flex-end' }}>
             <button
               onClick={handleToggle}
               disabled={toggleSaving}
