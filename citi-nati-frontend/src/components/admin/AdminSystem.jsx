@@ -15,6 +15,13 @@ const DEFAULT_BUSINESS_TIME = {
   now: '',
 };
 
+const formatChangeDateTime = (value) => {
+  if (!value) return 'N/A';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'N/A';
+  return date.toLocaleString();
+};
+
 const pad2 = (value) => String(value).padStart(2, '0');
 
 const formatBusinessNow = (offsetMinutes = 120) => {
@@ -37,6 +44,7 @@ const AdminSystem = () => {
   const [vatEnabled, setVatEnabled] = useState(true);
   const [configuredVatRatePercent, setConfiguredVatRatePercent] = useState(DEFAULT_VAT_RATE);
   const [emergencySalesDayOpen, setEmergencySalesDayOpen] = useState(true);
+  const [emergencySalesDayLastChange, setEmergencySalesDayLastChange] = useState(null);
   const [updatingEmergencySalesDay, setUpdatingEmergencySalesDay] = useState(false);
   const [businessTime, setBusinessTime] = useState(DEFAULT_BUSINESS_TIME);
   const [businessNowDisplay, setBusinessNowDisplay] = useState('');
@@ -56,6 +64,7 @@ const AdminSystem = () => {
         setVatEnabled(settings.vatEnabled !== false);
         setConfiguredVatRatePercent(Number(settings.configuredVatRatePercent || settings.vatRatePercent || DEFAULT_VAT_RATE));
         setEmergencySalesDayOpen(settings.emergencySalesDayOpen !== false);
+        setEmergencySalesDayLastChange(settings.emergencySalesDayLastChange || null);
         const businessTimeSettings = settings.businessTime || DEFAULT_BUSINESS_TIME;
         setBusinessTime(businessTimeSettings);
         setBusinessNowDisplay(formatBusinessNow(Number(businessTimeSettings.offsetMinutes || 120)));
@@ -173,6 +182,7 @@ const AdminSystem = () => {
           });
 
           setEmergencySalesDayOpen(response.data?.settings?.emergencySalesDayOpen !== false);
+          setEmergencySalesDayLastChange(response.data?.settings?.emergencySalesDayLastChange || null);
           showSuccess('Emergency Sales Day Updated', response.data?.message || 'Emergency sales day state updated successfully.');
         } catch (err) {
           showError('Update failed', err.response?.data?.error || 'Failed to update emergency sales day state');
@@ -383,6 +393,31 @@ const AdminSystem = () => {
                 ? 'Cashiers can access the emergency sales dashboard and process online emergency sales.'
                 : 'Cashier emergency sales access is locked until an admin opens the day again.'}
             </div>
+          </div>
+
+          <div style={{
+            borderTop: '1px dashed #d1d5db',
+            paddingTop: '0.7rem',
+            color: '#4b5563',
+            fontSize: '0.88rem',
+            lineHeight: 1.5,
+          }}>
+            <div style={{ fontWeight: 700, color: '#374151', marginBottom: '0.25rem' }}>Last Status Change</div>
+            {emergencySalesDayLastChange ? (
+              <>
+                <div>
+                  Action: {emergencySalesDayLastChange.action === 'EMERGENCY_SALES_DAY_OPENED' ? 'Opened' : 'Closed'}
+                </div>
+                <div>
+                  Changed At: {formatChangeDateTime(emergencySalesDayLastChange.changedAt)}
+                </div>
+                <div>
+                  By: {emergencySalesDayLastChange.actorName || emergencySalesDayLastChange.actorEmail || emergencySalesDayLastChange.actorUserId || 'Unknown'}
+                </div>
+              </>
+            ) : (
+              <div>No status change has been recorded yet.</div>
+            )}
           </div>
 
           {canManageSystem && (

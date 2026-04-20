@@ -241,6 +241,43 @@ const getSettingValue = async (key, fallbackValue) => {
   return setting ? setting.value : fallbackValue;
 };
 
+const getEmergencySalesDayLastChange = async () => {
+  const latest = await prisma.securityAuditLog.findFirst({
+    where: {
+      action: {
+        in: ['EMERGENCY_SALES_DAY_OPENED', 'EMERGENCY_SALES_DAY_CLOSED'],
+      },
+      resourceType: 'SYSTEM_SETTING',
+      resourceId: 'emergency_sales_day_open',
+    },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      action: true,
+      createdAt: true,
+      actorUserId: true,
+      actorUser: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+    },
+  });
+
+  if (!latest) {
+    return null;
+  }
+
+  return {
+    action: latest.action,
+    changedAt: latest.createdAt,
+    actorUserId: latest.actorUserId || latest.actorUser?.id || null,
+    actorName: latest.actorUser?.name || null,
+    actorEmail: latest.actorUser?.email || null,
+  };
+};
+
 /**
  * GET /api/admin/test
  * Simple test endpoint to verify admin access
@@ -370,11 +407,12 @@ router.get('/dashboard', verifyTokenMiddleware, verifyAdmin, async (req, res) =>
 
 router.get('/system/settings', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
   try {
-    const [maintenanceEnabled, maintenanceMessage, vatSettings, emergencySalesDayOpen] = await Promise.all([
+    const [maintenanceEnabled, maintenanceMessage, vatSettings, emergencySalesDayOpen, emergencySalesDayLastChange] = await Promise.all([
       getSettingValue(MAINTENANCE_MODE_KEY, 'false'),
       getSettingValue(MAINTENANCE_MESSAGE_KEY, DEFAULT_MAINTENANCE_MESSAGE),
       getVatSettings(),
       getEmergencySalesDayOpen(prisma),
+      getEmergencySalesDayLastChange(),
     ]);
 
     const businessOffsetMinutes = getBusinessOffsetMinutes();
@@ -394,6 +432,7 @@ router.get('/system/settings', verifyTokenMiddleware, verifyAdmin, async (req, r
         vatRatePercent: vatSettings.ratePercent,
         configuredVatRatePercent: vatSettings.configuredRatePercent,
         emergencySalesDayOpen,
+        emergencySalesDayLastChange,
         businessTime,
       },
     });
@@ -474,6 +513,8 @@ router.put('/system/emergency-sales-day', verifyTokenMiddleware, verifyAdmin, as
       },
     });
 
+    const emergencySalesDayLastChange = await getEmergencySalesDayLastChange();
+
     return res.json({
       success: true,
       message: emergencySalesDayOpen
@@ -481,6 +522,7 @@ router.put('/system/emergency-sales-day', verifyTokenMiddleware, verifyAdmin, as
         : 'Emergency sales day closed. Cashier emergency sales dashboard is now locked.',
       settings: {
         emergencySalesDayOpen,
+        emergencySalesDayLastChange,
       },
     });
   } catch (err) {
