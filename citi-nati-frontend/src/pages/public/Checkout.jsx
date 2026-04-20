@@ -62,6 +62,8 @@ const CheckoutContent = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const { modal, closeModal, showWarning, showError } = useModal();
 
+  const districtLabel = (district) => String(district || '').replace(/\s+district$/i, '').trim();
+
   // Fetch cart from backend on mount
   useEffect(() => {
     const fetchCart = async () => {
@@ -519,7 +521,7 @@ const CheckoutContent = () => {
                 >
                   <option value="">Select district</option>
                   {districtOptions.map((district) => (
-                    <option key={district} value={district}>{district}</option>
+                    <option key={district} value={district}>{districtLabel(district)}</option>
                   ))}
                 </select>
                 {errors.district && (

@@ -35,6 +35,11 @@ function toTitleCase(value) {
     .join(' ');
 }
 
+function districtSortIndex(masterOrder, districtName) {
+  const normalized = normalizeLocationName(districtName);
+  return masterOrder.indexOf(normalized);
+}
+
 function normalizeZoneNames({ district, area, allowCustomArea = false }) {
   const districtInput = normalizeText(district);
   const areaInput = normalizeText(area);
@@ -169,13 +174,6 @@ const getDeliveryZoneOptions = async (req, res) => {
 
     const districtMap = new Map();
 
-    for (const district of getAllMalawiDistricts()) {
-      districtMap.set(normalizeLocationName(district), {
-        district,
-        areas: [],
-      });
-    }
-
     for (const zone of activeZones) {
       const canonicalDistrict = resolveCanonicalDistrictName(zone.district) || normalizeText(zone.district);
       const districtKey = normalizeLocationName(canonicalDistrict);
@@ -187,8 +185,8 @@ const getDeliveryZoneOptions = async (req, res) => {
 
     const masterOrder = getAllMalawiDistricts().map((district) => normalizeLocationName(district));
     const districts = Array.from(districtMap.values()).sort((a, b) => {
-      const idxA = masterOrder.indexOf(normalizeLocationName(a.district));
-      const idxB = masterOrder.indexOf(normalizeLocationName(b.district));
+      const idxA = districtSortIndex(masterOrder, a.district);
+      const idxB = districtSortIndex(masterOrder, b.district);
       if (idxA !== -1 && idxB !== -1) return idxA - idxB;
       if (idxA !== -1) return -1;
       if (idxB !== -1) return 1;

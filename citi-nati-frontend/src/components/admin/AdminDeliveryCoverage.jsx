@@ -15,6 +15,8 @@ const emptyForm = {
 
 const numberToInput = (value) => (value === null || value === undefined ? '' : String(value));
 
+const districtLabel = (district) => String(district || '').replace(/\s+district$/i, '').trim();
+
 const cardStyle = {
   background: '#ffffff',
   borderRadius: '14px',
@@ -353,7 +355,7 @@ const AdminDeliveryCoverage = () => {
               {districtOptions.map((district) => {
                 const areaCount = masterDistricts.find((entry) => entry.district === district)?.areas?.length || 0;
                 return (
-                  <option key={district} value={district}>{`${district}${areaCount ? ` (${areaCount})` : ''}`}</option>
+                  <option key={district} value={district}>{`${districtLabel(district)}${areaCount ? ` (${areaCount})` : ''}`}</option>
                 );
               })}
             </select>
