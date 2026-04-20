@@ -3,6 +3,8 @@ const { RedisStore } = require('rate-limit-redis');
 const { createClient } = require('redis');
 const logger = require('../utils/logger');
 
+const DEFAULT_LOGIN_RATE_LIMIT_WINDOW_MINUTES = 5;
+
 let redisClient;
 let sharedStore;
 let storeInitialized = false;
@@ -128,14 +130,14 @@ function buildRateLimiter({
 
 const loginIpRateLimiter = buildRateLimiter({
   name: 'auth_login_ip',
-  windowMs: 15 * 60 * 1000,
+  windowMs: parseLimitValue(process.env.LOGIN_RATE_LIMIT_WINDOW_MINUTES, DEFAULT_LOGIN_RATE_LIMIT_WINDOW_MINUTES) * 60 * 1000,
   max: parseLimitValue(process.env.LOGIN_RATE_LIMIT_IP_MAX || process.env.AUTH_RATE_LIMIT_MAX, 10),
   message: 'Too many failed login attempts',
 });
 
 const loginIdentityRateLimiter = buildRateLimiter({
   name: 'auth_login_identity',
-  windowMs: 15 * 60 * 1000,
+  windowMs: parseLimitValue(process.env.LOGIN_RATE_LIMIT_WINDOW_MINUTES, DEFAULT_LOGIN_RATE_LIMIT_WINDOW_MINUTES) * 60 * 1000,
   max: parseLimitValue(process.env.LOGIN_RATE_LIMIT_IDENTITY_MAX, 5),
   keyGenerator: (req) => `${normalizeEmail(req.body?.email) || 'unknown'}:${getClientKey(req)}`,
   message: 'Too many failed login attempts for this account',
