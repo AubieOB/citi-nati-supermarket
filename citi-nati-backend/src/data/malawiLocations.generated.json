@@ -2,7 +2,7 @@
   "source": "GeoNames Malawi dump (MW.zip + admin2Codes)",
   "generatedAt": "2026-04-20T12:34:46.340Z",
   "districtCount": 28,
-  "areaCount": 7327,
+  "areaCount": 7331,
   "districts": [
     {
       "district": "Balaka District",
@@ -229,9 +229,21 @@
           "defaultRadiusKm": 4.5
         },
         {
+          "name": "Chinyonga",
+          "defaultLatitude": -15.77,
+          "defaultLongitude": 34.99,
+          "defaultRadiusKm": 4.5
+        },
+        {
           "name": "Chipalanje",
           "defaultLatitude": -15.4,
           "defaultLongitude": 34.93333,
+          "defaultRadiusKm": 4.5
+        },
+        {
+          "name": "Chitawira",
+          "defaultLatitude": -15.78,
+          "defaultLongitude": 35.02,
           "defaultRadiusKm": 4.5
         },
         {
@@ -415,6 +427,12 @@
           "defaultRadiusKm": 4.5
         },
         {
+          "name": "New Naperi",
+          "defaultLatitude": -15.79,
+          "defaultLongitude": 35.01,
+          "defaultRadiusKm": 4.5
+        },
+        {
           "name": "Ngumeni",
           "defaultLatitude": -15.75915,
           "defaultLongitude": 34.85051,
@@ -430,6 +448,12 @@
           "name": "Nyambadwe",
           "defaultLatitude": -15.77366,
           "defaultLongitude": 35.02196,
+          "defaultRadiusKm": 4.5
+        },
+        {
+          "name": "Old Naperi",
+          "defaultLatitude": -15.81,
+          "defaultLongitude": 35,
           "defaultRadiusKm": 4.5
         },
         {
