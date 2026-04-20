@@ -15,6 +15,44 @@ const emptyForm = {
 
 const numberToInput = (value) => (value === null || value === undefined ? '' : String(value));
 
+const cardStyle = {
+  background: '#ffffff',
+  borderRadius: '14px',
+  border: '1px solid #e2e8f0',
+  boxShadow: '0 6px 22px rgba(15, 23, 42, 0.05)',
+};
+
+const fieldStyle = {
+  width: '100%',
+  marginTop: '0.35rem',
+  border: '1px solid #cbd5e1',
+  borderRadius: '10px',
+  padding: '0.62rem 0.7rem',
+  fontSize: '0.92rem',
+  color: '#0f172a',
+  backgroundColor: '#f8fafc',
+  outline: 'none',
+  boxSizing: 'border-box',
+};
+
+const labelStyle = {
+  display: 'grid',
+  gap: '0.15rem',
+  fontSize: '0.84rem',
+  fontWeight: 600,
+  color: '#334155',
+};
+
+const subtleButtonStyle = {
+  border: '1px solid #cbd5e1',
+  borderRadius: '9px',
+  background: '#fff',
+  color: '#334155',
+  padding: '0.55rem 0.9rem',
+  cursor: 'pointer',
+  fontWeight: 600,
+};
+
 const AdminDeliveryCoverage = () => {
   const [zones, setZones] = useState([]);
   const [masterDistricts, setMasterDistricts] = useState([]);
@@ -253,22 +291,27 @@ const AdminDeliveryCoverage = () => {
   };
 
   return (
-    <div style={{ padding: '1rem' }}>
+    <div style={{ padding: '0.95rem', background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 45%)' }}>
       <div style={{
-        background: '#ffffff',
-        borderRadius: '14px',
-        border: '1px solid #e2e8f0',
-        boxShadow: '0 6px 22px rgba(15, 23, 42, 0.06)',
-        padding: '1rem',
-        marginBottom: '1rem',
+        ...cardStyle,
+        position: 'sticky',
+        top: '-0.95rem',
+        zIndex: 5,
+        margin: '-0.95rem -0.95rem 1rem',
+        borderRadius: 0,
+        borderLeft: 'none',
+        borderRight: 'none',
+        borderTop: 'none',
+        boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)',
+        padding: '0.95rem',
       }}>
-        <h2 style={{ margin: 0, fontSize: '1.2rem', color: '#334155' }}>
+        <h2 style={{ margin: 0, fontSize: '1.15rem', color: '#0f172a', fontWeight: 800 }}>
           Delivery Coverage
         </h2>
-        <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.9rem' }}>
+        <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>
           Activate or deactivate predefined Malawi delivery areas with optional GPS radius enforcement.
         </p>
-        <p style={{ margin: '0.35rem 0 0', color: '#0f172a', fontSize: '0.85rem', fontWeight: 600 }}>
+        <p style={{ margin: '0.42rem 0 0', color: '#0f172a', fontSize: '0.83rem', fontWeight: 700 }}>
           Malawi districts: {masterDistricts.length} | Active delivery areas: {activeAreaCount}
         </p>
       </div>
@@ -285,29 +328,26 @@ const AdminDeliveryCoverage = () => {
         </div>
       )}
 
-      <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
+      <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))' }}>
         <form onSubmit={handleSubmit} style={{
-          background: '#ffffff',
-          borderRadius: '14px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 6px 22px rgba(15, 23, 42, 0.05)',
+          ...cardStyle,
           padding: '1rem',
           display: 'grid',
-          gap: '0.75rem',
+          gap: '0.8rem',
           alignContent: 'start',
         }}>
-          <h3 style={{ margin: 0, fontSize: '1rem', color: '#334155' }}>
+          <h3 style={{ margin: 0, fontSize: '1rem', color: '#0f172a', fontWeight: 700 }}>
             {editingZoneId ? 'Edit Delivery Zone' : 'Add Delivery Zone'}
           </h3>
 
-          <label>
+          <label style={labelStyle}>
             District
             <select
               name="district"
               value={form.district}
               onChange={handleInputChange}
               disabled={masterLoading}
-              style={{ width: '100%', marginTop: '0.25rem' }}
+              style={fieldStyle}
             >
               <option value="">Select district</option>
               {districtOptions.map((district) => {
@@ -325,14 +365,14 @@ const AdminDeliveryCoverage = () => {
             </p>
           )}
 
-          <label>
+          <label style={labelStyle}>
             Area
             <select
               name="area"
               value={form.area}
               onChange={handleInputChange}
               disabled={!form.district || form.allowCustomArea || masterLoading}
-              style={{ width: '100%', marginTop: '0.25rem' }}
+              style={fieldStyle}
             >
               <option value="">Select area</option>
               {areaOptionsForDistrict.map((area) => (
@@ -341,20 +381,20 @@ const AdminDeliveryCoverage = () => {
             </select>
           </label>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.84rem', fontWeight: 600, color: '#334155' }}>
             <input type="checkbox" name="allowCustomArea" checked={form.allowCustomArea} onChange={handleInputChange} />
             Use custom area (optional)
           </label>
 
           {form.allowCustomArea && (
-            <label>
+            <label style={labelStyle}>
               Custom Area Name
               <input
                 name="customArea"
                 value={form.customArea}
                 onChange={handleInputChange}
                 placeholder="Type custom area"
-                style={{ width: '100%', marginTop: '0.25rem' }}
+                style={fieldStyle}
               />
             </label>
           )}
@@ -365,14 +405,14 @@ const AdminDeliveryCoverage = () => {
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.55rem' }}>
-            <label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.55rem' }}>
+            <label style={labelStyle}>
               Latitude
-              <input type="number" step="0.000001" name="latitude" value={form.latitude} onChange={handleInputChange} style={{ width: '100%', marginTop: '0.25rem' }} />
+              <input type="number" step="0.000001" name="latitude" value={form.latitude} onChange={handleInputChange} style={fieldStyle} />
             </label>
-            <label>
+            <label style={labelStyle}>
               Longitude
-              <input type="number" step="0.000001" name="longitude" value={form.longitude} onChange={handleInputChange} style={{ width: '100%', marginTop: '0.25rem' }} />
+              <input type="number" step="0.000001" name="longitude" value={form.longitude} onChange={handleInputChange} style={fieldStyle} />
             </label>
           </div>
 
@@ -389,28 +429,28 @@ const AdminDeliveryCoverage = () => {
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.55rem' }}>
-            <label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.55rem' }}>
+            <label style={labelStyle}>
               Radius (km)
-              <input type="number" step="0.1" name="radiusKm" value={form.radiusKm} onChange={handleInputChange} style={{ width: '100%', marginTop: '0.25rem' }} />
+              <input type="number" step="0.1" name="radiusKm" value={form.radiusKm} onChange={handleInputChange} style={fieldStyle} />
             </label>
-            <label>
+            <label style={labelStyle}>
               Delivery Fee (MWK)
-              <input type="number" step="0.01" name="deliveryFee" value={form.deliveryFee} onChange={handleInputChange} style={{ width: '100%', marginTop: '0.25rem' }} />
+              <input type="number" step="0.01" name="deliveryFee" value={form.deliveryFee} onChange={handleInputChange} style={fieldStyle} />
             </label>
           </div>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.84rem', fontWeight: 600, color: '#334155' }}>
             <input type="checkbox" name="isActive" checked={form.isActive} onChange={handleInputChange} />
             Active
           </label>
 
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <button type="submit" disabled={saving} style={{ border: 'none', borderRadius: '9px', background: '#2563eb', color: '#fff', padding: '0.55rem 0.9rem', cursor: 'pointer' }}>
+            <button type="submit" disabled={saving} style={{ border: 'none', borderRadius: '10px', background: '#2563eb', color: '#fff', padding: '0.58rem 0.95rem', cursor: 'pointer', fontWeight: 700 }}>
               {saving ? 'Saving...' : editingZoneId ? 'Update Zone' : 'Save Zone'}
             </button>
             {editingZoneId && (
-              <button type="button" onClick={resetForm} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', background: '#fff', color: '#334155', padding: '0.55rem 0.9rem', cursor: 'pointer' }}>
+              <button type="button" onClick={resetForm} style={subtleButtonStyle}>
                 Cancel Edit
               </button>
             )}
@@ -418,16 +458,13 @@ const AdminDeliveryCoverage = () => {
         </form>
 
         <div style={{
-          background: '#ffffff',
-          borderRadius: '14px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 6px 22px rgba(15, 23, 42, 0.05)',
+          ...cardStyle,
           padding: '1rem',
-          overflow: 'auto',
+          overflow: 'hidden',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.7rem' }}>
-            <h3 style={{ margin: 0, fontSize: '1rem', color: '#334155' }}>Delivery Zones</h3>
-            <button type="button" onClick={fetchZones} disabled={loading} style={{ border: '1px solid #cbd5e1', borderRadius: '8px', background: '#fff', color: '#334155', padding: '0.45rem 0.75rem', cursor: 'pointer' }}>
+            <h3 style={{ margin: 0, fontSize: '1rem', color: '#0f172a', fontWeight: 700 }}>Delivery Zones</h3>
+            <button type="button" onClick={fetchZones} disabled={loading} style={subtleButtonStyle}>
               Refresh
             </button>
           </div>
@@ -441,8 +478,9 @@ const AdminDeliveryCoverage = () => {
           ) : zones.length === 0 ? (
             <div style={{ color: '#64748b' }}>No delivery zones configured yet.</div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
-              <thead>
+            <div style={{ overflow: 'auto', maxHeight: '68vh', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem', background: '#fff' }}>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 1, background: '#f8fafc' }}>
                 <tr>
                   <th style={{ textAlign: 'left', borderBottom: '1px solid #e2e8f0', padding: '0.45rem 0.35rem' }}>District</th>
                   <th style={{ textAlign: 'left', borderBottom: '1px solid #e2e8f0', padding: '0.45rem 0.35rem' }}>Area</th>
@@ -473,10 +511,10 @@ const AdminDeliveryCoverage = () => {
                     </td>
                     <td style={{ padding: '0.45rem 0.35rem', borderBottom: '1px solid #f1f5f9' }}>
                       <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                        <button type="button" onClick={() => handleEdit(zone)} style={{ border: '1px solid #cbd5e1', borderRadius: '7px', background: '#fff', color: '#334155', padding: '0.3rem 0.55rem', cursor: 'pointer' }}>
+                        <button type="button" onClick={() => handleEdit(zone)} style={{ ...subtleButtonStyle, borderRadius: '7px', padding: '0.3rem 0.55rem', fontSize: '0.78rem' }}>
                           Edit
                         </button>
-                        <button type="button" onClick={() => handleToggleActive(zone)} style={{ border: '1px solid #cbd5e1', borderRadius: '7px', background: '#fff', color: '#334155', padding: '0.3rem 0.55rem', cursor: 'pointer' }}>
+                        <button type="button" onClick={() => handleToggleActive(zone)} style={{ ...subtleButtonStyle, borderRadius: '7px', padding: '0.3rem 0.55rem', fontSize: '0.78rem' }}>
                           {zone.isActive ? 'Disable' : 'Enable'}
                         </button>
                         <button type="button" onClick={() => handleDelete(zone.id)} style={{ border: '1px solid #fecaca', borderRadius: '7px', background: '#fff1f2', color: '#b91c1c', padding: '0.3rem 0.55rem', cursor: 'pointer' }}>
@@ -487,7 +525,8 @@ const AdminDeliveryCoverage = () => {
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           )}
         </div>
       </div>
