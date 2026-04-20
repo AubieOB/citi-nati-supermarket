@@ -1,11 +1,15 @@
 const { PrismaClient } = require('@prisma/client');
+const {
+  resolveCanonicalDistrictName,
+  resolveCanonicalAreaName,
+} = require('../data/malawiLocations');
 
 const prisma = new PrismaClient();
 
 const EARTH_RADIUS_KM = 6371;
 
 function normalizeName(value) {
-  return String(value || '').trim();
+  return String(value || '').trim().replace(/\s+/g, ' ');
 }
 
 function toRadians(value) {
@@ -23,8 +27,11 @@ function haversineDistanceKm(lat1, lon1, lat2, lon2) {
 }
 
 async function validateDeliveryLocation({ district, area, latitude, longitude }, prismaClient = prisma) {
-  const normalizedDistrict = normalizeName(district);
-  const normalizedArea = normalizeName(area);
+  const normalizedDistrictInput = normalizeName(district);
+  const normalizedAreaInput = normalizeName(area);
+
+  const normalizedDistrict = resolveCanonicalDistrictName(normalizedDistrictInput) || normalizedDistrictInput;
+  const normalizedArea = resolveCanonicalAreaName(normalizedDistrict, normalizedAreaInput) || normalizedAreaInput;
 
   if (!normalizedDistrict || !normalizedArea) {
     return {

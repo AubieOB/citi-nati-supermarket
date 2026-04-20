@@ -1,4 +1,12 @@
 const { PrismaClient } = require('@prisma/client');
+const {
+  MALAWI_LOCATION_MASTER,
+  normalizeLocationName,
+  getAllMalawiDistricts,
+  getAreasForDistrict,
+  resolveCanonicalDistrictName,
+  resolveCanonicalAreaName,
+} = require('../data/malawiLocations');
 
 const prisma = new PrismaClient();
 
@@ -9,7 +17,7 @@ function parseOptionalNumber(value) {
 }
 
 function normalizeText(value) {
-  return String(value || '').trim();
+  return String(value || '').trim().replace(/\s+/g, ' ');
 }
 
 function serializeZone(zone) {
@@ -19,17 +27,67 @@ function serializeZone(zone) {
   };
 }
 
+function toTitleCase(value) {
+  return normalizeText(value)
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function normalizeZoneNames({ district, area, allowCustomArea = false }) {
+  const districtInput = normalizeText(district);
+  const areaInput = normalizeText(area);
+
+  if (!districtInput) {
+    return { ok: false, error: 'District is required.' };
+  }
+
+  const canonicalDistrict = resolveCanonicalDistrictName(districtInput);
+  if (!canonicalDistrict) {
+    return { ok: false, error: 'Please select a valid Malawi district from the list.' };
+  }
+
+  if (!areaInput) {
+    return { ok: false, error: 'Area is required.' };
+  }
+
+  const canonicalArea = resolveCanonicalAreaName(canonicalDistrict, areaInput);
+  if (canonicalArea) {
+    return {
+      ok: true,
+      district: canonicalDistrict,
+      area: canonicalArea,
+      isCustomArea: false,
+    };
+  }
+
+  if (!allowCustomArea) {
+    return { ok: false, error: 'Please select a predefined area for the selected district.' };
+  }
+
+  return {
+    ok: true,
+    district: canonicalDistrict,
+    area: toTitleCase(areaInput),
+    isCustomArea: true,
+  };
+}
+
+async function findZoneByDistrictAreaInsensitive(district, area, excludeId = null) {
+  return prisma.deliveryZone.findFirst({
+    where: {
+      district: { equals: district, mode: 'insensitive' },
+      area: { equals: area, mode: 'insensitive' },
+      ...(excludeId != null ? { id: { not: excludeId } } : {}),
+    },
+  });
+}
+
 function validateZonePayload(payload, { partial = false } = {}) {
-  const district = normalizeText(payload.district);
-  const area = normalizeText(payload.area);
-
-  if (!partial || payload.district !== undefined) {
-    if (!district) return { valid: false, error: 'District is required.' };
-  }
-
-  if (!partial || payload.area !== undefined) {
-    if (!area) return { valid: false, error: 'Area is required.' };
-  }
+  const district = payload.district;
+  const area = payload.area;
+  const allowCustomArea = Boolean(payload.allowCustomArea);
 
   const latitude = parseOptionalNumber(payload.latitude);
   const longitude = parseOptionalNumber(payload.longitude);
@@ -56,10 +114,24 @@ function validateZonePayload(payload, { partial = false } = {}) {
     return { valid: false, error: 'Delivery fee cannot be negative.' };
   }
 
+  let normalizedNames = null;
+  if (!partial || payload.district !== undefined || payload.area !== undefined) {
+    normalizedNames = normalizeZoneNames({
+      district,
+      area,
+      allowCustomArea,
+    });
+
+    if (!normalizedNames.ok) {
+      return { valid: false, error: normalizedNames.error };
+    }
+  }
+
   return {
     valid: true,
-    district,
-    area,
+    district: normalizedNames?.district,
+    area: normalizedNames?.area,
+    isCustomArea: normalizedNames?.isCustomArea || false,
     latitude,
     longitude,
     radiusKm,
@@ -67,28 +139,69 @@ function validateZonePayload(payload, { partial = false } = {}) {
   };
 }
 
+function getMasterDistrictAreaCounts() {
+  const districtCount = MALAWI_LOCATION_MASTER.length;
+  const areaCount = MALAWI_LOCATION_MASTER.reduce((acc, entry) => acc + entry.areas.length, 0);
+  return { districtCount, areaCount };
+}
+
+const getDeliveryLocationMaster = async (req, res) => {
+  try {
+    const { districtCount, areaCount } = getMasterDistrictAreaCounts();
+    return res.status(200).json({
+      districts: MALAWI_LOCATION_MASTER,
+      districtCount,
+      areaCount,
+    });
+  } catch (error) {
+    console.error('Error fetching delivery location master:', error);
+    return res.status(500).json({ error: 'Failed to fetch Malawi location master data.' });
+  }
+};
+
 const getDeliveryZoneOptions = async (req, res) => {
   try {
-    const zones = await prisma.deliveryZone.findMany({
+    const activeZones = await prisma.deliveryZone.findMany({
       where: { isActive: true },
       orderBy: [{ district: 'asc' }, { area: 'asc' }],
     });
 
-    const grouped = zones.reduce((acc, zone) => {
-      const district = zone.district;
-      if (!acc[district]) {
-        acc[district] = [];
+    const districtMap = new Map();
+
+    for (const district of getAllMalawiDistricts()) {
+      districtMap.set(normalizeLocationName(district), {
+        district,
+        areas: [],
+      });
+    }
+
+    for (const zone of activeZones) {
+      const canonicalDistrict = resolveCanonicalDistrictName(zone.district) || normalizeText(zone.district);
+      const districtKey = normalizeLocationName(canonicalDistrict);
+      if (!districtMap.has(districtKey)) {
+        districtMap.set(districtKey, { district: canonicalDistrict, areas: [] });
       }
-      acc[district].push(serializeZone(zone));
-      return acc;
-    }, {});
+      districtMap.get(districtKey).areas.push(serializeZone(zone));
+    }
 
-    const districts = Object.keys(grouped).map((district) => ({
-      district,
-      areas: grouped[district],
-    }));
+    const masterOrder = getAllMalawiDistricts().map((district) => normalizeLocationName(district));
+    const districts = Array.from(districtMap.values()).sort((a, b) => {
+      const idxA = masterOrder.indexOf(normalizeLocationName(a.district));
+      const idxB = masterOrder.indexOf(normalizeLocationName(b.district));
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.district.localeCompare(b.district);
+    });
 
-    return res.status(200).json({ zones: districts });
+    const districtCount = districts.length;
+    const activeAreaCount = activeZones.length;
+
+    return res.status(200).json({
+      zones: districts,
+      districtCount,
+      activeAreaCount,
+    });
   } catch (error) {
     console.error('Error fetching delivery zone options:', error);
     return res.status(500).json({ error: 'Failed to fetch delivery zones.' });
@@ -100,8 +213,14 @@ const getAdminDeliveryZones = async (req, res) => {
     const zones = await prisma.deliveryZone.findMany({
       orderBy: [{ district: 'asc' }, { area: 'asc' }],
     });
+    const activeAreaCount = zones.filter((zone) => zone.isActive).length;
+    const districtCount = new Set(zones.map((zone) => normalizeLocationName(zone.district))).size;
 
-    return res.status(200).json({ zones: zones.map(serializeZone) });
+    return res.status(200).json({
+      zones: zones.map(serializeZone),
+      districtCount,
+      activeAreaCount,
+    });
   } catch (error) {
     console.error('Error fetching delivery zones:', error);
     return res.status(500).json({ error: 'Failed to fetch delivery zones.' });
@@ -113,6 +232,11 @@ const createDeliveryZone = async (req, res) => {
     const validation = validateZonePayload(req.body);
     if (!validation.valid) {
       return res.status(400).json({ error: validation.error });
+    }
+
+    const existing = await findZoneByDistrictAreaInsensitive(validation.district, validation.area);
+    if (existing) {
+      return res.status(409).json({ error: 'A delivery zone with this district and area already exists.' });
     }
 
     const zone = await prisma.deliveryZone.create({
@@ -152,8 +276,20 @@ const updateDeliveryZone = async (req, res) => {
 
     const data = {};
 
-    if (req.body.district !== undefined) data.district = validation.district;
-    if (req.body.area !== undefined) data.area = validation.area;
+    const current = await prisma.deliveryZone.findUnique({ where: { id: zoneId } });
+    if (!current) {
+      return res.status(404).json({ error: 'Delivery zone not found.' });
+    }
+
+    if (req.body.district !== undefined || req.body.area !== undefined) {
+      data.district = validation.district;
+      data.area = validation.area;
+
+      const existing = await findZoneByDistrictAreaInsensitive(data.district, data.area, zoneId);
+      if (existing) {
+        return res.status(409).json({ error: 'A delivery zone with this district and area already exists.' });
+      }
+    }
     if (req.body.isActive !== undefined) data.isActive = Boolean(req.body.isActive);
     if (req.body.latitude !== undefined) data.latitude = validation.latitude;
     if (req.body.longitude !== undefined) data.longitude = validation.longitude;
@@ -224,6 +360,7 @@ const deleteDeliveryZone = async (req, res) => {
 };
 
 module.exports = {
+  getDeliveryLocationMaster,
   getDeliveryZoneOptions,
   getAdminDeliveryZones,
   createDeliveryZone,

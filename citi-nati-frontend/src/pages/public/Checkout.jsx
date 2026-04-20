@@ -551,6 +551,11 @@ const CheckoutContent = () => {
                     {errors.area}
                   </span>
                 )}
+                {!!formData.district && selectedDistrictAreas.length === 0 && (
+                  <p style={{ fontSize: '0.82rem', color: '#b45309', margin: '0.35rem 0 0' }}>
+                    No supported delivery areas are active for this district yet.
+                  </p>
+                )}
                 {selectedAreaOption?.deliveryFee != null && (
                   <p style={{ fontSize: '0.8rem', color: '#2D8659', margin: '0.35rem 0 0' }}>
                     Estimated delivery fee for this area: {formatMWK(selectedAreaOption.deliveryFee)}

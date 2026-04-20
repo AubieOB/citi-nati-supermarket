@@ -4,6 +4,8 @@ import api from '../../utils/api.js';
 const emptyForm = {
   district: '',
   area: '',
+  customArea: '',
+  allowCustomArea: false,
   latitude: '',
   longitude: '',
   radiusKm: '',
@@ -15,16 +17,37 @@ const numberToInput = (value) => (value === null || value === undefined ? '' : S
 
 const AdminDeliveryCoverage = () => {
   const [zones, setZones] = useState([]);
+  const [masterDistricts, setMasterDistricts] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [editingZoneId, setEditingZoneId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [masterLoading, setMasterLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const districts = useMemo(
-    () => Array.from(new Set(zones.map((zone) => zone.district))).sort((a, b) => a.localeCompare(b)),
+  const districtOptions = useMemo(() => {
+    const base = masterDistricts.map((entry) => entry.district);
+    const zoneOnlyDistricts = zones
+      .map((zone) => zone.district)
+      .filter((district) => district && !base.includes(district));
+    return [...base, ...zoneOnlyDistricts];
+  }, [masterDistricts, zones]);
+
+  const areaOptionsForDistrict = useMemo(() => {
+    if (!form.district) return [];
+    const districtEntry = masterDistricts.find((entry) => entry.district === form.district);
+    return districtEntry?.areas || [];
+  }, [masterDistricts, form.district]);
+
+  const activeAreaCount = useMemo(
+    () => zones.filter((zone) => zone.isActive).length,
     [zones]
+  );
+
+  const selectedDistrictActiveAreaCount = useMemo(
+    () => zones.filter((zone) => zone.isActive && zone.district === form.district).length,
+    [zones, form.district]
   );
 
   const fetchZones = async () => {
@@ -41,7 +64,21 @@ const AdminDeliveryCoverage = () => {
     }
   };
 
+  const fetchMasterLocations = async () => {
+    try {
+      setMasterLoading(true);
+      const response = await api.get('/admin/delivery-zones/master');
+      setMasterDistricts(Array.isArray(response.data?.districts) ? response.data.districts : []);
+    } catch (err) {
+      console.error('Failed to fetch Malawi location master:', err);
+      setError(err.response?.data?.error || 'Failed to load Malawi districts and areas.');
+    } finally {
+      setMasterLoading(false);
+    }
+  };
+
   useEffect(() => {
+    fetchMasterLocations();
     fetchZones();
   }, []);
 
@@ -55,12 +92,15 @@ const AdminDeliveryCoverage = () => {
     setForm((prev) => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
+      ...(name === 'district' ? { area: '', customArea: '' } : {}),
+      ...(name === 'allowCustomArea' && !checked ? { customArea: '' } : {}),
     }));
   };
 
   const toPayload = () => ({
     district: form.district.trim(),
-    area: form.area.trim(),
+    area: (form.allowCustomArea ? form.customArea : form.area).trim(),
+    allowCustomArea: Boolean(form.allowCustomArea),
     latitude: form.latitude === '' ? null : Number(form.latitude),
     longitude: form.longitude === '' ? null : Number(form.longitude),
     radiusKm: form.radiusKm === '' ? null : Number(form.radiusKm),
@@ -71,7 +111,8 @@ const AdminDeliveryCoverage = () => {
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (!form.district.trim() || !form.area.trim()) {
+    const selectedArea = (form.allowCustomArea ? form.customArea : form.area).trim();
+    if (!form.district.trim() || !selectedArea) {
       setError('District and area are required.');
       return;
     }
@@ -102,10 +143,15 @@ const AdminDeliveryCoverage = () => {
   };
 
   const handleEdit = (zone) => {
+    const districtAreas = masterDistricts.find((entry) => entry.district === zone.district)?.areas || [];
+    const isKnownArea = districtAreas.includes(zone.area);
+
     setEditingZoneId(zone.id);
     setForm({
       district: zone.district || '',
-      area: zone.area || '',
+      area: isKnownArea ? zone.area : '',
+      customArea: isKnownArea ? '' : (zone.area || ''),
+      allowCustomArea: !isKnownArea,
       latitude: numberToInput(zone.latitude),
       longitude: numberToInput(zone.longitude),
       radiusKm: numberToInput(zone.radiusKm),
@@ -161,7 +207,10 @@ const AdminDeliveryCoverage = () => {
           Delivery Coverage
         </h2>
         <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.9rem' }}>
-          Manage supported districts and delivery areas with optional GPS radius enforcement.
+          Activate or deactivate predefined Malawi delivery areas with optional GPS radius enforcement.
+        </p>
+        <p style={{ margin: '0.35rem 0 0', color: '#0f172a', fontSize: '0.85rem', fontWeight: 600 }}>
+          Malawi districts: {masterDistricts.length} | Active delivery areas: {activeAreaCount}
         </p>
       </div>
 
@@ -194,13 +243,59 @@ const AdminDeliveryCoverage = () => {
 
           <label>
             District
-            <input name="district" value={form.district} onChange={handleInputChange} placeholder="e.g. Blantyre" style={{ width: '100%', marginTop: '0.25rem' }} />
+            <select
+              name="district"
+              value={form.district}
+              onChange={handleInputChange}
+              disabled={masterLoading}
+              style={{ width: '100%', marginTop: '0.25rem' }}
+            >
+              <option value="">Select district</option>
+              {districtOptions.map((district) => (
+                <option key={district} value={district}>{district}</option>
+              ))}
+            </select>
           </label>
 
           <label>
             Area
-            <input name="area" value={form.area} onChange={handleInputChange} placeholder="e.g. Namiwawa" style={{ width: '100%', marginTop: '0.25rem' }} />
+            <select
+              name="area"
+              value={form.area}
+              onChange={handleInputChange}
+              disabled={!form.district || form.allowCustomArea || masterLoading}
+              style={{ width: '100%', marginTop: '0.25rem' }}
+            >
+              <option value="">Select area</option>
+              {areaOptionsForDistrict.map((area) => (
+                <option key={area} value={area}>{area}</option>
+              ))}
+            </select>
           </label>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+            <input type="checkbox" name="allowCustomArea" checked={form.allowCustomArea} onChange={handleInputChange} />
+            Use custom area (optional)
+          </label>
+
+          {form.allowCustomArea && (
+            <label>
+              Custom Area Name
+              <input
+                name="customArea"
+                value={form.customArea}
+                onChange={handleInputChange}
+                placeholder="Type custom area"
+                style={{ width: '100%', marginTop: '0.25rem' }}
+              />
+            </label>
+          )}
+
+          {!!form.district && selectedDistrictActiveAreaCount === 0 && (
+            <div style={{ padding: '0.55rem 0.65rem', borderRadius: '8px', background: '#fff7ed', border: '1px solid #fed7aa', color: '#9a3412', fontSize: '0.82rem' }}>
+              No areas are active yet for {form.district}. Activate one or more areas to allow checkout deliveries.
+            </div>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.55rem' }}>
             <label>
@@ -257,7 +352,7 @@ const AdminDeliveryCoverage = () => {
           </div>
 
           <p style={{ margin: '0 0 0.55rem', color: '#64748b', fontSize: '0.85rem' }}>
-            Districts: {districts.join(', ') || 'None'}
+            Preloaded districts: {masterDistricts.length} | Active areas: {activeAreaCount}
           </p>
 
           {loading ? (

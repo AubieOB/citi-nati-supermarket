@@ -51,6 +51,9 @@ const createOrder = async (req, res) => {
       });
     }
 
+    const canonicalDistrict = String(locationValidation?.zone?.district || district).trim();
+    const canonicalArea = String(locationValidation?.zone?.area || area).trim();
+
     // CHECK: Verify sales day is open
     const openSalesDay = await prisma.salesDay.findFirst({
       where: { status: 'OPEN' }
@@ -126,8 +129,8 @@ const createOrder = async (req, res) => {
           deliveryAddress,
           houseNumber,
           phone,
-          district: String(district).trim(),
-          area: String(area).trim(),
+          district: canonicalDistrict,
+          area: canonicalArea,
           latitude: parsedLatitude,
           longitude: parsedLongitude,
           status: 'PENDING_PAYMENT',
