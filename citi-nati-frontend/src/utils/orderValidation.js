@@ -8,8 +8,8 @@
  * - phone (required)
  * - district (required)
  * - area (required)
- * - latitude (optional)
- * - longitude (optional)
+ * - latitude (required)
+ * - longitude (required)
  */
 
 /**
@@ -55,16 +55,20 @@ export const validateOrderCreate = (formData) => {
     errors.area = 'Area is required';
   }
 
-  // latitude validation (optional)
-  if (formData.latitude !== undefined && formData.latitude !== null && formData.latitude !== '') {
+  // latitude validation (required)
+  if (formData.latitude === undefined || formData.latitude === null || formData.latitude === '') {
+    errors.latitude = 'Latitude is required';
+  } else {
     const lat = parseFloat(formData.latitude);
     if (isNaN(lat) || lat < -90 || lat > 90) {
       errors.latitude = 'Latitude must be between -90 and 90';
     }
   }
 
-  // longitude validation (optional)
-  if (formData.longitude !== undefined && formData.longitude !== null && formData.longitude !== '') {
+  // longitude validation (required)
+  if (formData.longitude === undefined || formData.longitude === null || formData.longitude === '') {
+    errors.longitude = 'Longitude is required';
+  } else {
     const lon = parseFloat(formData.longitude);
     if (isNaN(lon) || lon < -180 || lon > 180) {
       errors.longitude = 'Longitude must be between -180 and 180';

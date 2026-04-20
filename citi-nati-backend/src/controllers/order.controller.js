@@ -20,9 +20,9 @@ const createOrder = async (req, res) => {
     const { deliveryAddress, houseNumber, phone, district, area, latitude, longitude } = req.body;
 
     // Validate required fields
-    if (!deliveryAddress || !houseNumber || !phone || !district || !area) {
+    if (!deliveryAddress || !houseNumber || !phone || !district || !area || latitude === '' || latitude == null || longitude === '' || longitude == null) {
       return res.status(400).json({
-        error: 'Validation failed: deliveryAddress, houseNumber, phone, district, and area are required',
+        error: 'Validation failed: deliveryAddress, houseNumber, phone, district, area, latitude, and longitude are required',
       });
     }
 

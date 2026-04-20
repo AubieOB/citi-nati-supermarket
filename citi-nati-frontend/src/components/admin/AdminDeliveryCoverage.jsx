@@ -173,6 +173,18 @@ const AdminDeliveryCoverage = () => {
     }
   });
 
+  useEffect(() => {
+    if (!success) return undefined;
+    const timerId = setTimeout(() => setSuccess(''), 5000);
+    return () => clearTimeout(timerId);
+  }, [success]);
+
+  useEffect(() => {
+    if (!error) return undefined;
+    const timerId = setTimeout(() => setError(''), 6500);
+    return () => clearTimeout(timerId);
+  }, [error]);
+
   const resetForm = () => {
     setForm(emptyForm);
     setEditingZoneId(null);
@@ -395,6 +407,8 @@ const AdminDeliveryCoverage = () => {
           display: 'grid',
           gap: '0.8rem',
           alignContent: 'start',
+          maxHeight: '72vh',
+          overflowY: 'auto',
         }}>
           <h3 style={{ margin: 0, fontSize: '1rem', color: '#0f172a', fontWeight: 700, letterSpacing: '0.01em' }}>
             {editingZoneId ? 'Edit Delivery Zone' : 'Add Delivery Zone'}
@@ -520,7 +534,8 @@ const AdminDeliveryCoverage = () => {
         <div style={{
           ...cardStyle,
           padding: '1rem',
-          overflow: 'hidden',
+          maxHeight: '72vh',
+          overflowY: 'auto',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.7rem' }}>
             <h3 style={{ margin: 0, fontSize: '1rem', color: '#0f172a', fontWeight: 700 }}>Delivery Zones</h3>
@@ -538,7 +553,7 @@ const AdminDeliveryCoverage = () => {
           ) : zones.length === 0 ? (
             <div style={{ color: '#64748b' }}>No delivery zones configured yet.</div>
           ) : (
-            <div style={{ overflow: 'auto', maxHeight: '68vh', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
+            <div style={{ overflow: 'auto', maxHeight: '56vh', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem', background: '#fff' }}>
               <thead style={{ position: 'sticky', top: 0, zIndex: 1, background: '#f8fafc' }}>
                 <tr>

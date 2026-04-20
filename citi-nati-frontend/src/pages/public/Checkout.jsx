@@ -308,6 +308,8 @@ const CheckoutContent = () => {
     outOfStockItems.length > 0 ||
     !cart || 
     cart.items.length === 0 ||
+    !String(formData.latitude || '').trim() ||
+    !String(formData.longitude || '').trim() ||
     orderCreated !== null;
   const vatLabel = cart?.vatEnabled === false
     ? 'VAT (disabled):'
@@ -568,7 +570,7 @@ const CheckoutContent = () => {
               {/* Geolocation Section */}
               <div style={{ marginBottom: '1.5rem', paddingBottom: '1.5rem', borderBottom: '1px solid #eee' }}>
                 <h3 style={{ marginBottom: '1rem', fontSize: '1rem', color: '#666' }}>
-                  Location (Optional)
+                  Location (Required)
                 </h3>
                 
                 <Button
@@ -595,7 +597,7 @@ const CheckoutContent = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   {/* Latitude */}
                   <div className="form__group">
-                    <label className="form__label">Latitude</label>
+                    <label className="form__label">Latitude <span style={{ color: '#dc3545' }}>*</span></label>
                     <input
                       type="number"
                       className="form__input"
@@ -618,7 +620,7 @@ const CheckoutContent = () => {
 
                   {/* Longitude */}
                   <div className="form__group">
-                    <label className="form__label">Longitude</label>
+                    <label className="form__label">Longitude <span style={{ color: '#dc3545' }}>*</span></label>
                     <input
                       type="number"
                       className="form__input"
