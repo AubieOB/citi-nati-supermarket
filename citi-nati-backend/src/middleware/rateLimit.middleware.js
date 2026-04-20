@@ -20,6 +20,22 @@ function getClientKey(req) {
   return String(req.ip || req.headers['x-forwarded-for'] || 'unknown').trim();
 }
 
+function resolveRetryAfterSeconds(rateLimitState) {
+  const resetTime = rateLimitState?.resetTime;
+  if (!resetTime) return null;
+
+  const resetTimestamp = resetTime instanceof Date
+    ? resetTime.getTime()
+    : new Date(resetTime).getTime();
+
+  if (!Number.isFinite(resetTimestamp)) return null;
+
+  const remainingMs = Math.max(resetTimestamp - Date.now(), 0);
+  if (remainingMs <= 0) return null;
+
+  return Math.max(1, Math.ceil(remainingMs / 1000));
+}
+
 function getSharedStore() {
   if (storeInitialized) {
     return sharedStore;
@@ -75,6 +91,11 @@ function buildRateLimiter({
     standardHeaders,
     legacyHeaders,
     handler: (req, res) => {
+      const retryAfterSeconds = resolveRetryAfterSeconds(req.rateLimit);
+      const retryAfterMinutes = retryAfterSeconds
+        ? Math.max(1, Math.ceil(retryAfterSeconds / 60))
+        : null;
+
       logger.warn('[RATE_LIMIT] Request blocked', {
         limiter: name || 'unknown',
         method: req.method,
@@ -87,8 +108,19 @@ function buildRateLimiter({
         resetTime: req.rateLimit?.resetTime,
       });
 
+      if (retryAfterSeconds) {
+        res.set('Retry-After', String(retryAfterSeconds));
+      }
+
+      const trimmedMessage = String(message || 'Too many requests.').replace(/\s*\.?\s*$/, '');
+      const errorMessage = retryAfterMinutes
+        ? `${trimmedMessage}. Please try again after ${retryAfterMinutes} minute${retryAfterMinutes === 1 ? '' : 's'}.`
+        : trimmedMessage;
+
       return res.status(429).json({
-        error: message,
+        error: errorMessage,
+        retryAfterSeconds,
+        retryAfterMinutes,
       });
     },
   });
@@ -98,7 +130,7 @@ const loginIpRateLimiter = buildRateLimiter({
   name: 'auth_login_ip',
   windowMs: 15 * 60 * 1000,
   max: parseLimitValue(process.env.LOGIN_RATE_LIMIT_IP_MAX || process.env.AUTH_RATE_LIMIT_MAX, 10),
-  message: 'Too many login attempts. Please try again later.',
+  message: 'Too many failed login attempts',
 });
 
 const loginIdentityRateLimiter = buildRateLimiter({
@@ -106,7 +138,7 @@ const loginIdentityRateLimiter = buildRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: parseLimitValue(process.env.LOGIN_RATE_LIMIT_IDENTITY_MAX, 5),
   keyGenerator: (req) => `${normalizeEmail(req.body?.email) || 'unknown'}:${getClientKey(req)}`,
-  message: 'Too many login attempts for this account. Please try again later.',
+  message: 'Too many failed login attempts for this account',
 });
 
 const authRateLimiter = buildRateLimiter({

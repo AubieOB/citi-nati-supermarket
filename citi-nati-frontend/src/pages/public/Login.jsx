@@ -55,6 +55,24 @@ const Login = () => {
         setError('Please enter both email and password');
       } else if (err.response?.status === 401) {
         setError('Invalid email or password');
+      } else if (err.response?.status === 429) {
+        const retryAfterMinutesFromBody = Number(err.response?.data?.retryAfterMinutes);
+        const retryAfterSecondsFromHeader = Number(err.response?.headers?.['retry-after']);
+        const retryAfterMinutesFromHeader = Number.isFinite(retryAfterSecondsFromHeader) && retryAfterSecondsFromHeader > 0
+          ? Math.max(1, Math.ceil(retryAfterSecondsFromHeader / 60))
+          : null;
+        const retryAfterMinutes = Number.isFinite(retryAfterMinutesFromBody) && retryAfterMinutesFromBody > 0
+          ? retryAfterMinutesFromBody
+          : retryAfterMinutesFromHeader;
+
+        const backendMessage = String(err.response?.data?.error || '').trim();
+        if (backendMessage) {
+          setError(backendMessage);
+        } else if (retryAfterMinutes) {
+          setError(`Too many failed login attempts. Please try again after ${retryAfterMinutes} minute${retryAfterMinutes === 1 ? '' : 's'}.`);
+        } else {
+          setError('Too many failed login attempts. Please try again later.');
+        }
       } else if (err.response?.status === 500) {
         setError('Server error. Please try again later');
       } else {
