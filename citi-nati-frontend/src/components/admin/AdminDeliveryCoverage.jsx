@@ -371,12 +371,15 @@ const AdminDeliveryCoverage = () => {
           boxSizing: 'border-box',
           overflow: 'hidden',
           padding: '0.82rem 1rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
         }}
       >
         <h2 style={{ margin: 0, fontSize: '1.12rem', color: '#0f172a', fontWeight: 800 }}>
           Delivery Coverage
         </h2>
-        <p style={{ margin: '0.38rem 0 0', color: '#0f172a', fontSize: '0.82rem', fontWeight: 700 }}>
+        <p style={{ margin: 0, color: '#0f172a', fontSize: '0.82rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
           Malawi districts: {masterDistricts.length} | Active delivery areas: {activeAreaCount} | Configured zones: {zones.length}
         </p>
       </div>

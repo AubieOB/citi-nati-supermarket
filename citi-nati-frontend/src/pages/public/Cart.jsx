@@ -311,6 +311,27 @@ const Cart = () => {
     ? 'VAT (disabled):'
     : `VAT (${Number(cart?.configuredVatRatePercent ?? cart?.vatRatePercent ?? 0).toFixed(1)}%):`;
 
+  // MINIMUM ORDER VALIDATION
+  const cartItemsSubtotal = useMemo(
+    () => Number(cart?.itemsSubtotal ?? cart?.total ?? 0),
+    [cart]
+  );
+
+  const minimumOrderValue = useMemo(
+    () => Number(cart?.minimumOrderValue ?? 10000),
+    [cart]
+  );
+
+  const isBelowMinimumOrderValue = useMemo(
+    () => cartItemsSubtotal < minimumOrderValue,
+    [cartItemsSubtotal, minimumOrderValue]
+  );
+
+  const amountNeededForMinimum = useMemo(
+    () => Number(Math.max(0, minimumOrderValue - cartItemsSubtotal).toFixed(2)),
+    [minimumOrderValue, cartItemsSubtotal]
+  );
+
   return (
     <div className="page cart-page">
       <Container>
@@ -428,16 +449,31 @@ const Cart = () => {
                 <span>{formatMWK(cart.total)}</span>
               </div>
 
-              {/* CHECKOUT BUTTON: Disabled if cart empty */}
-              {/* ✅ Technically impossible here since we check length above, but being safe */}
-              <Link to="/checkout">
+              {/* MINIMUM ORDER VALUE WARNING */}
+              {isBelowMinimumOrderValue && (
+                <div style={{
+                  marginBottom: '1rem',
+                  padding: '0.75rem',
+                  borderRadius: '8px',
+                  border: '1px solid #fecaca',
+                  backgroundColor: '#fef2f2',
+                  color: '#b91c1c',
+                  fontSize: '0.9rem',
+                  lineHeight: 1.5
+                }}>
+                  <strong>Minimum Order Required:</strong> Your subtotal ({formatMWK(cartItemsSubtotal)}) must be at least {formatMWK(minimumOrderValue)}. Add {formatMWK(amountNeededForMinimum)} more to proceed.
+                </div>
+              )}
+
+              {/* CHECKOUT BUTTON: Disabled if cart empty or below minimum */}
+              <Link to={isBelowMinimumOrderValue ? '#' : '/checkout'}>
                 <Button
                   variant="primary"
                   size="large"
                   style={{ width: '100%' }}
-                  disabled={cart.items.length === 0}
+                  disabled={cart.items.length === 0 || isBelowMinimumOrderValue}
                 >
-                  Proceed to Checkout
+                  {isBelowMinimumOrderValue ? 'Add Items to Meet Minimum' : 'Proceed to Checkout'}
                 </Button>
               </Link>
             </div>

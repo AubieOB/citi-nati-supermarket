@@ -279,13 +279,6 @@ const CheckoutContent = () => {
       return;
     }
 
-    if (isBelowMinimumOrderValue) {
-      setErrors({
-        form: `The minimum order value for delivery is ${formatMWK(minimumOrderValue)}. Add ${formatMWK(amountNeededForMinimum)} more to continue.`,
-      });
-      return;
-    }
-
     try {
       setIsSubmitting(true);
       setErrors({});
@@ -349,7 +342,6 @@ const CheckoutContent = () => {
     outOfStockItems.length > 0 ||
     !cart || 
     cart.items.length === 0 ||
-    isBelowMinimumOrderValue ||
     !String(formData.latitude || '').trim() ||
     !String(formData.longitude || '').trim() ||
     orderCreated !== null;
@@ -605,12 +597,6 @@ const CheckoutContent = () => {
                 {selectedAreaOption?.deliveryFee != null && (
                   <p style={{ fontSize: '0.8rem', color: '#2D8659', margin: '0.35rem 0 0' }}>
                     Estimated delivery fee for this area: {formatMWK(selectedAreaOption.deliveryFee)}
-                  </p>
-                )}
-
-                {isBelowMinimumOrderValue && (
-                  <p style={{ fontSize: '0.82rem', color: '#b91c1c', margin: '0.35rem 0 0', lineHeight: 1.45 }}>
-                    Minimum order value is {formatMWK(minimumOrderValue)} (items subtotal only). Add {formatMWK(amountNeededForMinimum)} more to continue.
                   </p>
                 )}
               </div>
