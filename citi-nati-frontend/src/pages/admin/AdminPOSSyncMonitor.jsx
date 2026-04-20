@@ -536,7 +536,7 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
       {/* ── Sticky Header ── */}
       <div ref={headerRef} className={`admin-filter-bar-fixed ${isMobileViewport ? 'admin-mobile-filter-bar' : ''}`} style={fixedHeaderStyle}>
         {/* Title row */}
-        <div className={isMobileViewport ? 'admin-mobile-filter-top-row' : ''} style={{ display: isMobileViewport ? 'flex' : 'grid', gridTemplateColumns: isMobileViewport ? undefined : 'minmax(0, 1fr) auto', alignItems: 'flex-start', flexWrap: isMobileViewport ? 'wrap' : 'nowrap', gap: '0.75rem', marginBottom: isMobileViewport ? '0.75rem' : '1rem' }}>
+        <div className={`admin-pos-sync-header-row ${isMobileViewport ? 'admin-mobile-filter-top-row' : ''}`} style={{ display: isMobileViewport ? 'flex' : 'grid', gridTemplateColumns: isMobileViewport ? undefined : 'minmax(0, 1fr) auto', alignItems: 'flex-start', flexWrap: isMobileViewport ? 'wrap' : 'nowrap', gap: '0.75rem', marginBottom: isMobileViewport ? '0.75rem' : '1rem' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <h2 style={{ margin: 0, color: '#5B4B8A', fontSize: '1.4rem', fontWeight: 700 }}>
               <i className="fas fa-chart-line" style={{ marginRight: '0.5rem', opacity: 0.8 }} />
@@ -578,7 +578,7 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
             </div>
           </div>
 
-          <div className={isMobileViewport ? 'admin-mobile-filter-actions' : ''} style={{ display: 'flex', flexWrap: isMobileViewport ? 'wrap' : 'nowrap', gap: '0.5rem', alignItems: 'center', marginLeft: isMobileViewport ? 0 : 'auto', justifyContent: isMobileViewport ? 'flex-start' : 'flex-end', justifySelf: isMobileViewport ? 'stretch' : 'end' }}>
+          <div className={`admin-pos-sync-header-actions ${isMobileViewport ? 'admin-mobile-filter-actions' : ''}`} style={{ display: 'flex', flexWrap: isMobileViewport ? 'wrap' : 'nowrap', gap: '0.5rem', alignItems: 'center', marginLeft: isMobileViewport ? 0 : 'auto', justifyContent: isMobileViewport ? 'flex-start' : 'flex-end', justifySelf: isMobileViewport ? 'stretch' : 'end' }}>
             <button
               onClick={handleToggle}
               disabled={toggleSaving}

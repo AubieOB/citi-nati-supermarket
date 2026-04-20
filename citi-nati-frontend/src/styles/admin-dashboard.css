@@ -584,6 +584,46 @@ body.admin-theme-dark .bo-filter-title i {
   color: #dce6f6;
 }
 
+@media (min-width: 769px) {
+  .admin-pos-sync-header-row {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    width: 100% !important;
+    align-items: flex-start !important;
+  }
+
+  .admin-pos-sync-header-row > :first-child {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+  }
+
+  .admin-pos-sync-header-actions {
+    margin-left: auto !important;
+    justify-content: flex-end !important;
+    width: auto !important;
+    flex-wrap: nowrap !important;
+  }
+
+  .bo-filter-header {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    width: 100% !important;
+    align-items: center !important;
+  }
+
+  .bo-filter-title {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+  }
+
+  .bo-filter-actions {
+    margin-left: auto !important;
+    justify-content: flex-end !important;
+    width: auto !important;
+    flex: 0 0 auto !important;
+  }
+}
+
 /* End aggressive enforcement */
 
 /* Wide desktops */
