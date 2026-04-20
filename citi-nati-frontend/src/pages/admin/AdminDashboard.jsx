@@ -76,6 +76,32 @@ const TAB_SCOPE_BY_ID = SIDEBAR_TABS.reduce((accumulator, tab) => {
   return accumulator;
 }, {});
 
+const MOBILE_MAX_WIDTH = 768;
+const MOBILE_SAFE_TAB_IDS = new Set([
+  'inbox',
+  'orders',
+  'emergency-sales',
+  'emergency-sales-reports',
+  'pos-sync-monitor',
+  'system',
+  'security',
+]);
+
+const MOBILE_BLOCKED_MESSAGE_BY_TAB = {
+  products: 'Product catalog management is desktop-only on mobile for safety and usability.',
+  stocks: 'Stock management tools are desktop-only on mobile for safety and usability.',
+  promotions: 'Promotion management is desktop-only on mobile for safety and usability.',
+  users: 'User and permissions administration is desktop-only on mobile.',
+  drivers: 'Driver administration is desktop-only on mobile.',
+  sales: 'Sales analytics are desktop-only on mobile.',
+  quotations: 'Quotation management is desktop-only on mobile.',
+  'pos-management': 'POS management is desktop-only on mobile.',
+  cashiers: 'Cashier account management is desktop-only on mobile.',
+  'business-operations': 'Business operations tools are desktop-only on mobile.',
+  refunds: 'Refund management is desktop-only on mobile.',
+  support: 'Support management is desktop-only on mobile.',
+};
+
 const extractColorToken = (value) => {
   if (!value || typeof value !== 'string') return null;
   const rgbMatch = value.match(/rgba?\([^)]*\)/i);
@@ -271,6 +297,10 @@ const AdminDashboard = () => {
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') return 'light';
     return window.localStorage.getItem(ADMIN_THEME_KEY) === 'dark' ? 'dark' : 'light';
+  });
+  const [isMobileViewport, setIsMobileViewport] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth <= MOBILE_MAX_WIDTH;
   });
   const isDarkTheme = theme === 'dark';
   const selectedOperationalScope = resolveOperationalScope(selectedOperationalLocationCode);
@@ -474,6 +504,21 @@ const AdminDashboard = () => {
   }, [theme]);
 
   React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const updateViewportState = () => {
+      setIsMobileViewport(window.innerWidth <= MOBILE_MAX_WIDTH);
+    };
+
+    updateViewportState();
+    window.addEventListener('resize', updateViewportState);
+
+    return () => {
+      window.removeEventListener('resize', updateViewportState);
+    };
+  }, []);
+
+  React.useEffect(() => {
     if (typeof document === 'undefined') return;
 
     const body = document.body;
@@ -544,7 +589,10 @@ const AdminDashboard = () => {
   }, [theme, activeTab]);
 
   const allowedTabs = SIDEBAR_TABS.filter((tab) => hasPermission(user, tab.permission));
-  const defaultAllowedTabId = allowedTabs[0]?.id || 'inbox';
+  const mobileAllowedTabs = allowedTabs.filter((tab) => MOBILE_SAFE_TAB_IDS.has(tab.id));
+  const navigationTabs = isMobileViewport ? mobileAllowedTabs : allowedTabs;
+  const defaultAllowedTabId = navigationTabs[0]?.id || 'inbox';
+  const isActiveTabMobileBlocked = isMobileViewport && !MOBILE_SAFE_TAB_IDS.has(activeTab);
 
   React.useEffect(() => {
     if (!allowedTabs.some((tab) => tab.id === activeTab)) {
@@ -585,6 +633,11 @@ const AdminDashboard = () => {
       return;
     }
 
+    if (isMobileViewport && !MOBILE_SAFE_TAB_IDS.has(tabId)) {
+      toast.error('This section is desktop-only on mobile.');
+      return;
+    }
+
     setActiveTab(tabId);
     if (tabId === 'emergency-sales') {
       navigate('/admin/emergency-sales');
@@ -594,10 +647,14 @@ const AdminDashboard = () => {
       navigate('/admin');
     }
     setSidebarOpen(false);
-  }, [location.pathname, navigate, user]);
+  }, [isMobileViewport, location.pathname, navigate, user]);
 
-  const visibleTabs = allowedTabs.filter((tab) => sidebarScope === 'all' || tab.scope === sidebarScope);
+  const visibleTabs = navigationTabs.filter((tab) => sidebarScope === 'all' || tab.scope === sidebarScope);
   const selectedScopeMeta = SIDEBAR_SCOPES.find((scope) => scope.id === sidebarScope) || SIDEBAR_SCOPES[0];
+  const activeTabMeta = SIDEBAR_TABS.find((tab) => tab.id === activeTab);
+  const activeTabBlockedReason = activeTabMeta
+    ? (MOBILE_BLOCKED_MESSAGE_BY_TAB[activeTabMeta.id] || 'This admin module is desktop-only on mobile.')
+    : 'This admin module is desktop-only on mobile.';
   const activeLocationCachedProducts = adminProductsCacheByLocation[selectedOperationalLocationCode] || [];
   const activeLocationCachedProductsMeta = adminProductsCacheMetaByLocation[selectedOperationalLocationCode] || {};
   const handleRefreshAdminProductsCache = useCallback(async () => {
@@ -989,6 +1046,53 @@ const AdminDashboard = () => {
 
       {/* Main Content Area (with left margin for fixed sidebar) */}
       <div className={`admin-main-content ${sidebarCollapsed ? 'collapsed' : ''}`}>
+        {isMobileViewport && (
+          <div style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 85,
+            backgroundColor: isDarkTheme ? '#121212' : '#ffffff',
+            borderBottom: `1px solid ${isDarkTheme ? '#2e2e2e' : '#e5e7eb'}`,
+            padding: '0.55rem 0.75rem',
+          }}>
+            <div style={{
+              display: 'flex',
+              gap: '0.45rem',
+              overflowX: 'auto',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+            }}>
+              {navigationTabs.map((tab) => {
+                const active = activeTab === tab.id;
+                return (
+                  <button
+                    key={`mobile-tab-${tab.id}`}
+                    type="button"
+                    onClick={() => handleTabSelect(tab.id)}
+                    style={{
+                      border: `1px solid ${active ? (isDarkTheme ? '#7c71f5' : '#5B4B8A') : (isDarkTheme ? '#323232' : '#d1d5db')}`,
+                      backgroundColor: active ? (isDarkTheme ? 'rgba(124, 113, 245, 0.18)' : '#ede9fe') : 'transparent',
+                      color: active ? (isDarkTheme ? '#ece9ff' : '#4c1d95') : (isDarkTheme ? '#b7c6da' : '#4b5563'),
+                      borderRadius: '999px',
+                      padding: '0.35rem 0.75rem',
+                      fontSize: '0.76rem',
+                      fontWeight: 700,
+                      whiteSpace: 'nowrap',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                    }}
+                  >
+                    <i className={`fas ${tab.icon}`} style={{ fontSize: '0.72rem' }}></i>
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Scrollable Content */}
         <div
           className="admin-content-area"
@@ -1001,57 +1105,95 @@ const AdminDashboard = () => {
             : undefined}
         >
           <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>Loading...</div>}>
-            {activeTab === 'inbox' && <AdminInbox selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
-            {activeTab === 'quotations' && <AdminQuotations selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
-            {activeTab === 'products' && (
-              <AdminProducts
-                selectedLocationCode={selectedOperationalPosLocationCode}
-                selectedBranchCode={selectedOperationalBranchCode}
-                cachedProducts={activeLocationCachedProducts}
-                cachedProductsMeta={activeLocationCachedProductsMeta}
-                onRefreshProductsCache={handleRefreshAdminProductsCache}
-              />
+            {isActiveTabMobileBlocked ? (
+              <div style={{
+                maxWidth: '760px',
+                margin: '0 auto',
+                backgroundColor: isDarkTheme ? '#161616' : '#ffffff',
+                border: `1px solid ${isDarkTheme ? '#333333' : '#e5e7eb'}`,
+                borderRadius: '14px',
+                padding: '1.25rem',
+                boxShadow: isDarkTheme ? '0 14px 28px rgba(0,0,0,0.35)' : '0 8px 20px rgba(15, 23, 42, 0.08)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.6rem' }}>
+                  <i className="fas fa-desktop" style={{ color: isDarkTheme ? '#a78bfa' : '#6d28d9' }}></i>
+                  <h3 style={{ margin: 0, fontSize: '1rem', color: isDarkTheme ? '#e2e8f0' : '#1f2937' }}>Desktop Required</h3>
+                </div>
+                <p style={{ margin: 0, color: isDarkTheme ? '#a8b6c9' : '#4b5563', lineHeight: 1.55 }}>
+                  {activeTabBlockedReason}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => handleTabSelect('inbox')}
+                  style={{
+                    marginTop: '0.85rem',
+                    border: 'none',
+                    borderRadius: '8px',
+                    backgroundColor: '#5B4B8A',
+                    color: '#fff',
+                    padding: '0.55rem 0.9rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Go To Inbox
+                </button>
+              </div>
+            ) : (
+              <>
+                {activeTab === 'inbox' && <AdminInbox selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
+                {activeTab === 'quotations' && <AdminQuotations selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
+                {activeTab === 'products' && (
+                  <AdminProducts
+                    selectedLocationCode={selectedOperationalPosLocationCode}
+                    selectedBranchCode={selectedOperationalBranchCode}
+                    cachedProducts={activeLocationCachedProducts}
+                    cachedProductsMeta={activeLocationCachedProductsMeta}
+                    onRefreshProductsCache={handleRefreshAdminProductsCache}
+                  />
+                )}
+                {activeTab === 'stocks' && (
+                  <AdminStocks
+                    selectedLocationCode={selectedOperationalPosLocationCode}
+                    selectedBranchCode={selectedOperationalBranchCode}
+                    cachedProducts={activeLocationCachedProducts}
+                    cachedProductsMeta={activeLocationCachedProductsMeta}
+                    onRefreshProductsCache={handleRefreshAdminProductsCache}
+                  />
+                )}
+                {activeTab === 'emergency-sales' && <AdminEmergencySales selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
+                {activeTab === 'emergency-sales-reports' && <AdminEmergencySalesReports selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
+                {activeTab === 'system' && <AdminSystem />}
+                {activeTab === 'security' && <AdminSecurity />}
+                {activeTab === 'promotions' && (
+                  <AdminPromotions
+                    selectedLocationCode={selectedOperationalPosLocationCode}
+                    selectedBranchCode={selectedOperationalBranchCode}
+                    cachedProducts={activeLocationCachedProducts}
+                    cachedProductsMeta={activeLocationCachedProductsMeta}
+                    onRefreshProductsCache={handleRefreshAdminProductsCache}
+                  />
+                )}
+                {activeTab === 'pos-management' && (
+                  <AdminPOSManagement
+                    selectedLocationCode={selectedOperationalPosLocationCode}
+                    selectedBranchCode={selectedOperationalBranchCode}
+                    cachedProducts={activeLocationCachedProducts}
+                    cachedProductsMeta={activeLocationCachedProductsMeta}
+                    onRefreshProductsCache={handleRefreshAdminProductsCache}
+                  />
+                )}
+                {activeTab === 'pos-sync-monitor' && <AdminPOSSyncMonitor selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
+                {activeTab === 'orders' && <AdminOrders selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
+                {activeTab === 'users' && <AdminUsers />}
+                {activeTab === 'sales' && <AdminSales selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
+                {activeTab === 'business-operations' && <AdminBusinessOperations />}
+                {activeTab === 'refunds' && <AdminRefunds />}
+                {activeTab === 'support' && <SupportDashboard />}
+                {activeTab === 'drivers' && <AdminDrivers />}
+                {activeTab === 'cashiers' && <AdminCashiers selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
+              </>
             )}
-            {activeTab === 'stocks' && (
-              <AdminStocks
-                selectedLocationCode={selectedOperationalPosLocationCode}
-                selectedBranchCode={selectedOperationalBranchCode}
-                cachedProducts={activeLocationCachedProducts}
-                cachedProductsMeta={activeLocationCachedProductsMeta}
-                onRefreshProductsCache={handleRefreshAdminProductsCache}
-              />
-            )}
-            {activeTab === 'emergency-sales' && <AdminEmergencySales selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
-            {activeTab === 'emergency-sales-reports' && <AdminEmergencySalesReports selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
-            {activeTab === 'system' && <AdminSystem />}
-            {activeTab === 'security' && <AdminSecurity />}
-            {activeTab === 'promotions' && (
-              <AdminPromotions
-                selectedLocationCode={selectedOperationalPosLocationCode}
-                selectedBranchCode={selectedOperationalBranchCode}
-                cachedProducts={activeLocationCachedProducts}
-                cachedProductsMeta={activeLocationCachedProductsMeta}
-                onRefreshProductsCache={handleRefreshAdminProductsCache}
-              />
-            )}
-            {activeTab === 'pos-management' && (
-              <AdminPOSManagement
-                selectedLocationCode={selectedOperationalPosLocationCode}
-                selectedBranchCode={selectedOperationalBranchCode}
-                cachedProducts={activeLocationCachedProducts}
-                cachedProductsMeta={activeLocationCachedProductsMeta}
-                onRefreshProductsCache={handleRefreshAdminProductsCache}
-              />
-            )}
-            {activeTab === 'pos-sync-monitor' && <AdminPOSSyncMonitor selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
-            {activeTab === 'orders' && <AdminOrders selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
-            {activeTab === 'users' && <AdminUsers />}
-            {activeTab === 'sales' && <AdminSales selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
-            {activeTab === 'business-operations' && <AdminBusinessOperations />}
-            {activeTab === 'refunds' && <AdminRefunds />}
-            {activeTab === 'support' && <SupportDashboard />}
-            {activeTab === 'drivers' && <AdminDrivers />}
-            {activeTab === 'cashiers' && <AdminCashiers selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
           </Suspense>
         </div>
       </div>
