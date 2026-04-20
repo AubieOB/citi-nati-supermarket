@@ -663,24 +663,9 @@ const AdminDashboard = () => {
 
   return (
     <div className={`admin-dashboard-root ${isDarkTheme ? 'theme-dark' : 'theme-light'}`} data-admin-theme={theme}>
-      {/* Hamburger Menu Icon - Mobile Only */}
-      <button
-        className="admin-hamburger"
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-      >
-        <i className={`fas ${sidebarOpen ? 'fa-times' : 'fa-bars'}`}></i>
-      </button>
-
-      {/* Mobile Overlay - Click to close sidebar */}
-      {sidebarOpen && (
-        <div
-          onClick={() => setSidebarOpen(false)}
-          className="mobile-overlay"
-        />
-      )}
-
-      {/* Fixed Left Sidebar Navigation */}
-      <div className={`admin-sidebar ${sidebarOpen ? 'open' : ''} ${sidebarCollapsed ? 'collapsed' : ''}`}>
+      {/* Fixed Left Sidebar Navigation - Desktop Only */}
+      {!isMobileViewport && (
+        <div className={`admin-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
         {/* Sidebar Logo/Title */}
         <div style={{
           padding: sidebarCollapsed ? '1rem 0.75rem' : '1rem 1.5rem',
@@ -1043,6 +1028,7 @@ const AdminDashboard = () => {
           </button>
         </div>
       </div>
+      )}
 
       {/* Main Content Area (with left margin for fixed sidebar) */}
       <div className={`admin-main-content ${sidebarCollapsed ? 'collapsed' : ''}`}>

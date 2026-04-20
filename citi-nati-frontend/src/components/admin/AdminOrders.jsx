@@ -11,6 +11,7 @@ import { notifySuccess, notifyError } from '../../utils/notifications.js';
 import { generateAdminOrdersTablePDF } from '../../utils/pdfReports.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { PERMISSION_KEYS, hasPermission } from '../../utils/permissions.js';
+import useMobileViewport from '../../hooks/useMobileViewport.js';
 import '../../css/admin-responsive-filters.css';
 
 /**
@@ -21,6 +22,7 @@ import '../../css/admin-responsive-filters.css';
 
 const AdminOrders = () => {
   const { user: loggedInUser } = useAuth();
+  const isMobileViewport = useMobileViewport();
   const [orders, setOrders] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -440,7 +442,8 @@ const AdminOrders = () => {
 
           <div
             ref={filterBarRef}
-            style={{
+            className={isMobileViewport ? 'admin-filter-bar-fixed' : ''}
+            style={!isMobileViewport ? {
             display: 'flex',
             gap: '0.75rem',
             alignItems: 'center',
@@ -450,6 +453,19 @@ const AdminOrders = () => {
             top: `${filterBarLayout.top}px`,
             left: `${filterBarLayout.left}px`,
             width: `${filterBarLayout.width}px`,
+            zIndex: 80,
+            backgroundColor: '#fff',
+            border: '1px solid #eee',
+            borderRadius: '8px',
+            padding: '0.75rem',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+            boxSizing: 'border-box',
+          } : {
+            display: 'flex',
+            gap: '0.75rem',
+            alignItems: 'center',
+            marginBottom: '1rem',
+            flexWrap: 'wrap',
             zIndex: 80,
             backgroundColor: '#fff',
             border: '1px solid #eee',
