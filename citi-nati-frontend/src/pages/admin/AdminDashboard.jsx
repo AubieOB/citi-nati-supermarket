@@ -282,8 +282,8 @@ const AdminDashboard = () => {
       ? 'business-operations'
       : 'inbox';
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showPanelFilters, setShowPanelFilters] = useState(false);
   const [sidebarScope, setSidebarScope] = useState('all');
   const scopePillsRef = useRef(null);
   const isScopePillsDraggingRef = useRef(false);
@@ -646,7 +646,6 @@ const AdminDashboard = () => {
     } else if (location.pathname !== '/admin') {
       navigate('/admin');
     }
-    setSidebarOpen(false);
   }, [isMobileViewport, location.pathname, navigate, user]);
 
   const visibleTabs = navigationTabs.filter((tab) => sidebarScope === 'all' || tab.scope === sidebarScope);
@@ -662,7 +661,10 @@ const AdminDashboard = () => {
   }, [preloadAdminProductsForLocation, selectedOperationalLocationCode]);
 
   return (
-    <div className={`admin-dashboard-root ${isDarkTheme ? 'theme-dark' : 'theme-light'}`} data-admin-theme={theme}>
+    <div
+      className={`admin-dashboard-root ${isDarkTheme ? 'theme-dark' : 'theme-light'} ${showPanelFilters ? '' : 'admin-panel-filters-hidden'}`}
+      data-admin-theme={theme}
+    >
       {/* Fixed Left Sidebar Navigation - Desktop Only */}
       {!isMobileViewport && (
         <div className={`admin-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
@@ -996,6 +998,34 @@ const AdminDashboard = () => {
             {!sidebarCollapsed && <span>{isDarkTheme ? 'Light Mode' : 'Dark Mode'}</span>}
           </button>
 
+          <button
+            onClick={() => setShowPanelFilters((prev) => !prev)}
+            title={sidebarCollapsed ? (showPanelFilters ? 'Hide Filters' : 'Show Filters') : undefined}
+            style={{
+              width: '100%',
+              padding: '0.75rem 1rem',
+              border: 'none',
+              backgroundColor: showPanelFilters
+                ? (isDarkTheme ? '#2a2341' : '#efe9ff')
+                : (isDarkTheme ? '#222222' : '#f5f5f5'),
+              color: showPanelFilters
+                ? (isDarkTheme ? '#d7ccff' : '#5B4B8A')
+                : (isDarkTheme ? '#a4b2c5' : '#666'),
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '0.9rem',
+              fontWeight: '500',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: sidebarCollapsed ? '0' : '0.5rem',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <i className={`fas ${showPanelFilters ? 'fa-eye-slash' : 'fa-sliders-h'}`}></i>
+            {!sidebarCollapsed && <span>{showPanelFilters ? 'Hide Filters' : 'Show Filters'}</span>}
+          </button>
+
           {/* Home Link */}
           <button
             onClick={() => navigate('/')}
@@ -1048,6 +1078,28 @@ const AdminDashboard = () => {
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
             }}>
+              <button
+                type="button"
+                onClick={() => setShowPanelFilters((prev) => !prev)}
+                style={{
+                  border: `1px solid ${showPanelFilters ? (isDarkTheme ? '#7c71f5' : '#5B4B8A') : (isDarkTheme ? '#323232' : '#d1d5db')}`,
+                  backgroundColor: showPanelFilters ? (isDarkTheme ? 'rgba(124, 113, 245, 0.18)' : '#ede9fe') : 'transparent',
+                  color: showPanelFilters ? (isDarkTheme ? '#ece9ff' : '#4c1d95') : (isDarkTheme ? '#b7c6da' : '#4b5563'),
+                  borderRadius: '999px',
+                  padding: '0.35rem 0.75rem',
+                  fontSize: '0.76rem',
+                  fontWeight: 700,
+                  whiteSpace: 'nowrap',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                }}
+                title={showPanelFilters ? 'Hide filters' : 'Show filters'}
+              >
+                <i className={`fas ${showPanelFilters ? 'fa-eye-slash' : 'fa-sliders-h'}`} style={{ fontSize: '0.72rem' }}></i>
+                <span>{showPanelFilters ? 'Hide Filters' : 'Show Filters'}</span>
+              </button>
               {navigationTabs.map((tab) => {
                 const active = activeTab === tab.id;
                 return (

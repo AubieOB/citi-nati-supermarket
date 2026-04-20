@@ -644,18 +644,31 @@ body.admin-theme-dark .bo-filter-title i {
     --admin-scale: 0.92;
   }
 
-  /* Convert fixed filter bars to sticky on mobile for better UX */
+  /* Keep panel filter bars in normal flow on mobile so they scroll with content */
   .admin-filter-bar-fixed {
-    position: sticky !important;
-    top: 0;
+    position: static !important;
+    top: auto;
     width: 100%;
-    left: 0;
+    left: auto;
     border-radius: 6px;
     padding: 0.6rem;
     font-size: 0.9rem;
     gap: 0.5rem;
-    z-index: 50;
+    z-index: auto;
     flex-wrap: wrap;
+  }
+
+  .admin-dashboard-root [style*='position: fixed'][style*='z-index: 80'] {
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    width: 100% !important;
+    margin-bottom: 0.85rem !important;
+  }
+
+  .admin-dashboard-root [style*='position: fixed'][style*='z-index: 80'] + div[style*='height:'] {
+    display: none !important;
+    height: 0 !important;
   }
 
   .admin-main-content {
@@ -759,6 +772,18 @@ body.admin-theme-dark .bo-filter-title i {
   align-items: center;
   margin-bottom: 0;
   flex-wrap: wrap;
+}
+
+.admin-dashboard-root.admin-panel-filters-hidden .admin-filter-bar-fixed,
+.admin-dashboard-root.admin-panel-filters-hidden .bo-filter-bar,
+.admin-dashboard-root.admin-panel-filters-hidden [style*='position: fixed'][style*='z-index: 80'] {
+  display: none !important;
+}
+
+.admin-dashboard-root.admin-panel-filters-hidden .admin-filter-bar-fixed + div[style*='height:'],
+.admin-dashboard-root.admin-panel-filters-hidden [style*='position: fixed'][style*='z-index: 80'] + div[style*='height:'] {
+  display: none !important;
+  height: 0 !important;
 }
 
 /* Generic tab strip for all panels */
