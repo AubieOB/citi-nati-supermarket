@@ -1,4 +1,5 @@
 import React, { Suspense, useState, useEffect } from 'react';
+import api from '../../utils/api.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import AdminEmergencySales from '../../components/admin/AdminEmergencySales.jsx';
 import Modal from '../../components/common/Modal.jsx';
@@ -23,6 +24,8 @@ const CashierDashboard = () => {
   const { modal, showConfirm, closeModal } = useModal();
   
   const [selectedScopeCode, setSelectedScopeCode] = useState(null);
+  const [emergencySalesDayOpen, setEmergencySalesDayOpen] = useState(true);
+  const [availabilityLoading, setAvailabilityLoading] = useState(true);
   const [showLocationModal, setShowLocationModal] = useState(true);
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [pendingScopeCode, setPendingScopeCode] = useState(null);
@@ -36,6 +39,41 @@ const CashierDashboard = () => {
       setSelectedScopeCode(normalizeOperationalScopeCode(storedLocation));
       setShowLocationModal(false);
     }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadEmergencySalesAvailability = async ({ silent = false } = {}) => {
+      try {
+        if (!silent && active) {
+          setAvailabilityLoading(true);
+        }
+
+        const response = await api.get('/system/status');
+        if (!active) return;
+
+        setEmergencySalesDayOpen(response.data?.emergencySalesDayOpen !== false);
+      } catch (error) {
+        if (active) {
+          setEmergencySalesDayOpen(true);
+        }
+      } finally {
+        if (active) {
+          setAvailabilityLoading(false);
+        }
+      }
+    };
+
+    loadEmergencySalesAvailability();
+    const intervalId = window.setInterval(() => {
+      loadEmergencySalesAvailability({ silent: true });
+    }, 15000);
+
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
   }, []);
 
   const handleLocationSelect = (scopeCode) => {
@@ -127,7 +165,43 @@ const CashierDashboard = () => {
       </div>
 
       {/* POS Panel - only show if location is selected */}
-      {selectedScope ? (
+      {availabilityLoading ? (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ textAlign: 'center', color: '#666' }}>Checking emergency sales availability...</div>
+        </div>
+      ) : !emergencySalesDayOpen ? (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.25rem' }}>
+          <div style={{
+            maxWidth: '640px',
+            width: '100%',
+            backgroundColor: '#fff',
+            border: '1px solid #fecaca',
+            borderRadius: '14px',
+            padding: '2rem',
+            boxShadow: '0 10px 30px rgba(15, 23, 42, 0.08)',
+            textAlign: 'center',
+          }}>
+            <div style={{
+              width: '72px',
+              height: '72px',
+              borderRadius: '50%',
+              margin: '0 auto 1rem',
+              backgroundColor: '#fee2e2',
+              color: '#b91c1c',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1.6rem',
+            }}>
+              <i className="fas fa-lock"></i>
+            </div>
+            <h2 style={{ margin: 0, color: '#111827', fontSize: '1.4rem' }}>Emergency Sales Day Closed</h2>
+            <p style={{ margin: '0.85rem 0 0', color: '#4b5563', lineHeight: 1.6, fontSize: '0.98rem' }}>
+              The emergency sales dashboard has been locked by admin. Cashiers cannot process emergency sales until the day is opened again.
+            </p>
+          </div>
+        </div>
+      ) : selectedScope ? (
         <div style={{ flex: 1, overflow: 'hidden', padding: '0.75rem' }}>
           <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>Loading POS...</div>}>
             <AdminEmergencySales apiBase="cashier/emergency-sales" selectedLocationCode={selectedScope.locationCode} />
@@ -140,7 +214,7 @@ const CashierDashboard = () => {
       )}
 
       {/* Location Selection Modal */}
-      {showLocationModal && (
+      {emergencySalesDayOpen && showLocationModal && (
         <div style={{
           position: 'fixed',
           inset: 0,
@@ -282,7 +356,7 @@ const CashierDashboard = () => {
       )}
 
       {/* Location Confirmation Warning Modal */}
-      {showWarningModal && pendingScope && (
+      {emergencySalesDayOpen && showWarningModal && pendingScope && (
         <div style={{
           position: 'fixed',
           inset: 0,

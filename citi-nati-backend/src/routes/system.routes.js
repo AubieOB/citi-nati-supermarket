@@ -1,6 +1,7 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { getVatSettings } = require('../utils/vat');
+const { getEmergencySalesDayOpen } = require('../utils/emergencySalesAccess');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -16,10 +17,11 @@ const getSettingValue = async (key, fallbackValue) => {
 
 router.get('/status', async (req, res) => {
   try {
-    const [maintenanceEnabled, maintenanceMessage, vatSettings] = await Promise.all([
+    const [maintenanceEnabled, maintenanceMessage, vatSettings, emergencySalesDayOpen] = await Promise.all([
       getSettingValue(MAINTENANCE_MODE_KEY, 'false'),
       getSettingValue(MAINTENANCE_MESSAGE_KEY, DEFAULT_MAINTENANCE_MESSAGE),
       getVatSettings(),
+      getEmergencySalesDayOpen(prisma),
     ]);
 
     return res.json({
@@ -29,6 +31,7 @@ router.get('/status', async (req, res) => {
       vatEnabled: vatSettings.enabled,
       vatRatePercent: vatSettings.ratePercent,
       configuredVatRatePercent: vatSettings.configuredRatePercent,
+      emergencySalesDayOpen,
     });
   } catch (err) {
     console.error('[SYSTEM] Failed to fetch public status:', err.message);

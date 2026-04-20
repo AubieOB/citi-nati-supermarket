@@ -36,11 +36,13 @@ const AdminSystem = () => {
   const [maintenanceMessage, setMaintenanceMessage] = useState(DEFAULT_MESSAGE);
   const [vatEnabled, setVatEnabled] = useState(true);
   const [configuredVatRatePercent, setConfiguredVatRatePercent] = useState(DEFAULT_VAT_RATE);
+  const [emergencySalesDayOpen, setEmergencySalesDayOpen] = useState(true);
+  const [updatingEmergencySalesDay, setUpdatingEmergencySalesDay] = useState(false);
   const [businessTime, setBusinessTime] = useState(DEFAULT_BUSINESS_TIME);
   const [businessNowDisplay, setBusinessNowDisplay] = useState('');
   const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
   const [filterBarHeight, setFilterBarHeight] = useState(0);
-  const { modal, showError, showSuccess, closeModal } = useModal();
+  const { modal, showConfirm, showError, showSuccess, closeModal } = useModal();
   const filterBarRef = useRef(null);
   const canManageSystem = hasPermission(loggedInUser, PERMISSION_KEYS.ADMIN_SYSTEM_MANAGE);
 
@@ -53,6 +55,7 @@ const AdminSystem = () => {
         setMaintenanceMessage(settings.maintenanceMessage || DEFAULT_MESSAGE);
         setVatEnabled(settings.vatEnabled !== false);
         setConfiguredVatRatePercent(Number(settings.configuredVatRatePercent || settings.vatRatePercent || DEFAULT_VAT_RATE));
+        setEmergencySalesDayOpen(settings.emergencySalesDayOpen !== false);
         const businessTimeSettings = settings.businessTime || DEFAULT_BUSINESS_TIME;
         setBusinessTime(businessTimeSettings);
         setBusinessNowDisplay(formatBusinessNow(Number(businessTimeSettings.offsetMinutes || 120)));
@@ -147,6 +150,39 @@ const AdminSystem = () => {
     }
   };
 
+  const handleEmergencySalesDayToggle = () => {
+    if (!canManageSystem || updatingEmergencySalesDay) {
+      if (!canManageSystem) {
+        showError('Access denied', 'You do not have permission to change emergency sales day access.');
+      }
+      return;
+    }
+
+    const nextOpenState = !emergencySalesDayOpen;
+
+    showConfirm(
+      nextOpenState ? 'Open Emergency Sales Day' : 'Close Emergency Sales Day',
+      nextOpenState
+        ? 'This will unlock the cashier emergency sales dashboard for all cashiers.'
+        : 'This will immediately lock the cashier emergency sales dashboard for all cashiers.',
+      async () => {
+        try {
+          setUpdatingEmergencySalesDay(true);
+          const response = await api.put('/admin/system/emergency-sales-day', {
+            emergencySalesDayOpen: nextOpenState,
+          });
+
+          setEmergencySalesDayOpen(response.data?.settings?.emergencySalesDayOpen !== false);
+          showSuccess('Emergency Sales Day Updated', response.data?.message || 'Emergency sales day state updated successfully.');
+        } catch (err) {
+          showError('Update failed', err.response?.data?.error || 'Failed to update emergency sales day state');
+        } finally {
+          setUpdatingEmergencySalesDay(false);
+        }
+      }
+    );
+  };
+
   if (loading) {
     return <div style={{ padding: '1.5rem', color: '#666' }}>Loading system settings...</div>;
   }
@@ -187,6 +223,9 @@ const AdminSystem = () => {
             </div>
             <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600', marginTop: '0.2rem' }}>
               VAT: {vatEnabled ? `ENABLED (${configuredVatRatePercent.toFixed(1)}%)` : 'DISABLED'}
+            </div>
+            <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600', marginTop: '0.2rem' }}>
+              Emergency Sales Day: {emergencySalesDayOpen ? 'OPEN' : 'CLOSED'}
             </div>
           </div>
           <div style={{ textAlign: 'right', marginLeft: 'auto' }}>
@@ -301,6 +340,77 @@ const AdminSystem = () => {
           >
             {saving ? 'Saving...' : 'Save System Settings'}
           </button>
+          )}
+        </div>
+      </div>
+
+      <div style={{ backgroundColor: '#fff', borderRadius: '10px', padding: '1.5rem', boxShadow: '0 2px 10px rgba(0,0,0,0.08)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontWeight: 800, color: '#111827', fontSize: '1.05rem' }}>Emergency Sales Day Control</div>
+            <p style={{ color: '#666', margin: '0.4rem 0 0', maxWidth: '560px', lineHeight: 1.5 }}>
+              This is a global lock for the cashier emergency sales dashboard. When closed, cashiers cannot search products, load the emergency sales panel, or record emergency sales online.
+            </p>
+          </div>
+          <div style={{
+            borderRadius: '999px',
+            padding: '0.45rem 0.85rem',
+            fontWeight: 800,
+            fontSize: '0.85rem',
+            backgroundColor: emergencySalesDayOpen ? '#dcfce7' : '#fee2e2',
+            color: emergencySalesDayOpen ? '#166534' : '#991b1b',
+            alignSelf: 'center',
+          }}>
+            {emergencySalesDayOpen ? 'OPEN FOR CASHIERS' : 'CLOSED FOR CASHIERS'}
+          </div>
+        </div>
+
+        <div style={{
+          marginTop: '1rem',
+          border: '1px solid #e5e7eb',
+          borderRadius: '10px',
+          padding: '1rem',
+          backgroundColor: emergencySalesDayOpen ? '#f0fdf4' : '#fff7ed',
+          display: 'grid',
+          gap: '0.8rem',
+        }}>
+          <div>
+            <div style={{ fontWeight: 700, color: '#333', marginBottom: '0.25rem' }}>
+              {emergencySalesDayOpen ? 'Emergency sales are currently open.' : 'Emergency sales are currently closed.'}
+            </div>
+            <div style={{ color: '#666', fontSize: '0.92rem' }}>
+              {emergencySalesDayOpen
+                ? 'Cashiers can access the emergency sales dashboard and process online emergency sales.'
+                : 'Cashier emergency sales access is locked until an admin opens the day again.'}
+            </div>
+          </div>
+
+          {canManageSystem && (
+            <button
+              type="button"
+              onClick={handleEmergencySalesDayToggle}
+              disabled={updatingEmergencySalesDay}
+              style={{
+                border: 'none',
+                borderRadius: '8px',
+                padding: '0.9rem 1rem',
+                backgroundColor: updatingEmergencySalesDay
+                  ? '#94a3b8'
+                  : emergencySalesDayOpen
+                    ? '#b91c1c'
+                    : '#166534',
+                color: '#fff',
+                fontWeight: 800,
+                cursor: updatingEmergencySalesDay ? 'not-allowed' : 'pointer',
+                width: 'fit-content',
+              }}
+            >
+              {updatingEmergencySalesDay
+                ? 'Updating...'
+                : emergencySalesDayOpen
+                  ? 'Close Emergency Sales Day'
+                  : 'Open Emergency Sales Day'}
+            </button>
           )}
         </div>
       </div>

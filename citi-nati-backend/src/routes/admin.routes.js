@@ -50,6 +50,10 @@ const { getPermissionSnapshotForUser } = require('../security/userPermissions.se
 const { requirePermission } = require('../middleware/permissions.middleware');
 const { validateStrongPassword } = require('../utils/passwordPolicy');
 const { recordAuditLog } = require('../services/auditLog.service');
+const {
+  getEmergencySalesDayOpen,
+  setEmergencySalesDayOpen,
+} = require('../utils/emergencySalesAccess');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -366,10 +370,11 @@ router.get('/dashboard', verifyTokenMiddleware, verifyAdmin, async (req, res) =>
 
 router.get('/system/settings', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
   try {
-    const [maintenanceEnabled, maintenanceMessage, vatSettings] = await Promise.all([
+    const [maintenanceEnabled, maintenanceMessage, vatSettings, emergencySalesDayOpen] = await Promise.all([
       getSettingValue(MAINTENANCE_MODE_KEY, 'false'),
       getSettingValue(MAINTENANCE_MESSAGE_KEY, DEFAULT_MAINTENANCE_MESSAGE),
       getVatSettings(),
+      getEmergencySalesDayOpen(prisma),
     ]);
 
     const businessOffsetMinutes = getBusinessOffsetMinutes();
@@ -388,6 +393,7 @@ router.get('/system/settings', verifyTokenMiddleware, verifyAdmin, async (req, r
         vatEnabled: vatSettings.enabled,
         vatRatePercent: vatSettings.ratePercent,
         configuredVatRatePercent: vatSettings.configuredRatePercent,
+        emergencySalesDayOpen,
         businessTime,
       },
     });
@@ -447,6 +453,39 @@ router.put('/system/maintenance', verifyTokenMiddleware, verifyAdmin, async (req
   } catch (err) {
     console.error('[ADMIN SYSTEM] Failed to update maintenance mode:', err.message);
     return res.status(500).json({ success: false, error: 'Failed to update maintenance mode' });
+  }
+});
+
+router.put('/system/emergency-sales-day', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const emergencySalesDayOpen = Boolean(req.body?.emergencySalesDayOpen);
+
+    await setEmergencySalesDayOpen(prisma, emergencySalesDayOpen);
+
+    await recordAuditLog({
+      req,
+      actorUserId: req.user?.userId,
+      action: emergencySalesDayOpen ? 'EMERGENCY_SALES_DAY_OPENED' : 'EMERGENCY_SALES_DAY_CLOSED',
+      resourceType: 'SYSTEM_SETTING',
+      resourceId: 'emergency_sales_day_open',
+      status: 'SUCCESS',
+      metadata: {
+        emergencySalesDayOpen,
+      },
+    });
+
+    return res.json({
+      success: true,
+      message: emergencySalesDayOpen
+        ? 'Emergency sales day opened. Cashiers can use the emergency sales dashboard.'
+        : 'Emergency sales day closed. Cashier emergency sales dashboard is now locked.',
+      settings: {
+        emergencySalesDayOpen,
+      },
+    });
+  } catch (err) {
+    console.error('[ADMIN SYSTEM] Failed to update emergency sales day:', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to update emergency sales day state' });
   }
 });
 

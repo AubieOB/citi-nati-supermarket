@@ -8,6 +8,10 @@ const {
   createEmergencySale,
   listEmergencySales,
 } = require('../controllers/emergencySales.controller');
+const {
+  getEmergencySalesDayOpen,
+  EMERGENCY_SALES_DAY_CLOSED_MESSAGE,
+} = require('../utils/emergencySalesAccess');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -73,17 +77,35 @@ router.post('/security-key/verify', verifyTokenMiddleware, verifyCashier, async 
 // All routes below require cashier auth
 router.use(verifyTokenMiddleware, verifyCashier);
 
+async function requireEmergencySalesDayOpen(req, res, next) {
+  try {
+    const emergencySalesDayOpen = await getEmergencySalesDayOpen(prisma);
+    if (!emergencySalesDayOpen) {
+      return res.status(423).json({
+        success: false,
+        error: EMERGENCY_SALES_DAY_CLOSED_MESSAGE,
+        code: 'EMERGENCY_SALES_DAY_CLOSED',
+      });
+    }
+
+    return next();
+  } catch (err) {
+    console.error('[CASHIER EMERGENCY SALES] Failed to verify day status:', err.message);
+    return res.status(500).json({ success: false, error: 'Failed to verify emergency sales availability' });
+  }
+}
+
 /**
  * GET /api/cashier/emergency-sales/lookup
  * Product lookup for POS scanner.
  */
-router.get('/emergency-sales/lookup', lookupEmergencyProducts);
+router.get('/emergency-sales/lookup', requireEmergencySalesDayOpen, lookupEmergencyProducts);
 
 /**
  * POST /api/cashier/emergency-sales
  * Create a new emergency sale (cashier is the authenticated user).
  */
-router.post('/emergency-sales', createEmergencySale);
+router.post('/emergency-sales', requireEmergencySalesDayOpen, createEmergencySale);
 
 /**
  * GET /api/cashier/emergency-sales
@@ -93,13 +115,13 @@ router.get('/emergency-sales', (req, res, next) => {
   // Restrict list to this cashier's own sales by injecting their userId as cashier filter
   req.query.cashier = req.user.userId;
   next();
-}, listEmergencySales);
+}, requireEmergencySalesDayOpen, listEmergencySales);
 
 /**
  * GET /api/cashier/emergency-sales/:id
  * Get a specific sale — cashier can only view their own sale.
  */
-router.get('/emergency-sales/:id', async (req, res) => {
+router.get('/emergency-sales/:id', requireEmergencySalesDayOpen, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ success: false, error: 'Invalid emergency sale id' });
