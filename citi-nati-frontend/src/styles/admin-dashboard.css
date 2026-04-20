@@ -611,9 +611,9 @@ body.admin-theme-dark .bo-filter-title i {
   }
 
   .bo-filter-actions {
-    min-width: 0;
-    flex: 1 1 100%;
-    justify-content: flex-start;
+    min-width: 210px;
+    flex: 0 0 auto;
+    justify-content: flex-end;
   }
 
   .bo-tab-button {

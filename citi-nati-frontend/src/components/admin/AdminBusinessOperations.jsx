@@ -277,8 +277,8 @@ const AdminBusinessOperations = () => {
           boxSizing: 'border-box',
         }}
       >
-          <div className="bo-filter-header" style={{ flexWrap: isMobileViewport ? 'wrap' : 'nowrap' }}>
-            <div className="bo-filter-title">
+          <div className="bo-filter-header" style={{ display: isMobileViewport ? 'flex' : 'grid', gridTemplateColumns: isMobileViewport ? undefined : 'minmax(0, 1fr) auto', flexWrap: isMobileViewport ? 'wrap' : 'nowrap' }}>
+            <div className="bo-filter-title" style={{ minWidth: 0 }}>
               <i className="fas fa-briefcase"></i>
               Business Operations
               {isAllLocationsSelected && (
@@ -305,7 +305,7 @@ const AdminBusinessOperations = () => {
                 </span>
               )}
             </div>
-              <div className="bo-filter-actions" style={{ marginLeft: isMobileViewport ? 0 : 'auto', justifyContent: isMobileViewport ? 'space-between' : 'flex-end', flexWrap: isMobileViewport ? 'wrap' : 'nowrap' }}>
+              <div className="bo-filter-actions" style={{ marginLeft: isMobileViewport ? 0 : 'auto', justifyContent: isMobileViewport ? 'space-between' : 'flex-end', flexWrap: isMobileViewport ? 'wrap' : 'nowrap', justifySelf: isMobileViewport ? 'stretch' : 'end' }}>
               <label className="bo-location-control">
                 <span className="bo-location-label">
                   Location Scope
