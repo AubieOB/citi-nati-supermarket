@@ -51,7 +51,10 @@ const Login = () => {
       navigate(getDashboardPathForUser(user) || '/');
     } catch (err) {
       // ❌ ERROR HANDLING
-      if (err.response?.status === 400) {
+      const backendMessage = String(err.response?.data?.error || err.response?.data?.message || '').trim();
+      if (backendMessage) {
+        setError(backendMessage);
+      } else if (err.response?.status === 400) {
         setError('Please enter both email and password');
       } else if (err.response?.status === 401) {
         setError('Invalid email or password');
@@ -65,10 +68,7 @@ const Login = () => {
           ? retryAfterMinutesFromBody
           : retryAfterMinutesFromHeader;
 
-        const backendMessage = String(err.response?.data?.error || '').trim();
-        if (backendMessage) {
-          setError(backendMessage);
-        } else if (retryAfterMinutes) {
+        if (retryAfterMinutes) {
           setError(`Too many failed login attempts. Please try again after ${retryAfterMinutes} minute${retryAfterMinutes === 1 ? '' : 's'}.`);
         } else {
           setError('Too many failed login attempts. Please try again later.');
