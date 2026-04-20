@@ -519,6 +519,7 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
     <div style={{ position: 'relative' }}>
       <div
         ref={filterBarRef}
+        className="admin-filter-bar-fixed"
         style={{
           position: 'fixed',
           top: `${filterBarLayout.top}px`,

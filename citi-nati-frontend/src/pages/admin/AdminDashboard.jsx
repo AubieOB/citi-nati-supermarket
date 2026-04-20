@@ -80,7 +80,6 @@ const MOBILE_MAX_WIDTH = 768;
 const MOBILE_SAFE_TAB_IDS = new Set([
   'inbox',
   'orders',
-  'emergency-sales',
   'emergency-sales-reports',
   'pos-sync-monitor',
   'business-operations',
@@ -1050,6 +1049,52 @@ const AdminDashboard = () => {
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
             }}>
+              <button
+                type="button"
+                onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+                style={{
+                  border: `1px solid ${isDarkTheme ? '#323232' : '#d1d5db'}`,
+                  backgroundColor: 'transparent',
+                  color: isDarkTheme ? '#b7c6da' : '#4b5563',
+                  borderRadius: '999px',
+                  padding: '0.35rem 0.75rem',
+                  fontSize: '0.76rem',
+                  fontWeight: 700,
+                  whiteSpace: 'nowrap',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                }}
+                title={isDarkTheme ? 'Switch to light mode' : 'Switch to dark mode'}
+              >
+                <i className={`fas ${isDarkTheme ? 'fa-sun' : 'fa-moon'}`} style={{ fontSize: '0.72rem' }}></i>
+                <span>{isDarkTheme ? 'Light' : 'Dark'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate('/')}
+                style={{
+                  border: `1px solid ${isDarkTheme ? '#323232' : '#d1d5db'}`,
+                  backgroundColor: 'transparent',
+                  color: isDarkTheme ? '#b7c6da' : '#4b5563',
+                  borderRadius: '999px',
+                  padding: '0.35rem 0.75rem',
+                  fontSize: '0.76rem',
+                  fontWeight: 700,
+                  whiteSpace: 'nowrap',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                }}
+                title="Home"
+              >
+                <i className="fas fa-home" style={{ fontSize: '0.72rem' }}></i>
+                <span>Home</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setShowPanelFilters((prev) => !prev)}
