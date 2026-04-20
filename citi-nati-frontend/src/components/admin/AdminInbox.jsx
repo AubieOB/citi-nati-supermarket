@@ -514,6 +514,7 @@ const AdminInbox = () => {
         <>
         <div
           ref={filterBarRef}
+          className="admin-filter-bar-fixed admin-mobile-filter-bar"
           style={{
           display: 'flex',
           gap: '1rem',
@@ -532,7 +533,7 @@ const AdminInbox = () => {
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
           boxSizing: 'border-box',
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '1rem', flexWrap: 'wrap' }}>
+          <div className="admin-mobile-filter-top-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '1rem', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
               <h2 style={{ margin: 0, fontSize: '1.4rem', color: '#333', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <i className="fas fa-inbox" style={{ color: '#5B4B8A' }}></i>
@@ -553,7 +554,7 @@ const AdminInbox = () => {
               </p>
             </div>
 
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <div className="admin-mobile-filter-actions" style={{ display: 'flex', gap: '0.5rem' }}>
               {unreadCount > 0 && (
                 <button
                   onClick={handleMarkAllAsRead}
@@ -610,7 +611,7 @@ const AdminInbox = () => {
           <div style={{ width: '100%', height: '1px', backgroundColor: '#eee' }}></div>
 
           {/* Search Input */}
-          <div style={{
+          <div className="admin-mobile-filter-grow" style={{
             position: 'relative',
             flex: 1,
             minWidth: '200px',
@@ -747,7 +748,7 @@ const AdminInbox = () => {
           )}
 
           {/* Results Count */}
-          <div style={{
+          <div className="admin-mobile-filter-meta" style={{
             marginLeft: 'auto',
             fontSize: '0.9rem',
             color: '#666',

@@ -351,6 +351,7 @@ const AdminSecurity = () => {
     <div style={{ position: 'relative' }}>
       <div
         ref={filterBarRef}
+        className="admin-filter-bar-fixed admin-mobile-filter-bar"
         style={{
           position: 'fixed',
           top: `${filterBarLayout.top}px`,
@@ -366,7 +367,7 @@ const AdminSecurity = () => {
           padding: '0.75rem 1rem',
         }}
       >
-        <div style={{
+        <div className="admin-mobile-filter-top-row" style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -383,7 +384,7 @@ const AdminSecurity = () => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+        <div className="admin-mobile-tabs-row" style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
           {securityTabs.map((tab) => (
             <button
               key={tab.id}

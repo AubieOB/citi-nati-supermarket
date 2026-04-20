@@ -519,7 +519,7 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
     <div style={{ position: 'relative' }}>
       <div
         ref={filterBarRef}
-        className="admin-filter-bar-fixed"
+        className="admin-filter-bar-fixed admin-mobile-filter-bar"
         style={{
           position: 'fixed',
           top: `${filterBarLayout.top}px`,
@@ -534,7 +534,7 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
           overflow: 'hidden',
         }}
       >
-        <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f1f5f9', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <div className="admin-mobile-tabs-row" style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f1f5f9', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           {TAB_DEFS.map((tab) => (
             <button
               key={tab.id}
@@ -551,7 +551,7 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
           ))}
         </div>
 
-        <div style={{ padding: '0.75rem 1rem', display: 'flex', gap: '0.65rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="admin-mobile-filter-controls" style={{ padding: '0.75rem 1rem', display: 'flex', gap: '0.65rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <button
             onClick={() => applyPreset('today')}
             style={{ padding: '0.45rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '999px', backgroundColor: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem', color: textPrimary }}
@@ -577,6 +577,7 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
             type="date"
             value={pendingFilters.startDate}
             onChange={(event) => setPendingFilters((prev) => ({ ...prev, startDate: event.target.value }))}
+            className="admin-filter-date"
             style={{ padding: '0.6rem 0.7rem', border: '1px solid #d1d5db', borderRadius: '6px' }}
             title="Start date"
           />
@@ -585,6 +586,7 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
             type="date"
             value={pendingFilters.endDate}
             onChange={(event) => setPendingFilters((prev) => ({ ...prev, endDate: event.target.value }))}
+            className="admin-filter-date"
             style={{ padding: '0.6rem 0.7rem', border: '1px solid #d1d5db', borderRadius: '6px' }}
             title="End date"
           />
@@ -594,6 +596,7 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
             value={pendingFilters.product}
             onChange={(event) => setPendingFilters((prev) => ({ ...prev, product: event.target.value }))}
             placeholder="Filter by product"
+            className="admin-filter-text-input"
             style={{ padding: '0.6rem 0.7rem', border: '1px solid #d1d5db', borderRadius: '6px', minWidth: '200px' }}
           />
 
@@ -602,12 +605,14 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
             value={pendingFilters.cashier}
             onChange={(event) => setPendingFilters((prev) => ({ ...prev, cashier: event.target.value }))}
             placeholder="Filter by cashier/user"
+            className="admin-filter-text-input"
             style={{ padding: '0.6rem 0.7rem', border: '1px solid #d1d5db', borderRadius: '6px', minWidth: '200px' }}
           />
 
           <select
             value={pendingFilters.status}
             onChange={(event) => setPendingFilters((prev) => ({ ...prev, status: event.target.value }))}
+            className="admin-filter-select"
             style={{ padding: '0.6rem 0.7rem', border: '1px solid #d1d5db', borderRadius: '6px' }}
           >
             <option value="all">All Statuses</option>

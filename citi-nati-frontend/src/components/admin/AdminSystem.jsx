@@ -203,6 +203,7 @@ const AdminSystem = () => {
     <div style={{ position: 'relative' }}>
       <div
         ref={filterBarRef}
+        className="admin-filter-bar-fixed admin-mobile-filter-bar"
         style={{
           position: 'fixed',
           top: `${filterBarLayout.top}px`,
@@ -218,7 +219,7 @@ const AdminSystem = () => {
           padding: '0.75rem 1rem',
         }}
       >
-        <div style={{
+        <div className="admin-mobile-filter-top-row" style={{
           display: 'flex',
           alignItems: 'center',
           gap: '0.6rem',
@@ -226,7 +227,7 @@ const AdminSystem = () => {
           <i className="fas fa-sliders-h" style={{ fontSize: '1.2rem', color: '#5B4B8A' }}></i>
           <h1 style={{ margin: 0, color: '#333', fontSize: '1.15rem' }}>System Settings</h1>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1.25rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+        <div className="admin-mobile-filter-controls" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1.25rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
           <div>
             <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600' }}>
               Maintenance: {maintenanceMode ? 'ENABLED' : 'DISABLED'}
@@ -238,7 +239,7 @@ const AdminSystem = () => {
               Emergency Sales Day: {emergencySalesDayOpen ? 'OPEN' : 'CLOSED'}
             </div>
           </div>
-          <div style={{ textAlign: 'right', marginLeft: 'auto' }}>
+          <div className="admin-mobile-filter-meta" style={{ textAlign: 'right', marginLeft: 'auto' }}>
             <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600' }}>
               Business Timezone: {businessTime.timezoneName} ({businessTime.offsetLabel})
             </div>

@@ -442,7 +442,7 @@ const AdminOrders = () => {
 
           <div
             ref={filterBarRef}
-            className={isMobileViewport ? 'admin-filter-bar-fixed' : ''}
+            className={`${isMobileViewport ? 'admin-filter-bar-fixed' : ''} admin-mobile-filter-bar`}
             style={!isMobileViewport ? {
             display: 'flex',
             gap: '0.75rem',
@@ -474,7 +474,7 @@ const AdminOrders = () => {
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
             boxSizing: 'border-box',
           }}>
-            <div style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
+            <div className="admin-mobile-filter-grow" style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
               <input
                 type="text"
                 placeholder="Search by order #, customer, email, driver, status..."
@@ -635,7 +635,7 @@ const AdminOrders = () => {
               </button>
             )}
 
-            <span style={{ color: '#666', fontSize: '0.9rem', marginLeft: 'auto' }}>
+            <span className="admin-mobile-filter-meta" style={{ color: '#666', fontSize: '0.9rem', marginLeft: 'auto' }}>
               {filteredOrders.length} / {orders.length} orders
             </span>
           </div>

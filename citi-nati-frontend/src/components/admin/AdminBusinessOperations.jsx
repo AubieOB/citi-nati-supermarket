@@ -265,7 +265,7 @@ const AdminBusinessOperations = () => {
     <div className="bo-shell" style={{ position: 'relative' }}>
       <div
         ref={filterBarRef}
-        className="bo-filter-bar"
+        className="bo-filter-bar admin-filter-bar-fixed admin-mobile-filter-bar"
         style={{
           position: 'fixed',
           top: `${filterBarLayout.top}px`,

@@ -532,9 +532,9 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
   return (
     <div className="admin-pos-sync-monitor">
       {/* ── Sticky Header ── */}
-      <div ref={headerRef} style={fixedHeaderStyle}>
+      <div ref={headerRef} className="admin-filter-bar-fixed admin-mobile-filter-bar" style={fixedHeaderStyle}>
         {/* Title row */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
+        <div className="admin-mobile-filter-top-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
           <div>
             <h2 style={{ margin: 0, color: '#5B4B8A', fontSize: '1.4rem', fontWeight: 700 }}>
               <i className="fas fa-chart-line" style={{ marginRight: '0.5rem', opacity: 0.8 }} />
@@ -559,7 +559,7 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
+          <div className="admin-mobile-filter-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
             <button
               onClick={handleToggle}
               disabled={toggleSaving}
@@ -580,7 +580,7 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
         </div>
 
         {/* Tab bar */}
-        <div style={{ display: 'flex', gap: '0.1rem', borderBottom: '2px solid #e0e0e0', overflowX: 'auto' }}>
+        <div className="admin-mobile-tabs-row" style={{ display: 'flex', gap: '0.1rem', borderBottom: '2px solid #e0e0e0', overflowX: 'auto' }}>
           {TABS.map((tab) => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={S.tab(activeTab === tab.id)}>
               <i className={`fas ${tab.icon}`} />
