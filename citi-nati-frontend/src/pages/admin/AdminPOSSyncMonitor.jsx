@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import api from '../../utils/api.js';
 import { getSocket } from '../../utils/socket.js';
 import { notifyError, notifyInfo, notifySuccess } from '../../utils/notifications.js';
+import useMobileViewport from '../../hooks/useMobileViewport.js';
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: 'fa-tachometer-alt' },
@@ -283,6 +284,7 @@ function FailureBar({ items = [] }) {
 export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
   const [activeTab, setActiveTab] = useState('overview');
+  const isMobileViewport = useMobileViewport();
   const [monitor, setMonitor] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -566,7 +568,7 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
               style={{ ...S.actionBtn(enabled ? 'disable' : 'enable'), opacity: toggleSaving ? 0.6 : 1 }}
             >
               <i className={`fas ${enabled ? 'fa-pause-circle' : 'fa-play-circle'}`} style={{ marginRight: '0.35rem' }} />
-              {toggleSaving ? 'Saving…' : enabled ? 'Disable POS Sync' : 'Enable POS Sync'}
+              {toggleSaving ? 'Saving…' : enabled ? (isMobileViewport ? 'Disable' : 'Disable POS Sync') : (isMobileViewport ? 'Enable' : 'Enable POS Sync')}
             </button>
             <button
               onClick={handleManualSync}
@@ -574,7 +576,7 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
               style={{ ...S.actionBtn('secondary'), opacity: manualSyncing || !enabled ? 0.5 : 1 }}
             >
               <i className="fas fa-sync-alt" style={{ marginRight: '0.35rem' }} />
-              {manualSyncing ? 'Syncing…' : 'Run Manual Sync'}
+              {manualSyncing ? 'Syncing…' : (isMobileViewport ? 'Sync' : 'Run Manual Sync')}
             </button>
           </div>
         </div>

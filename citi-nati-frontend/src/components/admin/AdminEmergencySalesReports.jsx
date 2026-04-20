@@ -3,6 +3,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import api from '../../utils/api.js';
 import { notifyError, notifySuccess } from '../../utils/notifications.js';
+import useMobileViewport from '../../hooks/useMobileViewport.js';
 
 const TAB_DEFS = [
   { id: 'overview', label: 'Overview', icon: 'fa-chart-pie' },
@@ -82,6 +83,7 @@ function statusColor(status) {
 }
 
 const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
+  const isMobileViewport = useMobileViewport();
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
   const [retryingSaleId, setRetryingSaleId] = useState(null);
@@ -555,23 +557,23 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
           <button
             onClick={() => applyPreset('today')}
             style={{ padding: '0.45rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '999px', backgroundColor: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem', color: textPrimary }}
-          >Today</button>
+          >{isMobileViewport ? 'Today' : 'Today'}</button>
           <button
             onClick={() => applyPreset('last7')}
             style={{ padding: '0.45rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '999px', backgroundColor: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem', color: textPrimary }}
-          >Last 7 Days</button>
+          >{isMobileViewport ? '7D' : 'Last 7 Days'}</button>
           <button
             onClick={() => applyPreset('last30')}
             style={{ padding: '0.45rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '999px', backgroundColor: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem', color: textPrimary }}
-          >Last 30 Days</button>
+          >{isMobileViewport ? '30D' : 'Last 30 Days'}</button>
           <button
             onClick={() => applyPreset('thisMonth')}
             style={{ padding: '0.45rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '999px', backgroundColor: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem', color: textPrimary }}
-          >This Month</button>
+          >{isMobileViewport ? 'This Mo' : 'This Month'}</button>
           <button
             onClick={() => applyPreset('lastMonth')}
             style={{ padding: '0.45rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '999px', backgroundColor: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem', color: textPrimary }}
-          >Last Month</button>
+          >{isMobileViewport ? 'Last Mo' : 'Last Month'}</button>
 
           <input
             type="date"
@@ -633,7 +635,7 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
               cursor: 'pointer',
             }}
           >
-            Apply Filters
+            {isMobileViewport ? 'Apply' : 'Apply Filters'}
           </button>
 
           <button
@@ -648,7 +650,7 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
               cursor: 'pointer',
             }}
           >
-            Reset
+            {isMobileViewport ? 'Reset' : 'Reset'}
           </button>
         </div>
       </div>

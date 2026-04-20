@@ -5,6 +5,7 @@ import { getSocket } from '../../utils/socket.js';
 import { playNotificationSound } from '../../utils/notifications.js';
 import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
+import useMobileViewport from '../../hooks/useMobileViewport.js';
 import '../../css/admin-responsive-filters.css';
 
 const MESSAGE_TYPES = [
@@ -34,6 +35,7 @@ const MESSAGE_TYPES = [
 const AdminInbox = () => {
   const INBOX_PERFORMANCE_WARNING_THRESHOLD = 500;
   const INBOX_FETCH_LIMIT = 300;
+  const isMobileViewport = useMobileViewport();
   const [messages, setMessages] = useState([]);
   const [filteredMessages, setFilteredMessages] = useState([]);
   const [totalMessages, setTotalMessages] = useState(0);
@@ -579,7 +581,7 @@ const AdminInbox = () => {
                   title={`Mark all ${unreadCount} unread message${unreadCount !== 1 ? 's' : ''} as read`}
                 >
                   <i className="fas fa-check-double" style={{ marginRight: '0.5rem' }}></i>
-                  Mark All Read
+                  {isMobileViewport ? 'Read' : 'Mark All Read'}
                 </button>
               )}
               <button
@@ -603,7 +605,7 @@ const AdminInbox = () => {
                 }}
               >
                 <i className="fas fa-trash" style={{ marginRight: '0.5rem' }}></i>
-                Clear All
+                {isMobileViewport ? 'Clear' : 'Clear All'}
               </button>
             </div>
           </div>
@@ -743,7 +745,7 @@ const AdminInbox = () => {
               }}
             >
               <i className="fas fa-redo" style={{ marginRight: '0.5rem' }}></i>
-              Reset
+              {isMobileViewport ? 'Reset' : 'Reset'}
             </button>
           )}
 

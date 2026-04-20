@@ -606,7 +606,7 @@ const AdminOrders = () => {
                   whiteSpace: 'nowrap',
                 }}
               >
-                Clear Filters
+                {isMobileViewport ? 'Clear' : 'Clear Filters'}
               </button>
             )}
 
@@ -631,7 +631,7 @@ const AdminOrders = () => {
                 title="Download filtered orders as PDF"
               >
                 <i className="fas fa-file-pdf"></i>
-                Download PDF
+                {isMobileViewport ? 'PDF' : 'Download PDF'}
               </button>
             )}
 

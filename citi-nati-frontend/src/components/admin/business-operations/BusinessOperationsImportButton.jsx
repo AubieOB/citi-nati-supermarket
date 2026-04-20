@@ -1,6 +1,8 @@
 import React from 'react';
+import useMobileViewport from '../../../hooks/useMobileViewport.js';
 
 const BusinessOperationsImportButton = ({ onClick, disabled = false }) => {
+  const isMobileViewport = useMobileViewport();
   return (
     <button
       type="button"
@@ -25,7 +27,7 @@ const BusinessOperationsImportButton = ({ onClick, disabled = false }) => {
       title="Upload and import Excel workbooks with employee, payroll, supplier, and expense data"
     >
       <i className="fas fa-file-excel"></i>
-      Import Workbook
+      {isMobileViewport ? 'Import' : 'Import Workbook'}
     </button>
   );
 };
