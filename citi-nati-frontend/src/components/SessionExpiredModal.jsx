@@ -78,18 +78,6 @@ const SessionExpiredModal = () => {
             onClick={handleLoginRedirect}
             style={{
               ...buttonBaseStyle,
-              border: '1px solid #cbd5e1',
-              backgroundColor: '#ffffff',
-              color: '#334155',
-            }}
-          >
-            Okay
-          </button>
-          <button
-            type="button"
-            onClick={handleLoginRedirect}
-            style={{
-              ...buttonBaseStyle,
               border: '1px solid #2563eb',
               backgroundColor: '#2563eb',
               color: '#ffffff',
