@@ -376,9 +376,6 @@ const AdminDeliveryCoverage = () => {
         <h2 style={{ margin: 0, fontSize: '1.12rem', color: '#0f172a', fontWeight: 800 }}>
           Delivery Coverage
         </h2>
-        <p style={{ margin: '0.32rem 0 0', color: '#64748b', fontSize: '0.86rem' }}>
-          Activate or deactivate predefined Malawi delivery areas with optional GPS radius enforcement.
-        </p>
         <p style={{ margin: '0.38rem 0 0', color: '#0f172a', fontSize: '0.82rem', fontWeight: 700 }}>
           Malawi districts: {masterDistricts.length} | Active delivery areas: {activeAreaCount} | Configured zones: {zones.length}
         </p>
