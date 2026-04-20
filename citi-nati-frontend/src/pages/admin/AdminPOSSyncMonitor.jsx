@@ -534,9 +534,9 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
   return (
     <div className="admin-pos-sync-monitor">
       {/* ── Sticky Header ── */}
-      <div ref={headerRef} className="admin-filter-bar-fixed admin-mobile-filter-bar" style={fixedHeaderStyle}>
+      <div ref={headerRef} className={`admin-filter-bar-fixed ${isMobileViewport ? 'admin-mobile-filter-bar' : ''}`} style={fixedHeaderStyle}>
         {/* Title row */}
-        <div className="admin-mobile-filter-top-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
+        <div className={isMobileViewport ? 'admin-mobile-filter-top-row' : ''} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: isMobileViewport ? 'wrap' : 'nowrap', gap: '0.75rem', marginBottom: isMobileViewport ? '0.75rem' : '1rem' }}>
           <div>
             <h2 style={{ margin: 0, color: '#5B4B8A', fontSize: '1.4rem', fontWeight: 700 }}>
               <i className="fas fa-chart-line" style={{ marginRight: '0.5rem', opacity: 0.8 }} />
@@ -546,22 +546,39 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
               <span style={S.badge(tone.bg, tone.fg)}>
                 {summary.healthLabel || 'unknown'} {summary.healthScore != null ? `${summary.healthScore}/100` : ''}
               </span>
-              <span style={S.badge('#f1f5f9', '#475569')}>
-                Agent: {summary.agentHealthy ? 'reachable' : 'unreachable'}
-              </span>
-              <span style={S.badge('#f1f5f9', '#475569')}>
-                Scope: {selectedLocationCode === 'ZA' ? 'Zomba' : 'Blantyre'} ({selectedLocationCode})
-              </span>
-              <span style={S.badge('#f1f5f9', '#475569')}>
-                Last event: {rel(summary.lastEventAt)}
-              </span>
+              {!isMobileViewport && (
+                <>
+                  <span style={S.badge('#f1f5f9', '#475569')}>
+                    Agent: {summary.agentHealthy ? 'reachable' : 'unreachable'}
+                  </span>
+                  <span style={S.badge('#f1f5f9', '#475569')}>
+                    Scope: {selectedLocationCode === 'ZA' ? 'Zomba' : 'Blantyre'} ({selectedLocationCode})
+                  </span>
+                  <span style={S.badge('#f1f5f9', '#475569')}>
+                    Last event: {rel(summary.lastEventAt)}
+                  </span>
+                </>
+              )}
+              {isMobileViewport && (
+                <>
+                  <span style={S.badge('#f1f5f9', '#475569')}>
+                    Agent: {summary.agentHealthy ? 'reachable' : 'unreachable'}
+                  </span>
+                  <span style={S.badge('#f1f5f9', '#475569')}>
+                    Scope: {selectedLocationCode === 'ZA' ? 'Zomba' : 'Blantyre'} ({selectedLocationCode})
+                  </span>
+                  <span style={S.badge('#f1f5f9', '#475569')}>
+                    Last event: {rel(summary.lastEventAt)}
+                  </span>
+                </>
+              )}
               {refreshing && (
                 <span style={S.badge('#dbeafe', '#1d4ed8')}>Refreshing…</span>
               )}
             </div>
           </div>
 
-          <div className="admin-mobile-filter-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
+          <div className={isMobileViewport ? 'admin-mobile-filter-actions' : ''} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
             <button
               onClick={handleToggle}
               disabled={toggleSaving}
@@ -582,7 +599,7 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
         </div>
 
         {/* Tab bar */}
-        <div className="admin-mobile-tabs-row" style={{ display: 'flex', gap: '0.1rem', borderBottom: '2px solid #e0e0e0', overflowX: 'auto' }}>
+        <div className={isMobileViewport ? 'admin-mobile-tabs-row' : ''} style={{ display: 'flex', gap: '0.1rem', borderBottom: '2px solid #e0e0e0', overflowX: isMobileViewport ? 'auto' : 'visible' }}>
           {TABS.map((tab) => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={S.tab(activeTab === tab.id)}>
               <i className={`fas ${tab.icon}`} />

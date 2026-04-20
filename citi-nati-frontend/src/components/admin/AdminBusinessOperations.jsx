@@ -16,6 +16,7 @@ import BusinessOperationsImportButton from './business-operations/BusinessOperat
 import BusinessOperationsImportModal from './business-operations/BusinessOperationsImportModal.jsx';
 import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
+import useMobileViewport from '../../hooks/useMobileViewport.js';
 import { registerBoDialogHandler } from '../../utils/boDialogBus.js';
 import { getOperationalScopeOptions } from '../../utils/operationalScope.js';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -48,6 +49,7 @@ const TABS = [
 const AdminBusinessOperations = () => {
   const { user } = useAuth();
   const { modal, showModal, closeModal } = useModal();
+  const isMobileViewport = useMobileViewport();
   const [activeTab, setActiveTab] = useState('sales-reports');
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [filterBarLayout, setFilterBarLayout] = useState({ left: 0, width: 0, top: 0 });
@@ -265,7 +267,7 @@ const AdminBusinessOperations = () => {
     <div className="bo-shell" style={{ position: 'relative' }}>
       <div
         ref={filterBarRef}
-        className="bo-filter-bar admin-filter-bar-fixed admin-mobile-filter-bar"
+        className={`bo-filter-bar admin-filter-bar-fixed ${isMobileViewport ? 'admin-mobile-filter-bar' : ''}`}
         style={{
           position: 'fixed',
           top: `${filterBarLayout.top}px`,
