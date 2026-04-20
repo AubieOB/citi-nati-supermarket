@@ -25,6 +25,10 @@ const AdminDeliveryCoverage = () => {
   const [masterLoading, setMasterLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [autofillState, setAutofillState] = useState({
+    status: 'idle',
+    message: '',
+  });
 
   const districtOptions = useMemo(() => {
     const base = masterDistricts.map((entry) => entry.district);
@@ -89,11 +93,62 @@ const AdminDeliveryCoverage = () => {
 
   const handleInputChange = (event) => {
     const { name, value, type, checked } = event.target;
+    if (name === 'district') {
+      setForm((prev) => ({
+        ...prev,
+        district: value,
+        area: '',
+        customArea: '',
+      }));
+      setAutofillState({ status: 'idle', message: '' });
+      return;
+    }
+
+    if (name === 'area') {
+      const districtEntry = masterDistricts.find((entry) => entry.district === form.district);
+      const selectedArea = districtEntry?.areas?.find((area) => area.name === value) || null;
+
+      setForm((prev) => ({
+        ...prev,
+        area: value,
+        latitude: selectedArea?.defaultLatitude != null ? String(selectedArea.defaultLatitude) : prev.latitude,
+        longitude: selectedArea?.defaultLongitude != null ? String(selectedArea.defaultLongitude) : prev.longitude,
+        radiusKm: selectedArea?.defaultRadiusKm != null ? String(selectedArea.defaultRadiusKm) : prev.radiusKm,
+      }));
+
+      if (selectedArea?.defaultLatitude != null && selectedArea?.defaultLongitude != null && selectedArea?.defaultRadiusKm != null) {
+        setAutofillState({
+          status: 'filled',
+          message: 'Latitude, longitude, and radius were auto-filled from the selected area and can be adjusted manually.',
+        });
+      } else {
+        setAutofillState({
+          status: 'missing',
+          message: 'Selected area has no default coordinates metadata yet. Please enter values manually.',
+        });
+      }
+      return;
+    }
+
+    if (name === 'allowCustomArea') {
+      setForm((prev) => ({
+        ...prev,
+        allowCustomArea: checked,
+        ...(checked ? { area: '' } : { customArea: '' }),
+      }));
+
+      setAutofillState({
+        status: checked ? 'missing' : 'idle',
+        message: checked
+          ? 'Custom area mode enabled. Enter coordinates manually or adjust as needed.'
+          : '',
+      });
+      return;
+    }
+
     setForm((prev) => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
-      ...(name === 'district' ? { area: '', customArea: '' } : {}),
-      ...(name === 'allowCustomArea' && !checked ? { customArea: '' } : {}),
     }));
   };
 
@@ -144,7 +199,7 @@ const AdminDeliveryCoverage = () => {
 
   const handleEdit = (zone) => {
     const districtAreas = masterDistricts.find((entry) => entry.district === zone.district)?.areas || [];
-    const isKnownArea = districtAreas.includes(zone.area);
+    const isKnownArea = districtAreas.some((entry) => entry.name === zone.area);
 
     setEditingZoneId(zone.id);
     setForm({
@@ -160,6 +215,10 @@ const AdminDeliveryCoverage = () => {
     });
     setError('');
     setSuccess('');
+    setAutofillState({
+      status: 'filled',
+      message: 'Loaded existing zone values. You can manually adjust coordinates and radius before saving.',
+    });
   };
 
   const handleToggleActive = async (zone) => {
@@ -251,11 +310,20 @@ const AdminDeliveryCoverage = () => {
               style={{ width: '100%', marginTop: '0.25rem' }}
             >
               <option value="">Select district</option>
-              {districtOptions.map((district) => (
-                <option key={district} value={district}>{district}</option>
-              ))}
+              {districtOptions.map((district) => {
+                const areaCount = masterDistricts.find((entry) => entry.district === district)?.areas?.length || 0;
+                return (
+                  <option key={district} value={district}>{`${district}${areaCount ? ` (${areaCount})` : ''}`}</option>
+                );
+              })}
             </select>
           </label>
+
+          {!!form.district && (
+            <p style={{ margin: '-0.15rem 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+              Total predefined areas for {form.district}: {areaOptionsForDistrict.length}
+            </p>
+          )}
 
           <label>
             Area
@@ -268,7 +336,7 @@ const AdminDeliveryCoverage = () => {
             >
               <option value="">Select area</option>
               {areaOptionsForDistrict.map((area) => (
-                <option key={area} value={area}>{area}</option>
+                <option key={area.name} value={area.name}>{area.name}</option>
               ))}
             </select>
           </label>
@@ -307,6 +375,19 @@ const AdminDeliveryCoverage = () => {
               <input type="number" step="0.000001" name="longitude" value={form.longitude} onChange={handleInputChange} style={{ width: '100%', marginTop: '0.25rem' }} />
             </label>
           </div>
+
+          {autofillState.message && (
+            <div style={{
+              padding: '0.55rem 0.65rem',
+              borderRadius: '8px',
+              background: autofillState.status === 'filled' ? '#eff6ff' : '#fff7ed',
+              border: autofillState.status === 'filled' ? '1px solid #bfdbfe' : '1px solid #fed7aa',
+              color: autofillState.status === 'filled' ? '#1d4ed8' : '#9a3412',
+              fontSize: '0.82rem',
+            }}>
+              {autofillState.message}
+            </div>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.55rem' }}>
             <label>

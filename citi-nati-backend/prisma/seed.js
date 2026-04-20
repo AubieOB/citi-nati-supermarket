@@ -59,9 +59,25 @@ async function main() {
           district,
           area,
           isActive: false,
+          latitude: pair.defaultLatitude,
+          longitude: pair.defaultLongitude,
+          radiusKm: pair.defaultRadiusKm,
         },
       });
       createdCount += 1;
+      continue;
+    }
+
+    const updateData = {};
+    if (existing.latitude == null && pair.defaultLatitude != null) updateData.latitude = pair.defaultLatitude;
+    if (existing.longitude == null && pair.defaultLongitude != null) updateData.longitude = pair.defaultLongitude;
+    if (existing.radiusKm == null && pair.defaultRadiusKm != null) updateData.radiusKm = pair.defaultRadiusKm;
+
+    if (Object.keys(updateData).length > 0) {
+      await prisma.deliveryZone.update({
+        where: { id: existing.id },
+        data: updateData,
+      });
     }
 
     console.log(`✓ Delivery zones preload complete. Created: ${createdCount}, Existing skipped: ${skippedCount}, Master pairs: ${masterPairs.length}`);

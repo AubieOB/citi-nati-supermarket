@@ -152,6 +152,7 @@ const getDeliveryLocationMaster = async (req, res) => {
       districts: MALAWI_LOCATION_MASTER,
       districtCount,
       areaCount,
+      source: 'curated-static-malawi-master',
     });
   } catch (error) {
     console.error('Error fetching delivery location master:', error);
@@ -197,10 +198,16 @@ const getDeliveryZoneOptions = async (req, res) => {
     const districtCount = districts.length;
     const activeAreaCount = activeZones.length;
 
+    const districtAreaStats = districts.map((entry) => ({
+      district: entry.district,
+      activeAreaCount: entry.areas.length,
+    }));
+
     return res.status(200).json({
       zones: districts,
       districtCount,
       activeAreaCount,
+      districtAreaStats,
     });
   } catch (error) {
     console.error('Error fetching delivery zone options:', error);
