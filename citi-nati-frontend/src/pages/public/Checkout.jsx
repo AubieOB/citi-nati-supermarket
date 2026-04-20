@@ -120,6 +120,36 @@ const CheckoutContent = () => {
     [selectedDistrictAreas, formData.area]
   );
 
+  const cartItemsSubtotal = useMemo(
+    () => Number(cart?.itemsSubtotal ?? cart?.total ?? 0),
+    [cart]
+  );
+
+  const minimumOrderValue = useMemo(
+    () => Number(cart?.minimumOrderValue ?? 10000),
+    [cart]
+  );
+
+  const selectedDeliveryFee = useMemo(
+    () => Number(selectedAreaOption?.deliveryFee ?? 0),
+    [selectedAreaOption]
+  );
+
+  const checkoutFinalTotal = useMemo(
+    () => Number((cartItemsSubtotal + selectedDeliveryFee).toFixed(2)),
+    [cartItemsSubtotal, selectedDeliveryFee]
+  );
+
+  const isBelowMinimumOrderValue = useMemo(
+    () => cartItemsSubtotal < minimumOrderValue,
+    [cartItemsSubtotal, minimumOrderValue]
+  );
+
+  const amountNeededForMinimum = useMemo(
+    () => Number(Math.max(0, minimumOrderValue - cartItemsSubtotal).toFixed(2)),
+    [minimumOrderValue, cartItemsSubtotal]
+  );
+
   // Validate stock availability
   const validateStockAvailability = async (cartItems) => {
     if (!cartItems || cartItems.length === 0) {
@@ -249,6 +279,13 @@ const CheckoutContent = () => {
       return;
     }
 
+    if (isBelowMinimumOrderValue) {
+      setErrors({
+        form: `The minimum order value for delivery is ${formatMWK(minimumOrderValue)}. Add ${formatMWK(amountNeededForMinimum)} more to continue.`,
+      });
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setErrors({});
@@ -287,6 +324,10 @@ const CheckoutContent = () => {
         errorMessage = 'Sorry, we currently do not deliver to your selected area.';
       } else if (backendCode === 'OUTSIDE_COVERAGE_RADIUS') {
         errorMessage = 'Your location is outside our delivery coverage. Please choose a supported area.';
+      } else if (backendCode === 'MINIMUM_ORDER_NOT_MET') {
+        const remainingAmount = Number(err.response?.data?.remainingAmount ?? 0);
+        const configuredMinimum = Number(err.response?.data?.minimumOrderValue ?? minimumOrderValue);
+        errorMessage = `The minimum order value for delivery is ${formatMWK(configuredMinimum)}. Add ${formatMWK(remainingAmount)} more to continue.`;
       }
       
       if (err.response?.status === 401) {
@@ -308,6 +349,7 @@ const CheckoutContent = () => {
     outOfStockItems.length > 0 ||
     !cart || 
     cart.items.length === 0 ||
+    isBelowMinimumOrderValue ||
     !String(formData.latitude || '').trim() ||
     !String(formData.longitude || '').trim() ||
     orderCreated !== null;
@@ -565,6 +607,12 @@ const CheckoutContent = () => {
                     Estimated delivery fee for this area: {formatMWK(selectedAreaOption.deliveryFee)}
                   </p>
                 )}
+
+                {isBelowMinimumOrderValue && (
+                  <p style={{ fontSize: '0.82rem', color: '#b91c1c', margin: '0.35rem 0 0', lineHeight: 1.45 }}>
+                    Minimum order value is {formatMWK(minimumOrderValue)} (items subtotal only). Add {formatMWK(amountNeededForMinimum)} more to continue.
+                  </p>
+                )}
               </div>
 
               {/* Geolocation Section */}
@@ -755,16 +803,35 @@ const CheckoutContent = () => {
                   fontWeight: 600,
                 }}>
                   <span>Subtotal:</span>
-                  <span>{formatMWK(cart.subtotal ?? cart.total ?? 0)}</span>
+                  <span>{formatMWK(cartItemsSubtotal)}</span>
                 </div>
 
                 <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  marginBottom: '0.8rem',
+                  marginBottom: '0.55rem',
                   color: '#475569',
                   fontWeight: 600,
+                }}>
+                  <span>Delivery Fee:</span>
+                  <span>{formatMWK(selectedDeliveryFee)}</span>
+                </div>
+
+                {isBelowMinimumOrderValue && (
+                  <div style={{ marginBottom: '0.75rem', padding: '0.6rem 0.7rem', borderRadius: '6px', border: '1px solid #fecaca', backgroundColor: '#fef2f2', color: '#991b1b', fontSize: '0.82rem', lineHeight: 1.45 }}>
+                    Minimum order required: {formatMWK(minimumOrderValue)}. Add {formatMWK(amountNeededForMinimum)} more items.
+                  </div>
+                )}
+
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '0.8rem',
+                  color: '#64748b',
+                  fontWeight: 600,
+                  fontSize: '0.88rem',
                 }}>
                   <span>{vatLabel}</span>
                   <span>{formatMWK(cart.vat ?? 0)}</span>
@@ -781,8 +848,8 @@ const CheckoutContent = () => {
                   fontWeight: '700',
                   color: '#2D8659',
                 }}>
-                  <span>Total:</span>
-                  <span>{formatMWK(cart.total)}</span>
+                  <span>Final Total:</span>
+                  <span>{formatMWK(checkoutFinalTotal)}</span>
                 </div>
 
                 <p style={{ fontSize: '0.75rem', color: '#999', marginTop: '1rem', textAlign: 'center' }}>

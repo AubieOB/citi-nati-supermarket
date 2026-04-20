@@ -10,6 +10,7 @@ const posCommandQueueService = require('../services/posCommandQueue.service');
 const { splitInclusiveVatAtRate, getVatRatePercent, normalizeVatRatePercent, roundMoney } = require('../utils/vat');
 const { formatBusinessDateKey, formatBusinessTimeKey } = require('../utils/businessTime');
 const { recordAuditLog } = require('../services/auditLog.service');
+const { getMinimumOrderValue } = require('../utils/checkoutRules');
 
 const prisma = new PrismaClient();
 
@@ -360,6 +361,26 @@ const initializePayment = async (req, res) => {
       });
     }
 
+    const minimumOrderValue = await getMinimumOrderValue();
+    const orderSubtotal = Number.isFinite(Number(order?.subtotalAmount))
+      ? Number(order.subtotalAmount)
+      : Number((Number(order.total || 0) - Number(order.deliveryFeeAmount || 0)).toFixed(2));
+
+    if (orderSubtotal < minimumOrderValue) {
+      const remainingAmount = Number((minimumOrderValue - orderSubtotal).toFixed(2));
+      return res.status(400).json({
+        code: 'MINIMUM_ORDER_NOT_MET',
+        minimumOrderValue,
+        currentSubtotal: orderSubtotal,
+        remainingAmount,
+        error: `The minimum order value for delivery is MWK ${Number(minimumOrderValue || 0).toLocaleString()}. Please add more items to continue.`,
+      });
+    }
+
+    const payableTotal = Number.isFinite(Number(order?.finalTotalAmount))
+      ? Number(order.finalTotalAmount)
+      : Number(order.total || 0);
+
     // Generate unique reference
     const paymentReference = `ORDER_${order.id}_${Date.now()}`;
 
@@ -421,7 +442,7 @@ const initializePayment = async (req, res) => {
       const [firstName = '', lastName = ''] = String(user.name).trim().split(/\s+/, 2);
 
       const paychanguPayload = {
-        amount: order.total.toString(),
+        amount: payableTotal.toString(),
         currency: 'MWK',
         email: user.email,
         phone_number: order.phone,
@@ -526,7 +547,7 @@ const initializePayment = async (req, res) => {
       return res.status(200).json({
         checkoutUrl,
         orderId: order.id,
-        amount: order.total,
+        amount: payableTotal,
         reference: paymentReference
       });
 

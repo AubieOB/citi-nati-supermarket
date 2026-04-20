@@ -2,6 +2,7 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { getVatSettings } = require('../utils/vat');
 const { getEmergencySalesDayOpen } = require('../utils/emergencySalesAccess');
+const { getMinimumOrderValue } = require('../utils/checkoutRules');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -17,11 +18,12 @@ const getSettingValue = async (key, fallbackValue) => {
 
 router.get('/status', async (req, res) => {
   try {
-    const [maintenanceEnabled, maintenanceMessage, vatSettings, emergencySalesDayOpen] = await Promise.all([
+    const [maintenanceEnabled, maintenanceMessage, vatSettings, emergencySalesDayOpen, minimumOrderValue] = await Promise.all([
       getSettingValue(MAINTENANCE_MODE_KEY, 'false'),
       getSettingValue(MAINTENANCE_MESSAGE_KEY, DEFAULT_MAINTENANCE_MESSAGE),
       getVatSettings(),
       getEmergencySalesDayOpen(prisma),
+      getMinimumOrderValue(prisma),
     ]);
 
     return res.json({
@@ -31,6 +33,7 @@ router.get('/status', async (req, res) => {
       vatEnabled: vatSettings.enabled,
       vatRatePercent: vatSettings.ratePercent,
       configuredVatRatePercent: vatSettings.configuredRatePercent,
+      minimumOrderValue,
       emergencySalesDayOpen,
     });
   } catch (err) {

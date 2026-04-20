@@ -54,6 +54,12 @@ const {
   getEmergencySalesDayOpen,
   setEmergencySalesDayOpen,
 } = require('../utils/emergencySalesAccess');
+const {
+  MINIMUM_ORDER_VALUE_KEY,
+  normalizeMinimumOrderValue,
+  clearCheckoutRulesCache,
+  getMinimumOrderValue,
+} = require('../utils/checkoutRules');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -407,12 +413,13 @@ router.get('/dashboard', verifyTokenMiddleware, verifyAdmin, async (req, res) =>
 
 router.get('/system/settings', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
   try {
-    const [maintenanceEnabled, maintenanceMessage, vatSettings, emergencySalesDayOpen, emergencySalesDayLastChange] = await Promise.all([
+    const [maintenanceEnabled, maintenanceMessage, vatSettings, emergencySalesDayOpen, emergencySalesDayLastChange, minimumOrderValue] = await Promise.all([
       getSettingValue(MAINTENANCE_MODE_KEY, 'false'),
       getSettingValue(MAINTENANCE_MESSAGE_KEY, DEFAULT_MAINTENANCE_MESSAGE),
       getVatSettings(),
       getEmergencySalesDayOpen(prisma),
       getEmergencySalesDayLastChange(),
+      getMinimumOrderValue(prisma),
     ]);
 
     const businessOffsetMinutes = getBusinessOffsetMinutes();
@@ -431,6 +438,7 @@ router.get('/system/settings', verifyTokenMiddleware, verifyAdmin, async (req, r
         vatEnabled: vatSettings.enabled,
         vatRatePercent: vatSettings.ratePercent,
         configuredVatRatePercent: vatSettings.configuredRatePercent,
+        minimumOrderValue,
         emergencySalesDayOpen,
         emergencySalesDayLastChange,
         businessTime,
@@ -446,6 +454,15 @@ router.put('/system/maintenance', verifyTokenMiddleware, verifyAdmin, async (req
   try {
     const { maintenanceMode, maintenanceMessage } = req.body;
     const vatEnabled = req.body?.vatEnabled !== undefined ? Boolean(req.body.vatEnabled) : true;
+    const minimumOrderInput = req.body?.minimumOrderValue;
+    const currentMinimumOrderValue = await getMinimumOrderValue(prisma);
+    const minimumOrderValue = minimumOrderInput === undefined
+      ? currentMinimumOrderValue
+      : normalizeMinimumOrderValue(minimumOrderInput, Number.NaN);
+
+    if (!Number.isFinite(minimumOrderValue) || minimumOrderValue < 0) {
+      return res.status(400).json({ success: false, error: 'Minimum order value must be a valid non-negative number.' });
+    }
 
     const messageToSave = (maintenanceMessage || DEFAULT_MAINTENANCE_MESSAGE).trim();
 
@@ -465,10 +482,17 @@ router.put('/system/maintenance', verifyTokenMiddleware, verifyAdmin, async (req
         update: { value: vatEnabled ? 'true' : 'false' },
         create: { key: VAT_ENABLED_KEY, value: vatEnabled ? 'true' : 'false' },
       }),
+      prisma.siteSetting.upsert({
+        where: { key: MINIMUM_ORDER_VALUE_KEY },
+        update: { value: String(minimumOrderValue) },
+        create: { key: MINIMUM_ORDER_VALUE_KEY, value: String(minimumOrderValue) },
+      }),
     ]);
 
     clearVatSettingsCache();
+    clearCheckoutRulesCache();
     const vatSettings = await getVatSettings(true);
+    const updatedMinimumOrderValue = await getMinimumOrderValue(prisma, true);
     const businessOffsetMinutes = getBusinessOffsetMinutes();
     const businessTime = {
       timezoneName: getBusinessTimezoneName(),
@@ -486,6 +510,7 @@ router.put('/system/maintenance', verifyTokenMiddleware, verifyAdmin, async (req
         vatEnabled: vatSettings.enabled,
         vatRatePercent: vatSettings.ratePercent,
         configuredVatRatePercent: vatSettings.configuredRatePercent,
+        minimumOrderValue: updatedMinimumOrderValue,
         businessTime,
       },
     });

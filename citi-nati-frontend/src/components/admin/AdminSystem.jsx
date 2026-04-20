@@ -7,6 +7,7 @@ import { PERMISSION_KEYS, hasPermission } from '../../utils/permissions.js';
 
 const DEFAULT_MESSAGE = 'We are currently carrying out maintenance to improve your experience. We apologize for the inconvenience.';
 const DEFAULT_VAT_RATE = 16.5;
+const DEFAULT_MINIMUM_ORDER_VALUE = 10000;
 
 const DEFAULT_BUSINESS_TIME = {
   timezoneName: 'UTC+02:00',
@@ -43,6 +44,7 @@ const AdminSystem = () => {
   const [maintenanceMessage, setMaintenanceMessage] = useState(DEFAULT_MESSAGE);
   const [vatEnabled, setVatEnabled] = useState(true);
   const [configuredVatRatePercent, setConfiguredVatRatePercent] = useState(DEFAULT_VAT_RATE);
+  const [minimumOrderValue, setMinimumOrderValue] = useState(DEFAULT_MINIMUM_ORDER_VALUE);
   const [emergencySalesDayOpen, setEmergencySalesDayOpen] = useState(true);
   const [emergencySalesDayLastChange, setEmergencySalesDayLastChange] = useState(null);
   const [updatingEmergencySalesDay, setUpdatingEmergencySalesDay] = useState(false);
@@ -63,6 +65,7 @@ const AdminSystem = () => {
         setMaintenanceMessage(settings.maintenanceMessage || DEFAULT_MESSAGE);
         setVatEnabled(settings.vatEnabled !== false);
         setConfiguredVatRatePercent(Number(settings.configuredVatRatePercent || settings.vatRatePercent || DEFAULT_VAT_RATE));
+        setMinimumOrderValue(Number(settings.minimumOrderValue ?? DEFAULT_MINIMUM_ORDER_VALUE));
         setEmergencySalesDayOpen(settings.emergencySalesDayOpen !== false);
         setEmergencySalesDayLastChange(settings.emergencySalesDayLastChange || null);
         const businessTimeSettings = settings.businessTime || DEFAULT_BUSINESS_TIME;
@@ -140,14 +143,23 @@ const AdminSystem = () => {
 
     try {
       setSaving(true);
+      const normalizedMinimumOrderValue = Number(minimumOrderValue);
+      if (!Number.isFinite(normalizedMinimumOrderValue) || normalizedMinimumOrderValue < 0) {
+        showError('Validation', 'Minimum order value must be a valid non-negative number.');
+        setSaving(false);
+        return;
+      }
+
       const response = await api.put('/admin/system/maintenance', {
         maintenanceMode,
         maintenanceMessage,
         vatEnabled,
+        minimumOrderValue: normalizedMinimumOrderValue,
       });
       const settings = response.data?.settings || {};
       setVatEnabled(settings.vatEnabled !== false);
       setConfiguredVatRatePercent(Number(settings.configuredVatRatePercent || settings.vatRatePercent || DEFAULT_VAT_RATE));
+      setMinimumOrderValue(Number(settings.minimumOrderValue ?? DEFAULT_MINIMUM_ORDER_VALUE));
       const businessTimeSettings = settings.businessTime || DEFAULT_BUSINESS_TIME;
       setBusinessTime(businessTimeSettings);
       setBusinessNowDisplay(formatBusinessNow(Number(businessTimeSettings.offsetMinutes || 120)));
@@ -237,6 +249,9 @@ const AdminSystem = () => {
             </div>
             <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600', marginTop: '0.2rem' }}>
               Emergency Sales Day: {emergencySalesDayOpen ? 'OPEN' : 'CLOSED'}
+            </div>
+            <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600', marginTop: '0.2rem' }}>
+              Checkout Minimum: MWK {Number(minimumOrderValue || 0).toLocaleString()}
             </div>
           </div>
           <div className="admin-mobile-filter-meta" style={{ textAlign: 'right', marginLeft: 'auto' }}>
@@ -332,6 +347,25 @@ const AdminSystem = () => {
               style={{ width: '100%', padding: '0.7rem 0.85rem', borderRadius: '8px', border: '1px solid #ddd', resize: 'vertical', minHeight: '42px' }}
               placeholder={DEFAULT_MESSAGE}
             />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.45rem', fontWeight: 600, color: '#333' }}>
+              Minimum Order Value (MWK)
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={minimumOrderValue}
+              onChange={(event) => setMinimumOrderValue(event.target.value)}
+              disabled={!canManageSystem}
+              style={{ width: '100%', padding: '0.7rem 0.85rem', borderRadius: '8px', border: '1px solid #ddd' }}
+              placeholder={String(DEFAULT_MINIMUM_ORDER_VALUE)}
+            />
+            <p style={{ margin: '0.45rem 0 0', color: '#64748b', fontSize: '0.85rem', lineHeight: 1.45 }}>
+              Minimum order value applies to cart subtotal only. Delivery fee is added after the minimum threshold is met.
+            </p>
           </div>
 
           {canManageSystem && (

@@ -210,6 +210,9 @@ model Order {
   userId          String
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   items           OrderItem[]
+  subtotalAmount  Float    @default(0) @map("subtotal_amount")
+  deliveryFeeAmount Float  @default(0) @map("delivery_fee_amount")
+  finalTotalAmount Float   @default(0) @map("final_total_amount")
   total           Float
   vatEnabled      Boolean  @default(true) @map("vat_enabled")
   vatRatePercent  Float    @default(16.5) @map("vat_rate_percent")

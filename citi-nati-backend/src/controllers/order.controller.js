@@ -8,6 +8,7 @@ const { isPaymentConfirmedInCache } = require('../utils/webhookCache');
 const { splitInclusiveVat } = require('../utils/vat');
 const { formatBusinessDateTimeLabel } = require('../utils/businessTime');
 const { validateDeliveryLocation } = require('../services/deliveryCoverage.service');
+const { getMinimumOrderValue } = require('../utils/checkoutRules');
 
 const prisma = new PrismaClient();
 
@@ -53,6 +54,10 @@ const createOrder = async (req, res) => {
 
     const canonicalDistrict = String(locationValidation?.zone?.district || district).trim();
     const canonicalArea = String(locationValidation?.zone?.area || area).trim();
+    const deliveryFeeAmount = Number(locationValidation?.zone?.deliveryFee ?? 0);
+    const normalizedDeliveryFee = Number.isFinite(deliveryFeeAmount) && deliveryFeeAmount > 0
+      ? Number(deliveryFeeAmount.toFixed(2))
+      : 0;
 
     // CHECK: Verify sales day is open
     const openSalesDay = await prisma.salesDay.findFirst({
@@ -116,13 +121,30 @@ const createOrder = async (req, res) => {
         subtotal += cartItem.quantity * cartItem.price;
       }
 
-      const totalsWithVat = await splitInclusiveVat(subtotal);
+      const cartItemsSubtotal = Number(subtotal.toFixed(2));
+      const minimumOrderValue = await getMinimumOrderValue(tx);
+
+      if (cartItemsSubtotal < minimumOrderValue) {
+        const remainingAmount = Number((minimumOrderValue - cartItemsSubtotal).toFixed(2));
+        const minimumError = new Error('MINIMUM_ORDER_NOT_MET');
+        minimumError.code = 'MINIMUM_ORDER_NOT_MET';
+        minimumError.minimumOrderValue = minimumOrderValue;
+        minimumError.currentSubtotal = cartItemsSubtotal;
+        minimumError.remainingAmount = remainingAmount;
+        throw minimumError;
+      }
+
+      const totalsWithVat = await splitInclusiveVat(cartItemsSubtotal);
+      const finalTotalAmount = Number((cartItemsSubtotal + normalizedDeliveryFee).toFixed(2));
 
       // Create Order with salesDayId
       const order = await tx.order.create({
         data: {
           userId,
-          total: totalsWithVat.gross,
+          subtotalAmount: cartItemsSubtotal,
+          deliveryFeeAmount: normalizedDeliveryFee,
+          finalTotalAmount,
+          total: finalTotalAmount,
           vatEnabled: totalsWithVat.vatEnabled,
           vatRatePercent: totalsWithVat.vatRatePercent,
           vatAmount: totalsWithVat.vatAmount,
@@ -169,6 +191,9 @@ const createOrder = async (req, res) => {
       order: {
         id: result.id,
         userId: result.userId,
+        subtotalAmount: result.subtotalAmount,
+        deliveryFeeAmount: result.deliveryFeeAmount,
+        finalTotalAmount: result.finalTotalAmount,
         total: result.total,
         status: result.status,
         paymentStatus: result.paymentStatus,
@@ -182,6 +207,16 @@ const createOrder = async (req, res) => {
       },
     });
   } catch (err) {
+    if (err.code === 'MINIMUM_ORDER_NOT_MET') {
+      return res.status(400).json({
+        code: 'MINIMUM_ORDER_NOT_MET',
+        minimumOrderValue: err.minimumOrderValue,
+        currentSubtotal: err.currentSubtotal,
+        remainingAmount: err.remainingAmount,
+        error: `The minimum order value for delivery is MWK ${Number(err.minimumOrderValue || 0).toLocaleString()}. Please add more items to continue.`,
+      });
+    }
+
     // Handle validation errors
     if (err.message === 'Cart is empty') {
       return res.status(400).json({

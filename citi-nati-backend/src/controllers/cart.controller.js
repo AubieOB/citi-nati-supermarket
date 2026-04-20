@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const { splitInclusiveVat } = require('../utils/vat');
+const { getMinimumOrderValue } = require('../utils/checkoutRules');
 
 const prisma = new PrismaClient();
 
@@ -132,18 +133,23 @@ const getCart = async (req, res) => {
     }));
 
     // Calculate VAT-aware totals so online checkout aligns with POS tax configuration.
-    const subtotal = formattedItems.reduce((sum, item) => sum + item.subtotal, 0);
-    const totalsWithVat = await splitInclusiveVat(subtotal);
+    const itemsSubtotal = formattedItems.reduce((sum, item) => sum + item.subtotal, 0);
+    const [totalsWithVat, minimumOrderValue] = await Promise.all([
+      splitInclusiveVat(itemsSubtotal),
+      getMinimumOrderValue(),
+    ]);
 
     return res.status(200).json({
       cartId: cart.id,
       items: formattedItems,
+      itemsSubtotal,
       subtotal: totalsWithVat.net,
       vat: totalsWithVat.vatAmount,
       vatEnabled: totalsWithVat.vatEnabled,
       vatRatePercent: totalsWithVat.vatRatePercent,
       configuredVatRatePercent: totalsWithVat.configuredVatRatePercent,
       total: totalsWithVat.gross,
+      minimumOrderValue,
     });
   } catch (err) {
     console.error('Error fetching cart:', err);

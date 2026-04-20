@@ -193,8 +193,13 @@ const OrderDetailsModal = ({ order, isOpen, onClose, drivers, onStatusUpdate, on
               <div>
                 <label style={{ fontWeight: '600', color: '#666' }}>Total</label>
                 <p style={{ margin: '0.5rem 0 0 0', fontSize: '1.2rem', color: '#5B4B8A', fontWeight: 'bold' }}>
-                  {formatMWK(order.total)}
+                  {formatMWK(order.finalTotalAmount ?? order.total)}
                 </p>
+                {(order.subtotalAmount != null || order.deliveryFeeAmount != null) && (
+                  <p style={{ margin: '0.35rem 0 0', fontSize: '0.8rem', color: '#64748b', lineHeight: 1.4 }}>
+                    Subtotal: {formatMWK(order.subtotalAmount ?? order.total)} | Delivery Fee: {formatMWK(order.deliveryFeeAmount ?? 0)}
+                  </p>
+                )}
               </div>
 
               <div>
