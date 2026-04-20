@@ -1,14 +1,19 @@
 const express = require('express');
 const { login, register, googleAuth, verifyEmail, resendVerificationCode, forgotPassword, resetPassword, logout, refreshSession, getSession } = require('../controllers/auth.controller');
 const { verifyTokenMiddleware } = require('../middleware/auth.middleware');
-const { authRateLimiter } = require('../middleware/rateLimit.middleware');
+const {
+	loginIpRateLimiter,
+	loginIdentityRateLimiter,
+	authRateLimiter,
+	refreshRateLimiter,
+} = require('../middleware/rateLimit.middleware');
 
 const router = express.Router();
 
 // Email/Password Authentication
-router.post('/login', authRateLimiter, login);
+router.post('/login', loginIpRateLimiter, loginIdentityRateLimiter, login);
 router.post('/logout', logout);
-router.post('/refresh', authRateLimiter, refreshSession);
+router.post('/refresh', refreshRateLimiter, refreshSession);
 router.get('/session', verifyTokenMiddleware, getSession);
 router.post('/register', authRateLimiter, register);
 
