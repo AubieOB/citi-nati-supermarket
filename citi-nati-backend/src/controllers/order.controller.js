@@ -7,6 +7,7 @@ const { sendDriverAssignedEmail, sendDeliveryStatusEmail, sendRefundNotification
 const { isPaymentConfirmedInCache } = require('../utils/webhookCache');
 const { splitInclusiveVat } = require('../utils/vat');
 const { formatBusinessDateTimeLabel } = require('../utils/businessTime');
+const { validateDeliveryLocation } = require('../services/deliveryCoverage.service');
 
 const prisma = new PrismaClient();
 
@@ -16,12 +17,37 @@ const createOrder = async (req, res) => {
     const userId = req.user.userId;
 
     // Accept from request body
-    const { deliveryAddress, houseNumber, phone, latitude, longitude } = req.body;
+    const { deliveryAddress, houseNumber, phone, district, area, latitude, longitude } = req.body;
 
     // Validate required fields
-    if (!deliveryAddress || !houseNumber || !phone) {
+    if (!deliveryAddress || !houseNumber || !phone || !district || !area) {
       return res.status(400).json({
-        error: 'Validation failed: deliveryAddress, houseNumber, and phone are required',
+        error: 'Validation failed: deliveryAddress, houseNumber, phone, district, and area are required',
+      });
+    }
+
+    const parsedLatitude = latitude === '' || latitude == null ? null : Number(latitude);
+    const parsedLongitude = longitude === '' || longitude == null ? null : Number(longitude);
+
+    if (parsedLatitude != null && !Number.isFinite(parsedLatitude)) {
+      return res.status(400).json({ error: 'Latitude must be a valid number when provided' });
+    }
+
+    if (parsedLongitude != null && !Number.isFinite(parsedLongitude)) {
+      return res.status(400).json({ error: 'Longitude must be a valid number when provided' });
+    }
+
+    const locationValidation = await validateDeliveryLocation({
+      district,
+      area,
+      latitude: parsedLatitude,
+      longitude: parsedLongitude,
+    });
+
+    if (!locationValidation.isValid) {
+      return res.status(400).json({
+        error: locationValidation.message,
+        code: locationValidation.code,
       });
     }
 
@@ -100,8 +126,10 @@ const createOrder = async (req, res) => {
           deliveryAddress,
           houseNumber,
           phone,
-          latitude: latitude ? parseFloat(latitude) : null,
-          longitude: longitude ? parseFloat(longitude) : null,
+          district: String(district).trim(),
+          area: String(area).trim(),
+          latitude: parsedLatitude,
+          longitude: parsedLongitude,
           status: 'PENDING_PAYMENT',
           paymentStatus: 'PENDING',
           salesDayId: openSalesDay.id
@@ -143,6 +171,8 @@ const createOrder = async (req, res) => {
         paymentStatus: result.paymentStatus,
         deliveryAddress: result.deliveryAddress,
         houseNumber: result.houseNumber,
+        district: result.district,
+        area: result.area,
         latitude: result.latitude,
         longitude: result.longitude,
         createdAt: result.createdAt,

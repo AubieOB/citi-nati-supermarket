@@ -6,8 +6,10 @@
  * - deliveryAddress (required)
  * - houseNumber (required)
  * - phone (required)
- * - latitude (required)
- * - longitude (required)
+ * - district (required)
+ * - area (required)
+ * - latitude (optional)
+ * - longitude (optional)
  */
 
 /**
@@ -45,20 +47,24 @@ export const validateOrderCreate = (formData) => {
     errors.phone = 'Phone number must not exceed 20 characters';
   }
 
-  // latitude validation (required)
-  if (!formData.latitude || formData.latitude === '') {
-    errors.latitude = 'Latitude is required';
-  } else {
+  if (!formData.district || formData.district.trim() === '') {
+    errors.district = 'District is required';
+  }
+
+  if (!formData.area || formData.area.trim() === '') {
+    errors.area = 'Area is required';
+  }
+
+  // latitude validation (optional)
+  if (formData.latitude !== undefined && formData.latitude !== null && formData.latitude !== '') {
     const lat = parseFloat(formData.latitude);
     if (isNaN(lat) || lat < -90 || lat > 90) {
       errors.latitude = 'Latitude must be between -90 and 90';
     }
   }
 
-  // longitude validation (required)
-  if (!formData.longitude || formData.longitude === '') {
-    errors.longitude = 'Longitude is required';
-  } else {
+  // longitude validation (optional)
+  if (formData.longitude !== undefined && formData.longitude !== null && formData.longitude !== '') {
     const lon = parseFloat(formData.longitude);
     if (isNaN(lon) || lon < -180 || lon > 180) {
       errors.longitude = 'Longitude must be between -180 and 180';
@@ -82,8 +88,10 @@ export const sanitizeOrderData = (formData) => {
     deliveryAddress: formData.deliveryAddress?.trim() || '',
     houseNumber: formData.houseNumber?.trim() || '',
     phone: formData.phone?.trim() || '',
-    latitude: parseFloat(formData.latitude),
-    longitude: parseFloat(formData.longitude),
+    district: formData.district?.trim() || '',
+    area: formData.area?.trim() || '',
+    latitude: formData.latitude === '' || formData.latitude == null ? null : parseFloat(formData.latitude),
+    longitude: formData.longitude === '' || formData.longitude == null ? null : parseFloat(formData.longitude),
   };
 
   return sanitized;

@@ -22,6 +22,7 @@ const AdminPOSSyncMonitor = React.lazy(() => import('./AdminPOSSyncMonitor.jsx')
 const SupportDashboard = React.lazy(() => import('./SupportDashboard.jsx'));
 const AdminQuotations = React.lazy(() => import('../../components/admin/AdminQuotations.jsx'));
 const AdminBusinessOperations = React.lazy(() => import('../../components/admin/AdminBusinessOperations.jsx'));
+const AdminDeliveryCoverage = React.lazy(() => import('../../components/admin/AdminDeliveryCoverage.jsx'));
 
 import { useOrderUpdates } from '../../hooks/useOrderUpdates.js';
 import { getSpeechAlertsEnabled, setSpeechAlertsEnabled } from '../../utils/notifications.js';
@@ -67,6 +68,7 @@ const SIDEBAR_TABS = [
   { id: 'pos-sync-monitor', label: 'POS Sync Monitor', icon: 'fa-chart-line', scope: 'physical-store', permission: PERMISSION_KEYS.ADMIN_POS_SYNC_MANAGE },
   { id: 'cashiers', label: 'Emergency Cashiers', icon: 'fa-user-tag', scope: 'physical-store', permission: PERMISSION_KEYS.ADMIN_CASHIERS_MANAGE },
   { id: 'business-operations', label: 'Business Operations', icon: 'fa-briefcase', scope: 'business', permission: PERMISSION_KEYS.BUSINESS_OPERATIONS_ACCESS },
+  { id: 'delivery-coverage', label: 'Delivery Coverage', icon: 'fa-location-dot', scope: 'administration', permission: PERMISSION_KEYS.ADMIN_SYSTEM_MANAGE },
   { id: 'system', label: 'System', icon: 'fa-cogs', scope: 'administration', permission: PERMISSION_KEYS.ADMIN_SYSTEM_MANAGE },
   { id: 'security', label: 'Security', icon: 'fa-key', scope: 'administration', permission: PERMISSION_KEYS.ADMIN_SECURITY_MANAGE },
 ];
@@ -1243,6 +1245,7 @@ const AdminDashboard = () => {
                 {activeTab === 'users' && <AdminUsers />}
                 {activeTab === 'sales' && <AdminSales selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
                 {activeTab === 'business-operations' && <AdminBusinessOperations />}
+                {activeTab === 'delivery-coverage' && <AdminDeliveryCoverage />}
                 {activeTab === 'refunds' && <AdminRefunds />}
                 {activeTab === 'support' && <SupportDashboard />}
                 {activeTab === 'drivers' && <AdminDrivers />}

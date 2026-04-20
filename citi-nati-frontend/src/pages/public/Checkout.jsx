@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import Container from '../../components/ui/Container.jsx';
@@ -34,9 +34,14 @@ const CheckoutContent = () => {
     deliveryAddress: '',
     houseNumber: '',
     phone: '',
+    district: '',
+    area: '',
     latitude: '',
     longitude: '',
   });
+
+  const [deliveryZoneOptions, setDeliveryZoneOptions] = useState([]);
+  const [zonesLoading, setZonesLoading] = useState(false);
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -76,6 +81,42 @@ const CheckoutContent = () => {
 
     fetchCart();
   }, []);
+
+  useEffect(() => {
+    const fetchDeliveryZoneOptions = async () => {
+      try {
+        setZonesLoading(true);
+        const response = await api.get('/delivery-zones/options');
+        setDeliveryZoneOptions(Array.isArray(response.data?.zones) ? response.data.zones : []);
+      } catch (err) {
+        console.error('Error fetching delivery zones:', err);
+        setErrors((prev) => ({
+          ...prev,
+          form: err.response?.data?.error || 'Unable to load delivery areas. Please try again.',
+        }));
+      } finally {
+        setZonesLoading(false);
+      }
+    };
+
+    fetchDeliveryZoneOptions();
+  }, []);
+
+  const districtOptions = useMemo(
+    () => deliveryZoneOptions.map((entry) => entry.district).filter(Boolean),
+    [deliveryZoneOptions]
+  );
+
+  const selectedDistrictAreas = useMemo(() => {
+    if (!formData.district) return [];
+    const districtEntry = deliveryZoneOptions.find((entry) => entry.district === formData.district);
+    return Array.isArray(districtEntry?.areas) ? districtEntry.areas : [];
+  }, [deliveryZoneOptions, formData.district]);
+
+  const selectedAreaOption = useMemo(
+    () => selectedDistrictAreas.find((entry) => entry.area === formData.area) || null,
+    [selectedDistrictAreas, formData.area]
+  );
 
   // Validate stock availability
   const validateStockAvailability = async (cartItems) => {
@@ -147,6 +188,7 @@ const CheckoutContent = () => {
     setFormData(prev => ({
       ...prev,
       [name]: value,
+      ...(name === 'district' ? { area: '' } : {}),
     }));
     // Clear error for this field when user starts typing
     if (errors[name]) {
@@ -236,7 +278,14 @@ const CheckoutContent = () => {
 
     } catch (err) {
       console.error('Error during checkout:', err);
-      const errorMessage = err.response?.data?.error || 'Failed to process order';
+      const backendCode = err.response?.data?.code;
+      let errorMessage = err.response?.data?.error || 'Failed to process order';
+
+      if (backendCode === 'UNSUPPORTED_AREA') {
+        errorMessage = 'Sorry, we currently do not deliver to your selected area.';
+      } else if (backendCode === 'OUTSIDE_COVERAGE_RADIUS') {
+        errorMessage = 'Your location is outside our delivery coverage. Please choose a supported area.';
+      }
       
       if (err.response?.status === 401) {
         navigate('/login');
@@ -252,6 +301,7 @@ const CheckoutContent = () => {
   const isPlaceOrderDisabled = 
     isSubmitting || 
     cartLoading ||
+    zonesLoading ||
     isValidatingStock ||
     outOfStockItems.length > 0 ||
     !cart || 
@@ -455,10 +505,63 @@ const CheckoutContent = () => {
                 </p>
               </div>
 
+              <div className="form__group">
+                <label className="form__label">
+                  District <span style={{ color: '#dc3545' }}>*</span>
+                </label>
+                <select
+                  className="form__input"
+                  name="district"
+                  value={formData.district}
+                  onChange={handleChange}
+                  disabled={isSubmitting || orderCreated !== null || zonesLoading}
+                  style={{ borderColor: errors.district ? '#dc3545' : undefined }}
+                >
+                  <option value="">Select district</option>
+                  {districtOptions.map((district) => (
+                    <option key={district} value={district}>{district}</option>
+                  ))}
+                </select>
+                {errors.district && (
+                  <span style={{ color: '#dc3545', fontSize: '0.85rem' }}>
+                    {errors.district}
+                  </span>
+                )}
+              </div>
+
+              <div className="form__group">
+                <label className="form__label">
+                  Area <span style={{ color: '#dc3545' }}>*</span>
+                </label>
+                <select
+                  className="form__input"
+                  name="area"
+                  value={formData.area}
+                  onChange={handleChange}
+                  disabled={isSubmitting || orderCreated !== null || zonesLoading || !formData.district}
+                  style={{ borderColor: errors.area ? '#dc3545' : undefined }}
+                >
+                  <option value="">Select area</option>
+                  {selectedDistrictAreas.map((entry) => (
+                    <option key={`${entry.district}-${entry.area}`} value={entry.area}>{entry.area}</option>
+                  ))}
+                </select>
+                {errors.area && (
+                  <span style={{ color: '#dc3545', fontSize: '0.85rem' }}>
+                    {errors.area}
+                  </span>
+                )}
+                {selectedAreaOption?.deliveryFee != null && (
+                  <p style={{ fontSize: '0.8rem', color: '#2D8659', margin: '0.35rem 0 0' }}>
+                    Estimated delivery fee for this area: {formatMWK(selectedAreaOption.deliveryFee)}
+                  </p>
+                )}
+              </div>
+
               {/* Geolocation Section */}
               <div style={{ marginBottom: '1.5rem', paddingBottom: '1.5rem', borderBottom: '1px solid #eee' }}>
                 <h3 style={{ marginBottom: '1rem', fontSize: '1rem', color: '#666' }}>
-                  Location <span style={{ color: '#dc3545' }}>*</span>
+                  Location (Optional)
                 </h3>
                 
                 <Button
@@ -485,7 +588,7 @@ const CheckoutContent = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   {/* Latitude */}
                   <div className="form__group">
-                    <label className="form__label">Latitude <span style={{ color: '#dc3545' }}>*</span></label>
+                    <label className="form__label">Latitude</label>
                     <input
                       type="number"
                       className="form__input"
@@ -508,7 +611,7 @@ const CheckoutContent = () => {
 
                   {/* Longitude */}
                   <div className="form__group">
-                    <label className="form__label">Longitude <span style={{ color: '#dc3545' }}>*</span></label>
+                    <label className="form__label">Longitude</label>
                     <input
                       type="number"
                       className="form__input"

@@ -25,9 +25,11 @@ const supportRoutes = require('./routes/support.routes');
 const posCommandsRoutes = require('./routes/posCommands.routes');
 const adminEmergencySalesRoutes = require('./routes/admin.emergency-sales.routes');
 const adminQuotationsRoutes = require('./routes/admin.quotations.routes');
+const adminDeliveryZonesRoutes = require('./routes/admin.delivery-zones.routes');
 const posSyncRoutes = require('./routes/posSync.routes');
 const cashierRoutes = require('./routes/cashier.routes');
 const businessOperationsRoutes = require('./routes/businessOperations.routes');
+const deliveryZonesRoutes = require('./routes/deliveryZones.routes');
 const logger = require('./utils/logger');
 const { adminRateLimiter, posAgentRateLimiter } = require('./middleware/rateLimit.middleware');
 
@@ -474,6 +476,12 @@ async function start() {
 
     // Business Operations reporting endpoints (admin-protected)
     app.use('/api/business-operations', adminRateLimiter, businessOperationsRoutes);
+
+    // Delivery coverage zones (public options for checkout)
+    app.use('/api/delivery-zones', deliveryZonesRoutes);
+
+    // Delivery coverage zones (admin management)
+    app.use('/api/admin/delivery-zones', adminRateLimiter, adminDeliveryZonesRoutes);
 
     // Ensure unknown API routes never return HTML to API clients
     app.use('/api', (req, res) => {
