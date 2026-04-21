@@ -1822,7 +1822,6 @@ const AdminProducts = ({
                 fontSize: '0.85rem',
                 borderBottom: activeSubTab === 'expiry-alerts' ? '3px solid #2D8659' : '3px solid transparent',
                 marginBottom: '-2px',
-                position: 'relative',
                 whiteSpace: 'nowrap',
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -1832,19 +1831,20 @@ const AdminProducts = ({
               <i className="fas fa-exclamation-triangle"></i>Expiry Alerts
               {expiryAlertCount > 0 && (
                 <span style={{
-                  position: 'absolute',
-                  top: '0.4rem',
-                  right: '0.3rem',
                   backgroundColor: '#f44336',
                   color: '#fff',
-                  borderRadius: '50%',
-                  width: '18px',
-                  height: '18px',
-                  display: 'flex',
+                  borderRadius: '999px',
+                  minWidth: '24px',
+                  height: '20px',
+                  padding: '0 0.45rem',
+                  display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '0.7rem',
-                  fontWeight: 'bold',
+                  fontSize: '0.72rem',
+                  fontWeight: '700',
+                  lineHeight: 1,
+                  marginLeft: '0.2rem',
+                  boxSizing: 'border-box',
                 }}>
                   {expiryAlertCount}
                 </span>
