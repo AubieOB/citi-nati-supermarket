@@ -444,11 +444,21 @@ async function fetchProductsFromPOS(locationCode) {
           CASE
             WHEN pa.ActivityLatestAt IS NOT NULL AND (ds.StockDate IS NULL OR pa.ActivityLatestAt > ds.StockDate)
               THEN pa.ActivityLatestAt
+            WHEN pa.ProductCode IS NOT NULL
+              AND pa.ActivityLatestAt IS NULL
+              AND ds.StockBalance IS NOT NULL
+              AND ISNULL(pa.ActivityStockBalance, 0) <> ISNULL(ds.StockBalance, 0)
+              THEN GETDATE()
             ELSE ds.StockDate
           END AS StockDate,
           ISNULL(
             CASE
               WHEN pa.ActivityLatestAt IS NOT NULL AND (ds.StockDate IS NULL OR pa.ActivityLatestAt > ds.StockDate)
+                THEN pa.ActivityStockBalance
+              WHEN pa.ProductCode IS NOT NULL
+                AND pa.ActivityLatestAt IS NULL
+                AND ds.StockBalance IS NOT NULL
+                AND ISNULL(pa.ActivityStockBalance, 0) <> ISNULL(ds.StockBalance, 0)
                 THEN pa.ActivityStockBalance
               ELSE COALESCE(ds.StockBalance, pa.ActivityStockBalance)
             END,
@@ -456,6 +466,11 @@ async function fetchProductsFromPOS(locationCode) {
           ) AS QuantityAvailable,
           CASE
             WHEN pa.ActivityLatestAt IS NOT NULL AND (ds.StockDate IS NULL OR pa.ActivityLatestAt > ds.StockDate) THEN 'ProductActivityFresh'
+            WHEN pa.ProductCode IS NOT NULL
+              AND pa.ActivityLatestAt IS NULL
+              AND ds.StockBalance IS NOT NULL
+              AND ISNULL(pa.ActivityStockBalance, 0) <> ISNULL(ds.StockBalance, 0)
+              THEN 'ProductActivityDivergence'
             WHEN ds.StockBalance IS NOT NULL THEN 'DailyStockBalance'
             WHEN pa.ProductCode IS NOT NULL THEN 'ProductActivity'
             ELSE 'NoStockRow'
