@@ -35,8 +35,8 @@ import '../../styles/global.css';
 import '../../styles/admin-dashboard.css';
 
 const ADMIN_THEME_KEY = 'adminDashboardTheme';
-const ADMIN_PRODUCTS_SILENT_REFRESH_STALE_MS = 30000;
-const ADMIN_PRODUCTS_SILENT_REFRESH_INTERVAL_MS = 45000;
+const ADMIN_PRODUCTS_SILENT_REFRESH_STALE_MS = 120000;
+const ADMIN_PRODUCTS_SILENT_REFRESH_INTERVAL_MS = 180000;
 
 const ADMIN_DARK_BG = '#1e1e1e';
 const ADMIN_DARK_BORDER = '#333333';
@@ -546,16 +546,12 @@ const AdminDashboard = () => {
       }
     };
 
-    refreshIfStale();
-
     const intervalId = window.setInterval(refreshIfStale, ADMIN_PRODUCTS_SILENT_REFRESH_INTERVAL_MS);
-    window.addEventListener('focus', refreshIfStale);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       disposed = true;
       window.clearInterval(intervalId);
-      window.removeEventListener('focus', refreshIfStale);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [
