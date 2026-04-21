@@ -220,7 +220,7 @@ function requireAllFeatures(flagNames, moduleName) {
 }
 
 /** Send products to live server API endpoint - with batching for large datasets */
-async function sendProductsToLiveServer(products) {
+async function sendProductsToLiveServer(products, syncContext = {}) {
   try {
     if (!appConfig.backend.baseUrl) {
       console.error(`${BRANCH_TAG} [POS SYNC] ERROR: BACKEND_BASE_URL not configured`);
@@ -228,6 +228,22 @@ async function sendProductsToLiveServer(products) {
     }
 
     console.log(`${SYNC_LOG_PREFIX} Sending ${products.length} products to backend (batching)`);
+
+    const syncedLocations = Array.isArray(syncContext.syncLocations) && syncContext.syncLocations.length > 0
+      ? syncContext.syncLocations
+      : Array.from(new Set(products.map((product) => String(product.LocationCode || '').trim()).filter(Boolean)));
+    const overallLocationBreakdown = products.reduce((acc, product) => {
+      const key = String(product.LocationCode || 'UNKNOWN').trim() || 'UNKNOWN';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+
+    console.log(`${SYNC_LOG_PREFIX} stock resolution mode`, {
+      mode: 'LOCATION_SPECIFIC',
+      aggregationEnabled: false,
+      operationalLocations: syncedLocations,
+      batchLocationBreakdown: overallLocationBreakdown,
+    });
 
     // Batch size to avoid payload too large errors - reduced for faster processing
     const BATCH_SIZE = 100;
@@ -241,64 +257,95 @@ async function sendProductsToLiveServer(products) {
 
     let totalSynced = 0;
     let totalErrors = 0;
+    const MAX_BATCH_ATTEMPTS = 2;
 
     for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
       const batch = batches[batchIndex];
-      const syncMetadata = getSyncMetadata(appConfig);
-      console.log(`${SYNC_LOG_PREFIX} Sending products batch ${batchIndex + 1}/${batches.length} (${batch.length} rows)`);
+      const batchLocationBreakdown = batch.reduce((acc, product) => {
+        const key = String(product.LocationCode || 'UNKNOWN').trim() || 'UNKNOWN';
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      }, {});
+      const batchLocations = Object.keys(batchLocationBreakdown);
+      const syncMetadata = getSyncMetadata(appConfig, {
+        locationCode: batchLocations.length === 1 ? batchLocations[0] : null,
+        syncedLocations,
+        stockResolutionMode: 'LOCATION_SPECIFIC',
+        aggregationEnabled: false,
+        batchLocationBreakdown,
+      });
+      console.log(`${SYNC_LOG_PREFIX} Sending products batch ${batchIndex + 1}/${batches.length} (${batch.length} rows)`, {
+        batchLocationBreakdown,
+        attemptLimit: MAX_BATCH_ATTEMPTS,
+      });
 
-      try {
-        const response = await axios.post(
-          `${appConfig.backend.baseUrl}/api/products/pos-sync/push`,
-          {
-            products: batch.map(p => ({
-              sourceCode: p.ProductCode,
-              name: p.ProductName,
-              price: p.SellingPrice,
-              stock: p.QuantityAvailable,
-              stockSource: p.StockSource || null,
-              stockDate: p.StockDate ? (p.StockDate instanceof Date ? p.StockDate.toISOString() : p.StockDate) : null,
-              barcode: p.Barcode || '',
-              category: p.CategoryName || 'Uncategorized',
-              expiryDate: p.ExpiryDate ? (p.ExpiryDate instanceof Date ? p.ExpiryDate.toISOString() : p.ExpiryDate) : null,
-              expirySource: p.ExpirySource || null,
-              nearestExpiryDate: p.ExpiryDate ? (p.ExpiryDate instanceof Date ? p.ExpiryDate.toISOString() : p.ExpiryDate) : null,
-              expiryBatchCount: Number.isFinite(Number(p.ExpiryBatchCount)) ? Number(p.ExpiryBatchCount) : 0,
-              daysToExpiry: Number.isFinite(Number(p.DaysToExpiry)) ? Number(p.DaysToExpiry) : null,
-              expiryStatus: p.ExpiryStatus || null,
-              expiryBatches: Array.isArray(p.ExpiryBatches) ? p.ExpiryBatches : [],
-              branchCode: appConfig.branch.branchCode,
-              branchName: appConfig.branch.branchName,
-              locationCode: p.LocationCode || appConfig.posDb.locationCode,
-            })),
-            metadata: syncMetadata,
-          },
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              'x-pos-secret': appConfig.backend.apiToken,
-              'x-branch-code': appConfig.branch.branchCode,
-              'x-sync-source-code': appConfig.branch.syncSourceCode,
+      let batchCompleted = false;
+      for (let attempt = 1; attempt <= MAX_BATCH_ATTEMPTS; attempt++) {
+        try {
+          const response = await axios.post(
+            `${appConfig.backend.baseUrl}/api/products/pos-sync/push`,
+            {
+              products: batch.map(p => ({
+                sourceCode: p.ProductCode,
+                name: p.ProductName,
+                price: p.SellingPrice,
+                stock: p.QuantityAvailable,
+                stockSource: p.StockSource || null,
+                stockDate: p.StockDate ? (p.StockDate instanceof Date ? p.StockDate.toISOString() : p.StockDate) : null,
+                barcode: p.Barcode || '',
+                category: p.CategoryName || 'Uncategorized',
+                expiryDate: p.ExpiryDate ? (p.ExpiryDate instanceof Date ? p.ExpiryDate.toISOString() : p.ExpiryDate) : null,
+                expirySource: p.ExpirySource || null,
+                nearestExpiryDate: p.ExpiryDate ? (p.ExpiryDate instanceof Date ? p.ExpiryDate.toISOString() : p.ExpiryDate) : null,
+                expiryBatchCount: Number.isFinite(Number(p.ExpiryBatchCount)) ? Number(p.ExpiryBatchCount) : 0,
+                daysToExpiry: Number.isFinite(Number(p.DaysToExpiry)) ? Number(p.DaysToExpiry) : null,
+                expiryStatus: p.ExpiryStatus || null,
+                expiryBatches: Array.isArray(p.ExpiryBatches) ? p.ExpiryBatches : [],
+                branchCode: appConfig.branch.branchCode,
+                branchName: appConfig.branch.branchName,
+                locationCode: p.LocationCode || appConfig.posDb.locationCode,
+              })),
+              metadata: syncMetadata,
             },
-            timeout: 120000,
-          }
-        );
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'x-pos-secret': appConfig.backend.apiToken,
+                'x-branch-code': appConfig.branch.branchCode,
+                'x-sync-source-code': appConfig.branch.syncSourceCode,
+              },
+              timeout: 120000,
+            }
+          );
 
-        if (response.data.success) {
-          totalSynced += response.data.synced || batch.length;
-          console.log(`${SYNC_LOG_PREFIX} products synced (batch ${batchIndex + 1}/${batches.length})`);
-        }
-      } catch (batchError) {
-        totalErrors++;
+          if (response.data.success) {
+            totalSynced += response.data.synced || batch.length;
+            batchCompleted = true;
+            console.log(`${SYNC_LOG_PREFIX} products synced (batch ${batchIndex + 1}/${batches.length}, attempt ${attempt}/${MAX_BATCH_ATTEMPTS})`, {
+              batchLocationBreakdown,
+            });
+            break;
+          }
+        } catch (batchError) {
           const httpStatus = batchError && batchError.response ? batchError.response.status : null;
           const responseBody = batchError && batchError.response ? batchError.response.data : null;
-        console.error(`${SYNC_LOG_PREFIX} error (products batch ${batchIndex + 1}/${batches.length}):`, batchError.message);
-        if (httpStatus) {
-          console.error(`${SYNC_LOG_PREFIX} batch ${batchIndex + 1} HTTP status: ${httpStatus}`);
+          console.error(`${SYNC_LOG_PREFIX} error (products batch ${batchIndex + 1}/${batches.length}, attempt ${attempt}/${MAX_BATCH_ATTEMPTS}):`, batchError.message);
+          console.error(`${SYNC_LOG_PREFIX} batch ${batchIndex + 1} location breakdown:`, batchLocationBreakdown);
+          if (httpStatus) {
+            console.error(`${SYNC_LOG_PREFIX} batch ${batchIndex + 1} HTTP status: ${httpStatus}`);
+          }
+          if (responseBody) {
+            console.error(`${SYNC_LOG_PREFIX} batch ${batchIndex + 1} response body:`, JSON.stringify(responseBody).slice(0, 1000));
+          }
+
+          if (attempt === MAX_BATCH_ATTEMPTS) {
+            totalErrors++;
+          }
         }
-        if (responseBody) {
-          console.error(`${SYNC_LOG_PREFIX} batch ${batchIndex + 1} response body:`, JSON.stringify(responseBody).slice(0, 1000));
-        }
+      }
+
+      if (!batchCompleted) {
+        console.error(`${SYNC_LOG_PREFIX} batch ${batchIndex + 1}/${batches.length} failed after ${MAX_BATCH_ATTEMPTS} attempts`);
       }
     }
 
@@ -308,7 +355,12 @@ async function sendProductsToLiveServer(products) {
       batchesSent: batches.length,
       batchesFailed: totalErrors,
       totalSynced,
-      metadata: getSyncMetadata(appConfig),
+      metadata: getSyncMetadata(appConfig, {
+        locationCode: null,
+        syncedLocations,
+        stockResolutionMode: 'LOCATION_SPECIFIC',
+        aggregationEnabled: false,
+      }),
     };
 
     console.log(`${SYNC_LOG_PREFIX} products sync complete`, summary);
@@ -330,21 +382,13 @@ function rejectDirectWritebackInProduction(req, res, next) {
   });
 }
 
-/** Fetch products from POS with category information.
- * @param {string} locationCode - The operational location to tag products with and fetch prices for (e.g. 'BAR').
- * @param {string} [stockLocationCode] - The POS location to read stock quantities from. Defaults to locationCode.
- *   For Zomba, BAR/ST999 share physical inventory with SH, so pass the primary stock location (SH) here
- *   while locationCode targets BAR/ST999-specific prices.
- */
-async function fetchProductsFromPOS(locationCode, stockLocationCode) {
+/** Fetch products from POS with category information for a specific operational location. */
+async function fetchProductsFromPOS(locationCode) {
   try {
     if (!pool) await initializePool();
 
     // Use provided location code or fall back to environment
     const LOCATION_CODE = locationCode || appConfig.posDb.locationCode;
-    // Stock is read from the primary warehouse location (may differ from the operational location).
-    // e.g. for Zomba BAR/ST999, stock is tracked under SH in the POS stocks table.
-    const STOCK_LOCATION_CODE = stockLocationCode || LOCATION_CODE;
 
     const stockConfig = await resolveLiveStockSourceConfig();
     const query = stockConfig.hasLiveStockTables
@@ -357,7 +401,7 @@ async function fetchProductsFromPOS(locationCode, stockLocationCode) {
           ${stockConfig.movementDateExpr} AS LiveStockDate
         FROM POS.dbo.stockdetails sd
         INNER JOIN POS.dbo.stocks s ON sd.GRNNo = s.GRNNo
-        WHERE s.LocationCode = @StockLocationCode
+        WHERE s.LocationCode = @LocationCode
           AND sd.ProductCode IS NOT NULL
         GROUP BY sd.ProductCode, s.LocationCode
       ),
@@ -371,7 +415,7 @@ async function fetchProductsFromPOS(locationCode, stockLocationCode) {
             ORDER BY StockDate DESC
           ) AS rn
         FROM POS.dbo.DailyStockBalance
-        WHERE LocationCode = @StockLocationCode
+          WHERE LocationCode = @LocationCode
           AND CAST(StockDate AS date) <= CAST(GETDATE() AS date)
       )
       SELECT
@@ -393,7 +437,7 @@ async function fetchProductsFromPOS(locationCode, stockLocationCode) {
           END AS PriceSource
       FROM POS.dbo.productsmaster p
       LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
-      LEFT JOIN live_stock ls ON ls.ProductCode = p.ProductCode AND ls.LocationCode = @StockLocationCode
+      LEFT JOIN live_stock ls ON ls.ProductCode = p.ProductCode AND ls.LocationCode = @LocationCode
       LEFT JOIN latest_daily ds ON ds.ProductCode = p.ProductCode AND ds.rn = 1
       OUTER APPLY (
         SELECT TOP 1 FPrice
@@ -415,7 +459,7 @@ async function fetchProductsFromPOS(locationCode, stockLocationCode) {
             ORDER BY StockDate DESC
           ) AS rn
         FROM POS.dbo.DailyStockBalance
-        WHERE LocationCode = @StockLocationCode
+        WHERE LocationCode = @LocationCode
           AND CAST(StockDate AS date) <= CAST(GETDATE() AS date)
       )
       SELECT
@@ -445,14 +489,18 @@ async function fetchProductsFromPOS(locationCode, stockLocationCode) {
 
     const request = pool.request();
     request.input('LocationCode', sql.VarChar(10), LOCATION_CODE);
-    request.input('StockLocationCode', sql.VarChar(10), STOCK_LOCATION_CODE);
 
     // Log BEFORE query so BAR/ST999 fetch attempts are visible even if SQL throws
-    console.log(`${SYNC_LOG_PREFIX} [FETCH] querying POS for location: ${LOCATION_CODE} (stock from: ${STOCK_LOCATION_CODE}, mode: ${stockConfig.hasLiveStockTables ? 'StockDetailsLive+DailyFallback' : 'DailyStockBalance'})`);
+    console.log(`${SYNC_LOG_PREFIX} [FETCH] querying POS for location: ${LOCATION_CODE}`, {
+      stockReadLocations: [LOCATION_CODE],
+      aggregationMode: false,
+      stockResolutionMode: 'LOCATION_SPECIFIC',
+      stockSourceMode: stockConfig.hasLiveStockTables ? 'StockDetailsLive+DailyFallback' : 'DailyStockBalance',
+    });
 
     const result = await request.query(query);
 
-    console.log(`${SYNC_LOG_PREFIX} [FETCH] done — fetched ${result.recordset.length} products for location ${LOCATION_CODE} (stock sourced from ${STOCK_LOCATION_CODE})`);
+    console.log(`${SYNC_LOG_PREFIX} [FETCH] done — fetched ${result.recordset.length} products for location ${LOCATION_CODE}`);
     console.log(`${SYNC_LOG_PREFIX} price mode: PriceByLocation from ${LOCATION_CODE} only (no cross-location fallback)`);
 
     const stockSourceSummary = result.recordset.reduce((acc, row) => {
@@ -465,19 +513,18 @@ async function fetchProductsFromPOS(locationCode, stockLocationCode) {
       acc[key] = (acc[key] || 0) + 1;
       return acc;
     }, {});
-    // If all products are NoStockRow for this operational location, log a prominent warning
     const noStockCount = stockSourceSummary.NoStockRow || 0;
     const totalCount = result.recordset.length;
-    if (totalCount > 0 && noStockCount === totalCount && LOCATION_CODE !== STOCK_LOCATION_CODE) {
-      console.warn(`${SYNC_LOG_PREFIX} [STOCK WARNING] ALL ${totalCount} products for location '${LOCATION_CODE}' have NoStockRow even after reading stock from '${STOCK_LOCATION_CODE}'. ` +
-        `This likely means '${STOCK_LOCATION_CODE}' has no entries in stockdetails/stocks for these products. ` +
-        `Check that POS_PRIMARY_STOCK_LOCATION_CODE is set to the correct warehouse location.`);
-    } else if (totalCount > 0 && noStockCount > 0 && LOCATION_CODE !== STOCK_LOCATION_CODE) {
-      console.log(`${SYNC_LOG_PREFIX} [STOCK INFO] ${noStockCount}/${totalCount} products for '${LOCATION_CODE}' have NoStockRow (stock read from '${STOCK_LOCATION_CODE}')`);
+    if (totalCount > 0 && noStockCount === totalCount) {
+      console.warn(`${SYNC_LOG_PREFIX} [STOCK WARNING] ALL ${totalCount} products for location '${LOCATION_CODE}' resolved with NoStockRow`);
+    } else if (totalCount > 0 && noStockCount > 0) {
+      console.log(`${SYNC_LOG_PREFIX} [STOCK INFO] ${noStockCount}/${totalCount} products for '${LOCATION_CODE}' resolved with NoStockRow`);
     }
     console.log(`${SYNC_LOG_PREFIX} stock-source diagnostics`, {
       locationCode: LOCATION_CODE,
-      stockLocationCode: STOCK_LOCATION_CODE,
+      stockReadLocations: [LOCATION_CODE],
+      aggregationMode: false,
+      stockResolutionMode: 'LOCATION_SPECIFIC',
       sourceBreakdown: stockSourceSummary,
       priceSourceBreakdown: priceSourceSummary,
     });
@@ -582,18 +629,6 @@ function getOperationalSyncLocations() {
   }
 
   return [appConfig.posDb.locationCode];
-}
-
-/**
- * Returns the location code used as the stock source in POS SQL Server queries.
- * By default this is POS_LOCATION_CODE ('SH'), which is the main warehouse.
- * For Zomba, BAR and ST999 share physical inventory tracked under SH, so stock
- * is always read from SH regardless of which operational location is being synced.
- * Override via POS_PRIMARY_STOCK_LOCATION_CODE env var if needed.
- */
-function getPrimaryStockLocationCode() {
-  const override = String(process.env.POS_PRIMARY_STOCK_LOCATION_CODE || '').trim().toUpperCase();
-  return override || appConfig.posDb.locationCode;
 }
 
 function reconcileBatchesWithLiveStock(batches, liveStockQty) {
@@ -1038,23 +1073,31 @@ app.get('/pos-sync/products', validateApiKey, requireFeature('enableReportingSyn
       includedLocations: syncLocations,
       mode: appConfig.branch.branchCode === 'ZOMBA' ? 'CONFIGURED_ZOMBA_OPERATIONAL_LOCATIONS' : 'CONFIGURED_LOCATION_ONLY',
       stockSource: 'StockDetailsLive preferred, DailyStockBalance fallback',
+      stockResolutionMode: 'LOCATION_SPECIFIC',
+      aggregationEnabled: false,
     });
-    
-    const primaryStockLocationCode = getPrimaryStockLocationCode();
-    console.log(`[POS SYNC] stock will be read from primary warehouse location: ${primaryStockLocationCode}`);
 
     for (const locationCode of syncLocations) {
       try {
-        const locationProducts = await fetchProductsFromPOS(locationCode, primaryStockLocationCode);
-        console.log(`[POS SYNC] Fetched ${locationProducts.length} products from ${locationCode} (stock from ${primaryStockLocationCode})`);
+        const locationProducts = await fetchProductsFromPOS(locationCode);
+        console.log(`[POS SYNC] Fetched ${locationProducts.length} products from ${locationCode} (stock from ${locationCode})`);
         allProducts.push(...locationProducts);
       } catch (locationErr) {
         console.error(`[POS SYNC] Error fetching products from ${locationCode}:`, locationErr.message);
         // Continue with other locations even if one fails
       }
     }
-    
-    console.log(`[POS SYNC] Fetched ${allProducts.length} products from operational scope: ${syncLocations.join(', ')} (stock source: ${primaryStockLocationCode})`);
+
+    const locationBreakdown = allProducts.reduce((acc, product) => {
+      const key = String(product.LocationCode || 'UNKNOWN').trim() || 'UNKNOWN';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+
+    console.log(`[POS SYNC] Fetched ${allProducts.length} products from operational scope: ${syncLocations.join(', ')}`);
+    console.log('[POS SYNC] stock read locations', syncLocations);
+    console.log('[POS SYNC] aggregation mode: disabled');
+    console.log('[POS SYNC] location breakdown', locationBreakdown);
 
     if (!allProducts || allProducts.length === 0) {
       return res.json({
@@ -1066,7 +1109,7 @@ app.get('/pos-sync/products', validateApiKey, requireFeature('enableReportingSyn
     }
 
     // Send to live server
-    const syncResult = await sendProductsToLiveServer(allProducts);
+    const syncResult = await sendProductsToLiveServer(allProducts, { syncLocations });
 
     res.json({
       success: true,
@@ -1978,25 +2021,33 @@ async function autoSync() {
       includedLocations: syncLocations,
       mode: appConfig.branch.branchCode === 'ZOMBA' ? 'CONFIGURED_ZOMBA_OPERATIONAL_LOCATIONS' : 'CONFIGURED_LOCATION_ONLY',
       stockSource: 'StockDetailsLive preferred, DailyStockBalance fallback',
+      stockResolutionMode: 'LOCATION_SPECIFIC',
+      aggregationEnabled: false,
     });
-    
-    const primaryStockLocationCode = getPrimaryStockLocationCode();
-    console.log(`${BRANCH_TAG} [AUTO SYNC] stock will be read from primary warehouse location: ${primaryStockLocationCode}`);
 
     for (const locationCode of syncLocations) {
       try {
-        const locationProducts = await fetchProductsFromPOS(locationCode, primaryStockLocationCode);
-        console.log(`${BRANCH_TAG} [AUTO SYNC] Fetched ${locationProducts.length} products from ${locationCode} (stock from ${primaryStockLocationCode})`);
+        const locationProducts = await fetchProductsFromPOS(locationCode);
+        console.log(`${BRANCH_TAG} [AUTO SYNC] Fetched ${locationProducts.length} products from ${locationCode} (stock from ${locationCode})`);
         allProducts.push(...locationProducts);
       } catch (locationErr) {
         console.error(`${BRANCH_TAG} [AUTO SYNC] Error fetching products from ${locationCode}:`, locationErr.message);
         // Continue with other locations even if one fails
       }
     }
+
+    const autoSyncLocationBreakdown = allProducts.reduce((acc, product) => {
+      const key = String(product.LocationCode || 'UNKNOWN').trim() || 'UNKNOWN';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    console.log(`${BRANCH_TAG} [AUTO SYNC] stock read locations: ${syncLocations.join(', ')}`);
+    console.log(`${BRANCH_TAG} [AUTO SYNC] aggregation mode: disabled`);
+    console.log(`${BRANCH_TAG} [AUTO SYNC] location breakdown`, autoSyncLocationBreakdown);
     
     if (allProducts.length > 0) {
       console.log(`${BRANCH_TAG} [AUTO SYNC] Total: ${allProducts.length} products from operational scope (${syncLocations.join(', ')})`);
-      await sendProductsToLiveServer(allProducts);
+      await sendProductsToLiveServer(allProducts, { syncLocations });
     } else {
       console.log(`${BRANCH_TAG} [AUTO SYNC] No products found from any location`);
     }
