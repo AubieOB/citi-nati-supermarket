@@ -290,8 +290,8 @@ async function sendProductsToLiveServer(products) {
         }
       } catch (batchError) {
         totalErrors++;
-        const httpStatus = batchError.response?.status;
-        const responseBody = batchError.response?.data;
+          const httpStatus = batchError && batchError.response ? batchError.response.status : null;
+          const responseBody = batchError && batchError.response ? batchError.response.data : null;
         console.error(`${SYNC_LOG_PREFIX} error (products batch ${batchIndex + 1}/${batches.length}):`, batchError.message);
         if (httpStatus) {
           console.error(`${SYNC_LOG_PREFIX} batch ${batchIndex + 1} HTTP status: ${httpStatus}`);
