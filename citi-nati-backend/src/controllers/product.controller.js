@@ -2286,6 +2286,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
     const affectedLocations = new Set();
     const affectedSourceCodes = new Set();
     let stockChangedCount = 0;
+    let priceChangedCount = 0;
     let zombaIngestSamplesLogged = 0;
     let zombaResolvedSamplesLogged = 0;
     const zombaPersistedByLocation = {
@@ -2478,6 +2479,9 @@ const syncProductsFromPOSAgent = async (req, res) => {
         if (existingProduct && Number(existingProduct.stock || 0) !== Number(baseProductData.stock || 0)) {
           stockChangedCount += 1;
         }
+        if (existingProduct && Number(existingProduct.price || 0) !== Number(baseProductData.price || 0)) {
+          priceChangedCount += 1;
+        }
         if (branchCode === 'ZOMBA' && Object.prototype.hasOwnProperty.call(zombaPersistedByLocation, productLocationCode)) {
           zombaPersistedByLocation[productLocationCode] += 1;
         }
@@ -2555,6 +2559,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
           skipped,
           total: products.length,
           stockChangedCount,
+          priceChangedCount,
           branchCode,
           locationCode: payloadLocationCode || null,
           affectedLocations: affectedLocationsList,
@@ -2563,6 +2568,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
         });
         console.log(`${syncLogPrefix} emitted realtime update for ${synced} synced products`, {
           stockChangedCount,
+          priceChangedCount,
           affectedLocations: affectedLocationsList,
           affectedProductCodes: affectedProductCodeSample.length,
         });
@@ -2577,6 +2583,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
         locationCode: payloadLocationCode || null,
         synced,
         stockChangedCount,
+        priceChangedCount,
         affectedLocations: Array.from(affectedLocations.values()).filter(Boolean),
         affectedProductCodesSample: Array.from(affectedSourceCodes.values()).slice(0, 20),
       });

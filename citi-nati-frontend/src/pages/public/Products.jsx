@@ -583,7 +583,12 @@ const Products = () => {
       };
 
       const handlePOSSync = (syncData) => {
-        console.log('[PRODUCTS] 🔄 POS Sync triggered:', syncData);
+        console.log('[PRODUCTS] 🔄 POS Sync triggered:', {
+          synced: syncData?.synced,
+          stockChangedCount: syncData?.stockChangedCount,
+          priceChangedCount: syncData?.priceChangedCount,
+          affectedLocations: syncData?.affectedLocations,
+        });
         // Keep current UI stable and silently refresh current product page scope.
         void fetchProducts(false, { bypassCache: true, silent: true });
       };

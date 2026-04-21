@@ -667,6 +667,7 @@ const AdminDashboard = () => {
         console.log('[ADMIN PRODUCTS CACHE][POS_SYNC_EVENT]', {
           synced: payload.synced,
           stockChangedCount: payload.stockChangedCount,
+          priceChangedCount: payload.priceChangedCount,
           affectedLocations: locations,
           targetUiScopes: Array.from(targetUiScopes.values()),
         });
@@ -1002,7 +1003,7 @@ const AdminDashboard = () => {
               title={`Stock cache source: ${activeLocationStockFreshnessSource}`}
             >
               <i className={`fas ${activeLocationCachedProductsMeta.isLoading ? 'fa-sync-alt fa-spin' : 'fa-clock'}`} aria-hidden="true"></i>
-              <span>Stock refresh: {activeLocationStockFreshnessLabel}</span>
+              <span>Stock/Price refresh: {activeLocationStockFreshnessLabel}</span>
             </div>
           )}
         </div>
