@@ -316,7 +316,6 @@ const AdminDashboard = () => {
   const [adminProductsCacheByLocation, setAdminProductsCacheByLocation] = useState({});
   const [adminProductsCacheMetaByLocation, setAdminProductsCacheMetaByLocation] = useState({});
   const adminProductsFetchRequestRef = useRef({});
-  const realtimeProductsRefreshGuardRef = useRef({});
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') return 'light';
     return window.localStorage.getItem(ADMIN_THEME_KEY) === 'dark' ? 'dark' : 'light';
@@ -575,25 +574,6 @@ const AdminDashboard = () => {
           .map((scope) => scope.uiCode);
       };
 
-      const scheduleSilentRefresh = (uiScopeCode, reason) => {
-        if (!uiScopeCode) return;
-
-        const now = Date.now();
-        const lastRunAt = Number(realtimeProductsRefreshGuardRef.current[uiScopeCode] || 0);
-        if ((now - lastRunAt) < 8000) {
-          return;
-        }
-        realtimeProductsRefreshGuardRef.current[uiScopeCode] = now;
-
-        console.log('[ADMIN PRODUCTS CACHE][INVALIDATE]', {
-          uiScopeCode,
-          reason,
-          strategy: 'silent_background_refresh',
-        });
-
-        void preloadAdminProductsForLocation(uiScopeCode, { force: true, silent: true });
-      };
-
       const applyRealtimeProductPatch = (product, sourceEvent) => {
         const targetUiScopeCodes = resolveUiScopeCodesFromPosLocation(product?.locationCode);
         if (targetUiScopeCodes.length === 0) {
@@ -632,8 +612,6 @@ const AdminDashboard = () => {
           updateProductsCacheMeta(uiScopeCode, {
             lastRealtimeUpdateAt: Date.now(),
           });
-
-          scheduleSilentRefresh(uiScopeCode, `${sourceEvent}:targeted_patch`);
         }
       };
 
@@ -669,7 +647,9 @@ const AdminDashboard = () => {
         });
 
         targetUiScopes.forEach((uiScopeCode) => {
-          scheduleSilentRefresh(uiScopeCode, 'pos-products-synced');
+          updateProductsCacheMeta(uiScopeCode, {
+            lastRealtimeUpdateAt: Date.now(),
+          });
         });
       };
 
@@ -685,7 +665,7 @@ const AdminDashboard = () => {
     } catch (socketErr) {
       console.warn('[ADMIN PRODUCTS CACHE] socket listener setup failed:', socketErr.message);
     }
-  }, [preloadAdminProductsForLocation, selectedOperationalLocationCode, updateProductsCacheMeta]);
+  }, [selectedOperationalLocationCode, updateProductsCacheMeta]);
 
   /**
    * Handle real-time order updates (for refreshing orders list)
