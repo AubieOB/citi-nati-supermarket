@@ -2305,10 +2305,14 @@ const syncProductsFromPOSAgent = async (req, res) => {
         // Guard against legacy calculated/fallback payloads for Zomba operational stock.
         if (branchCode === 'ZOMBA' && stockSourceRaw) {
           const normalizedSource = stockSourceRaw.toLowerCase();
-          const allowedSource = normalizedSource.includes('dailystockbalance') || normalizedSource === 'nostockrow';
+          const allowedSource = normalizedSource.includes('dailystockbalance')
+            || normalizedSource.includes('stockdetailslive')
+            || normalizedSource.includes('stockdetailsreport')
+            || normalizedSource.includes('productactivity')
+            || normalizedSource === 'nostockrow';
           if (!allowedSource) {
             skipped++;
-            const rejection = `[ZOMBA STOCK][REJECTED] product=${sourceCode} stockDate=${stockDateRaw || 'NULL'} source=${stockSourceRaw} location=${productLocationCode || 'NULL'} stock=${Number(product.stock || 0)} reason=NON_DAILY_STOCK_SOURCE`;
+            const rejection = `[ZOMBA STOCK][REJECTED] product=${sourceCode} stockDate=${stockDateRaw || 'NULL'} source=${stockSourceRaw} location=${productLocationCode || 'NULL'} stock=${Number(product.stock || 0)} reason=UNSUPPORTED_STOCK_SOURCE`;
             errors.push(rejection);
             console.warn(rejection);
             continue;

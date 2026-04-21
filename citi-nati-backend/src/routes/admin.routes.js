@@ -359,7 +359,7 @@ router.get('/zomba-stock-trace', verifyTokenMiddleware, verifyAdmin, async (req,
       productCode,
       zombaOperationalRule: {
         locationCode: 'SH',
-        source: 'DailyStockBalance latest snapshot <= today (agent-enforced)',
+        source: 'StockDetailsLive preferred, DailyStockBalance fallback (agent-enforced)',
       },
       product: product || null,
       latestShBatchSyncMeta: latestShBatch || null,

@@ -56,6 +56,7 @@ let expiryBatchCache = null;
 let expiryBatchCachedAt = 0;
 const EXPIRY_BATCH_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const ZOMBA_OPERATIONAL_LOCATION_CODES = ['SH', 'BAR', 'ST999'];
+let liveStockSourceConfig = null;
 
 function normalizeOperationalLocationCode(code) {
   const normalized = String(code || '').trim().toUpperCase();
@@ -81,6 +82,65 @@ function parseOperationalLocationCodes(rawCodes) {
   }
 
   return resolved;
+}
+
+async function getTableColumns(tableName) {
+  const request = pool.request();
+  request.input('TableName', sql.VarChar(128), tableName);
+  const result = await request.query(`
+    SELECT COLUMN_NAME
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = 'dbo'
+      AND TABLE_NAME = @TableName
+    ORDER BY ORDINAL_POSITION
+  `);
+  return new Set((result.recordset || []).map((row) => String(row.COLUMN_NAME || '').trim()));
+}
+
+function pickFirst(columns, candidates) {
+  return candidates.find((column) => columns.has(column)) || null;
+}
+
+async function resolveLiveStockSourceConfig() {
+  if (liveStockSourceConfig) {
+    return liveStockSourceConfig;
+  }
+
+  const [stockDetailsColumns, stocksColumns] = await Promise.all([
+    getTableColumns('stockdetails'),
+    getTableColumns('stocks'),
+  ]);
+
+  const hasLiveStockTables = stockDetailsColumns.has('ProductCode')
+    && stockDetailsColumns.has('GRNNo')
+    && stockDetailsColumns.has('StockQty')
+    && stocksColumns.has('GRNNo')
+    && stocksColumns.has('LocationCode');
+
+  const movementDateColumn = pickFirst(stocksColumns, [
+    'GRNDate',
+    'GrnDate',
+    'ReceivedDate',
+    'StockDate',
+    'CreatedAt',
+    'CreatedOn',
+    'EntryDate',
+    'Date',
+  ]);
+
+  liveStockSourceConfig = {
+    hasLiveStockTables,
+    movementDateColumn,
+    movementDateExpr: movementDateColumn ? `MAX(CAST(s.${movementDateColumn} AS datetime))` : 'NULL',
+  };
+
+  console.log(`${SYNC_LOG_PREFIX} stock source configuration resolved`, {
+    hasLiveStockTables,
+    movementDateColumn: movementDateColumn || null,
+    preferredSource: hasLiveStockTables ? 'stockdetails+stocks' : 'DailyStockBalance',
+  });
+
+  return liveStockSourceConfig;
 }
 
 async function getCachedExpiryBatches() {
@@ -270,12 +330,65 @@ async function fetchProductsFromPOS(locationCode) {
     // Use provided location code or fall back to environment
     const LOCATION_CODE = locationCode || appConfig.posDb.locationCode;
 
-    // Operational stock source: ONLY DailyStockBalance for the given LocationCode.
-    // Use ROW_NUMBER() to get the single latest snapshot row per product.
-    // No fallback to Stocks, Stocks.StockQty, or ProductActivity — those can cause
-    // aggregation across sub-locations and inflate values vs POS stock-balance screen.
-    // For Zomba: LocationCode is selected from configured operational scopes (SH/BAR/ST999).
-    const query = `
+    const stockConfig = await resolveLiveStockSourceConfig();
+    const query = stockConfig.hasLiveStockTables
+      ? `
+      WITH live_stock AS (
+        SELECT
+          sd.ProductCode,
+          s.LocationCode,
+          SUM(ISNULL(sd.StockQty, 0) - ISNULL(sd.StockOut, 0)) AS LiveStockBalance,
+          ${stockConfig.movementDateExpr} AS LiveStockDate
+        FROM POS.dbo.stockdetails sd
+        INNER JOIN POS.dbo.stocks s ON sd.GRNNo = s.GRNNo
+        WHERE s.LocationCode = @LocationCode
+          AND sd.ProductCode IS NOT NULL
+        GROUP BY sd.ProductCode, s.LocationCode
+      ),
+      latest_daily AS (
+        SELECT
+          ProductCode,
+          StockDate,
+          StockBalance,
+          ROW_NUMBER() OVER (
+            PARTITION BY ProductCode
+            ORDER BY StockDate DESC
+          ) AS rn
+        FROM POS.dbo.DailyStockBalance
+        WHERE LocationCode = @LocationCode
+          AND CAST(StockDate AS date) <= CAST(GETDATE() AS date)
+      )
+      SELECT
+          p.ProductCode,
+          p.ProductName,
+          ISNULL(p.Barcode, '') AS Barcode,
+          ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
+          COALESCE(ls.LiveStockDate, ds.StockDate) AS StockDate,
+          ISNULL(COALESCE(ls.LiveStockBalance, ds.StockBalance), 0) AS QuantityAvailable,
+          CASE
+            WHEN ls.ProductCode IS NOT NULL THEN 'StockDetailsLive'
+            WHEN ds.StockBalance IS NOT NULL THEN 'DailyStockBalance'
+            ELSE 'NoStockRow'
+          END AS StockSource,
+          ISNULL(lp.FPrice, 0) AS SellingPrice,
+          CASE
+            WHEN lp.FPrice IS NOT NULL THEN 'PriceByLocation'
+            ELSE 'NoPriceRow'
+          END AS PriceSource
+      FROM POS.dbo.productsmaster p
+      LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
+      LEFT JOIN live_stock ls ON ls.ProductCode = p.ProductCode AND ls.LocationCode = @LocationCode
+      LEFT JOIN latest_daily ds ON ds.ProductCode = p.ProductCode AND ds.rn = 1
+      OUTER APPLY (
+        SELECT TOP 1 FPrice
+        FROM POS.dbo.productprices
+        WHERE ProductCode = p.ProductCode
+          AND LocationCode = @LocationCode
+        ORDER BY PriceID DESC
+      ) lp
+      ORDER BY p.ProductCode
+    `
+      : `
       WITH latest_stock AS (
         SELECT
           ProductCode,
@@ -302,8 +415,12 @@ async function fetchProductsFromPOS(locationCode) {
           END AS StockSource,
           ISNULL(
               (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC),
-              (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode ORDER BY PriceID DESC)
-          ) AS SellingPrice
+              0
+          ) AS SellingPrice,
+          CASE
+            WHEN (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC) IS NOT NULL THEN 'PriceByLocation'
+            ELSE 'NoPriceRow'
+          END AS PriceSource
       FROM POS.dbo.productsmaster p
       LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
       LEFT JOIN latest_stock ls ON ls.ProductCode = p.ProductCode AND ls.rn = 1
@@ -317,17 +434,23 @@ async function fetchProductsFromPOS(locationCode) {
     console.log(`${SYNC_LOG_PREFIX} [DEBUG] selected location: ${LOCATION_CODE}`);
     console.log(`${SYNC_LOG_PREFIX} [DEBUG] locationCode used in query: ${LOCATION_CODE}`);
     console.log(`${SYNC_LOG_PREFIX} fetched ${result.recordset.length} products from location ${LOCATION_CODE}`);
-    console.log(`${SYNC_LOG_PREFIX} stock mode: DailyStockBalance latest snapshot via ROW_NUMBER() (SH-only, StockDate <= today, no Stocks/ProductActivity fallback)`);
-    console.log(`${SYNC_LOG_PREFIX} price mode: latest FPrice by PriceID DESC`);
+    console.log(`${SYNC_LOG_PREFIX} stock mode: ${stockConfig.hasLiveStockTables ? 'StockDetailsLive (stockdetails+stocks) with DailyStockBalance fallback' : 'DailyStockBalance latest snapshot fallback-only'}`);
+    console.log(`${SYNC_LOG_PREFIX} price mode: PriceByLocation only (no cross-location fallback)`);
 
     const stockSourceSummary = result.recordset.reduce((acc, row) => {
       const key = String(row.StockSource || 'Unknown');
       acc[key] = (acc[key] || 0) + 1;
       return acc;
     }, {});
+    const priceSourceSummary = result.recordset.reduce((acc, row) => {
+      const key = String(row.PriceSource || 'Unknown');
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
     console.log(`${SYNC_LOG_PREFIX} stock-source diagnostics`, {
       locationCode: LOCATION_CODE,
       sourceBreakdown: stockSourceSummary,
+      priceSourceBreakdown: priceSourceSummary,
     });
     
     // Debug log first 5 products (with location and stock source)
@@ -335,8 +458,19 @@ async function fetchProductsFromPOS(locationCode) {
       console.log(`${SYNC_LOG_PREFIX} [DEBUG] sample product stock (locationCode=${LOCATION_CODE}):`);
       result.recordset.slice(0, 5).forEach(product => {
         const stockDateLabel = product.StockDate ? new Date(product.StockDate).toISOString().slice(0, 10) : 'NULL';
-        console.log(`${SYNC_LOG_PREFIX} [DEBUG]  ${product.ProductCode}: ${product.ProductName} | stockDate=${stockDateLabel} | stock=${product.QuantityAvailable} | source=${product.StockSource} | price=${product.SellingPrice}`);
+        console.log(`${SYNC_LOG_PREFIX} [DEBUG]  ${product.ProductCode}: ${product.ProductName} | stockDate=${stockDateLabel} | stock=${product.QuantityAvailable} | source=${product.StockSource} | price=${product.SellingPrice} | priceSource=${product.PriceSource}`);
       });
+    }
+
+    const debugProductCode = String(process.env.STOCK_DEBUG_PRODUCT_CODE || '').trim();
+    if (debugProductCode) {
+      const matched = result.recordset.find((row) => String(row.ProductCode || '').trim() === debugProductCode);
+      if (matched) {
+        const stockDateLabel = matched.StockDate ? new Date(matched.StockDate).toISOString().slice(0, 19) : 'NULL';
+        console.log(`${SYNC_LOG_PREFIX} [STOCK DEBUG] productCode=${debugProductCode} locationCode=${LOCATION_CODE} stockSource=${matched.StockSource} stockDate=${stockDateLabel} resolvedStock=${Number(matched.QuantityAvailable || 0)} price=${Number(matched.SellingPrice || 0)} priceSource=${matched.PriceSource || 'Unknown'}`);
+      } else {
+        console.log(`${SYNC_LOG_PREFIX} [STOCK DEBUG] productCode=${debugProductCode} locationCode=${LOCATION_CODE} not found in fetched product set`);
+      }
     }
 
     // Enrich each product with active expiry batches from the same SQL Server.
@@ -862,7 +996,7 @@ app.get('/pos-sync/products', validateApiKey, requireFeature('enableReportingSyn
       configuredLocationCode: appConfig.posDb.locationCode,
       includedLocations: syncLocations,
       mode: appConfig.branch.branchCode === 'ZOMBA' ? 'CONFIGURED_ZOMBA_OPERATIONAL_LOCATIONS' : 'CONFIGURED_LOCATION_ONLY',
-      stockSource: 'DailyStockBalance latest snapshot only',
+      stockSource: 'StockDetailsLive preferred, DailyStockBalance fallback',
     });
     
     for (const locationCode of syncLocations) {
@@ -1110,51 +1244,28 @@ app.get('/pos-sync/stock-by-location', validateApiKey, async (req, res) => {
   try {
     if (!pool) await initializePool();
 
-    const LOCATION_CODE = 'SH';
+    const requestedLocationCode = normalizeOperationalLocationCode(req.query.locationCode || appConfig.posDb.locationCode || 'SH');
+    const LOCATION_CODE = requestedLocationCode || 'SH';
+    const rows = await fetchProductsFromPOS(LOCATION_CODE);
+    const normalizedRows = rows.map((row) => ({
+      ProductCode: row.ProductCode,
+      ProductName: row.ProductName,
+      LocationCode: row.LocationCode || LOCATION_CODE,
+      AvailableStock: Number(row.QuantityAvailable || 0),
+      StockDate: row.StockDate || null,
+      StockSource: row.StockSource || 'Unknown',
+    }));
 
-    const query = `
-      WITH latest_sh_stock AS (
-        SELECT
-          ProductCode,
-          LocationCode,
-          StockDate,
-          StockBalance,
-          ROW_NUMBER() OVER (
-            PARTITION BY ProductCode
-            ORDER BY StockDate DESC
-          ) AS rn
-        FROM POS.dbo.DailyStockBalance
-        WHERE LocationCode = @LocationCode
-          AND CAST(StockDate AS date) <= CAST(GETDATE() AS date)
-      )
-      SELECT 
-          s.ProductCode,
-          p.ProductName,
-          s.LocationCode,
-          s.StockBalance AS AvailableStock,
-          s.StockDate,
-          'DailyStockBalance' AS StockSource
-      FROM latest_sh_stock s
-      INNER JOIN POS.dbo.productsmaster p 
-          ON s.ProductCode = p.ProductCode
-      WHERE s.rn = 1
-      ORDER BY s.ProductCode
-    `;
-
-    const request = pool.request();
-    request.input('LocationCode', sql.VarChar(10), LOCATION_CODE);
-    const result = await request.query(query);
-
-    console.log(`[/pos-sync/stock-by-location] Fetched stock for ${result.recordset.length} products at location ${LOCATION_CODE} using latest DailyStockBalance <= today`);
-    result.recordset.slice(0, 5).forEach((row) => {
+    console.log(`[/pos-sync/stock-by-location] Fetched stock for ${normalizedRows.length} products at location ${LOCATION_CODE} using live preferred source`);
+    normalizedRows.slice(0, 5).forEach((row) => {
       const stockDateLabel = row.StockDate ? new Date(row.StockDate).toISOString().slice(0, 10) : 'NULL';
-      console.log(`[ZOMBA STOCK] product=${row.ProductCode} source=DailyStockBalance location=${row.LocationCode} stockDate=${stockDateLabel} stock=${Number(row.AvailableStock || 0)}`);
+      console.log(`[ZOMBA STOCK] product=${row.ProductCode} source=${row.StockSource} location=${row.LocationCode} stockDate=${stockDateLabel} stock=${Number(row.AvailableStock || 0)}`);
     });
 
     res.json({
       success: true,
-      count: result.recordset.length,
-      data: result.recordset,
+      count: normalizedRows.length,
+      data: normalizedRows,
     });
   } catch (err) {
     console.error('Database query error:', err.message);
@@ -1822,7 +1933,7 @@ async function autoSync() {
       configuredLocationCode: appConfig.posDb.locationCode,
       includedLocations: syncLocations,
       mode: appConfig.branch.branchCode === 'ZOMBA' ? 'CONFIGURED_ZOMBA_OPERATIONAL_LOCATIONS' : 'CONFIGURED_LOCATION_ONLY',
-      stockSource: 'DailyStockBalance latest snapshot only',
+      stockSource: 'StockDetailsLive preferred, DailyStockBalance fallback',
     });
     
     for (const locationCode of syncLocations) {
