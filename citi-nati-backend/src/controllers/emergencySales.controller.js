@@ -189,26 +189,8 @@ function writeLookupCache(locationCode, query, products) {
   });
 }
 
-function sumLocationBatchStockByProductCode(batchRows = []) {
-  const summed = new Map();
-
-  for (const row of batchRows) {
-    const code = String(row?.productCode || '').trim();
-    const qty = Number(row?.remainingQty ?? 0);
-    if (!code || !Number.isFinite(qty)) continue;
-    summed.set(code, Number((summed.get(code) || 0) + qty));
-  }
-
-  return summed;
-}
-
-async function resolveLocationSpecificStockBySourceCode(db, products = [], locationCode) {
+async function resolveLocationSpecificStockBySourceCode(_db, products = [], _locationCode) {
   const resolved = new Map();
-  const sourceCodes = Array.from(new Set(
-    (products || [])
-      .map((row) => String(row?.sourceCode || '').trim())
-      .filter(Boolean)
-  ));
 
   for (const product of products || []) {
     const sourceCode = String(product?.sourceCode || '').trim();
@@ -216,35 +198,6 @@ async function resolveLocationSpecificStockBySourceCode(db, products = [], locat
     resolved.set(sourceCode, {
       stock: Number(product?.stock || 0),
       source: 'LocationSpecificPersistedProductStock',
-    });
-  }
-
-  if (!locationCode || sourceCodes.length === 0) {
-    return resolved;
-  }
-
-  const batchRows = await db.productExpiryBatch.findMany({
-    where: {
-      productCode: { in: sourceCodes },
-      locationCode: {
-        equals: locationCode,
-        mode: 'insensitive',
-      },
-      remainingQty: {
-        gt: 0,
-      },
-    },
-    select: {
-      productCode: true,
-      remainingQty: true,
-    },
-  });
-
-  const locationBatchTotals = sumLocationBatchStockByProductCode(batchRows);
-  for (const [sourceCode, totalQty] of locationBatchTotals.entries()) {
-    resolved.set(sourceCode, {
-      stock: Math.max(0, Number(totalQty || 0)),
-      source: 'LocationSpecificExpiryBatchStock',
     });
   }
 
@@ -738,7 +691,7 @@ async function lookupEmergencyProducts(req, res) {
         resolvedStockLocation: locationCode,
         branchCode: 'ZOMBA',
         locationCode,
-        querySource: 'LocationSpecificStockResolver',
+        querySource: 'LocationSpecificPersistedProductStock',
       });
     } else {
       scopedProductCodes = await resolveLocationScopedProductCodes(locationCode);
@@ -935,28 +888,7 @@ async function createEmergencySale(req, res) {
         return Promise.reject(new Error('One or more products do not exist'));
       }
 
-      const locationSpecificStockBySourceCode = await resolveLocationSpecificStockBySourceCode(
-        tx,
-        products,
-        locationCode
-      );
-
       const productsById = new Map(products.map((product) => [product.id, product]));
-      const locationSpecificStockByProductId = new Map(
-        products.map((product) => {
-          const sourceCode = String(product?.sourceCode || '').trim();
-          const stockResolution = sourceCode
-            ? locationSpecificStockBySourceCode.get(sourceCode)
-            : null;
-          return [
-            product.id,
-            {
-              stock: Number(stockResolution?.stock ?? product.stock ?? 0),
-              source: stockResolution?.source || 'LocationSpecificPersistedProductStock',
-            },
-          ];
-        })
-      );
       const itemRows = [];
       let subtotal = 0;
 
@@ -970,18 +902,10 @@ async function createEmergencySale(req, res) {
           return Promise.reject(new Error(`Product ${product.name} has no POS product code and cannot be synced`));
         }
 
-        const stockResolution = locationSpecificStockByProductId.get(product.id) || {
-          stock: Number(product.stock || 0),
-          source: 'LocationSpecificPersistedProductStock',
-        };
-        const effectiveStock = resolveEffectiveStock({
-          ...product,
-          stock: Number(stockResolution.stock || 0),
-          posStock: Number(stockResolution.stock || 0),
-        });
+        const effectiveStock = resolveEffectiveStock(product);
         if (effectiveStock < qty) {
           return Promise.reject(
-            new Error(`Insufficient stock for ${product.name}. Available ${effectiveStock}, requested ${qty} (source: ${stockResolution.source})`)
+            new Error(`Insufficient stock for ${product.name}. Available ${effectiveStock}, requested ${qty}`)
           );
         }
 
@@ -1072,11 +996,7 @@ async function createEmergencySale(req, res) {
       const updatedProducts = [];
       for (const line of itemRows) {
         const product = line.product;
-        const stockResolution = locationSpecificStockByProductId.get(line.productId) || {
-          stock: Number(product.stock || 0),
-          source: 'LocationSpecificPersistedProductStock',
-        };
-        const nextPosStock = Math.max(0, Number(stockResolution.stock || 0) - line.qty);
+        const nextPosStock = Math.max(0, Number(product.stock || 0) - line.qty);
         const nextOverrideStock = product.overrideActive && product.overrideStock != null
           ? Math.max(0, Number(product.overrideStock || 0) - line.qty)
           : null;
@@ -1090,51 +1010,6 @@ async function createEmergencySale(req, res) {
         });
 
         updatedProducts.push(updatedProduct);
-
-        if (line.product?.sourceCode) {
-          const productCode = String(line.product.sourceCode).trim();
-          if (productCode) {
-            let remainingToConsume = Number(line.qty || 0);
-            const batches = await tx.productExpiryBatch.findMany({
-              where: {
-                productCode,
-                locationCode: {
-                  equals: locationCode,
-                  mode: 'insensitive',
-                },
-                remainingQty: {
-                  gt: 0,
-                },
-              },
-              orderBy: [
-                { expiryDate: 'asc' },
-                { updatedAt: 'asc' },
-                { id: 'asc' },
-              ],
-              select: {
-                id: true,
-                remainingQty: true,
-              },
-            });
-
-            for (const batch of batches) {
-              if (remainingToConsume <= 0) break;
-              const currentQty = Number(batch.remainingQty || 0);
-              if (!Number.isFinite(currentQty) || currentQty <= 0) continue;
-              const consumed = Math.min(currentQty, remainingToConsume);
-              const nextQty = Math.max(0, currentQty - consumed);
-
-              await tx.productExpiryBatch.update({
-                where: { id: batch.id },
-                data: {
-                  remainingQty: nextQty,
-                },
-              });
-
-              remainingToConsume -= consumed;
-            }
-          }
-        }
       }
 
       const fullSale = await tx.emergencySale.findUnique({
