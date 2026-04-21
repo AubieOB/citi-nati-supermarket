@@ -813,9 +813,9 @@ const Products = () => {
           maxWidth: '1200px',
           width: '100%',
           display: 'flex',
-          gap: '0.75rem',
+          gap: window.innerWidth > 768 ? '2rem' : '0.75rem',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: window.innerWidth > 768 ? 'space-between' : 'flex-start',
           flexWrap: 'nowrap'
         }}>
           {/* LEFT SECTION - Filters */}
@@ -823,7 +823,7 @@ const Products = () => {
             display: 'flex',
             gap: '0.75rem',
             alignItems: 'center',
-            flex: '1 1 auto',
+            flex: window.innerWidth > 768 ? '0 1 auto' : '1 1 auto',
             minWidth: 0
           }}>
             {/* SEARCH BAR */}
@@ -925,8 +925,8 @@ const Products = () => {
               display: 'flex',
               gap: '0.5rem',
               alignItems: 'center',
-              flex: 'none',
-              marginLeft: '1rem'
+              flex: '0 1 auto',
+              marginLeft: 'auto'
             }}>
               {/* Home Button */}
               <button
