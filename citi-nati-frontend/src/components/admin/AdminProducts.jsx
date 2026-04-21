@@ -419,7 +419,11 @@ const AdminProducts = ({
     setIsManualRefreshing(true);
     try {
       if (activeSubTab === 'expiry-alerts') {
-        await fetchPosExpiryAlerts();
+        if (typeof onRefreshProductsCache === 'function') {
+          await onRefreshProductsCache();
+        } else {
+          await fetchProducts();
+        }
       } else {
         if (typeof onRefreshProductsCache === 'function') {
           await onRefreshProductsCache();
@@ -472,15 +476,16 @@ const AdminProducts = ({
 
   useEffect(() => {
     if (activeSubTab === 'expiry-alerts') {
+      const hasSharedProducts = products.length > 0 || Boolean(cachedProductsMeta?.lastLoadedAt);
       const isFresh = posExpiryFetchedAtRef.current > 0
         && (Date.now() - posExpiryFetchedAtRef.current) < POS_ALERTS_CLIENT_CACHE_TTL_MS;
       const hasLocalData = posExpiryItems.length > 0;
 
-      if (!hasLocalData || !isFresh) {
+      if (!hasSharedProducts && (!hasLocalData || !isFresh)) {
         fetchPosExpiryAlerts();
       }
     }
-  }, [activeSubTab, posExpiryItems.length]);
+  }, [activeSubTab, cachedProductsMeta?.lastLoadedAt, posExpiryItems.length, products.length]);
 
   useEffect(() => {
     voiceEnabledRef.current = isVoiceSearchEnabled;
@@ -839,7 +844,10 @@ const AdminProducts = ({
       }));
   }, [products]);
 
-  const expiryAlerts = posExpiryError ? fallbackExpiryAlerts : posExpiryItems;
+  const shouldUseCachedExpiryAlerts = fallbackExpiryAlerts.length > 0 || Boolean(cachedProductsMeta?.lastLoadedAt);
+  const expiryAlerts = shouldUseCachedExpiryAlerts
+    ? fallbackExpiryAlerts
+    : (posExpiryError ? fallbackExpiryAlerts : posExpiryItems);
 
   // Memoize expensive alert card grouping/processing
   const expiryAlertCards = useMemo(() => {
