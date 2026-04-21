@@ -999,11 +999,17 @@ const AdminDashboard = () => {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.35rem',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                minHeight: '30px',
               }}
               title={`Stock cache source: ${activeLocationStockFreshnessSource}`}
             >
               <i className={`fas ${activeLocationCachedProductsMeta.isLoading ? 'fa-sync-alt fa-spin' : 'fa-clock'}`} aria-hidden="true"></i>
-              <span>Stock/Price refresh: {activeLocationStockFreshnessLabel}</span>
+              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                Stock/Price: {activeLocationStockFreshnessLabel}
+              </span>
             </div>
           )}
         </div>
