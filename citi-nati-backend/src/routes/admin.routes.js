@@ -1441,6 +1441,18 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
       }
     }
 
+    const servedAtIso = new Date().toISOString();
+    res.set('x-stock-data-source', 'db-live');
+    res.set('x-stock-served-at', servedAtIso);
+    console.log('[ADMIN POS][FRESHNESS]', {
+      endpoint: '/api/admin/pos-products',
+      locationCode: normalizedLocationCode || null,
+      source: 'db-live',
+      servedAt: servedAtIso,
+      rowCount: products.length,
+      total,
+    });
+
     res.json({
       success: true,
       products,

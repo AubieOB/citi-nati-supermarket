@@ -1372,6 +1372,18 @@ const getProducts = async (req, res) => {
       formatProduct(product, req, false)
     );
 
+    const servedAtIso = new Date().toISOString();
+    res.set('x-stock-data-source', 'db-live');
+    res.set('x-stock-served-at', servedAtIso);
+    console.log('[PRODUCTS][FRESHNESS]', {
+      endpoint: '/api/products',
+      locationCode: normalizedLocationCode || null,
+      source: 'db-live',
+      servedAt: servedAtIso,
+      rowCount: products.length,
+      total,
+    });
+
     // Return response with pagination metadata
     return res.status(200).json({
       products: productsWithFormatted,
@@ -2271,6 +2283,9 @@ const syncProductsFromPOSAgent = async (req, res) => {
     let synced = 0;
     let skipped = 0;
     const errors = [];
+    const affectedLocations = new Set();
+    const affectedSourceCodes = new Set();
+    let stockChangedCount = 0;
     let zombaIngestSamplesLogged = 0;
     let zombaResolvedSamplesLogged = 0;
     const zombaPersistedByLocation = {
@@ -2458,6 +2473,11 @@ const syncProductsFromPOSAgent = async (req, res) => {
         }
 
         synced++;
+        affectedLocations.add(productLocationCode || payloadLocationCode || 'UNKNOWN');
+        affectedSourceCodes.add(sourceCode);
+        if (existingProduct && Number(existingProduct.stock || 0) !== Number(baseProductData.stock || 0)) {
+          stockChangedCount += 1;
+        }
         if (branchCode === 'ZOMBA' && Object.prototype.hasOwnProperty.call(zombaPersistedByLocation, productLocationCode)) {
           zombaPersistedByLocation[productLocationCode] += 1;
         }
@@ -2527,16 +2547,39 @@ const syncProductsFromPOSAgent = async (req, res) => {
     // Emit real-time update to all connected clients
     if (synced > 0 && global.io) {
       try {
+        const affectedLocationsList = Array.from(affectedLocations.values()).filter(Boolean);
+        const affectedProductCodeSample = Array.from(affectedSourceCodes.values()).slice(0, 50);
+
         global.io.emit('pos-products-synced', {
           synced,
           skipped,
           total: products.length,
+          stockChangedCount,
+          branchCode,
+          locationCode: payloadLocationCode || null,
+          affectedLocations: affectedLocationsList,
+          affectedProductCodeSample,
           timestamp: new Date().toISOString(),
         });
-        console.log(`${syncLogPrefix} emitted realtime update for ${synced} synced products`);
+        console.log(`${syncLogPrefix} emitted realtime update for ${synced} synced products`, {
+          stockChangedCount,
+          affectedLocations: affectedLocationsList,
+          affectedProductCodes: affectedProductCodeSample.length,
+        });
       } catch (ioErr) {
         console.warn(`${syncLogPrefix} realtime emit warning:`, ioErr.message);
       }
+    }
+
+    if (synced > 0) {
+      console.log('[POS AGENT PUSH][FRESHNESS]', {
+        branchCode,
+        locationCode: payloadLocationCode || null,
+        synced,
+        stockChangedCount,
+        affectedLocations: Array.from(affectedLocations.values()).filter(Boolean),
+        affectedProductCodesSample: Array.from(affectedSourceCodes.values()).slice(0, 20),
+      });
     }
 
     console.log(`${syncLogPrefix} Sync complete - Synced: ${synced}, Skipped: ${skipped}`);

@@ -27,6 +27,7 @@ const AdminDeliveryCoverage = React.lazy(() => import('../../components/admin/Ad
 import { useOrderUpdates } from '../../hooks/useOrderUpdates.js';
 import { getSpeechAlertsEnabled, setSpeechAlertsEnabled } from '../../utils/notifications.js';
 import api from '../../utils/api.js';
+import { getSocket } from '../../utils/socket.js';
 import { filterProductsForOperationalLocation, getOperationalScopeOptions, normalizeOperationalScopeCode, resolveOperationalScope } from '../../utils/operationalScope.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { PERMISSION_KEYS, hasPermission } from '../../utils/permissions.js';
@@ -105,7 +106,13 @@ const MOBILE_BLOCKED_MESSAGE_BY_TAB = {
   support: 'Support management is desktop-only on mobile.',
 };
 
-const ADMIN_PRODUCTS_AUTO_REFRESH_TAB_IDS = new Set([]);
+const ADMIN_PRODUCTS_AUTO_REFRESH_TAB_IDS = new Set([
+  'products',
+  'stocks',
+  'promotions',
+  'pos-management',
+  'emergency-sales',
+]);
 
 const extractColorToken = (value) => {
   if (!value || typeof value !== 'string') return null;
@@ -299,6 +306,7 @@ const AdminDashboard = () => {
   const [adminProductsCacheByLocation, setAdminProductsCacheByLocation] = useState({});
   const [adminProductsCacheMetaByLocation, setAdminProductsCacheMetaByLocation] = useState({});
   const adminProductsFetchRequestRef = useRef({});
+  const realtimeProductsRefreshGuardRef = useRef({});
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') return 'light';
     return window.localStorage.getItem(ADMIN_THEME_KEY) === 'dark' ? 'dark' : 'light';
@@ -543,6 +551,132 @@ const AdminDashboard = () => {
     selectedOperationalLocationCode,
     shouldAutoRefreshAdminProducts,
   ]);
+
+  React.useEffect(() => {
+    try {
+      const socket = getSocket();
+      if (!socket) {
+        return;
+      }
+
+      const resolveUiScopeCodesFromPosLocation = (locationCode) => {
+        const normalized = normalizeOperationalScopeCode(locationCode);
+        if (!normalized) return [];
+        return OPERATIONAL_SCOPES
+          .filter((scope) => normalizeOperationalScopeCode(scope.locationCode) === normalized)
+          .map((scope) => scope.uiCode);
+      };
+
+      const scheduleSilentRefresh = (uiScopeCode, reason) => {
+        if (!uiScopeCode) return;
+
+        const now = Date.now();
+        const lastRunAt = Number(realtimeProductsRefreshGuardRef.current[uiScopeCode] || 0);
+        if ((now - lastRunAt) < 8000) {
+          return;
+        }
+        realtimeProductsRefreshGuardRef.current[uiScopeCode] = now;
+
+        console.log('[ADMIN PRODUCTS CACHE][INVALIDATE]', {
+          uiScopeCode,
+          reason,
+          strategy: 'silent_background_refresh',
+        });
+
+        void preloadAdminProductsForLocation(uiScopeCode, { force: true });
+      };
+
+      const applyRealtimeProductPatch = (product, sourceEvent) => {
+        const targetUiScopeCodes = resolveUiScopeCodesFromPosLocation(product?.locationCode);
+        if (targetUiScopeCodes.length === 0) {
+          return;
+        }
+
+        for (const uiScopeCode of targetUiScopeCodes) {
+          setAdminProductsCacheByLocation((prev) => {
+            const list = Array.isArray(prev[uiScopeCode]) ? prev[uiScopeCode] : null;
+            if (!list || list.length === 0) {
+              return prev;
+            }
+
+            const updated = list.map((row) => {
+              const idMatches = product?.id && row?.id === product.id;
+              const sourceMatches = product?.sourceCode && row?.sourceCode && String(row.sourceCode) === String(product.sourceCode);
+              if (!idMatches && !sourceMatches) {
+                return row;
+              }
+
+              return {
+                ...row,
+                ...(Number.isFinite(Number(product?.stock)) ? { stock: Number(product.stock) } : {}),
+                ...(Number.isFinite(Number(product?.price)) ? { price: Number(product.price) } : {}),
+                ...(product?.name ? { name: product.name } : {}),
+                ...(product?.updatedAt ? { updatedAt: product.updatedAt } : {}),
+              };
+            });
+
+            return {
+              ...prev,
+              [uiScopeCode]: updated,
+            };
+          });
+
+          updateProductsCacheMeta(uiScopeCode, {
+            lastRealtimeUpdateAt: Date.now(),
+          });
+
+          scheduleSilentRefresh(uiScopeCode, `${sourceEvent}:targeted_patch`);
+        }
+      };
+
+      const handlePosProductUpdated = (payload) => {
+        applyRealtimeProductPatch(payload, 'pos-product-updated');
+      };
+
+      const handleProductUpdated = (payload) => {
+        applyRealtimeProductPatch(payload, 'product_updated');
+      };
+
+      const handlePosProductsSynced = (payload = {}) => {
+        const locations = Array.isArray(payload.affectedLocations)
+          ? payload.affectedLocations
+          : [];
+
+        const targetUiScopes = new Set();
+        locations.forEach((locationCode) => {
+          resolveUiScopeCodesFromPosLocation(locationCode).forEach((scopeCode) => targetUiScopes.add(scopeCode));
+        });
+
+        // Fallback to selected scope when payload misses per-location metadata.
+        if (targetUiScopes.size === 0) {
+          targetUiScopes.add(selectedOperationalLocationCode);
+        }
+
+        console.log('[ADMIN PRODUCTS CACHE][POS_SYNC_EVENT]', {
+          synced: payload.synced,
+          stockChangedCount: payload.stockChangedCount,
+          affectedLocations: locations,
+          targetUiScopes: Array.from(targetUiScopes.values()),
+        });
+
+        targetUiScopes.forEach((uiScopeCode) => {
+          scheduleSilentRefresh(uiScopeCode, 'pos-products-synced');
+        });
+      };
+
+      socket.on('pos-product-updated', handlePosProductUpdated);
+      socket.on('product_updated', handleProductUpdated);
+      socket.on('pos-products-synced', handlePosProductsSynced);
+
+      return () => {
+        socket.off('pos-product-updated', handlePosProductUpdated);
+        socket.off('product_updated', handleProductUpdated);
+        socket.off('pos-products-synced', handlePosProductsSynced);
+      };
+    } catch (socketErr) {
+      console.warn('[ADMIN PRODUCTS CACHE] socket listener setup failed:', socketErr.message);
+    }
+  }, [preloadAdminProductsForLocation, selectedOperationalLocationCode, updateProductsCacheMeta]);
 
   /**
    * Handle real-time order updates (for refreshing orders list)

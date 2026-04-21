@@ -56,6 +56,7 @@ let expiryBatchCache = null;
 let expiryBatchCachedAt = 0;
 const EXPIRY_BATCH_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const ZOMBA_OPERATIONAL_LOCATION_CODES = ['SH', 'BAR', 'ST999'];
+const PRODUCT_ACTIVITY_FRESHNESS_WINDOW_MINUTES = Number.parseInt(process.env.PRODUCT_ACTIVITY_FRESHNESS_WINDOW_MINUTES || '5', 10);
 let liveStockSourceConfig = null;
 
 function normalizeOperationalLocationCode(code) {
@@ -121,14 +122,31 @@ async function resolveLiveStockSourceConfig() {
     && productActivityColumns.has('QtyIn')
     && productActivityColumns.has('QtyOut');
 
+  const productActivityTimestampColumn = hasProductActivity
+    ? pickFirst(productActivityColumns, [
+      'ActivityDate',
+      'TransactionDate',
+      'TransDate',
+      'DocDate',
+      'VoucherDate',
+      'EntryDate',
+      'CreatedAt',
+      'CreatedOn',
+      'ModifiedAt',
+      'UpdatedAt',
+    ])
+    : null;
+
   liveStockSourceConfig = {
     hasDailyStockBalance,
     hasProductActivity,
+    productActivityTimestampColumn,
   };
 
   console.log(`${SYNC_LOG_PREFIX} stock source configuration resolved`, {
     hasDailyStockBalance,
     hasProductActivity,
+    productActivityTimestampColumn,
     preferredSource: hasDailyStockBalance
       ? 'DailyStockBalance'
       : (hasProductActivity ? 'ProductActivity' : 'Unavailable'),
@@ -385,6 +403,12 @@ async function fetchProductsFromPOS(locationCode) {
     const LOCATION_CODE = locationCode || appConfig.posDb.locationCode;
 
     const stockConfig = await resolveLiveStockSourceConfig();
+    const safeActivityTimestampColumn = stockConfig.productActivityTimestampColumn
+      ? String(stockConfig.productActivityTimestampColumn).replace(/[^A-Za-z0-9_]/g, '')
+      : null;
+    const productActivityTimestampExpr = safeActivityTimestampColumn
+      ? `MAX(TRY_CONVERT(datetime2, pa.[${safeActivityTimestampColumn}])) AS ActivityLatestAt`
+      : 'NULL AS ActivityLatestAt';
     const query = stockConfig.hasDailyStockBalance && stockConfig.hasProductActivity
       ? `
       WITH latest_daily AS (
@@ -406,7 +430,9 @@ async function fetchProductsFromPOS(locationCode) {
           ProductCode,
           LocationCode,
           SUM(ISNULL(QtyIn, 0) - ISNULL(QtyOut, 0)) AS ActivityStockBalance
+          ,${productActivityTimestampExpr}
         FROM POS.dbo.ProductActivity
+        AS pa
         WHERE LocationCode = @LocationCode
         GROUP BY ProductCode, LocationCode
       )
@@ -415,9 +441,21 @@ async function fetchProductsFromPOS(locationCode) {
           p.ProductName,
           ISNULL(p.Barcode, '') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
-          ds.StockDate,
-          ISNULL(COALESCE(ds.StockBalance, pa.ActivityStockBalance), 0) AS QuantityAvailable,
           CASE
+            WHEN pa.ActivityLatestAt IS NOT NULL AND (ds.StockDate IS NULL OR pa.ActivityLatestAt > ds.StockDate)
+              THEN pa.ActivityLatestAt
+            ELSE ds.StockDate
+          END AS StockDate,
+          ISNULL(
+            CASE
+              WHEN pa.ActivityLatestAt IS NOT NULL AND (ds.StockDate IS NULL OR pa.ActivityLatestAt > ds.StockDate)
+                THEN pa.ActivityStockBalance
+              ELSE COALESCE(ds.StockBalance, pa.ActivityStockBalance)
+            END,
+            0
+          ) AS QuantityAvailable,
+          CASE
+            WHEN pa.ActivityLatestAt IS NOT NULL AND (ds.StockDate IS NULL OR pa.ActivityLatestAt > ds.StockDate) THEN 'ProductActivityFresh'
             WHEN ds.StockBalance IS NOT NULL THEN 'DailyStockBalance'
             WHEN pa.ProductCode IS NOT NULL THEN 'ProductActivity'
             ELSE 'NoStockRow'
@@ -546,10 +584,12 @@ async function fetchProductsFromPOS(locationCode) {
       aggregationMode: false,
       stockResolutionMode: 'LOCATION_SPECIFIC',
       stockSourceMode: stockConfig.hasDailyStockBalance && stockConfig.hasProductActivity
-        ? 'DailyStockBalance+ProductActivityFallback'
+        ? 'DailyStockBalance+FreshProductActivityFallback'
         : (stockConfig.hasDailyStockBalance
           ? 'DailyStockBalance'
           : (stockConfig.hasProductActivity ? 'ProductActivity' : 'Unavailable')),
+      productActivityTimestampColumn: safeActivityTimestampColumn,
+      productActivityFreshnessWindowMinutes: PRODUCT_ACTIVITY_FRESHNESS_WINDOW_MINUTES,
     });
 
     const result = await request.query(query);
@@ -1126,7 +1166,7 @@ app.get('/pos-sync/products', validateApiKey, requireFeature('enableReportingSyn
       configuredLocationCode: appConfig.posDb.locationCode,
       includedLocations: syncLocations,
       mode: appConfig.branch.branchCode === 'ZOMBA' ? 'CONFIGURED_ZOMBA_OPERATIONAL_LOCATIONS' : 'CONFIGURED_LOCATION_ONLY',
-      stockSource: 'DailyStockBalance preferred, ProductActivity fallback',
+      stockSource: 'DailyStockBalance preferred, freshness-aware ProductActivity fallback',
       stockResolutionMode: 'LOCATION_SPECIFIC',
       aggregationEnabled: false,
     });
@@ -2074,7 +2114,7 @@ async function autoSync() {
       configuredLocationCode: appConfig.posDb.locationCode,
       includedLocations: syncLocations,
       mode: appConfig.branch.branchCode === 'ZOMBA' ? 'CONFIGURED_ZOMBA_OPERATIONAL_LOCATIONS' : 'CONFIGURED_LOCATION_ONLY',
-      stockSource: 'DailyStockBalance preferred, ProductActivity fallback',
+      stockSource: 'DailyStockBalance preferred, freshness-aware ProductActivity fallback',
       stockResolutionMode: 'LOCATION_SPECIFIC',
       aggregationEnabled: false,
     });

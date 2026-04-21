@@ -15,6 +15,7 @@ import { useModal } from '../../hooks/useModal.js';
 import '../../styles/global.css';
 
 const STOREFRONT_LOCATION_CODE = String(import.meta.env.VITE_STOREFRONT_LOCATION_CODE || 'BT').trim().toUpperCase();
+const PRODUCTS_CACHE_BACKGROUND_REFRESH_COOLDOWN_MS = 12000;
 
 /**
  * HELPER FUNCTIONS - Defined before component
@@ -67,6 +68,7 @@ const Products = () => {
   // Refs for predictive search with caching and cancellation
   const searchCacheRef = useRef(new Map()); // Cache previous search results
   const productsCacheRef = useRef(new Map()); // Cache product pages (key: "page_1_category_all")
+  const productsCacheRefreshTrackerRef = useRef(new Map()); // Background refresh cooldown by cache key
   const abortControllerRef = useRef(null); // Cancel previous requests
   const debounceTimerRef = useRef(null); // Debounce timer for product search
   const selectedCategoryRef = useRef(''); // Track selected category in socket handlers
@@ -166,16 +168,21 @@ const Products = () => {
    * isLoadMore=true → append products (Load More)
    * isLoadMore=false → replace products (reset on filter/search change)
    */
-  const fetchProducts = async (isLoadMore = false) => {
+  const fetchProducts = async (isLoadMore = false, options = {}) => {
+    const bypassCache = options?.bypassCache === true;
+    const silent = options?.silent === true;
+
     try {
       // Show loading state
       if (isLoadMore) {
         setIsLoadingMore(true);
-      } else {
+      } else if (!silent) {
         setLoading(true);
         setOffset(0); // Reset offset for new filters
       }
-      setError(null);
+      if (!silent) {
+        setError(null);
+      }
 
       // Calculate offset based on current products
       const currentOffset = isLoadMore ? offset + limit : 0;
@@ -184,13 +191,22 @@ const Products = () => {
       const cacheKey = `offset_${currentOffset}_category_${selectedCategory || 'all'}_sale_${onSaleOnly}`;
 
       // Check cache (only for initial loads, not Load More to ensure fresh data)
-      if (!isLoadMore && productsCacheRef.current.has(cacheKey)) {
+      if (!isLoadMore && !bypassCache && productsCacheRef.current.has(cacheKey)) {
         console.log(`[CACHE HIT] Loading from cache (offset: ${currentOffset})`);
         const cachedData = productsCacheRef.current.get(cacheKey);
         setProducts(cachedData.products);
         setHasMoreProducts(cachedData.hasMore);
         setOffset(currentOffset);
         setLoading(false);
+
+        const now = Date.now();
+        const lastRefreshAt = Number(productsCacheRefreshTrackerRef.current.get(cacheKey) || 0);
+        if ((now - lastRefreshAt) >= PRODUCTS_CACHE_BACKGROUND_REFRESH_COOLDOWN_MS) {
+          productsCacheRefreshTrackerRef.current.set(cacheKey, now);
+          console.log(`[CACHE SWR] Silent revalidate scheduled (offset: ${currentOffset})`);
+          void fetchProducts(false, { bypassCache: true, silent: true });
+        }
+
         return;
       }
 
@@ -221,7 +237,8 @@ const Products = () => {
       // Cache the data
       productsCacheRef.current.set(cacheKey, {
         products: visibleProducts,
-        hasMore: hasMore
+        hasMore: hasMore,
+        cachedAt: Date.now(),
       });
 
       // If Load More, append; otherwise replace
@@ -235,7 +252,7 @@ const Products = () => {
       setOffset(currentOffset);
 
       // Clear search when browsing
-      if (!isLoadMore) {
+      if (!isLoadMore && !silent) {
         setSearchInput('');
         searchCacheRef.current.clear();
       }
@@ -252,7 +269,9 @@ const Products = () => {
       }
     } finally {
       setIsLoadingMore(false);
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -565,8 +584,8 @@ const Products = () => {
 
       const handlePOSSync = (syncData) => {
         console.log('[PRODUCTS] 🔄 POS Sync triggered:', syncData);
-        // Individual product updates will arrive via 'pos-product-updated' events
-        // No need to refetch - updates happen in real-time as products sync
+        // Keep current UI stable and silently refresh current product page scope.
+        void fetchProducts(false, { bypassCache: true, silent: true });
       };
 
       // Listen for stock updates, product updates, promotion changes, and POS product updates
