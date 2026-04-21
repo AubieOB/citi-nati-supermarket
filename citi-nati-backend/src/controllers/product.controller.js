@@ -2525,6 +2525,9 @@ const syncProductsFromPOSAgent = async (req, res) => {
               price: completeProduct.price,
               stock: completeProduct.stock,
               category: completeProduct.category,
+              branchCode: completeProduct.branchCode || null,
+              locationCode: completeProduct.locationCode || null,
+              updatedAt: completeProduct.updatedAt || new Date().toISOString(),
             });
           } catch (ioErr) {
             console.warn('[POS AGENT PUSH] Socket emit failed:', ioErr.message);

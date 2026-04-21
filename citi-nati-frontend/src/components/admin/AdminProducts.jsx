@@ -81,6 +81,7 @@ const AdminProducts = ({
   const POS_ALERTS_CLIENT_CACHE_TTL_MS = 5 * 60 * 1000;
   const searchTimeoutRef = useRef(null);
   const fetchRequestIdRef = useRef(0);
+  const silentRefreshGuardRef = useRef(0);
   const recognitionRef = useRef(null);
   const voiceEnabledRef = useRef(false);
   const posExpiryFetchedAtRef = useRef(0);
@@ -623,19 +624,53 @@ const AdminProducts = ({
         );
       };
 
+      const scheduleSilentRefresh = () => {
+        if (typeof onRefreshProductsCache !== 'function') return;
+        const now = Date.now();
+        if ((now - silentRefreshGuardRef.current) < 8000) {
+          return;
+        }
+        silentRefreshGuardRef.current = now;
+        void onRefreshProductsCache();
+      };
+
+      const handlePosProductUpdated = (updatedProduct) => {
+        const updatedLocationCode = String(updatedProduct?.locationCode || '').trim().toUpperCase();
+        const currentLocationCode = String(selectedLocationCode || '').trim().toUpperCase();
+        if (updatedLocationCode && currentLocationCode && updatedLocationCode !== currentLocationCode) {
+          return;
+        }
+        scheduleSilentRefresh();
+      };
+
+      const handlePosProductsSynced = (payload = {}) => {
+        const affectedLocations = Array.isArray(payload?.affectedLocations)
+          ? payload.affectedLocations.map((value) => String(value || '').trim().toUpperCase()).filter(Boolean)
+          : [];
+        const currentLocationCode = String(selectedLocationCode || '').trim().toUpperCase();
+        if (affectedLocations.length > 0 && currentLocationCode && !affectedLocations.includes(currentLocationCode)) {
+          return;
+        }
+        scheduleSilentRefresh();
+      };
+
       // Listen for comprehensive product updates
       socket.on('product_updated', handleProductUpdate);
+      socket.on('pos-product-updated', handlePosProductUpdated);
+      socket.on('pos-products-synced', handlePosProductsSynced);
       console.log('[AdminProducts] 🔌 Socket listener attached for product_updated events');
 
       // Cleanup: remove listener on component unmount
       return () => {
         socket.off('product_updated', handleProductUpdate);
+        socket.off('pos-product-updated', handlePosProductUpdated);
+        socket.off('pos-products-synced', handlePosProductsSynced);
         console.log('[AdminProducts] 🔌 Socket listener removed');
       };
     } catch (err) {
       console.warn('[AdminProducts] Error setting up product update listener:', err.message);
     }
-  }, [selectedLocationCode]);
+  }, [onRefreshProductsCache, selectedLocationCode]);
 
   const fetchProducts = async () => {
     const requestId = Date.now();
