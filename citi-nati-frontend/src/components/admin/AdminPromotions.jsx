@@ -52,6 +52,7 @@ const AdminPromotions = ({
   const effectiveBranchCode = selectedBranchCode || selectedScope.branchCode;
   const selectedLocationLabel = selectedScope.label;
   const scopeKey = `${effectiveBranchCode}|${effectiveLocationCode}`;
+  const isCatalogUpdating = Boolean(cachedProductsMeta?.isLoading || cachedProductsMeta?.isBackgroundLoading);
   const hasSharedProductsCache = Array.isArray(cachedProducts) && (
     cachedProducts.length > 0
     || Boolean(cachedProductsMeta?.lastLoadedAt)
@@ -774,6 +775,26 @@ const AdminPromotions = ({
           </div>
           <div style={{ color: textSecondary, fontSize: '0.85rem', fontWeight: '600' }}>
             Scope: {selectedLocationLabel} ({selectedLocationCode}) | Catalog: {allProducts.length} products | {categories.length} categories
+            {isCatalogUpdating ? (
+              <span
+                style={{
+                  marginLeft: '0.6rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  padding: '0.15rem 0.45rem',
+                  borderRadius: '999px',
+                  border: '1px solid #bfdbfe',
+                  backgroundColor: '#eff6ff',
+                  color: '#1d4ed8',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                }}
+              >
+                <i className="fas fa-sync-alt fa-spin" aria-hidden="true"></i>
+                catalog updating...
+              </span>
+            ) : null}
           </div>
         </div>
 
