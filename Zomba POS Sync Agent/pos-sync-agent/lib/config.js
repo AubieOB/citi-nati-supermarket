@@ -222,6 +222,7 @@ function validateStartupConfig(config) {
 
 function buildStartupSummary(config) {
   return {
+    developer: 'Aubrey Mkhulana',
     agentName: config.server.agentName,
     agentVersion: config.server.agentVersion,
     environment: config.server.environment,
