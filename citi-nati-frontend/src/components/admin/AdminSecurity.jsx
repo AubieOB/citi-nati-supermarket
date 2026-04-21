@@ -352,7 +352,7 @@ const AdminSecurity = () => {
     <div style={{ position: 'relative' }}>
       <div
         ref={filterBarRef}
-        className="admin-filter-bar-fixed admin-mobile-filter-bar"
+        className={`admin-filter-bar-fixed ${isMobileViewport ? 'admin-mobile-filter-bar' : ''}`}
         style={{
           position: 'fixed',
           top: `${filterBarLayout.top}px`,
@@ -368,24 +368,24 @@ const AdminSecurity = () => {
           padding: '0.75rem 1rem',
         }}
       >
-        <div className="admin-mobile-filter-top-row" style={{
-          display: 'flex',
+        <div className={isMobileViewport ? 'admin-mobile-filter-top-row' : ''} style={{
+          display: isMobileViewport ? 'flex' : 'grid',
+          gridTemplateColumns: isMobileViewport ? undefined : 'minmax(0, 1fr) auto',
           alignItems: 'center',
-          justifyContent: 'space-between',
           gap: '0.75rem',
           flexWrap: isMobileViewport ? 'wrap' : 'nowrap',
           marginBottom: '0.75rem',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
             <i className="fas fa-lock" style={{ fontSize: '1.2rem', color: '#5B4B8A' }}></i>
             <h1 style={{ margin: 0, color: '#333', fontSize: '1.15rem' }}>Security Management</h1>
           </div>
-          <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600', marginLeft: isMobileViewport ? 0 : 'auto', textAlign: isMobileViewport ? 'left' : 'right', whiteSpace: isMobileViewport ? 'normal' : 'nowrap' }}>
+          <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600', marginLeft: isMobileViewport ? 0 : 'auto', textAlign: isMobileViewport ? 'left' : 'right', whiteSpace: isMobileViewport ? 'normal' : 'nowrap', justifySelf: isMobileViewport ? 'stretch' : 'end' }}>
             Admin key: {hasAdminSecurityKey ? 'SET' : 'NOT SET'} | Driver key: {selectedDriverId ? (hasDriverSecurityKey ? 'SET' : 'NOT SET') : 'N/A'} | Cashier key: {selectedCashierId ? (hasCashierSecurityKey ? 'SET' : 'NOT SET') : 'N/A'}
           </div>
         </div>
 
-        <div className="admin-mobile-tabs-row" style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+        <div className={isMobileViewport ? 'admin-mobile-tabs-row' : ''} style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: isMobileViewport ? 'wrap' : 'nowrap', overflowX: isMobileViewport ? 'auto' : 'visible' }}>
           {securityTabs.map((tab) => (
             <button
               key={tab.id}

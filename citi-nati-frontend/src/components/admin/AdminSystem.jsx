@@ -216,7 +216,7 @@ const AdminSystem = () => {
     <div style={{ position: 'relative' }}>
       <div
         ref={filterBarRef}
-        className="admin-filter-bar-fixed admin-mobile-filter-bar"
+        className={`admin-filter-bar-fixed ${isMobileViewport ? 'admin-mobile-filter-bar' : ''}`}
         style={{
           position: 'fixed',
           top: `${filterBarLayout.top}px`,
@@ -232,23 +232,35 @@ const AdminSystem = () => {
           padding: '0.75rem 1rem',
         }}
       >
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobileViewport ? '1fr' : '1fr auto',
-          columnGap: '1.25rem',
-          rowGap: '0.5rem',
+        <div className={isMobileViewport ? 'admin-mobile-filter-top-row' : ''} style={{
+          display: isMobileViewport ? 'flex' : 'grid',
+          gridTemplateColumns: isMobileViewport ? undefined : 'minmax(0, 1fr) auto',
           alignItems: 'start',
+          gap: '0.75rem',
+          flexWrap: isMobileViewport ? 'wrap' : 'nowrap',
         }}>
-          <div className="admin-mobile-filter-top-row" style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.6rem',
-          }}>
-            <i className="fas fa-sliders-h" style={{ fontSize: '1.2rem', color: '#5B4B8A' }}></i>
-            <h1 style={{ margin: 0, color: '#333', fontSize: '1.15rem' }}>System Settings</h1>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <i className="fas fa-sliders-h" style={{ fontSize: '1.2rem', color: '#5B4B8A' }}></i>
+              <h1 style={{ margin: 0, color: '#333', fontSize: '1.15rem' }}>System Settings</h1>
+            </div>
+            <div className="admin-mobile-filter-controls" style={{ display: 'grid', gap: '0.2rem', marginTop: '0.5rem' }}>
+              <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600' }}>
+                Maintenance: {maintenanceMode ? 'ENABLED' : 'DISABLED'}
+              </div>
+              <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600', marginTop: '0.2rem' }}>
+                VAT: {vatEnabled ? `ENABLED (${configuredVatRatePercent.toFixed(1)}%)` : 'DISABLED'}
+              </div>
+              <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600', marginTop: '0.2rem' }}>
+                Emergency Sales Day: {emergencySalesDayOpen ? 'OPEN' : 'CLOSED'}
+              </div>
+              <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600', marginTop: '0.2rem' }}>
+                Checkout Minimum: MWK {Number(minimumOrderValue || 0).toLocaleString()}
+              </div>
+            </div>
           </div>
 
-          <div className="admin-mobile-filter-meta" style={{ textAlign: isMobileViewport ? 'left' : 'right', marginLeft: isMobileViewport ? 0 : 'auto', whiteSpace: isMobileViewport ? 'normal' : 'nowrap' }}>
+          <div className="admin-mobile-filter-meta" style={{ textAlign: isMobileViewport ? 'left' : 'right', marginLeft: isMobileViewport ? 0 : 'auto', whiteSpace: isMobileViewport ? 'normal' : 'nowrap', justifySelf: isMobileViewport ? 'stretch' : 'end' }}>
             <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600' }}>
               Business Timezone: {businessTime.timezoneName} ({businessTime.offsetLabel})
             </div>
@@ -256,23 +268,6 @@ const AdminSystem = () => {
               Current Business Time: {businessNowDisplay || formatBusinessNow(Number(businessTime.offsetMinutes || 120)) || 'N/A'}
             </div>
           </div>
-
-          <div className="admin-mobile-filter-controls" style={{ display: 'grid', gap: '0.2rem' }}>
-            <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600' }}>
-              Maintenance: {maintenanceMode ? 'ENABLED' : 'DISABLED'}
-            </div>
-            <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600', marginTop: '0.2rem' }}>
-              VAT: {vatEnabled ? `ENABLED (${configuredVatRatePercent.toFixed(1)}%)` : 'DISABLED'}
-            </div>
-            <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600', marginTop: '0.2rem' }}>
-              Emergency Sales Day: {emergencySalesDayOpen ? 'OPEN' : 'CLOSED'}
-            </div>
-            <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600', marginTop: '0.2rem' }}>
-              Checkout Minimum: MWK {Number(minimumOrderValue || 0).toLocaleString()}
-            </div>
-          </div>
-
-          {!isMobileViewport && <div aria-hidden="true" />}
         </div>
       </div>
 
