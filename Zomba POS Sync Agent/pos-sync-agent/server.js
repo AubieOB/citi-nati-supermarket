@@ -2134,15 +2134,28 @@ async function autoSync() {
       aggregationEnabled: false,
     });
 
-    for (const locationCode of syncLocations) {
-      try {
+    const locationResults = await Promise.allSettled(
+      syncLocations.map(async (locationCode) => {
         const locationProducts = await fetchProductsFromPOS(locationCode);
+        return {
+          locationCode,
+          products: locationProducts,
+        };
+      })
+    );
+
+    for (const locationResult of locationResults) {
+      if (locationResult.status === 'fulfilled') {
+        const { locationCode, products: locationProducts } = locationResult.value;
         console.log(`${BRANCH_TAG} [AUTO SYNC] Fetched ${locationProducts.length} products from ${locationCode} (stock from ${locationCode})`);
         allProducts.push(...locationProducts);
-      } catch (locationErr) {
-        console.error(`${BRANCH_TAG} [AUTO SYNC] Error fetching products from ${locationCode}:`, locationErr.message);
-        // Continue with other locations even if one fails
+        continue;
       }
+
+      const failedIndex = locationResults.indexOf(locationResult);
+      const failedLocationCode = syncLocations[failedIndex] || 'UNKNOWN';
+      console.error(`${BRANCH_TAG} [AUTO SYNC] Error fetching products from ${failedLocationCode}:`, locationResult.reason?.message || locationResult.reason);
+      // Continue with other locations even if one fails
     }
 
     const autoSyncLocationBreakdown = allProducts.reduce((acc, product) => {
@@ -2461,6 +2474,9 @@ async function startServer() {
         autoSyncInterval = setInterval(autoSync, SYNC_INTERVAL_MS);
         autoSyncStarted = true;
         console.log(`${BRANCH_TAG} [AUTO SYNC] ✅ Reporting sync enabled`);
+        autoSync().catch((error) => {
+          console.error(`${BRANCH_TAG} [AUTO SYNC] Initial sync failed:`, error.message);
+        });
       } else if (!appConfig.modules.reportingSync) {
         console.log(`${BRANCH_TAG} [AUTO SYNC] ⏸ Reporting sync disabled by ENABLE_REPORTING_SYNC=false`);
       }
