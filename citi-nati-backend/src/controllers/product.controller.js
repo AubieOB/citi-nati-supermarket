@@ -1252,6 +1252,8 @@ const getProducts = async (req, res) => {
           mode: 'insensitive',
         };
         where.sourceCode = { not: null };
+        // Only show products with a valid location-specific price row.
+        where.price = { gt: 0 };
 
         console.log('[PRODUCT QUERY]', {
           view: 'Products panel / stock panel',
