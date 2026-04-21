@@ -152,6 +152,12 @@ const AdminStocks = ({
       };
 
       const handleProductUpdate = (updatedProduct) => {
+        const updatedLocationCode = String(updatedProduct?.locationCode || '').trim().toUpperCase();
+        const currentLocationCode = String(selectedLocationCode || '').trim().toUpperCase();
+        if (updatedLocationCode && currentLocationCode && updatedLocationCode !== currentLocationCode) {
+          return;
+        }
+
         console.log('[AdminStocks] Product updated via Socket.io:', updatedProduct.id);
         
         // Update product details
@@ -267,7 +273,8 @@ const AdminStocks = ({
         : Math.max(0, selectedProduct.stock - stockQuantity);
 
       const response = await api.put(`/products/${selectedProduct.id}`, {
-        stock: newStock
+        stock: newStock,
+        locationCode: selectedLocationCode,
       });
 
       // Update local state (allProducts list used for filtering/pagination)

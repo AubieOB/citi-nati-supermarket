@@ -18,6 +18,8 @@ const {
 
 const prisma = new PrismaClient();
 const MIN_VALID_EXPIRY_DATE = new Date('2000-01-01T00:00:00.000Z');
+const POS_DEFAULT_LOCATION_CODE = normalizeOperationalScopeCode(process.env.POS_LOCATION_CODE) || 'BT';
+const POS_DEFAULT_PRICE_TYPE_CODE = process.env.POS_PRICE_TYPE_CODE || 'RT';
 
 const productImageMappingService = require('../services/productImageMapping.service');
 const { recordAuditLog } = require('../services/auditLog.service');
@@ -66,6 +68,54 @@ function normalizeProductNameInput(value) {
   }
 
   return { value: normalized, error: null };
+}
+
+function normalizeBranchCode(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  return normalized || null;
+}
+
+function getDefaultPosLocationCodeForBranch(branchCode, requestedLocationCode) {
+  if (branchCode === 'BLANTYRE') {
+    return 'BT';
+  }
+
+  if (branchCode === 'ZOMBA') {
+    const normalizedRequestedLocation = normalizeOperationalScopeCode(requestedLocationCode);
+    if (normalizedRequestedLocation && CORE_ZOMBA_LOCATION_CODES.includes(normalizedRequestedLocation)) {
+      return normalizedRequestedLocation;
+    }
+    return 'SH';
+  }
+
+  return normalizeOperationalScopeCode(requestedLocationCode) || POS_DEFAULT_LOCATION_CODE;
+}
+
+function resolveProductWritebackScope(req, product = null) {
+  const requestedLocationCode = normalizeOperationalScopeCode(
+    req.body?.locationCode
+    || req.query?.locationCode
+    || req.headers['x-location-code']
+    || product?.locationCode
+    || POS_DEFAULT_LOCATION_CODE
+  ) || POS_DEFAULT_LOCATION_CODE;
+
+  const branchCode = normalizeBranchCode(
+    req.body?.branchCode
+    || req.query?.branchCode
+    || req.headers['x-branch-code']
+    || product?.branchCode
+    || deriveBranchCodeFromLocationCode(requestedLocationCode)
+    || process.env.BRANCH_CODE
+  ) || deriveBranchCodeFromLocationCode(requestedLocationCode) || 'BLANTYRE';
+
+  return {
+    locationCode: requestedLocationCode,
+    requestedLocationCode,
+    branchCode,
+    posLocationCode: getDefaultPosLocationCodeForBranch(branchCode, requestedLocationCode),
+    priceTypeCode: POS_DEFAULT_PRICE_TYPE_CODE,
+  };
 }
 
 async function recordProductNameSyncEvent({
@@ -1568,12 +1618,17 @@ const updateProduct = async (req, res) => {
       }
     }
 
+    const writebackScope = resolveProductWritebackScope(req, updatedProduct);
     const posCommands = [];
     let posWritebackSummary = {
       attempted: false,
       hasPending: false,
       hasFailure: false,
       hasSuccess: false,
+      hasQueued: false,
+      requestedLocationCode: writebackScope.requestedLocationCode,
+      locationCode: writebackScope.posLocationCode,
+      branchCode: writebackScope.branchCode,
       updatedFields: [...new Set(changedFields)],
     };
 
@@ -1593,8 +1648,10 @@ const updateProduct = async (req, res) => {
         productCode: updatedProduct.sourceCode,
         newPrice: incomingParsedPrice,
         oldPrice: Number(existingProduct.price),
-        locationCode: process.env.POS_LOCATION_CODE || 'SH',
-        priceTypeCode: '1',
+        requestedLocationCode: writebackScope.requestedLocationCode,
+        locationCode: writebackScope.posLocationCode,
+        branchCode: writebackScope.branchCode,
+        priceTypeCode: writebackScope.priceTypeCode,
       };
 
       posCommand.attempted = true;
@@ -1613,10 +1670,19 @@ const updateProduct = async (req, res) => {
 
         posCommand.success = true;
         posCommand.commandId = queued.id;
-        console.log('[POS COMMAND QUEUE] enqueue UPDATE_PRICE success:', { commandId: queued.id });
+        posCommand.queueStatus = 'PENDING';
+        console.log('[POS COMMAND QUEUE] UPDATE_PRICE queued:', {
+          commandId: queued.id,
+          productCode: payload.productCode,
+          requestedLocationCode: payload.requestedLocationCode,
+          resolvedPosLocationCode: payload.locationCode,
+          branchCode: payload.branchCode,
+          priceTypeCode: payload.priceTypeCode,
+        });
       } catch (queueErr) {
         posCommand.success = false;
         posCommand.error = queueErr.message;
+        posCommand.queueStatus = 'QUEUE_FAILED';
         console.error('[POS COMMAND QUEUE ERROR] enqueue UPDATE_PRICE failed:', queueErr.message);
       }
 
@@ -1630,8 +1696,9 @@ const updateProduct = async (req, res) => {
         oldName: existingProduct.name,
         newName: normalizedIncomingName,
         updatedBy,
-        locationCode: process.env.POS_LOCATION_CODE || 'SH',
-        branchCode: process.env.BRANCH_CODE || 'BLANTYRE',
+        requestedLocationCode: writebackScope.requestedLocationCode,
+        locationCode: writebackScope.posLocationCode,
+        branchCode: writebackScope.branchCode,
       };
 
       const namePosCommand = {
@@ -1714,7 +1781,9 @@ const updateProduct = async (req, res) => {
         const stockPayload = {
           productId: String(updatedProduct.id),
           productCode: updatedProduct.sourceCode,
-          locationCode: process.env.POS_LOCATION_CODE || 'SH',
+          requestedLocationCode: writebackScope.requestedLocationCode,
+          locationCode: writebackScope.posLocationCode,
+          branchCode: writebackScope.branchCode,
           oldStock,
           newStock,
           qtyReduction,
@@ -1747,10 +1816,18 @@ const updateProduct = async (req, res) => {
 
           stockPosCommand.success = true;
           stockPosCommand.commandId = queuedStock.id;
-          console.log('[POS COMMAND QUEUE] enqueue UPDATE_STOCK success:', { commandId: queuedStock.id });
+          stockPosCommand.queueStatus = 'PENDING';
+          console.log('[POS COMMAND QUEUE] UPDATE_STOCK queued:', {
+            commandId: queuedStock.id,
+            productCode: stockPayload.productCode,
+            requestedLocationCode: stockPayload.requestedLocationCode,
+            resolvedPosLocationCode: stockPayload.locationCode,
+            branchCode: stockPayload.branchCode,
+          });
         } catch (queueErr) {
           stockPosCommand.success = false;
           stockPosCommand.error = queueErr.message;
+          stockPosCommand.queueStatus = 'QUEUE_FAILED';
           console.error('[POS COMMAND QUEUE ERROR] enqueue UPDATE_STOCK failed:', queueErr.message);
         }
 
@@ -1790,15 +1867,22 @@ const updateProduct = async (req, res) => {
 
     posWritebackSummary = {
       attempted: posCommands.some((command) => command.attempted),
-      hasPending: posCommands.some((command) => command.success === true),
+      hasPending: posCommands.some((command) => command.queueStatus === 'PENDING'),
       hasFailure: posCommands.some((command) => command.success === false),
-      hasSuccess: posCommands.some((command) => command.success === true),
+      hasSuccess: posCommands.some((command) => command.queueStatus === 'COMPLETED'),
+      hasQueued: posCommands.some((command) => command.success === true),
+      requestedLocationCode: writebackScope.requestedLocationCode,
+      locationCode: writebackScope.posLocationCode,
+      branchCode: writebackScope.branchCode,
       updatedFields: [...new Set(changedFields)],
       commands: posCommands.map((command) => ({
         commandId: command.commandId || null,
         commandType: command.commandType,
         success: command.success,
         queueStatus: command.queueStatus || null,
+        requestedLocationCode: command.payload?.requestedLocationCode || null,
+        locationCode: command.payload?.locationCode || null,
+        branchCode: command.payload?.branchCode || null,
         error: command.error || null,
       })),
     };

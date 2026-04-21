@@ -16,6 +16,8 @@ const STATUS_COLORS = {
 };
 
 const DEFAULT_VAT_RATE_PERCENT = 16.5;
+const EMERGENCY_LOOKUP_CLIENT_CACHE_TTL_MS = 2000;
+const EMERGENCY_LOOKUP_SILENT_REFRESH_INTERVAL_MS = 12000;
 
 function toMoney(value) {
   const parsed = Number(value);
@@ -360,18 +362,23 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
     });
   }, []);
 
-  const lookupProducts = useCallback(async (query) => {
+  const lookupProducts = useCallback(async (query, options = {}) => {
     const trimmed = String(query || '').trim();
     if (!trimmed) return [];
 
+    const bypassCache = options?.bypassCache === true;
     const cacheKey = `${String(selectedLocationCode || '').toUpperCase()}|${trimmed.toLowerCase()}`;
-    const cached = lookupCacheRef.current.get(cacheKey);
-    if (cached && (Date.now() - cached.cachedAt) < 8000) {
+    const cached = bypassCache ? null : lookupCacheRef.current.get(cacheKey);
+    if (cached && (Date.now() - cached.cachedAt) < EMERGENCY_LOOKUP_CLIENT_CACHE_TTL_MS) {
       return cached.products;
     }
 
     const response = await api.get(`/${apiBase}/lookup`, {
-      params: { q: trimmed, locationCode: selectedLocationCode },
+      params: {
+        q: trimmed,
+        locationCode: selectedLocationCode,
+        ...(bypassCache ? { forceRefresh: '1' } : {}),
+      },
     });
 
     const products = response.data?.products || [];
@@ -382,6 +389,38 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
 
     return products;
   }, [apiBase, selectedLocationCode]);
+
+  const refreshSearchModalResults = useCallback(async ({ bypassCache = false, showLoading = false, resetActiveIndex = false } = {}) => {
+    const query = searchModalQuery.trim();
+    if (!searchModalOpen || !query) {
+      return;
+    }
+
+    try {
+      if (showLoading) {
+        setSearchModalLoading(true);
+      }
+
+      const products = await lookupProducts(query, { bypassCache });
+      setSearchModalResults(products);
+      setSearchModalActiveIndex((prev) => {
+        if (resetActiveIndex) {
+          return 0;
+        }
+        return Math.min(prev, Math.max(products.length - 1, 0));
+      });
+    } catch (error) {
+      if (showLoading) {
+        setSearchModalResults([]);
+        setSearchModalActiveIndex(0);
+        notifyError(`Search failed: ${error.response?.data?.error || error.message}`, 2600);
+      }
+    } finally {
+      if (showLoading) {
+        setSearchModalLoading(false);
+      }
+    }
+  }, [lookupProducts, searchModalOpen, searchModalQuery]);
 
   const lookupAndAddFromScan = useCallback(async (scanValue) => {
     const query = String(scanValue || '').trim();
@@ -437,23 +476,8 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
 
     let disposed = false;
     const timer = setTimeout(async () => {
-      try {
-        setSearchModalLoading(true);
-        const products = await lookupProducts(query);
-        if (!disposed) {
-          setSearchModalResults(products);
-          setSearchModalActiveIndex(0);
-        }
-      } catch (error) {
-        if (!disposed) {
-          setSearchModalResults([]);
-          setSearchModalActiveIndex(0);
-          notifyError(`Search failed: ${error.response?.data?.error || error.message}`, 2600);
-        }
-      } finally {
-        if (!disposed) {
-          setSearchModalLoading(false);
-        }
+      if (!disposed) {
+        await refreshSearchModalResults({ showLoading: true, resetActiveIndex: true });
       }
     }, 160);
 
@@ -461,7 +485,48 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
       disposed = true;
       clearTimeout(timer);
     };
-  }, [lookupProducts, searchModalOpen, searchModalQuery]);
+  }, [refreshSearchModalResults, searchModalOpen, searchModalQuery]);
+
+  useEffect(() => {
+    if (!searchModalOpen) return undefined;
+
+    const query = searchModalQuery.trim();
+    if (!query) return undefined;
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return undefined;
+    }
+
+    let disposed = false;
+
+    const silentRefresh = () => {
+      if (disposed || document.visibilityState !== 'visible') {
+        return;
+      }
+
+      void refreshSearchModalResults({
+        bypassCache: true,
+        showLoading: false,
+        resetActiveIndex: false,
+      });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        silentRefresh();
+      }
+    };
+
+    const intervalId = window.setInterval(silentRefresh, EMERGENCY_LOOKUP_SILENT_REFRESH_INTERVAL_MS);
+    window.addEventListener('focus', silentRefresh);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', silentRefresh);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [refreshSearchModalResults, searchModalOpen, searchModalQuery, selectedLocationCode]);
 
   const clearInvoice = useCallback(() => {
     setCart([]);

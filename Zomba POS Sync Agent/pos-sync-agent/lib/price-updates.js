@@ -348,40 +348,34 @@ async function updateStandardPrice(request, productCode, newPrice, locationCode,
   try {
     const safeLocation = locationCode || 'SH';
     const payloadPriceTypeCode = priceTypeCode || null;
+    const intendedPriceTypeCode = payloadPriceTypeCode || 'RT';
     console.log('[PRICE] UPDATE_PRICE start:', {
       productCode,
       locationCode: safeLocation,
-      priceTypeCode: payloadPriceTypeCode,
+      priceTypeCode: intendedPriceTypeCode,
       newPrice,
     });
 
-    let currentPriceInfo = null;
-    let diagnostics = null;
+    const exists = await productExists(request, productCode);
+    if (!exists) {
+      throw new Error(`NON_RETRYABLE: Product ${productCode} does not exist in POS`);
+    }
 
-    try {
-      currentPriceInfo = await getCurrentPrice(request, productCode, safeLocation, payloadPriceTypeCode);
-      diagnostics = currentPriceInfo.diagnostics || null;
-    } catch (error) {
-      if (error.message && error.message.includes('No price record found for product')) {
-        diagnostics = await getPriceLookupDiagnostics(request, productCode, safeLocation, payloadPriceTypeCode);
-        console.warn('[PRICE] No productprices row found by ProductCode+LocationCode. Fallback insert will be attempted.', diagnostics);
-      } else {
-        throw error;
-      }
+    const diagnostics = await getPriceLookupDiagnostics(request, productCode, safeLocation, intendedPriceTypeCode);
+    let currentPriceRow = await getLatestPriceRow(request, productCode, safeLocation, intendedPriceTypeCode);
+    if (!currentPriceRow) {
+      console.warn('[PRICE] No exact ProductCode+LocationCode+PriceTypeCode row found. Fallback insert will be attempted.', diagnostics);
     }
 
     let updateAffectedRows = 0;
-    console.log('[PRICE] update affected rows:', updateAffectedRows);
-
     let writeAction = 'updated';
     let fallbackInsertAttempted = false;
-    let targetPriceId = null;
-    let usedPriceTypeCode = payloadPriceTypeCode;
+    let targetPriceId = currentPriceRow ? currentPriceRow.priceId : null;
 
-    if (currentPriceInfo && currentPriceInfo.priceId) {
+    if (currentPriceRow && currentPriceRow.priceId) {
       const updateRequest = createQueryRequest(request);
       const updateResult = await updateRequest
-        .input('UpdatePriceID', sql.Int, currentPriceInfo.priceId)
+        .input('UpdatePriceID', sql.Int, currentPriceRow.priceId)
         .input('UpdateNewPrice', sql.Decimal(18, 2), newPrice)
         .input('UpdatePriceDate', sql.DateTime, new Date())
         .query(`
@@ -394,52 +388,34 @@ async function updateStandardPrice(request, productCode, newPrice, locationCode,
       updateAffectedRows = updateResult.rowsAffected && updateResult.rowsAffected[0]
         ? updateResult.rowsAffected[0]
         : 0;
-      targetPriceId = currentPriceInfo.priceId;
-      usedPriceTypeCode = currentPriceInfo.dbPriceTypeCode || payloadPriceTypeCode;
       console.log('[PRICE] update affected rows:', updateAffectedRows);
     }
 
     if (updateAffectedRows === 0) {
       fallbackInsertAttempted = true;
       console.log('[PRICE] fallback insert attempt: true');
-      const insertRequest = createQueryRequest(request);
-      const insertPriceTypeCode = payloadPriceTypeCode || 'RT';
-      const insertQuery = `
-        INSERT INTO POS.dbo.productprices (
-          ProductCode,
-          FPrice,
-          LocationCode,
-          PriceTypeCode,
-          PriceDate
-        )
-        VALUES (
-          @ProductCode,
-          @NewPrice,
-          @LocationCode,
-          @PriceTypeCode,
-          @PriceDate
-        )
-      `;
-
-      await insertRequest
-        .input('InsertProductCode', sql.VarChar(50), productCode)
-        .input('InsertNewPrice', sql.Decimal(18, 2), newPrice)
-        .input('InsertLocationCode', sql.VarChar(10), safeLocation)
-        .input('InsertPriceTypeCode', sql.VarChar(10), insertPriceTypeCode)
-        .input('InsertPriceDate', sql.DateTime, new Date())
-        .query(
-          insertQuery
-            .replace(/@ProductCode/g, '@InsertProductCode')
-            .replace(/@NewPrice/g, '@InsertNewPrice')
-            .replace(/@LocationCode/g, '@InsertLocationCode')
-            .replace(/@PriceTypeCode/g, '@InsertPriceTypeCode')
-            .replace(/@PriceDate/g, '@InsertPriceDate')
-        );
-
-      usedPriceTypeCode = insertPriceTypeCode;
+      const insertedRow = await insertProductPriceRow(request, {
+        productCode,
+        locationCode: safeLocation,
+        priceTypeCode: intendedPriceTypeCode,
+        avgCost: currentPriceRow ? currentPriceRow.avgCost : 0,
+        price: newPrice,
+      });
+      targetPriceId = insertedRow.priceId;
       writeAction = 'inserted';
     } else {
       console.log('[PRICE] fallback insert attempt: false');
+    }
+
+    const verifiedPriceRow = await getLatestPriceRow(request, productCode, safeLocation, intendedPriceTypeCode);
+    if (!verifiedPriceRow) {
+      throw new Error(`Failed to verify latest price row for ${productCode} at ${safeLocation}/${intendedPriceTypeCode}`);
+    }
+
+    if (Number(verifiedPriceRow.price) !== Number(newPrice)) {
+      throw new Error(
+        `Price verification mismatch for ${productCode} at ${safeLocation}/${intendedPriceTypeCode}: expected ${newPrice}, got ${verifiedPriceRow.price}`
+      );
     }
 
     // GlobalPrices logging is best-effort and should not block a successful price update.
@@ -450,8 +426,8 @@ async function updateStandardPrice(request, productCode, newPrice, locationCode,
       await logRequest
         .input('LogLocationCode', sql.VarChar(10), safeLocation)
         .input('LogProductCode', sql.VarChar(50), productCode)
-        .input('LogPriceTypeCode', sql.VarChar(10), usedPriceTypeCode || payloadPriceTypeCode || 'RT')
-        .input('LogOldPrice', sql.Decimal(18, 2), Number((currentPriceInfo && currentPriceInfo.price) || 0))
+        .input('LogPriceTypeCode', sql.VarChar(10), intendedPriceTypeCode)
+        .input('LogOldPrice', sql.Decimal(18, 2), Number((currentPriceRow && currentPriceRow.price) || 0))
         .input('LogNewPrice', sql.Decimal(18, 2), Number(newPrice))
         .query(`
           INSERT INTO POS.dbo.GlobalPrices (
@@ -474,24 +450,27 @@ async function updateStandardPrice(request, productCode, newPrice, locationCode,
       console.warn('[PRICE] GlobalPrices log skipped:', globalPriceError.message);
     }
 
-    const oldPriceText = currentPriceInfo && currentPriceInfo.price != null
-      ? `${currentPriceInfo.price}`
+    const oldPriceText = currentPriceRow && currentPriceRow.price != null
+      ? `${currentPriceRow.price}`
       : 'N/A';
     console.log(`[PRICE] ✅ ${writeAction} price for ${productCode}: ${oldPriceText} → ${newPrice}`);
 
     return {
       productCode,
       locationCode: safeLocation,
-      priceTypeCode: usedPriceTypeCode,
+      priceTypeCode: intendedPriceTypeCode,
       payloadPriceTypeCode,
       newPrice,
-      oldPrice: currentPriceInfo ? currentPriceInfo.price : null,
-      existingRowFound: !!currentPriceInfo,
+      oldPrice: currentPriceRow ? currentPriceRow.price : null,
+      existingRowFound: !!currentPriceRow,
       matchingRowCount: diagnostics ? diagnostics.codeAndLocationCount : null,
-      targetPriceId,
+      matchingRequestedPriceTypeRowCount: diagnostics ? diagnostics.payloadTypeMatchCount : null,
+      targetPriceId: verifiedPriceRow.priceId || targetPriceId,
       updateAffectedRows,
       fallbackInsertAttempted,
       writeAction,
+      verifiedPrice: verifiedPriceRow.price,
+      verificationPassed: true,
     };
   } catch (error) {
     console.error('[PRICE ERROR] Error updating standard price:', error.message);

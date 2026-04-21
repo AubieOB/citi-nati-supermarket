@@ -34,6 +34,8 @@ import '../../styles/global.css';
 import '../../styles/admin-dashboard.css';
 
 const ADMIN_THEME_KEY = 'adminDashboardTheme';
+const ADMIN_PRODUCTS_SILENT_REFRESH_STALE_MS = 30000;
+const ADMIN_PRODUCTS_SILENT_REFRESH_INTERVAL_MS = 45000;
 
 const ADMIN_DARK_BG = '#1e1e1e';
 const ADMIN_DARK_BORDER = '#333333';
@@ -102,6 +104,13 @@ const MOBILE_BLOCKED_MESSAGE_BY_TAB = {
   refunds: 'Refund management is desktop-only on mobile.',
   support: 'Support management is desktop-only on mobile.',
 };
+
+const ADMIN_PRODUCTS_AUTO_REFRESH_TAB_IDS = new Set([
+  'products',
+  'stocks',
+  'emergency-sales',
+  'pos-management',
+]);
 
 const extractColorToken = (value) => {
   if (!value || typeof value !== 'string') return null;
@@ -482,6 +491,64 @@ const AdminDashboard = () => {
     });
   }, [preloadAdminProductsForLocation]);
 
+  const activeLocationCachedProductsMeta = adminProductsCacheMetaByLocation[selectedOperationalLocationCode] || {};
+  const shouldAutoRefreshAdminProducts = ADMIN_PRODUCTS_AUTO_REFRESH_TAB_IDS.has(activeTab);
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return undefined;
+    }
+
+    if (!shouldAutoRefreshAdminProducts) {
+      return undefined;
+    }
+
+    let disposed = false;
+
+    const refreshIfStale = () => {
+      if (disposed || document.visibilityState !== 'visible') {
+        return;
+      }
+
+      if (activeLocationCachedProductsMeta.isLoading || activeLocationCachedProductsMeta.isBackgroundLoading) {
+        return;
+      }
+
+      const lastLoadedAt = Number(activeLocationCachedProductsMeta.lastLoadedAt || 0);
+      if (lastLoadedAt && (Date.now() - lastLoadedAt) < ADMIN_PRODUCTS_SILENT_REFRESH_STALE_MS) {
+        return;
+      }
+
+      void preloadAdminProductsForLocation(selectedOperationalLocationCode, { force: true });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshIfStale();
+      }
+    };
+
+    refreshIfStale();
+
+    const intervalId = window.setInterval(refreshIfStale, ADMIN_PRODUCTS_SILENT_REFRESH_INTERVAL_MS);
+    window.addEventListener('focus', refreshIfStale);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refreshIfStale);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [
+    activeLocationCachedProductsMeta.isBackgroundLoading,
+    activeLocationCachedProductsMeta.isLoading,
+    activeLocationCachedProductsMeta.lastLoadedAt,
+    preloadAdminProductsForLocation,
+    selectedOperationalLocationCode,
+    shouldAutoRefreshAdminProducts,
+  ]);
+
   /**
    * Handle real-time order updates (for refreshing orders list)
    */
@@ -656,7 +723,6 @@ const AdminDashboard = () => {
     ? (MOBILE_BLOCKED_MESSAGE_BY_TAB[activeTabMeta.id] || 'This admin module is desktop-only on mobile.')
     : 'This admin module is desktop-only on mobile.';
   const activeLocationCachedProducts = adminProductsCacheByLocation[selectedOperationalLocationCode] || [];
-  const activeLocationCachedProductsMeta = adminProductsCacheMetaByLocation[selectedOperationalLocationCode] || {};
   const handleRefreshAdminProductsCache = useCallback(async () => {
     await preloadAdminProductsForLocation(selectedOperationalLocationCode, { force: true });
   }, [preloadAdminProductsForLocation, selectedOperationalLocationCode]);

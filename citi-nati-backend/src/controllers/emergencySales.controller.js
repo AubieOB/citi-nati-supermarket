@@ -560,6 +560,7 @@ async function lookupEmergencyProducts(req, res) {
     const startedAt = Date.now();
     const query = String(req.query.q || req.query.search || '').trim();
     const locationCode = normalizeLocationCode(req.query.locationCode || req.query.branchCode);
+    const bypassCache = ['1', 'true', 'yes'].includes(String(req.query.forceRefresh || '').trim().toLowerCase());
     if (!query) {
       return res.status(200).json({ success: true, products: [] });
     }
@@ -574,7 +575,7 @@ async function lookupEmergencyProducts(req, res) {
       return res.status(200).json({ success: true, products: [] });
     }
 
-    const cachedProducts = readLookupCache(locationCode, query);
+    const cachedProducts = bypassCache ? null : readLookupCache(locationCode, query);
     if (cachedProducts) {
       console.log('[EMERGENCY SALES][LOOKUP] cache-hit', {
         locationCode,

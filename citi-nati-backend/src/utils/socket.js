@@ -197,6 +197,8 @@ const emitProductUpdate = (product) => {
         stock: product.stock,
         category: product.category,
         image: product.image,
+        branchCode: product.branchCode || null,
+        locationCode: product.locationCode || null,
         expiryDate: product.expiryDate,
         expiryStatus,
         hideFromProductsPage: product.hideFromProductsPage || false,
@@ -211,6 +213,8 @@ const emitProductUpdate = (product) => {
         finalPrice: finalPrice,
         stock: product.stock,
         isOnSale: product.isOnSale,
+        branchCode: product.branchCode || null,
+        locationCode: product.locationCode || null,
         hideFromProductsPage: product.hideFromProductsPage || false
       });
     }

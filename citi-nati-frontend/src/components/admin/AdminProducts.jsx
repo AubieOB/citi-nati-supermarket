@@ -595,6 +595,12 @@ const AdminProducts = ({
       }
 
       const handleProductUpdate = (updatedProduct) => {
+        const updatedLocationCode = String(updatedProduct?.locationCode || '').trim().toUpperCase();
+        const currentLocationCode = String(selectedLocationCode || '').trim().toUpperCase();
+        if (updatedLocationCode && currentLocationCode && updatedLocationCode !== currentLocationCode) {
+          return;
+        }
+
         console.log('[AdminProducts] 🔄 Product update received:', updatedProduct.name);
         
         // Update the products list with complete product details
@@ -641,7 +647,7 @@ const AdminProducts = ({
     } catch (err) {
       console.warn('[AdminProducts] Error setting up product update listener:', err.message);
     }
-  }, []);
+  }, [selectedLocationCode]);
 
   const fetchProducts = async () => {
     const requestId = Date.now();
@@ -1171,25 +1177,36 @@ const AdminProducts = ({
       }
 
       if (editingId) {
+        if (selectedLocationCode) {
+          formPayload.append('locationCode', selectedLocationCode);
+        }
         console.log('[ADMIN PRODUCTS] ✏️ Updating product:', editingId);
         const response = await api.put(`/products/${editingId}`, formPayload, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
 
         const summary = response.data?.posWritebackSummary;
-        const nameCommand = Array.isArray(summary?.commands)
-          ? summary.commands.find((command) => command.commandType === 'UPDATE_PRODUCT_NAME')
-          : null;
+        const commands = Array.isArray(summary?.commands) ? summary.commands : [];
+        const failedCommands = commands.filter((command) => command.success === false);
+        const queuedCommands = commands.filter((command) => command.success === true);
+        const queuedCommandSummary = queuedCommands
+          .map((command) => {
+            if (command.commandType === 'UPDATE_PRICE') return 'price sync';
+            if (command.commandType === 'UPDATE_PRODUCT_NAME') return 'name sync';
+            if (command.commandType === 'UPDATE_STOCK') return 'stock sync';
+            return command.commandType;
+          })
+          .join(', ');
 
-        if (nameCommand?.success === false) {
+        if (failedCommands.length > 0) {
           showSuccess(
             'Partial Success',
-            `Product "${formData.name.trim()}" was updated on the website, but POS name sync could not be queued: ${nameCommand.error || 'Unknown error'}`
+            `Product "${formData.name.trim()}" was updated on the website, but some POS sync commands could not be queued: ${failedCommands.map((command) => command.error || command.commandType).join('; ')}`
           );
-        } else if (nameCommand?.success === true) {
+        } else if (queuedCommands.length > 0) {
           showSuccess(
             'Success',
-            `Product "${formData.name.trim()}" updated successfully. POS name sync has been queued${nameCommand.commandId ? ` (command ${nameCommand.commandId})` : ''}.`
+            `Product "${formData.name.trim()}" updated successfully. POS ${queuedCommandSummary} queued.`
           );
         } else {
           showSuccess('Success', `Product "${formData.name.trim()}" updated successfully`);
