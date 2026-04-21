@@ -408,12 +408,14 @@ async function fetchProductsFromPOS(locationCode) {
 
 function getOperationalSyncLocations() {
   if (appConfig.branch.branchCode === 'ZOMBA') {
-    const configured = parseOperationalLocationCodes(process.env.POS_OPERATIONAL_LOCATION_CODES);
+    const rawConfigured = String(process.env.POS_OPERATIONAL_LOCATION_CODES || '').trim();
+    const configured = parseOperationalLocationCodes(rawConfigured);
     if (configured.length > 0) {
       return configured;
     }
 
-    return ['SH'];
+    console.warn(`${BRANCH_TAG} [OPERATIONAL LOCATIONS] POS_OPERATIONAL_LOCATION_CODES not set or invalid; defaulting to full Zomba operational scope: ${ZOMBA_OPERATIONAL_LOCATION_CODES.join(', ')}`);
+    return [...ZOMBA_OPERATIONAL_LOCATION_CODES];
   }
 
   return [appConfig.posDb.locationCode];

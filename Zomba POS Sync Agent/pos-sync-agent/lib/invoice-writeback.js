@@ -566,6 +566,12 @@ async function writeBackInvoice(request, invoiceData) {
       items,
     } = invoiceData;
 
+    const selectedWebLocationCode = String(locationCode || '').trim().toUpperCase();
+    const resolvedPosLocationCode = selectedWebLocationCode === 'RES'
+      ? 'ST999'
+      : selectedWebLocationCode;
+    const writebackLocationCode = String(resolvedPosLocationCode || 'SH').slice(0, 6);
+
     if (!orderId) {
       throw new Error('NON_RETRYABLE: orderId is required');
     }
@@ -575,6 +581,11 @@ async function writeBackInvoice(request, invoiceData) {
     }
 
     console.log(`[INVOICE] WRITE_INVOICE start orderId=${orderId} reference=${reference} items=${items.length}`);
+    console.log('[INVOICE] location trace', {
+      selectedWebLocationCode: selectedWebLocationCode || null,
+      resolvedPosLocationCode: resolvedPosLocationCode || null,
+      writebackLocationCode,
+    });
 
     const cashSale = await getNextCashSaleNo(request);
     const cashSaleNo = cashSale.cashSaleNo;
@@ -612,7 +623,7 @@ async function writeBackInvoice(request, invoiceData) {
       invoiceDate: safeInvoiceDate,
       invoiceTime: safeInvoiceDate,
       customerCode: String('CASH').slice(0, 15),
-      locationCode: String('SH').slice(0, 6),
+      locationCode: writebackLocationCode,
       grossSale: Number(grossSale) || 0,
       vat: Number(vat) || 0,
       discount: Number(discount) || 0,
@@ -634,7 +645,7 @@ async function writeBackInvoice(request, invoiceData) {
       request,
       invoiceCode,
       items,
-      'SH'
+      writebackLocationCode
     );
     const itemCount = detailResult.insertedCount;
 
