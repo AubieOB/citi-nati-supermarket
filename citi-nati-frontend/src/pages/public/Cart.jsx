@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Container from '../../components/ui/Container.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -312,25 +312,10 @@ const Cart = () => {
     : `VAT (${Number(cart?.configuredVatRatePercent ?? cart?.vatRatePercent ?? 0).toFixed(1)}%):`;
 
   // MINIMUM ORDER VALIDATION
-  const cartItemsSubtotal = useMemo(
-    () => Number(cart?.itemsSubtotal ?? cart?.total ?? 0),
-    [cart]
-  );
-
-  const minimumOrderValue = useMemo(
-    () => Number(cart?.minimumOrderValue ?? 10000),
-    [cart]
-  );
-
-  const isBelowMinimumOrderValue = useMemo(
-    () => cartItemsSubtotal < minimumOrderValue,
-    [cartItemsSubtotal, minimumOrderValue]
-  );
-
-  const amountNeededForMinimum = useMemo(
-    () => Number(Math.max(0, minimumOrderValue - cartItemsSubtotal).toFixed(2)),
-    [minimumOrderValue, cartItemsSubtotal]
-  );
+  const cartItemsSubtotal = Number(cart?.itemsSubtotal ?? cart?.total ?? 0);
+  const minimumOrderValue = Number(cart?.minimumOrderValue ?? 10000);
+  const isBelowMinimumOrderValue = cartItemsSubtotal < minimumOrderValue;
+  const amountNeededForMinimum = Number(Math.max(0, minimumOrderValue - cartItemsSubtotal).toFixed(2));
 
   return (
     <div className="page cart-page">
