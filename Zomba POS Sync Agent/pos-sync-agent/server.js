@@ -509,30 +509,14 @@ async function fetchProductsFromPOS(locationCode) {
     const productActivityTimestampExpr = safeActivityTimestampColumn
       ? `MAX(TRY_CONVERT(datetime2, pa.[${safeActivityTimestampColumn}])) AS ActivityLatestAt`
       : 'NULL AS ActivityLatestAt';
-    const query = stockConfig.hasDailyStockBalance && stockConfig.hasProductActivity
+    const query = stockConfig.hasProductActivity
       ? `
-      WITH latest_daily AS (
-        SELECT
-          ProductCode,
-          LocationCode,
-          StockDate,
-          StockBalance,
-          ROW_NUMBER() OVER (
-            PARTITION BY ProductCode, LocationCode
-            ORDER BY StockDate DESC
-          ) AS rn
-        FROM POS.dbo.DailyStockBalance
-        WHERE LocationCode = @LocationCode
-          AND CAST(StockDate AS date) <= CAST(GETDATE() AS date)
-      ),
-      product_activity AS (
+      WITH product_activity AS (
         SELECT
           ProductCode,
           LocationCode,
           SUM(ISNULL(QtyIn, 0) - ISNULL(QtyOut, 0)) AS ActivityStockBalance
-          ,${productActivityTimestampExpr}
         FROM POS.dbo.ProductActivity
-        AS pa
         WHERE LocationCode = @LocationCode
         GROUP BY ProductCode, LocationCode
       )
@@ -541,39 +525,23 @@ async function fetchProductsFromPOS(locationCode) {
           p.ProductName,
           ISNULL(p.Barcode, '') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
+          NULL AS StockDate,
+          ISNULL(pa.ActivityStockBalance, 0) AS QuantityAvailable,
           CASE
-            WHEN pa.ProductCode IS NOT NULL THEN pa.ActivityLatestAt
-            WHEN ds.StockDate IS NOT NULL THEN ds.StockDate
-            ELSE NULL
-          END AS StockDate,
-          ISNULL(
-            CASE
-              WHEN pa.ActivityStockBalance IS NOT NULL THEN pa.ActivityStockBalance
-              ELSE ds.StockBalance
-            END,
-            0
-          ) AS QuantityAvailable,
-          CASE
-            WHEN pa.ActivityStockBalance IS NOT NULL THEN 'ProductActivity'
-            WHEN ds.StockBalance IS NOT NULL THEN 'DailyStockBalanceFallback'
+            WHEN pa.ProductCode IS NOT NULL THEN 'ProductActivity'
             ELSE 'NoStockRow'
           END AS StockSource,
-          ISNULL(lp.FPrice, 0) AS SellingPrice,
+          ISNULL(
+              (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC),
+              0
+          ) AS SellingPrice,
           CASE
-            WHEN lp.FPrice IS NOT NULL THEN 'PriceByLocation'
+            WHEN (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC) IS NOT NULL THEN 'PriceByLocation'
             ELSE 'NoPriceRow'
           END AS PriceSource
       FROM POS.dbo.productsmaster p
       LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
-      LEFT JOIN latest_daily ds ON ds.ProductCode = p.ProductCode AND ds.LocationCode = @LocationCode AND ds.rn = 1
       LEFT JOIN product_activity pa ON pa.ProductCode = p.ProductCode AND pa.LocationCode = @LocationCode
-      OUTER APPLY (
-        SELECT TOP 1 FPrice
-        FROM POS.dbo.productprices
-        WHERE ProductCode = p.ProductCode
-          AND LocationCode = @LocationCode
-        ORDER BY PriceID DESC
-      ) lp
       ORDER BY p.ProductCode
     `
       : stockConfig.hasDailyStockBalance
@@ -616,41 +584,6 @@ async function fetchProductsFromPOS(locationCode) {
       LEFT JOIN latest_stock ls ON ls.ProductCode = p.ProductCode AND ls.LocationCode = @LocationCode AND ls.rn = 1
       ORDER BY p.ProductCode
     `
-      : stockConfig.hasProductActivity
-      ? `
-      WITH product_activity AS (
-        SELECT
-          ProductCode,
-          LocationCode,
-          SUM(ISNULL(QtyIn, 0) - ISNULL(QtyOut, 0)) AS ActivityStockBalance
-        FROM POS.dbo.ProductActivity
-        WHERE LocationCode = @LocationCode
-        GROUP BY ProductCode, LocationCode
-      )
-      SELECT
-          p.ProductCode,
-          p.ProductName,
-          ISNULL(p.Barcode, '') AS Barcode,
-          ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
-          NULL AS StockDate,
-          ISNULL(pa.ActivityStockBalance, 0) AS QuantityAvailable,
-          CASE
-            WHEN pa.ProductCode IS NOT NULL THEN 'ProductActivity'
-            ELSE 'NoStockRow'
-          END AS StockSource,
-          ISNULL(
-              (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC),
-              0
-          ) AS SellingPrice,
-          CASE
-            WHEN (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC) IS NOT NULL THEN 'PriceByLocation'
-            ELSE 'NoPriceRow'
-          END AS PriceSource
-      FROM POS.dbo.productsmaster p
-      LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
-      LEFT JOIN product_activity pa ON pa.ProductCode = p.ProductCode AND pa.LocationCode = @LocationCode
-      ORDER BY p.ProductCode
-    `
       : `
       SELECT
           p.ProductCode,
@@ -682,7 +615,7 @@ async function fetchProductsFromPOS(locationCode) {
       aggregationMode: false,
       stockResolutionMode: 'LOCATION_SPECIFIC',
       stockSourceMode: stockConfig.hasDailyStockBalance && stockConfig.hasProductActivity
-        ? 'ProductActivityPrimary+MissingRowDailyStockBalanceFallback'
+        ? 'ProductActivity'
         : (stockConfig.hasDailyStockBalance
           ? 'DailyStockBalance'
           : (stockConfig.hasProductActivity ? 'ProductActivityFallbackOnly' : 'Unavailable')),
@@ -1263,7 +1196,7 @@ app.get('/pos-sync/products', validateApiKey, requireFeature('enableReportingSyn
       configuredLocationCode: appConfig.posDb.locationCode,
       includedLocations: syncLocations,
       mode: appConfig.branch.branchCode === 'ZOMBA' ? 'CONFIGURED_ZOMBA_OPERATIONAL_LOCATIONS' : 'CONFIGURED_LOCATION_ONLY',
-      stockSource: 'ProductActivity primary, DailyStockBalance fallback only when no activity row exists',
+      stockSource: 'ProductActivity (same as BAR/RES); DailyStockBalance ignored even when present',
       stockResolutionMode: 'LOCATION_SPECIFIC',
       aggregationEnabled: false,
     });
