@@ -350,10 +350,7 @@ const AdminDashboard = () => {
     const forceRefresh = options?.force === true;
     const preferSilentRefresh = options?.silent === true;
     const cacheMeta = adminProductsCacheMetaByLocation[safeLocationCode] || {};
-    const cachedItems = Array.isArray(adminProductsCacheByLocation[safeLocationCode])
-      ? adminProductsCacheByLocation[safeLocationCode]
-      : [];
-    const hasCachedItems = cachedItems.length > 0;
+    const hasCachedItems = Boolean(cacheMeta.lastLoadedAt);
 
     if (!forceRefresh) {
       if (cacheMeta.isLoading || cacheMeta.isBackgroundLoading) {
@@ -504,7 +501,7 @@ const AdminDashboard = () => {
         error: error?.response?.data?.error || error.message || 'Failed to load products',
       });
     }
-  }, [adminProductsCacheByLocation, adminProductsCacheMetaByLocation, updateProductsCacheMeta]);
+  }, [adminProductsCacheMetaByLocation, updateProductsCacheMeta]);
 
   React.useEffect(() => {
     OPERATIONAL_SCOPES.forEach((scope) => {
