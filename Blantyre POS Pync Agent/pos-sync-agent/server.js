@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const sql = require('mssql');
 const axios = require('axios');
+const net = require('net');
 
 // Import modules for POS write-back
 const transactionManager = require('./lib/transaction-manager');
@@ -10,30 +11,36 @@ const stockUpdates = require('./lib/stock-updates');
 const priceUpdates = require('./lib/price-updates');
 const commandQueueClient = require('./lib/command-queue-client');
 const commandExecutor = require('./lib/command-executor');
+const { buildConfig, getBranchTag, getSyncMetadata, validateStartupConfig, buildStartupSummary } = require('./lib/config');
 const ReportingSyncService = require('./lib/reporting-sync');
 const ReportingSyncState = require('./lib/reporting-sync-state');
 
 const app = express();
 app.use(express.json());
 
-const ENABLE_DIRECT_WRITEBACK_DEBUG = process.env.ENABLE_DIRECT_POS_WRITEBACK_DEBUG === 'true';
-const SQL_SERVER = process.env.DB_SERVER || 'localhost';
-const SQL_DATABASE = process.env.DB_NAME || process.env.DB_DATABASE || 'POS';
-const SQL_USER = process.env.DB_USER || '';
-const BRANCH_CODE = String(process.env.BRANCH_CODE || 'BLANTYRE').trim().toUpperCase();
-const BRANCH_NAME = String(process.env.BRANCH_NAME || 'BLANTYRE').trim();
-const LOCATION_ID = String(process.env.LOCATION_ID || '1').trim();
-const SYNC_SOURCE_CODE = String(process.env.SYNC_SOURCE_CODE || 'BLANTYRE_POS_01').trim();
-const BRANCH_TAG = `[BRANCH:${BRANCH_CODE}|SRC:${SYNC_SOURCE_CODE}]`;
-const BACKEND_BASE_URL = process.env.BACKEND_BASE_URL || process.env.LIVE_SERVER_URL || '';
-const BACKEND_API_TOKEN = process.env.BACKEND_API_TOKEN || process.env.POS_SECRET || '';
+const appConfig = buildConfig();
+const BRANCH_TAG = getBranchTag(appConfig);
+const SYNC_LOG_PREFIX = appConfig.branch.logPrefix || `[${appConfig.branch.branchCode} SYNC]`;
+const PACKAGE_VERSION = require('./package.json').version || '0.0.0';
+const ENABLE_DIRECT_WRITEBACK_DEBUG = appConfig.server.enableDirectWritebackDebug;
+const SQL_SERVER = appConfig.posDb.server;
+const SQL_DATABASE = appConfig.posDb.database;
+const SQL_USER = appConfig.posDb.user;
+const BRANCH_CODE = appConfig.branch.branchCode;
+const BRANCH_NAME = appConfig.branch.branchName;
+const LOCATION_ID = appConfig.branch.locationId;
+const SYNC_SOURCE_CODE = appConfig.branch.syncSourceCode;
+const BACKEND_BASE_URL = appConfig.backend.baseUrl;
+const BACKEND_API_TOKEN = appConfig.backend.apiToken;
 
 // SQL Server configuration
 const sqlConfig = {
   user: SQL_USER,
-  password: process.env.DB_PASSWORD,
+  password: appConfig.posDb.password,
   server: SQL_SERVER,
   database: SQL_DATABASE,
+  connectionTimeout: appConfig.posDb.connectionTimeoutMs,
+  requestTimeout: appConfig.posDb.requestTimeoutMs,
   options: {
     encrypt: false,
     trustServerCertificate: true, // needed for local SQL Server
@@ -51,12 +58,75 @@ let pool;
 /** Reporting sync service and state */
 let reportingSyncState;
 let reportingSyncService;
+let instanceLockServer = null;
+
+function acquireInstanceLock() {
+  return new Promise((resolve) => {
+    const requestedLockPort = Number(appConfig.server.instanceLockPort || 0);
+    if (!Number.isInteger(requestedLockPort) || requestedLockPort <= 0) {
+      console.warn(`${BRANCH_TAG} [BOOT][WARN] Duplicate instance guard disabled because INSTANCE_LOCK_PORT is invalid.`);
+      resolve(true);
+      return;
+    }
+
+    const lockServer = net.createServer();
+
+    lockServer.once('error', (error) => {
+      if (error && error.code === 'EADDRINUSE') {
+        console.error(`${BRANCH_TAG} [BOOT][ERROR] Duplicate instance detected on lock port ${requestedLockPort}.`);
+        resolve(false);
+        return;
+      }
+      console.error(`${BRANCH_TAG} [BOOT][ERROR] Instance lock check failed:`, error ? error.message : 'Unknown error');
+      resolve(false);
+    });
+
+    lockServer.once('listening', () => {
+      instanceLockServer = lockServer;
+      console.log(`${BRANCH_TAG} [BOOT] Instance lock acquired on port ${requestedLockPort}`);
+      resolve(true);
+    });
+
+    lockServer.listen(requestedLockPort, '127.0.0.1');
+  });
+}
+
+async function validateBackendConnection() {
+  if (!appConfig.backend.connectionTestEnabled) {
+    console.log(`${BRANCH_TAG} [BOOT] Backend connectivity test skipped (BACKEND_CONNECTION_TEST_ENABLED=false).`);
+    return;
+  }
+
+  if (!appConfig.backend.baseUrl) {
+    console.warn(`${BRANCH_TAG} [BOOT][WARN] Backend connectivity test skipped because BACKEND_URL is not configured.`);
+    return;
+  }
+
+  const timeoutMs = appConfig.backend.connectionTimeoutMs;
+  const healthPath = appConfig.backend.healthCheckPath || '/api/health';
+  const baseUrl = appConfig.backend.baseUrl.replace(/\/$/, '');
+  const candidates = [
+    `${baseUrl}${healthPath.startsWith('/') ? '' : '/'}${healthPath}`,
+    `${baseUrl}/api/products?page=1&pageSize=1`,
+  ];
+
+  for (const targetUrl of candidates) {
+    try {
+      const response = await axios.get(targetUrl, { timeout: timeoutMs });
+      console.log(`${BRANCH_TAG} [BOOT] Backend connectivity check passed`, {
+        targetUrl,
+        status: response.status,
+      });
+      return;
+    } catch (error) {
+      console.warn(`${BRANCH_TAG} [BOOT][WARN] Backend connectivity check failed for ${targetUrl}:`, error.message);
+    }
+  }
+
+  console.error(`${BRANCH_TAG} [BOOT][ERROR] Backend connectivity checks failed for all configured probe endpoints.`);
+}
 
 function buildReportingModuleConfig() {
-  const locationCode = String(process.env.POS_LOCATION_CODE || 'SH').trim().toUpperCase();
-  const reportingBatchSize = parseInt(process.env.REPORTING_BATCH_SIZE || '500', 10);
-  const reportingPollingIntervalMs = parseInt(process.env.REPORTING_POLLING_INTERVAL_MS || process.env.SYNC_INTERVAL_MS || '60000', 10);
-
   return {
     branch: {
       branchCode: BRANCH_CODE,
@@ -70,18 +140,16 @@ function buildReportingModuleConfig() {
       apiToken: BACKEND_API_TOKEN,
     },
     posDb: {
-      locationCode,
+      locationCode: appConfig.posDb.locationCode,
     },
     reporting: {
-      backendReportingEndpoint: process.env.REPORTING_BACKEND_ENDPOINT || '/api/pos-sync/reporting/invoices',
-      backendLatestProductCostEndpoint: process.env.REPORTING_LATEST_COST_ENDPOINT || '/api/pos-sync/reporting/latest-product-costs',
-      batchSize: Number.isInteger(reportingBatchSize) && reportingBatchSize > 0 ? reportingBatchSize : 500,
-      latestCostBatchSize: Number.isInteger(parseInt(process.env.REPORTING_LATEST_COST_BATCH_SIZE || '', 10))
-        ? parseInt(process.env.REPORTING_LATEST_COST_BATCH_SIZE, 10)
-        : 500,
-      pollingIntervalMs: Number.isInteger(reportingPollingIntervalMs) && reportingPollingIntervalMs > 0 ? reportingPollingIntervalMs : 60000,
-      latestCostSyncIntervalMs: parseInt(process.env.REPORTING_LATEST_COST_INTERVAL_MS || '300000', 10),
-      limitToRecentDays: parseInt(process.env.REPORTING_LIMIT_TO_RECENT_DAYS || '0', 10),
+      backendReportingEndpoint: appConfig.reporting.backendReportingEndpoint,
+      backendLatestProductCostEndpoint: appConfig.reporting.backendLatestProductCostEndpoint,
+      batchSize: appConfig.reporting.batchSize,
+      latestCostBatchSize: appConfig.reporting.latestCostBatchSize,
+      pollingIntervalMs: appConfig.reporting.pollingIntervalMs,
+      latestCostSyncIntervalMs: appConfig.reporting.latestCostSyncIntervalMs,
+      limitToRecentDays: appConfig.reporting.limitToRecentDays,
     },
   };
 }
@@ -108,7 +176,7 @@ async function initializePool() {
 /** Middleware: API Key Validation */
 function validateApiKey(req, res, next) {
   const apiKey = req.headers['x-pos-secret'];
-  if (!apiKey || apiKey !== process.env.POS_SECRET) {
+  if (!apiKey || apiKey !== appConfig.server.agentApiSecret) {
     return res.status(401).json({ success: false, error: 'Unauthorized: Invalid API key' });
   }
   next();
@@ -118,8 +186,8 @@ function validateApiKey(req, res, next) {
 async function sendProductsToLiveServer(products) {
   try {
     if (!BACKEND_BASE_URL) {
-      console.error('[POS SYNC] ERROR: BACKEND_BASE_URL/LIVE_SERVER_URL not configured in .env');
-      return { success: false, error: 'BACKEND_BASE_URL/LIVE_SERVER_URL not configured' };
+      console.error('[POS SYNC] ERROR: BACKEND_URL not configured in .env');
+      return { success: false, error: 'BACKEND_URL not configured' };
     }
 
     console.log(`[POS SYNC] Sending ${products.length} products to live server (batching)...`);
@@ -162,15 +230,9 @@ async function sendProductsToLiveServer(products) {
               expiryBatches: Array.isArray(p.ExpiryBatches) ? p.ExpiryBatches : [],
               branchCode: BRANCH_CODE,
               branchName: BRANCH_NAME,
-              locationCode: process.env.POS_LOCATION_CODE || 'SH',
+              locationCode: appConfig.posDb.locationCode,
             })),
-            metadata: {
-              branchCode: BRANCH_CODE,
-              branchName: BRANCH_NAME,
-              locationId: LOCATION_ID,
-              syncSourceCode: SYNC_SOURCE_CODE,
-              syncedAt: new Date().toISOString(),
-            },
+            metadata: getSyncMetadata(appConfig),
           },
           {
             headers: {
@@ -227,7 +289,7 @@ async function fetchProductsFromPOS() {
     if (!pool) await initializePool();
 
     // Get location code from environment or default to 'SH'
-    const LOCATION_CODE = process.env.POS_LOCATION_CODE || 'SH';
+    const LOCATION_CODE = appConfig.posDb.locationCode;
 
     // REAL-TIME STOCK + PRICE
     // Stock = SUM(QtyIn) - SUM(QtyOut) from ProductActivity
@@ -382,7 +444,7 @@ function shouldDebugExpiryBatch(productCode) {
 async function buildActiveExpiryBatchesFromPOS() {
   try {
     if (!pool) await initializePool();
-    const locationCode = process.env.POS_LOCATION_CODE || 'SH';
+    const locationCode = appConfig.posDb.locationCode;
     
     // Fetch all expiry rows from view - no pre-filtering by days here
     const result = await fetchExpiryCandidates({
@@ -507,7 +569,7 @@ function normalizeExpiryDays(value) {
 }
 
 function normalizeLocationCode(value) {
-  const normalized = String(value || process.env.POS_LOCATION_CODE || 'SH').trim().toUpperCase();
+  const normalized = String(value || appConfig.posDb.locationCode || 'SH').trim().toUpperCase();
   return normalized || 'SH';
 }
 
@@ -919,7 +981,7 @@ app.get('/debug/find-location-stock', validateApiKey, async (req, res) => {
   try {
     if (!pool) await initializePool();
 
-    const LOCATION_CODE = process.env.POS_LOCATION_CODE || 'SH';
+    const LOCATION_CODE = appConfig.posDb.locationCode;
 
     // Check if stocks table (which had LocationCode) can be joined with stockdetails
     const query = `
@@ -997,7 +1059,7 @@ app.get('/pos-sync/stock-by-location', validateApiKey, async (req, res) => {
   try {
     if (!pool) await initializePool();
 
-    const LOCATION_CODE = process.env.POS_LOCATION_CODE || 'SH';
+    const LOCATION_CODE = appConfig.posDb.locationCode;
 
     const query = `
       SELECT 
@@ -1536,7 +1598,7 @@ app.get('/pos-sync/promotion-preview/:productCode', validateApiKey, async (req, 
     if (!pool) await initializePool();
 
     const { productCode } = req.params;
-    const locationCode = req.query.locationCode || process.env.POS_LOCATION_CODE || 'SH';
+    const locationCode = req.query.locationCode || appConfig.posDb.locationCode;
     const priceTypeCode = req.query.priceTypeCode || 'RT';
 
     const request = pool.request();
@@ -1576,7 +1638,7 @@ app.get('/pos-sync/get-resolved-price/:productCode', validateApiKey, async (req,
     if (!pool) await initializePool();
 
     const { productCode } = req.params;
-    const locationCode = req.query.locationCode || process.env.POS_LOCATION_CODE || 'SH';
+    const locationCode = req.query.locationCode || appConfig.posDb.locationCode;
     const priceTypeCode = req.query.priceTypeCode || 'RT';
     const request = pool.request();
     const resolvedPrice = await priceUpdates.getResolvedPrice(request, productCode, locationCode, priceTypeCode);
@@ -1646,6 +1708,11 @@ async function gracefulShutdown() {
     await pool.close();
     console.log('Database connection pool closed');
   }
+  if (instanceLockServer) {
+    instanceLockServer.close();
+    instanceLockServer = null;
+    console.log('Instance lock released');
+  }
   process.exit(0);
 }
 process.on('SIGTERM', gracefulShutdown);
@@ -1653,25 +1720,25 @@ process.on('SIGINT', gracefulShutdown);
 
 /** Auto-sync interval */
 let autoSyncInterval;
-const SYNC_INTERVAL_MS = process.env.SYNC_INTERVAL_MS || 60000; // 60 seconds default
+const SYNC_INTERVAL_MS = appConfig.polling.reportingSyncIntervalMs;
 let isAutoSyncRunning = false;
 
 /** Command polling interval */
 let commandPollInterval;
-const COMMAND_POLL_INTERVAL_MS = parseInt(process.env.COMMAND_POLL_INTERVAL_MS || '5000', 10);
-const ENABLE_POS_COMMAND_POLLING = process.env.ENABLE_POS_COMMAND_POLLING !== 'false';
+const COMMAND_POLL_INTERVAL_MS = appConfig.polling.commandPollIntervalMs;
+const ENABLE_POS_COMMAND_POLLING = appConfig.modules.commandPolling;
 let isCommandPollRunning = false;
 
 /** Emergency sales polling interval */
 let emergencySalesPollInterval;
-const EMERGENCY_SALES_POLL_INTERVAL_MS = parseInt(process.env.EMERGENCY_SALES_POLL_INTERVAL_MS || '7000', 10);
-const ENABLE_EMERGENCY_SALES_SYNC = process.env.ENABLE_EMERGENCY_SALES_SYNC !== 'false';
+const EMERGENCY_SALES_POLL_INTERVAL_MS = appConfig.polling.emergencySalesPollIntervalMs;
+const ENABLE_EMERGENCY_SALES_SYNC = appConfig.modules.emergencySalesSync;
 let isEmergencySalesPollRunning = false;
 
 /** Reporting sync interval */
 let reportingSyncInterval;
-const REPORTING_SYNC_INTERVAL_MS = parseInt(process.env.REPORTING_POLLING_INTERVAL_MS || process.env.SYNC_INTERVAL_MS || '60000', 10);
-const ENABLE_REPORTING_SYNC = process.env.ENABLE_REPORTING_SYNC !== 'false';
+const REPORTING_SYNC_INTERVAL_MS = appConfig.reporting.pollingIntervalMs;
+const ENABLE_REPORTING_SYNC = appConfig.features.enableReportingSync;
 let isReportingSyncRunning = false;
 
 /**
@@ -1849,8 +1916,7 @@ async function pollAndProcessReportingSync() {
 
   try {
     console.log(`${BRANCH_TAG} [REPORTING SYNC] Polling started`);
-    const batchSize = parseInt(process.env.REPORTING_BATCH_SIZE || '500', 10);
-    const result = await reportingSyncService.syncBatch(pool, Number.isInteger(batchSize) && batchSize > 0 ? batchSize : 500);
+    const result = await reportingSyncService.syncBatch(pool, appConfig.reporting.batchSize);
 
     if (result.success) {
       const latestCostSummary = result.latestProductCostThrottled
@@ -1866,13 +1932,54 @@ async function pollAndProcessReportingSync() {
 }
 
 /** Start server */
-const PORT = process.env.PORT || 3001;
+const PORT = appConfig.server.port;
 let autoSyncStarted = false;
+
+function logStartupConfiguration() {
+  const validation = validateStartupConfig(appConfig);
+  const startupSummary = buildStartupSummary(appConfig);
+  const nodeVersion = process.version;
+  const nodeMajor = Number.parseInt(String(nodeVersion).replace(/^v/, '').split('.')[0], 10);
+
+  console.log(`${BRANCH_TAG} [BOOT] Runtime: Node ${nodeVersion}`);
+  if (Number.isInteger(nodeMajor) && nodeMajor < 14) {
+    console.warn(`${BRANCH_TAG} [BOOT][WARN] Node ${nodeVersion} may be too old for modern JS syntax. Recommended: Node 16+.`);
+  }
+
+  console.log(`${BRANCH_TAG} [BOOT] Agent: ${appConfig.server.agentName} v${PACKAGE_VERSION}`);
+  console.log(`${BRANCH_TAG} [BOOT] Branch: ${appConfig.branch.branchName} (${appConfig.branch.branchCode})`);
+  console.log(`${BRANCH_TAG} [BOOT] Source: ${appConfig.branch.syncSourceCode} | LocationId: ${appConfig.branch.locationId}`);
+  console.log(`${BRANCH_TAG} [BOOT] Feature flags:`, appConfig.features);
+  console.log(`${BRANCH_TAG} [BOOT] Startup summary:`, startupSummary);
+
+  if (validation.warnings.length > 0) {
+    validation.warnings.forEach((warning) => {
+      console.warn(`${BRANCH_TAG} [BOOT][WARN] ${warning}`);
+    });
+  }
+
+  if (!validation.valid) {
+    validation.errors.forEach((error) => {
+      console.error(`${BRANCH_TAG} [BOOT][ERROR] ${error}`);
+    });
+    throw new Error('Startup configuration validation failed');
+  }
+}
 
 startServer();
 async function startServer() {
   try {
+    logStartupConfiguration();
+
+    const lockAcquired = await acquireInstanceLock();
+    if (!lockAcquired) {
+      console.error(`${BRANCH_TAG} [BOOT][ERROR] Startup aborted because another agent instance appears to be running.`);
+      process.exit(1);
+      return;
+    }
+
     await initializePool();
+    await validateBackendConnection();
 
     if (ENABLE_REPORTING_SYNC) {
       try {
@@ -1888,7 +1995,7 @@ async function startServer() {
       console.log(`${BRANCH_TAG} POS Sync Agent listening on port ${PORT}`);
       console.log(`API Key validation: ENABLED`);
       console.log(`Database: ${SQL_SERVER}/${SQL_DATABASE}`);
-      console.log(`Live Server: ${BACKEND_BASE_URL || 'NOT CONFIGURED'}`);
+      console.log(`Backend: ${BACKEND_BASE_URL || 'NOT CONFIGURED'}`);
       console.log(`Auto-sync interval: ${SYNC_INTERVAL_MS}ms (${Math.round(SYNC_INTERVAL_MS / 1000)}s)`);
       console.log('[PHASE 3 ROUTES] Registered:', [
         'GET /pos-sync/expiry-products',
@@ -1913,19 +2020,19 @@ async function startServer() {
         commandPollInterval = setInterval(pollAndProcessCommands, COMMAND_POLL_INTERVAL_MS);
         console.log(`[POS COMMAND POLLER] ✅ Polling enabled (${COMMAND_POLL_INTERVAL_MS}ms)`);
       } else {
-        console.log('[POS COMMAND POLLER] ⚠️ Polling disabled (requires ENABLE_POS_COMMAND_POLLING=true, BACKEND_BASE_URL/LIVE_SERVER_URL, BACKEND_API_TOKEN/POS_SECRET)');
+        console.log('[POS COMMAND POLLER] ⚠️ Polling disabled (requires command polling feature flags, BACKEND_URL, BACKEND_API_TOKEN/POS_SECRET)');
       }
 
       if (ENABLE_EMERGENCY_SALES_SYNC && BACKEND_BASE_URL && BACKEND_API_TOKEN) {
         emergencySalesPollInterval = setInterval(pollAndProcessEmergencySales, EMERGENCY_SALES_POLL_INTERVAL_MS);
         console.log(`[EMERGENCY SALES] ✅ Sync polling enabled (${EMERGENCY_SALES_POLL_INTERVAL_MS}ms)`);
       } else {
-        console.log('[EMERGENCY SALES] ⚠️ Sync polling disabled (requires ENABLE_EMERGENCY_SALES_SYNC=true, BACKEND_BASE_URL/LIVE_SERVER_URL, BACKEND_API_TOKEN/POS_SECRET)');
+        console.log('[EMERGENCY SALES] ⚠️ Sync polling disabled (requires emergency sales feature flags, BACKEND_URL, BACKEND_API_TOKEN/POS_SECRET)');
       }
 
       if (ENABLE_REPORTING_SYNC && reportingSyncService) {
         reportingSyncInterval = setInterval(pollAndProcessReportingSync, REPORTING_SYNC_INTERVAL_MS);
-        console.log(`${BRANCH_TAG} [REPORTING SYNC] ✅ Polling enabled (${REPORTING_SYNC_INTERVAL_MS}ms, batch: ${process.env.REPORTING_BATCH_SIZE || '500'})`);
+        console.log(`${BRANCH_TAG} [REPORTING SYNC] ✅ Polling enabled (${REPORTING_SYNC_INTERVAL_MS}ms, batch: ${appConfig.reporting.batchSize})`);
         pollAndProcessReportingSync();
       } else if (!ENABLE_REPORTING_SYNC) {
         console.log(`${BRANCH_TAG} [REPORTING SYNC] ⏸ Polling disabled by ENABLE_REPORTING_SYNC=false`);

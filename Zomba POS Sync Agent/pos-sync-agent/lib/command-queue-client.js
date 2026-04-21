@@ -8,7 +8,7 @@ function getClientConfig() {
   const agentId = config.backend.agentId;
 
   if (!baseURL) {
-    throw new Error('BACKEND_BASE_URL (or LIVE_SERVER_URL) is required for command polling');
+    throw new Error('BACKEND_URL (or BACKEND_BASE_URL/LIVE_SERVER_URL fallback) is required for command polling');
   }
 
   if (!posSecret) {

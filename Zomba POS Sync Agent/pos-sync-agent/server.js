@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const sql = require('mssql');
 const axios = require('axios');
+const net = require('net');
 
 // Import modules for POS write-back
 const transactionManager = require('./lib/transaction-manager');
@@ -10,7 +11,7 @@ const stockUpdates = require('./lib/stock-updates');
 const priceUpdates = require('./lib/price-updates');
 const commandQueueClient = require('./lib/command-queue-client');
 const commandExecutor = require('./lib/command-executor');
-const { buildConfig, getBranchTag, getSyncMetadata, validateStartupConfig } = require('./lib/config');
+const { buildConfig, getBranchTag, getSyncMetadata, validateStartupConfig, buildStartupSummary } = require('./lib/config');
 const ReportingSyncService = require('./lib/reporting-sync');
 const ReportingSyncState = require('./lib/reporting-sync-state');
 
@@ -20,6 +21,7 @@ app.use(express.json());
 const appConfig = buildConfig();
 const BRANCH_TAG = getBranchTag(appConfig);
 const SYNC_LOG_PREFIX = appConfig.branch.logPrefix || `[${appConfig.branch.branchCode} SYNC]`;
+const PACKAGE_VERSION = require('./package.json').version || '0.0.0';
 const ENABLE_DIRECT_WRITEBACK_DEBUG = appConfig.server.enableDirectWritebackDebug;
 const SQL_SERVER = appConfig.posDb.server;
 const SQL_DATABASE = appConfig.posDb.database;
@@ -50,6 +52,7 @@ let pool;
 /** Reporting sync service and state */
 let reportingSyncState;
 let reportingSyncService;
+let instanceLockServer = null;
 
 /** Expiry batch cache - refreshed every 5 minutes so heavy view query doesn't block every 15s product push tick */
 let expiryBatchCache = null;
@@ -62,6 +65,72 @@ const ENABLE_DELTA_PRODUCT_SYNC = String(process.env.ENABLE_DELTA_PRODUCT_SYNC |
 const DELTA_FULL_SYNC_EVERY_CYCLES = Number.parseInt(process.env.DELTA_FULL_SYNC_EVERY_CYCLES || '40', 10);
 let lastProductSyncSnapshot = new Map();
 let productSyncCycleCounter = 0;
+
+function acquireInstanceLock() {
+  return new Promise((resolve) => {
+    const requestedLockPort = Number(appConfig.server.instanceLockPort || 0);
+    if (!Number.isInteger(requestedLockPort) || requestedLockPort <= 0) {
+      console.warn(`${BRANCH_TAG} [BOOT][WARN] Duplicate instance guard disabled because INSTANCE_LOCK_PORT is invalid.`);
+      resolve(true);
+      return;
+    }
+
+    const lockServer = net.createServer();
+
+    lockServer.once('error', (error) => {
+      if (error && error.code === 'EADDRINUSE') {
+        console.error(`${BRANCH_TAG} [BOOT][ERROR] Duplicate instance detected on lock port ${requestedLockPort}.`);
+        resolve(false);
+        return;
+      }
+      console.error(`${BRANCH_TAG} [BOOT][ERROR] Instance lock check failed:`, error ? error.message : 'Unknown error');
+      resolve(false);
+    });
+
+    lockServer.once('listening', () => {
+      instanceLockServer = lockServer;
+      console.log(`${BRANCH_TAG} [BOOT] Instance lock acquired on port ${requestedLockPort}`);
+      resolve(true);
+    });
+
+    lockServer.listen(requestedLockPort, '127.0.0.1');
+  });
+}
+
+async function validateBackendConnection() {
+  if (!appConfig.backend.connectionTestEnabled) {
+    console.log(`${BRANCH_TAG} [BOOT] Backend connectivity test skipped (BACKEND_CONNECTION_TEST_ENABLED=false).`);
+    return;
+  }
+
+  if (!appConfig.backend.baseUrl) {
+    console.warn(`${BRANCH_TAG} [BOOT][WARN] Backend connectivity test skipped because BACKEND_URL is not configured.`);
+    return;
+  }
+
+  const timeoutMs = appConfig.backend.connectionTimeoutMs;
+  const healthPath = appConfig.backend.healthCheckPath || '/api/health';
+  const baseUrl = appConfig.backend.baseUrl.replace(/\/$/, '');
+  const candidates = [
+    `${baseUrl}${healthPath.startsWith('/') ? '' : '/'}${healthPath}`,
+    `${baseUrl}/api/products?page=1&pageSize=1`,
+  ];
+
+  for (const targetUrl of candidates) {
+    try {
+      const response = await axios.get(targetUrl, { timeout: timeoutMs });
+      console.log(`${BRANCH_TAG} [BOOT] Backend connectivity check passed`, {
+        targetUrl,
+        status: response.status,
+      });
+      return;
+    } catch (error) {
+      console.warn(`${BRANCH_TAG} [BOOT][WARN] Backend connectivity check failed for ${targetUrl}:`, error.message);
+    }
+  }
+
+  console.error(`${BRANCH_TAG} [BOOT][ERROR] Backend connectivity checks failed for all configured probe endpoints.`);
+}
 
 function buildProductDeltaKey(product) {
   const productCode = String(product && product.ProductCode ? product.ProductCode : '').trim().toUpperCase();
@@ -266,8 +335,8 @@ function requireAllFeatures(flagNames, moduleName) {
 async function sendProductsToLiveServer(products, syncContext = {}) {
   try {
     if (!appConfig.backend.baseUrl) {
-      console.error(`${BRANCH_TAG} [POS SYNC] ERROR: BACKEND_BASE_URL not configured`);
-      return { success: false, error: 'BACKEND_BASE_URL not configured' };
+      console.error(`${BRANCH_TAG} [POS SYNC] ERROR: BACKEND_URL not configured`);
+      return { success: false, error: 'BACKEND_URL not configured' };
     }
 
     console.log(`${SYNC_LOG_PREFIX} Sending ${products.length} products to backend (batching)`);
@@ -2109,6 +2178,11 @@ async function gracefulShutdown() {
     await pool.close();
     console.log('Database connection pool closed');
   }
+  if (instanceLockServer) {
+    instanceLockServer.close();
+    instanceLockServer = null;
+    console.log('Instance lock released');
+  }
   process.exit(0);
 }
 process.on('SIGTERM', gracefulShutdown);
@@ -2502,6 +2576,7 @@ let autoSyncStarted = false;
 
 function logStartupConfiguration() {
   const validation = validateStartupConfig(appConfig);
+  const startupSummary = buildStartupSummary(appConfig);
   const nodeVersion = process.version;
   const nodeMajor = Number.parseInt(String(nodeVersion).replace(/^v/, '').split('.')[0], 10);
 
@@ -2510,9 +2585,11 @@ function logStartupConfiguration() {
     console.warn(`${BRANCH_TAG} [BOOT][WARN] Node ${nodeVersion} may be too old for modern JS syntax. Recommended: Node 16+.`);
   }
 
+  console.log(`${BRANCH_TAG} [BOOT] Agent: ${appConfig.server.agentName} v${PACKAGE_VERSION}`);
   console.log(`${BRANCH_TAG} [BOOT] Branch: ${appConfig.branch.branchName} (${appConfig.branch.branchCode})`);
   console.log(`${BRANCH_TAG} [BOOT] Source: ${appConfig.branch.syncSourceCode} | LocationId: ${appConfig.branch.locationId}`);
   console.log(`${BRANCH_TAG} [BOOT] Feature flags:`, appConfig.features);
+  console.log(`${BRANCH_TAG} [BOOT] Startup summary:`, startupSummary);
 
   if (validation.warnings.length > 0) {
     validation.warnings.forEach((warning) => {
@@ -2532,7 +2609,16 @@ startServer();
 async function startServer() {
   try {
     logStartupConfiguration();
+
+    const lockAcquired = await acquireInstanceLock();
+    if (!lockAcquired) {
+      console.error(`${BRANCH_TAG} [BOOT][ERROR] Startup aborted because another agent instance appears to be running.`);
+      process.exit(1);
+      return;
+    }
+
     await initializePool();
+    await validateBackendConnection();
 
     // Initialize reporting sync if enabled
     if (appConfig.features.enableReportingSync) {

@@ -56,29 +56,44 @@ function buildFeatureFlags() {
 function buildConfig() {
   const branch = buildBranchConfig();
   const features = buildFeatureFlags();
+  const runtimeEnvironment = normalizeString(process.env.AGENT_ENV, normalizeString(process.env.NODE_ENV, 'development')).toLowerCase();
+  const agentName = normalizeString(process.env.AGENT_NAME, `${branch.branchCode.toLowerCase()}-pos-sync-agent`);
+  const agentVersion = normalizeString(process.env.AGENT_VERSION, '1.0.0');
 
-  const backendBaseUrl = normalizeString(process.env.BACKEND_BASE_URL, normalizeString(process.env.LIVE_SERVER_URL));
+  const backendBaseUrl = normalizeString(
+    process.env.BACKEND_URL,
+    normalizeString(process.env.BACKEND_BASE_URL, normalizeString(process.env.LIVE_SERVER_URL))
+  );
   const backendApiToken = normalizeString(process.env.BACKEND_API_TOKEN, normalizeString(process.env.POS_SECRET));
 
-  const sqlServer = normalizeString(process.env.POS_DB_SERVER, normalizeString(process.env.DB_SERVER, 'localhost'));
-  const sqlDatabase = normalizeString(process.env.POS_DB_NAME, normalizeString(process.env.DB_NAME || process.env.DB_DATABASE, 'POS'));
+  const sqlServer = normalizeString(process.env.POS_DB_SERVER, normalizeString(process.env.DB_SERVER));
+  const sqlDatabase = normalizeString(process.env.POS_DB_NAME, normalizeString(process.env.DB_NAME || process.env.DB_DATABASE));
   const sqlUser = normalizeString(process.env.POS_DB_USER, normalizeString(process.env.DB_USER));
   const sqlPassword = normalizeString(process.env.POS_DB_PASSWORD, normalizeString(process.env.DB_PASSWORD));
 
-  const pollingIntervalMs = parseInteger(process.env.POLLING_INTERVAL_MS || process.env.SYNC_INTERVAL_MS, 60000);
+  const pollingIntervalMs = parseInteger(process.env.POLL_INTERVAL_MS || process.env.POLLING_INTERVAL_MS || process.env.SYNC_INTERVAL_MS, 60000);
+  const serverPort = parseInteger(process.env.PORT, 3001);
+  const instanceLockPort = parseInteger(process.env.INSTANCE_LOCK_PORT, serverPort + 10000);
 
   const config = {
     branch,
     server: {
-      port: parseInteger(process.env.PORT, 3001),
+      port: serverPort,
       enableDirectWritebackDebug: parseBoolean(process.env.ENABLE_DIRECT_POS_WRITEBACK_DEBUG, false),
       agentApiSecret: normalizeString(process.env.POS_SECRET, backendApiToken),
+      environment: runtimeEnvironment,
+      agentName,
+      agentVersion,
+      instanceLockPort,
     },
     backend: {
       baseUrl: backendBaseUrl,
       apiToken: backendApiToken,
       commandPollTimeoutMs: parseInteger(process.env.COMMAND_POLL_TIMEOUT_MS, 15000),
       agentId: normalizeString(process.env.POS_AGENT_ID, `${branch.branchCode.toLowerCase()}-${branch.syncSourceCode.toLowerCase()}`),
+      connectionTestEnabled: parseBoolean(process.env.BACKEND_CONNECTION_TEST_ENABLED, true),
+      connectionTimeoutMs: parseInteger(process.env.BACKEND_CONNECTION_TIMEOUT_MS, 5000),
+      healthCheckPath: normalizeString(process.env.BACKEND_HEALTHCHECK_PATH, '/api/health'),
     },
     posDb: {
       server: sqlServer,
@@ -166,12 +181,16 @@ function validateStartupConfig(config) {
   requireValue(config.server.agentApiSecret, 'Missing agent API secret (POS_SECRET)');
 
   if (config.modules.reportingSync || config.modules.commandPolling || config.modules.emergencySalesSync) {
-    requireValue(config.backend.baseUrl, 'Missing backend URL (BACKEND_BASE_URL or LIVE_SERVER_URL)');
+    requireValue(config.backend.baseUrl, 'Missing backend URL (BACKEND_URL or BACKEND_BASE_URL/LIVE_SERVER_URL)');
     requireValue(config.backend.apiToken, 'Missing backend API token (BACKEND_API_TOKEN or POS_SECRET)');
   }
 
-  if (!process.env.BACKEND_BASE_URL && process.env.LIVE_SERVER_URL) {
-    warnings.push('Using legacy LIVE_SERVER_URL fallback. Prefer BACKEND_BASE_URL.');
+  if (!process.env.BACKEND_URL && !process.env.BACKEND_BASE_URL && process.env.LIVE_SERVER_URL) {
+    warnings.push('Using legacy LIVE_SERVER_URL fallback. Prefer BACKEND_URL.');
+  }
+
+  if (!process.env.BACKEND_URL && process.env.BACKEND_BASE_URL) {
+    warnings.push('Using BACKEND_BASE_URL fallback. Prefer BACKEND_URL.');
   }
 
   if (!process.env.BACKEND_API_TOKEN && process.env.POS_SECRET) {
@@ -201,10 +220,29 @@ function validateStartupConfig(config) {
   };
 }
 
+function buildStartupSummary(config) {
+  return {
+    agentName: config.server.agentName,
+    agentVersion: config.server.agentVersion,
+    environment: config.server.environment,
+    backendUrl: config.backend.baseUrl || 'NOT_CONFIGURED',
+    pollIntervalMs: config.polling.reportingSyncIntervalMs,
+    commandPollIntervalMs: config.polling.commandPollIntervalMs,
+    emergencySalesPollIntervalMs: config.polling.emergencySalesPollIntervalMs,
+    branchCode: config.branch.branchCode,
+    branchName: config.branch.branchName,
+    locationCode: config.posDb.locationCode,
+    syncSourceCode: config.branch.syncSourceCode,
+    listenPort: config.server.port,
+    instanceLockPort: config.server.instanceLockPort,
+  };
+}
+
 module.exports = {
   buildConfig,
   getBranchTag,
   getSyncMetadata,
   validateStartupConfig,
+  buildStartupSummary,
   parseBoolean,
 };
