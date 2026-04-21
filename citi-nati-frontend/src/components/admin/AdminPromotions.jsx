@@ -51,6 +51,7 @@ const AdminPromotions = ({
   const effectiveLocationCode = selectedScope.locationCode;
   const effectiveBranchCode = selectedBranchCode || selectedScope.branchCode;
   const selectedLocationLabel = selectedScope.label;
+  const scopeKey = `${effectiveBranchCode}|${effectiveLocationCode}`;
   const hasSharedProductsCache = Array.isArray(cachedProducts) && (
     cachedProducts.length > 0
     || Boolean(cachedProductsMeta?.lastLoadedAt)
@@ -110,7 +111,7 @@ const AdminPromotions = ({
     }
 
     fetchCurrentPromotions();
-  }, [selectedLocationCode, selectedBranchCode, cachedProducts, hasSharedProductsCache]);
+  }, [scopeKey]);
 
   useEffect(() => {
     if (!hasSharedProductsCache) return;
