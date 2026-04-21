@@ -230,6 +230,7 @@ const AdminSystem = () => {
           boxSizing: 'border-box',
           overflow: 'hidden',
           padding: '0.75rem 1rem',
+          display: 'block',
         }}
       >
         <div className={isMobileViewport ? 'admin-mobile-filter-top-row' : ''} style={{
