@@ -1,6 +1,11 @@
 'use strict';
 
 const { PrismaClient } = require('@prisma/client');
+const {
+  normalizeScopeCode,
+  expandLocationScopeCodes,
+  deriveBranchCodeFromLocationCode,
+} = require('../../utils/operationalScope');
 
 const prisma = new PrismaClient();
 
@@ -131,6 +136,84 @@ function includeShape() {
   };
 }
 
+async function lookupGoodsIntakeProducts({ query, locationCode, take = 20 }) {
+  const normalizedQuery = String(query || '').trim();
+  const normalizedLocationCode = normalizeScopeCode(locationCode);
+  if (!normalizedQuery || !normalizedLocationCode) {
+    return [];
+  }
+
+  const scopeCodes = expandLocationScopeCodes(normalizedLocationCode);
+  const branchCode = deriveBranchCodeFromLocationCode(normalizedLocationCode);
+  const isConcreteZombaScope = branchCode === 'ZOMBA' && normalizedLocationCode !== 'ZA';
+
+  const scopeWhere = isConcreteZombaScope
+    ? {
+        branchCode: 'ZOMBA',
+        locationCode: { equals: normalizedLocationCode, mode: 'insensitive' },
+      }
+    : {
+        OR: [
+          ...scopeCodes.map((code) => ({
+            locationCode: { equals: code, mode: 'insensitive' },
+          })),
+          ...(scopeCodes.includes('BT') ? [{ branchCode: 'BLANTYRE' }] : []),
+        ],
+      };
+
+  const products = await prisma.product.findMany({
+    where: {
+      ...scopeWhere,
+      OR: [
+        { barcode: { equals: normalizedQuery, mode: 'insensitive' } },
+        { sourceCode: { equals: normalizedQuery, mode: 'insensitive' } },
+        { name: { contains: normalizedQuery, mode: 'insensitive' } },
+        { barcode: { contains: normalizedQuery, mode: 'insensitive' } },
+        { sourceCode: { contains: normalizedQuery, mode: 'insensitive' } },
+      ],
+    },
+    select: {
+      id: true,
+      name: true,
+      sourceCode: true,
+      barcode: true,
+      price: true,
+      category: true,
+      branchCode: true,
+      locationCode: true,
+      isActive: true,
+      enabled: true,
+    },
+    take: Math.max(1, Math.min(Number(take) || 20, 30)),
+    orderBy: [
+      { name: 'asc' },
+    ],
+  });
+
+  const loweredQuery = normalizedQuery.toLowerCase();
+
+  return products
+    .map((product) => ({
+      ...product,
+      productCode: product.sourceCode,
+      product_code: product.sourceCode,
+      unitPrice: Number(product.price || 0),
+      unit_price: Number(product.price || 0),
+    }))
+    .sort((a, b) => {
+      const aExact = String(a.barcode || '').toLowerCase() === loweredQuery
+        || String(a.sourceCode || '').toLowerCase() === loweredQuery;
+      const bExact = String(b.barcode || '').toLowerCase() === loweredQuery
+        || String(b.sourceCode || '').toLowerCase() === loweredQuery;
+
+      if (aExact === bExact) {
+        return String(a.name || '').localeCompare(String(b.name || ''));
+      }
+
+      return aExact ? -1 : 1;
+    });
+}
+
 async function createGoodsIntake(payload) {
   const items = payload.items.map(buildLineItem).filter((line) => line.productName);
   const totals = computeTotals(items);
@@ -232,4 +315,5 @@ module.exports = {
   deleteGoodsIntake,
   getGoodsIntakeById,
   listGoodsIntakes,
+  lookupGoodsIntakeProducts,
 };

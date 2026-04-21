@@ -258,6 +258,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
   const [form, setForm] = useState(() => buildNewForm(selectedLocation));
   const [saving, setSaving] = useState(false);
   const [activeLookupRow, setActiveLookupRow] = useState(-1);
+  const [lookupWarning, setLookupWarning] = useState('');
   const [isIntakeWorkspaceOpen, setIsIntakeWorkspaceOpen] = useState(false);
   const [isIntakeWorkspaceMaximized, setIsIntakeWorkspaceMaximized] = useState(false);
 
@@ -270,6 +271,12 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
       locationName: selectedLocation?.name || '',
     }));
   }, [form.id, selectedLocation]);
+
+  useEffect(() => {
+    if (activeLookupLocationCode) {
+      setLookupWarning('');
+    }
+  }, [activeLookupLocationCode]);
 
   const calculatedItems = useMemo(() => form.items.map(withCalculatedLine), [form.items]);
 
@@ -413,6 +420,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
   };
 
   const clearForm = () => {
+    setLookupWarning('');
     setForm(buildNewForm(selectedLocation));
   };
 
@@ -549,11 +557,16 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
   const handleLookup = async (index) => {
     const line = form.items[index];
     const query = String(line?.barcode || line?.productName || '').trim();
-    if (!query || !activeLookupLocationCode) return;
+    if (!query) return;
+    if (!activeLookupLocationCode) {
+      setLookupWarning('Select the branch / location before scanning or typing a barcode so goods intake can match the correct product.');
+      return;
+    }
 
     setActiveLookupRow(index);
+    setLookupWarning('');
     try {
-      const response = await api.get('/admin/emergency-sales/lookup', {
+      const response = await api.get('/business-operations/goods-intake/lookup-products', {
         params: {
           q: query,
           locationCode: activeLookupLocationCode,
@@ -724,6 +737,12 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
           <span style={{ fontSize: '0.78rem', color: missingBarcodeCount ? '#b45309' : '#64748b' }}>Missing barcode: {missingBarcodeCount}</span>
           <span style={{ fontSize: '0.78rem', color: missingExpiryCount ? '#b45309' : '#64748b' }}>Missing expiry: {missingExpiryCount}</span>
         </div>
+
+        {lookupWarning && (
+          <div style={{ marginTop: '0.75rem', border: '1px solid #fdba74', background: '#fff7ed', color: '#9a3412', borderRadius: '10px', padding: '0.7rem 0.85rem', fontSize: '0.84rem', fontWeight: 600 }}>
+            {lookupWarning}
+          </div>
+        )}
 
         <div style={{ marginTop: '0.8rem', width: '100%', maxWidth: '100%', overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 0.45rem', minWidth: '1220px' }}>

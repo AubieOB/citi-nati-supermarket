@@ -163,10 +163,37 @@ async function listGoodsIntakes(req, res) {
   }
 }
 
+async function lookupGoodsIntakeProducts(req, res) {
+  try {
+    const query = String(req.query.q || req.query.search || '').trim();
+    const locationCode = req.query.locationCode ? String(req.query.locationCode).trim() : null;
+
+    if (!query) {
+      return res.json({ success: true, products: [] });
+    }
+
+    if (!locationCode) {
+      return res.status(400).json({ success: false, error: 'locationCode is required for goods intake lookup' });
+    }
+
+    const products = await goodsIntakeService.lookupGoodsIntakeProducts({
+      query,
+      locationCode,
+      take: req.query.take,
+    });
+
+    return res.json({ success: true, products });
+  } catch (error) {
+    console.error('[BO][GOODS_INTAKE] lookup error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to lookup goods intake products' });
+  }
+}
+
 module.exports = {
   createGoodsIntake,
   updateGoodsIntake,
   deleteGoodsIntake,
   getGoodsIntakeById,
   listGoodsIntakes,
+  lookupGoodsIntakeProducts,
 };
