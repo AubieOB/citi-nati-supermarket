@@ -111,12 +111,71 @@ function getLookupCacheKey(locationCode, query) {
   return `${String(locationCode || '').toUpperCase()}|${String(query || '').trim().toLowerCase()}`;
 }
 
-function readLookupCache(locationCode, query) {
+function invalidateLookupCacheForLocation(locationCode, reason = 'unspecified') {
+  const prefix = `${String(locationCode || '').trim().toUpperCase()}|`;
+  if (!prefix || prefix === '|') return;
+
+  let deleted = 0;
+  for (const key of emergencyLookupCache.keys()) {
+    if (key.startsWith(prefix)) {
+      emergencyLookupCache.delete(key);
+      deleted += 1;
+    }
+  }
+
+  if (deleted > 0) {
+    console.log('[EMERGENCY SALES][LOOKUP CACHE][INVALIDATE]', {
+      locationCode,
+      reason,
+      deletedEntries: deleted,
+    });
+  }
+}
+
+async function hasLocationLookupStockChangedSince(locationCode, sinceTimestampMs) {
+  if (!Number.isFinite(sinceTimestampMs) || sinceTimestampMs <= 0) {
+    return false;
+  }
+
+  const scopeCodes = expandLocationScopeCodes(locationCode);
+  const branchCode = deriveBranchCodeFromScopeCodes(scopeCodes);
+  const sinceDate = new Date(sinceTimestampMs);
+
+  const where = {
+    enabled: true,
+    updatedAt: {
+      gt: sinceDate,
+    },
+    ...(branchCode ? { branchCode } : {}),
+  };
+
+  if (branchCode === 'ZOMBA' && isConcreteZombaOperationalLocationCode(locationCode)) {
+    where.locationCode = {
+      equals: locationCode,
+      mode: 'insensitive',
+    };
+  }
+
+  const changedCount = await prisma.product.count({ where });
+  return changedCount > 0;
+}
+
+async function readLookupCache(locationCode, query) {
   const key = getLookupCacheKey(locationCode, query);
   const entry = emergencyLookupCache.get(key);
   if (!entry) return null;
   if ((Date.now() - entry.cachedAt) > EMERGENCY_LOOKUP_CACHE_TTL_MS) {
     emergencyLookupCache.delete(key);
+    return null;
+  }
+  const changedSinceCache = await hasLocationLookupStockChangedSince(locationCode, entry.cachedAt);
+  if (changedSinceCache) {
+    emergencyLookupCache.delete(key);
+    console.log('[EMERGENCY SALES][LOOKUP CACHE][REVALIDATE]', {
+      locationCode,
+      query,
+      action: 'evicted_after_stock_change',
+    });
     return null;
   }
   return entry.products;
@@ -128,6 +187,68 @@ function writeLookupCache(locationCode, query, products) {
     cachedAt: Date.now(),
     products,
   });
+}
+
+function sumLocationBatchStockByProductCode(batchRows = []) {
+  const summed = new Map();
+
+  for (const row of batchRows) {
+    const code = String(row?.productCode || '').trim();
+    const qty = Number(row?.remainingQty ?? 0);
+    if (!code || !Number.isFinite(qty)) continue;
+    summed.set(code, Number((summed.get(code) || 0) + qty));
+  }
+
+  return summed;
+}
+
+async function resolveLocationSpecificStockBySourceCode(db, products = [], locationCode) {
+  const resolved = new Map();
+  const sourceCodes = Array.from(new Set(
+    (products || [])
+      .map((row) => String(row?.sourceCode || '').trim())
+      .filter(Boolean)
+  ));
+
+  for (const product of products || []) {
+    const sourceCode = String(product?.sourceCode || '').trim();
+    if (!sourceCode) continue;
+    resolved.set(sourceCode, {
+      stock: Number(product?.stock || 0),
+      source: 'LocationSpecificPersistedProductStock',
+    });
+  }
+
+  if (!locationCode || sourceCodes.length === 0) {
+    return resolved;
+  }
+
+  const batchRows = await db.productExpiryBatch.findMany({
+    where: {
+      productCode: { in: sourceCodes },
+      locationCode: {
+        equals: locationCode,
+        mode: 'insensitive',
+      },
+      remainingQty: {
+        gt: 0,
+      },
+    },
+    select: {
+      productCode: true,
+      remainingQty: true,
+    },
+  });
+
+  const locationBatchTotals = sumLocationBatchStockByProductCode(batchRows);
+  for (const [sourceCode, totalQty] of locationBatchTotals.entries()) {
+    resolved.set(sourceCode, {
+      stock: Math.max(0, Number(totalQty || 0)),
+      source: 'LocationSpecificExpiryBatchStock',
+    });
+  }
+
+  return resolved;
 }
 
 async function resolveLocationScopedProductCodesFromSales(scopeCodes = []) {
@@ -573,7 +694,7 @@ async function lookupEmergencyProducts(req, res) {
     }
 
     if (!locationCode || !SUPPORTED_LOCATION_CODES.includes(locationCode)) {
-      return res.status(400).json({ success: false, error: 'locationCode is required and must be one of BT, SH, BAR, WH, or ZA' });
+      return res.status(400).json({ success: false, error: 'locationCode is required and must be one of BT, SH, BAR, ST999, or WH' });
     }
 
     if (locationCode === 'ZA') {
@@ -589,11 +710,16 @@ async function lookupEmergencyProducts(req, res) {
       return res.status(200).json({ success: true, products: [] });
     }
 
-    const cachedProducts = bypassCache ? null : readLookupCache(locationCode, query);
+    const cachedProducts = bypassCache ? null : await readLookupCache(locationCode, query);
     if (cachedProducts) {
       console.log('[EMERGENCY SALES][LOOKUP] cache-hit', {
+        selectedLocation: req.query.locationCode || req.query.branchCode || '(none)',
+        resolvedStockLocation: locationCode,
         locationCode,
         query,
+        stockSource: cachedProducts[0]?.stockSource || 'LocationSpecificPersistedProductStock',
+        sampleProductCode: cachedProducts[0]?.sourceCode || cachedProducts[0]?.productCode || null,
+        sampleStock: cachedProducts[0] ? Number(cachedProducts[0].stock || 0) : null,
         resultCount: cachedProducts.length,
         durationMs: Date.now() - startedAt,
       });
@@ -612,7 +738,7 @@ async function lookupEmergencyProducts(req, res) {
         resolvedStockLocation: locationCode,
         branchCode: 'ZOMBA',
         locationCode,
-        querySource: 'PersistedProduct.stock',
+        querySource: 'LocationSpecificStockResolver',
       });
     } else {
       scopedProductCodes = await resolveLocationScopedProductCodes(locationCode);
@@ -673,12 +799,28 @@ async function lookupEmergencyProducts(req, res) {
 
     console.log('[PRODUCT RESULT COUNT]', products.length);
 
+    const resolvedLocationStockBySourceCode = await resolveLocationSpecificStockBySourceCode(
+      prisma,
+      products,
+      locationCode
+    );
+
     const mapped = products
       .map((product) => {
-        const enriched = enrichProductStock(product);
+        const sourceCode = String(product.sourceCode || '').trim();
+        const stockResolution = resolvedLocationStockBySourceCode.get(sourceCode) || {
+          stock: Number(product.stock || 0),
+          source: 'LocationSpecificPersistedProductStock',
+        };
+        const enriched = enrichProductStock({
+          ...product,
+          stock: Number(stockResolution.stock || 0),
+          posStock: Number(stockResolution.stock || 0),
+        });
         const unitPrice = computeUnitPrice(product);
         return {
           ...enriched,
+          stockSource: stockResolution.source,
           productCode: enriched.sourceCode,
           product_code: enriched.sourceCode,
           unitPrice,
@@ -696,10 +838,10 @@ async function lookupEmergencyProducts(req, res) {
 
     if (isZombaLocationCode(locationCode) && mapped.length > 0) {
       const sample = mapped[0];
-      console.log(`[ZOMBA STOCK][EMERGENCY_LOOKUP] selectedLocation=${req.query.locationCode || req.query.branchCode || '(none)'} resolvedStockLocation=${locationCode} querySource=PersistedProduct.stock product=${sample.sourceCode || sample.productCode || 'UNKNOWN'} stock=${Number(sample.stock || 0)}`);
+      console.log(`[ZOMBA STOCK][EMERGENCY_LOOKUP] selectedLocation=${req.query.locationCode || req.query.branchCode || '(none)'} resolvedStockLocation=${locationCode} querySource=${sample.stockSource || 'LocationSpecificPersistedProductStock'} product=${sample.sourceCode || sample.productCode || 'UNKNOWN'} stock=${Number(sample.stock || 0)} cache=miss`);
       const verifyProduct = mapped.find((row) => String(row.sourceCode || row.productCode || '').trim() === '9501100002174');
       if (verifyProduct) {
-        console.log(`[ZOMBA STOCK][VERIFY][EMERGENCY_LOOKUP] selectedLocation=${req.query.locationCode || req.query.branchCode || '(none)'} resolvedStockLocation=${locationCode} querySource=PersistedProduct.stock product=9501100002174 stock=${Number(verifyProduct.stock || 0)}`);
+        console.log(`[ZOMBA STOCK][VERIFY][EMERGENCY_LOOKUP] selectedLocation=${req.query.locationCode || req.query.branchCode || '(none)'} resolvedStockLocation=${locationCode} querySource=${verifyProduct.stockSource || 'LocationSpecificPersistedProductStock'} product=9501100002174 stock=${Number(verifyProduct.stock || 0)} cache=miss`);
       }
     }
 
@@ -793,7 +935,28 @@ async function createEmergencySale(req, res) {
         return Promise.reject(new Error('One or more products do not exist'));
       }
 
+      const locationSpecificStockBySourceCode = await resolveLocationSpecificStockBySourceCode(
+        tx,
+        products,
+        locationCode
+      );
+
       const productsById = new Map(products.map((product) => [product.id, product]));
+      const locationSpecificStockByProductId = new Map(
+        products.map((product) => {
+          const sourceCode = String(product?.sourceCode || '').trim();
+          const stockResolution = sourceCode
+            ? locationSpecificStockBySourceCode.get(sourceCode)
+            : null;
+          return [
+            product.id,
+            {
+              stock: Number(stockResolution?.stock ?? product.stock ?? 0),
+              source: stockResolution?.source || 'LocationSpecificPersistedProductStock',
+            },
+          ];
+        })
+      );
       const itemRows = [];
       let subtotal = 0;
 
@@ -807,10 +970,18 @@ async function createEmergencySale(req, res) {
           return Promise.reject(new Error(`Product ${product.name} has no POS product code and cannot be synced`));
         }
 
-        const effectiveStock = resolveEffectiveStock(product);
+        const stockResolution = locationSpecificStockByProductId.get(product.id) || {
+          stock: Number(product.stock || 0),
+          source: 'LocationSpecificPersistedProductStock',
+        };
+        const effectiveStock = resolveEffectiveStock({
+          ...product,
+          stock: Number(stockResolution.stock || 0),
+          posStock: Number(stockResolution.stock || 0),
+        });
         if (effectiveStock < qty) {
           return Promise.reject(
-            new Error(`Insufficient stock for ${product.name}. Available ${effectiveStock}, requested ${qty}`)
+            new Error(`Insufficient stock for ${product.name}. Available ${effectiveStock}, requested ${qty} (source: ${stockResolution.source})`)
           );
         }
 
@@ -901,7 +1072,11 @@ async function createEmergencySale(req, res) {
       const updatedProducts = [];
       for (const line of itemRows) {
         const product = line.product;
-        const nextPosStock = Math.max(0, Number(product.stock || 0) - line.qty);
+        const stockResolution = locationSpecificStockByProductId.get(line.productId) || {
+          stock: Number(product.stock || 0),
+          source: 'LocationSpecificPersistedProductStock',
+        };
+        const nextPosStock = Math.max(0, Number(stockResolution.stock || 0) - line.qty);
         const nextOverrideStock = product.overrideActive && product.overrideStock != null
           ? Math.max(0, Number(product.overrideStock || 0) - line.qty)
           : null;
@@ -915,6 +1090,51 @@ async function createEmergencySale(req, res) {
         });
 
         updatedProducts.push(updatedProduct);
+
+        if (line.product?.sourceCode) {
+          const productCode = String(line.product.sourceCode).trim();
+          if (productCode) {
+            let remainingToConsume = Number(line.qty || 0);
+            const batches = await tx.productExpiryBatch.findMany({
+              where: {
+                productCode,
+                locationCode: {
+                  equals: locationCode,
+                  mode: 'insensitive',
+                },
+                remainingQty: {
+                  gt: 0,
+                },
+              },
+              orderBy: [
+                { expiryDate: 'asc' },
+                { updatedAt: 'asc' },
+                { id: 'asc' },
+              ],
+              select: {
+                id: true,
+                remainingQty: true,
+              },
+            });
+
+            for (const batch of batches) {
+              if (remainingToConsume <= 0) break;
+              const currentQty = Number(batch.remainingQty || 0);
+              if (!Number.isFinite(currentQty) || currentQty <= 0) continue;
+              const consumed = Math.min(currentQty, remainingToConsume);
+              const nextQty = Math.max(0, currentQty - consumed);
+
+              await tx.productExpiryBatch.update({
+                where: { id: batch.id },
+                data: {
+                  remainingQty: nextQty,
+                },
+              });
+
+              remainingToConsume -= consumed;
+            }
+          }
+        }
       }
 
       const fullSale = await tx.emergencySale.findUnique({
@@ -940,6 +1160,8 @@ async function createEmergencySale(req, res) {
 
     const formattedSale = formatEmergencySale(created.sale);
     const posWritePayload = buildPosWriteInvoicePayload(created.sale);
+
+    invalidateLookupCacheForLocation(locationCode, 'emergency_sale_stock_update');
 
     console.log('[EMERGENCY SALES][CREATE] created sale', {
       saleRef: formattedSale.sale_ref,
