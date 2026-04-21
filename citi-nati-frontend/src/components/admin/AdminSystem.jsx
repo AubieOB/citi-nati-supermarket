@@ -210,6 +210,7 @@ const AdminSystem = () => {
   }
 
   const systemFilterSpacerHeight = filterBarHeight > 0 ? filterBarHeight + 8 : 0;
+  const isMobileViewport = filterBarLayout.top > 0;
 
   return (
     <div style={{ position: 'relative' }}>
@@ -231,16 +232,32 @@ const AdminSystem = () => {
           padding: '0.75rem 1rem',
         }}
       >
-        <div className="admin-mobile-filter-top-row" style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.6rem',
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobileViewport ? '1fr' : '1fr auto',
+          columnGap: '1.25rem',
+          rowGap: '0.5rem',
+          alignItems: 'start',
         }}>
-          <i className="fas fa-sliders-h" style={{ fontSize: '1.2rem', color: '#5B4B8A' }}></i>
-          <h1 style={{ margin: 0, color: '#333', fontSize: '1.15rem' }}>System Settings</h1>
-        </div>
-        <div className="admin-mobile-filter-controls" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1.25rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
-          <div>
+          <div className="admin-mobile-filter-top-row" style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.6rem',
+          }}>
+            <i className="fas fa-sliders-h" style={{ fontSize: '1.2rem', color: '#5B4B8A' }}></i>
+            <h1 style={{ margin: 0, color: '#333', fontSize: '1.15rem' }}>System Settings</h1>
+          </div>
+
+          <div className="admin-mobile-filter-meta" style={{ textAlign: isMobileViewport ? 'left' : 'right', marginLeft: isMobileViewport ? 0 : 'auto', whiteSpace: isMobileViewport ? 'normal' : 'nowrap' }}>
+            <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600' }}>
+              Business Timezone: {businessTime.timezoneName} ({businessTime.offsetLabel})
+            </div>
+            <div style={{ color: '#334155', fontSize: '0.9rem', fontWeight: 700, marginTop: '0.2rem' }}>
+              Current Business Time: {businessNowDisplay || formatBusinessNow(Number(businessTime.offsetMinutes || 120)) || 'N/A'}
+            </div>
+          </div>
+
+          <div className="admin-mobile-filter-controls" style={{ display: 'grid', gap: '0.2rem' }}>
             <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600' }}>
               Maintenance: {maintenanceMode ? 'ENABLED' : 'DISABLED'}
             </div>
@@ -254,14 +271,8 @@ const AdminSystem = () => {
               Checkout Minimum: MWK {Number(minimumOrderValue || 0).toLocaleString()}
             </div>
           </div>
-          <div className="admin-mobile-filter-meta" style={{ textAlign: 'right', marginLeft: 'auto' }}>
-            <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600' }}>
-              Business Timezone: {businessTime.timezoneName} ({businessTime.offsetLabel})
-            </div>
-            <div style={{ color: '#334155', fontSize: '0.9rem', fontWeight: 700, marginTop: '0.2rem' }}>
-              Current Business Time: {businessNowDisplay || formatBusinessNow(Number(businessTime.offsetMinutes || 120)) || 'N/A'}
-            </div>
-          </div>
+
+          {!isMobileViewport && <div aria-hidden="true" />}
         </div>
       </div>
 

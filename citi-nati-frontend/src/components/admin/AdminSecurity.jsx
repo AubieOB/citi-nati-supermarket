@@ -346,6 +346,7 @@ const AdminSecurity = () => {
   ];
 
   const securityFilterSpacerHeight = filterBarHeight > 0 ? filterBarHeight + 8 : 0;
+  const isMobileViewport = filterBarLayout.top > 0;
 
   return (
     <div style={{ position: 'relative' }}>
@@ -372,14 +373,14 @@ const AdminSecurity = () => {
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: '0.75rem',
-          flexWrap: 'wrap',
+          flexWrap: isMobileViewport ? 'wrap' : 'nowrap',
           marginBottom: '0.75rem',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <i className="fas fa-lock" style={{ fontSize: '1.2rem', color: '#5B4B8A' }}></i>
             <h1 style={{ margin: 0, color: '#333', fontSize: '1.15rem' }}>Security Management</h1>
           </div>
-          <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600' }}>
+          <div style={{ color: '#666', fontSize: '0.85rem', fontWeight: '600', marginLeft: isMobileViewport ? 0 : 'auto', textAlign: isMobileViewport ? 'left' : 'right', whiteSpace: isMobileViewport ? 'normal' : 'nowrap' }}>
             Admin key: {hasAdminSecurityKey ? 'SET' : 'NOT SET'} | Driver key: {selectedDriverId ? (hasDriverSecurityKey ? 'SET' : 'NOT SET') : 'N/A'} | Cashier key: {selectedCashierId ? (hasCashierSecurityKey ? 'SET' : 'NOT SET') : 'N/A'}
           </div>
         </div>
