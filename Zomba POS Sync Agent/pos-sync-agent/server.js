@@ -58,6 +58,37 @@ const EXPIRY_BATCH_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const ZOMBA_OPERATIONAL_LOCATION_CODES = ['SH', 'BAR', 'ST999'];
 const PRODUCT_ACTIVITY_FRESHNESS_WINDOW_MINUTES = Number.parseInt(process.env.PRODUCT_ACTIVITY_FRESHNESS_WINDOW_MINUTES || '5', 10);
 let liveStockSourceConfig = null;
+const ENABLE_DELTA_PRODUCT_SYNC = String(process.env.ENABLE_DELTA_PRODUCT_SYNC || 'true').trim().toLowerCase() !== 'false';
+const DELTA_FULL_SYNC_EVERY_CYCLES = Number.parseInt(process.env.DELTA_FULL_SYNC_EVERY_CYCLES || '40', 10);
+let lastProductSyncSnapshot = new Map();
+let productSyncCycleCounter = 0;
+
+function buildProductDeltaKey(product) {
+  const productCode = String(product && product.ProductCode ? product.ProductCode : '').trim().toUpperCase();
+  const locationCode = String(product && product.LocationCode ? product.LocationCode : '').trim().toUpperCase();
+  return `${locationCode}::${productCode}`;
+}
+
+function normalizeDateValue(value) {
+  if (!value) return '';
+  const date = value instanceof Date ? value : new Date(value);
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+    return String(value).trim();
+  }
+  return date.toISOString();
+}
+
+function buildProductDeltaSignature(product) {
+  return [
+    Number(product && product.QuantityAvailable ? product.QuantityAvailable : 0),
+    Number(product && product.SellingPrice ? product.SellingPrice : 0),
+    String(product && product.ProductName ? product.ProductName : '').trim(),
+    String(product && product.CategoryName ? product.CategoryName : '').trim(),
+    String(product && product.Barcode ? product.Barcode : '').trim(),
+    normalizeDateValue(product && product.ExpiryDate ? product.ExpiryDate : ''),
+    Number(product && product.ExpiryBatchCount ? product.ExpiryBatchCount : 0),
+  ].join('|');
+}
 
 function normalizeOperationalLocationCode(code) {
   const normalized = String(code || '').trim().toUpperCase();
@@ -2171,8 +2202,57 @@ async function autoSync() {
     console.log(`${BRANCH_TAG} [AUTO SYNC] location breakdown`, autoSyncLocationBreakdown);
     
     if (allProducts.length > 0) {
+      productSyncCycleCounter += 1;
+
+      const shouldForceFullSync = !ENABLE_DELTA_PRODUCT_SYNC
+        || lastProductSyncSnapshot.size === 0
+        || (!Number.isNaN(DELTA_FULL_SYNC_EVERY_CYCLES) && DELTA_FULL_SYNC_EVERY_CYCLES > 0 && (productSyncCycleCounter % DELTA_FULL_SYNC_EVERY_CYCLES) === 0);
+
+      let productsToSync = allProducts;
+      let nextSnapshot = null;
+
+      if (!shouldForceFullSync) {
+        nextSnapshot = new Map();
+        const changedProducts = [];
+        for (const product of allProducts) {
+          const key = buildProductDeltaKey(product);
+          const signature = buildProductDeltaSignature(product);
+          nextSnapshot.set(key, signature);
+
+          const previousSignature = lastProductSyncSnapshot.get(key);
+          if (previousSignature !== signature) {
+            changedProducts.push(product);
+          }
+        }
+
+        productsToSync = changedProducts;
+      }
+
       console.log(`${BRANCH_TAG} [AUTO SYNC] Total: ${allProducts.length} products from operational scope (${syncLocations.join(', ')})`);
-      await sendProductsToLiveServer(allProducts, { syncLocations });
+      console.log(`${BRANCH_TAG} [AUTO SYNC] delta sync`, {
+        enabled: ENABLE_DELTA_PRODUCT_SYNC,
+        cycle: productSyncCycleCounter,
+        forceFullSync: shouldForceFullSync,
+        queued: productsToSync.length,
+      });
+
+      if (productsToSync.length > 0) {
+        const syncResult = await sendProductsToLiveServer(productsToSync, { syncLocations });
+        if (syncResult && syncResult.success) {
+          if (shouldForceFullSync || !nextSnapshot) {
+            nextSnapshot = new Map();
+            for (const product of allProducts) {
+              nextSnapshot.set(buildProductDeltaKey(product), buildProductDeltaSignature(product));
+            }
+          }
+          lastProductSyncSnapshot = nextSnapshot;
+        }
+      } else {
+        console.log(`${BRANCH_TAG} [AUTO SYNC] No product changes detected for this cycle`);
+        if (nextSnapshot) {
+          lastProductSyncSnapshot = nextSnapshot;
+        }
+      }
     } else {
       console.log(`${BRANCH_TAG} [AUTO SYNC] No products found from any location`);
     }
