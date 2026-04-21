@@ -12,7 +12,7 @@ import {
   resolveEffectiveStock,
   resolveStockStatus,
 } from '../../utils/stockResolver.js';
-import { filterProductsForOperationalLocation } from '../../utils/operationalScope.js';
+import { filterProductsForOperationalLocation, resolveOperationalScope } from '../../utils/operationalScope.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { PERMISSION_KEYS, hasPermission } from '../../utils/permissions.js';
 import '../../css/admin-responsive-filters.css';
@@ -81,7 +81,6 @@ const AdminProducts = ({
   const POS_ALERTS_CLIENT_CACHE_TTL_MS = 5 * 60 * 1000;
   const searchTimeoutRef = useRef(null);
   const fetchRequestIdRef = useRef(0);
-  const silentRefreshGuardRef = useRef(0);
   const recognitionRef = useRef(null);
   const voiceEnabledRef = useRef(false);
   const posExpiryFetchedAtRef = useRef(0);
@@ -585,7 +584,8 @@ const AdminProducts = ({
 
       const handleProductUpdate = (updatedProduct) => {
         const updatedLocationCode = String(updatedProduct?.locationCode || '').trim().toUpperCase();
-        const currentLocationCode = String(selectedLocationCode || '').trim().toUpperCase();
+        const selectedScope = resolveOperationalScope(selectedLocationCode);
+        const currentLocationCode = String(selectedScope?.locationCode || selectedLocationCode || '').trim().toUpperCase();
         if (updatedLocationCode && currentLocationCode && updatedLocationCode !== currentLocationCode) {
           return;
         }
@@ -624,53 +624,19 @@ const AdminProducts = ({
         );
       };
 
-      const scheduleSilentRefresh = () => {
-        if (typeof onRefreshProductsCache !== 'function') return;
-        const now = Date.now();
-        if ((now - silentRefreshGuardRef.current) < 8000) {
-          return;
-        }
-        silentRefreshGuardRef.current = now;
-        void onRefreshProductsCache();
-      };
-
-      const handlePosProductUpdated = (updatedProduct) => {
-        const updatedLocationCode = String(updatedProduct?.locationCode || '').trim().toUpperCase();
-        const currentLocationCode = String(selectedLocationCode || '').trim().toUpperCase();
-        if (updatedLocationCode && currentLocationCode && updatedLocationCode !== currentLocationCode) {
-          return;
-        }
-        scheduleSilentRefresh();
-      };
-
-      const handlePosProductsSynced = (payload = {}) => {
-        const affectedLocations = Array.isArray(payload?.affectedLocations)
-          ? payload.affectedLocations.map((value) => String(value || '').trim().toUpperCase()).filter(Boolean)
-          : [];
-        const currentLocationCode = String(selectedLocationCode || '').trim().toUpperCase();
-        if (affectedLocations.length > 0 && currentLocationCode && !affectedLocations.includes(currentLocationCode)) {
-          return;
-        }
-        scheduleSilentRefresh();
-      };
-
       // Listen for comprehensive product updates
       socket.on('product_updated', handleProductUpdate);
-      socket.on('pos-product-updated', handlePosProductUpdated);
-      socket.on('pos-products-synced', handlePosProductsSynced);
       console.log('[AdminProducts] 🔌 Socket listener attached for product_updated events');
 
       // Cleanup: remove listener on component unmount
       return () => {
         socket.off('product_updated', handleProductUpdate);
-        socket.off('pos-product-updated', handlePosProductUpdated);
-        socket.off('pos-products-synced', handlePosProductsSynced);
         console.log('[AdminProducts] 🔌 Socket listener removed');
       };
     } catch (err) {
       console.warn('[AdminProducts] Error setting up product update listener:', err.message);
     }
-  }, [onRefreshProductsCache, selectedLocationCode]);
+  }, [selectedLocationCode]);
 
   const fetchProducts = async () => {
     const requestId = Date.now();

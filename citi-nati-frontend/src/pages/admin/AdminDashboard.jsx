@@ -348,7 +348,12 @@ const AdminDashboard = () => {
     const safeLocationCode = normalizeOperationalScopeCode(locationCode);
     const scope = resolveOperationalScope(safeLocationCode);
     const forceRefresh = options?.force === true;
+    const preferSilentRefresh = options?.silent === true;
     const cacheMeta = adminProductsCacheMetaByLocation[safeLocationCode] || {};
+    const cachedItems = Array.isArray(adminProductsCacheByLocation[safeLocationCode])
+      ? adminProductsCacheByLocation[safeLocationCode]
+      : [];
+    const hasCachedItems = cachedItems.length > 0;
 
     if (!forceRefresh) {
       if (cacheMeta.isLoading || cacheMeta.isBackgroundLoading) {
@@ -386,9 +391,10 @@ const AdminDashboard = () => {
     });
 
     try {
+      const useBackgroundLoading = preferSilentRefresh || (forceRefresh && hasCachedItems);
       updateProductsCacheMeta(safeLocationCode, {
-        isLoading: true,
-        isBackgroundLoading: false,
+        isLoading: !useBackgroundLoading,
+        isBackgroundLoading: useBackgroundLoading,
         error: null,
       });
 
@@ -498,7 +504,7 @@ const AdminDashboard = () => {
         error: error?.response?.data?.error || error.message || 'Failed to load products',
       });
     }
-  }, [adminProductsCacheMetaByLocation, updateProductsCacheMeta]);
+  }, [adminProductsCacheByLocation, adminProductsCacheMetaByLocation, updateProductsCacheMeta]);
 
   React.useEffect(() => {
     OPERATIONAL_SCOPES.forEach((scope) => {
@@ -534,7 +540,7 @@ const AdminDashboard = () => {
         return;
       }
 
-      void preloadAdminProductsForLocation(selectedOperationalLocationCode, { force: true });
+      void preloadAdminProductsForLocation(selectedOperationalLocationCode, { force: true, silent: true });
     };
 
     const handleVisibilityChange = () => {
@@ -595,7 +601,7 @@ const AdminDashboard = () => {
           strategy: 'silent_background_refresh',
         });
 
-        void preloadAdminProductsForLocation(uiScopeCode, { force: true });
+        void preloadAdminProductsForLocation(uiScopeCode, { force: true, silent: true });
       };
 
       const applyRealtimeProductPatch = (product, sourceEvent) => {
@@ -865,8 +871,11 @@ const AdminDashboard = () => {
     ? (MOBILE_BLOCKED_MESSAGE_BY_TAB[activeTabMeta.id] || 'This admin module is desktop-only on mobile.')
     : 'This admin module is desktop-only on mobile.';
   const activeLocationCachedProducts = adminProductsCacheByLocation[selectedOperationalLocationCode] || [];
-  const handleRefreshAdminProductsCache = useCallback(async () => {
-    await preloadAdminProductsForLocation(selectedOperationalLocationCode, { force: true });
+  const handleRefreshAdminProductsCache = useCallback(async (options = {}) => {
+    await preloadAdminProductsForLocation(selectedOperationalLocationCode, {
+      force: true,
+      silent: options?.silent === true,
+    });
   }, [preloadAdminProductsForLocation, selectedOperationalLocationCode]);
 
   const activeLocationLastLoadedAt = Number(activeLocationCachedProductsMeta.lastLoadedAt || 0);
