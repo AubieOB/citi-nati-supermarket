@@ -823,7 +823,7 @@ const Products = () => {
             display: 'flex',
             gap: '0.75rem',
             alignItems: 'center',
-            flex: '0 1 auto',
+            flex: window.innerWidth > 768 ? '1 1 auto' : '1 1 0',
             minWidth: 0
           }}>
             {/* SEARCH BAR */}
