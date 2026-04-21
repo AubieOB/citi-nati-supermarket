@@ -813,7 +813,7 @@ const Products = () => {
           maxWidth: '1200px',
           width: '100%',
           display: 'flex',
-          gap: window.innerWidth > 768 ? '2rem' : '0.75rem',
+          gap: '0.75rem',
           alignItems: 'center',
           justifyContent: window.innerWidth > 768 ? 'space-between' : 'flex-start',
           flexWrap: 'nowrap'
@@ -823,7 +823,7 @@ const Products = () => {
             display: 'flex',
             gap: '0.75rem',
             alignItems: 'center',
-            flex: window.innerWidth > 768 ? '0 1 auto' : '1 1 auto',
+            flex: '0 1 auto',
             minWidth: 0
           }}>
             {/* SEARCH BAR */}
