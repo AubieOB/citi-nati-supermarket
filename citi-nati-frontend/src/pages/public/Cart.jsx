@@ -312,7 +312,9 @@ const Cart = () => {
     : `VAT (${Number(cart?.configuredVatRatePercent ?? cart?.vatRatePercent ?? 0).toFixed(1)}%):`;
 
   // MINIMUM ORDER VALIDATION
-  const cartItemsSubtotal = Number(cart?.itemsSubtotal ?? cart?.total ?? 0);
+  const cartItemsSubtotal = Array.isArray(cart?.items)
+    ? Number(cart.items.reduce((sum, item) => sum + Number(item?.subtotal ?? 0), 0).toFixed(2))
+    : Number(cart?.itemsSubtotal ?? cart?.total ?? 0);
   const minimumOrderValue = Number(cart?.minimumOrderValue ?? 10000);
   const isBelowMinimumOrderValue = cartItemsSubtotal < minimumOrderValue;
   const amountNeededForMinimum = Number(Math.max(0, minimumOrderValue - cartItemsSubtotal).toFixed(2));
