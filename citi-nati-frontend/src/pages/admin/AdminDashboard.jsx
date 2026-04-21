@@ -105,9 +105,7 @@ const MOBILE_BLOCKED_MESSAGE_BY_TAB = {
   support: 'Support management is desktop-only on mobile.',
 };
 
-const ADMIN_PRODUCTS_AUTO_REFRESH_TAB_IDS = new Set([
-  'emergency-sales',
-]);
+const ADMIN_PRODUCTS_AUTO_REFRESH_TAB_IDS = new Set([]);
 
 const extractColorToken = (value) => {
   if (!value || typeof value !== 'string') return null;
