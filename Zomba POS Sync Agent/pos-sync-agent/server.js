@@ -542,37 +542,20 @@ async function fetchProductsFromPOS(locationCode) {
           ISNULL(p.Barcode, '') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
           CASE
-            WHEN pa.ActivityLatestAt IS NOT NULL AND (ds.StockDate IS NULL OR pa.ActivityLatestAt > ds.StockDate)
-              THEN pa.ActivityLatestAt
-            WHEN pa.ProductCode IS NOT NULL
-              AND pa.ActivityLatestAt IS NULL
-              AND ds.StockBalance IS NOT NULL
-              AND ISNULL(pa.ActivityStockBalance, 0) <> ISNULL(ds.StockBalance, 0)
-              THEN GETDATE()
-            ELSE ds.StockDate
+            WHEN ds.StockDate IS NOT NULL THEN ds.StockDate
+            WHEN pa.ProductCode IS NOT NULL THEN pa.ActivityLatestAt
+            ELSE NULL
           END AS StockDate,
           ISNULL(
             CASE
-              WHEN pa.ActivityLatestAt IS NOT NULL AND (ds.StockDate IS NULL OR pa.ActivityLatestAt > ds.StockDate)
-                THEN pa.ActivityStockBalance
-              WHEN pa.ProductCode IS NOT NULL
-                AND pa.ActivityLatestAt IS NULL
-                AND ds.StockBalance IS NOT NULL
-                AND ISNULL(pa.ActivityStockBalance, 0) <> ISNULL(ds.StockBalance, 0)
-                THEN pa.ActivityStockBalance
-              ELSE COALESCE(ds.StockBalance, pa.ActivityStockBalance)
+              WHEN ds.StockBalance IS NOT NULL THEN ds.StockBalance
+              ELSE pa.ActivityStockBalance
             END,
             0
           ) AS QuantityAvailable,
           CASE
-            WHEN pa.ActivityLatestAt IS NOT NULL AND (ds.StockDate IS NULL OR pa.ActivityLatestAt > ds.StockDate) THEN 'ProductActivityFresh'
-            WHEN pa.ProductCode IS NOT NULL
-              AND pa.ActivityLatestAt IS NULL
-              AND ds.StockBalance IS NOT NULL
-              AND ISNULL(pa.ActivityStockBalance, 0) <> ISNULL(ds.StockBalance, 0)
-              THEN 'ProductActivityDivergence'
             WHEN ds.StockBalance IS NOT NULL THEN 'DailyStockBalance'
-            WHEN pa.ProductCode IS NOT NULL THEN 'ProductActivity'
+            WHEN pa.ProductCode IS NOT NULL THEN 'ProductActivityFallback'
             ELSE 'NoStockRow'
           END AS StockSource,
           ISNULL(lp.FPrice, 0) AS SellingPrice,
@@ -699,14 +682,13 @@ async function fetchProductsFromPOS(locationCode) {
       aggregationMode: false,
       stockResolutionMode: 'LOCATION_SPECIFIC',
       stockSourceMode: stockConfig.hasDailyStockBalance && stockConfig.hasProductActivity
-        ? 'DailyStockBalance+FreshProductActivityFallback'
+        ? 'DailyStockBalancePrimary+MissingRowProductActivityFallback'
         : (stockConfig.hasDailyStockBalance
           ? 'DailyStockBalance'
-          : (stockConfig.hasProductActivity ? 'ProductActivity' : 'Unavailable')),
+          : (stockConfig.hasProductActivity ? 'ProductActivityFallbackOnly' : 'Unavailable')),
       productActivityTimestampColumn: safeActivityTimestampColumn,
       productActivityFreshnessWindowMinutes: PRODUCT_ACTIVITY_FRESHNESS_WINDOW_MINUTES,
     });
-
     const result = await request.query(query);
 
     console.log(`${SYNC_LOG_PREFIX} [FETCH] done — fetched ${result.recordset.length} products for location ${LOCATION_CODE}`);
@@ -1281,11 +1263,10 @@ app.get('/pos-sync/products', validateApiKey, requireFeature('enableReportingSyn
       configuredLocationCode: appConfig.posDb.locationCode,
       includedLocations: syncLocations,
       mode: appConfig.branch.branchCode === 'ZOMBA' ? 'CONFIGURED_ZOMBA_OPERATIONAL_LOCATIONS' : 'CONFIGURED_LOCATION_ONLY',
-      stockSource: 'DailyStockBalance preferred, freshness-aware ProductActivity fallback',
+      stockSource: 'DailyStockBalance primary, ProductActivity fallback only when no daily row exists',
       stockResolutionMode: 'LOCATION_SPECIFIC',
       aggregationEnabled: false,
     });
-
     for (const locationCode of syncLocations) {
       try {
         const locationProducts = await fetchProductsFromPOS(locationCode);
