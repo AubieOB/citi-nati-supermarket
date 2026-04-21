@@ -73,6 +73,10 @@ function normalizeLocationCode(value) {
 
 const ZOMBA_LOCATION_CODES = ['ZA'].concat(CORE_ZOMBA_LOCATION_CODES);
 
+function isConcreteZombaOperationalLocationCode(locationCode) {
+  return CORE_ZOMBA_LOCATION_CODES.includes(String(locationCode || '').trim().toUpperCase());
+}
+
 function expandLocationScopeCodes(locationCode) {
   return expandOperationalLocationScopeCodes(locationCode);
 }
@@ -310,15 +314,26 @@ router.get('/test', verifyTokenMiddleware, verifyAdmin, (req, res) => {
 router.get('/zomba-stock-trace', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
   try {
     const productCode = String(req.query.productCode || '9501100002174').trim();
+    const selectedLocationCode = normalizeLocationCode(req.query.locationCode || 'SH');
     if (!productCode) {
       return res.status(400).json({ success: false, error: 'productCode is required' });
     }
+    if (!isConcreteZombaOperationalLocationCode(selectedLocationCode)) {
+      return res.status(400).json({
+        success: false,
+        error: 'locationCode must be one of SH, BAR, or ST999',
+      });
+    }
 
-    const [product, latestShBatch] = await Promise.all([
+    const [product, latestLocationBatch] = await Promise.all([
       prisma.product.findFirst({
         where: {
           branchCode: 'ZOMBA',
           sourceCode: productCode,
+          locationCode: {
+            equals: selectedLocationCode,
+            mode: 'insensitive',
+          },
         },
         select: {
           id: true,
@@ -336,7 +351,7 @@ router.get('/zomba-stock-trace', verifyTokenMiddleware, verifyAdmin, async (req,
         where: {
           productCode,
           locationCode: {
-            equals: 'SH',
+            equals: selectedLocationCode,
             mode: 'insensitive',
           },
         },
@@ -358,11 +373,11 @@ router.get('/zomba-stock-trace', verifyTokenMiddleware, verifyAdmin, async (req,
     const payload = {
       productCode,
       zombaOperationalRule: {
-        locationCode: 'SH',
+        locationCode: selectedLocationCode,
         source: 'StockDetailsLive preferred, DailyStockBalance fallback (agent-enforced)',
       },
       product: product || null,
-      latestShBatchSyncMeta: latestShBatch || null,
+      latestLocationBatchSyncMeta: latestLocationBatch || null,
       trace: {
         sourceUsed: 'PersistedProduct.stock from POS agent push',
         finalStockReturned: Number(product?.stock || 0),
@@ -371,11 +386,13 @@ router.get('/zomba-stock-trace', verifyTokenMiddleware, verifyAdmin, async (req,
 
     console.log('[ZOMBA STOCK][TRACE ENDPOINT]', {
       productCode,
+      selectedLocation: req.query.locationCode || '(none)',
+      resolvedStockLocation: selectedLocationCode,
       source: payload.zombaOperationalRule.source,
-      locationCode: 'SH',
+      locationCode: selectedLocationCode,
       finalStockReturned: payload.trace.finalStockReturned,
       productUpdatedAt: product?.updatedAt || null,
-      latestShBatchSyncedAt: latestShBatch?.lastSyncedAt || null,
+      latestLocationBatchSyncedAt: latestLocationBatch?.lastSyncedAt || null,
     });
 
     return res.json({
@@ -1321,7 +1338,20 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
       const resWasMapped = (rawParam === 'RES' || rawParam === 'ZOMBA_RES') && normalizedLocationCode === 'ST999';
 
       if (derivedBranchCode === 'ZOMBA') {
-        const resolvedLocationCode = scopeCodes[0] || normalizedLocationCode;
+        const resolvedLocationCode = normalizedLocationCode;
+        if (!isConcreteZombaOperationalLocationCode(resolvedLocationCode)) {
+          console.warn('[PRODUCT QUERY][POS_MANAGEMENT][INVALID_ZOMBA_SCOPE]', {
+            view: 'POS Management / Stock panel',
+            selectedLocation: locationCode || '(none)',
+            normalizedLocation: normalizedLocationCode,
+            scopeCodes,
+            reason: 'Concrete locationCode required for Zomba stock reads (SH|BAR|ST999)',
+          });
+          return res.status(400).json({
+            success: false,
+            error: 'Concrete locationCode is required for Zomba stock reads (use SH, BAR, or ST999)',
+          });
+        }
         where.branchCode = 'ZOMBA';
         where.locationCode = {
           equals: resolvedLocationCode,
@@ -1330,9 +1360,13 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
         where.sourceCode = { not: null };
 
         console.log('[PRODUCT QUERY][POS_MANAGEMENT]', {
+          view: 'POS Management / Stock panel',
           uiLocation: locationCode || '(none)',
+          selectedLocation: normalizedLocationCode,
+          resolvedStockLocation: resolvedLocationCode,
           branchCode: 'ZOMBA',
           locationCode: resolvedLocationCode,
+          querySource: 'PersistedProduct.stock',
           resAlias: resWasMapped ? 'RES->ST999' : null,
         });
       } else {
@@ -1398,10 +1432,10 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
     const isZombaScope = normalizedLocationCode && ZOMBA_LOCATION_CODES.includes(normalizedLocationCode);
     if (isZombaScope && products.length > 0) {
       const sample = products[0];
-      console.log(`[ZOMBA STOCK][POS_MANAGEMENT] product=${sample.sourceCode || 'UNKNOWN'} source=PersistedProductStock location=${normalizedLocationCode} stock=${Number(sample.stock || 0)}`);
+      console.log(`[ZOMBA STOCK][POS_MANAGEMENT] selectedLocation=${locationCode || '(none)'} resolvedStockLocation=${normalizedLocationCode} querySource=PersistedProduct.stock product=${sample.sourceCode || 'UNKNOWN'} stock=${Number(sample.stock || 0)}`);
       const verifyProduct = products.find((row) => String(row.sourceCode || '').trim() === '9501100002174');
       if (verifyProduct) {
-        console.log(`[ZOMBA STOCK][VERIFY][POS_MANAGEMENT] product=9501100002174 source=PersistedProductStock location=${normalizedLocationCode} stock=${Number(verifyProduct.stock || 0)}`);
+        console.log(`[ZOMBA STOCK][VERIFY][POS_MANAGEMENT] selectedLocation=${locationCode || '(none)'} resolvedStockLocation=${normalizedLocationCode} querySource=PersistedProduct.stock product=9501100002174 stock=${Number(verifyProduct.stock || 0)}`);
       }
     }
 
@@ -1555,7 +1589,10 @@ router.delete('/pos-products/delete-selected', verifyTokenMiddleware, verifyAdmi
       const derivedBranchCode = deriveBranchCodeFromScopeCodes(scopeCodes);
 
       if (derivedBranchCode === 'ZOMBA') {
-        const resolvedLocationCode = scopeCodes[0] || normalizedLocationCode;
+        const resolvedLocationCode = normalizedLocationCode;
+        if (!isConcreteZombaOperationalLocationCode(resolvedLocationCode)) {
+          return res.status(400).json({ success: false, error: 'Concrete locationCode is required for Zomba delete scope (use SH, BAR, or ST999)' });
+        }
         where.branchCode = 'ZOMBA';
         where.locationCode = {
           equals: resolvedLocationCode,
@@ -1609,7 +1646,10 @@ router.delete('/pos-products/delete-all', verifyTokenMiddleware, verifyAdmin, as
       const derivedBranchCode = deriveBranchCodeFromScopeCodes(scopeCodes);
 
       if (derivedBranchCode === 'ZOMBA') {
-        const resolvedLocationCode = scopeCodes[0] || normalizedLocationCode;
+        const resolvedLocationCode = normalizedLocationCode;
+        if (!isConcreteZombaOperationalLocationCode(resolvedLocationCode)) {
+          return res.status(400).json({ success: false, error: 'Concrete locationCode is required for Zomba delete scope (use SH, BAR, or ST999)' });
+        }
         where.branchCode = 'ZOMBA';
         where.locationCode = {
           equals: resolvedLocationCode,
