@@ -32,6 +32,7 @@ const businessOperationsRoutes = require('./routes/businessOperations.routes');
 const deliveryZonesRoutes = require('./routes/deliveryZones.routes');
 const logger = require('./utils/logger');
 const { adminRateLimiter, posAgentRateLimiter } = require('./middleware/rateLimit.middleware');
+const mailConfig = require('./config/mailConfig');
 
 const prisma = new PrismaClient();
 
@@ -68,6 +69,9 @@ async function start() {
     // Connect to the database before starting the server
     await prisma.$connect();
     logger.info('Connected to the database via Prisma');
+
+    // Initialize mail configuration
+    mailConfig.initializeMailConfig();
 
     const app = express();
     const server = http.createServer(app);

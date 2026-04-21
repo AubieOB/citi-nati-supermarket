@@ -1,83 +1,47 @@
-const sgMail = require('@sendgrid/mail');
-
 /**
- * Email Service - Handles all email operations using SendGrid
+ * Email Service - Handles all email operations using provider abstraction
+ * Supports SMTP, SendGrid, and other providers via unified interface
  * Centralized email sending with professional templates
  */
 
-// Configuration
-const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
-const FROM_EMAIL = process.env.FROM_EMAIL || 'renewableenergyh@gmail.com';
-
-const classifyEmailError = (err) => {
-  const details = err?.response?.body?.errors || [];
-  const combined = [err?.message || '', ...details.map((d) => d?.message || '')]
-    .join(' ')
-    .toLowerCase();
-
-  if (combined.includes('maximum credits exceeded')) {
-    return {
-      errorCode: 'EMAIL_PROVIDER_CREDITS_EXCEEDED',
-      userMessage: 'Email service quota exceeded. Please try again later or contact support.',
-    };
-  }
-
-  if (combined.includes('unauthorized') || combined.includes('invalid api key')) {
-    return {
-      errorCode: 'EMAIL_PROVIDER_UNAUTHORIZED',
-      userMessage: 'Email service is temporarily unavailable. Please try again later.',
-    };
-  }
-
-  return {
-    errorCode: 'EMAIL_SEND_FAILED',
-    userMessage: 'Failed to send email. Please try again.',
-  };
-};
-
-// Initialize SendGrid
-if (SENDGRID_API_KEY) {
-  sgMail.setApiKey(SENDGRID_API_KEY);
-  console.log('[SENDGRID] ✅ API key configured successfully');
-  console.log('[SENDGRID] FROM_EMAIL env:', process.env.FROM_EMAIL);
-  console.log('[SENDGRID] FROM_EMAIL used:', FROM_EMAIL);
-} else {
-  console.error('[SENDGRID] ❌ SENDGRID_API_KEY not found in environment variables');
-}
+const mailProvider = require('../services/mailProvider');
+const logger = require('../utils/logger');
 
 /**
  * Generic Email Sending Function
  * All emails go through this function
+ * Provider is selected via MAIL_PROVIDER environment variable
  */
 const sendEmail = async (to, subject, html) => {
   try {
-    if (!SENDGRID_API_KEY) {
-      throw new Error('SendGrid API key not configured');
-    }
-
-    const msg = {
+    const provider = mailProvider.getMailProvider();
+    
+    const result = await provider.send({
       to,
-      from: FROM_EMAIL,
       subject,
       html,
-    };
+    });
 
-    console.log(`[EMAIL] Sending from: ${FROM_EMAIL}`);
-    const result = await sgMail.send(msg);
-    console.log(`[EMAIL] ✅ Email sent successfully to: ${to}`);
-    return { success: true, messageId: result[0]?.headers?.['x-message-id'] };
+    logger.info(`Email sent successfully to: ${to}`, {
+      subject,
+      messageId: result.messageId,
+    });
+
+    return {
+      success: true,
+      messageId: result.messageId,
+    };
   } catch (err) {
-    console.error(`[EMAIL] ❌ Error sending email to ${to}:`, err.message);
-    if (err.response) {
-      console.error(`[EMAIL] SendGrid Error Details:`, err.response.body);
-    }
-    const classifiedError = classifyEmailError(err);
+    logger.error(`Error sending email to ${to}`, {
+      subject,
+      error: err.message || err.code,
+    });
+
     return {
       success: false,
-      error: err.message,
-      errorCode: classifiedError.errorCode,
-      userMessage: classifiedError.userMessage,
-      providerErrors: err?.response?.body?.errors || [],
+      error: err.originalError || err.message,
+      errorCode: err.code || 'EMAIL_SEND_FAILED',
+      userMessage: err.message || 'Failed to send email. Please try again.',
     };
   }
 };
@@ -88,7 +52,7 @@ const sendEmail = async (to, subject, html) => {
  */
 const sendVerificationEmail = async (email, code) => {
   try {
-    console.log('[EMAIL] Attempting to send verification email to:', email);
+    logger.debug('Sending verification email', { email });
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -118,7 +82,7 @@ const sendVerificationEmail = async (email, code) => {
 
     return await sendEmail(email, 'Verify Your Citi-Nati Account', html);
   } catch (err) {
-    console.error('[EMAIL] ❌ Error in sendVerificationEmail:', err.message);
+    logger.error('Error in sendVerificationEmail', { error: err.message, email });
     return { success: false, error: err.message };
   }
 };
@@ -129,7 +93,7 @@ const sendVerificationEmail = async (email, code) => {
  */
 const sendPasswordResetEmail = async (email, code) => {
   try {
-    console.log('[EMAIL] Attempting to send password reset email to:', email);
+    logger.debug('Sending password reset email', { email });
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -159,7 +123,7 @@ const sendPasswordResetEmail = async (email, code) => {
 
     return await sendEmail(email, 'Reset Your Citi-Nati Password', html);
   } catch (err) {
-    console.error('[EMAIL] ❌ Error in sendPasswordResetEmail:', err.message);
+    logger.error('Error in sendPasswordResetEmail', { error: err.message, email });
     return { success: false, error: err.message };
   }
 };
@@ -170,7 +134,7 @@ const sendPasswordResetEmail = async (email, code) => {
  */
 const sendOrderConfirmationEmail = async (email, userName, order, products) => {
   try {
-    console.log('[EMAIL] Attempting to send order confirmation email to:', email);
+    logger.debug('Sending order confirmation email', { email, orderId: order.id });
 
     const productRows = products
       .map(
@@ -227,7 +191,7 @@ const sendOrderConfirmationEmail = async (email, userName, order, products) => {
 
     return await sendEmail(email, `Order Confirmation - #${order.id}`, html);
   } catch (err) {
-    console.error('[EMAIL] ❌ Error in sendOrderConfirmationEmail:', err.message);
+    logger.error('Error in sendOrderConfirmationEmail', { error: err.message, email, orderId: order.id });
     return { success: false, error: err.message };
   }
 };
@@ -238,7 +202,7 @@ const sendOrderConfirmationEmail = async (email, userName, order, products) => {
  */
 const sendPaymentConfirmationEmail = async (email, userName, paymentDetails) => {
   try {
-    console.log('[EMAIL] Attempting to send payment confirmation email to:', email);
+    logger.debug('Sending payment confirmation email', { email, orderId: paymentDetails.orderId });
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -301,7 +265,7 @@ const sendPaymentConfirmationEmail = async (email, userName, paymentDetails) => 
 
     return await sendEmail(email, 'Payment Confirmation', html);
   } catch (err) {
-    console.error('[EMAIL] ❌ Error in sendPaymentConfirmationEmail:', err.message);
+    logger.error('Error in sendPaymentConfirmationEmail', { error: err.message, email });
     return { success: false, error: err.message };
   }
 };
@@ -312,7 +276,7 @@ const sendPaymentConfirmationEmail = async (email, userName, paymentDetails) => 
  */
 const sendDriverAssignedEmail = async (email, userName, driverInfo, orderDetails) => {
   try {
-    console.log('[EMAIL] Attempting to send driver assigned email to:', email);
+    logger.debug('Sending driver assigned email', { email, orderId: orderDetails.id });
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -342,7 +306,7 @@ const sendDriverAssignedEmail = async (email, userName, driverInfo, orderDetails
 
     return await sendEmail(email, 'Your Order is On The Way!', html);
   } catch (err) {
-    console.error('[EMAIL] ❌ Error in sendDriverAssignedEmail:', err.message);
+    logger.error('Error in sendDriverAssignedEmail', { error: err.message, email });
     return { success: false, error: err.message };
   }
 };
@@ -353,7 +317,7 @@ const sendDriverAssignedEmail = async (email, userName, driverInfo, orderDetails
  */
 const sendDeliveryStatusEmail = async (email, userName, orderDetails, status) => {
   try {
-    console.log('[EMAIL] Attempting to send delivery status email to:', email);
+    logger.debug('Sending delivery status email', { email, orderId: orderDetails.id, status });
 
     const statusMessages = {
       delivered: 'Your Order Has Been Delivered',
@@ -404,7 +368,7 @@ const sendDeliveryStatusEmail = async (email, userName, orderDetails, status) =>
 
     return await sendEmail(email, subject, html);
   } catch (err) {
-    console.error('[EMAIL] ❌ Error in sendDeliveryStatusEmail:', err.message);
+    logger.error('Error in sendDeliveryStatusEmail', { error: err.message, email, orderId: orderDetails.id, status });
     return { success: false, error: err.message };
   }
 };
@@ -415,7 +379,7 @@ const sendDeliveryStatusEmail = async (email, userName, orderDetails, status) =>
  */
 const sendRefundNotificationEmail = async (email, userName, refundDetails) => {
   try {
-    console.log('[EMAIL] Attempting to send refund notification email to:', email);
+    logger.debug('Sending refund notification email', { email, orderId: refundDetails.orderId });
 
     const formattedAmount = refundDetails.amount ? `MWK ${refundDetails.amount.toLocaleString()}` : 'N/A';
     const refundId = refundDetails.refundId || 'Processing';
@@ -473,7 +437,7 @@ const sendRefundNotificationEmail = async (email, userName, refundDetails) => {
 
     return await sendEmail(email, 'Payment Refunded - Order #' + refundDetails.orderId, html);
   } catch (err) {
-    console.error('[EMAIL] ❌ Error in sendRefundNotificationEmail:', err.message);
+    logger.error('Error in sendRefundNotificationEmail', { error: err.message, email, orderId: refundDetails.orderId });
     return { success: false, error: err.message };
   }
 };
