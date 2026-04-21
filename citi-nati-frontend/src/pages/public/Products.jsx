@@ -806,17 +806,20 @@ const Products = () => {
         boxShadow: scrollY > 0 ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
         transition: 'box-shadow 0.3s ease',
         display: 'flex',
-        justifyContent: 'center',
-        padding: window.innerWidth <= 480 ? '0.75rem' : '0.75rem 1.5rem'
+        justifyContent: 'flex-start',
+        paddingTop: window.innerWidth <= 480 ? '0.75rem' : '0.75rem',
+        paddingBottom: window.innerWidth <= 480 ? '0.75rem' : '0.75rem'
       }}>
         <div style={{
-          maxWidth: '1200px',
+          maxWidth: '100%',
           width: '100%',
           display: 'flex',
           gap: '0.75rem',
           alignItems: 'center',
           justifyContent: window.innerWidth > 768 ? 'space-between' : 'flex-start',
-          flexWrap: 'nowrap'
+          flexWrap: 'nowrap',
+          paddingLeft: window.innerWidth <= 480 ? '0.75rem' : '1.5rem',
+          paddingRight: window.innerWidth <= 480 ? '0.75rem' : '1.5rem'
         }}>
           {/* LEFT SECTION - Filters */}
           <div style={{
