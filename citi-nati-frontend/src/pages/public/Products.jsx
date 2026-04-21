@@ -101,15 +101,13 @@ const Products = () => {
       return;
     }
   
-    // Check cache first - return instantly if cached
+    // Check cache first - show cached results instantly while fresh fetch runs
     if (searchCacheRef.current.has(query)) {
-      console.log(`[SEARCH CACHE HIT] "${query}"`);
-      const cachedResults = searchCacheRef.current.get(query);
-      setFilteredProducts(cachedResults);
-      return;
+      console.log(`[SEARCH CACHE HIT] "${query}" - showing instantly, fetching fresh`);
+      setFilteredProducts(searchCacheRef.current.get(query));
     }
 
-    // Debounce the API call (200ms) only for actual search queries
+    // Always fetch fresh from API (200ms debounce)
     debounceTimerRef.current = setTimeout(() => {
       // Cancel previous request
       if (abortControllerRef.current) {

@@ -1203,12 +1203,12 @@ const getProducts = async (req, res) => {
       where.hideFromProductsPage = false; // Public storefront only
     }
 
-    // Search filter (case-insensitive name search)
+    // Search filter (case-insensitive name or sourceCode search)
     if (search) {
-      where.name = {
-        contains: search,
-        mode: 'insensitive'
-      };
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { sourceCode: { contains: search, mode: 'insensitive' } },
+      ];
     }
 
     // Category filter

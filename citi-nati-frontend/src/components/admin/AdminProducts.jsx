@@ -433,13 +433,17 @@ const AdminProducts = ({
   };
 
   // Refetch and reset location-scoped UI state when operational location changes.
+  // Reset filters and search ONLY when the operational location changes.
   useEffect(() => {
     setSearchTerm('');
     setSelectedCategory('');
     setOnSaleOnly(false);
     setCurrentPage(1);
     setExpandedBatchRows({});
+  }, [selectedLocationCode]);
 
+  // Sync product list from shared cache whenever it changes — never touches search/filter state.
+  useEffect(() => {
     if (Array.isArray(cachedProducts) && cachedProducts.length > 0) {
       const scopedCachedProducts = filterProductsForOperationalLocation(cachedProducts, selectedLocationCode);
       const sortedCached = [...scopedCachedProducts].sort((a, b) => getExpirySeverity(a) - getExpirySeverity(b));
@@ -465,22 +469,6 @@ const AdminProducts = ({
 
     fetchProducts();
   }, [selectedLocationCode, cachedProducts, cachedProductsMeta]);
-
-  useEffect(() => {
-    if (!Array.isArray(cachedProducts)) return;
-
-    const scopedCachedProducts = filterProductsForOperationalLocation(cachedProducts, selectedLocationCode);
-    const sortedCached = [...scopedCachedProducts].sort((a, b) => getExpirySeverity(a) - getExpirySeverity(b));
-    setProducts(sortedCached);
-
-    if (cachedProductsMeta?.isLoading || cachedProductsMeta?.isBackgroundLoading) {
-      setLoading(sortedCached.length === 0);
-    }
-
-    if (cachedProductsMeta?.error) {
-      setError(cachedProductsMeta.error);
-    }
-  }, [cachedProducts, cachedProductsMeta]);
 
   useEffect(() => {
     if (activeSubTab === 'expiry-alerts') {

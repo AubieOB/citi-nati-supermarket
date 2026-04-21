@@ -66,12 +66,18 @@ const AdminStocks = ({
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
   const canManageStocks = hasPermission(loggedInUser, PERMISSION_KEYS.ADMIN_STOCKS_MANAGE);
 
+  // Reset filters and search ONLY when the operational location changes.
   useEffect(() => {
     setSearchTerm('');
     setFilterCategory('all');
     setStockStatusFilter('all');
     setCurrentPage(1);
+    const cleanup = setupSocketListeners();
+    return cleanup;
+  }, [selectedLocationCode]);
 
+  // Sync product list from shared cache whenever it changes — never touches search/filter state.
+  useEffect(() => {
     if (Array.isArray(cachedProducts) && cachedProducts.length > 0) {
       const scopedCachedProducts = filterProductsForOperationalLocation(cachedProducts, selectedLocationCode);
       const nextProducts = scopedCachedProducts.map((product) => enrichProductStock(product));
@@ -92,9 +98,6 @@ const AdminStocks = ({
       setCategories([]);
       fetchProducts();
     }
-
-    const cleanup = setupSocketListeners();
-    return cleanup;
   }, [selectedLocationCode, cachedProducts, cachedProductsMeta]);
 
   useEffect(() => {

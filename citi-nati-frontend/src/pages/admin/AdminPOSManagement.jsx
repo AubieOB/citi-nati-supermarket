@@ -323,9 +323,10 @@ const AdminPOSManagement = ({
     fetchProducts('', 1, 'all');
   }, [selectedLocationCode]);
 
+  // When the shared cache updates, re-filter WITHOUT resetting page or search.
   useEffect(() => {
     if (!hasSharedProductsCache) return;
-    fetchProducts(searchTerm, 1, selectedCategory);
+    fetchProducts(searchTerm, page, selectedCategory);
   }, [cachedProducts, cachedProductsMeta, hasSharedProductsCache]);
 
   // Handle pagination
