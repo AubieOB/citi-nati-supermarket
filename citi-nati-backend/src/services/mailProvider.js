@@ -7,7 +7,7 @@
 
 const nodemailer = require('nodemailer');
 const logger = require('../utils/logger');
-const mailConfig = require('./mailConfig');
+const mailConfig = require('../config/mailConfig');
 
 let mailProvider = null;
 
