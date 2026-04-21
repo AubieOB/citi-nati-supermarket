@@ -15,6 +15,11 @@ function getMailConfig() {
   const provider = process.env.MAIL_PROVIDER || 'smtp';
   const fromEmail = process.env.MAIL_FROM || process.env.FROM_EMAIL || 'noreply@citi-nati.com';
   const fromName = process.env.MAIL_FROM_NAME || 'Citi-Nati Supermarket';
+  const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
+  const smtpSecureRaw = process.env.SMTP_SECURE;
+  const smtpSecure = smtpSecureRaw === undefined
+    ? smtpPort === 465
+    : smtpSecureRaw === 'true';
 
   const config = {
     provider,
@@ -27,8 +32,8 @@ function getMailConfig() {
   if (provider === 'smtp') {
     config.smtp = {
       host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587', 10),
-      secure: process.env.SMTP_SECURE === 'true',
+      port: smtpPort,
+      secure: smtpSecure,
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
@@ -61,11 +66,17 @@ function validateMailConfig() {
     if (!config.smtp.host) {
       errors.push('SMTP_HOST environment variable not set');
     }
+    if (!Number.isFinite(config.smtp.port) || config.smtp.port <= 0) {
+      errors.push('SMTP_PORT must be a valid positive number');
+    }
     if (!config.smtp.auth.user) {
       errors.push('SMTP_USER environment variable not set');
     }
     if (!config.smtp.auth.pass) {
       errors.push('SMTP_PASS environment variable not set');
+    }
+    if (config.smtp.port === 587 && config.smtp.secure) {
+      errors.push('SMTP_SECURE=true with SMTP_PORT=587 is invalid. Use SMTP_SECURE=false for STARTTLS on port 587, or SMTP_PORT=465 with SMTP_SECURE=true for SSL/TLS.');
     }
   } else if (config.provider === 'sendgrid') {
     if (!config.sendgrid.apiKey) {

@@ -37,11 +37,13 @@ const sendEmail = async (to, subject, html) => {
       error: err.message || err.code,
     });
 
+    const safeUserMessage = err?.userMessage || err?.message || 'Email service is temporarily unavailable. Please try again later.';
+
     return {
       success: false,
       error: err.originalError || err.message,
       errorCode: err.code || 'EMAIL_SEND_FAILED',
-      userMessage: err.message || 'Failed to send email. Please try again.',
+      userMessage: safeUserMessage,
     };
   }
 };

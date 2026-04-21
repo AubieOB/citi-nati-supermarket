@@ -11,6 +11,44 @@ const mailConfig = require('../config/mailConfig');
 
 let mailProvider = null;
 
+function classifySmtpError(error) {
+  const raw = String(error?.message || '').toLowerCase();
+
+  if (
+    raw.includes('wrong version number') ||
+    raw.includes('tls_validate_record_header') ||
+    raw.includes('ssl routines')
+  ) {
+    return {
+      code: 'EMAIL_PROVIDER_MISCONFIGURED',
+      message: 'Email service configuration error: SMTP TLS/SSL settings are invalid. Check SMTP_SECURE and SMTP_PORT.',
+      originalError: error?.message,
+    };
+  }
+
+  if (raw.includes('econnrefused') || raw.includes('ehostunreach') || raw.includes('etimedout')) {
+    return {
+      code: 'EMAIL_SERVICE_UNAVAILABLE',
+      message: 'Email service is temporarily unavailable.',
+      originalError: error?.message,
+    };
+  }
+
+  if (raw.includes('invalid login') || raw.includes('unauthorized') || raw.includes('535')) {
+    return {
+      code: 'EMAIL_PROVIDER_UNAUTHORIZED',
+      message: 'Email service authentication failed.',
+      originalError: error?.message,
+    };
+  }
+
+  return {
+    code: 'EMAIL_SEND_FAILED',
+    message: 'Failed to send email. Please try again later.',
+    originalError: error?.message,
+  };
+}
+
 /**
  * SMTP Provider Implementation
  */
@@ -44,8 +82,9 @@ class SmtpProvider {
         error: error.message,
         host: this.config.smtp.host,
         port: this.config.smtp.port,
+        secure: this.config.smtp.secure,
       });
-      throw error;
+      throw classifySmtpError(error);
     }
   }
 
@@ -81,24 +120,8 @@ class SmtpProvider {
         subject: options.subject,
         error: error.message,
       });
-      
-      // Classify error
-      let errorType = 'EMAIL_SEND_FAILED';
-      let userMessage = 'Failed to send email. Please try again later.';
 
-      if (error.message.includes('ECONNREFUSED') || error.message.includes('EHOSTUNREACH')) {
-        errorType = 'EMAIL_SERVICE_UNAVAILABLE';
-        userMessage = 'Email service is temporarily unavailable.';
-      } else if (error.message.includes('Invalid login') || error.message.includes('Unauthorized')) {
-        errorType = 'EMAIL_PROVIDER_UNAUTHORIZED';
-        userMessage = 'Email service authentication failed.';
-      }
-
-      throw {
-        code: errorType,
-        message: userMessage,
-        originalError: error.message,
-      };
+      throw classifySmtpError(error);
     }
   }
 
