@@ -2208,24 +2208,30 @@ async function autoSync() {
         || lastProductSyncSnapshot.size === 0
         || (!Number.isNaN(DELTA_FULL_SYNC_EVERY_CYCLES) && DELTA_FULL_SYNC_EVERY_CYCLES > 0 && (productSyncCycleCounter % DELTA_FULL_SYNC_EVERY_CYCLES) === 0);
 
-      let productsToSync = allProducts;
-      let nextSnapshot = null;
+      const nextSnapshot = new Map();
+      const changedProducts = [];
+      const changedProductKeys = new Set();
 
-      if (!shouldForceFullSync) {
-        nextSnapshot = new Map();
-        const changedProducts = [];
-        for (const product of allProducts) {
-          const key = buildProductDeltaKey(product);
-          const signature = buildProductDeltaSignature(product);
-          nextSnapshot.set(key, signature);
+      for (const product of allProducts) {
+        const key = buildProductDeltaKey(product);
+        const signature = buildProductDeltaSignature(product);
+        nextSnapshot.set(key, signature);
 
-          const previousSignature = lastProductSyncSnapshot.get(key);
-          if (previousSignature !== signature) {
-            changedProducts.push(product);
-          }
+        const previousSignature = lastProductSyncSnapshot.get(key);
+        if (previousSignature !== signature) {
+          changedProducts.push(product);
+          changedProductKeys.add(key);
         }
+      }
 
+      let productsToSync = shouldForceFullSync ? allProducts : changedProducts;
+      const hasBaselineSnapshot = lastProductSyncSnapshot.size > 0;
+      const shouldRunPriorityLane = shouldForceFullSync && hasBaselineSnapshot && changedProducts.length > 0;
+      let fullSyncRemainder = [];
+
+      if (shouldRunPriorityLane) {
         productsToSync = changedProducts;
+        fullSyncRemainder = allProducts.filter((product) => !changedProductKeys.has(buildProductDeltaKey(product)));
       }
 
       console.log(`${BRANCH_TAG} [AUTO SYNC] Total: ${allProducts.length} products from operational scope (${syncLocations.join(', ')})`);
@@ -2233,25 +2239,30 @@ async function autoSync() {
         enabled: ENABLE_DELTA_PRODUCT_SYNC,
         cycle: productSyncCycleCounter,
         forceFullSync: shouldForceFullSync,
+        priorityLane: shouldRunPriorityLane,
         queued: productsToSync.length,
+        remainderQueued: fullSyncRemainder.length,
       });
 
       if (productsToSync.length > 0) {
         const syncResult = await sendProductsToLiveServer(productsToSync, { syncLocations });
-        if (syncResult && syncResult.success) {
-          if (shouldForceFullSync || !nextSnapshot) {
-            nextSnapshot = new Map();
-            for (const product of allProducts) {
-              nextSnapshot.set(buildProductDeltaKey(product), buildProductDeltaSignature(product));
-            }
-          }
+        let remainderSyncSucceeded = true;
+
+        if (syncResult && syncResult.success && shouldRunPriorityLane && fullSyncRemainder.length > 0) {
+          console.log(`${BRANCH_TAG} [AUTO SYNC] priority lane complete, sending full-sync remainder`, {
+            changedQueued: productsToSync.length,
+            remainderQueued: fullSyncRemainder.length,
+          });
+          const remainderResult = await sendProductsToLiveServer(fullSyncRemainder, { syncLocations });
+          remainderSyncSucceeded = Boolean(remainderResult && remainderResult.success);
+        }
+
+        if (syncResult && syncResult.success && remainderSyncSucceeded) {
           lastProductSyncSnapshot = nextSnapshot;
         }
       } else {
         console.log(`${BRANCH_TAG} [AUTO SYNC] No product changes detected for this cycle`);
-        if (nextSnapshot) {
-          lastProductSyncSnapshot = nextSnapshot;
-        }
+        lastProductSyncSnapshot = nextSnapshot;
       }
     } else {
       console.log(`${BRANCH_TAG} [AUTO SYNC] No products found from any location`);
