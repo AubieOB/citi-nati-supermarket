@@ -249,18 +249,18 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
     return locations.find((location) => Number(location.id) === Number(selectedLocationId)) || null;
   }, [locations, selectedLocationId]);
 
-  const activeLookupLocationCode = useMemo(() => {
-    const formLocationCode = String(form.locationCode || '').trim().toUpperCase();
-    if (formLocationCode) return formLocationCode;
-    return normalizeLocationCode(selectedLocation);
-  }, [form.locationCode, selectedLocation]);
-
   const [form, setForm] = useState(() => buildNewForm(selectedLocation));
   const [saving, setSaving] = useState(false);
   const [activeLookupRow, setActiveLookupRow] = useState(-1);
   const [lookupWarning, setLookupWarning] = useState('');
   const [isIntakeWorkspaceOpen, setIsIntakeWorkspaceOpen] = useState(false);
   const [isIntakeWorkspaceMaximized, setIsIntakeWorkspaceMaximized] = useState(false);
+
+  const activeLookupLocationCode = useMemo(() => {
+    const formLocationCode = String(form.locationCode || '').trim().toUpperCase();
+    if (formLocationCode) return formLocationCode;
+    return normalizeLocationCode(selectedLocation);
+  }, [form.locationCode, selectedLocation]);
 
   useEffect(() => {
     if (form.id) return;
