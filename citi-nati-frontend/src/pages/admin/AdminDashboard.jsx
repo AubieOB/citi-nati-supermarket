@@ -106,10 +106,7 @@ const MOBILE_BLOCKED_MESSAGE_BY_TAB = {
 };
 
 const ADMIN_PRODUCTS_AUTO_REFRESH_TAB_IDS = new Set([
-  'products',
-  'stocks',
   'emergency-sales',
-  'pos-management',
 ]);
 
 const extractColorToken = (value) => {

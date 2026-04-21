@@ -104,14 +104,18 @@ const AdminPOSManagement = ({
 
       if (hasSharedProductsCache) {
         const normalizedSearch = String(searchValue || '').trim().toLowerCase();
+        const posScopedCachedProducts = cachedProducts.filter((product) => {
+          const sourceCode = String(product?.sourceCode || product?.productCode || '').trim();
+          return Boolean(sourceCode);
+        });
         const allItems = normalizedSearch
-          ? cachedProducts.filter((product) => {
+          ? posScopedCachedProducts.filter((product) => {
               const name = String(product?.name || '').toLowerCase();
               const code = String(product?.sourceCode || product?.productCode || '').toLowerCase();
               const category = String(product?.category || '').toLowerCase();
               return name.includes(normalizedSearch) || code.includes(normalizedSearch) || category.includes(normalizedSearch);
             })
-          : cachedProducts;
+          : posScopedCachedProducts;
 
         if (fetchRequestIdRef.current !== requestId) {
           return;

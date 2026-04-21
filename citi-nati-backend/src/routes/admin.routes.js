@@ -1551,14 +1551,25 @@ router.delete('/pos-products/delete-selected', verifyTokenMiddleware, verifyAdmi
     };
 
     if (normalizedLocationCode) {
-      const scopedCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
-      const derivedBranchCode = deriveBranchCodeFromScopeCodes(expandLocationScopeCodes(normalizedLocationCode));
-      if (!scopedCodes || scopedCodes.length === 0) {
-        return res.json({ success: true, message: 'No POS products found for selected location', deletedCount: 0 });
-      }
-      where.sourceCode = { in: scopedCodes };
-      if (derivedBranchCode) {
-        where.branchCode = derivedBranchCode;
+      const scopeCodes = expandLocationScopeCodes(normalizedLocationCode);
+      const derivedBranchCode = deriveBranchCodeFromScopeCodes(scopeCodes);
+
+      if (derivedBranchCode === 'ZOMBA') {
+        const resolvedLocationCode = scopeCodes[0] || normalizedLocationCode;
+        where.branchCode = 'ZOMBA';
+        where.locationCode = {
+          equals: resolvedLocationCode,
+          mode: 'insensitive',
+        };
+      } else {
+        const scopedCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
+        if (!scopedCodes || scopedCodes.length === 0) {
+          return res.json({ success: true, message: 'No POS products found for selected location', deletedCount: 0 });
+        }
+        where.sourceCode = { in: scopedCodes };
+        if (derivedBranchCode) {
+          where.branchCode = derivedBranchCode;
+        }
       }
     }
 
@@ -1594,14 +1605,25 @@ router.delete('/pos-products/delete-all', verifyTokenMiddleware, verifyAdmin, as
     };
 
     if (normalizedLocationCode) {
-      const scopedCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
-      const derivedBranchCode = deriveBranchCodeFromScopeCodes(expandLocationScopeCodes(normalizedLocationCode));
-      if (!scopedCodes || scopedCodes.length === 0) {
-        return res.json({ success: true, message: 'No POS products found for selected location', deletedCount: 0 });
-      }
-      where.sourceCode = { in: scopedCodes };
-      if (derivedBranchCode) {
-        where.branchCode = derivedBranchCode;
+      const scopeCodes = expandLocationScopeCodes(normalizedLocationCode);
+      const derivedBranchCode = deriveBranchCodeFromScopeCodes(scopeCodes);
+
+      if (derivedBranchCode === 'ZOMBA') {
+        const resolvedLocationCode = scopeCodes[0] || normalizedLocationCode;
+        where.branchCode = 'ZOMBA';
+        where.locationCode = {
+          equals: resolvedLocationCode,
+          mode: 'insensitive',
+        };
+      } else {
+        const scopedCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
+        if (!scopedCodes || scopedCodes.length === 0) {
+          return res.json({ success: true, message: 'No POS products found for selected location', deletedCount: 0 });
+        }
+        where.sourceCode = { in: scopedCodes };
+        if (derivedBranchCode) {
+          where.branchCode = derivedBranchCode;
+        }
       }
     }
 
