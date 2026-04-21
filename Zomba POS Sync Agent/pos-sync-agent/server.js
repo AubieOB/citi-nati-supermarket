@@ -542,20 +542,20 @@ async function fetchProductsFromPOS(locationCode) {
           ISNULL(p.Barcode, '') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
           CASE
-            WHEN ds.StockDate IS NOT NULL THEN ds.StockDate
             WHEN pa.ProductCode IS NOT NULL THEN pa.ActivityLatestAt
+            WHEN ds.StockDate IS NOT NULL THEN ds.StockDate
             ELSE NULL
           END AS StockDate,
           ISNULL(
             CASE
-              WHEN ds.StockBalance IS NOT NULL THEN ds.StockBalance
-              ELSE pa.ActivityStockBalance
+              WHEN pa.ActivityStockBalance IS NOT NULL THEN pa.ActivityStockBalance
+              ELSE ds.StockBalance
             END,
             0
           ) AS QuantityAvailable,
           CASE
-            WHEN ds.StockBalance IS NOT NULL THEN 'DailyStockBalance'
-            WHEN pa.ProductCode IS NOT NULL THEN 'ProductActivityFallback'
+            WHEN pa.ActivityStockBalance IS NOT NULL THEN 'ProductActivity'
+            WHEN ds.StockBalance IS NOT NULL THEN 'DailyStockBalanceFallback'
             ELSE 'NoStockRow'
           END AS StockSource,
           ISNULL(lp.FPrice, 0) AS SellingPrice,
@@ -682,7 +682,7 @@ async function fetchProductsFromPOS(locationCode) {
       aggregationMode: false,
       stockResolutionMode: 'LOCATION_SPECIFIC',
       stockSourceMode: stockConfig.hasDailyStockBalance && stockConfig.hasProductActivity
-        ? 'DailyStockBalancePrimary+MissingRowProductActivityFallback'
+        ? 'ProductActivityPrimary+MissingRowDailyStockBalanceFallback'
         : (stockConfig.hasDailyStockBalance
           ? 'DailyStockBalance'
           : (stockConfig.hasProductActivity ? 'ProductActivityFallbackOnly' : 'Unavailable')),
@@ -1263,7 +1263,7 @@ app.get('/pos-sync/products', validateApiKey, requireFeature('enableReportingSyn
       configuredLocationCode: appConfig.posDb.locationCode,
       includedLocations: syncLocations,
       mode: appConfig.branch.branchCode === 'ZOMBA' ? 'CONFIGURED_ZOMBA_OPERATIONAL_LOCATIONS' : 'CONFIGURED_LOCATION_ONLY',
-      stockSource: 'DailyStockBalance primary, ProductActivity fallback only when no daily row exists',
+      stockSource: 'ProductActivity primary, DailyStockBalance fallback only when no activity row exists',
       stockResolutionMode: 'LOCATION_SPECIFIC',
       aggregationEnabled: false,
     });
