@@ -290,7 +290,15 @@ async function sendProductsToLiveServer(products) {
         }
       } catch (batchError) {
         totalErrors++;
+        const httpStatus = batchError.response?.status;
+        const responseBody = batchError.response?.data;
         console.error(`${SYNC_LOG_PREFIX} error (products batch ${batchIndex + 1}/${batches.length}):`, batchError.message);
+        if (httpStatus) {
+          console.error(`${SYNC_LOG_PREFIX} batch ${batchIndex + 1} HTTP status: ${httpStatus}`);
+        }
+        if (responseBody) {
+          console.error(`${SYNC_LOG_PREFIX} batch ${batchIndex + 1} response body:`, JSON.stringify(responseBody).slice(0, 1000));
+        }
       }
     }
 
@@ -322,13 +330,21 @@ function rejectDirectWritebackInProduction(req, res, next) {
   });
 }
 
-/** Fetch products from POS with category information */
-async function fetchProductsFromPOS(locationCode) {
+/** Fetch products from POS with category information.
+ * @param {string} locationCode - The operational location to tag products with and fetch prices for (e.g. 'BAR').
+ * @param {string} [stockLocationCode] - The POS location to read stock quantities from. Defaults to locationCode.
+ *   For Zomba, BAR/ST999 share physical inventory with SH, so pass the primary stock location (SH) here
+ *   while locationCode targets BAR/ST999-specific prices.
+ */
+async function fetchProductsFromPOS(locationCode, stockLocationCode) {
   try {
     if (!pool) await initializePool();
 
     // Use provided location code or fall back to environment
     const LOCATION_CODE = locationCode || appConfig.posDb.locationCode;
+    // Stock is read from the primary warehouse location (may differ from the operational location).
+    // e.g. for Zomba BAR/ST999, stock is tracked under SH in the POS stocks table.
+    const STOCK_LOCATION_CODE = stockLocationCode || LOCATION_CODE;
 
     const stockConfig = await resolveLiveStockSourceConfig();
     const query = stockConfig.hasLiveStockTables
@@ -341,7 +357,7 @@ async function fetchProductsFromPOS(locationCode) {
           ${stockConfig.movementDateExpr} AS LiveStockDate
         FROM POS.dbo.stockdetails sd
         INNER JOIN POS.dbo.stocks s ON sd.GRNNo = s.GRNNo
-        WHERE s.LocationCode = @LocationCode
+        WHERE s.LocationCode = @StockLocationCode
           AND sd.ProductCode IS NOT NULL
         GROUP BY sd.ProductCode, s.LocationCode
       ),
@@ -355,7 +371,7 @@ async function fetchProductsFromPOS(locationCode) {
             ORDER BY StockDate DESC
           ) AS rn
         FROM POS.dbo.DailyStockBalance
-        WHERE LocationCode = @LocationCode
+        WHERE LocationCode = @StockLocationCode
           AND CAST(StockDate AS date) <= CAST(GETDATE() AS date)
       )
       SELECT
@@ -377,7 +393,7 @@ async function fetchProductsFromPOS(locationCode) {
           END AS PriceSource
       FROM POS.dbo.productsmaster p
       LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
-      LEFT JOIN live_stock ls ON ls.ProductCode = p.ProductCode AND ls.LocationCode = @LocationCode
+      LEFT JOIN live_stock ls ON ls.ProductCode = p.ProductCode AND ls.LocationCode = @StockLocationCode
       LEFT JOIN latest_daily ds ON ds.ProductCode = p.ProductCode AND ds.rn = 1
       OUTER APPLY (
         SELECT TOP 1 FPrice
@@ -399,7 +415,7 @@ async function fetchProductsFromPOS(locationCode) {
             ORDER BY StockDate DESC
           ) AS rn
         FROM POS.dbo.DailyStockBalance
-        WHERE LocationCode = @LocationCode
+        WHERE LocationCode = @StockLocationCode
           AND CAST(StockDate AS date) <= CAST(GETDATE() AS date)
       )
       SELECT
@@ -429,13 +445,15 @@ async function fetchProductsFromPOS(locationCode) {
 
     const request = pool.request();
     request.input('LocationCode', sql.VarChar(10), LOCATION_CODE);
+    request.input('StockLocationCode', sql.VarChar(10), STOCK_LOCATION_CODE);
+
+    // Log BEFORE query so BAR/ST999 fetch attempts are visible even if SQL throws
+    console.log(`${SYNC_LOG_PREFIX} [FETCH] querying POS for location: ${LOCATION_CODE} (stock from: ${STOCK_LOCATION_CODE}, mode: ${stockConfig.hasLiveStockTables ? 'StockDetailsLive+DailyFallback' : 'DailyStockBalance'})`);
+
     const result = await request.query(query);
 
-    console.log(`${SYNC_LOG_PREFIX} [DEBUG] selected location: ${LOCATION_CODE}`);
-    console.log(`${SYNC_LOG_PREFIX} [DEBUG] locationCode used in query: ${LOCATION_CODE}`);
-    console.log(`${SYNC_LOG_PREFIX} fetched ${result.recordset.length} products from location ${LOCATION_CODE}`);
-    console.log(`${SYNC_LOG_PREFIX} stock mode: ${stockConfig.hasLiveStockTables ? 'StockDetailsLive (stockdetails+stocks) with DailyStockBalance fallback' : 'DailyStockBalance latest snapshot fallback-only'}`);
-    console.log(`${SYNC_LOG_PREFIX} price mode: PriceByLocation only (no cross-location fallback)`);
+    console.log(`${SYNC_LOG_PREFIX} [FETCH] done — fetched ${result.recordset.length} products for location ${LOCATION_CODE} (stock sourced from ${STOCK_LOCATION_CODE})`);
+    console.log(`${SYNC_LOG_PREFIX} price mode: PriceByLocation from ${LOCATION_CODE} only (no cross-location fallback)`);
 
     const stockSourceSummary = result.recordset.reduce((acc, row) => {
       const key = String(row.StockSource || 'Unknown');
@@ -447,8 +465,19 @@ async function fetchProductsFromPOS(locationCode) {
       acc[key] = (acc[key] || 0) + 1;
       return acc;
     }, {});
+    // If all products are NoStockRow for this operational location, log a prominent warning
+    const noStockCount = stockSourceSummary.NoStockRow || 0;
+    const totalCount = result.recordset.length;
+    if (totalCount > 0 && noStockCount === totalCount && LOCATION_CODE !== STOCK_LOCATION_CODE) {
+      console.warn(`${SYNC_LOG_PREFIX} [STOCK WARNING] ALL ${totalCount} products for location '${LOCATION_CODE}' have NoStockRow even after reading stock from '${STOCK_LOCATION_CODE}'. ` +
+        `This likely means '${STOCK_LOCATION_CODE}' has no entries in stockdetails/stocks for these products. ` +
+        `Check that POS_PRIMARY_STOCK_LOCATION_CODE is set to the correct warehouse location.`);
+    } else if (totalCount > 0 && noStockCount > 0 && LOCATION_CODE !== STOCK_LOCATION_CODE) {
+      console.log(`${SYNC_LOG_PREFIX} [STOCK INFO] ${noStockCount}/${totalCount} products for '${LOCATION_CODE}' have NoStockRow (stock read from '${STOCK_LOCATION_CODE}')`);
+    }
     console.log(`${SYNC_LOG_PREFIX} stock-source diagnostics`, {
       locationCode: LOCATION_CODE,
+      stockLocationCode: STOCK_LOCATION_CODE,
       sourceBreakdown: stockSourceSummary,
       priceSourceBreakdown: priceSourceSummary,
     });
@@ -553,6 +582,18 @@ function getOperationalSyncLocations() {
   }
 
   return [appConfig.posDb.locationCode];
+}
+
+/**
+ * Returns the location code used as the stock source in POS SQL Server queries.
+ * By default this is POS_LOCATION_CODE ('SH'), which is the main warehouse.
+ * For Zomba, BAR and ST999 share physical inventory tracked under SH, so stock
+ * is always read from SH regardless of which operational location is being synced.
+ * Override via POS_PRIMARY_STOCK_LOCATION_CODE env var if needed.
+ */
+function getPrimaryStockLocationCode() {
+  const override = String(process.env.POS_PRIMARY_STOCK_LOCATION_CODE || '').trim().toUpperCase();
+  return override || appConfig.posDb.locationCode;
 }
 
 function reconcileBatchesWithLiveStock(batches, liveStockQty) {
@@ -999,10 +1040,13 @@ app.get('/pos-sync/products', validateApiKey, requireFeature('enableReportingSyn
       stockSource: 'StockDetailsLive preferred, DailyStockBalance fallback',
     });
     
+    const primaryStockLocationCode = getPrimaryStockLocationCode();
+    console.log(`[POS SYNC] stock will be read from primary warehouse location: ${primaryStockLocationCode}`);
+
     for (const locationCode of syncLocations) {
       try {
-        const locationProducts = await fetchProductsFromPOS(locationCode);
-        console.log(`[POS SYNC] Fetched ${locationProducts.length} products from ${locationCode}`);
+        const locationProducts = await fetchProductsFromPOS(locationCode, primaryStockLocationCode);
+        console.log(`[POS SYNC] Fetched ${locationProducts.length} products from ${locationCode} (stock from ${primaryStockLocationCode})`);
         allProducts.push(...locationProducts);
       } catch (locationErr) {
         console.error(`[POS SYNC] Error fetching products from ${locationCode}:`, locationErr.message);
@@ -1010,7 +1054,7 @@ app.get('/pos-sync/products', validateApiKey, requireFeature('enableReportingSyn
       }
     }
     
-    console.log(`[POS SYNC] Fetched ${allProducts.length} products from operational scope: ${syncLocations.join(', ')}`);
+    console.log(`[POS SYNC] Fetched ${allProducts.length} products from operational scope: ${syncLocations.join(', ')} (stock source: ${primaryStockLocationCode})`);
 
     if (!allProducts || allProducts.length === 0) {
       return res.json({
@@ -1936,10 +1980,13 @@ async function autoSync() {
       stockSource: 'StockDetailsLive preferred, DailyStockBalance fallback',
     });
     
+    const primaryStockLocationCode = getPrimaryStockLocationCode();
+    console.log(`${BRANCH_TAG} [AUTO SYNC] stock will be read from primary warehouse location: ${primaryStockLocationCode}`);
+
     for (const locationCode of syncLocations) {
       try {
-        const locationProducts = await fetchProductsFromPOS(locationCode);
-        console.log(`${BRANCH_TAG} [AUTO SYNC] Fetched ${locationProducts.length} products from ${locationCode}`);
+        const locationProducts = await fetchProductsFromPOS(locationCode, primaryStockLocationCode);
+        console.log(`${BRANCH_TAG} [AUTO SYNC] Fetched ${locationProducts.length} products from ${locationCode} (stock from ${primaryStockLocationCode})`);
         allProducts.push(...locationProducts);
       } catch (locationErr) {
         console.error(`${BRANCH_TAG} [AUTO SYNC] Error fetching products from ${locationCode}:`, locationErr.message);
