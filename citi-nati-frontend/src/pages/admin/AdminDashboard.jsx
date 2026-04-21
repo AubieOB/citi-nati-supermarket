@@ -154,6 +154,17 @@ const parseColor = (value) => {
   return null;
 };
 
+const formatAgeCompact = (ageMs) => {
+  if (!Number.isFinite(ageMs) || ageMs < 0) return 'unknown';
+  if (ageMs < 5000) return 'just now';
+  const seconds = Math.floor(ageMs / 1000);
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ago`;
+};
+
 const getRelativeLuminance = ({ r, g, b }) => {
   const normalize = (channel) => {
     const value = channel / 255;
@@ -316,6 +327,7 @@ const AdminDashboard = () => {
     return window.innerWidth <= MOBILE_MAX_WIDTH;
   });
   const isDarkTheme = theme === 'dark';
+  const [freshnessClockMs, setFreshnessClockMs] = useState(() => Date.now());
   const selectedOperationalScope = resolveOperationalScope(selectedOperationalLocationCode);
   const selectedOperationalLocationLabel = selectedOperationalScope.label;
   const selectedOperationalBranchCode = selectedOperationalScope.branchCode;
@@ -856,6 +868,31 @@ const AdminDashboard = () => {
     await preloadAdminProductsForLocation(selectedOperationalLocationCode, { force: true });
   }, [preloadAdminProductsForLocation, selectedOperationalLocationCode]);
 
+  const activeLocationLastLoadedAt = Number(activeLocationCachedProductsMeta.lastLoadedAt || 0);
+  const activeLocationLastRealtimeUpdateAt = Number(activeLocationCachedProductsMeta.lastRealtimeUpdateAt || 0);
+  const activeLocationLastStockRefreshAt = Math.max(activeLocationLastLoadedAt, activeLocationLastRealtimeUpdateAt);
+  const activeLocationStockFreshnessAgeMs = activeLocationLastStockRefreshAt > 0
+    ? Math.max(0, freshnessClockMs - activeLocationLastStockRefreshAt)
+    : null;
+  const activeLocationStockFreshnessLabel = activeLocationCachedProductsMeta.isLoading
+    ? 'updating...'
+    : (activeLocationStockFreshnessAgeMs == null
+      ? 'not loaded yet'
+      : formatAgeCompact(activeLocationStockFreshnessAgeMs));
+  const activeLocationStockFreshnessSource = activeLocationLastRealtimeUpdateAt > activeLocationLastLoadedAt
+    ? 'realtime event'
+    : (activeLocationLastStockRefreshAt > 0 ? 'silent refresh' : 'none');
+
+  React.useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setFreshnessClockMs(Date.now());
+    }, 10000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
   return (
     <div
       className={`admin-dashboard-root ${isDarkTheme ? 'theme-dark' : 'theme-light'} ${(isMobileViewport && !showPanelFilters) ? 'admin-panel-filters-hidden' : ''}`}
@@ -947,6 +984,27 @@ const AdminDashboard = () => {
               </>
             )}
           </select>
+          {!sidebarCollapsed && (
+            <div
+              style={{
+                marginTop: '0.45rem',
+                padding: '0.35rem 0.45rem',
+                borderRadius: '6px',
+                border: `1px solid ${isDarkTheme ? '#2f3d55' : '#dbeafe'}`,
+                backgroundColor: isDarkTheme ? 'rgba(29, 78, 216, 0.12)' : '#eff6ff',
+                color: isDarkTheme ? '#bfdbfe' : '#1d4ed8',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+              }}
+              title={`Stock cache source: ${activeLocationStockFreshnessSource}`}
+            >
+              <i className={`fas ${activeLocationCachedProductsMeta.isLoading ? 'fa-sync-alt fa-spin' : 'fa-clock'}`} aria-hidden="true"></i>
+              <span>Stock refresh: {activeLocationStockFreshnessLabel}</span>
+            </div>
+          )}
         </div>
 
         {!sidebarCollapsed && (
