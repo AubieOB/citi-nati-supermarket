@@ -222,6 +222,9 @@ function getScopedActiveProductFilter(branchCode, locationCode = null, scopedPro
       equals: normalizedLocationCode,
       mode: 'insensitive',
     };
+    // Only products with a valid location-specific price row (price > 0).
+    // Products synced without a price row for this location are not operationally available.
+    where.price = { gt: 0 };
   }
 
   if (Array.isArray(scopedProductCodes) && scopedProductCodes.length > 0) {
@@ -425,6 +428,18 @@ async function queuePosPromotionCommands({
         skippedNoSourceCodeSamples.push({ id: product.id, name: product.name || null });
       }
       continue;
+    }
+
+    // Log location-availability decision for diagnostics.
+    const locationPriceExists = Number(product.price || 0) > 0;
+    const promotionLocationCode = scope?.locationCode || null;
+    if (promotionLocationCode) {
+      console.log(
+        `[LOCATION AVAILABILITY] product=${product.sourceCode} location=${promotionLocationCode}` +
+        ` masterExists=true locationPriceExists=${locationPriceExists}` +
+        ` availability=${locationPriceExists} action=${commandType}` +
+        `${locationPriceExists ? '' : ' reason=NO_LOCATION_PRICE_ROW'}`
+      );
     }
 
     if (enabled) {

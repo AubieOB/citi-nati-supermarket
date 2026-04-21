@@ -712,6 +712,9 @@ async function lookupEmergencyProducts(req, res) {
         ? {
             locationCode: { equals: locationCode, mode: 'insensitive' },
             sourceCode: { not: null },
+            // Only products with a valid location-specific price row (price > 0).
+            // Products synced from POS without a price row for this location get price=0.
+            price: { gt: 0 },
           }
         : { sourceCode: { in: scopedProductCodes } }),
     };
@@ -757,6 +760,20 @@ async function lookupEmergencyProducts(req, res) {
       products,
       locationCode
     );
+
+    // Log location-availability decision for each result (diagnostics).
+    if (isZombaScope) {
+      products.forEach((product) => {
+        const masterExists = true; // already filtered to existing rows
+        const locationPriceExists = Number(product.price || 0) > 0;
+        console.log(
+          `[LOCATION AVAILABILITY] product=${product.sourceCode || product.id} location=${locationCode}` +
+          ` masterExists=${masterExists} locationPriceExists=${locationPriceExists}` +
+          ` availability=${locationPriceExists}` +
+          `${locationPriceExists ? '' : ' reason=NO_LOCATION_PRICE_ROW'}`
+        );
+      });
+    }
 
     const mapped = products
       .map((product) => {
@@ -829,9 +846,15 @@ async function createEmergencySale(req, res) {
         error: 'Concrete locationCode is required for Zomba emergency sale (use SH, BAR, or ST999)',
       });
     }
-    const scopedProductCodes = await resolveLocationScopedProductCodes(locationCode);
-    if (!scopedProductCodes || scopedProductCodes.length === 0) {
-      return res.status(400).json({ success: false, error: `No products are available for location ${locationCode}` });
+    // For Zomba: availability is determined directly by location+price row, not the indirect
+    // scopedProductCodes set (which requires prior sales/expiry/cost history that BAR/ST999 may lack).
+    const isZombaCreateScope = branchCode === 'ZOMBA' && isConcreteZombaOperationalLocationCode(posLocationCode);
+    let scopedProductCodes = null;
+    if (!isZombaCreateScope) {
+      scopedProductCodes = await resolveLocationScopedProductCodes(locationCode);
+      if (!scopedProductCodes || scopedProductCodes.length === 0) {
+        return res.status(400).json({ success: false, error: `No products are available for location ${locationCode}` });
+      }
     }
 
     const rawItems = Array.isArray(req.body?.items) ? req.body.items : [];
@@ -863,12 +886,24 @@ async function createEmergencySale(req, res) {
     const vatSettings = await getVatSettings();
 
     const created = await prisma.$transaction(async (tx) => {
+      // Build location-aware product query.
+      // Zomba: validate by branchCode=ZOMBA + exact locationCode + price>0 (= location price row exists).
+      // Non-Zomba: validate by scopedProductCodes derived from activity history.
+      const productQueryWhere = isZombaCreateScope
+        ? {
+            id: { in: productIds },
+            branchCode: 'ZOMBA',
+            locationCode: { equals: posLocationCode, mode: 'insensitive' },
+            sourceCode: { not: null },
+          }
+        : {
+            id: { in: productIds },
+            sourceCode: { in: scopedProductCodes },
+            ...(branchCode ? { branchCode } : {}),
+          };
+
       const products = await tx.product.findMany({
-        where: {
-          id: { in: productIds },
-          sourceCode: { in: scopedProductCodes },
-          ...(branchCode ? { branchCode } : {}),
-        },
+        where: productQueryWhere,
         select: {
           id: true,
           name: true,
@@ -884,8 +919,59 @@ async function createEmergencySale(req, res) {
         },
       });
 
+      // Log location-availability decision for each product in the cart.
+      if (isZombaCreateScope) {
+        const productMap = new Map(products.map((p) => [p.id, p]));
+        for (const productId of productIds) {
+          const found = productMap.get(productId);
+          const masterExists = !!found;
+          const locationPriceExists = masterExists && Number(found.price || 0) > 0;
+          console.log(
+            `[LOCATION AVAILABILITY] product=${found?.sourceCode || productId} location=${posLocationCode}` +
+            ` masterExists=${masterExists} locationPriceExists=${locationPriceExists}` +
+            ` availability=${locationPriceExists}` +
+            `${locationPriceExists ? '' : ` reason=${masterExists ? 'NO_LOCATION_PRICE_ROW' : 'NOT_FOUND'}`}`
+          );
+        }
+      }
+
       if (products.length !== productIds.length) {
+        // For Zomba provide a specific error distinguishing global-only products from missing ones.
+        if (isZombaCreateScope) {
+          const foundIds = new Set(products.map((p) => p.id));
+          const missingIds = productIds.filter((id) => !foundIds.has(id));
+          // Diagnose: are the missing IDs present at all for this branch?
+          const globalCheck = await tx.product.findMany({
+            where: { id: { in: missingIds }, branchCode: 'ZOMBA' },
+            select: { id: true, name: true, locationCode: true, price: true },
+          });
+          const noPriceRow = globalCheck.filter((p) => Number(p.price || 0) === 0);
+          const wrongLocation = globalCheck.filter((p) => Number(p.price || 0) > 0 && p.locationCode !== posLocationCode);
+          if (noPriceRow.length > 0) {
+            const names = noPriceRow.map((p) => p.name).join(', ');
+            return Promise.reject(new Error(
+              `Product(s) not configured for ${posLocationCode}: ${names}. No price row exists for this location.`
+            ));
+          }
+          if (wrongLocation.length > 0) {
+            const names = wrongLocation.map((p) => `${p.name} (${p.locationCode})`).join(', ');
+            return Promise.reject(new Error(
+              `Product(s) not available in ${posLocationCode}: ${names}`
+            ));
+          }
+        }
         return Promise.reject(new Error('One or more products do not exist'));
+      }
+
+      // Enforce location price row for Zomba: reject products with price=0 even if found.
+      if (isZombaCreateScope) {
+        const noPriceProducts = products.filter((p) => Number(p.price || 0) === 0);
+        if (noPriceProducts.length > 0) {
+          const names = noPriceProducts.map((p) => p.name).join(', ');
+          return Promise.reject(new Error(
+            `Product(s) not configured for ${posLocationCode} (no price row): ${names}`
+          ));
+        }
       }
 
       const productsById = new Map(products.map((product) => [product.id, product]));
