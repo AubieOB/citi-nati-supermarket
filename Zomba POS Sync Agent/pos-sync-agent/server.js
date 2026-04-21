@@ -2154,7 +2154,10 @@ async function autoSync() {
 
       const failedIndex = locationResults.indexOf(locationResult);
       const failedLocationCode = syncLocations[failedIndex] || 'UNKNOWN';
-      console.error(`${BRANCH_TAG} [AUTO SYNC] Error fetching products from ${failedLocationCode}:`, locationResult.reason?.message || locationResult.reason);
+      const failureReason = locationResult.reason && locationResult.reason.message
+        ? locationResult.reason.message
+        : locationResult.reason;
+      console.error(`${BRANCH_TAG} [AUTO SYNC] Error fetching products from ${failedLocationCode}:`, failureReason);
       // Continue with other locations even if one fails
     }
 
