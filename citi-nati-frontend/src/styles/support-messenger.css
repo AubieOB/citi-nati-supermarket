@@ -501,8 +501,9 @@
 .support-secondary-button,
 .support-danger-button,
 .support-ghost-button {
-  padding: 0.78rem 1rem;
+  padding: 0.5rem 0.85rem;
   font-weight: 700;
+  font-size: 0.95rem;
 }
 
 .support-primary-button {
@@ -526,8 +527,8 @@
 }
 
 .support-icon-button {
-  width: 2.7rem;
-  height: 2.7rem;
+  width: 2.2rem;
+  height: 2.2rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
