@@ -706,7 +706,7 @@ const HelpCenter = () => {
         {selectedTicket ? (
           <section ref={conversationPanelRef} className="support-conversation-panel">
             <div className="support-conversation-header">
-              <div>
+              <div className="support-conversation-title-area">
                 <h2 className="support-conversation-title">{selectedTicket.subject}</h2>
                 <div className="support-conversation-meta">
                   <span className="support-chip"><i className="fas fa-hashtag"></i> {selectedTicket.id}</span>
