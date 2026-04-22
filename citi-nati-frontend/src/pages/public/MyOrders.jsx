@@ -9,6 +9,7 @@ import { formatMWK } from '../../utils/currency.js';
 import ProtectedRoute from '../../components/ProtectedRoute.jsx';
 import toast from 'react-hot-toast';
 import { generateOrderReceiptPDF } from '../../utils/pdfReports.js';
+import { exportOrderReceiptImage } from '../../utils/orderReceiptImageExport.js';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import '../../styles/global.css';
 
@@ -392,7 +393,7 @@ const MyOrdersContent = () => {
             size="medium"
             onClick={() => {
               generateOrderReceiptPDF(order);
-              toast.success('Receipt downloaded successfully!');
+              toast.success('Receipt PDF downloaded successfully!');
             }}
             style={{
               backgroundColor: '#2D8659',
@@ -403,7 +404,31 @@ const MyOrdersContent = () => {
             }}
           >
             <i className="fas fa-receipt" style={{ marginRight: '0.5rem' }}></i>
-            Download Receipt
+            Download PDF Receipt
+          </Button>
+
+          <Button
+            variant="secondary"
+            size="medium"
+            onClick={async () => {
+              try {
+                await exportOrderReceiptImage({ order, format: 'png' });
+                toast.success('Receipt image downloaded successfully!');
+              } catch (err) {
+                console.error('Failed to download receipt image:', err);
+                toast.error('Failed to download receipt image. Please try again.');
+              }
+            }}
+            style={{
+              backgroundColor: '#1d4ed8',
+              color: '#fff',
+              border: 'none',
+              cursor: 'pointer',
+              flex: 1,
+            }}
+          >
+            <i className="fas fa-image" style={{ marginRight: '0.5rem' }}></i>
+            Download Receipt Image
           </Button>
         </div>
       )}
