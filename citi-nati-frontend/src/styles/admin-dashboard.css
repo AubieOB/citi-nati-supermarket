@@ -82,6 +82,33 @@
   max-width: 100%;
 }
 
+/* Sealed layout mode: full-width panes and square card/header geometry. */
+.admin-dashboard-root.admin-sealed-layout {
+  --admin-content-pad-y: 0;
+  --admin-content-pad-x: 0;
+}
+
+.admin-dashboard-root.admin-sealed-layout .admin-content-area {
+  padding: 0;
+}
+
+.admin-dashboard-root.admin-sealed-layout .admin-content-area > * {
+  border-radius: 0 !important;
+}
+
+.admin-dashboard-root.admin-sealed-layout .admin-content-area :is(section, article, header, aside, div)[style*='border-radius'] {
+  border-radius: 0 !important;
+}
+
+.admin-dashboard-root.admin-sealed-layout :is(.bo-filter-bar, .admin-panel-filter-bar, .admin-panel, .admin-panel-card, .admin-table-wrapper, .admin-summary-card, .admin-content-card, .admin-metric-card, .admin-list-card, .admin-empty-state-card) {
+  border-radius: 0 !important;
+}
+
+.admin-dashboard-root.admin-sealed-layout :is(.bo-filter-bar, .admin-panel-filter-bar) {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
 .admin-hamburger {
   display: none;
 }
@@ -780,9 +807,19 @@ body.admin-theme-dark .bo-filter-title i {
     --admin-content-pad-x: 0.75rem;
   }
 
+  .admin-dashboard-root.admin-sealed-layout .admin-content-area {
+    --admin-content-pad-y: 0;
+    --admin-content-pad-x: 0;
+    padding: 0;
+  }
+
   .bo-filter-bar {
     border-radius: 14px;
     padding: 0.5rem 0.65rem;
+  }
+
+  .admin-dashboard-root.admin-sealed-layout .bo-filter-bar {
+    border-radius: 0;
   }
 
   .bo-filter-header {
@@ -829,6 +866,10 @@ body.admin-theme-dark .bo-filter-title i {
 
   .admin-content-area {
     --admin-content-pad-x: 0.5rem;
+  }
+
+  .admin-dashboard-root.admin-sealed-layout .admin-content-area {
+    --admin-content-pad-x: 0;
   }
 }
 

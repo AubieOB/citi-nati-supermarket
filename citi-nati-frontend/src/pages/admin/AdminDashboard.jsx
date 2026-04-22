@@ -923,7 +923,7 @@ const AdminDashboard = () => {
 
   return (
     <div
-      className={`admin-dashboard-root ${isDarkTheme ? 'theme-dark' : 'theme-light'} ${(isMobileViewport && !showPanelFilters) ? 'admin-panel-filters-hidden' : ''}`}
+      className={`admin-dashboard-root admin-sealed-layout ${isDarkTheme ? 'theme-dark' : 'theme-light'} ${(isMobileViewport && !showPanelFilters) ? 'admin-panel-filters-hidden' : ''}`}
       data-admin-theme={theme}
     >
       {/* Fixed Left Sidebar Navigation - Desktop Only */}
