@@ -515,19 +515,27 @@ async function fetchProductsFromPOS(locationCode) {
       : 'NULL AS ActivityLatestAt';
     const query = isGuardedZombaLocation && stockConfig.hasDailyStockBalance && stockConfig.hasProductActivity
       ? `
-      WITH latest_daily AS (
+      WITH effective_balance_date AS (
         SELECT
-          ProductCode,
-          LocationCode,
-          StockDate,
-          StockBalance,
-          ROW_NUMBER() OVER (
-            PARTITION BY ProductCode, LocationCode
-            ORDER BY StockDate DESC
-          ) AS rn
+          MAX(CAST(StockDate AS date)) AS EffectiveStockDate
         FROM POS.dbo.DailyStockBalance
         WHERE LocationCode = @LocationCode
-          AND CAST(StockDate AS date) <= CAST(GETDATE() AS date)
+      ),
+      latest_daily AS (
+        SELECT
+          ds.ProductCode,
+          ds.LocationCode,
+          ds.StockDate,
+          ds.StockBalance,
+          ROW_NUMBER() OVER (
+            PARTITION BY ds.ProductCode, ds.LocationCode
+            ORDER BY ds.StockDate DESC
+          ) AS rn
+        FROM POS.dbo.DailyStockBalance ds
+        CROSS JOIN effective_balance_date ebd
+        WHERE ds.LocationCode = @LocationCode
+          AND ebd.EffectiveStockDate IS NOT NULL
+          AND CAST(ds.StockDate AS date) = ebd.EffectiveStockDate
       ),
       product_activity AS (
         SELECT
@@ -545,6 +553,8 @@ async function fetchProductsFromPOS(locationCode) {
           p.ProductName,
           ISNULL(p.Barcode, '') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
+          ebd.EffectiveStockDate,
+          ebd.EffectiveStockDate AS LatestBalanceDate,
           ds.StockDate AS DailyStockDate,
           ds.StockBalance AS DailyStockBalance,
           pa.ActivityLatestAt,
@@ -562,6 +572,7 @@ async function fetchProductsFromPOS(locationCode) {
             ELSE 'NoPriceRow'
           END AS PriceSource
       FROM POS.dbo.productsmaster p
+          CROSS JOIN effective_balance_date ebd
       LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
       LEFT JOIN latest_daily ds ON ds.ProductCode = p.ProductCode AND ds.LocationCode = @LocationCode AND ds.rn = 1
       LEFT JOIN product_activity pa ON pa.ProductCode = p.ProductCode AND pa.LocationCode = @LocationCode
@@ -576,19 +587,27 @@ async function fetchProductsFromPOS(locationCode) {
     `
       : stockConfig.hasDailyStockBalance && stockConfig.hasProductActivity
       ? `
-      WITH latest_daily AS (
+      WITH effective_balance_date AS (
         SELECT
-          ProductCode,
-          LocationCode,
-          StockDate,
-          StockBalance,
-          ROW_NUMBER() OVER (
-            PARTITION BY ProductCode, LocationCode
-            ORDER BY StockDate DESC
-          ) AS rn
+          MAX(CAST(StockDate AS date)) AS EffectiveStockDate
         FROM POS.dbo.DailyStockBalance
         WHERE LocationCode = @LocationCode
-          AND CAST(StockDate AS date) <= CAST(GETDATE() AS date)
+      ),
+      latest_daily AS (
+        SELECT
+          ds.ProductCode,
+          ds.LocationCode,
+          ds.StockDate,
+          ds.StockBalance,
+          ROW_NUMBER() OVER (
+            PARTITION BY ds.ProductCode, ds.LocationCode
+            ORDER BY ds.StockDate DESC
+          ) AS rn
+        FROM POS.dbo.DailyStockBalance ds
+        CROSS JOIN effective_balance_date ebd
+        WHERE ds.LocationCode = @LocationCode
+          AND ebd.EffectiveStockDate IS NOT NULL
+          AND CAST(ds.StockDate AS date) = ebd.EffectiveStockDate
       ),
       product_activity AS (
         SELECT
@@ -606,6 +625,8 @@ async function fetchProductsFromPOS(locationCode) {
           p.ProductName,
           ISNULL(p.Barcode, '') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
+          ebd.EffectiveStockDate,
+          ebd.EffectiveStockDate AS LatestBalanceDate,
           CASE
             WHEN ds.StockDate IS NOT NULL THEN ds.StockDate
             WHEN pa.ProductCode IS NOT NULL THEN pa.ActivityLatestAt
@@ -629,6 +650,7 @@ async function fetchProductsFromPOS(locationCode) {
             ELSE 'NoPriceRow'
           END AS PriceSource
       FROM POS.dbo.productsmaster p
+          CROSS JOIN effective_balance_date ebd
       LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
       LEFT JOIN latest_daily ds ON ds.ProductCode = p.ProductCode AND ds.LocationCode = @LocationCode AND ds.rn = 1
       LEFT JOIN product_activity pa ON pa.ProductCode = p.ProductCode AND pa.LocationCode = @LocationCode
@@ -643,25 +665,35 @@ async function fetchProductsFromPOS(locationCode) {
     `
       : stockConfig.hasDailyStockBalance
       ? `
-      WITH latest_stock AS (
+      WITH effective_balance_date AS (
         SELECT
-          ProductCode,
-          LocationCode,
-          StockDate,
-          StockBalance,
-          ROW_NUMBER() OVER (
-            PARTITION BY ProductCode, LocationCode
-            ORDER BY StockDate DESC
-          ) AS rn
+          MAX(CAST(StockDate AS date)) AS EffectiveStockDate
         FROM POS.dbo.DailyStockBalance
         WHERE LocationCode = @LocationCode
-          AND CAST(StockDate AS date) <= CAST(GETDATE() AS date)
+      ),
+      latest_stock AS (
+        SELECT
+          ds.ProductCode,
+          ds.LocationCode,
+          ds.StockDate,
+          ds.StockBalance,
+          ROW_NUMBER() OVER (
+            PARTITION BY ds.ProductCode, ds.LocationCode
+            ORDER BY ds.StockDate DESC
+          ) AS rn
+        FROM POS.dbo.DailyStockBalance ds
+        CROSS JOIN effective_balance_date ebd
+        WHERE ds.LocationCode = @LocationCode
+          AND ebd.EffectiveStockDate IS NOT NULL
+          AND CAST(ds.StockDate AS date) = ebd.EffectiveStockDate
       )
       SELECT
           p.ProductCode,
           p.ProductName,
           ISNULL(p.Barcode, '') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
+          ebd.EffectiveStockDate,
+          ebd.EffectiveStockDate AS LatestBalanceDate,
           ls.StockDate,
           ISNULL(ls.StockBalance, 0) AS QuantityAvailable,
           CASE
@@ -677,6 +709,7 @@ async function fetchProductsFromPOS(locationCode) {
             ELSE 'NoPriceRow'
           END AS PriceSource
       FROM POS.dbo.productsmaster p
+          CROSS JOIN effective_balance_date ebd
       LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
       LEFT JOIN latest_stock ls ON ls.ProductCode = p.ProductCode AND ls.LocationCode = @LocationCode AND ls.rn = 1
       ORDER BY p.ProductCode
@@ -765,6 +798,14 @@ async function fetchProductsFromPOS(locationCode) {
       productActivityFreshnessWindowMinutes: PRODUCT_ACTIVITY_FRESHNESS_WINDOW_MINUTES,
     });
     let result = await request.query(query);
+
+    const locationStockDateRow = result.recordset.find((row) => row && (row.EffectiveStockDate || row.LatestBalanceDate)) || null;
+    const effectiveStockDate = locationStockDateRow && locationStockDateRow.EffectiveStockDate
+      ? new Date(locationStockDateRow.EffectiveStockDate).toISOString().slice(0, 10)
+      : null;
+    const latestBalanceDate = locationStockDateRow && locationStockDateRow.LatestBalanceDate
+      ? new Date(locationStockDateRow.LatestBalanceDate).toISOString().slice(0, 10)
+      : effectiveStockDate;
 
     if (isGuardedZombaLocation && stockConfig.hasDailyStockBalance && stockConfig.hasProductActivity) {
       const nowMs = Date.now();
@@ -872,6 +913,14 @@ async function fetchProductsFromPOS(locationCode) {
         ...result,
         recordset: normalizedRows,
       };
+    }
+
+    const stockDateSample = result.recordset.find((row) => String(row.StockSource || '').includes('DailyStockBalance'))
+      || result.recordset.find((row) => Number.isFinite(Number(row.QuantityAvailable)));
+    console.log(`${SYNC_LOG_PREFIX} [STOCK DATE RESOLUTION] location=${LOCATION_CODE} serverDate=${new Date().toISOString()} effectiveStockDate=${effectiveStockDate || 'NULL'} latestBalanceDate=${latestBalanceDate || 'NULL'}`);
+    if (stockDateSample) {
+      const sampleStockDate = stockDateSample.StockDate ? new Date(stockDateSample.StockDate).toISOString().slice(0, 10) : 'NULL';
+      console.log(`${SYNC_LOG_PREFIX} [STOCK DATE SAMPLE] location=${LOCATION_CODE} productCode=${stockDateSample.ProductCode} stockDate=${sampleStockDate} stock=${Number(stockDateSample.QuantityAvailable || 0)} source=${stockDateSample.StockSource || 'Unknown'}`);
     }
 
     console.log(`${SYNC_LOG_PREFIX} [FETCH] done — fetched ${result.recordset.length} products for location ${LOCATION_CODE}`);
