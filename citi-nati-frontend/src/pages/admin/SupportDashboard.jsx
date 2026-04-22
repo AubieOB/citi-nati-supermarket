@@ -541,7 +541,13 @@ const SupportDashboard = ({ openTicketRequest }) => {
 
   return (
       <div className="page support-messenger-shell support-admin-sealed" style={{ minHeight: '100vh', paddingBottom: '1rem', ...panelStyleVars }}>
-          <div className="support-admin-sealed-inner" style={{ paddingTop: '0.25rem' }}>
+          <div
+            className="support-admin-sealed-inner"
+            style={{
+              paddingTop: '0.25rem',
+              '--support-fixed-header-offset': `${supportFilterSpacerHeight + 14}px`,
+            }}
+          >
             <section
               ref={filterBarRef}
               className="support-hero support-fixed-header"
