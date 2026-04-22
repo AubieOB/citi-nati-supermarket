@@ -168,3 +168,54 @@ export const formatSupportTime = (value) => {
     minute: '2-digit',
   });
 };
+
+/**
+ * Parse message text and extract URLs
+ * Returns an array of parts: strings and objects with {type: 'link', text, href}
+ * Component is responsible for rendering these as JSX
+ */
+export const parseMessageLinks = (text) => {
+  if (!text || typeof text !== 'string') return [text];
+
+  // URL regex pattern - matches http(s), www., and domain.tld patterns
+  const urlPattern = /(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.[a-z]{2,}\/[^\s]*)/g;
+  
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+
+  // Reset regex state
+  urlPattern.lastIndex = 0;
+
+  while ((match = urlPattern.exec(text)) !== null) {
+    const url = match[0];
+    
+    // Add text before the URL
+    if (match.index > lastIndex) {
+      parts.push(text.substring(lastIndex, match.index));
+    }
+
+    // Ensure URL has protocol
+    let href = url;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      href = url.startsWith('www.') ? `https://${url}` : `https://${url}`;
+    }
+
+    // Add the link data object
+    parts.push({
+      type: 'link',
+      text: url,
+      href,
+    });
+
+    lastIndex = match.index + url.length;
+  }
+
+  // Add remaining text
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex));
+  }
+
+  // If no links found, return original text
+  return parts.length === 0 ? [text] : parts;
+};

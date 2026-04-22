@@ -14,6 +14,7 @@ import {
   getSupportAttachmentIcon,
   mergeReplyIntoReplyList,
   mergeReplyIntoTicketList,
+  parseMessageLinks,
 } from '../../utils/supportChat.js';
 import '../../styles/global.css';
 import '../../styles/support-messenger.css';
@@ -738,7 +739,28 @@ const SupportDashboard = ({ openTicketRequest }) => {
                                 <span className="support-message-author">{isSelf ? 'You' : (message.senderLabel || 'Customer')}</span>
                                 <span className="support-message-time">{formatSupportTime(message.createdAt)}</span>
                               </div>
-                              <p className="support-message-text">{message.message}</p>
+                              <p className="support-message-text">
+                                {parseMessageLinks(message.message).map((part, idx) =>
+                                  typeof part === 'string' ? (
+                                    <span key={idx}>{part}</span>
+                                  ) : (
+                                    <a
+                                      key={idx}
+                                      href={part.href}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      style={{
+                                        color: 'var(--support-accent, #2D8659)',
+                                        textDecoration: 'underline',
+                                        wordBreak: 'break-all',
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      {part.text}
+                                    </a>
+                                  )
+                                )}
+                              </p>
                               {message.attachments?.length > 0 && (
                                 <div className="support-attachments">
                                   {message.attachments.map((attachment, index) => (
