@@ -160,6 +160,12 @@
   backdrop-filter: blur(14px);
 }
 
+.admin-theme-dark .support-hero {
+  border-color: var(--support-border);
+  background: linear-gradient(135deg, rgba(30,30,30,0.98), rgba(22,22,22,0.92));
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.5);
+}
+
 .support-hero-title {
   margin: 0;
   font-size: clamp(1.4rem, 2.8vw, 2.25rem);
