@@ -107,14 +107,14 @@
   border-radius: 0 !important;
 }
 
-.admin-dashboard-root.admin-sealed-layout .admin-content-area :is(div, section, article, header, aside, main)[style*='max-width'] {
+.admin-dashboard-root.admin-sealed-layout .admin-content-area > :is(div, section, article, header, aside, main)[style*='max-width'] {
   max-width: none !important;
 }
 
-.admin-dashboard-root.admin-sealed-layout .admin-content-area :is(div, section, article, header, aside, main)[style*='margin: 0 auto'],
-.admin-dashboard-root.admin-sealed-layout .admin-content-area :is(div, section, article, header, aside, main)[style*='margin:0 auto'],
-.admin-dashboard-root.admin-sealed-layout .admin-content-area :is(div, section, article, header, aside, main)[style*='margin: 0px auto'],
-.admin-dashboard-root.admin-sealed-layout .admin-content-area :is(div, section, article, header, aside, main)[style*='margin:0px auto'] {
+.admin-dashboard-root.admin-sealed-layout .admin-content-area > :is(div, section, article, header, aside, main)[style*='margin: 0 auto'],
+.admin-dashboard-root.admin-sealed-layout .admin-content-area > :is(div, section, article, header, aside, main)[style*='margin:0 auto'],
+.admin-dashboard-root.admin-sealed-layout .admin-content-area > :is(div, section, article, header, aside, main)[style*='margin: 0px auto'],
+.admin-dashboard-root.admin-sealed-layout .admin-content-area > :is(div, section, article, header, aside, main)[style*='margin:0px auto'] {
   margin-left: 0 !important;
   margin-right: 0 !important;
 }

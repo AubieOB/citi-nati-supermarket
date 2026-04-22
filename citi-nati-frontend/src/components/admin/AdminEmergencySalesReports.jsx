@@ -155,11 +155,14 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
 
       const rect = contentArea.getBoundingClientRect();
       const mobileTopOffset = 56;
+      const resolvedTop = window.innerWidth <= 768
+        ? Math.max(rect.top, mobileTopOffset)
+        : rect.top;
 
       setFilterBarLayout({
         left: rect.left,
         width: rect.width,
-        top: window.innerWidth <= 768 ? mobileTopOffset : 0,
+        top: resolvedTop,
       });
 
       if (filterBarRef.current) {
