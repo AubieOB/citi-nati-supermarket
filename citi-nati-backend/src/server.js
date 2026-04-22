@@ -33,6 +33,7 @@ const deliveryZonesRoutes = require('./routes/deliveryZones.routes');
 const logger = require('./utils/logger');
 const { adminRateLimiter, posAgentRateLimiter } = require('./middleware/rateLimit.middleware');
 const mailConfig = require('./config/mailConfig');
+const { startDataRetentionScheduler } = require('./services/dataRetention.service');
 
 const prisma = new PrismaClient();
 
@@ -103,6 +104,9 @@ async function start() {
 
     // Connect to the database before starting the server
     await connectPrismaWithRetry();
+
+    // Keep high-churn operational tables trimmed so the DB does not hit storage limits.
+    startDataRetentionScheduler({ prisma, logger });
 
     // Initialize mail configuration
     mailConfig.initializeMailConfig();
