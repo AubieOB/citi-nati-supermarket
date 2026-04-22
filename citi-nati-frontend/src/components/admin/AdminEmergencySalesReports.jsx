@@ -540,21 +540,67 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
           overflow: 'hidden',
         }}
       >
-        <div className="admin-mobile-tabs-row" style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f1f5f9', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          {TAB_DEFS.map((tab) => (
+        <div className="admin-mobile-tabs-row" style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f1f5f9', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', flex: '1 1 420px' }}>
+            {TAB_DEFS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`admin-tab-button${activeTab === tab.id ? ' active' : ''}`}
+                style={{
+                  backgroundColor: activeTab === tab.id ? '#1f3a8a' : '#fff',
+                  color: activeTab === tab.id ? '#fff' : textSecondary,
+                }}
+              >
+                <i className={`fas ${tab.icon} admin-tab-icon`}></i>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end', flex: '1 1 340px', marginLeft: 'auto' }}>
+            <select
+              value={pendingFilters.status}
+              onChange={(event) => setPendingFilters((prev) => ({ ...prev, status: event.target.value }))}
+              className="admin-filter-select"
+              style={{ padding: '0.6rem 0.7rem', border: '1px solid #d1d5db', borderRadius: '6px', minWidth: isMobileViewport ? '160px' : '180px' }}
+            >
+              <option value="all">All Statuses</option>
+              <option value="pending_pos_sync">Pending POS Sync</option>
+              <option value="synced_to_pos">Synced to POS</option>
+              <option value="sync_failed">Sync Failed</option>
+            </select>
+
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`admin-tab-button${activeTab === tab.id ? ' active' : ''}`}
+              onClick={handleApplyFilters}
               style={{
-                backgroundColor: activeTab === tab.id ? '#1f3a8a' : '#fff',
-                color: activeTab === tab.id ? '#fff' : textSecondary,
+                padding: '0.6rem 0.9rem',
+                border: 'none',
+                borderRadius: '6px',
+                backgroundColor: '#0f766e',
+                color: '#fff',
+                fontWeight: 700,
+                cursor: 'pointer',
               }}
             >
-              <i className={`fas ${tab.icon} admin-tab-icon`}></i>
-              {tab.label}
+              {isMobileViewport ? 'Apply' : 'Apply Filters'}
             </button>
-          ))}
+
+            <button
+              onClick={handleResetFilters}
+              style={{
+                padding: '0.6rem 0.9rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                backgroundColor: '#fff',
+                color: textSecondary,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Reset
+            </button>
+          </div>
         </div>
 
         <div className="admin-mobile-filter-controls" style={{ padding: '0.75rem 1rem', display: 'flex', gap: '0.65rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -615,47 +661,6 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
             style={{ padding: '0.6rem 0.7rem', border: '1px solid #d1d5db', borderRadius: '6px', minWidth: '200px' }}
           />
 
-          <select
-            value={pendingFilters.status}
-            onChange={(event) => setPendingFilters((prev) => ({ ...prev, status: event.target.value }))}
-            className="admin-filter-select"
-            style={{ padding: '0.6rem 0.7rem', border: '1px solid #d1d5db', borderRadius: '6px' }}
-          >
-            <option value="all">All Statuses</option>
-            <option value="pending_pos_sync">Pending POS Sync</option>
-            <option value="synced_to_pos">Synced to POS</option>
-            <option value="sync_failed">Sync Failed</option>
-          </select>
-
-          <button
-            onClick={handleApplyFilters}
-            style={{
-              padding: '0.6rem 0.9rem',
-              border: 'none',
-              borderRadius: '6px',
-              backgroundColor: '#0f766e',
-              color: '#fff',
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
-          >
-            {isMobileViewport ? 'Apply' : 'Apply Filters'}
-          </button>
-
-          <button
-            onClick={handleResetFilters}
-            style={{
-              padding: '0.6rem 0.9rem',
-              border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              backgroundColor: '#fff',
-              color: textSecondary,
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
-          >
-            {isMobileViewport ? 'Reset' : 'Reset'}
-          </button>
         </div>
       </div>
 
