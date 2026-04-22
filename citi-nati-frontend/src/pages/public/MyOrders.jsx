@@ -448,7 +448,7 @@ const MyOrdersContent = () => {
             }}
           >
             <i className="fas fa-receipt" style={{ marginRight: '0.5rem' }}></i>
-            Download PDF Receipt
+            PDF Receipt
           </Button>
 
           <Button
@@ -472,7 +472,7 @@ const MyOrdersContent = () => {
             }}
           >
             <i className="fas fa-image" style={{ marginRight: '0.5rem' }}></i>
-            Download Receipt Image
+            Image Receipt
           </Button>
         </div>
       )}
