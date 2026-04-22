@@ -30,6 +30,13 @@
   z-index: 1;
 }
 
+.support-help-fullwidth {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0 clamp(0.75rem, 2.6vw, 2.75rem);
+}
+
 .support-hero {
   display: flex;
   justify-content: space-between;
@@ -540,6 +547,10 @@
 }
 
 @media (max-width: 640px) {
+  .support-help-fullwidth {
+    padding: 0 0.65rem;
+  }
+
   .support-hero,
   .support-sidebar-header,
   .support-conversation-header,

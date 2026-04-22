@@ -476,7 +476,7 @@ const HelpCenter = () => {
 
   return (
     <div className="page support-messenger-shell" style={{ minHeight: '100vh', paddingBottom: '3rem', ...panelStyleVars }}>
-      <Container>
+      <div className="support-help-fullwidth">
         <div style={{ paddingTop: '2rem' }}>
           <section className="support-hero">
             <div>
@@ -741,7 +741,7 @@ const HelpCenter = () => {
             )}
           </section>
         </div>
-      </Container>
+      </div>
       <Modal
         isOpen={modal.isOpen}
         title={modal.title}
