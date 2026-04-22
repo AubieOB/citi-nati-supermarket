@@ -66,6 +66,7 @@ const HelpCenter = () => {
   const messagesEndRef = useRef(null);
   const topBarRef = useRef(null);
   const [topBarHeight, setTopBarHeight] = useState(0);
+  const [isMaximized, setIsMaximized] = useState(false);
 
   // Fetch tickets on component mount
   useEffect(() => {
@@ -638,7 +639,7 @@ const HelpCenter = () => {
         </aside>
 
         {selectedTicket ? (
-          <section className="support-conversation-panel">
+          <section className="support-conversation-panel" style={isMaximized ? { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, borderRadius: 0, height: '100%', width: '100%' } : {}}>
             <div className="support-conversation-header">
               <div>
                 <h2 className="support-conversation-title">{selectedTicket.subject}</h2>
@@ -648,9 +649,14 @@ const HelpCenter = () => {
                   <span className="support-chip"><i className="fas fa-bolt"></i> {selectedTicket.priority}</span>
                 </div>
               </div>
-              <button type="button" className="support-danger-button" onClick={() => handleDeleteTicket(selectedTicket.id)}>
-                <i className="fas fa-trash"></i> Delete
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <button type="button" className="support-icon-button" onClick={() => setIsMaximized(!isMaximized)} title={isMaximized ? 'Restore' : 'Maximize'}>
+                  <i className={`fas ${isMaximized ? 'fa-compress' : 'fa-expand'}`}></i>
+                </button>
+                <button type="button" className="support-danger-button" onClick={() => handleDeleteTicket(selectedTicket.id)}>
+                  <i className="fas fa-trash"></i> Delete
+                </button>
+              </div>
             </div>
 
             <div className="support-conversation-body">

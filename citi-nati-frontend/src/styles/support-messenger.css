@@ -324,8 +324,13 @@
 .support-ticket-title,
 .support-section-title {
   margin: 0;
-  color: var(--support-text);
+  color: #5B4B8A;
   font-weight: 800;
+}
+
+.admin-theme-dark .support-ticket-title,
+.admin-theme-dark .support-section-title {
+  color: #9388FF;
 }
 
 .support-ticket-preview,
@@ -379,7 +384,11 @@
 .support-conversation-title {
   margin: 0;
   font-size: 1.1rem;
-  color: var(--support-text);
+  color: #5B4B8A;
+}
+
+.admin-theme-dark .support-conversation-title {
+  color: #9388FF;
 }
 
 .support-conversation-meta {
@@ -768,7 +777,11 @@
   margin: 0;
   font-size: 1.3rem;
   font-weight: 800;
-  color: var(--support-text, #102132);
+  color: #5B4B8A;
+}
+
+.admin-theme-dark .help-center-heading {
+  color: #9388FF;
 }
 
 /* Messenger layout fills remaining height */

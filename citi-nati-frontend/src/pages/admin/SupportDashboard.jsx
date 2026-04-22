@@ -72,6 +72,7 @@ const SupportDashboard = ({ openTicketRequest }) => {
   const { modal, closeModal, showConfirm } = useModal();
   const filterBarRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const [isMaximized, setIsMaximized] = useState(false);
 
   // Fetch tickets on component mount or filter change
   useEffect(() => {
@@ -688,7 +689,7 @@ const SupportDashboard = ({ openTicketRequest }) => {
               </aside>
 
               {selectedTicket ? (
-                <section className="support-conversation-panel">
+                <section className="support-conversation-panel" style={isMaximized ? { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, borderRadius: 0, height: '100%', width: '100%' } : {}}>
                   <div className="support-conversation-header">
                     <div>
                       <div className="support-conversation-top">
@@ -700,7 +701,10 @@ const SupportDashboard = ({ openTicketRequest }) => {
                             <span className="support-chip"><i className="fas fa-envelope"></i> {selectedTicket.user?.email || 'No email'}</span>
                           </div>
                         </div>
-                        <div className="support-badge-row">
+                        <div className="support-badge-row" style={{ gap: '0.5rem' }}>
+                          <button type="button" className="support-icon-button" onClick={() => setIsMaximized(!isMaximized)} title={isMaximized ? 'Restore' : 'Maximize'}>
+                            <i className={`fas ${isMaximized ? 'fa-compress' : 'fa-expand'}`}></i>
+                          </button>
                           <button type="button" className="support-danger-button" onClick={() => handleDeleteTicket(selectedTicket.id)}>
                             <i className="fas fa-trash"></i> Delete
                           </button>
