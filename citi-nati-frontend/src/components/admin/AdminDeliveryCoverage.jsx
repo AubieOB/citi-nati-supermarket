@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import api from '../../utils/api.js';
+import Modal from '../common/Modal.jsx';
+import { useModal } from '../../hooks/useModal.js';
 
 const emptyForm = {
   district: '',
@@ -58,6 +60,7 @@ const subtleButtonStyle = {
 };
 
 const AdminDeliveryCoverage = () => {
+  const { modal, closeModal, showConfirm, showWarning } = useModal();
   const [zones, setZones] = useState([]);
   const [masterDistricts, setMasterDistricts] = useState([]);
   const [form, setForm] = useState(emptyForm);
@@ -267,7 +270,7 @@ const AdminDeliveryCoverage = () => {
 
     const selectedArea = (form.allowCustomArea ? form.customArea : form.area).trim();
     if (!form.district.trim() || !selectedArea) {
-      setError('District and area are required.');
+      showWarning('Validation Required', 'District and area are required before saving a delivery zone.');
       return;
     }
 
@@ -334,21 +337,25 @@ const AdminDeliveryCoverage = () => {
   };
 
   const handleDelete = async (zoneId) => {
-    if (!window.confirm('Delete this delivery zone permanently?')) return;
-
-    try {
-      setError('');
-      setSuccess('');
-      await api.delete(`/admin/delivery-zones/${zoneId}`);
-      setSuccess('Delivery zone deleted successfully.');
-      if (editingZoneId === zoneId) {
-        resetForm();
+    showConfirm(
+      'Delete Delivery Zone',
+      'Delete this delivery zone permanently?',
+      async () => {
+        try {
+          setError('');
+          setSuccess('');
+          await api.delete(`/admin/delivery-zones/${zoneId}`);
+          setSuccess('Delivery zone deleted successfully.');
+          if (editingZoneId === zoneId) {
+            resetForm();
+          }
+          await fetchZones();
+        } catch (err) {
+          console.error('Failed to delete delivery zone:', err);
+          setError(err.response?.data?.error || 'Failed to delete delivery zone.');
+        }
       }
-      await fetchZones();
-    } catch (err) {
-      console.error('Failed to delete delivery zone:', err);
-      setError(err.response?.data?.error || 'Failed to delete delivery zone.');
-    }
+    );
   };
 
   const filterBarSpacerHeight = filterBarHeight > 0 ? filterBarHeight + 8 : 0;
@@ -605,6 +612,18 @@ const AdminDeliveryCoverage = () => {
           )}
         </div>
       </div>
+
+      <Modal
+        isOpen={modal.isOpen}
+        title={modal.title}
+        message={modal.message}
+        type={modal.type}
+        onConfirm={modal.onConfirm}
+        onCancel={closeModal}
+        confirmText={modal.confirmText}
+        cancelText={modal.cancelText}
+        showCancelButton={modal.showCancelButton}
+      />
       </div>
     </div>
   );
