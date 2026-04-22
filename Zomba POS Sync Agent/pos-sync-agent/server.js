@@ -60,6 +60,7 @@ let expiryBatchCachedAt = 0;
 const EXPIRY_BATCH_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const ZOMBA_OPERATIONAL_LOCATION_CODES = ['SH', 'BAR', 'ST999'];
 const PRODUCT_ACTIVITY_FRESHNESS_WINDOW_MINUTES = Number.parseInt(process.env.PRODUCT_ACTIVITY_FRESHNESS_WINDOW_MINUTES || '5', 10);
+const PRODUCT_ACTIVITY_FALLBACK_MAX_ABS_STOCK = Number.parseInt(process.env.PRODUCT_ACTIVITY_FALLBACK_MAX_ABS_STOCK || '2000', 10);
 let liveStockSourceConfig = null;
 const ENABLE_DELTA_PRODUCT_SYNC = String(process.env.ENABLE_DELTA_PRODUCT_SYNC || 'true').trim().toLowerCase() !== 'false';
 const DELTA_FULL_SYNC_EVERY_CYCLES = Number.parseInt(process.env.DELTA_FULL_SYNC_EVERY_CYCLES || '40', 10);
@@ -503,20 +504,38 @@ async function fetchProductsFromPOS(locationCode) {
     const LOCATION_CODE = locationCode || appConfig.posDb.locationCode;
 
     const stockConfig = await resolveLiveStockSourceConfig();
+    const isSHLocation = String(LOCATION_CODE || '').trim().toUpperCase() === 'SH';
     const safeActivityTimestampColumn = stockConfig.productActivityTimestampColumn
       ? String(stockConfig.productActivityTimestampColumn).replace(/[^A-Za-z0-9_]/g, '')
       : null;
+    const canUseFreshProductActivityFallback = Boolean(stockConfig.hasProductActivity && safeActivityTimestampColumn);
     const productActivityTimestampExpr = safeActivityTimestampColumn
       ? `MAX(TRY_CONVERT(datetime2, pa.[${safeActivityTimestampColumn}])) AS ActivityLatestAt`
       : 'NULL AS ActivityLatestAt';
-    const query = stockConfig.hasProductActivity
+    const query = isSHLocation && stockConfig.hasDailyStockBalance && stockConfig.hasProductActivity
       ? `
-      WITH product_activity AS (
+      WITH latest_daily AS (
+        SELECT
+          ProductCode,
+          LocationCode,
+          StockDate,
+          StockBalance,
+          ROW_NUMBER() OVER (
+            PARTITION BY ProductCode, LocationCode
+            ORDER BY StockDate DESC
+          ) AS rn
+        FROM POS.dbo.DailyStockBalance
+        WHERE LocationCode = @LocationCode
+          AND CAST(StockDate AS date) <= CAST(GETDATE() AS date)
+      ),
+      product_activity AS (
         SELECT
           ProductCode,
           LocationCode,
           SUM(ISNULL(QtyIn, 0) - ISNULL(QtyOut, 0)) AS ActivityStockBalance
+          ,${productActivityTimestampExpr}
         FROM POS.dbo.ProductActivity
+        AS pa
         WHERE LocationCode = @LocationCode
         GROUP BY ProductCode, LocationCode
       )
@@ -525,23 +544,100 @@ async function fetchProductsFromPOS(locationCode) {
           p.ProductName,
           ISNULL(p.Barcode, '') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
-          NULL AS StockDate,
-          ISNULL(pa.ActivityStockBalance, 0) AS QuantityAvailable,
+          ds.StockDate AS DailyStockDate,
+          ds.StockBalance AS DailyStockBalance,
+          pa.ActivityLatestAt,
+          pa.ActivityStockBalance,
+          ds.StockDate AS StockDate,
+          ISNULL(ds.StockBalance, 0) AS QuantityAvailable,
           CASE
-            WHEN pa.ProductCode IS NOT NULL THEN 'ProductActivity'
+            WHEN ds.StockBalance IS NOT NULL THEN 'DailyStockBalance'
+            WHEN pa.ProductCode IS NOT NULL THEN 'ProductActivityCandidate'
             ELSE 'NoStockRow'
           END AS StockSource,
-          ISNULL(
-              (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC),
-              0
-          ) AS SellingPrice,
+          ISNULL(lp.FPrice, 0) AS SellingPrice,
           CASE
-            WHEN (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC) IS NOT NULL THEN 'PriceByLocation'
+            WHEN lp.FPrice IS NOT NULL THEN 'PriceByLocation'
             ELSE 'NoPriceRow'
           END AS PriceSource
       FROM POS.dbo.productsmaster p
       LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
+      LEFT JOIN latest_daily ds ON ds.ProductCode = p.ProductCode AND ds.LocationCode = @LocationCode AND ds.rn = 1
       LEFT JOIN product_activity pa ON pa.ProductCode = p.ProductCode AND pa.LocationCode = @LocationCode
+      OUTER APPLY (
+        SELECT TOP 1 FPrice
+        FROM POS.dbo.productprices
+        WHERE ProductCode = p.ProductCode
+          AND LocationCode = @LocationCode
+        ORDER BY PriceID DESC
+      ) lp
+      ORDER BY p.ProductCode
+    `
+      : stockConfig.hasDailyStockBalance && stockConfig.hasProductActivity
+      ? `
+      WITH latest_daily AS (
+        SELECT
+          ProductCode,
+          LocationCode,
+          StockDate,
+          StockBalance,
+          ROW_NUMBER() OVER (
+            PARTITION BY ProductCode, LocationCode
+            ORDER BY StockDate DESC
+          ) AS rn
+        FROM POS.dbo.DailyStockBalance
+        WHERE LocationCode = @LocationCode
+          AND CAST(StockDate AS date) <= CAST(GETDATE() AS date)
+      ),
+      product_activity AS (
+        SELECT
+          ProductCode,
+          LocationCode,
+          SUM(ISNULL(QtyIn, 0) - ISNULL(QtyOut, 0)) AS ActivityStockBalance
+          ,${productActivityTimestampExpr}
+        FROM POS.dbo.ProductActivity
+        AS pa
+        WHERE LocationCode = @LocationCode
+        GROUP BY ProductCode, LocationCode
+      )
+      SELECT
+          p.ProductCode,
+          p.ProductName,
+          ISNULL(p.Barcode, '') AS Barcode,
+          ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
+          CASE
+            WHEN ds.StockDate IS NOT NULL THEN ds.StockDate
+            WHEN pa.ProductCode IS NOT NULL THEN pa.ActivityLatestAt
+            ELSE NULL
+          END AS StockDate,
+          ISNULL(
+            CASE
+              WHEN ds.StockBalance IS NOT NULL THEN ds.StockBalance
+              ELSE pa.ActivityStockBalance
+            END,
+            0
+          ) AS QuantityAvailable,
+          CASE
+            WHEN ds.StockBalance IS NOT NULL THEN 'DailyStockBalance'
+            WHEN pa.ProductCode IS NOT NULL THEN 'ProductActivityFallback'
+            ELSE 'NoStockRow'
+          END AS StockSource,
+          ISNULL(lp.FPrice, 0) AS SellingPrice,
+          CASE
+            WHEN lp.FPrice IS NOT NULL THEN 'PriceByLocation'
+            ELSE 'NoPriceRow'
+          END AS PriceSource
+      FROM POS.dbo.productsmaster p
+      LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
+      LEFT JOIN latest_daily ds ON ds.ProductCode = p.ProductCode AND ds.LocationCode = @LocationCode AND ds.rn = 1
+      LEFT JOIN product_activity pa ON pa.ProductCode = p.ProductCode AND pa.LocationCode = @LocationCode
+      OUTER APPLY (
+        SELECT TOP 1 FPrice
+        FROM POS.dbo.productprices
+        WHERE ProductCode = p.ProductCode
+          AND LocationCode = @LocationCode
+        ORDER BY PriceID DESC
+      ) lp
       ORDER BY p.ProductCode
     `
       : stockConfig.hasDailyStockBalance
@@ -584,6 +680,41 @@ async function fetchProductsFromPOS(locationCode) {
       LEFT JOIN latest_stock ls ON ls.ProductCode = p.ProductCode AND ls.LocationCode = @LocationCode AND ls.rn = 1
       ORDER BY p.ProductCode
     `
+      : stockConfig.hasProductActivity
+      ? `
+      WITH product_activity AS (
+        SELECT
+          ProductCode,
+          LocationCode,
+          SUM(ISNULL(QtyIn, 0) - ISNULL(QtyOut, 0)) AS ActivityStockBalance
+        FROM POS.dbo.ProductActivity
+        WHERE LocationCode = @LocationCode
+        GROUP BY ProductCode, LocationCode
+      )
+      SELECT
+          p.ProductCode,
+          p.ProductName,
+          ISNULL(p.Barcode, '') AS Barcode,
+          ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
+          NULL AS StockDate,
+          ISNULL(pa.ActivityStockBalance, 0) AS QuantityAvailable,
+          CASE
+            WHEN pa.ProductCode IS NOT NULL THEN 'ProductActivity'
+            ELSE 'NoStockRow'
+          END AS StockSource,
+          ISNULL(
+              (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC),
+              0
+          ) AS SellingPrice,
+          CASE
+            WHEN (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC) IS NOT NULL THEN 'PriceByLocation'
+            ELSE 'NoPriceRow'
+          END AS PriceSource
+      FROM POS.dbo.productsmaster p
+      LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
+      LEFT JOIN product_activity pa ON pa.ProductCode = p.ProductCode AND pa.LocationCode = @LocationCode
+      ORDER BY p.ProductCode
+    `
       : `
       SELECT
           p.ProductCode,
@@ -614,15 +745,124 @@ async function fetchProductsFromPOS(locationCode) {
       stockReadLocations: [LOCATION_CODE],
       aggregationMode: false,
       stockResolutionMode: 'LOCATION_SPECIFIC',
-      stockSourceMode: stockConfig.hasDailyStockBalance && stockConfig.hasProductActivity
-        ? 'ProductActivity'
-        : (stockConfig.hasDailyStockBalance
-          ? 'DailyStockBalance'
-          : (stockConfig.hasProductActivity ? 'ProductActivityFallbackOnly' : 'Unavailable')),
+      stockSourceMode: isSHLocation && stockConfig.hasDailyStockBalance && stockConfig.hasProductActivity
+        ? 'SH_DailyStockBalancePrimary_GuardedProductActivityFallback'
+        : (stockConfig.hasDailyStockBalance && stockConfig.hasProductActivity
+          ? 'DailyStockBalancePrimary+MissingRowProductActivityFallback'
+          : (stockConfig.hasDailyStockBalance
+            ? 'DailyStockBalance'
+            : (stockConfig.hasProductActivity ? 'ProductActivityFallbackOnly' : 'Unavailable'))),
+      shSafeMode: isSHLocation,
+      dailyStockBalanceAvailable: stockConfig.hasDailyStockBalance,
+      productActivityAvailable: stockConfig.hasProductActivity,
+      productActivityFallbackTimestampRequired: true,
+      canUseFreshProductActivityFallback,
+      productActivityFallbackMaxAbsStock: PRODUCT_ACTIVITY_FALLBACK_MAX_ABS_STOCK,
+      productActivityTimestampColumnConfigured: Boolean(safeActivityTimestampColumn),
       productActivityTimestampColumn: safeActivityTimestampColumn,
       productActivityFreshnessWindowMinutes: PRODUCT_ACTIVITY_FRESHNESS_WINDOW_MINUTES,
     });
-    const result = await request.query(query);
+    let result = await request.query(query);
+
+    if (isSHLocation && stockConfig.hasDailyStockBalance && stockConfig.hasProductActivity) {
+      const nowMs = Date.now();
+      let fallbackAccepted = 0;
+      let fallbackRejectedMissingTimestamp = 0;
+      let fallbackRejectedStale = 0;
+      let fallbackRejectedUnsafe = 0;
+      const comparisonSamples = [];
+
+      const normalizedRows = result.recordset.map((row) => {
+        const dailyRaw = row.DailyStockBalance;
+        const activityRaw = row.ActivityStockBalance;
+        const dailyValue = dailyRaw == null ? null : Number(dailyRaw);
+        const activityValue = activityRaw == null ? null : Number(activityRaw);
+        const hasDaily = dailyValue != null && Number.isFinite(dailyValue);
+        const hasActivity = activityValue != null && Number.isFinite(activityValue);
+        const activityDate = row.ActivityLatestAt ? new Date(row.ActivityLatestAt) : null;
+        const activityAgeMinutes = activityDate && !Number.isNaN(activityDate.getTime())
+          ? (nowMs - activityDate.getTime()) / 60000
+          : null;
+        const activityIsFresh = activityAgeMinutes != null && activityAgeMinutes <= PRODUCT_ACTIVITY_FRESHNESS_WINDOW_MINUTES;
+        const activityIsSafe = hasActivity
+          && activityValue >= 0
+          && Math.abs(activityValue) <= PRODUCT_ACTIVITY_FALLBACK_MAX_ABS_STOCK;
+
+        let finalStock = hasDaily ? dailyValue : 0;
+        let finalSource = hasDaily ? 'DailyStockBalance' : 'NoStockRow';
+
+        if (!hasDaily && hasActivity) {
+          if (!canUseFreshProductActivityFallback) {
+            fallbackRejectedMissingTimestamp++;
+          } else if (!activityIsFresh) {
+            fallbackRejectedStale++;
+          } else if (!activityIsSafe) {
+            fallbackRejectedUnsafe++;
+          } else {
+            fallbackAccepted++;
+            finalStock = activityValue;
+            finalSource = 'ProductActivityFallbackFresh';
+          }
+        }
+
+        if (!hasDaily && hasActivity && finalSource === 'NoStockRow') {
+          console.warn(`${SYNC_LOG_PREFIX} [SH STOCK GUARD] rejected ProductActivity fallback`, {
+            locationCode: LOCATION_CODE,
+            productCode: row.ProductCode,
+            activityStock: activityValue,
+            activityLatestAt: row.ActivityLatestAt || null,
+            reason: !canUseFreshProductActivityFallback
+              ? 'MISSING_TIMESTAMP_COLUMN'
+              : (!activityIsFresh ? 'STALE_ACTIVITY' : 'UNSAFE_ACTIVITY_VALUE'),
+          });
+        }
+
+        if (hasDaily && hasActivity && (activityValue < 0 || Math.abs(activityValue - dailyValue) > PRODUCT_ACTIVITY_FALLBACK_MAX_ABS_STOCK)) {
+          console.warn(`${SYNC_LOG_PREFIX} [SH STOCK ALERT] ProductActivity diverges from DailyStockBalance`, {
+            locationCode: LOCATION_CODE,
+            productCode: row.ProductCode,
+            dailyStock: dailyValue,
+            activityStock: activityValue,
+            activityLatestAt: row.ActivityLatestAt || null,
+          });
+        }
+
+        if (comparisonSamples.length < 5) {
+          comparisonSamples.push({
+            productCode: row.ProductCode,
+            dailyStockBalance: hasDaily ? dailyValue : null,
+            productActivityStock: hasActivity ? activityValue : null,
+            productActivityAgeMinutes: activityAgeMinutes == null ? null : Math.round(activityAgeMinutes),
+            productActivityFresh: activityIsFresh,
+            finalStock,
+            finalSource,
+          });
+        }
+
+        return {
+          ...row,
+          StockDate: hasDaily ? row.DailyStockDate : (finalSource === 'ProductActivityFallbackFresh' ? row.ActivityLatestAt : null),
+          QuantityAvailable: finalStock,
+          StockSource: finalSource,
+        };
+      });
+
+      console.log(`${SYNC_LOG_PREFIX} [SH STOCK DIAGNOSTICS]`, {
+        locationCode: LOCATION_CODE,
+        dailyStockBalancePrimary: true,
+        canUseFreshProductActivityFallback,
+        fallbackAccepted,
+        fallbackRejectedMissingTimestamp,
+        fallbackRejectedStale,
+        fallbackRejectedUnsafe,
+        sampleComparison: comparisonSamples,
+      });
+
+      result = {
+        ...result,
+        recordset: normalizedRows,
+      };
+    }
 
     console.log(`${SYNC_LOG_PREFIX} [FETCH] done — fetched ${result.recordset.length} products for location ${LOCATION_CODE}`);
     console.log(`${SYNC_LOG_PREFIX} price mode: PriceByLocation from ${LOCATION_CODE} only (no cross-location fallback)`);
@@ -1196,7 +1436,7 @@ app.get('/pos-sync/products', validateApiKey, requireFeature('enableReportingSyn
       configuredLocationCode: appConfig.posDb.locationCode,
       includedLocations: syncLocations,
       mode: appConfig.branch.branchCode === 'ZOMBA' ? 'CONFIGURED_ZOMBA_OPERATIONAL_LOCATIONS' : 'CONFIGURED_LOCATION_ONLY',
-      stockSource: 'ProductActivity (same as BAR/RES); DailyStockBalance ignored even when present',
+      stockSource: 'SH uses DailyStockBalance primary with guarded ProductActivity fallback; BAR/ST999 stay location-specific',
       stockResolutionMode: 'LOCATION_SPECIFIC',
       aggregationEnabled: false,
     });
@@ -2148,7 +2388,7 @@ async function autoSync() {
       configuredLocationCode: appConfig.posDb.locationCode,
       includedLocations: syncLocations,
       mode: appConfig.branch.branchCode === 'ZOMBA' ? 'CONFIGURED_ZOMBA_OPERATIONAL_LOCATIONS' : 'CONFIGURED_LOCATION_ONLY',
-      stockSource: 'DailyStockBalance preferred, freshness-aware ProductActivity fallback',
+      stockSource: 'SH uses DailyStockBalance primary with guarded ProductActivity fallback; BAR/ST999 stay location-specific',
       stockResolutionMode: 'LOCATION_SPECIFIC',
       aggregationEnabled: false,
     });
