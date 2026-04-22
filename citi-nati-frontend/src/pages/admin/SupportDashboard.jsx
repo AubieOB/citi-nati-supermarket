@@ -747,42 +747,35 @@ const SupportDashboard = ({ openTicketRequest }) => {
               {selectedTicket ? (
                 <section ref={conversationPanelRef} className="support-conversation-panel">
                   <div className="support-conversation-header">
-                    <div className="support-conversation-top">
-                      <div>
-                        <h2 className="support-conversation-title">{selectedTicket.subject}</h2>
-                        <div className="support-conversation-meta">
-                          <span className="support-chip"><i className="fas fa-hashtag"></i> {selectedTicket.id}</span>
-                          <span className="support-chip"><i className="fas fa-user"></i> {selectedTicket.user?.name || 'Customer'}</span>
-                          <span className="support-chip"><i className="fas fa-envelope"></i> {selectedTicket.user?.email || 'No email'}</span>
-                        </div>
-                      </div>
-                      <div className="support-header-actions">
-                        <button type="button" className="support-icon-button" onClick={toggleConversationFullscreen} title={isMaximized ? 'Restore' : 'Maximize'}>
-                          <i className={`fas ${isMaximized ? 'fa-compress' : 'fa-expand'}`}></i>
-                        </button>
-                        <button type="button" className="support-icon-button" onClick={() => handleDeleteTicket(selectedTicket.id)} title="Delete ticket">
-                          <i className="fas fa-trash" style={{ color: '#dc4c64' }}></i>
-                        </button>
+                    <div className="support-conversation-title-area">
+                      <h2 className="support-conversation-title">{selectedTicket.subject}</h2>
+                      <div className="support-conversation-meta">
+                        <span className="support-chip"><i className="fas fa-hashtag"></i> {selectedTicket.id}</span>
+                        <span className="support-chip"><i className="fas fa-user"></i> {selectedTicket.user?.name || 'Customer'}</span>
+                        <span className="support-chip"><i className="fas fa-envelope"></i> {selectedTicket.user?.email || 'No email'}</span>
                       </div>
                     </div>
-                    <div className={`support-form-grid support-controls-row${isMaximized ? ' is-maximized' : ''}`} style={{ marginTop: '1rem' }}>
-                      <div>
-                        <label className="support-field-label">Status</label>
-                        <select className="support-select" value={selectedTicket.status} onChange={(event) => handleStatusChange(selectedTicket.id, event.target.value)}>
-                          <option value="OPEN">Open</option>
-                          <option value="IN_PROGRESS">In progress</option>
-                          <option value="CLOSED">Closed</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="support-field-label">Priority</label>
-                        <select className="support-select" value={selectedTicket.priority} onChange={(event) => handlePriorityChange(selectedTicket.id, event.target.value)}>
-                          <option value="LOW">Low</option>
-                          <option value="MEDIUM">Medium</option>
-                          <option value="HIGH">High</option>
-                          <option value="URGENT">Urgent</option>
-                        </select>
-                      </div>
+                    <div className="support-header-actions">
+                      <select className="support-select support-select-inline" value={selectedTicket.status} onChange={(event) => handleStatusChange(selectedTicket.id, event.target.value)} title="Status">
+                        <option value="OPEN">Open</option>
+                        <option value="IN_PROGRESS">In progress</option>
+                        <option value="CLOSED">Closed</option>
+                      </select>
+                      <select className="support-select support-select-inline" value={selectedTicket.priority} onChange={(event) => handlePriorityChange(selectedTicket.id, event.target.value)} title="Priority">
+                        <option value="LOW">Low</option>
+                        <option value="MEDIUM">Medium</option>
+                        <option value="HIGH">High</option>
+                        <option value="URGENT">Urgent</option>
+                      </select>
+                      <button type="button" className="support-icon-button" onClick={toggleConversationFullscreen} title={isMaximized ? 'Restore' : 'Maximize'}>
+                        <i className={`fas ${isMaximized ? 'fa-compress' : 'fa-expand'}`}></i>
+                      </button>
+                      <button type="button" className="support-icon-button" onClick={() => setSelectedTicket(null)} title="Close conversation">
+                        <i className="fas fa-times"></i>
+                      </button>
+                      <button type="button" className="support-icon-button" onClick={() => handleDeleteTicket(selectedTicket.id)} title="Delete ticket">
+                        <i className="fas fa-trash" style={{ color: '#dc4c64' }}></i>
+                      </button>
                     </div>
                   </div>
 
