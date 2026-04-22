@@ -103,8 +103,17 @@
   border-radius: 0 !important;
 }
 
-.admin-dashboard-root.admin-sealed-layout .admin-content-area :is(section, article, header, aside, div)[style*='border-radius'] {
+.admin-dashboard-root.admin-sealed-layout .admin-content-area [style*='border-radius'] {
   border-radius: 0 !important;
+}
+
+.admin-dashboard-root.admin-sealed-layout .admin-content-area [style*='max-width'] {
+  max-width: none !important;
+}
+
+.admin-dashboard-root.admin-sealed-layout .admin-content-area :is([style*='margin: 0 auto'], [style*='margin:0 auto'], [style*='margin: 0px auto'], [style*='margin:0px auto']) {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
 }
 
 .admin-dashboard-root.admin-sealed-layout :is(.bo-filter-bar, .admin-panel-filter-bar, .admin-panel, .admin-panel-card, .admin-table-wrapper, .admin-summary-card, .admin-content-card, .admin-metric-card, .admin-list-card, .admin-empty-state-card) {
