@@ -842,10 +842,29 @@
   white-space: nowrap;
 }
 
-.help-center-composer-actions {
-  justify-content: flex-end;
-  flex-wrap: nowrap;
+.hc-compose-row {
+  display: flex;
+  align-items: flex-end;
   gap: 0.5rem;
+}
+
+.hc-compose-textarea {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  margin: 0;
+}
+
+.hc-compose-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.hc-send-button {
+  background: var(--support-accent) !important;
+  color: #fff !important;
 }
 
 .help-center-heading {

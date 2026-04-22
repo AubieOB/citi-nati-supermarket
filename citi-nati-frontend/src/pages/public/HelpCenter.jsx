@@ -816,27 +816,29 @@ const HelpCenter = () => {
                       ))}
                     </div>
                   )}
-                  <textarea
-                    className="support-textarea"
-                    value={replyMessage}
-                    onChange={handleTyping}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        if (!isSendingReply && replyMessage.trim()) handleSendReply(e);
-                      }
-                    }}
-                    placeholder={dragOver ? 'Drop files here, then finish your message…' : 'Type your message… (Enter to send, Shift+Enter for new line)'}
-                    rows={3}
-                    disabled={isSendingReply}
-                  />
-                  <div className="support-composer-toolbar help-center-composer-actions" style={{ marginTop: '0.75rem' }}>
-                    <button type="button" className="support-icon-button" onClick={() => fileInputRef.current?.click()} disabled={isSendingReply} title="Add files">
-                      <i className="fas fa-paperclip"></i>
-                    </button>
-                    <button type="submit" className="support-icon-button" disabled={isSendingReply || (!replyMessage.trim() && attachedFiles.length === 0)} title={isSendingReply ? 'Sending' : 'Send message'}>
-                      <i className={`fas ${isSendingReply ? 'fa-spinner fa-spin' : 'fa-paper-plane'}`}></i>
-                    </button>
+                  <div className="hc-compose-row">
+                    <textarea
+                      className="support-textarea hc-compose-textarea"
+                      value={replyMessage}
+                      onChange={handleTyping}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          if (!isSendingReply && replyMessage.trim()) handleSendReply(e);
+                        }
+                      }}
+                      placeholder={dragOver ? 'Drop files here…' : 'Type a message…'}
+                      rows={2}
+                      disabled={isSendingReply}
+                    />
+                    <div className="hc-compose-actions">
+                      <button type="button" className="support-icon-button" onClick={() => fileInputRef.current?.click()} disabled={isSendingReply} title="Attach files">
+                        <i className="fas fa-paperclip"></i>
+                      </button>
+                      <button type="submit" className="support-icon-button hc-send-button" disabled={isSendingReply || (!replyMessage.trim() && attachedFiles.length === 0)} title={isSendingReply ? 'Sending…' : 'Send'}>
+                        <i className={`fas ${isSendingReply ? 'fa-spinner fa-spin' : 'fa-paper-plane'}`}></i>
+                      </button>
+                    </div>
                   </div>
                   <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} style={{ display: 'none' }} accept={SUPPORT_ATTACHMENT_ACCEPT} />
                 </form>
