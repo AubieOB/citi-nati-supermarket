@@ -304,6 +304,7 @@ const AdminDashboard = () => {
       ? 'business-operations'
       : 'inbox';
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [orderOpenRequest, setOrderOpenRequest] = useState(null);
   const [supportTicketOpenRequest, setSupportTicketOpenRequest] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showPanelFilters, setShowPanelFilters] = useState(false);
@@ -852,6 +853,29 @@ const AdminDashboard = () => {
       requestedAt: Date.now(),
     });
     setActiveTab('support');
+
+    if (location.pathname !== '/admin') {
+      navigate('/admin');
+    }
+  }, [isMobileViewport, location.pathname, navigate, user]);
+
+  const handleOpenOrder = useCallback((orderId) => {
+    const selectedTab = SIDEBAR_TABS.find((tab) => tab.id === 'orders');
+    if (!selectedTab || !hasPermission(user, selectedTab.permission)) {
+      toast.error('You do not have access to that section');
+      return;
+    }
+
+    if (isMobileViewport && !MOBILE_SAFE_TAB_IDS.has('orders')) {
+      toast.error('This section is desktop-only on mobile.');
+      return;
+    }
+
+    setOrderOpenRequest({
+      orderId: String(orderId),
+      requestedAt: Date.now(),
+    });
+    setActiveTab('orders');
 
     if (location.pathname !== '/admin') {
       navigate('/admin');
@@ -1466,6 +1490,7 @@ const AdminDashboard = () => {
                     selectedLocationCode={selectedOperationalPosLocationCode}
                     selectedBranchCode={selectedOperationalBranchCode}
                     onOpenSupportTicket={handleOpenSupportTicket}
+                    onOpenOrder={handleOpenOrder}
                   />
                 )}
                 {activeTab === 'quotations' && <AdminQuotations selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
@@ -1510,7 +1535,13 @@ const AdminDashboard = () => {
                   />
                 )}
                 {activeTab === 'pos-sync-monitor' && <AdminPOSSyncMonitor selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
-                {activeTab === 'orders' && <AdminOrders selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
+                {activeTab === 'orders' && (
+                  <AdminOrders
+                    selectedLocationCode={selectedOperationalPosLocationCode}
+                    selectedBranchCode={selectedOperationalBranchCode}
+                    openOrderRequest={orderOpenRequest}
+                  />
+                )}
                 {activeTab === 'users' && <AdminUsers />}
                 {activeTab === 'sales' && <AdminSales selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
                 {activeTab === 'business-operations' && <AdminBusinessOperations />}

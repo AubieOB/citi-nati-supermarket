@@ -20,7 +20,7 @@ import '../../css/admin-responsive-filters.css';
  * View all orders, assign drivers, update status
  */
 
-const AdminOrders = () => {
+const AdminOrders = ({ openOrderRequest }) => {
   const { user: loggedInUser } = useAuth();
   const isMobileViewport = useMobileViewport();
   const [orders, setOrders] = useState([]);
@@ -150,6 +150,13 @@ const AdminOrders = () => {
       setDetailsLoading(false);
     }
   };
+
+  useEffect(() => {
+    const requestedOrderId = String(openOrderRequest?.orderId || '');
+    if (!requestedOrderId) return;
+
+    openOrderDetails(requestedOrderId);
+  }, [openOrderRequest]);
 
   const closeOrderDetails = () => {
     setIsDetailsOpen(false);

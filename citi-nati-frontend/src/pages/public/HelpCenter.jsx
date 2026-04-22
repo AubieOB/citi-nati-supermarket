@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { useNavigate } from 'react-router-dom';
 import Container from '../../components/ui/Container.jsx';
 import api from '../../utils/api.js';
-import { getSocket } from '../../utils/socket.js';
+import { getSocket, identifySocket } from '../../utils/socket.js';
 import { notifyInfo, notifyError, notifySuccess, playNotificationSound } from '../../utils/notifications.js';
 import Modal from '../../components/common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
@@ -62,6 +62,11 @@ const HelpCenter = () => {
     fetchTickets();
   }, [authLoading, user, navigate]);
 
+  useEffect(() => {
+    if (!user?.id) return;
+    identifySocket(user.id, 'user', user.email || null);
+  }, [user]);
+
   // Socket listeners
   useEffect(() => {
     if (!socket.current || !user) return;
@@ -117,13 +122,64 @@ const HelpCenter = () => {
         setTickets(prev =>
           prev.map(t =>
             t.id === data.ticketId
-              ? { ...t, status: data.status }
+              ? { ...t, status: data.status, updatedAt: new Date().toISOString() }
               : t
           )
         );
         playNotificationSound();
         notifyInfo(`Ticket status updated to ${data.status}`);
       }
+    };
+
+    const handleTicketPriorityChanged = (data) => {
+      if (data.userId !== user.id) return;
+
+      setSelectedTicket(prev =>
+        prev && prev.id === data.ticketId
+          ? { ...prev, priority: data.priority }
+          : prev
+      );
+
+      setTickets(prev =>
+        prev.map(t =>
+          t.id === data.ticketId
+            ? { ...t, priority: data.priority, updatedAt: new Date().toISOString() }
+            : t
+        )
+      );
+    };
+
+    const handleNewTicket = (ticketData) => {
+      if (ticketData.userId !== user.id) return;
+
+      const newTicket = {
+        id: ticketData.id,
+        subject: ticketData.subject,
+        message: ticketData.message,
+        priority: ticketData.priority,
+        status: ticketData.status,
+        createdAt: ticketData.createdAt,
+        updatedAt: ticketData.createdAt,
+        replies: [],
+        userId: ticketData.userId,
+        user: {
+          id: ticketData.userId,
+          name: ticketData.userName || user.name,
+          email: ticketData.userEmail || user.email,
+        },
+      };
+
+      setTickets(prev => {
+        if (prev.some(ticket => ticket.id === newTicket.id)) {
+          return prev.map(ticket =>
+            ticket.id === newTicket.id
+              ? { ...ticket, ...newTicket }
+              : ticket
+          );
+        }
+
+        return [newTicket, ...prev];
+      });
     };
 
     // Listen for ticket deletion
@@ -142,14 +198,18 @@ const HelpCenter = () => {
     socket.current.on('ticketMessage', handleTicketMessage);
     socket.current.on('ticketTyping', handleTyping);
     socket.current.on('userJoined', handleUserJoined);
+    socket.current.on('newTicket', handleNewTicket);
     socket.current.on('ticketStatusChanged', handleTicketStatusChanged);
+    socket.current.on('ticketPriorityChanged', handleTicketPriorityChanged);
     socket.current.on('ticketDeleted', handleTicketDeleted);
 
     return () => {
       socket.current?.off('ticketMessage', handleTicketMessage);
       socket.current?.off('ticketTyping', handleTyping);
       socket.current?.off('userJoined', handleUserJoined);
+      socket.current?.off('newTicket', handleNewTicket);
       socket.current?.off('ticketStatusChanged', handleTicketStatusChanged);
+      socket.current?.off('ticketPriorityChanged', handleTicketPriorityChanged);
       socket.current?.off('ticketDeleted', handleTicketDeleted);
     };
   }, [user]);

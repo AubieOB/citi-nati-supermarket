@@ -33,7 +33,7 @@ const MESSAGE_TYPES = [
  * - Notification sounds for critical alerts (refunds)
  */
 
-const AdminInbox = ({ onOpenSupportTicket }) => {
+const AdminInbox = ({ onOpenSupportTicket, onOpenOrder }) => {
   const INBOX_PERFORMANCE_WARNING_THRESHOLD = 500;
   const INBOX_FETCH_LIMIT = 300;
   const isMobileViewport = useMobileViewport();
@@ -73,9 +73,39 @@ const AdminInbox = ({ onOpenSupportTicket }) => {
     return String(message?.entityType || '').toLowerCase() === 'support_ticket' && Boolean(message?.entityId);
   };
 
+  const getOrderMessageOrderId = (message) => {
+    const entityType = String(message?.entityType || '').toLowerCase();
+    const entityId = message?.entityId;
+
+    if (entityType === 'order' && entityId != null && String(entityId).trim()) {
+      return String(entityId);
+    }
+
+    const type = String(message?.type || '').toLowerCase();
+    const content = `${message?.title || ''} ${message?.message || ''}`;
+    const matchedOrderId = content.match(/order\s*#?\s*(\d+)/i);
+
+    if (
+      matchedOrderId?.[1] &&
+      ['order_placed', 'order_completed', 'driver_assigned', 'payment_success', 'payment_failed', 'refund_required'].includes(type)
+    ) {
+      return matchedOrderId[1];
+    }
+
+    return matchedOrderId?.[1] || null;
+  };
+
+  const isOrderMessage = (message) => Boolean(getOrderMessageOrderId(message));
+
   const handleOpenSupportTicket = (message) => {
     if (!isSupportTicketMessage(message) || !onOpenSupportTicket) return;
     onOpenSupportTicket(message.entityId);
+  };
+
+  const handleOpenOrder = (message) => {
+    const orderId = getOrderMessageOrderId(message);
+    if (!orderId || !onOpenOrder) return;
+    onOpenOrder(orderId);
   };
 
   // Fetch messages on mount
@@ -973,6 +1003,38 @@ const AdminInbox = ({ onOpenSupportTicket }) => {
                     flexShrink: 0,
                     marginLeft: '1rem',
                   }}>
+                    {isOrderMessage(message) && (
+                      <button
+                        onClick={() => handleOpenOrder(message)}
+                        title="View order"
+                        style={{
+                          minWidth: '7rem',
+                          height: '2.5rem',
+                          padding: '0 0.85rem',
+                          borderRadius: '4px',
+                          border: 'none',
+                          backgroundColor: '#ecfeff',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.45rem',
+                          transition: 'all 0.2s',
+                          color: '#0f766e',
+                          fontWeight: 700,
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.backgroundColor = '#cffafe';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.backgroundColor = '#ecfeff';
+                        }}
+                      >
+                        <i className="fas fa-receipt"></i>
+                        <span>View Order</span>
+                      </button>
+                    )}
+
                     {isSupportTicketMessage(message) && (
                       <button
                         onClick={() => handleOpenSupportTicket(message)}

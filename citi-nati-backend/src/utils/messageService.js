@@ -38,7 +38,13 @@ const notifyPaymentSuccess = async (order, paymentDetails) => {
     await createMessage(
       'payment_success',
       'Payment Confirmation',
-      `Payment of MWK ${amount.toFixed(2)} for Order #${order.id} confirmed${paymentRef ? `. Reference: ${paymentRef}` : ''}.`
+      `Payment of MWK ${amount.toFixed(2)} for Order #${order.id} confirmed${paymentRef ? `. Reference: ${paymentRef}` : ''}.`,
+      {
+        sourceModule: 'orders',
+        entityType: 'order',
+        entityId: order?.id != null ? String(order.id) : null,
+        errorCode: 'payment_success',
+      }
     );
   } catch (error) {
     console.error('[MESSAGE SERVICE] Error notifying payment success:', error);
@@ -55,7 +61,13 @@ const notifyOrderPlaced = async (order, itemCount) => {
     await createMessage(
       'order_placed',
       'New Order',
-      `Order #${order.id} placed. Total: MWK ${amount.toFixed(2)}. Items: ${itemCount}.`
+      `Order #${order.id} placed. Total: MWK ${amount.toFixed(2)}. Items: ${itemCount}.`,
+      {
+        sourceModule: 'orders',
+        entityType: 'order',
+        entityId: order?.id != null ? String(order.id) : null,
+        errorCode: 'order_placed',
+      }
     );
   } catch (error) {
     console.error('[MESSAGE SERVICE] Error notifying order placed:', error);
@@ -77,7 +89,13 @@ const notifyDriverAssigned = async (order, driver) => {
     await createMessage(
       'driver_assigned',
       'Driver Assigned',
-      message
+      message,
+      {
+        sourceModule: 'orders',
+        entityType: 'order',
+        entityId: order?.id != null ? String(order.id) : null,
+        errorCode: 'driver_assigned',
+      }
     );
   } catch (error) {
     console.error('[MESSAGE SERVICE] Error notifying driver assigned:', error);
@@ -92,7 +110,13 @@ const notifyOrderCompleted = async (order) => {
     await createMessage(
       'order_completed',
       'Order Completed',
-      `Order #${order.id} has been delivered successfully.`
+      `Order #${order.id} has been delivered successfully.`,
+      {
+        sourceModule: 'orders',
+        entityType: 'order',
+        entityId: order?.id != null ? String(order.id) : null,
+        errorCode: 'order_completed',
+      }
     );
   } catch (error) {
     console.error('[MESSAGE SERVICE] Error notifying order completed:', error);
@@ -109,7 +133,13 @@ const notifyPaymentFailed = async (order, reason) => {
     await createMessage(
       'payment_failed',
       'Payment Failed',
-      `Payment attempt for Order #${order.id} failed. Error: ${reasonText}. Contact customer.`
+      `Payment attempt for Order #${order.id} failed. Error: ${reasonText}. Contact customer.`,
+      {
+        sourceModule: 'orders',
+        entityType: 'order',
+        entityId: order?.id != null ? String(order.id) : null,
+        errorCode: 'payment_failed',
+      }
     );
   } catch (error) {
     console.error('[MESSAGE SERVICE] Error notifying payment failed:', error);
