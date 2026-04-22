@@ -212,36 +212,54 @@ function encodeExpiryBatchReference(stockDetailId, grnNo, fallbackValue = null) 
 
 // ensure a trigram index for fast case-insensitive name searches (autocomplete)
 (async () => {
+  const ensureIndex = async (label, statement) => {
+    try {
+      await statement();
+    } catch (err) {
+      console.error(`[DB INIT] failed to create ${label}:`, err.message);
+    }
+  };
+
   try {
-    // Existing trigram index for search
-    await prisma.$executeRaw`
-      CREATE INDEX IF NOT EXISTS idx_product_name_search
-      ON "Product" USING gin (name gin_trgm_ops);
-    `;
+    let trigramReady = false;
+
+    try {
+      await prisma.$executeRawUnsafe('CREATE EXTENSION IF NOT EXISTS pg_trgm');
+      trigramReady = true;
+    } catch (err) {
+      console.warn('[DB INIT] pg_trgm extension unavailable; product name trigram index skipped:', err.message);
+    }
+
+    if (trigramReady) {
+      await ensureIndex('idx_product_name_search', () => prisma.$executeRaw`
+        CREATE INDEX IF NOT EXISTS idx_product_name_search
+        ON "Product" USING gin (name gin_trgm_ops);
+      `);
+    }
     
     // Index for visibility filtering (enabled = true)
-    await prisma.$executeRaw`
+    await ensureIndex('idx_product_enabled', () => prisma.$executeRaw`
       CREATE INDEX IF NOT EXISTS idx_product_enabled
       ON "Product"(enabled);
-    `;
+    `);
     
     // Index for category filtering
-    await prisma.$executeRaw`
+    await ensureIndex('idx_product_category', () => prisma.$executeRaw`
       CREATE INDEX IF NOT EXISTS idx_product_category
       ON "Product"(category);
-    `;
+    `);
     
     // Combined index for enabled + category queries
-    await prisma.$executeRaw`
+    await ensureIndex('idx_product_enabled_category', () => prisma.$executeRaw`
       CREATE INDEX IF NOT EXISTS idx_product_enabled_category
       ON "Product"(enabled, category);
-    `;
+    `);
     
     // Index for isOnSale filtering
-    await prisma.$executeRaw`
+    await ensureIndex('idx_product_on_sale', () => prisma.$executeRaw`
       CREATE INDEX IF NOT EXISTS idx_product_on_sale
       ON "Product"(isOnSale);
-    `;
+    `);
     
     console.log('[DB INIT] ensured all performance indexes on Product table');
   } catch (err) {
