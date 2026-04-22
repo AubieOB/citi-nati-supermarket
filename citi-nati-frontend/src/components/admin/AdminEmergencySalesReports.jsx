@@ -542,8 +542,8 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
           overflow: 'hidden',
         }}
       >
-        <div className="admin-mobile-tabs-row" style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f1f5f9', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', flex: '1 1 420px' }}>
+        <div className="admin-mobile-tabs-row" style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f1f5f9', display: 'flex', gap: '0.5rem', flexWrap: isMobileViewport ? 'wrap' : 'nowrap', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: isMobileViewport ? 'wrap' : 'nowrap', alignItems: 'center', flex: isMobileViewport ? '1 1 420px' : '0 1 auto', minWidth: 0 }}>
             {TAB_DEFS.map((tab) => (
               <button
                 key={tab.id}
@@ -560,7 +560,7 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
             ))}
           </div>
 
-          <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end', flex: '1 1 340px', marginLeft: 'auto' }}>
+          <div style={{ display: 'flex', gap: '0.65rem', flexWrap: isMobileViewport ? 'wrap' : 'nowrap', alignItems: 'center', justifyContent: 'flex-end', flex: isMobileViewport ? '1 1 340px' : '0 0 auto', marginLeft: 'auto' }}>
             <select
               value={pendingFilters.status}
               onChange={(event) => setPendingFilters((prev) => ({ ...prev, status: event.target.value }))}
