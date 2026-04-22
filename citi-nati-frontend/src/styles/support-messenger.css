@@ -14,6 +14,21 @@
   position: relative;
 }
 
+/* Dark mode support for Online Support */
+.admin-theme-dark .support-messenger-shell {
+  --support-bg: #0a0a0a;
+  --support-panel: rgba(30, 30, 30, 0.92);
+  --support-panel-strong: #1e1e1e;
+  --support-panel-muted: #181818;
+  --support-border: rgba(255, 255, 255, 0.1);
+  --support-text: #f1f5f9;
+  --support-text-muted: #c4c4c4;
+  --support-accent: #2D8659;
+  --support-accent-soft: rgba(45, 134, 89, 0.15);
+  --support-secondary: #1fa77a;
+  --support-shadow: 0 22px 60px rgba(0, 0, 0, 0.5);
+}
+
 .support-messenger-shell::before {
   content: '';
   position: absolute;
@@ -23,6 +38,13 @@
     radial-gradient(circle at top right, rgba(15, 118, 110, 0.12), transparent 30%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(244, 248, 251, 0.92));
   pointer-events: none;
+}
+
+.admin-theme-dark .support-messenger-shell::before {
+  background:
+    radial-gradient(circle at top left, rgba(45, 134, 89, 0.08), transparent 34%),
+    radial-gradient(circle at top right, rgba(31, 143, 98, 0.06), transparent 30%),
+    linear-gradient(180deg, rgba(30, 30, 30, 0.5), rgba(20, 20, 20, 0.7));
 }
 
 .support-messenger-shell > * {
@@ -53,6 +75,10 @@
   margin: 0;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
   padding: 0.75rem 1rem;
+}
+
+.admin-theme-dark .support-admin-sealed .support-fixed-header {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .support-admin-sealed :is(
@@ -163,6 +189,10 @@
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
 }
 
+.admin-theme-dark .support-metric-chip {
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+}
+
 .support-metric-label {
   display: block;
   font-size: 0.78rem;
@@ -252,10 +282,19 @@
   cursor: pointer;
 }
 
+.admin-theme-dark .support-ticket-card {
+  background: linear-gradient(180deg, rgba(40,40,40,0.96), rgba(30,30,30,0.96));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
 .support-ticket-card.is-active {
   border-color: var(--support-accent);
   background: linear-gradient(180deg, rgba(240, 253, 248, 0.98), rgba(236, 253, 245, 0.92));
   transform: translateY(-1px);
+}
+
+.admin-theme-dark .support-ticket-card.is-active {
+  background: linear-gradient(180deg, rgba(45, 75, 55, 0.96), rgba(35, 60, 45, 0.96));
 }
 
 .support-ticket-card::before {
@@ -383,6 +422,10 @@
   padding: 0.9rem 1rem;
   box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
   position: relative;
+}
+
+.admin-theme-dark .support-message-bubble {
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.3);
 }
 
 .support-message-row.is-self .support-message-bubble {
