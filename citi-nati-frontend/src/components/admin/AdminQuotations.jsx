@@ -3,6 +3,8 @@ import api from '../../utils/api.js';
 import { generateQuotationPDF } from '../../utils/pdfReports.js';
 import { exportQuotationReportImage } from '../../utils/quotationImageExport.js';
 import toast from 'react-hot-toast';
+import Modal from '../common/Modal.jsx';
+import { useModal } from '../../hooks/useModal.js';
 
 /* ─────────────────────────── helpers ─────────────────────────── */
 const fmt = (v) =>
@@ -196,6 +198,7 @@ const S = {
 /* ═══════════════════════════ Component ═══════════════════════════ */
 const AdminQuotations = ({ selectedLocationCode = 'BT', selectedBranchCode = 'BLANTYRE' }) => {
   const [tab, setTab] = useState('new');
+  const { modal, closeModal, showConfirm } = useModal();
 
   // ── Fixed header layout (matches AdminPromotions / AdminOrders pattern) ──
   const headerRef = useRef(null);
@@ -414,14 +417,19 @@ const AdminQuotations = ({ selectedLocationCode = 'BT', selectedBranchCode = 'BL
 
   /* ── Delete ─── */
   const handleDelete = async (id, ref) => {
-    if (!window.confirm(`Delete quotation ${ref}?`)) return;
-    try {
-      await api.delete(`/admin/quotations/${id}`, { params: operationalScope });
-      toast.success('Quotation deleted');
-      setQuotations((prev) => prev.filter((q) => q.id !== id));
-    } catch {
-      toast.error('Delete failed');
-    }
+    showConfirm(
+      'Delete Quotation?',
+      `Are you sure you want to delete quotation "${ref}"? This cannot be undone.`,
+      async () => {
+        try {
+          await api.delete(`/admin/quotations/${id}`, { params: operationalScope });
+          toast.success('Quotation deleted');
+          setQuotations((prev) => prev.filter((q) => q.id !== id));
+        } catch {
+          toast.error('Delete failed');
+        }
+      }
+    );
   };
 
   /* ── WhatsApp share ─── */
@@ -793,6 +801,23 @@ const AdminQuotations = ({ selectedLocationCode = 'BT', selectedBranchCode = 'BL
             </div>
           ))}
         </div>
+      )}
+
+      {modal && (
+        <Modal
+          isOpen={modal.isOpen}
+          title={modal.title}
+          message={modal.message}
+          type={modal.type}
+          onConfirm={modal.onConfirm}
+          onCancel={modal.onCancel || closeModal}
+          confirmText={modal.confirmText}
+          cancelText={modal.cancelText}
+          showCancelButton={modal.showCancelButton}
+          confirmButtonColor={modal.confirmButtonColor}
+        >
+          {modal.children}
+        </Modal>
       )}
     </div>
   );
