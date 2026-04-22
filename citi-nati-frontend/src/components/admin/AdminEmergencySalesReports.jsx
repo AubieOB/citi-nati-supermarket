@@ -542,8 +542,8 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
           overflow: 'hidden',
         }}
       >
-        <div className="admin-mobile-tabs-row" style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f1f5f9', display: 'flex', gap: '0.5rem', flexWrap: isMobileViewport ? 'wrap' : 'nowrap', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: isMobileViewport ? 'wrap' : 'nowrap', alignItems: 'center', flex: isMobileViewport ? '1 1 420px' : '1 1 auto', minWidth: 0 }}>
+        <div className="admin-mobile-tabs-row" style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f1f5f9', display: isMobileViewport ? 'flex' : 'grid', gridTemplateColumns: isMobileViewport ? undefined : 'minmax(0, 1fr) auto', columnGap: isMobileViewport ? undefined : '0.75rem', rowGap: isMobileViewport ? '0.5rem' : undefined, flexWrap: isMobileViewport ? 'wrap' : undefined, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: isMobileViewport ? 'wrap' : 'nowrap', alignItems: 'center', minWidth: 0, overflowX: isMobileViewport ? 'visible' : 'auto' }}>
             {TAB_DEFS.map((tab) => (
               <button
                 key={tab.id}
@@ -560,7 +560,7 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
             ))}
           </div>
 
-          <div style={{ display: 'flex', gap: '0.65rem', flexWrap: isMobileViewport ? 'wrap' : 'nowrap', alignItems: 'center', justifyContent: 'flex-end', flex: isMobileViewport ? '1 1 340px' : '0 0 auto', marginLeft: 'auto' }}>
+          <div style={{ display: 'flex', gap: '0.65rem', flexWrap: isMobileViewport ? 'wrap' : 'nowrap', alignItems: 'center', justifyContent: 'flex-end', flex: isMobileViewport ? '1 1 340px' : undefined, marginLeft: isMobileViewport ? 'auto' : undefined, justifySelf: isMobileViewport ? undefined : 'end' }}>
             <select
               value={pendingFilters.status}
               onChange={(event) => setPendingFilters((prev) => ({ ...prev, status: event.target.value }))}
