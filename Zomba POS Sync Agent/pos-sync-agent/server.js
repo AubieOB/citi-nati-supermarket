@@ -504,7 +504,8 @@ async function fetchProductsFromPOS(locationCode) {
     const LOCATION_CODE = locationCode || appConfig.posDb.locationCode;
 
     const stockConfig = await resolveLiveStockSourceConfig();
-    const isSHLocation = String(LOCATION_CODE || '').trim().toUpperCase() === 'SH';
+    const normalizedLocationCode = String(LOCATION_CODE || '').trim().toUpperCase();
+    const isGuardedZombaLocation = ZOMBA_OPERATIONAL_LOCATION_CODES.includes(normalizedLocationCode);
     const safeActivityTimestampColumn = stockConfig.productActivityTimestampColumn
       ? String(stockConfig.productActivityTimestampColumn).replace(/[^A-Za-z0-9_]/g, '')
       : null;
@@ -512,7 +513,7 @@ async function fetchProductsFromPOS(locationCode) {
     const productActivityTimestampExpr = safeActivityTimestampColumn
       ? `MAX(TRY_CONVERT(datetime2, pa.[${safeActivityTimestampColumn}])) AS ActivityLatestAt`
       : 'NULL AS ActivityLatestAt';
-    const query = isSHLocation && stockConfig.hasDailyStockBalance && stockConfig.hasProductActivity
+    const query = isGuardedZombaLocation && stockConfig.hasDailyStockBalance && stockConfig.hasProductActivity
       ? `
       WITH latest_daily AS (
         SELECT
@@ -745,14 +746,15 @@ async function fetchProductsFromPOS(locationCode) {
       stockReadLocations: [LOCATION_CODE],
       aggregationMode: false,
       stockResolutionMode: 'LOCATION_SPECIFIC',
-      stockSourceMode: isSHLocation && stockConfig.hasDailyStockBalance && stockConfig.hasProductActivity
-        ? 'SH_DailyStockBalancePrimary_GuardedProductActivityFallback'
+      stockSourceMode: isGuardedZombaLocation && stockConfig.hasDailyStockBalance && stockConfig.hasProductActivity
+        ? 'ZOMBA_DailyStockBalancePrimary_GuardedProductActivityFallback'
         : (stockConfig.hasDailyStockBalance && stockConfig.hasProductActivity
           ? 'DailyStockBalancePrimary+MissingRowProductActivityFallback'
           : (stockConfig.hasDailyStockBalance
             ? 'DailyStockBalance'
             : (stockConfig.hasProductActivity ? 'ProductActivityFallbackOnly' : 'Unavailable'))),
-      shSafeMode: isSHLocation,
+      guardedLocationMode: isGuardedZombaLocation,
+      locationCode: normalizedLocationCode,
       dailyStockBalanceAvailable: stockConfig.hasDailyStockBalance,
       productActivityAvailable: stockConfig.hasProductActivity,
       productActivityFallbackTimestampRequired: true,
@@ -764,9 +766,10 @@ async function fetchProductsFromPOS(locationCode) {
     });
     let result = await request.query(query);
 
-    if (isSHLocation && stockConfig.hasDailyStockBalance && stockConfig.hasProductActivity) {
+    if (isGuardedZombaLocation && stockConfig.hasDailyStockBalance && stockConfig.hasProductActivity) {
       const nowMs = Date.now();
       let fallbackAccepted = 0;
+      let fallbackAcceptedNoTimestamp = 0;
       let fallbackRejectedMissingTimestamp = 0;
       let fallbackRejectedStale = 0;
       let fallbackRejectedUnsafe = 0;
@@ -792,12 +795,15 @@ async function fetchProductsFromPOS(locationCode) {
         let finalSource = hasDaily ? 'DailyStockBalance' : 'NoStockRow';
 
         if (!hasDaily && hasActivity) {
-          if (!canUseFreshProductActivityFallback) {
-            fallbackRejectedMissingTimestamp++;
+          if (!activityIsSafe) {
+            fallbackRejectedUnsafe++;
+          } else if (!canUseFreshProductActivityFallback) {
+            // Keep BAR/ST999 operational when ProductActivity has no discoverable timestamp column.
+            fallbackAcceptedNoTimestamp++;
+            finalStock = activityValue;
+            finalSource = 'ProductActivityFallbackNoTimestamp';
           } else if (!activityIsFresh) {
             fallbackRejectedStale++;
-          } else if (!activityIsSafe) {
-            fallbackRejectedUnsafe++;
           } else {
             fallbackAccepted++;
             finalStock = activityValue;
@@ -806,7 +812,10 @@ async function fetchProductsFromPOS(locationCode) {
         }
 
         if (!hasDaily && hasActivity && finalSource === 'NoStockRow') {
-          console.warn(`${SYNC_LOG_PREFIX} [SH STOCK GUARD] rejected ProductActivity fallback`, {
+          if (!canUseFreshProductActivityFallback) {
+            fallbackRejectedMissingTimestamp++;
+          }
+          console.warn(`${SYNC_LOG_PREFIX} [ZOMBA STOCK GUARD] rejected ProductActivity fallback`, {
             locationCode: LOCATION_CODE,
             productCode: row.ProductCode,
             activityStock: activityValue,
@@ -818,7 +827,7 @@ async function fetchProductsFromPOS(locationCode) {
         }
 
         if (hasDaily && hasActivity && (activityValue < 0 || Math.abs(activityValue - dailyValue) > PRODUCT_ACTIVITY_FALLBACK_MAX_ABS_STOCK)) {
-          console.warn(`${SYNC_LOG_PREFIX} [SH STOCK ALERT] ProductActivity diverges from DailyStockBalance`, {
+          console.warn(`${SYNC_LOG_PREFIX} [ZOMBA STOCK ALERT] ProductActivity diverges from DailyStockBalance`, {
             locationCode: LOCATION_CODE,
             productCode: row.ProductCode,
             dailyStock: dailyValue,
@@ -847,11 +856,12 @@ async function fetchProductsFromPOS(locationCode) {
         };
       });
 
-      console.log(`${SYNC_LOG_PREFIX} [SH STOCK DIAGNOSTICS]`, {
+      console.log(`${SYNC_LOG_PREFIX} [ZOMBA STOCK DIAGNOSTICS]`, {
         locationCode: LOCATION_CODE,
         dailyStockBalancePrimary: true,
         canUseFreshProductActivityFallback,
         fallbackAccepted,
+        fallbackAcceptedNoTimestamp,
         fallbackRejectedMissingTimestamp,
         fallbackRejectedStale,
         fallbackRejectedUnsafe,
@@ -1436,7 +1446,7 @@ app.get('/pos-sync/products', validateApiKey, requireFeature('enableReportingSyn
       configuredLocationCode: appConfig.posDb.locationCode,
       includedLocations: syncLocations,
       mode: appConfig.branch.branchCode === 'ZOMBA' ? 'CONFIGURED_ZOMBA_OPERATIONAL_LOCATIONS' : 'CONFIGURED_LOCATION_ONLY',
-      stockSource: 'SH uses DailyStockBalance primary with guarded ProductActivity fallback; BAR/ST999 stay location-specific',
+      stockSource: 'All Zomba operational locations (SH/BAR/ST999) use guarded location-specific strategy: DailyStockBalance primary when present, ProductActivity fallback with safety checks',
       stockResolutionMode: 'LOCATION_SPECIFIC',
       aggregationEnabled: false,
     });
@@ -2388,7 +2398,7 @@ async function autoSync() {
       configuredLocationCode: appConfig.posDb.locationCode,
       includedLocations: syncLocations,
       mode: appConfig.branch.branchCode === 'ZOMBA' ? 'CONFIGURED_ZOMBA_OPERATIONAL_LOCATIONS' : 'CONFIGURED_LOCATION_ONLY',
-      stockSource: 'SH uses DailyStockBalance primary with guarded ProductActivity fallback; BAR/ST999 stay location-specific',
+      stockSource: 'All Zomba operational locations (SH/BAR/ST999) use guarded location-specific strategy: DailyStockBalance primary when present, ProductActivity fallback with safety checks',
       stockResolutionMode: 'LOCATION_SPECIFIC',
       aggregationEnabled: false,
     });
