@@ -540,6 +540,7 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
           boxSizing: 'border-box',
           overflow: 'hidden',
+          display: 'block',
         }}
       >
         <div className="admin-mobile-tabs-row" style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f1f5f9', display: isMobileViewport ? 'flex' : 'grid', gridTemplateColumns: isMobileViewport ? undefined : 'minmax(0, 1fr) auto', columnGap: isMobileViewport ? undefined : '0.75rem', rowGap: isMobileViewport ? '0.5rem' : undefined, flexWrap: isMobileViewport ? 'wrap' : undefined, alignItems: 'center' }}>
