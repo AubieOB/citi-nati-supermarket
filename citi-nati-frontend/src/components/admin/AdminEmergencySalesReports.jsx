@@ -154,11 +154,10 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
       if (!contentArea) return;
 
       const rect = contentArea.getBoundingClientRect();
-      const desktopTopOffset = 12;
       const mobileTopOffset = 56;
       const resolvedTop = window.innerWidth <= 768
         ? Math.max(rect.top, mobileTopOffset)
-        : Math.max(rect.top, desktopTopOffset);
+        : rect.top;
 
       setFilterBarLayout({
         left: rect.left,
@@ -276,7 +275,10 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
   }, [sales]);
 
-  const reportFilterSpacerHeight = Math.max(Math.min(filterBarHeight, 150) - 8, 0);
+  const reportFilterSpacerHeight = Math.max(
+    filterBarHeight + (isMobileViewport ? 8 : 12),
+    0
+  );
 
   const salesTotalsRow = useMemo(() => {
     return {
