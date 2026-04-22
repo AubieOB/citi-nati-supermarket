@@ -61,3 +61,12 @@ When functionality changes:
 This repository includes specialized technical/operational guides (POS sync, deployment, import/export, and testing).
 
 Those documents are complementary and do not replace the two primary user guides above.
+
+## 7. Role-specific dashboard guides
+
+The following full guides provide operational detail for role dashboards beyond the two primary audience guides:
+
+- Delivery driver dashboard guide
+  File: `DELIVERY_DRIVER_DASHBOARD_USER_GUIDE.md`
+- Emergency cashier dashboard guide
+  File: `EMERGENCY_CASHIER_DASHBOARD_USER_GUIDE.md`
