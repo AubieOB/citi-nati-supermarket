@@ -1,4 +1,4 @@
-# Citi-Nati Supermarket Admin Panel User Guide
+# Citi-Nati Supermarket Admin Dashboard User Guide
 
 ## 1. Purpose of this guide
 
@@ -633,19 +633,19 @@ Operator rule:
 
 ### 10.1 Location safety reminder
 
-```
+```text
 Before changing stock, price, or promotion, verify the selected operational location first.
 ```
 
 ### 10.2 High-risk action reminder
 
-```
+```text
 Use bulk delete or wipe actions only with explicit approval and verified scope.
 ```
 
 ### 10.3 Troubleshooting escalation snippet
 
-```
+```text
 If POS values are not updating, capture selected location, product code, timestamp, and POS Sync Monitor status before escalation.
 ```
 

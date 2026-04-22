@@ -15,7 +15,7 @@ This guide covers:
 - order tracking and payment retry
 - help and policy pages
 
-This guide does not cover admin-only features. See `ADMIN_PANEL_USER_GUIDE.md` for admin operations.
+This guide does not cover admin-only features. See `ADMIN_DASHBOARD_USER_GUIDE.md` for admin operations.
 
 ## 2. Supported customer routes (page map)
 
@@ -414,19 +414,19 @@ Use these snippets when supporting customers.
 
 ### 13.1 Minimum order reminder
 
-```
+```text
 Your cart subtotal must meet the minimum order value shown in cart before checkout becomes available.
 ```
 
 ### 13.2 Delivery coverage reminder
 
-```
+```text
 Please choose a supported district and area. If the zone is inactive or out of coverage radius, checkout will be blocked.
 ```
 
 ### 13.3 Payment verification reminder
 
-```
+```text
 After payment, keep the payment success page open while confirmation is processed, then continue to My Orders.
 ```
 
