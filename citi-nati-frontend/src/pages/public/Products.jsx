@@ -182,6 +182,12 @@ const Products = () => {
   const fetchProducts = async (isLoadMore = false, options = {}) => {
     const bypassCache = options?.bypassCache === true;
     const silent = options?.silent === true;
+    const effectiveCategory = options?.categoryOverride !== undefined
+      ? options.categoryOverride
+      : selectedCategoryRef.current;
+    const effectiveOnSaleOnly = options?.onSaleOverride !== undefined
+      ? Boolean(options.onSaleOverride)
+      : Boolean(onSaleOnlyRef.current);
 
     try {
       // Show loading state
@@ -199,7 +205,7 @@ const Products = () => {
       const currentOffset = isLoadMore ? offset + limit : 0;
       
       // Create cache key
-      const cacheKey = `offset_${currentOffset}_category_${selectedCategory || 'all'}_sale_${onSaleOnly}`;
+      const cacheKey = `offset_${currentOffset}_category_${effectiveCategory || 'all'}_sale_${effectiveOnSaleOnly}`;
 
       // Check cache (only for initial loads, not Load More to ensure fresh data)
       if (!isLoadMore && !bypassCache && productsCacheRef.current.has(cacheKey)) {
@@ -225,10 +231,10 @@ const Products = () => {
       params.append('limit', limit);
       params.append('offset', currentOffset);
       params.append('locationCode', STOREFRONT_LOCATION_CODE);
-      if (selectedCategory) params.append('category', selectedCategory);
-      if (onSaleOnly) params.append('onSale', 'true');
+      if (effectiveCategory) params.append('category', effectiveCategory);
+      if (effectiveOnSaleOnly) params.append('onSale', 'true');
 
-      console.log(`[PRODUCTS FETCH] ${isLoadMore ? 'Load More' : 'Initial'} | Offset: ${currentOffset} | Limit: ${limit} | Category: ${selectedCategory || 'all'}`);
+      console.log(`[PRODUCTS FETCH] ${isLoadMore ? 'Load More' : 'Initial'} | Offset: ${currentOffset} | Limit: ${limit} | Category: ${effectiveCategory || 'all'} | OnSale: ${effectiveOnSaleOnly}`);
       
       const response = await api.get(`/products?${params.toString()}`);
       const data = response.data;
