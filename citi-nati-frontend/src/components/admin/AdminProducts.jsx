@@ -809,14 +809,34 @@ const AdminProducts = ({
       // Search filter (AND logic - all search terms must match)
       const searchTerms = searchTerm.toLowerCase().trim().split(/\s+/).filter(t => t);
       const searchableProductCode = String(product.productCode || product.sourceCode || product.code || '').toLowerCase();
-      const matchesSearch = searchTerms.length === 0 || searchTerms.every(term => 
-        product.name.toLowerCase().includes(term) || 
-        product.category.toLowerCase().includes(term) ||
-        searchableProductCode.includes(term)
-      );
-
-      // Category filter
-      const matchesCategory = !selectedCategory || product.category === selectedCategory;
+        const normalizedSearchQuery = searchTerm.toLowerCase().trim().replace(/\s+/g, ' ');
+        let matchesSearch = false;
+        if (!normalizedSearchQuery) {
+          matchesSearch = true;
+        } else {
+          const nameLower = product.name.toLowerCase();
+          const categoryLower = (product.category || '').toLowerCase();
+          const codeLower = searchableProductCode;
+          // 1. Full-phrase match in any field (single-word queries are covered here).
+          if (
+            nameLower.includes(normalizedSearchQuery) ||
+            codeLower.includes(normalizedSearchQuery) ||
+            categoryLower.includes(normalizedSearchQuery)
+          ) {
+            matchesSearch = true;
+          } else {
+            // 2. Multi-word: all tokens must appear within the SAME field.
+            const tokens = normalizedSearchQuery.split(' ').filter(Boolean);
+            if (tokens.length > 1) {
+              matchesSearch =
+                tokens.every(t => nameLower.includes(t)) ||
+                tokens.every(t => codeLower.includes(t)) ||
+                tokens.every(t => categoryLower.includes(t));
+            }
+          }
+        }
+        // Category filter
+        const matchesCategory = !selectedCategory || product.category === selectedCategory;
 
       // Sale filter
       const matchesSale = !onSaleOnly || product.isOnSale;

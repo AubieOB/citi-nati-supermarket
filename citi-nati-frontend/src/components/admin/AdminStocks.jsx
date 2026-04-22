@@ -390,11 +390,31 @@ const AdminStocks = ({
   // Filter products with debounced search
   const filteredProducts = allProducts
     .filter(product => {
-      const term = searchTerm.toLowerCase();
-      const searchableProductCode = String(product.productCode || product.sourceCode || product.code || '').toLowerCase();
-      const matchesSearch = !searchTerm ||
-        product.name.toLowerCase().includes(term) ||
-        searchableProductCode.includes(term);
+        const normalizedSearchQuery = searchTerm.toLowerCase().trim().replace(/\s+/g, ' ');
+        const searchableProductCode = String(product.productCode || product.sourceCode || product.code || '').toLowerCase();
+        let matchesSearch = false;
+        if (!normalizedSearchQuery) {
+          matchesSearch = true;
+        } else {
+          const nameLower = product.name.toLowerCase();
+          const categoryLower = (product.category || '').toLowerCase();
+          const codeLower = searchableProductCode;
+          if (
+            nameLower.includes(normalizedSearchQuery) ||
+            codeLower.includes(normalizedSearchQuery) ||
+            categoryLower.includes(normalizedSearchQuery)
+          ) {
+            matchesSearch = true;
+          } else {
+            const tokens = normalizedSearchQuery.split(' ').filter(Boolean);
+            if (tokens.length > 1) {
+              matchesSearch =
+                tokens.every(t => nameLower.includes(t)) ||
+                tokens.every(t => codeLower.includes(t)) ||
+                tokens.every(t => categoryLower.includes(t));
+            }
+          }
+        }
       const matchesCategory = filterCategory === 'all' || product.category === filterCategory;
       const matchesStockStatus =
         stockStatusFilter === 'all' ||

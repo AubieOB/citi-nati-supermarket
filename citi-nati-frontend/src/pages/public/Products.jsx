@@ -71,6 +71,7 @@ const Products = () => {
   const productsCacheRefreshTrackerRef = useRef(new Map()); // Background refresh cooldown by cache key
   const abortControllerRef = useRef(null); // Cancel previous requests
   const debounceTimerRef = useRef(null); // Debounce timer for product search
+    const searchRequestIdRef = useRef(0); // Monotonic counter — only apply results from the latest request
   const selectedCategoryRef = useRef(''); // Track selected category in socket handlers
   const productsRef = useRef([]); // Keep products in ref for search callback
   const selectedCategorySearchRef = useRef(''); // Keep category for search callback
@@ -122,7 +123,11 @@ const Products = () => {
       // Silent fetch - no loading state changes, NO error display
       (async () => {
         try {
-          const pageSize = 50; // Search returns more results
+            // Capture the request ID at the moment this fetch starts.
+            // If the user types more characters before this response arrives the ID
+            // will have been incremented and we silently discard the stale result.
+            const requestId = ++searchRequestIdRef.current;
+            const pageSize = 200; // Large enough to cover all matching products
           const params = new URLSearchParams();
           params.append('page', '1');
           params.append('pageSize', pageSize);
@@ -134,6 +139,12 @@ const Products = () => {
           const response = await api.get(`/products?${params.toString()}`, {
             signal: abortControllerRef.current.signal
           });
+
+            // Discard if a newer search was already started.
+            if (requestId !== searchRequestIdRef.current) {
+              console.log(`[SEARCH STALE] Discarding response for "${query}" (req ${requestId} < current ${searchRequestIdRef.current})`);
+              return;
+            }
 
           const data = response.data;
           const results = data.products || [];
@@ -147,7 +158,7 @@ const Products = () => {
           // Update display silently
           setFilteredProducts(visibleResults);
 
-          console.log(`[SEARCH API] Found ${visibleResults.length} results for "${query}"`);
+            console.log(`[SEARCH API] Found ${visibleResults.length} results for "${query}" (req ${requestId})`);
         } catch (err) {
           // For search: silently ignore ALL errors including network errors
           // This includes AbortError and any other errors
