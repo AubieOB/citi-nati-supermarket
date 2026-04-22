@@ -84,12 +84,19 @@
 
 /* Sealed layout mode: full-width panes and square card/header geometry. */
 .admin-dashboard-root.admin-sealed-layout {
-  --admin-content-pad-y: 0;
+  --admin-content-pad-y: 0.5rem;
   --admin-content-pad-x: 0;
 }
 
 .admin-dashboard-root.admin-sealed-layout .admin-content-area {
-  padding: 0;
+  padding: var(--admin-content-pad-y) 0 0;
+}
+
+.admin-dashboard-root.admin-sealed-layout .container {
+  max-width: none;
+  margin: 0;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .admin-dashboard-root.admin-sealed-layout .admin-content-area > * {
@@ -101,6 +108,14 @@
 }
 
 .admin-dashboard-root.admin-sealed-layout :is(.bo-filter-bar, .admin-panel-filter-bar, .admin-panel, .admin-panel-card, .admin-table-wrapper, .admin-summary-card, .admin-content-card, .admin-metric-card, .admin-list-card, .admin-empty-state-card) {
+  border-radius: 0 !important;
+}
+
+.admin-dashboard-root.admin-sealed-layout :is(.bo-tab-button, .admin-tab-button, .admin-action-button, .admin-table-action-button, .admin-filter-pill, .admin-mobile-filter-bar) {
+  border-radius: 0 !important;
+}
+
+.admin-dashboard-root.admin-sealed-layout :is(.bo-tabs-row, .bo-tabs-strip, .admin-mobile-tabs-row) {
   border-radius: 0 !important;
 }
 
@@ -808,9 +823,9 @@ body.admin-theme-dark .bo-filter-title i {
   }
 
   .admin-dashboard-root.admin-sealed-layout .admin-content-area {
-    --admin-content-pad-y: 0;
+    --admin-content-pad-y: 0.4rem;
     --admin-content-pad-x: 0;
-    padding: 0;
+    padding: var(--admin-content-pad-y) 0 0;
   }
 
   .bo-filter-bar {
@@ -870,6 +885,7 @@ body.admin-theme-dark .bo-filter-title i {
 
   .admin-dashboard-root.admin-sealed-layout .admin-content-area {
     --admin-content-pad-x: 0;
+    --admin-content-pad-y: 0.35rem;
   }
 }
 
