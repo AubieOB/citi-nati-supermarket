@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useNavigate } from 'react-router-dom';
-import Container from '../../components/ui/Container.jsx';
 import api from '../../utils/api.js';
 import { getSocket } from '../../utils/socket.js';
 import { notifyInfo, notifyError, playNotificationSound } from '../../utils/notifications.js';
@@ -282,7 +281,7 @@ const SupportDashboard = ({ openTicketRequest }) => {
       setFilterBarLayout({
         left: rect.left,
         width: rect.width,
-        top: window.innerWidth <= 768 ? mobileTopOffset : 0,
+        top: window.innerWidth <= 768 ? mobileTopOffset : rect.top,
       });
 
       if (filterBarRef.current) {
@@ -532,24 +531,31 @@ const SupportDashboard = ({ openTicketRequest }) => {
   if (authLoading || loading) {
     return (
       <div className="page" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Container>
+        <div>
           <i className="fas fa-spinner fa-spin" style={{ fontSize: '3rem', color: '#2D8659' }}></i>
           <p style={{ marginTop: '1rem' }}>Loading support dashboard...</p>
-        </Container>
+        </div>
       </div>
     );
   }
 
   return (
-      <div className="page support-messenger-shell" style={{ minHeight: '100vh', paddingBottom: '3rem', ...panelStyleVars }}>
-        <Container>
-          <div style={{ paddingTop: '2rem' }}>
-            <section className="support-hero">
+      <div className="page support-messenger-shell support-admin-sealed" style={{ minHeight: '100vh', paddingBottom: '1rem', ...panelStyleVars }}>
+          <div className="support-admin-sealed-inner" style={{ paddingTop: '0.25rem' }}>
+            <section
+              ref={filterBarRef}
+              className="support-hero support-fixed-header"
+              style={{
+                position: 'fixed',
+                top: `${filterBarLayout.top}px`,
+                left: `${filterBarLayout.left}px`,
+                width: `${filterBarLayout.width}px`,
+                zIndex: 82,
+              }}
+            >
               <div>
-                <h1 className="support-hero-title">Support Command Center</h1>
-                <p className="support-hero-subtitle">
-                  Manage tickets in a live messenger workspace with faster replies, cleaner filters, and one-step file delivery.
-                </p>
+                <h1 className="support-hero-title">Online Support</h1>
+                <p className="support-hero-subtitle">Live tickets workspace</p>
               </div>
               <div className="support-hero-metrics">
                 <div className="support-metric-chip">
@@ -566,6 +572,8 @@ const SupportDashboard = ({ openTicketRequest }) => {
                 </div>
               </div>
             </section>
+
+            <div style={{ height: `${supportFilterSpacerHeight}px` }}></div>
 
             {successMessage && (
               <div className="support-alert is-success">
@@ -812,7 +820,6 @@ const SupportDashboard = ({ openTicketRequest }) => {
               )}
             </section>
           </div>
-        </Container>
         <Modal
           isOpen={modal.isOpen}
           title={modal.title}
