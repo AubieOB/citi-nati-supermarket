@@ -859,6 +859,12 @@
   color: #9388FF;
 }
 
+.help-center-subtitle {
+  margin: 0.15rem 0 0;
+  font-size: 0.84rem;
+  color: var(--support-text-muted);
+}
+
 /* Messenger layout fills remaining height */
 .support-public-sealed .support-messenger-layout {
   overflow: hidden;

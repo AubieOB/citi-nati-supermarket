@@ -567,7 +567,10 @@ const HelpCenter = () => {
       {/* Top bar: heading + actions + alerts + optional new-ticket form */}
       <div ref={topBarRef} className="help-center-top-bar">
         <div className="help-center-top-row">
-          <h1 className="help-center-heading">Help Center</h1>
+          <div>
+            <h1 className="help-center-heading">Help Center</h1>
+            <p className="help-center-subtitle">Get help with your orders, payments, or account.</p>
+          </div>
           {!showForm && (
             <button type="button" className="support-primary-button help-center-new-ticket-button" onClick={() => setShowForm(true)}>
               <i className="fas fa-plus"></i>
