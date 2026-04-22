@@ -10,6 +10,7 @@ import ProtectedRoute from '../../components/ProtectedRoute.jsx';
 import toast from 'react-hot-toast';
 import { generateOrderReceiptPDF } from '../../utils/pdfReports.js';
 import { exportOrderReceiptImage } from '../../utils/orderReceiptImageExport.js';
+import { getSocket } from '../../utils/socket.js';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import '../../styles/global.css';
 
@@ -37,6 +38,8 @@ const MyOrdersContent = () => {
   const [isMobileView, setIsMobileView] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth <= 640 : false
   );
+  // Tracks order IDs that just received a live status patch (for subtle flash indicator)
+  const [updatedOrderIds, setUpdatedOrderIds] = useState(new Set());
 
   // Reusable fetch function
   const fetchOrders = useCallback(async () => {
@@ -86,6 +89,66 @@ const MyOrdersContent = () => {
     mediaQuery.addListener(updateMobileState);
     return () => mediaQuery.removeListener(updateMobileState);
   }, []);
+
+  // Live silent auto-refresh: patch a single order in-state when the backend emits orderUpdated
+  useEffect(() => {
+    if (authLoading || !user) return;
+
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleOrderUpdated = (updatedOrder) => {
+      if (!updatedOrder || !updatedOrder.id) return;
+
+      setOrders((prevOrders) => {
+        const idx = prevOrders.findIndex((o) => o.id === updatedOrder.id);
+        if (idx === -1) return prevOrders;
+
+        const merged = {
+          ...prevOrders[idx],
+          // Only overwrite fields the server actually sent – preserve local items array
+          status: updatedOrder.status ?? prevOrders[idx].status,
+          paymentStatus: updatedOrder.paymentStatus ?? prevOrders[idx].paymentStatus,
+          driverId: updatedOrder.driverId ?? prevOrders[idx].driverId,
+          driver: updatedOrder.driver ?? prevOrders[idx].driver,
+          finalTotalAmount: updatedOrder.finalTotalAmount ?? updatedOrder.total ?? prevOrders[idx].finalTotalAmount,
+          total: updatedOrder.total ?? prevOrders[idx].total,
+          updatedAt: updatedOrder.updatedAt ?? prevOrders[idx].updatedAt,
+          // Prefer richer items array (keep existing if the live payload has no items)
+          items: (Array.isArray(updatedOrder.items) && updatedOrder.items.length > 0)
+            ? updatedOrder.items
+            : prevOrders[idx].items,
+        };
+
+        const next = [...prevOrders];
+        next[idx] = merged;
+        return next;
+      });
+
+      // Also patch open preview if it matches
+      setPreviewReceiptOrder((prev) => {
+        if (!prev || prev.id !== updatedOrder.id) return prev;
+        return {
+          ...prev,
+          status: updatedOrder.status ?? prev.status,
+          paymentStatus: updatedOrder.paymentStatus ?? prev.paymentStatus,
+        };
+      });
+
+      // Brief highlight flash (cleared after 2.5 s)
+      setUpdatedOrderIds((prev) => new Set([...prev, updatedOrder.id]));
+      setTimeout(() => {
+        setUpdatedOrderIds((prev) => {
+          const next = new Set(prev);
+          next.delete(updatedOrder.id);
+          return next;
+        });
+      }, 2500);
+    };
+
+    socket.on('orderUpdated', handleOrderUpdated);
+    return () => socket.off('orderUpdated', handleOrderUpdated);
+  }, [authLoading, user]);
 
   // Lock background scroll while quick preview modal is open
   useEffect(() => {
@@ -304,6 +367,7 @@ const MyOrdersContent = () => {
   // Individual Order Card Component
   const OrderCard = ({ order }) => {
     const orderItems = getOrderItems(order);
+    const isRecentlyUpdated = updatedOrderIds.has(order.id);
 
     return (
     <div
@@ -311,8 +375,11 @@ const MyOrdersContent = () => {
         backgroundColor: '#fff',
         padding: '1.5rem',
         borderRadius: '8px',
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+        boxShadow: isRecentlyUpdated
+          ? '0 2px 12px rgba(45, 134, 89, 0.35)'
+          : '0 2px 8px rgba(0, 0, 0, 0.1)',
         borderLeft: `4px solid ${getStatusColor(order.status)}`,
+        transition: 'box-shadow 0.5s ease',
       }}
     >
       {/* Order Header */}
