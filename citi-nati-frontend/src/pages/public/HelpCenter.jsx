@@ -7,7 +7,17 @@ import { getSocket, identifySocket } from '../../utils/socket.js';
 import { notifyInfo, notifyError, notifySuccess, playNotificationSound } from '../../utils/notifications.js';
 import Modal from '../../components/common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
+import {
+  SUPPORT_ATTACHMENT_ACCEPT,
+  appendValidatedSupportFiles,
+  buildSupportAttachmentDownloadUrl,
+  formatSupportTime,
+  getSupportAttachmentIcon,
+  mergeReplyIntoReplyList,
+  mergeReplyIntoTicketList,
+} from '../../utils/supportChat.js';
 import '../../styles/global.css';
+import '../../styles/support-messenger.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 
 /**
@@ -39,6 +49,8 @@ const HelpCenter = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
+  const [isSendingReply, setIsSendingReply] = useState(false);
+  const [ticketSearch, setTicketSearch] = useState('');
 
   // Real-time state
   const [replyMessage, setReplyMessage] = useState('');
@@ -49,6 +61,7 @@ const HelpCenter = () => {
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef(null);
   const { modal, closeModal, showConfirm } = useModal();
+  const messagesEndRef = useRef(null);
 
   // Fetch tickets on component mount
   useEffect(() => {
@@ -77,7 +90,8 @@ const HelpCenter = () => {
         if (!prev || prev.id !== reply.ticketId) return prev;
         const updatedTicket = {
           ...prev,
-          replies: [...prev.replies, reply]
+          updatedAt: reply.createdAt || new Date().toISOString(),
+          replies: mergeReplyIntoReplyList(prev.replies || [], reply)
         };
         // Play sound for new message
         if (reply.senderId !== user.id) {
@@ -88,13 +102,7 @@ const HelpCenter = () => {
       });
 
       // Update tickets list
-      setTickets(prev =>
-        prev.map(t =>
-          t.id === reply.ticketId
-            ? { ...t, replies: [...t.replies, reply] }
-            : t
-        )
-      );
+      setTickets(prev => mergeReplyIntoTicketList(prev, reply));
     };
 
     // Listen for typing indicators
@@ -122,7 +130,7 @@ const HelpCenter = () => {
         setTickets(prev =>
           prev.map(t =>
             t.id === data.ticketId
-              ? { ...t, status: data.status, updatedAt: new Date().toISOString() }
+                ? { ...t, status: data.status, updatedAt: new Date().toISOString() }
               : t
           )
         );
@@ -175,10 +183,10 @@ const HelpCenter = () => {
             ticket.id === newTicket.id
               ? { ...ticket, ...newTicket }
               : ticket
-          );
+          ).sort((left, right) => new Date(right.updatedAt || right.createdAt).getTime() - new Date(left.updatedAt || left.createdAt).getTime());
         }
 
-        return [newTicket, ...prev];
+        return [newTicket, ...prev].sort((left, right) => new Date(right.updatedAt || right.createdAt).getTime() - new Date(left.updatedAt || left.createdAt).getTime());
       });
     };
 
@@ -214,6 +222,10 @@ const HelpCenter = () => {
     };
   }, [user]);
 
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [selectedTicket?.id, selectedTicket?.replies?.length]);
+
   // Handle ticket selection - join room
   useEffect(() => {
     if (selectedTicket && socket.current) {
@@ -231,7 +243,8 @@ const HelpCenter = () => {
       setLoading(true);
       setError(null);
       const response = await api.get('/support/my-tickets');
-      setTickets(response.data.tickets || []);
+      const ticketList = response.data.tickets || [];
+      setTickets(ticketList.sort((left, right) => new Date(right.updatedAt || right.createdAt).getTime() - new Date(left.updatedAt || left.createdAt).getTime()));
     } catch (err) {
       console.error('Error fetching tickets:', err);
       setError('Failed to load support tickets');
@@ -261,7 +274,7 @@ const HelpCenter = () => {
       const response = await api.post('/support/tickets', formData);
       
       const newTicket = response.data.ticket;
-      setTickets(prev => [newTicket, ...prev]);
+      setTickets(prev => [newTicket, ...prev].sort((left, right) => new Date(right.updatedAt || right.createdAt).getTime() - new Date(left.updatedAt || left.createdAt).getTime()));
       setFormData({ subject: '', message: '', priority: 'MEDIUM' });
       setShowForm(false);
       setSuccessMessage('Ticket created successfully! We will review it shortly.');
@@ -279,89 +292,53 @@ const HelpCenter = () => {
     if (!selectedTicket) {
       return;
     }
+    if (!replyMessage.trim()) {
+      setError('Type a message before sending your reply');
+      return;
+    }
 
     try {
+      setIsSendingReply(true);
       setError(null);
 
-      // Upload files first and get attachment data
-      let uploadedAttachments = [];
-      for (const file of attachedFiles) {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('ticketId', selectedTicket.id);
-
-        try {
-          const response = await api.post('/support/upload-attachment', formData, {
-            headers: {
-              'Content-Type': 'multipart/form-data'
-            }
-          });
-          uploadedAttachments.push(response.data.attachment);
-        } catch (uploadErr) {
-          console.error('File upload failed:', uploadErr);
-          notifyError(`Failed to upload ${file.name}`);
-        }
-      }
-
-      // Create the reply via API (not Socket.io) so it's properly saved to database with attachments
-      const replyResponse = await api.post(`/support/tickets/${selectedTicket.id}/reply`, {
-        message: replyMessage,
-        attachments: uploadedAttachments
+      const formData = new FormData();
+      formData.append('message', replyMessage.trim());
+      attachedFiles.forEach((file) => {
+        formData.append('attachments', file);
       });
 
-      const newReply = replyResponse.data.reply;
-      
-      // Manually add attachments to the reply object
-      if (uploadedAttachments.length > 0) {
-        newReply.attachments = uploadedAttachments;
-      }
+      const replyResponse = await api.post(`/support/tickets/${selectedTicket.id}/reply`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
 
-      // Update the selected ticket with new reply
-      setSelectedTicket(prev => ({
-        ...prev,
-        replies: [...(prev.replies || []), newReply]
-      }));
+      const reply = replyResponse.data.reply;
 
-      // Also update the ticket in the list
-      setTickets(prev =>
-        prev.map(t =>
-          t.id === selectedTicket.id
-            ? { ...t, replies: [...(t.replies || []), newReply] }
-            : t
-        )
-      );
+      setSelectedTicket((prev) => {
+        if (!prev || prev.id !== selectedTicket.id) return prev;
+        return {
+          ...prev,
+          updatedAt: reply.createdAt || new Date().toISOString(),
+          replies: mergeReplyIntoReplyList(prev.replies || [], reply),
+        };
+      });
 
-      // Emit Socket.io event for real-time notification to admin
-      if (socket.current) {
-        socket.current.emit('ticketMessage', {
-          ticketId: selectedTicket.id,
-          message: replyMessage,
-          senderId: user.id,
-          attachments: uploadedAttachments
-        });
-      }
+      setTickets((prev) => mergeReplyIntoTicketList(prev, reply));
 
       setReplyMessage('');
       setAttachedFiles([]);
     } catch (err) {
       console.error('Error sending reply:', err);
       setError(err.response?.data?.error || 'Failed to send reply');
+    } finally {
+      setIsSendingReply(false);
     }
   };
 
   const handleFileSelect = (e) => {
-    const files = Array.from(e.target.files);
-    const maxSize = 5 * 1024 * 1024; // 5MB
-
-    const validFiles = files.filter(file => {
-      if (file.size > maxSize) {
-        notifyError(`File ${file.name} is larger than 5MB`);
-        return false;
-      }
-      return true;
-    });
-
-    setAttachedFiles(prev => [...prev, ...validFiles]);
+    const files = Array.from(e.target.files || []);
+    setAttachedFiles((prev) => appendValidatedSupportFiles(prev, files, notifyError));
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -384,18 +361,8 @@ const HelpCenter = () => {
     e.stopPropagation();
     setDragOver(false);
     
-    const files = Array.from(e.dataTransfer.files);
-    const maxSize = 5 * 1024 * 1024; // 5MB
-
-    const validFiles = files.filter(file => {
-      if (file.size > maxSize) {
-        notifyError(`File ${file.name} is larger than 5MB`);
-        return false;
-      }
-      return true;
-    });
-
-    setAttachedFiles(prev => [...prev, ...validFiles]);
+    const files = Array.from(e.dataTransfer.files || []);
+    setAttachedFiles((prev) => appendValidatedSupportFiles(prev, files, notifyError));
   };
 
   const removeAttachedFile = (index) => {
@@ -443,6 +410,46 @@ const HelpCenter = () => {
     }, 2000);
   };
 
+  const filteredTickets = tickets
+    .filter((ticket) => {
+      const query = ticketSearch.trim().toLowerCase();
+      if (!query) return true;
+
+      return [ticket.subject, ticket.message, String(ticket.id)]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query));
+    })
+    .sort((left, right) => new Date(right.updatedAt || right.createdAt).getTime() - new Date(left.updatedAt || left.createdAt).getTime());
+
+  const conversationMessages = selectedTicket
+    ? [
+        {
+          id: `initial-${selectedTicket.id}`,
+          senderId: user?.id,
+          message: selectedTicket.message,
+          createdAt: selectedTicket.createdAt,
+          attachments: [],
+          senderLabel: 'You',
+        },
+        ...(selectedTicket.replies || []).map((reply) => ({
+          ...reply,
+          senderLabel: reply.senderId === user?.id ? 'You' : 'Support Team',
+        })),
+      ]
+    : [];
+
+  const panelStyleVars = {
+    '--support-panel': 'rgba(255, 255, 255, 0.92)',
+    '--support-panel-strong': '#ffffff',
+    '--support-panel-muted': '#eef4f7',
+    '--support-border': 'rgba(148, 163, 184, 0.22)',
+    '--support-text': '#102132',
+    '--support-text-muted': '#627388',
+    '--support-accent': '#2D8659',
+    '--support-secondary': '#0f766e',
+    '--support-bg': '#f6f9fb',
+  };
+
   const statusColor = (status) => {
     switch (status) {
       case 'OPEN': return '#ff6b6b';
@@ -474,654 +481,271 @@ const HelpCenter = () => {
   }
 
   return (
-    <div className="page" style={{ minHeight: '100vh', paddingBottom: '3rem' }}>
+    <div className="page support-messenger-shell" style={{ minHeight: '100vh', paddingBottom: '3rem', ...panelStyleVars }}>
       <Container>
         <div style={{ paddingTop: '2rem' }}>
-          {/* Header */}
-          <div style={{
-            marginBottom: '2rem',
-            paddingBottom: '1.5rem',
-            borderBottom: '1px solid #e0e0e0'
-          }}>
-            <h1 style={{ 
-              margin: '0 0 0.5rem 0', 
-              fontSize: '2rem', 
-              color: '#333',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}>
-              <i className="fas fa-headset"></i>
-              Help Center
-            </h1>
-            <p style={{ margin: '0', color: '#666' }}>
-              Get support and track your support tickets
-            </p>
-          </div>
+          <section className="support-hero">
+            <div>
+              <h1 className="support-hero-title">Help Center</h1>
+              <p className="support-hero-subtitle">
+                Talk to support in a real conversation layout, track every reply live, and send files through one faster message flow.
+              </p>
+            </div>
+            <div className="support-hero-metrics">
+              <div className="support-metric-chip">
+                <span className="support-metric-label">Tickets</span>
+                <span className="support-metric-value">{tickets.length}</span>
+              </div>
+              <div className="support-metric-chip">
+                <span className="support-metric-label">Open</span>
+                <span className="support-metric-value">{tickets.filter((ticket) => ticket.status === 'OPEN').length}</span>
+              </div>
+              <div className="support-metric-chip">
+                <span className="support-metric-label">Live chat</span>
+                <span className="support-metric-value">On</span>
+              </div>
+            </div>
+          </section>
 
-          {/* Success Message */}
           {successMessage && (
-            <div style={{
-              padding: '1rem',
-              backgroundColor: '#d4edda',
-              color: '#155724',
-              borderRadius: '4px',
-              marginBottom: '1.5rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}>
-              <i className="fas fa-check-circle"></i>
-              {successMessage}
+            <div className="support-alert is-success">
+              <i className="fas fa-circle-check"></i>
+              <span>{successMessage}</span>
             </div>
           )}
 
-          {/* Error Message */}
           {error && (
-            <div style={{
-              padding: '1rem',
-              backgroundColor: '#f8d7da',
-              color: '#721c24',
-              borderRadius: '4px',
-              marginBottom: '1.5rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}>
-              <i className="fas fa-exclamation-circle"></i>
-              {error}
+            <div className="support-alert is-error">
+              <i className="fas fa-circle-exclamation"></i>
+              <span>{error}</span>
             </div>
           )}
 
-          {/* Create Ticket Button */}
-          {!showForm && (
-            <button
-              onClick={() => setShowForm(true)}
-              style={{
-                padding: '0.75rem 1.5rem',
-                backgroundColor: '#2D8659',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '1rem',
-                marginBottom: '2rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}
-            >
-              <i className="fas fa-plus"></i>
-              Create New Ticket
-            </button>
-          )}
-
-          {/* Create Ticket Form */}
-          {showForm && (
-            <div style={{
-              backgroundColor: '#f8f9fa',
-              padding: '1.5rem',
-              borderRadius: '8px',
-              marginBottom: '2rem',
-              border: '1px solid #e0e0e0'
-            }}>
-              <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: '#333' }}>
-                Create a New Support Ticket
-              </h3>
-              <form onSubmit={handleCreateTicket}>
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{
-                    display: 'block',
-                    marginBottom: '0.5rem',
-                    fontWeight: '500',
-                    color: '#333'
-                  }}>
-                    Subject <span style={{ color: 'red' }}>*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="subject"
-                    value={formData.subject}
-                    onChange={handleFormChange}
-                    placeholder="Brief description of your issue"
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #ddd',
-                      borderRadius: '4px',
-                      fontSize: '1rem',
-                      fontFamily: 'inherit'
-                    }}
-                  />
+          {showForm ? (
+            <section className="support-ticket-creator">
+              <h2 className="support-section-title" style={{ marginTop: 0 }}>Start a new conversation</h2>
+              <p className="support-empty-copy" style={{ marginTop: '0.35rem' }}>Give the team enough detail so they can help without extra back-and-forth.</p>
+              <form onSubmit={handleCreateTicket} className="support-form-stack" style={{ marginTop: '1rem' }}>
+                <div className="support-form-grid">
+                  <div>
+                    <label className="support-field-label">Subject</label>
+                    <input className="support-input" type="text" name="subject" value={formData.subject} onChange={handleFormChange} placeholder="Short summary of the issue" />
+                  </div>
+                  <div>
+                    <label className="support-field-label">Priority</label>
+                    <select className="support-select" name="priority" value={formData.priority} onChange={handleFormChange}>
+                      <option value="LOW">Low · General inquiry</option>
+                      <option value="MEDIUM">Medium · Standard issue</option>
+                      <option value="HIGH">High · Urgent issue</option>
+                      <option value="URGENT">Urgent · Critical problem</option>
+                    </select>
+                  </div>
                 </div>
-
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{
-                    display: 'block',
-                    marginBottom: '0.5rem',
-                    fontWeight: '500',
-                    color: '#333'
-                  }}>
-                    Message <span style={{ color: 'red' }}>*</span>
-                  </label>
-                  <textarea
-                    name="message"
-                    value={formData.message}
-                    onChange={handleFormChange}
-                    placeholder="Describe your issue in detail..."
-                    rows={5}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #ddd',
-                      borderRadius: '4px',
-                      fontSize: '1rem',
-                      fontFamily: 'inherit',
-                      resize: 'vertical'
-                    }}
-                  />
+                <div>
+                  <label className="support-field-label">Message</label>
+                  <textarea className="support-textarea" name="message" value={formData.message} onChange={handleFormChange} rows={5} placeholder="Explain what happened, what you expected, and any order numbers or details that matter." />
                 </div>
-
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{
-                    display: 'block',
-                    marginBottom: '0.5rem',
-                    fontWeight: '500',
-                    color: '#333'
-                  }}>
-                    Priority
-                  </label>
-                  <select
-                    name="priority"
-                    value={formData.priority}
-                    onChange={handleFormChange}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #ddd',
-                      borderRadius: '4px',
-                      fontSize: '1rem',
-                      fontFamily: 'inherit'
-                    }}
-                  >
-                    <option value="LOW">Low - General inquiry</option>
-                    <option value="MEDIUM">Medium - Standard issue</option>
-                    <option value="HIGH">High - Urgent issue</option>
-                    <option value="URGENT">Urgent - Critical problem</option>
-                  </select>
-                </div>
-
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button
-                    type="submit"
-                    style={{
-                      padding: '0.75rem 1.5rem',
-                      backgroundColor: '#2D8659',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '1rem'
-                    }}
-                  >
-                    Submit Ticket
-                  </button>
+                <div className="support-form-actions">
+                  <button type="submit" className="support-primary-button"><i className="fas fa-paper-plane"></i> Submit Ticket</button>
                   <button
                     type="button"
+                    className="support-ghost-button"
                     onClick={() => {
                       setShowForm(false);
                       setFormData({ subject: '', message: '', priority: 'MEDIUM' });
-                    }}
-                    style={{
-                      padding: '0.75rem 1.5rem',
-                      backgroundColor: '#e0e0e0',
-                      color: '#333',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '1rem'
                     }}
                   >
                     Cancel
                   </button>
                 </div>
               </form>
+            </section>
+          ) : (
+            <div style={{ marginTop: '1.1rem' }}>
+              <button type="button" className="support-primary-button" onClick={() => setShowForm(true)}>
+                <i className="fas fa-plus"></i> New Ticket
+              </button>
             </div>
           )}
 
-          {/* Two-Column Layout: Tickets List + Chat (Responsive) */}
-          {tickets.length === 0 ? (
-            <div style={{
-              textAlign: 'center',
-              padding: '2rem',
-              backgroundColor: '#f8f9fa',
-              borderRadius: '8px'
-            }}>
-              <i className="fas fa-inbox" style={{ fontSize: '3rem', color: '#ccc', marginBottom: '1rem' }}></i>
-              <p style={{ color: '#666', fontSize: '1.1rem' }}>
-                No support tickets yet. Create one to get started!
-              </p>
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
-              {/* Left: Tickets List */}
-              <div>
-                <h3 style={{ marginTop: 0, marginBottom: '1rem', color: '#333' }}>
-                  Tickets ({tickets.length})
-                </h3>
-                <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
-                  {tickets.map(ticket => (
-                    <div
+          <section className="support-messenger-layout">
+            <aside className="support-sidebar">
+              <div className="support-sidebar-header">
+                <label className="support-field-label">Search your tickets</label>
+                <input
+                  className="support-search-input"
+                  value={ticketSearch}
+                  onChange={(event) => setTicketSearch(event.target.value)}
+                  placeholder="Search by subject, message, or ticket #"
+                />
+              </div>
+              <div className="support-ticket-list">
+                {filteredTickets.length === 0 ? (
+                  <div className="support-empty-card" style={{ margin: '0.75rem' }}>
+                    <p className="support-empty-copy" style={{ margin: 0 }}>No tickets yet. Start one above and the conversation will appear here.</p>
+                  </div>
+                ) : (
+                  filteredTickets.map((ticket) => (
+                    <button
                       key={ticket.id}
-                      onClick={() => setSelectedTicket(ticket)}
-                      style={{
-                        padding: '1rem',
-                        marginBottom: '0.75rem',
-                        border: '1px solid #e0e0e0',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        backgroundColor: selectedTicket?.id === ticket.id ? '#f0f8ff' : 'white',
-                        transition: 'all 0.2s',
-                        borderLeft: `4px solid ${statusColor(ticket.status)}`
+                      type="button"
+                      className={`support-ticket-card${selectedTicket?.id === ticket.id ? ' is-active' : ''}`}
+                      style={{ '--ticket-accent': statusColor(ticket.status) }}
+                      onClick={() => {
+                        setSelectedTicket(ticket);
+                        setReplyMessage('');
+                        setAttachedFiles([]);
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '0.5rem' }}>
-                        <h4 style={{ margin: 0, color: '#333', fontSize: '1rem' }}>
-                          #{ticket.id}
-                        </h4>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{
-                            fontSize: '0.75rem',
-                            padding: '0.25rem 0.75rem',
-                            backgroundColor: statusColor(ticket.status),
-                            color: 'white',
-                            borderRadius: '12px'
-                          }}>
-                            {ticket.status}
-                          </span>
+                      <div className="support-ticket-card-content">
+                        <div className="support-ticket-top">
+                          <div>
+                            <p className="support-ticket-title">#{ticket.id} · {ticket.subject}</p>
+                            <div className="support-badge-row" style={{ marginTop: '0.45rem' }}>
+                              <span className="support-badge" style={{ backgroundColor: statusColor(ticket.status), color: '#fff' }}>{ticket.status.replace('_', ' ')}</span>
+                              <span className="support-badge" style={{ backgroundColor: priorityBadge(ticket.priority), color: '#fff' }}>{ticket.priority}</span>
+                            </div>
+                          </div>
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
+                            className="support-icon-button"
+                            onClick={(event) => {
+                              event.stopPropagation();
                               handleDeleteTicket(ticket.id);
-                            }}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              color: '#ff6b6b',
-                              cursor: 'pointer',
-                              fontSize: '1rem',
-                              padding: '0.25rem',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
                             }}
                             title="Delete ticket"
                           >
-                            <i className="fas fa-trash"></i>
+                            <i className="fas fa-trash" style={{ color: '#dc4c64' }}></i>
                           </button>
                         </div>
-                      </div>
-
-                      <p style={{ margin: '0.25rem 0', color: '#333', fontWeight: '500', fontSize: '0.9rem' }}>
-                        {ticket.subject.substring(0, 30)}...
-                      </p>
-
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#999' }}>
-                        <span>{new Date(ticket.createdAt).toLocaleDateString()}</span>
-                        <span><i className="fas fa-comments"></i> {ticket.replies.length}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Right: Chat View */}
-              {selectedTicket ? (
-                <div style={{
-                  padding: '1.5rem',
-                  backgroundColor: '#f8f9fa',
-                  borderRadius: '8px',
-                  border: '1px solid #e0e0e0',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  height: '600px',
-                  maxHeight: '600px'
-                }}>
-                  {/* Ticket Header */}
-                  <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid #e0e0e0' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '0.5rem' }}>
-                      <h3 style={{ margin: 0, color: '#333' }}>
-                        {selectedTicket.subject}
-                      </h3>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteTicket(selectedTicket.id)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#ff6b6b',
-                          cursor: 'pointer',
-                          fontSize: '1.2rem',
-                          padding: '0.25rem',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                        title="Delete ticket"
-                      >
-                        <i className="fas fa-trash"></i>
-                      </button>
-                    </div>
-                    <p style={{ margin: '0', color: '#666', fontSize: '0.9rem' }}>
-                      Ticket #{selectedTicket.id} • {selectedTicket.status}
-                    </p>
-                  </div>
-
-                  {/* Messages Area */}
-                  <div style={{
-                    flex: 1,
-                    overflowY: 'auto',
-                    marginBottom: '1rem',
-                    padding: '1rem',
-                    backgroundColor: 'white',
-                    borderRadius: '4px',
-                    border: '1px solid #e0e0e0'
-                  }}>
-                    {/* Initial Message */}
-                    <div style={{
-                      marginBottom: '1rem',
-                      padding: '1rem',
-                      backgroundColor: '#f0f8ff',
-                      borderRadius: '4px',
-                      borderLeft: '3px solid #2D8659'
-                    }}>
-                      <div style={{ fontSize: '0.85rem', color: '#999', marginBottom: '0.5rem' }}>
-                        You • {new Date(selectedTicket.createdAt).toLocaleString()}
-                      </div>
-                      <p style={{ margin: 0, color: '#333', whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>
-                        {selectedTicket.message}
-                      </p>
-                    </div>
-
-                    {/* Replies */}
-                    {selectedTicket.replies.map(reply => {
-                      const isUserMessage = reply.senderId === user.id;
-                      return (
-                      <div
-                        key={reply.id}
-                        style={{
-                          marginBottom: '1rem',
-                          padding: '0.75rem',
-                          backgroundColor: isUserMessage ? '#f0f8ff' : '#fff',
-                          borderRadius: '4px',
-                          border: '1px solid #e0e0e0',
-                          borderLeft: `3px solid ${isUserMessage ? '#2D8659' : '#ff6b6b'}`
-                        }}
-                      >
-                        <div style={{ fontSize: '0.85rem', color: '#999', marginBottom: '0.5rem' }}>
-                          {isUserMessage ? 'You' : 'Admin'} • {new Date(reply.createdAt).toLocaleString()}
-                        </div>
-                        <p style={{ margin: '0.25rem 0', color: '#333', whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>
-                          {reply.message}
+                        <p className="support-ticket-preview" style={{ margin: '0.7rem 0 0.8rem' }}>
+                          {(ticket.message || '').slice(0, 90)}{ticket.message?.length > 90 ? '…' : ''}
                         </p>
-                        {/* Display Attachments */}
-                        {reply.attachments && reply.attachments.length > 0 && (
-                          <div style={{ marginTop: '0.75rem' }}>
-                            <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.5rem' }}>
-                              <i className="fas fa-paperclip"></i> Attachments:
-                            </div>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                              {reply.attachments.map((attachment, idx) => {
-                                // Extract filename for download endpoint
-                                const filename = attachment.fileUrl?.split('/').pop() || attachment.fileName;
-                                const backendBaseUrl = api.defaults.baseURL?.replace('/api', '') || 'http://localhost:5000';
-                                const downloadUrl = `${backendBaseUrl}/api/support/download-attachment/${filename}`;
-                                
-                                return (
-                                <a
-                                  key={idx}
-                                  href={downloadUrl}
-                                  download={attachment.fileName}
-                                  style={{
-                                    padding: '0.5rem 0.75rem',
-                                    backgroundColor: '#f0f8ff',
-                                    color: '#2D8659',
-                                    textDecoration: 'none',
-                                    borderRadius: '4px',
-                                    fontSize: '0.85rem',
-                                    border: '1px solid #2D8659',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s ease'
-                                  }}
-                                  onMouseOver={(e) => {
-                                    e.target.style.backgroundColor = '#2D8659';
-                                    e.target.style.color = '#fff';
-                                  }}
-                                  onMouseOut={(e) => {
-                                    e.target.style.backgroundColor = '#f0f8ff';
-                                    e.target.style.color = '#2D8659';
-                                  }}
-                                  title={`${attachment.fileName} (${(attachment.fileSize / 1024).toFixed(2)} KB)`}
-                                >
-                                  <i className="fas fa-download"></i> {attachment.fileName}
-                                </a>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
+                        <div className="support-ticket-bottom">
+                          <span className="support-inline-copy"><i className="fas fa-comments"></i> {(ticket.replies || []).length} replies</span>
+                          <span className="support-inline-copy">{formatSupportTime(ticket.updatedAt || ticket.createdAt)}</span>
+                        </div>
                       </div>
-                    );
-                    })}
+                    </button>
+                  ))
+                )}
+              </div>
+            </aside>
 
-                    {/* Typing Indicator */}
-                    {typingUser && (
-                      <div style={{
-                        marginBottom: '1rem',
-                        padding: '0.75rem',
-                        backgroundColor: '#f8f9fa',
-                        borderRadius: '4px',
-                        fontStyle: 'italic',
-                        color: '#999',
-                        fontSize: '0.9rem'
-                      }}>
-                        <i className="fas fa-ellipsis-h"></i> Admin is typing...
-                      </div>
-                    )}
+            {selectedTicket ? (
+              <section className="support-conversation-panel">
+                <div className="support-conversation-header">
+                  <div>
+                    <h2 className="support-conversation-title">{selectedTicket.subject}</h2>
+                    <div className="support-conversation-meta">
+                      <span className="support-chip"><i className="fas fa-hashtag"></i> {selectedTicket.id}</span>
+                      <span className="support-chip"><i className="fas fa-signal"></i> {selectedTicket.status.replace('_', ' ')}</span>
+                      <span className="support-chip"><i className="fas fa-bolt"></i> {selectedTicket.priority}</span>
+                    </div>
                   </div>
+                  <button type="button" className="support-danger-button" onClick={() => handleDeleteTicket(selectedTicket.id)}>
+                    <i className="fas fa-trash"></i> Delete
+                  </button>
+                </div>
 
-                  {/* Reply Input with File Attachment */}
-                  {selectedTicket.status !== 'CLOSED' ? (
-                    <form onSubmit={handleSendReply}>
-                      {/* Attached Files Preview */}
-                      {attachedFiles.length > 0 && (
-                        <div style={{
-                          marginBottom: '0.75rem',
-                          padding: '0.75rem',
-                          backgroundColor: '#f0f8ff',
-                          borderRadius: '4px',
-                          border: '1px solid #2D8659'
-                        }}>
-                          <h5 style={{ margin: '0 0 0.5rem 0', color: '#333', fontSize: '0.9rem' }}>
-                            <i className="fas fa-paperclip"></i> Selected Files ({attachedFiles.length})
-                          </h5>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                            {attachedFiles.map((file, idx) => {
-                              const getFileIcon = (filename) => {
-                                const ext = filename.split('.').pop().toLowerCase();
-                                if (['jpg', 'jpeg', 'png', 'gif'].includes(ext)) return 'fa-image';
-                                if (ext === 'pdf') return 'fa-file-pdf';
-                                if (['doc', 'docx'].includes(ext)) return 'fa-file-word';
-                                if (['xls', 'xlsx'].includes(ext)) return 'fa-file-excel';
-                                if (ext === 'txt') return 'fa-file-text';
-                                return 'fa-file';
-                              };
-                              return (
-                              <div
-                                key={idx}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '0.5rem',
-                                  padding: '0.5rem 0.75rem',
-                                  backgroundColor: 'white',
-                                  borderRadius: '4px',
-                                  fontSize: '0.85rem',
-                                  color: '#333'
-                                }}
-                              >
-                                <i className={`fas ${getFileIcon(file.name)}`} style={{ color: '#2D8659' }}></i>
-                                <span title={file.name}>
-                                  {file.name.substring(0, 20)}
-                                  {file.name.length > 20 ? '...' : ''}
-                                  <span style={{ fontSize: '0.75rem', color: '#999', marginLeft: '0.25rem' }}>
-                                    ({(file.size / 1024).toFixed(1)}KB)
-                                  </span>
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => removeAttachedFile(idx)}
-                                  style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: '#ff6b6b',
-                                    cursor: 'pointer',
-                                    fontSize: '0.9rem'
-                                  }}
-                                >
-                                  ✕
-                                </button>
+                <div className="support-conversation-body">
+                  <div className="support-message-stack">
+                    {conversationMessages.map((message) => {
+                      const isSelf = message.senderId === user?.id;
+                      return (
+                        <div key={message.id} className={`support-message-row ${isSelf ? 'is-self' : 'is-other'}`}>
+                          <div className="support-message-bubble">
+                            <div className="support-badge-row" style={{ justifyContent: 'space-between' }}>
+                              <span className="support-message-author">{isSelf ? 'You' : (message.senderLabel || 'Support Team')}</span>
+                              <span className="support-message-time">{formatSupportTime(message.createdAt)}</span>
+                            </div>
+                            <p className="support-message-text">{message.message}</p>
+                            {message.attachments?.length > 0 && (
+                              <div className="support-attachments">
+                                {message.attachments.map((attachment, index) => (
+                                  <a
+                                    key={`${message.id}-attachment-${index}`}
+                                    className="support-attachment-link"
+                                    href={buildSupportAttachmentDownloadUrl(api, attachment)}
+                                    download={attachment.fileName}
+                                    title={`${attachment.fileName} (${(attachment.fileSize / 1024).toFixed(1)} KB)`}
+                                  >
+                                    <i className={`fas ${getSupportAttachmentIcon(attachment.fileName, attachment.mimeType)}`}></i>
+                                    <span className="support-attachment-name">
+                                      <strong>{attachment.fileName}</strong>
+                                      <span>{(attachment.fileSize / 1024).toFixed(1)} KB</span>
+                                    </span>
+                                  </a>
+                                ))}
                               </div>
-                              );
-                            })}
+                            )}
                           </div>
+                        </div>
+                      );
+                    })}
+                    {typingUser && <div className="support-typing"><i className="fas fa-ellipsis"></i> Support is typing…</div>}
+                    <div ref={messagesEndRef}></div>
+                  </div>
+                </div>
+
+                <div className="support-composer">
+                  {selectedTicket.status === 'CLOSED' ? (
+                    <div className="support-alert is-success" style={{ marginTop: 0 }}>
+                      <i className="fas fa-lock"></i>
+                      <span>This ticket is closed. Create a new ticket if you need more help.</span>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleSendReply} className="support-compose-surface" onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+                      {attachedFiles.length > 0 && (
+                        <div className="support-attachments" style={{ marginBottom: '0.8rem' }}>
+                          {attachedFiles.map((file, index) => (
+                            <div key={`${file.name}-${file.size}-${index}`} className="support-attachment-chip">
+                              <i className={`fas ${getSupportAttachmentIcon(file.name, file.type)}`}></i>
+                              <span className="support-attachment-name">
+                                <strong>{file.name}</strong>
+                                <span>{(file.size / 1024).toFixed(1)} KB</span>
+                              </span>
+                              <button type="button" className="support-icon-button" onClick={() => removeAttachedFile(index)}>
+                                <i className="fas fa-xmark"></i>
+                              </button>
+                            </div>
+                          ))}
                         </div>
                       )}
-
-                      {/* Drag-and-Drop Area + Message Input */}
-                      <div
-                        onDragOver={handleDragOver}
-                        onDragLeave={handleDragLeave}
-                        onDrop={handleDrop}
-                        style={{
-                          padding: '1rem',
-                          backgroundColor: dragOver ? '#e8f5e9' : 'white',
-                          border: dragOver ? '2px dashed #2D8659' : '1px solid #ddd',
-                          borderRadius: '4px',
-                          transition: 'all 0.2s',
-                          marginBottom: '0.75rem'
-                        }}
-                      >
-                        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', flexDirection: window.innerWidth < 640 ? 'column' : 'row', alignItems: window.innerWidth < 640 ? 'stretch' : 'stretch' }}>
-                          <input
-                            type="text"
-                            value={replyMessage}
-                            onChange={handleTyping}
-                            placeholder={dragOver ? 'Drop files here or type your message...' : 'Type your message... (or drag files here)'}
-                            style={{
-                              flex: 1,
-                              minWidth: '0',
-                              padding: '0.75rem',
-                              border: '1px solid #ddd',
-                              borderRadius: '4px',
-                              fontSize: '0.9rem',
-                              fontFamily: 'inherit'
-                            }}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            title="Attach file"
-                            style={{
-                              padding: '0.75rem',
-                              backgroundColor: '#4ecdc4',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              fontSize: '1rem',
-                              transition: 'all 0.2s'
-                            }}
-                            onMouseOver={(e) => e.target.style.backgroundColor = '#3db8ae'}
-                            onMouseOut={(e) => e.target.style.backgroundColor = '#4ecdc4'}
-                          >
-                            <i className="fas fa-paperclip"></i>
-                          </button>
-                          <button
-                            type="submit"
-                            style={{
-                              padding: '0.75rem 1.5rem',
-                              backgroundColor: '#2D8659',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              fontSize: '0.9rem',
-                              whiteSpace: 'nowrap',
-                              transition: 'all 0.2s'
-                            }}
-                            onMouseOver={(e) => e.target.style.backgroundColor = '#1f5f3f'}
-                            onMouseOut={(e) => e.target.style.backgroundColor = '#2D8659'}
-                          >
-                            Send
-                          </button>
-                        </div>
-                        {dragOver && (
-                          <div style={{
-                            textAlign: 'center',
-                            padding: '0.5rem',
-                            color: '#2D8659',
-                            fontSize: '0.9rem',
-                            fontStyle: 'italic'
-                          }}>
-                            <i className="fas fa-cloud-upload-alt" style={{ marginRight: '0.5rem' }}></i>
-                            Drop files here to add them
-                          </div>
-                        )}
-                      </div>
-
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        multiple
-                        onChange={handleFileSelect}
-                        style={{ display: 'none' }}
-                        accept="*/*"
+                      <textarea
+                        className="support-textarea"
+                        value={replyMessage}
+                        onChange={handleTyping}
+                        placeholder={dragOver ? 'Drop files here, then finish your message…' : 'Type your message…'}
+                        rows={3}
+                        disabled={isSendingReply}
                       />
+                      <div className="support-composer-toolbar" style={{ justifyContent: 'space-between', marginTop: '0.75rem' }}>
+                        <div className="support-chip-row">
+                          <button type="button" className="support-secondary-button" onClick={() => fileInputRef.current?.click()} disabled={isSendingReply}>
+                            <i className="fas fa-paperclip"></i> Add Files
+                          </button>
+                          <span className="support-inline-copy">Drag files into the composer or browse. Max 5MB each.</span>
+                        </div>
+                        <button type="submit" className="support-primary-button" disabled={isSendingReply}>
+                          <i className={`fas ${isSendingReply ? 'fa-spinner fa-spin' : 'fa-paper-plane'}`}></i> {isSendingReply ? 'Sending…' : 'Send'}
+                        </button>
+                      </div>
+                      <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} style={{ display: 'none' }} accept={SUPPORT_ATTACHMENT_ACCEPT} />
                     </form>
-                  ) : (
-                    <div style={{
-                      padding: '0.75rem',
-                      backgroundColor: '#d4edda',
-                      borderRadius: '4px',
-                      color: '#155724',
-                      textAlign: 'center',
-                      fontSize: '0.9rem'
-                    }}>
-                      This ticket is closed. You cannot add replies.
-                    </div>
                   )}
                 </div>
-              ) : (
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: '400px',
-                  backgroundColor: '#f8f9fa',
-                  borderRadius: '8px',
-                  color: '#999',
-                  textAlign: 'center'
-                }}>
-                  <div>
-                    <i className="fas fa-arrow-left" style={{ fontSize: '2rem', marginBottom: '0.5rem' }}></i>
-                    <p style={{ margin: 0 }}>Select a ticket from the list</p>
-                  </div>
+              </section>
+            ) : (
+              <section className="support-empty-state">
+                <div className="support-empty-card">
+                  <i className="fas fa-headset" style={{ fontSize: '2rem', color: '#2D8659' }}></i>
+                  <h3 className="support-section-title" style={{ marginTop: '1rem' }}>Choose a conversation</h3>
+                  <p className="support-empty-copy">Select a ticket to see the full message thread in the new chat view.</p>
                 </div>
-              )}
-            </div>
-          )}
+              </section>
+            )}
+          </section>
         </div>
       </Container>
       <Modal

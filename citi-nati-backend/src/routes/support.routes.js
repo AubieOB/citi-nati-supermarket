@@ -50,6 +50,30 @@ const upload = multer({
   }
 });
 
+const handleUploadMiddleware = (middleware) => (req, res, next) => {
+  middleware(req, res, (error) => {
+    if (!error) {
+      next();
+      return;
+    }
+
+    if (error instanceof multer.MulterError) {
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        res.status(400).json({ error: 'Each attachment must be 5MB or less' });
+        return;
+      }
+
+      res.status(400).json({ error: error.message || 'Failed to process attachments' });
+      return;
+    }
+
+    res.status(400).json({ error: error.message || 'Unsupported attachment type' });
+  });
+};
+
+const replyAttachmentUpload = handleUploadMiddleware(upload.array('attachments', 5));
+const singleAttachmentUpload = handleUploadMiddleware(upload.single('file'));
+
 const router = express.Router();
 
 // Apply authentication to all routes
@@ -69,7 +93,7 @@ router.get('/my-tickets', getMyTickets);
 router.get('/tickets/:id', getTicketById);
 
 // Reply to a ticket
-router.post('/tickets/:id/reply', replyToTicket);
+router.post('/tickets/:id/reply', replyAttachmentUpload, replyToTicket);
 
 // Delete a ticket
 router.delete('/tickets/:id', deleteTicket);
@@ -79,7 +103,7 @@ router.delete('/tickets/:id', deleteTicket);
  */
 
 // Upload ticket attachment
-router.post('/upload-attachment', upload.single('file'), uploadTicketAttachment);
+router.post('/upload-attachment', singleAttachmentUpload, uploadTicketAttachment);
 
 // Download ticket attachment with proper headers
 router.get('/download-attachment/:filename', downloadTicketAttachment);

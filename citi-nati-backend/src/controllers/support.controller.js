@@ -3,6 +3,40 @@ const { notifySupportTicketCreated } = require('../utils/messageService.js');
 
 const prisma = new PrismaClient();
 
+const normalizeReplyAttachments = (files, attachments) => {
+  const uploadedFiles = Array.isArray(files)
+    ? files.map((file) => ({
+        fileName: file.originalname,
+        fileUrl: `/uploads/tickets/${file.filename}`,
+        fileSize: file.size,
+        mimeType: file.mimetype || 'application/octet-stream',
+      }))
+    : [];
+
+  let normalizedAttachments = [];
+  if (Array.isArray(attachments)) {
+    normalizedAttachments = attachments;
+  } else if (typeof attachments === 'string') {
+    try {
+      const parsed = JSON.parse(attachments);
+      if (Array.isArray(parsed)) {
+        normalizedAttachments = parsed;
+      }
+    } catch (error) {
+      normalizedAttachments = [];
+    }
+  }
+
+  return [...uploadedFiles, ...normalizedAttachments]
+    .filter((attachment) => attachment?.fileName && attachment?.fileUrl)
+    .map((attachment) => ({
+      fileName: attachment.fileName,
+      fileUrl: attachment.fileUrl,
+      fileSize: Number(attachment.fileSize) || 0,
+      mimeType: attachment.mimeType || 'application/octet-stream',
+    }));
+};
+
 /**
  * Create a new support ticket
  * POST /support/tickets
@@ -219,6 +253,7 @@ const getAllTickets = async (req, res) => {
 const replyToTicket = async (req, res) => {
   try {
     const { message, attachments } = req.body;
+    const replyAttachments = normalizeReplyAttachments(req.files, attachments);
     const ticketId = parseInt(req.params.id);
     const senderId = req.user.userId;
 
@@ -253,9 +288,8 @@ const replyToTicket = async (req, res) => {
         message,
         ticketId,
         senderId,
-        // Connect existing attachments or create new ones
-        attachments: attachments && attachments.length > 0 ? {
-          create: attachments.map(att => ({
+        attachments: replyAttachments.length > 0 ? {
+          create: replyAttachments.map((att) => ({
             fileName: att.fileName,
             fileUrl: att.fileUrl,
             fileSize: att.fileSize,
@@ -273,6 +307,11 @@ const replyToTicket = async (req, res) => {
       where: { id: ticketId },
       data: { updatedAt: new Date() }
     });
+
+    if (global.io) {
+      global.io.to(`ticket_${ticketId}`).emit('ticketMessage', reply);
+      console.log(`[Socket.io] Ticket ${ticketId} reply broadcast`);
+    }
 
     res.status(201).json({
       success: true,
