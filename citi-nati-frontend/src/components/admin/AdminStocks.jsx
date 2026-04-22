@@ -63,6 +63,9 @@ const AdminStocks = ({
   const searchTimeoutRef = useRef(null);
   const filterBarRef = useRef(null);
   const fetchRequestIdRef = useRef(0);
+  // Tracks the last products array successfully rendered so background pagination
+  // does not blank or shrink the list while fresh pages are still loading.
+  const displayedProductsRef = useRef([]);
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
   const canManageStocks = hasPermission(loggedInUser, PERMISSION_KEYS.ADMIN_STOCKS_MANAGE);
 
@@ -72,45 +75,49 @@ const AdminStocks = ({
     setFilterCategory('all');
     setStockStatusFilter('all');
     setCurrentPage(1);
+    // Reset stale-while-revalidate guard so the new location’s data always renders immediately.
+    displayedProductsRef.current = [];
     const cleanup = setupSocketListeners();
     return cleanup;
   }, [selectedLocationCode]);
 
   // Sync product list from shared cache whenever it changes — never touches search/filter state.
+  // Stale-while-revalidate: during background pagination the currently displayed list stays
+  // frozen on screen; we only swap in fresh data once the full refresh is complete.
   useEffect(() => {
     if (Array.isArray(cachedProducts) && cachedProducts.length > 0) {
       const scopedCachedProducts = filterProductsForOperationalLocation(cachedProducts, selectedLocationCode);
       const nextProducts = scopedCachedProducts.map((product) => enrichProductStock(product));
       const nextCategories = [...new Set(nextProducts.map((product) => product.category).filter(Boolean))];
+
+      // Background pagination in progress AND we already have data on screen:
+      // keep the existing display stable; do not replace with a partial page.
+      if (cachedProductsMeta?.isBackgroundLoading && displayedProductsRef.current.length > 0) {
+        setLoading(false);
+        return;
+      }
+
+      // Either initial load (no displayed data yet) or background load just finished—swap in.
+      displayedProductsRef.current = nextProducts;
       setAllProducts(nextProducts);
       setCategories(nextCategories);
       setLoading(Boolean(cachedProductsMeta?.isLoading));
     } else if (cachedProductsMeta?.lastLoadedAt) {
+      displayedProductsRef.current = [];
       setAllProducts([]);
       setCategories([]);
       setLoading(false);
-    } else if (cachedProductsMeta?.isLoading || cachedProductsMeta?.isBackgroundLoading) {
-      setAllProducts([]);
-      setCategories([]);
+    } else if (cachedProductsMeta?.isLoading) {
+      // Initial fetch in progress — show loading spinner (no data yet).
       setLoading(true);
+    } else if (cachedProductsMeta?.isBackgroundLoading) {
+      // Background loading with no cache yet — unusual; silently wait, no loading overlay.
     } else {
       setAllProducts([]);
       setCategories([]);
       fetchProducts();
     }
   }, [selectedLocationCode, cachedProducts, cachedProductsMeta]);
-
-  useEffect(() => {
-    if (!Array.isArray(cachedProducts)) return;
-    const scopedCachedProducts = filterProductsForOperationalLocation(cachedProducts, selectedLocationCode);
-    const nextProducts = scopedCachedProducts.map((product) => enrichProductStock(product));
-    const nextCategories = [...new Set(nextProducts.map((product) => product.category).filter(Boolean))];
-    setAllProducts(nextProducts);
-    setCategories(nextCategories);
-    if (cachedProductsMeta?.isLoading || cachedProductsMeta?.isBackgroundLoading) {
-      setLoading(cachedProducts.length === 0);
-    }
-  }, [cachedProducts, cachedProductsMeta]);
 
   /**
    * Real-time stock updates via Socket.io

@@ -86,6 +86,9 @@ const AdminProducts = ({
   const posExpiryFetchedAtRef = useRef(0);
   const posExpiryInFlightRef = useRef(false);
   const filterBarRef = useRef(null);
+  // Tracks the last products array successfully rendered so background pagination
+  // does not blank or shrink the list while fresh pages are still loading.
+  const displayedProductsRef = useRef([]);
   const { modal, closeModal, showConfirm, showError, showSuccess } = useModal();
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
   const textPrimary = isAdminDarkTheme ? '#f8fafc' : '#111827';
@@ -444,13 +447,28 @@ const AdminProducts = ({
     setOnSaleOnly(false);
     setCurrentPage(1);
     setExpandedBatchRows({});
+    // Reset stale-while-revalidate guard so the new location’s data always renders immediately.
+    displayedProductsRef.current = [];
   }, [selectedLocationCode]);
 
   // Sync product list from shared cache whenever it changes — never touches search/filter state.
+  // Stale-while-revalidate: during background pagination the currently displayed list stays
+  // frozen on screen; we only swap in fresh data once the full refresh is complete.
   useEffect(() => {
     if (Array.isArray(cachedProducts) && cachedProducts.length > 0) {
       const scopedCachedProducts = filterProductsForOperationalLocation(cachedProducts, selectedLocationCode);
       const sortedCached = [...scopedCachedProducts].sort((a, b) => getExpirySeverity(a) - getExpirySeverity(b));
+
+      // Background pagination in progress AND we already have data on screen:
+      // keep the existing display stable; do not replace with a partial page.
+      if (cachedProductsMeta?.isBackgroundLoading && displayedProductsRef.current.length > 0) {
+        setLoading(false);
+        setError(cachedProductsMeta?.error || null);
+        return;
+      }
+
+      // Either initial load (no displayed data yet) or background load just finished—swap in.
+      displayedProductsRef.current = sortedCached;
       setProducts(sortedCached);
       setLoading(Boolean(cachedProductsMeta?.isLoading));
       setError(cachedProductsMeta?.error || null);
@@ -458,16 +476,22 @@ const AdminProducts = ({
     }
 
     if (cachedProductsMeta?.lastLoadedAt) {
+      displayedProductsRef.current = [];
       setProducts([]);
       setLoading(false);
       setError(cachedProductsMeta?.error || null);
       return;
     }
 
-    if (cachedProductsMeta?.isLoading || cachedProductsMeta?.isBackgroundLoading) {
-      setProducts([]);
+    // Initial fetch in progress — show loading spinner (no data yet).
+    if (cachedProductsMeta?.isLoading) {
       setLoading(true);
       setError(null);
+      return;
+    }
+
+    // Background loading with no cache yet — unusual; silently wait, no loading overlay.
+    if (cachedProductsMeta?.isBackgroundLoading) {
       return;
     }
 
