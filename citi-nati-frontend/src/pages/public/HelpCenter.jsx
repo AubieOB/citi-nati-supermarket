@@ -746,7 +746,7 @@ const HelpCenter = () => {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 style={{
-                                  color: 'var(--support-accent, #2D8659)',
+                                  color: isSelf ? '#ecfff5' : 'var(--support-accent, #2D8659)',
                                   textDecoration: 'underline',
                                   wordBreak: 'break-all',
                                 }}

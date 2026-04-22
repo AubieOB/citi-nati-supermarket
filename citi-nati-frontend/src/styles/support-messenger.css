@@ -487,6 +487,22 @@
   word-break: break-word;
   line-height: 1.6;
 }
+.support-message-text a {
+  text-decoration: underline;
+  word-break: break-all;
+}
+.support-message-row.is-self .support-message-text a {
+  color: #ecfff5;
+}
+.admin-theme-dark .support-message-row.is-self .support-message-text a {
+  color: #f4fff9;
+}
+.support-message-row.is-other .support-message-text a {
+  color: var(--support-accent, #2D8659);
+}
+.admin-theme-dark .support-message-row.is-other .support-message-text a {
+  color: #58d7a1;
+}
 
 .support-attachments {
   margin-top: 0.8rem;
