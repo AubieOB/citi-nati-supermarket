@@ -16,6 +16,7 @@ const MESSAGE_TYPES = [
   { value: 'payment_failed', label: 'Payment Failed', icon: 'fa-times-circle', color: '#F44336' },
   { value: 'driver_assigned', label: 'Driver Assigned', icon: 'fa-car', color: '#9C27B0' },
   { value: 'refund_required', label: 'Refund Required', icon: 'fa-exclamation-triangle', color: '#FF5722' },
+  { value: 'support_ticket', label: 'Support Ticket', icon: 'fa-life-ring', color: '#0EA5E9' },
   { value: 'system', label: 'System Alert', icon: 'fa-bell', color: '#607D8B' },
 ];
 
@@ -32,7 +33,7 @@ const MESSAGE_TYPES = [
  * - Notification sounds for critical alerts (refunds)
  */
 
-const AdminInbox = () => {
+const AdminInbox = ({ onOpenSupportTicket }) => {
   const INBOX_PERFORMANCE_WARNING_THRESHOLD = 500;
   const INBOX_FETCH_LIMIT = 300;
   const isMobileViewport = useMobileViewport();
@@ -66,6 +67,15 @@ const AdminInbox = () => {
     const entityType = String(message?.entityType || '').toLowerCase();
 
     return entityType === 'product' && (errorCode === 'low_stock' || errorCode === 'out_of_stock');
+  };
+
+  const isSupportTicketMessage = (message) => {
+    return String(message?.entityType || '').toLowerCase() === 'support_ticket' && Boolean(message?.entityId);
+  };
+
+  const handleOpenSupportTicket = (message) => {
+    if (!isSupportTicketMessage(message) || !onOpenSupportTicket) return;
+    onOpenSupportTicket(message.entityId);
   };
 
   // Fetch messages on mount
@@ -963,6 +973,38 @@ const AdminInbox = () => {
                     flexShrink: 0,
                     marginLeft: '1rem',
                   }}>
+                    {isSupportTicketMessage(message) && (
+                      <button
+                        onClick={() => handleOpenSupportTicket(message)}
+                        title="View support ticket"
+                        style={{
+                          minWidth: '7.5rem',
+                          height: '2.5rem',
+                          padding: '0 0.85rem',
+                          borderRadius: '4px',
+                          border: 'none',
+                          backgroundColor: '#eff6ff',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.45rem',
+                          transition: 'all 0.2s',
+                          color: '#1d4ed8',
+                          fontWeight: 700,
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.backgroundColor = '#dbeafe';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.backgroundColor = '#eff6ff';
+                        }}
+                      >
+                        <i className="fas fa-life-ring"></i>
+                        <span>View Ticket</span>
+                      </button>
+                    )}
+
                     {!message.read ? (
                       <button
                         onClick={() => handleMarkAsRead(message.id)}

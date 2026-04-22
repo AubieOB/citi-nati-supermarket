@@ -304,6 +304,7 @@ const AdminDashboard = () => {
       ? 'business-operations'
       : 'inbox';
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [supportTicketOpenRequest, setSupportTicketOpenRequest] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showPanelFilters, setShowPanelFilters] = useState(false);
   const [sidebarScope, setSidebarScope] = useState('all');
@@ -830,6 +831,29 @@ const AdminDashboard = () => {
     } else if (tabId === 'business-operations') {
       navigate('/admin/business-operations');
     } else if (location.pathname !== '/admin') {
+      navigate('/admin');
+    }
+  }, [isMobileViewport, location.pathname, navigate, user]);
+
+  const handleOpenSupportTicket = useCallback((ticketId) => {
+    const selectedTab = SIDEBAR_TABS.find((tab) => tab.id === 'support');
+    if (!selectedTab || !hasPermission(user, selectedTab.permission)) {
+      toast.error('You do not have access to that section');
+      return;
+    }
+
+    if (isMobileViewport && !MOBILE_SAFE_TAB_IDS.has('support')) {
+      toast.error('This section is desktop-only on mobile.');
+      return;
+    }
+
+    setSupportTicketOpenRequest({
+      ticketId: String(ticketId),
+      requestedAt: Date.now(),
+    });
+    setActiveTab('support');
+
+    if (location.pathname !== '/admin') {
       navigate('/admin');
     }
   }, [isMobileViewport, location.pathname, navigate, user]);
@@ -1437,7 +1461,13 @@ const AdminDashboard = () => {
               </div>
             ) : (
               <>
-                {activeTab === 'inbox' && <AdminInbox selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
+                {activeTab === 'inbox' && (
+                  <AdminInbox
+                    selectedLocationCode={selectedOperationalPosLocationCode}
+                    selectedBranchCode={selectedOperationalBranchCode}
+                    onOpenSupportTicket={handleOpenSupportTicket}
+                  />
+                )}
                 {activeTab === 'quotations' && <AdminQuotations selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
                 {activeTab === 'products' && (
                   <AdminProducts
@@ -1486,7 +1516,7 @@ const AdminDashboard = () => {
                 {activeTab === 'business-operations' && <AdminBusinessOperations />}
                 {activeTab === 'delivery-coverage' && <AdminDeliveryCoverage />}
                 {activeTab === 'refunds' && <AdminRefunds />}
-                {activeTab === 'support' && <SupportDashboard />}
+                {activeTab === 'support' && <SupportDashboard openTicketRequest={supportTicketOpenRequest} />}
                 {activeTab === 'drivers' && <AdminDrivers />}
                 {activeTab === 'cashiers' && <AdminCashiers selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
               </>

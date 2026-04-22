@@ -21,7 +21,7 @@ import '@fortawesome/fontawesome-free/css/all.min.css';
  * 5. Live typing indicators for customer messages
  */
 
-const SupportDashboard = () => {
+const SupportDashboard = ({ openTicketRequest }) => {
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useAuth();
   const socket = useRef(getSocket());
@@ -212,6 +212,22 @@ const SupportDashboard = () => {
       };
     }
   }, [selectedTicket]);
+
+  useEffect(() => {
+    const ticketId = String(openTicketRequest?.ticketId || '');
+    if (!ticketId || tickets.length === 0) return;
+
+    const matchingTicket = tickets.find((ticket) => String(ticket.id) === ticketId);
+    if (!matchingTicket) return;
+
+    setSelectedTicket((prev) => {
+      if (String(prev?.id || '') === ticketId) {
+        return prev;
+      }
+
+      return matchingTicket;
+    });
+  }, [openTicketRequest, tickets]);
 
   const fetchTickets = async () => {
     try {
