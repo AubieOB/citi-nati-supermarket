@@ -569,8 +569,9 @@ const HelpCenter = () => {
         <div className="help-center-top-row">
           <h1 className="help-center-heading">Help Center</h1>
           {!showForm && (
-            <button type="button" className="support-primary-button" onClick={() => setShowForm(true)}>
-              <i className="fas fa-plus"></i> New Ticket
+            <button type="button" className="support-primary-button help-center-new-ticket-button" onClick={() => setShowForm(true)}>
+              <i className="fas fa-plus"></i>
+              <span className="help-center-new-ticket-text">New Ticket</span>
             </button>
           )}
         </div>
@@ -718,6 +719,9 @@ const HelpCenter = () => {
                 <button type="button" className="support-icon-button" onClick={toggleConversationFullscreen} title={isMaximized ? 'Restore' : 'Maximize'}>
                   <i className={`fas ${isMaximized ? 'fa-compress' : 'fa-expand'}`}></i>
                 </button>
+                <button type="button" className="support-icon-button" onClick={() => setSelectedTicket(null)} title="Close conversation">
+                  <i className="fas fa-times"></i>
+                </button>
                 <button type="button" className="support-icon-button" onClick={() => handleDeleteTicket(selectedTicket.id)} title="Delete ticket">
                   <i className="fas fa-trash" style={{ color: '#dc4c64' }}></i>
                 </button>
@@ -823,15 +827,12 @@ const HelpCenter = () => {
                     rows={3}
                     disabled={isSendingReply}
                   />
-                  <div className="support-composer-toolbar" style={{ justifyContent: 'space-between', marginTop: '0.75rem' }}>
-                    <div className="support-chip-row">
-                      <button type="button" className="support-secondary-button" onClick={() => fileInputRef.current?.click()} disabled={isSendingReply}>
-                        <i className="fas fa-paperclip"></i> Add Files
-                      </button>
-                      <span className="support-inline-copy">Drag files into the composer or browse. Max 5MB each.</span>
-                    </div>
-                    <button type="submit" className="support-primary-button" disabled={isSendingReply}>
-                      <i className={`fas ${isSendingReply ? 'fa-spinner fa-spin' : 'fa-paper-plane'}`}></i> {isSendingReply ? 'Sending…' : 'Send'}
+                  <div className="support-composer-toolbar help-center-composer-actions" style={{ marginTop: '0.75rem' }}>
+                    <button type="button" className="support-icon-button" onClick={() => fileInputRef.current?.click()} disabled={isSendingReply} title="Add files">
+                      <i className="fas fa-paperclip"></i>
+                    </button>
+                    <button type="submit" className="support-icon-button" disabled={isSendingReply || (!replyMessage.trim() && attachedFiles.length === 0)} title={isSendingReply ? 'Sending' : 'Send message'}>
+                      <i className={`fas ${isSendingReply ? 'fa-spinner fa-spin' : 'fa-paper-plane'}`}></i>
                     </button>
                   </div>
                   <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} style={{ display: 'none' }} accept={SUPPORT_ATTACHMENT_ACCEPT} />

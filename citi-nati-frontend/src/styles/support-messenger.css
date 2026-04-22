@@ -835,6 +835,19 @@
   margin-bottom: 0.1rem;
 }
 
+.help-center-new-ticket-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  white-space: nowrap;
+}
+
+.help-center-composer-actions {
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+}
+
 .help-center-heading {
   margin: 0;
   font-size: 1.3rem;
@@ -906,6 +919,32 @@
   .support-public-sealed .support-conversation-body {
     max-height: 60vh;
     overflow-y: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .help-center-top-row {
+    gap: 0.5rem;
+  }
+
+  .help-center-heading {
+    white-space: nowrap;
+    font-size: 1.15rem;
+  }
+
+  .help-center-new-ticket-button {
+    min-width: 2.25rem;
+    padding-left: 0.6rem;
+    padding-right: 0.6rem;
+  }
+
+  .help-center-new-ticket-text {
+    display: none;
+  }
+
+  .help-center-composer-actions {
+    width: 100%;
+    justify-content: flex-end;
   }
 }
 
