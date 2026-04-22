@@ -55,16 +55,17 @@ export const mergeReplyIntoReplyList = (replies = [], reply) => {
     return reply ? [...replies, reply] : replies;
   }
 
-  const existingIndex = replies.findIndex((entry) => entry.id === reply.id);
+  const targetReplyId = String(reply.id);
+  const existingIndex = replies.findIndex((entry) => String(entry.id) === targetReplyId);
   if (existingIndex === -1) {
     return [...replies, reply];
   }
 
-  return replies.map((entry) => (entry.id === reply.id ? { ...entry, ...reply } : entry));
+  return replies.map((entry) => (String(entry.id) === targetReplyId ? { ...entry, ...reply } : entry));
 };
 
 export const mergeReplyIntoTicket = (ticket, reply) => {
-  if (!ticket || ticket.id !== reply?.ticketId) {
+  if (!ticket || String(ticket.id) !== String(reply?.ticketId)) {
     return ticket;
   }
 
@@ -78,6 +79,57 @@ export const mergeReplyIntoTicket = (ticket, reply) => {
 export const mergeReplyIntoTicketList = (tickets = [], reply) => {
   const updatedTickets = tickets.map((ticket) => mergeReplyIntoTicket(ticket, reply));
   return updatedTickets.sort((left, right) => new Date(right.updatedAt || right.createdAt).getTime() - new Date(left.updatedAt || left.createdAt).getTime());
+};
+
+export const dedupeTicketsById = (tickets = []) => {
+  const ticketMap = new Map();
+
+  tickets.forEach((ticket) => {
+    if (!ticket || ticket.id == null) return;
+    const normalizedId = String(ticket.id);
+    const current = ticketMap.get(normalizedId);
+
+    if (!current) {
+      ticketMap.set(normalizedId, ticket);
+      return;
+    }
+
+    const currentTimestamp = new Date(current.updatedAt || current.createdAt || 0).getTime();
+    const candidateTimestamp = new Date(ticket.updatedAt || ticket.createdAt || 0).getTime();
+
+    if (candidateTimestamp >= currentTimestamp) {
+      ticketMap.set(normalizedId, { ...current, ...ticket });
+    }
+  });
+
+  return Array.from(ticketMap.values()).sort(
+    (left, right) => new Date(right.updatedAt || right.createdAt).getTime() - new Date(left.updatedAt || left.createdAt).getTime(),
+  );
+};
+
+export const upsertTicketById = (tickets = [], candidateTicket) => {
+  if (!candidateTicket || candidateTicket.id == null) {
+    return dedupeTicketsById(tickets);
+  }
+
+  const normalizedId = String(candidateTicket.id);
+  const nextTickets = tickets.map((ticket) => {
+    if (String(ticket.id) !== normalizedId) {
+      return ticket;
+    }
+
+    return {
+      ...ticket,
+      ...candidateTicket,
+      replies: candidateTicket.replies || ticket.replies || [],
+    };
+  });
+
+  if (!nextTickets.some((ticket) => String(ticket.id) === normalizedId)) {
+    nextTickets.unshift(candidateTicket);
+  }
+
+  return dedupeTicketsById(nextTickets);
 };
 
 export const appendValidatedSupportFiles = (currentFiles, incomingFiles, notifyError) => {

@@ -11,10 +11,12 @@ import {
   SUPPORT_ATTACHMENT_ACCEPT,
   appendValidatedSupportFiles,
   buildSupportAttachmentDownloadUrl,
+  dedupeTicketsById,
   formatSupportTime,
   getSupportAttachmentIcon,
   mergeReplyIntoReplyList,
   mergeReplyIntoTicketList,
+  upsertTicketById,
 } from '../../utils/supportChat.js';
 import '../../styles/global.css';
 import '../../styles/support-messenger.css';
@@ -143,14 +145,14 @@ const HelpCenter = () => {
       if (data.userId !== user.id) return;
 
       setSelectedTicket(prev =>
-        prev && prev.id === data.ticketId
+        prev && String(prev.id) === String(data.ticketId)
           ? { ...prev, priority: data.priority }
           : prev
       );
 
       setTickets(prev =>
         prev.map(t =>
-          t.id === data.ticketId
+          String(t.id) === String(data.ticketId)
             ? { ...t, priority: data.priority, updatedAt: new Date().toISOString() }
             : t
         )
@@ -178,15 +180,7 @@ const HelpCenter = () => {
       };
 
       setTickets(prev => {
-        if (prev.some(ticket => ticket.id === newTicket.id)) {
-          return prev.map(ticket =>
-            ticket.id === newTicket.id
-              ? { ...ticket, ...newTicket }
-              : ticket
-          ).sort((left, right) => new Date(right.updatedAt || right.createdAt).getTime() - new Date(left.updatedAt || left.createdAt).getTime());
-        }
-
-        return [newTicket, ...prev].sort((left, right) => new Date(right.updatedAt || right.createdAt).getTime() - new Date(left.updatedAt || left.createdAt).getTime());
+        return upsertTicketById(prev, newTicket);
       });
     };
 
@@ -194,8 +188,8 @@ const HelpCenter = () => {
     const handleTicketDeleted = (data) => {
       if (data.userId === user.id) {
         console.log(`[HelpCenter] Ticket ${data.ticketId} was deleted`);
-        setTickets(prev => prev.filter(t => t.id !== data.ticketId));
-        if (selectedTicket?.id === data.ticketId) {
+        setTickets(prev => prev.filter(t => String(t.id) !== String(data.ticketId)));
+        if (String(selectedTicket?.id) === String(data.ticketId)) {
           setSelectedTicket(null);
         }
         playNotificationSound();
@@ -244,7 +238,7 @@ const HelpCenter = () => {
       setError(null);
       const response = await api.get('/support/my-tickets');
       const ticketList = response.data.tickets || [];
-      setTickets(ticketList.sort((left, right) => new Date(right.updatedAt || right.createdAt).getTime() - new Date(left.updatedAt || left.createdAt).getTime()));
+      setTickets(dedupeTicketsById(ticketList));
     } catch (err) {
       console.error('Error fetching tickets:', err);
       setError('Failed to load support tickets');
@@ -274,7 +268,7 @@ const HelpCenter = () => {
       const response = await api.post('/support/tickets', formData);
       
       const newTicket = response.data.ticket;
-      setTickets(prev => [newTicket, ...prev].sort((left, right) => new Date(right.updatedAt || right.createdAt).getTime() - new Date(left.updatedAt || left.createdAt).getTime()));
+      setTickets(prev => upsertTicketById(prev, newTicket));
       setFormData({ subject: '', message: '', priority: 'MEDIUM' });
       setShowForm(false);
       setSuccessMessage('Ticket created successfully! We will review it shortly.');
@@ -378,7 +372,7 @@ const HelpCenter = () => {
           setError(null);
           await api.delete(`/support/tickets/${ticketId}`);
           
-          setTickets(prev => prev.filter(t => t.id !== ticketId));
+          setTickets(prev => prev.filter(t => String(t.id) !== String(ticketId)));
           setSelectedTicket(null);
           setSuccessMessage('Ticket deleted successfully');
           
