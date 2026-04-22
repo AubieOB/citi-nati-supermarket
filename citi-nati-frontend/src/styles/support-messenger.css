@@ -321,6 +321,23 @@
   gap: 0.75rem;
 }
 
+.support-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+  justify-content: flex-end;
+}
+
+.support-controls-row.is-maximized {
+  margin-left: auto;
+  width: min(100%, 34rem);
+}
+
+.support-controls-row.is-maximized > div {
+  text-align: right;
+}
+
 .support-ticket-title,
 .support-section-title {
   margin: 0;
@@ -374,9 +391,9 @@
 
 .support-conversation-header {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 1rem;
-  align-items: center;
+  align-items: stretch;
   border-bottom: 1px solid var(--support-border);
   background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.9));
 }

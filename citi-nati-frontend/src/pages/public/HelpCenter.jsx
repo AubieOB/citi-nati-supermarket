@@ -714,12 +714,12 @@ const HelpCenter = () => {
                   <span className="support-chip"><i className="fas fa-bolt"></i> {selectedTicket.priority}</span>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <div className="support-header-actions">
                 <button type="button" className="support-icon-button" onClick={toggleConversationFullscreen} title={isMaximized ? 'Restore' : 'Maximize'}>
                   <i className={`fas ${isMaximized ? 'fa-compress' : 'fa-expand'}`}></i>
                 </button>
-                <button type="button" className="support-danger-button" onClick={() => handleDeleteTicket(selectedTicket.id)}>
-                  <i className="fas fa-trash"></i> Delete
+                <button type="button" className="support-icon-button" onClick={() => handleDeleteTicket(selectedTicket.id)} title="Delete ticket">
+                  <i className="fas fa-trash" style={{ color: '#dc4c64' }}></i>
                 </button>
               </div>
             </div>
