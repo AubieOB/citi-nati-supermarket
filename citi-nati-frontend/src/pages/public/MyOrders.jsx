@@ -32,6 +32,7 @@ const MyOrdersContent = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [retryingOrderId, setRetryingOrderId] = useState(null);
+  const [previewReceiptOrder, setPreviewReceiptOrder] = useState(null);
 
   // Reusable fetch function
   const fetchOrders = useCallback(async () => {
@@ -64,6 +65,27 @@ const MyOrdersContent = () => {
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  // Lock background scroll while quick preview modal is open
+  useEffect(() => {
+    if (!previewReceiptOrder || typeof document === 'undefined') return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setPreviewReceiptOrder(null);
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [previewReceiptOrder]);
 
   /**
    * Retry payment for unpaid order
@@ -388,6 +410,28 @@ const MyOrdersContent = () => {
           display: 'flex',
           gap: '0.75rem',
         }}>
+          <button
+            type="button"
+            aria-label={`Quick open receipt image for order ${order.id}`}
+            title="Quick open receipt image"
+            onClick={() => setPreviewReceiptOrder(order)}
+            style={{
+              minWidth: '52px',
+              width: '52px',
+              borderRadius: '8px',
+              border: 'none',
+              cursor: 'pointer',
+              backgroundColor: '#0f172a',
+              color: '#fff',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1rem',
+            }}
+          >
+            <i className="fas fa-eye"></i>
+          </button>
+
           <Button
             variant="secondary"
             size="medium"
@@ -635,6 +679,178 @@ const MyOrdersContent = () => {
           );
         })()}
       </Container>
+
+      {previewReceiptOrder && (
+        <div
+          role="presentation"
+          onClick={() => setPreviewReceiptOrder(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.62)',
+            zIndex: 1200,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Receipt quick preview for order ${previewReceiptOrder.id}`}
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              width: 'min(960px, 100%)',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              borderRadius: '14px',
+              backgroundColor: '#fff',
+              boxShadow: '0 20px 44px rgba(15, 23, 42, 0.28)',
+            }}
+          >
+            <div style={{
+              position: 'sticky',
+              top: 0,
+              zIndex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0.9rem 1rem',
+              borderBottom: '1px solid #e2e8f0',
+              backgroundColor: '#f8fafc',
+            }}>
+              <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1rem' }}>
+                Receipt Quick Preview
+              </h3>
+              <button
+                type="button"
+                onClick={() => setPreviewReceiptOrder(null)}
+                style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#fff',
+                  color: '#334155',
+                  cursor: 'pointer',
+                  fontSize: '1.15rem',
+                  lineHeight: 1,
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ padding: '1.25rem' }}>
+              <div style={{
+                border: '1px solid #e2e8f0',
+                borderRadius: '10px',
+                padding: '1rem 1rem 0.8rem',
+                marginBottom: '1rem',
+                backgroundColor: '#ffffff',
+              }}>
+                <h2 style={{ margin: '0 0 0.35rem 0', color: '#0f172a', fontSize: '1.35rem' }}>
+                  Citi-Nati Supermarket Receipt
+                </h2>
+                <p style={{ margin: 0, color: '#64748b', fontSize: '0.95rem' }}>
+                  Order #{previewReceiptOrder.id} • {formatDate(previewReceiptOrder.createdAt)}
+                </p>
+              </div>
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
+                gap: '0.75rem',
+                marginBottom: '1rem',
+              }}>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.8rem', backgroundColor: '#f8fafc' }}>
+                  <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Order Status</p>
+                  <p style={{ margin: '0.35rem 0 0 0', fontSize: '1rem', color: '#0f172a', fontWeight: 700 }}>{previewReceiptOrder.status}</p>
+                </div>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.8rem', backgroundColor: '#f8fafc' }}>
+                  <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Payment Status</p>
+                  <p style={{ margin: '0.35rem 0 0 0', fontSize: '1rem', color: '#0f172a', fontWeight: 700 }}>{previewReceiptOrder.paymentStatus}</p>
+                </div>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.8rem', backgroundColor: '#f8fafc' }}>
+                  <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Total</p>
+                  <p style={{ margin: '0.35rem 0 0 0', fontSize: '1rem', color: '#166534', fontWeight: 700 }}>{formatMWK(previewReceiptOrder.finalTotalAmount ?? previewReceiptOrder.total)}</p>
+                </div>
+              </div>
+
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden', marginBottom: '1rem' }}>
+                <div style={{ backgroundColor: '#2D8659', color: '#fff', fontWeight: 700, padding: '0.75rem 1rem', fontSize: '0.95rem' }}>
+                  Items
+                </div>
+                <div style={{ width: '100%', overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '560px' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#f8fafc' }}>
+                        <th style={{ textAlign: 'left', padding: '0.7rem 0.85rem', borderBottom: '1px solid #e2e8f0', fontSize: '0.85rem' }}>Product</th>
+                        <th style={{ textAlign: 'center', padding: '0.7rem 0.85rem', borderBottom: '1px solid #e2e8f0', fontSize: '0.85rem' }}>Qty</th>
+                        <th style={{ textAlign: 'right', padding: '0.7rem 0.85rem', borderBottom: '1px solid #e2e8f0', fontSize: '0.85rem' }}>Unit Price</th>
+                        <th style={{ textAlign: 'right', padding: '0.7rem 0.85rem', borderBottom: '1px solid #e2e8f0', fontSize: '0.85rem' }}>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(previewReceiptOrder.items || []).map((item, idx) => (
+                        <tr key={`${previewReceiptOrder.id}-preview-${idx}`} style={{ backgroundColor: idx % 2 === 0 ? '#fff' : '#f8fafc' }}>
+                          <td style={{ padding: '0.68rem 0.85rem', borderBottom: '1px solid #e2e8f0', fontWeight: 600, fontSize: '0.92rem', color: '#0f172a' }}>
+                            {item.product?.name || 'Product'}
+                          </td>
+                          <td style={{ padding: '0.68rem 0.85rem', textAlign: 'center', borderBottom: '1px solid #e2e8f0', fontSize: '0.92rem', color: '#334155' }}>
+                            {item.quantity}
+                          </td>
+                          <td style={{ padding: '0.68rem 0.85rem', textAlign: 'right', borderBottom: '1px solid #e2e8f0', fontSize: '0.92rem', color: '#334155' }}>
+                            {formatMWK(item.price)}
+                          </td>
+                          <td style={{ padding: '0.68rem 0.85rem', textAlign: 'right', borderBottom: '1px solid #e2e8f0', fontWeight: 700, fontSize: '0.92rem', color: '#166534' }}>
+                            {formatMWK(Number(item.price || 0) * Number(item.quantity || 0))}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr auto',
+                rowGap: '0.45rem',
+                columnGap: '0.8rem',
+                border: '1px solid #e2e8f0',
+                borderRadius: '10px',
+                padding: '0.85rem 1rem',
+                backgroundColor: '#f8fafc',
+              }}>
+                <span style={{ color: '#475569' }}>Subtotal</span>
+                <strong style={{ color: '#0f172a' }}>{formatMWK(previewReceiptOrder.subtotalAmount ?? previewReceiptOrder.total)}</strong>
+                <span style={{ color: '#475569' }}>Delivery Fee</span>
+                <strong style={{ color: '#0f172a' }}>{formatMWK(previewReceiptOrder.deliveryFeeAmount ?? 0)}</strong>
+                <span style={{ color: '#0f172a', fontWeight: 700, fontSize: '1rem', paddingTop: '0.3rem' }}>Grand Total</span>
+                <strong style={{ color: '#166534', fontSize: '1rem', paddingTop: '0.3rem' }}>{formatMWK(previewReceiptOrder.finalTotalAmount ?? previewReceiptOrder.total)}</strong>
+              </div>
+
+              <div style={{
+                marginTop: '1rem',
+                border: '1px solid #e2e8f0',
+                borderRadius: '10px',
+                padding: '0.9rem 1rem',
+                backgroundColor: '#fffef6',
+              }}>
+                <p style={{ margin: '0 0 0.4rem 0', fontSize: '0.78rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Delivery Address
+                </p>
+                <p style={{ margin: 0, lineHeight: 1.55, color: '#334155', fontSize: '0.95rem' }}>
+                  {previewReceiptOrder.deliveryAddress}
+                  {previewReceiptOrder.houseNumber ? <><br />{previewReceiptOrder.houseNumber}</> : null}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
