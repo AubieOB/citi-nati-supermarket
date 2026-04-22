@@ -33,6 +33,7 @@ const MyOrdersContent = () => {
   const [error, setError] = useState(null);
   const [retryingOrderId, setRetryingOrderId] = useState(null);
   const [previewReceiptOrder, setPreviewReceiptOrder] = useState(null);
+  const [previewLoadingOrderId, setPreviewLoadingOrderId] = useState(null);
   const [isMobileView, setIsMobileView] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth <= 640 : false
   );
@@ -238,8 +239,73 @@ const MyOrdersContent = () => {
     return { newOrders, oldOrders };
   };
 
+  const getOrderItems = useCallback((orderData) => {
+    if (!orderData || typeof orderData !== 'object') return [];
+
+    const sourceItems = Array.isArray(orderData.items) && orderData.items.length > 0
+      ? orderData.items
+      : Array.isArray(orderData.orderItems)
+        ? orderData.orderItems
+        : [];
+
+    return sourceItems.map((item) => ({
+      ...item,
+      quantity: Number(item?.quantity ?? item?.qty ?? 0),
+      price: Number(item?.price ?? item?.unitPrice ?? item?.amount ?? 0),
+      product: item?.product || (item?.productName ? { name: item.productName } : null),
+    }));
+  }, []);
+
+  const getOrderWithItems = useCallback(async (orderData) => {
+    const normalizedItems = getOrderItems(orderData);
+    if (normalizedItems.length > 0) {
+      return {
+        ...orderData,
+        items: normalizedItems,
+      };
+    }
+
+    try {
+      const response = await api.get(`/orders/${orderData.id}`);
+      const detailedOrder = response?.data?.order;
+      const detailedItems = getOrderItems(detailedOrder);
+
+      return {
+        ...orderData,
+        ...(detailedOrder || {}),
+        items: detailedItems,
+      };
+    } catch (err) {
+      console.error(`Failed to fetch detailed order items for order ${orderData?.id}:`, err);
+      return {
+        ...orderData,
+        items: normalizedItems,
+      };
+    }
+  }, [getOrderItems]);
+
+  const openReceiptPreview = useCallback(async (orderData) => {
+    try {
+      setPreviewLoadingOrderId(orderData.id);
+      const enrichedOrder = await getOrderWithItems(orderData);
+      setPreviewReceiptOrder(enrichedOrder);
+
+      if (!enrichedOrder.items || enrichedOrder.items.length === 0) {
+        toast.error('No order items were found for this receipt.');
+      }
+    } catch (err) {
+      console.error('Failed to open receipt preview:', err);
+      toast.error('Failed to open receipt preview. Please try again.');
+    } finally {
+      setPreviewLoadingOrderId(null);
+    }
+  }, [getOrderWithItems]);
+
   // Individual Order Card Component
-  const OrderCard = ({ order }) => (
+  const OrderCard = ({ order }) => {
+    const orderItems = getOrderItems(order);
+
+    return (
     <div
       style={{
         backgroundColor: '#fff',
@@ -376,7 +442,7 @@ const MyOrdersContent = () => {
       </div>
 
       {/* Order Items Preview */}
-      {order.items && order.items.length > 0 && (
+      {orderItems.length > 0 && (
         <div style={{
           marginTop: '1rem',
           paddingTop: '1rem',
@@ -389,14 +455,14 @@ const MyOrdersContent = () => {
             color: '#666',
             textTransform: 'uppercase',
           }}>
-            Items ({order.items.length})
+            Items ({orderItems.length})
           </p>
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
             gap: '1rem',
           }}>
-            {order.items.map((item, idx) => (
+            {orderItems.map((item, idx) => (
               <div
                 key={idx}
                 style={{
@@ -407,7 +473,7 @@ const MyOrdersContent = () => {
                 }}
               >
                 <p style={{ margin: '0', fontWeight: '600', color: '#333' }}>
-                  {item.product?.name || 'Product'}
+                  {item.product?.name || item.productName || 'Product'}
                 </p>
                 <p style={{
                   margin: '0.25rem 0 0 0',
@@ -434,22 +500,24 @@ const MyOrdersContent = () => {
             type="button"
             aria-label={`Quick open receipt image for order ${order.id}`}
             title="Quick open receipt image"
-            onClick={() => setPreviewReceiptOrder(order)}
+            onClick={() => openReceiptPreview(order)}
+            disabled={previewLoadingOrderId === order.id}
             style={{
               minWidth: '52px',
               width: '52px',
               borderRadius: '8px',
               border: 'none',
-              cursor: 'pointer',
+              cursor: previewLoadingOrderId === order.id ? 'not-allowed' : 'pointer',
               backgroundColor: '#0f172a',
               color: '#fff',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: '1rem',
+              opacity: previewLoadingOrderId === order.id ? 0.65 : 1,
             }}
           >
-            <i className="fas fa-eye"></i>
+            <i className={`fas ${previewLoadingOrderId === order.id ? 'fa-spinner fa-spin' : 'fa-eye'}`}></i>
           </button>
 
           <Button
@@ -476,7 +544,8 @@ const MyOrdersContent = () => {
             size="medium"
             onClick={async () => {
               try {
-                await exportOrderReceiptImage({ order, format: 'png' });
+                const enrichedOrder = await getOrderWithItems(order);
+                await exportOrderReceiptImage({ order: enrichedOrder, format: 'png' });
                 toast.success('Receipt image downloaded successfully!');
               } catch (err) {
                 console.error('Failed to download receipt image:', err);
@@ -537,6 +606,7 @@ const MyOrdersContent = () => {
       )}
     </div>
   );
+  };
 
   // Auth initialization loading
   if (authLoading) {
@@ -813,10 +883,10 @@ const MyOrdersContent = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {(previewReceiptOrder.items || []).map((item, idx) => (
+                      {getOrderItems(previewReceiptOrder).map((item, idx) => (
                         <tr key={`${previewReceiptOrder.id}-preview-${idx}`} style={{ backgroundColor: idx % 2 === 0 ? '#fff' : '#f8fafc' }}>
                           <td style={{ padding: '0.68rem 0.85rem', borderBottom: '1px solid #e2e8f0', fontWeight: 600, fontSize: '0.92rem', color: '#0f172a' }}>
-                            {item.product?.name || 'Product'}
+                            {item.product?.name || item.productName || 'Product'}
                           </td>
                           <td style={{ padding: '0.68rem 0.85rem', textAlign: 'center', borderBottom: '1px solid #e2e8f0', fontSize: '0.92rem', color: '#334155' }}>
                             {item.quantity}

@@ -18,6 +18,23 @@ const safeText = (value, fallback = '-') => {
   return text.length ? text : fallback;
 };
 
+const normalizeOrderItems = (order) => {
+  if (!order || typeof order !== 'object') return [];
+
+  const rawItems = Array.isArray(order.items) && order.items.length > 0
+    ? order.items
+    : Array.isArray(order.orderItems)
+      ? order.orderItems
+      : [];
+
+  return rawItems.map((item) => ({
+    ...item,
+    quantity: Number(item?.quantity ?? item?.qty ?? 0),
+    price: Number(item?.price ?? item?.unitPrice ?? item?.amount ?? 0),
+    product: item?.product || (item?.productName ? { name: item.productName } : null),
+  }));
+};
+
 export async function exportOrderReceiptImage({
   order,
   title = 'Order Receipt',
@@ -36,7 +53,7 @@ export async function exportOrderReceiptImage({
     })
     : '-';
 
-  const items = Array.isArray(order.items) ? order.items : [];
+  const items = normalizeOrderItems(order);
   const computedSubtotal = items.reduce((sum, item) => sum + (Number(item.price || 0) * Number(item.quantity || 0)), 0);
   const subtotal = Number(order.subtotalAmount ?? computedSubtotal);
   const deliveryFee = Number(order.deliveryFeeAmount ?? 0);
