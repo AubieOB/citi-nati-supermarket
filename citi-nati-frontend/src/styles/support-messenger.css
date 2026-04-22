@@ -329,12 +329,12 @@
   justify-content: flex-end;
 }
 
-.support-controls-row.is-maximized {
+.support-controls-row {
   margin-left: auto;
   width: min(100%, 34rem);
 }
 
-.support-controls-row.is-maximized > div {
+.support-controls-row > div {
   text-align: right;
 }
 
