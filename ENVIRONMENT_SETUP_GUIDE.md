@@ -1,592 +1,199 @@
-# Environment Setup & Configuration Guide
+# Citi-Nati Supermarket Environment Setup Guide
 
-## Overview
-This guide covers all configuration needed to run the email verification and password reset system in development and production.
+## 1. Purpose of this guide
 
----
+This guide documents environment variables used by the system and identifies what is truly required.
+It includes deployment-ready placeholders for values you must provide.
 
-## Backend Configuration (.env)
+Scope covered:
 
-### Location
-```
-citi-nati-backend/.env
-```
+- backend service (`citi-nati-backend`)
+- frontend service (`citi-nati-frontend`)
+- branch POS sync agents
 
-### Existing Variables (Keep As-Is)
+## 2. How to use this guide
+
+1. Copy the template values for each component.
+2. Replace every placeholder value before deployment.
+3. Keep secrets out of source control.
+4. Rotate credentials on a defined schedule.
+
+## 3. Truly required environment variables (master table)
+
+This table lists required variables by runtime condition.
+
+- `Always`: required for normal production operation.
+- `Conditional`: required only when a feature/module is enabled.
+
+| Component | Variable | Required When | Why It Is Required | Placeholder You Must Fill |
+|---|---|---|---|---|
+| Backend | DATABASE_URL | Always | Prisma datasource uses `env("DATABASE_URL")`; backend cannot use DB without it | `<REPLACE_WITH_POSTGRES_CONNECTION_URL>` |
+| Backend | JWT_SECRET | Always | JWT signing/verification depends on it in auth token utilities | `<REPLACE_WITH_STRONG_JWT_SECRET>` |
+| Frontend | VITE_API_BASE_URL | Always (production frontend) | Frontend API client must target backend API URL | `<REPLACE_WITH_PUBLIC_API_URL>/api` |
+| Frontend | VITE_BACKEND_URL | Always (production frontend) | Socket/auxiliary backend URL resolution uses it | `<REPLACE_WITH_PUBLIC_BACKEND_URL>` |
+| Backend | POS_SECRET | Conditional: POS sync or POS agent auth enabled | Backend POS/agent endpoints validate shared secret | `<REPLACE_WITH_SHARED_POS_SECRET>` |
+| Backend | POS_AGENT_URL | Conditional: `ENABLE_POS_SYNC` is true (default) | Backend POS sync service needs agent base URL | `<REPLACE_WITH_POS_AGENT_URL>` |
+| Backend | PAYCHANGU_SECRET_KEY | Conditional: online payment initiation enabled | Payment API authorization uses this secret key | `<REPLACE_WITH_PAYCHANGU_SECRET_KEY>` |
+| Backend | PAYCHANGU_PUBLIC_KEY | Conditional: payment frontend/public integration enabled | Payment provider public key required by payment flow | `<REPLACE_WITH_PAYCHANGU_PUBLIC_KEY>` |
+| Backend | PAYCHANGU_WEBHOOK_SECRET | Conditional: payment webhook verification enabled | HMAC webhook signature verification depends on this secret | `<REPLACE_WITH_PAYCHANGU_WEBHOOK_SECRET>` |
+| Backend | FRONTEND_URL | Conditional: production callback links, CORS finalization, and mail links | Used for callback URL generation and allowed origin resolution | `<REPLACE_WITH_PUBLIC_FRONTEND_URL>` |
+| Backend | MAIL_PROVIDER | Conditional: email verification/reset enabled | Selects SMTP or SendGrid provider path | `<smtp_or_sendgrid>` |
+| Backend | SMTP_HOST | Conditional: `MAIL_PROVIDER=smtp` | SMTP transport configuration requires host | `<REPLACE_WITH_SMTP_HOST>` |
+| Backend | SMTP_PORT | Conditional: `MAIL_PROVIDER=smtp` | SMTP transport configuration requires port | `<REPLACE_WITH_SMTP_PORT>` |
+| Backend | SMTP_USER | Conditional: `MAIL_PROVIDER=smtp` | SMTP auth username is required | `<REPLACE_WITH_SMTP_USERNAME>` |
+| Backend | SMTP_PASS | Conditional: `MAIL_PROVIDER=smtp` | SMTP auth password/app-password is required | `<REPLACE_WITH_SMTP_PASSWORD>` |
+| Backend | SENDGRID_API_KEY | Conditional: `MAIL_PROVIDER=sendgrid` | SendGrid provider path requires API key | `<REPLACE_WITH_SENDGRID_API_KEY>` |
+| POS Agent | BRANCH_CODE | Always (each agent instance) | Agent startup config validation requires branch identity | `<BLANTYRE_or_ZOMBA>` |
+| POS Agent | BRANCH_NAME | Always (each agent instance) | Agent startup config validation requires branch name | `<REPLACE_WITH_BRANCH_NAME>` |
+| POS Agent | LOCATION_ID | Always (each agent instance) | Agent startup config validation requires location id | `<REPLACE_WITH_LOCATION_ID>` |
+| POS Agent | SYNC_SOURCE_CODE | Always (each agent instance) | Agent startup config validation requires sync source identity | `<REPLACE_WITH_SYNC_SOURCE_CODE>` |
+| POS Agent | POS_DB_SERVER | Always (or `DB_SERVER` fallback) | Agent startup config validation requires SQL Server host | `<REPLACE_WITH_POS_SQL_SERVER_HOST>` |
+| POS Agent | POS_DB_NAME | Always (or `DB_NAME`/`DB_DATABASE` fallback) | Agent startup config validation requires SQL DB name | `<REPLACE_WITH_POS_SQL_DB_NAME>` |
+| POS Agent | POS_DB_USER | Always (or `DB_USER` fallback) | Agent startup config validation requires SQL user | `<REPLACE_WITH_POS_SQL_USERNAME>` |
+| POS Agent | POS_DB_PASSWORD | Always (or `DB_PASSWORD` fallback) | Agent startup config validation requires SQL password | `<REPLACE_WITH_POS_SQL_PASSWORD>` |
+| POS Agent | BACKEND_URL | Conditional: reporting sync or command polling enabled | Agent requires backend URL for queue/reporting communication | `<REPLACE_WITH_PUBLIC_BACKEND_URL>` |
+| POS Agent | BACKEND_API_TOKEN | Conditional: reporting sync or command polling enabled | Agent authenticates to backend using token (or POS_SECRET fallback) | `<REPLACE_WITH_AGENT_BACKEND_TOKEN>` |
+| POS Agent | POS_SECRET | Always (agent API secret) | Agent startup config validation requires inbound API secret | `<REPLACE_WITH_SHARED_POS_SECRET>` |
+
+## 4. Deployment-ready templates with placeholders
+
+## 4.1 Backend `.env` template (production)
+
 ```env
-# Database
-DATABASE_URL="postgresql://user:password@localhost:5432/citinati"
+# Core
+DATABASE_URL=<REPLACE_WITH_POSTGRES_CONNECTION_URL>
+JWT_SECRET=<REPLACE_WITH_STRONG_JWT_SECRET>
+NODE_ENV=production
+PORT=10000
 
-# JWT
-JWT_SECRET="your-secret-key-here"
+# Public URLs
+FRONTEND_URL=<REPLACE_WITH_PUBLIC_FRONTEND_URL>
+BACKEND_URL=<REPLACE_WITH_PUBLIC_BACKEND_URL>
 
-# Google OAuth
-GOOGLE_CLIENT_ID="your-google-client-id"
+# POS integration
+ENABLE_POS_SYNC=true
+POS_AGENT_URL=<REPLACE_WITH_POS_AGENT_URL>
+POS_SECRET=<REPLACE_WITH_SHARED_POS_SECRET>
 
-# Payment
-PAYCHANGU_PUBLIC_KEY="your-paychangu-key"
-PAYCHANGU_SECRET_KEY="your-paychangu-secret"
+# Payments (PayChangu)
+PAYCHANGU_PUBLIC_KEY=<REPLACE_WITH_PAYCHANGU_PUBLIC_KEY>
+PAYCHANGU_SECRET_KEY=<REPLACE_WITH_PAYCHANGU_SECRET_KEY>
+PAYCHANGU_WEBHOOK_SECRET=<REPLACE_WITH_PAYCHANGU_WEBHOOK_SECRET>
+
+# Mail (choose one provider)
+MAIL_PROVIDER=smtp
+MAIL_FROM=<REPLACE_WITH_FROM_EMAIL>
+MAIL_FROM_NAME=Citi-Nati Supermarket
+SMTP_HOST=<REPLACE_WITH_SMTP_HOST>
+SMTP_PORT=<REPLACE_WITH_SMTP_PORT>
+SMTP_SECURE=false
+SMTP_USER=<REPLACE_WITH_SMTP_USERNAME>
+SMTP_PASS=<REPLACE_WITH_SMTP_PASSWORD>
+# SENDGRID_API_KEY=<REPLACE_WITH_SENDGRID_API_KEY>
 ```
 
-### New SMTP Configuration Variables
+## 4.2 Frontend `.env.production` template
+
 ```env
-# Email Configuration
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASSWORD=your-app-password
-FROM_EMAIL=noreply@citinati.com
+VITE_API_BASE_URL=<REPLACE_WITH_PUBLIC_API_URL>/api
+VITE_BACKEND_URL=<REPLACE_WITH_PUBLIC_BACKEND_URL>
+VITE_GOOGLE_CLIENT_ID=<REPLACE_WITH_GOOGLE_CLIENT_ID>
+VITE_STOREFRONT_LOCATION_CODE=BT
+VITE_APP_NAME=Citi-Nati Supermarket
+VITE_APP_VERSION=1.0.0
 ```
 
-### Full .env Template
+## 4.3 POS agent `.env` template (branch)
+
 ```env
-# ========== DATABASE ==========
-DATABASE_URL="postgresql://user:password@localhost:5432/citinati"
+# Branch identity
+BRANCH_CODE=<BLANTYRE_or_ZOMBA>
+BRANCH_NAME=<REPLACE_WITH_BRANCH_NAME>
+LOCATION_ID=<REPLACE_WITH_LOCATION_ID>
+SYNC_SOURCE_CODE=<REPLACE_WITH_SYNC_SOURCE_CODE>
 
-# ========== JWT ==========
-JWT_SECRET="your-secret-key-here"
+# Backend connectivity
+BACKEND_URL=<REPLACE_WITH_PUBLIC_BACKEND_URL>
+BACKEND_API_TOKEN=<REPLACE_WITH_AGENT_BACKEND_TOKEN>
 
-# ========== GOOGLE OAUTH ==========
-GOOGLE_CLIENT_ID="your-google-client-id"
+# Agent security
+POS_SECRET=<REPLACE_WITH_SHARED_POS_SECRET>
 
-# ========== PAYMENT ==========
-PAYCHANGU_PUBLIC_KEY="your-paychangu-key"
-PAYCHANGU_SECRET_KEY="your-paychangu-secret"
+# POS SQL connection
+POS_DB_SERVER=<REPLACE_WITH_POS_SQL_SERVER_HOST>
+POS_DB_NAME=<REPLACE_WITH_POS_SQL_DB_NAME>
+POS_DB_USER=<REPLACE_WITH_POS_SQL_USERNAME>
+POS_DB_PASSWORD=<REPLACE_WITH_POS_SQL_PASSWORD>
+POS_LOCATION_CODE=<REPLACE_WITH_LOCATION_CODE>
 
-# ========== EMAIL (NEW) ==========
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASSWORD=your-app-password
-FROM_EMAIL=noreply@citinati.com
+# Runtime
+PORT=3001
+POLLING_INTERVAL_MS=60000
+COMMAND_POLL_INTERVAL_MS=5000
+EMERGENCY_SALES_POLL_INTERVAL_MS=7000
 ```
 
----
+## 5. Variable provenance notes
 
-## Gmail SMTP Setup (Step-by-Step)
+Required-variable determination source:
 
-### ✅ Step 1: Enable 2-Factor Authentication
-1. Go to myaccount.google.com
-2. Click "Security" in the left menu
-3. Scroll to "How you sign in to Google"
-4. Click "2-Step Verification"
-5. Follow the setup process
-6. Confirm with your phone
+- Prisma schema datasource requirements (`DATABASE_URL`)
+- backend auth token utility usage (`JWT_SECRET`)
+- frontend runtime env references in API/socket utilities
+- backend payment controller checks (`PAYCHANGU_SECRET_KEY` path)
+- mail configuration validation rules (`SMTP_*` or `SENDGRID_API_KEY`)
+- POS agent startup config validation in agent config module
 
-### ✅ Step 2: Generate App Password
-1. After 2FA is enabled, go back to Security
-2. Scroll to "App passwords" (below 2-Step Verification)
-3. Select "Mail" from the app dropdown
-4. Select "Windows Computer" (or your OS)
-5. Click "Generate"
-6. Copy the 16-character password (Gmail generates this)
-7. Use this password in `.env` as `SMTP_PASSWORD`
+## 6. Security handling rules
 
-### ✅ Step 3: Update .env
-```env
-SMTP_USER=your-email@gmail.com
-SMTP_PASSWORD=xxxx xxxx xxxx xxxx  # Paste the 16-char password here (remove spaces)
-```
+1. Never commit real secrets to git.
+2. Use platform secret managers where possible.
+3. Rotate secrets after incidents or staff changes.
+4. Keep backend and agent shared secrets synchronized.
+5. Use distinct tokens per environment (dev/staging/prod).
 
-### ⚠️ DO NOT USE
-- ❌ Your Gmail account password
-- ❌ 2FA unlock code
-- ❌ Any other credentials
-- ✅ ONLY use the App Password generated by Google
+## 7. Validation checklist before go-live
 
----
+1. Backend starts and connects to DB.
+2. Frontend loads and reaches backend API.
+3. Login and token issuance work.
+4. Payment init works with live/test provider key set.
+5. Email send test succeeds with chosen provider.
+6. Each POS agent passes startup validation with no missing required fields.
 
-## Frontend Configuration (.env.local or .env)
+## 8. Troubleshooting by variable class
 
-### Location
-```
-citi-nati-frontend/.env.local (or .env)
-```
+## 8.1 Authentication failures
 
-### Variables (Existing)
-```env
-# Google OAuth
-VITE_GOOGLE_CLIENT_ID=your-google-client-id
+Check:
 
-# API
-VITE_API_URL=http://localhost:3001
-```
+- `JWT_SECRET`
+- token expiry settings (if customized)
 
-### Complete Frontend .env Template
-```env
-VITE_GOOGLE_CLIENT_ID=your-google-client-id
-VITE_API_URL=http://localhost:3001
-```
+## 8.2 Payment failures
 
----
+Check:
 
-## Development Setup
+- `PAYCHANGU_SECRET_KEY`
+- `PAYCHANGU_WEBHOOK_SECRET`
+- callback URL variables (`FRONTEND_URL`, backend URL)
 
-### Backend Startup
-```bash
-cd citi-nati-backend
+## 8.3 Email failures
 
-# Install dependencies (if not done)
-npm install
+Check:
 
-# Run database migrations (if not done)
-npx prisma migrate dev --name initial
+- `MAIL_PROVIDER`
+- SMTP or SendGrid credentials according to provider path
 
-# Start backend server
-npm start
-# Server runs on http://localhost:3001
-```
+## 8.4 POS sync failures
 
-### Frontend Startup
-```bash
-cd citi-nati-frontend
+Check:
 
-# Install dependencies (if not done)
-npm install
+- `POS_SECRET` value match between backend and agents
+- `POS_AGENT_URL` in backend
+- `BACKEND_URL` and `BACKEND_API_TOKEN` on agent
+- `POS_DB_*` credentials on agent
 
-# Start frontend development server
-npm run dev
-# App runs on http://localhost:5173 (or similar)
-```
+## 9. Change control note
 
-### Verify Backend is Running
-```bash
-# Check if backend is accessible
-curl http://localhost:3001
-# Should return some response (error message is okay)
-```
-
-### Verify Frontend is Running
-1. Open http://localhost:5173 in browser
-2. Should see Citi-Nati homepage
-3. Click "Register" or "Login" to test new pages
-
----
-
-## Database Setup
-
-### PostgreSQL Installation
-```bash
-# Windows: Download from https://www.postgresql.org/download/windows/
-# Mac: brew install postgresql
-# Linux: sudo apt install postgresql
-```
-
-### Create Database
-```bash
-# Open PostgreSQL CLI
-psql -U postgres
-
-# Create database
-CREATE DATABASE citinati;
-
-# Exit
-\q
-```
-
-### Update DATABASE_URL in .env
-```env
-DATABASE_URL="postgresql://postgres:password@localhost:5432/citinati"
-```
-
-### Run Migrations
-```bash
-npx prisma migrate dev
-# This creates all tables including new email verification fields
-```
-
-### Verify Schema
-```bash
-# Check User table has new fields
-npx prisma studio
-# Open browser to view database
-
-# Look for User model and verify these fields exist:
-# - emailVerified (Boolean, default: false)
-# - verificationCode (String, nullable)
-# - verificationCodeExpiry (DateTime, nullable)
-# - passwordResetCode (String, nullable)
-# - passwordResetCodeExpiry (DateTime, nullable)
-```
-
----
-
-## Testing Configuration
-
-### Postman Setup
-
-#### 1. Register Endpoint
-```
-POST http://localhost:3001/auth/register
-Content-Type: application/json
-
-Body:
-{
-  "name": "Test User",
-  "email": "test@example.com",
-  "password": "TestPass123"
-}
-
-Expected Response (201):
-{
-  "message": "Registration successful...",
-  "user": {
-    "id": "...",
-    "name": "Test User",
-    "email": "test@example.com",
-    "role": "user",
-    "emailVerified": false
-  },
-  "requiresVerification": true
-}
-```
-
-#### 2. Check Email for Code
-- Go to your Gmail inbox
-- Look for email from: `SMTP_USER` value
-- Subject: "Verify Your Email Address"
-- Extract 6-digit code from email
-
-#### 3. Verify Email Endpoint
-```
-POST http://localhost:3001/auth/verify-email
-Content-Type: application/json
-
-Body:
-{
-  "email": "test@example.com",
-  "code": "123456"  # Code from email
-}
-
-Expected Response (200):
-{
-  "message": "Email verified successfully",
-  "token": "eyJhbGc...",
-  "user": {
-    "id": "...",
-    "email": "test@example.com",
-    "name": "Test User",
-    "role": "user",
-    "emailVerified": true
-  }
-}
-```
-
-#### 4. Login Endpoint
-```
-POST http://localhost:3001/auth/login
-Content-Type: application/json
-
-Body:
-{
-  "email": "test@example.com",
-  "password": "TestPass123"
-}
-
-Expected Response (200):
-{
-  "token": "eyJhbGc...",
-  "user": {
-    "id": "...",
-    "email": "test@example.com",
-    "name": "Test User",
-    "role": "user",
-    "emailVerified": true
-  }
-}
-```
-
-#### 5. Forgot Password Endpoint
-```
-POST http://localhost:3001/auth/forgot-password
-Content-Type: application/json
-
-Body:
-{
-  "email": "test@example.com"
-}
-
-Expected Response (200):
-{
-  "message": "If email exists, a reset code has been sent"
-}
-```
-
-#### 6. Reset Password Endpoint
-```
-POST http://localhost:3001/auth/reset-password
-Content-Type: application/json
-
-Body:
-{
-  "email": "test@example.com",
-  "code": "654321",  # From password reset email
-  "newPassword": "NewPass456"
-}
-
-Expected Response (200):
-{
-  "message": "Password reset successful",
-  "token": "eyJhbGc...",
-  "user": {
-    "id": "...",
-    "email": "test@example.com",
-    "name": "Test User",
-    "role": "user",
-    "emailVerified": true
-  }
-}
-```
-
----
-
-## Production Deployment
-
-### Pre-Deployment Checklist
-- [ ] Update all .env values with production credentials
-- [ ] Configure real SMTP_USER and SMTP_PASSWORD
-- [ ] Update DATABASE_URL to production database
-- [ ] Update JWT_SECRET to strong value (32+ characters)
-- [ ] Update GOOGLE_CLIENT_ID for production OAuth app
-- [ ] Enable HTTPS on frontend and backend
-- [ ] Configure CORS for production domain
-- [ ] Test all email flows with production email
-- [ ] Set up error logging and monitoring
-- [ ] Configure backups for database
-- [ ] Test backup and restore process
-
-### Backend Production
-```bash
-# Set environment to production
-NODE_ENV=production npm start
-
-# Or use PM2 for process management
-npm install -g pm2
-pm2 start npm --name "citi-nati-api" -- start
-pm2 save
-pm2 startup
-```
-
-### Frontend Production
-```bash
-# Build for production
-npm run build
-
-# Deploy `dist` folder to hosting service
-# examples: Netlify, Vercel, AWS S3, etc.
-```
-
-### SMTP Production Email Address
-For production, consider:
-- [ ] Use company domain email (e.g., noreply@citinati.com)
-- [ ] Set up SPF, DKIM, DMARC records for domain
-- [ ] Use dedicated transactional email service:
-  - SendGrid
-  - MailChimp Transactional
-  - Amazon SES
-  - Postmark
-  - Brevo (Sendinblue)
-
----
-
-## Troubleshooting
-
-### Issue: "Nodemailer not found"
-```
-Error: Cannot find module 'nodemailer'
-```
-**Solution:**
-```bash
-npm install nodemailer --save
-cd citi-nati-backend
-npm install
-```
-
-### Issue: "SMTP_USER environment variable not set"
-```
-Error: SMTP_USER is not defined
-```
-**Solution:**
-1. Add all 5 SMTP variables to .env
-2. Make sure .env file is in citi-nati-backend root
-3. Restart backend server
-
-### Issue: "Failed to send verification email"
-```
-Error: connect ECONNREFUSED 127.0.0.1:587
-```
-**Solution:**
-1. Check SMTP_HOST and SMTP_PORT are correct
-2. Verify Gmail 2FA is enabled
-3. Verify App Password is correct (copy-paste from Gmail)
-4. Check internet connection
-
-### Issue: "Invalid verification code"
-```
-Error: Verification code has expired
-```
-**Solution:**
-1. Code expires after 10 minutes
-2. Use "Resend Code" button to send new code
-3. Check email for latest code
-4. Use new code immediately
-
-### Issue: "Email already exists"
-```
-Error: Email already exists
-```
-**Solution:**
-1. Use different email for registration
-2. Or reset password if you forgot it
-
-### Issue: "User not found" during verification
-```
-Error: User not found
-```
-**Solution:**
-1. Make sure email matches registration email exactly
-2. Check database: `SELECT * FROM "User" WHERE email = '...';`
-3. Re-register if user was deleted
-
----
-
-## Debugging Tips
-
-### Enable Debug Logs (Backend)
-```bash
-# Set debug environment variable
-NODE_DEBUG=* npm start
-
-# Or check existing console.logs in auth.controller.js
-# Look for [DEBUG REGISTER], [DEBUG VERIFY EMAIL], etc.
-```
-
-### Check Database State
-```bash
-# Open Prisma Studio
-npx prisma studio
-
-# Check User table:
-# - Is emailVerified field TRUE/FALSE?
-# - Is verificationCode set correctly?
-# - Is verificationCodeExpiry time correct?
-```
-
-### Check Email Delivery
-```javascript
-// In emailService.js, add logging
-console.log('Email sent to:', email);
-console.log('Verification code:', code);
-console.log('Expiry time:', new Date(Date.now() + 10 * 60 * 1000));
-```
-
-### Test Email Sending Directly
-```javascript
-// Add to auth.controller.js for testing
-const { sendVerificationEmail } = require('../utils/emailService');
-
-// Test function
-const test = async () => {
-  await sendVerificationEmail('test@gmail.com', '123456');
-};
-
-test();
-```
-
----
-
-## Security Best Practices
-
-### ✅ DO:
-- [ ] Use strong JWT_SECRET (32+ random characters)
-- [ ] Always validate email format before sending
-- [ ] Always hash passwords with bcrypt
-- [ ] Check code expiry on every verification attempt
-- [ ] Use HTTPS in production
-- [ ] Store SMTP password securely (not in git)
-- [ ] Rotate API keys periodically
-- [ ] Monitor email bounce rates
-- [ ] Rate-limit verification endpoints (recommended)
-- [ ] Log security events for audit
-
-### ❌ DON'T:
-- [ ] Don't commit .env to Git (use .env.example instead)
-- [ ] Don't use user passwords for SMTP
-- [ ] Don't log sensitive data like codes or tokens
-- [ ] Don't accept expired codes
-- [ ] Don't send codes in URLs (only in email body)
-- [ ] Don't allow unlimited verification attempts
-- [ ] Don't reuse old codes
-- [ ] Don't send emails to unverified domains
-- [ ] Don't store plaintext passwords
-
----
-
-## Performance Optimization
-
-### Email Sending
-- Consider async queue for bulk emails (Bull, BullMQ)
-- Implement retry logic for failed emails
-- Monitor email delivery status
-
-### Database
-- Add indexes on (email, verificationCode)
-- Clean up expired verification codes periodically
-- Archive old password reset attempts
-
-### Rate Limiting
-```javascript
-// Recommended: Add express-rate-limit
-const rateLimit = require('express-rate-limit');
-
-const verifyLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 requests per window
-  message: 'Too many verification attempts'
-});
-
-router.post('/verify-email', verifyLimiter, verifyEmail);
-```
-
----
-
-## Monitoring & Analytics
-
-### Track These Metrics
-- [ ] Registration count per day
-- [ ] Email verification success rate
-- [ ] Failed verification attempts
-- [ ] Password reset requests
-- [ ] Email delivery failures
-- [ ] Average time to verify email
-
-### Firebase Analytics (Optional)
-```javascript
-// Install: npm install firebase
-// Track custom events for email verification
-analytics.logEvent('email_verified', { email: user.email });
-```
-
----
-
-## Support & Escalation
-
-### Common Issues
-| Issue | Status | Workaround |
-|-------|--------|-----------|
-| Email not received | ⚠️ Common | Check spam folder, resend code |
-| Code expired | ✅ Expected | Use resend button, codes are 10 min |
-| Login after reset | ✅ Working | Auto-login implemented |
-| Multiple registrations | ⚠️ Need to prevent | Duplicate email check in place |
-| Password requirements | ✅ Set | Requires upper, lower, numbers |
-
-### Contact Information
-- Backend Issues: Check auth.controller.js logs
-- Email Issues: Check emailService.js logs
-- Database Issues: Use Prisma Studio to inspect
-
----
-
-**Last Updated**: February 26, 2026
-**Version**: 1.0
-**Status**: Production Ready
+When required environment variables change in code or startup validations, this guide must be updated in the same release.
