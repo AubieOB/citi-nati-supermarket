@@ -93,7 +93,42 @@ const SupportDashboard = ({ openTicketRequest }) => {
   const { modal, closeModal, showConfirm } = useModal();
   const filterBarRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const conversationPanelRef = useRef(null);
   const [isMaximized, setIsMaximized] = useState(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsMaximized(document.fullscreenElement === conversationPanelRef.current);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  const toggleConversationFullscreen = async () => {
+    const panel = conversationPanelRef.current;
+    if (!panel) return;
+
+    try {
+      if (document.fullscreenElement === panel) {
+        await document.exitFullscreen();
+        return;
+      }
+
+      if (!document.fullscreenElement && panel.requestFullscreen) {
+        await panel.requestFullscreen();
+        return;
+      }
+
+      if (document.fullscreenElement && document.exitFullscreen) {
+        await document.exitFullscreen();
+      }
+    } catch (error) {
+      console.error('Failed to toggle fullscreen mode:', error);
+    }
+  };
 
   // Fetch tickets on component mount or filter change
   useEffect(() => {
@@ -710,7 +745,7 @@ const SupportDashboard = ({ openTicketRequest }) => {
               </aside>
 
               {selectedTicket ? (
-                <section className="support-conversation-panel" style={isMaximized ? { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, borderRadius: 0, height: '100%', width: '100%' } : {}}>
+                <section ref={conversationPanelRef} className="support-conversation-panel">
                   <div className="support-conversation-header">
                     <div>
                       <div className="support-conversation-top">
@@ -723,7 +758,7 @@ const SupportDashboard = ({ openTicketRequest }) => {
                           </div>
                         </div>
                         <div className="support-badge-row" style={{ gap: '0.5rem' }}>
-                          <button type="button" className="support-icon-button" onClick={() => setIsMaximized(!isMaximized)} title={isMaximized ? 'Restore' : 'Maximize'}>
+                          <button type="button" className="support-icon-button" onClick={toggleConversationFullscreen} title={isMaximized ? 'Restore' : 'Maximize'}>
                             <i className={`fas ${isMaximized ? 'fa-compress' : 'fa-expand'}`}></i>
                           </button>
                           <button type="button" className="support-danger-button" onClick={() => handleDeleteTicket(selectedTicket.id)}>
