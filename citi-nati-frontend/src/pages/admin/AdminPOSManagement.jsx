@@ -46,6 +46,9 @@ const AdminPOSManagement = ({
   const searchTimeoutRef = useRef(null);
   const filterBarRef = useRef(null);
   const fetchRequestIdRef = useRef(null);
+  // Tracks whether products are already on screen so background pagination
+  // does not blank or shrink the list while fresh pages are still loading.
+  const displayedProductsRef = useRef([]);
   const { modal, closeModal, showError, showSuccess, showConfirm } = useModal();
 
   const applyCategoryFilter = (items, categoryFilter = 'all') => {
@@ -124,6 +127,8 @@ const AdminPOSManagement = ({
         syncLocalState(allItems);
         setError(cachedProductsMeta?.error || null);
         setLoading(Boolean(cachedProductsMeta?.isLoading && allItems.length === 0));
+        // Record that we now have data displayed so future background ticks stay stable.
+        displayedProductsRef.current = allItems;
         return;
       }
 
@@ -320,12 +325,16 @@ const AdminPOSManagement = ({
 
   // Initial fetch
   useEffect(() => {
+    displayedProductsRef.current = [];
     fetchProducts('', 1, 'all');
   }, [selectedLocationCode]);
 
   // When the shared cache updates, re-filter WITHOUT resetting page or search.
+  // Stale-while-revalidate: if background pagination is running and we already have
+  // data on screen, skip the re-sync — wait for the full refresh to finish first.
   useEffect(() => {
     if (!hasSharedProductsCache) return;
+    if (cachedProductsMeta?.isBackgroundLoading && displayedProductsRef.current.length > 0) return;
     fetchProducts(searchTerm, page, selectedCategory);
   }, [cachedProducts, cachedProductsMeta, hasSharedProductsCache]);
 
