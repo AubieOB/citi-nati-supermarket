@@ -35,7 +35,28 @@ const SupportDashboard = ({ openTicketRequest }) => {
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useAuth();
   const socket = useRef(getSocket());
-  const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
+  
+  // Dark mode state
+  const [isDarkMode, setIsDarkMode] = useState(
+    typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark')
+  );
+
+  // Watch for dark mode changes
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      const darkMode = document.body.classList.contains('admin-theme-dark');
+      setIsDarkMode(darkMode);
+    });
+
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  const isAdminDarkTheme = isDarkMode;
 
   const panelBg = isAdminDarkTheme ? '#1e1e1e' : '#fff';
   const panelSoft = isAdminDarkTheme ? '#181818' : '#f8f9fa';

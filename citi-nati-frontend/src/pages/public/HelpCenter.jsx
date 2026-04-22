@@ -37,6 +37,26 @@ const HelpCenter = () => {
   const { user, isLoading: authLoading } = useAuth();
   const socket = useRef(getSocket());
 
+  // Dark mode state
+  const [isDarkMode, setIsDarkMode] = useState(
+    typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark')
+  );
+
+  // Watch for dark mode changes
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      const darkMode = document.body.classList.contains('admin-theme-dark');
+      setIsDarkMode(darkMode);
+    });
+
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
   // Form state
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
@@ -455,7 +475,17 @@ const HelpCenter = () => {
       ]
     : [];
 
-  const panelStyleVars = {
+  const panelStyleVars = isDarkMode ? {
+    '--support-panel': 'rgba(30, 30, 30, 0.92)',
+    '--support-panel-strong': '#1e1e1e',
+    '--support-panel-muted': '#181818',
+    '--support-border': 'rgba(255, 255, 255, 0.1)',
+    '--support-text': '#f1f5f9',
+    '--support-text-muted': '#c4c4c4',
+    '--support-accent': '#2D8659',
+    '--support-secondary': '#1fa77a',
+    '--support-bg': '#0a0a0a',
+  } : {
     '--support-panel': 'rgba(255, 255, 255, 0.92)',
     '--support-panel-strong': '#ffffff',
     '--support-panel-muted': '#eef4f7',
