@@ -33,6 +33,9 @@ const MyOrdersContent = () => {
   const [error, setError] = useState(null);
   const [retryingOrderId, setRetryingOrderId] = useState(null);
   const [previewReceiptOrder, setPreviewReceiptOrder] = useState(null);
+  const [isMobileView, setIsMobileView] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth <= 640 : false
+  );
 
   // Reusable fetch function
   const fetchOrders = useCallback(async () => {
@@ -65,6 +68,23 @@ const MyOrdersContent = () => {
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const mediaQuery = window.matchMedia('(max-width: 640px)');
+    const updateMobileState = (event) => setIsMobileView(event.matches);
+
+    setIsMobileView(mediaQuery.matches);
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', updateMobileState);
+      return () => mediaQuery.removeEventListener('change', updateMobileState);
+    }
+
+    mediaQuery.addListener(updateMobileState);
+    return () => mediaQuery.removeListener(updateMobileState);
+  }, []);
 
   // Lock background scroll while quick preview modal is open
   useEffect(() => {
@@ -448,7 +468,7 @@ const MyOrdersContent = () => {
             }}
           >
             <i className="fas fa-receipt" style={{ marginRight: '0.5rem' }}></i>
-            PDF Receipt
+            {isMobileView ? 'PDF' : 'PDF Receipt'}
           </Button>
 
           <Button
@@ -472,7 +492,7 @@ const MyOrdersContent = () => {
             }}
           >
             <i className="fas fa-image" style={{ marginRight: '0.5rem' }}></i>
-            Image Receipt
+            {isMobileView ? 'Image' : 'Image Receipt'}
           </Button>
         </div>
       )}
