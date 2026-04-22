@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useNavigate } from 'react-router-dom';
-import Container from '../../components/ui/Container.jsx';
 import api from '../../utils/api.js';
 import { getSocket, identifySocket } from '../../utils/socket.js';
 import { notifyInfo, notifyError, notifySuccess, playNotificationSound } from '../../utils/notifications.js';
@@ -64,6 +63,8 @@ const HelpCenter = () => {
   const fileInputRef = useRef(null);
   const { modal, closeModal, showConfirm } = useModal();
   const messagesEndRef = useRef(null);
+  const topBarRef = useRef(null);
+  const [topBarHeight, setTopBarHeight] = useState(0);
 
   // Fetch tickets on component mount
   useEffect(() => {
@@ -89,14 +90,14 @@ const HelpCenter = () => {
     // Listen for new messages
     const handleTicketMessage = (reply) => {
       setSelectedTicket(prev => {
-        if (!prev || prev.id !== reply.ticketId) return prev;
+        if (!prev || String(prev.id) !== String(reply.ticketId)) return prev;
         const updatedTicket = {
           ...prev,
           updatedAt: reply.createdAt || new Date().toISOString(),
           replies: mergeReplyIntoReplyList(prev.replies || [], reply)
         };
         // Play sound for new message
-        if (reply.senderId !== user.id) {
+        if (String(reply.senderId) !== String(user.id)) {
           playNotificationSound();
           notifyInfo('Admin replied to your ticket!');
         }
@@ -220,17 +221,37 @@ const HelpCenter = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [selectedTicket?.id, selectedTicket?.replies?.length]);
 
-  // Handle ticket selection - join room
+  // Measure top bar height for messenger layout sizing
   useEffect(() => {
-    if (selectedTicket && socket.current) {
-      socket.current.emit('joinTicketRoom', selectedTicket.id);
-      console.log(`[Chat] Joined ticket ${selectedTicket.id} room`);
+    const measure = () => {
+      if (topBarRef.current) setTopBarHeight(topBarRef.current.offsetHeight);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (topBarRef.current) ro.observe(topBarRef.current);
+    return () => ro.disconnect();
+  }, [showForm]);
 
-      return () => {
-        socket.current?.emit('leaveTicketRoom', selectedTicket.id);
-      };
-    }
-  }, [selectedTicket]);
+  // Handle ticket selection - join room (re-join on socket reconnect too)
+  useEffect(() => {
+    if (!selectedTicket || !socket.current) return;
+    const roomId = selectedTicket.id;
+
+    socket.current.emit('joinTicketRoom', roomId);
+    console.log(`[Chat] Joined ticket ${roomId} room`);
+
+    // Re-join the room after a socket reconnect (reconnect loses server-side room membership)
+    const handleReconnect = () => {
+      socket.current?.emit('joinTicketRoom', roomId);
+      console.log(`[Chat] Re-joined ticket ${roomId} room after reconnect`);
+    };
+    socket.current.on('connect', handleReconnect);
+
+    return () => {
+      socket.current?.off('connect', handleReconnect);
+      socket.current?.emit('leaveTicketRoom', roomId);
+    };
+  }, [selectedTicket?.id]);
 
   const fetchTickets = async () => {
     try {
@@ -466,282 +487,276 @@ const HelpCenter = () => {
   if (authLoading || loading) {
     return (
       <div className="page" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Container>
+        <div style={{ textAlign: 'center' }}>
           <i className="fas fa-spinner fa-spin" style={{ fontSize: '3rem', color: '#2D8659' }}></i>
           <p style={{ marginTop: '1rem' }}>Loading help center...</p>
-        </Container>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="page support-messenger-shell" style={{ minHeight: '100vh', paddingBottom: '3rem', ...panelStyleVars }}>
-      <div className="support-help-fullwidth">
-        <div style={{ paddingTop: '2rem' }}>
-          <section className="support-hero">
-            <div>
-              <h1 className="support-hero-title">Help Center</h1>
-              <p className="support-hero-subtitle">
-                Talk to support in a real conversation layout, track every reply live, and send files through one faster message flow.
-              </p>
-            </div>
-            <div className="support-hero-metrics">
-              <div className="support-metric-chip">
-                <span className="support-metric-label">Tickets</span>
-                <span className="support-metric-value">{tickets.length}</span>
-              </div>
-              <div className="support-metric-chip">
-                <span className="support-metric-label">Open</span>
-                <span className="support-metric-value">{tickets.filter((ticket) => ticket.status === 'OPEN').length}</span>
-              </div>
-              <div className="support-metric-chip">
-                <span className="support-metric-label">Live chat</span>
-                <span className="support-metric-value">On</span>
-              </div>
-            </div>
-          </section>
-
-          {successMessage && (
-            <div className="support-alert is-success">
-              <i className="fas fa-circle-check"></i>
-              <span>{successMessage}</span>
-            </div>
+    <div className="page support-messenger-shell support-public-sealed" style={{ ...panelStyleVars }}>
+      {/* Top bar: heading + actions + alerts + optional new-ticket form */}
+      <div ref={topBarRef} className="help-center-top-bar">
+        <div className="help-center-top-row">
+          <h1 className="help-center-heading">Help Center</h1>
+          {!showForm && (
+            <button type="button" className="support-primary-button" onClick={() => setShowForm(true)}>
+              <i className="fas fa-plus"></i> New Ticket
+            </button>
           )}
+        </div>
 
-          {error && (
-            <div className="support-alert is-error">
-              <i className="fas fa-circle-exclamation"></i>
-              <span>{error}</span>
-            </div>
-          )}
+        {successMessage && (
+          <div className="support-alert is-success">
+            <i className="fas fa-circle-check"></i>
+            <span>{successMessage}</span>
+          </div>
+        )}
 
-          {showForm ? (
-            <section className="support-ticket-creator">
-              <h2 className="support-section-title" style={{ marginTop: 0 }}>Start a new conversation</h2>
-              <p className="support-empty-copy" style={{ marginTop: '0.35rem' }}>Give the team enough detail so they can help without extra back-and-forth.</p>
-              <form onSubmit={handleCreateTicket} className="support-form-stack" style={{ marginTop: '1rem' }}>
-                <div className="support-form-grid">
-                  <div>
-                    <label className="support-field-label">Subject</label>
-                    <input className="support-input" type="text" name="subject" value={formData.subject} onChange={handleFormChange} placeholder="Short summary of the issue" />
-                  </div>
-                  <div>
-                    <label className="support-field-label">Priority</label>
-                    <select className="support-select" name="priority" value={formData.priority} onChange={handleFormChange}>
-                      <option value="LOW">Low · General inquiry</option>
-                      <option value="MEDIUM">Medium · Standard issue</option>
-                      <option value="HIGH">High · Urgent issue</option>
-                      <option value="URGENT">Urgent · Critical problem</option>
-                    </select>
-                  </div>
+        {error && (
+          <div className="support-alert is-error">
+            <i className="fas fa-circle-exclamation"></i>
+            <span>{error}</span>
+          </div>
+        )}
+
+        {showForm && (
+          <section className="support-ticket-creator">
+            <h2 className="support-section-title" style={{ marginTop: 0 }}>Start a new conversation</h2>
+            <p className="support-empty-copy" style={{ marginTop: '0.35rem' }}>Give the team enough detail so they can help without extra back-and-forth.</p>
+            <form onSubmit={handleCreateTicket} className="support-form-stack" style={{ marginTop: '1rem' }}>
+              <div className="support-form-grid">
+                <div>
+                  <label className="support-field-label">Subject</label>
+                  <input className="support-input" type="text" name="subject" value={formData.subject} onChange={handleFormChange} placeholder="Short summary of the issue" />
                 </div>
                 <div>
-                  <label className="support-field-label">Message</label>
-                  <textarea className="support-textarea" name="message" value={formData.message} onChange={handleFormChange} rows={5} placeholder="Explain what happened, what you expected, and any order numbers or details that matter." />
+                  <label className="support-field-label">Priority</label>
+                  <select className="support-select" name="priority" value={formData.priority} onChange={handleFormChange}>
+                    <option value="LOW">Low · General inquiry</option>
+                    <option value="MEDIUM">Medium · Standard issue</option>
+                    <option value="HIGH">High · Urgent issue</option>
+                    <option value="URGENT">Urgent · Critical problem</option>
+                  </select>
                 </div>
-                <div className="support-form-actions">
-                  <button type="submit" className="support-primary-button"><i className="fas fa-paper-plane"></i> Submit Ticket</button>
-                  <button
-                    type="button"
-                    className="support-ghost-button"
-                    onClick={() => {
-                      setShowForm(false);
-                      setFormData({ subject: '', message: '', priority: 'MEDIUM' });
-                    }}
-                  >
-                    Cancel
-                  </button>
+              </div>
+              <div>
+                <label className="support-field-label">Message</label>
+                <textarea className="support-textarea" name="message" value={formData.message} onChange={handleFormChange} rows={4} placeholder="Explain what happened, what you expected, and any order numbers or details that matter." />
+              </div>
+              <div className="support-form-actions">
+                <button type="submit" className="support-primary-button"><i className="fas fa-paper-plane"></i> Submit Ticket</button>
+                <button
+                  type="button"
+                  className="support-ghost-button"
+                  onClick={() => {
+                    setShowForm(false);
+                    setFormData({ subject: '', message: '', priority: 'MEDIUM' });
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </section>
+        )}
+      </div>
+
+      {/* Two-pane messenger layout — height fills remainder of viewport below top bar + navbar */}
+      <section
+        className="support-messenger-layout"
+        style={{
+          height: topBarHeight > 0 ? `calc(100vh - 70px - ${topBarHeight}px - 0.5rem)` : '70vh',
+          minHeight: '28rem',
+          marginTop: 0,
+        }}
+      >
+        <aside className="support-sidebar">
+          <div className="support-sidebar-header">
+            <label className="support-field-label">Search your tickets</label>
+            <input
+              className="support-search-input"
+              value={ticketSearch}
+              onChange={(event) => setTicketSearch(event.target.value)}
+              placeholder="Search by subject, message, or ticket #"
+            />
+          </div>
+          <div className="support-ticket-list">
+            {filteredTickets.length === 0 ? (
+              <div className="support-empty-card" style={{ margin: '0.75rem' }}>
+                <p className="support-empty-copy" style={{ margin: 0 }}>No tickets yet. Start one above and the conversation will appear here.</p>
+              </div>
+            ) : (
+              filteredTickets.map((ticket) => (
+                <button
+                  key={ticket.id}
+                  type="button"
+                  className={`support-ticket-card${selectedTicket?.id === ticket.id ? ' is-active' : ''}`}
+                  style={{ '--ticket-accent': statusColor(ticket.status) }}
+                  onClick={() => {
+                    setSelectedTicket(ticket);
+                    setReplyMessage('');
+                    setAttachedFiles([]);
+                  }}
+                >
+                  <div className="support-ticket-card-content">
+                    <div className="support-ticket-top">
+                      <div>
+                        <p className="support-ticket-title">#{ticket.id} · {ticket.subject}</p>
+                        <div className="support-badge-row" style={{ marginTop: '0.45rem' }}>
+                          <span className="support-badge" style={{ backgroundColor: statusColor(ticket.status), color: '#fff' }}>{ticket.status.replace('_', ' ')}</span>
+                          <span className="support-badge" style={{ backgroundColor: priorityBadge(ticket.priority), color: '#fff' }}>{ticket.priority}</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="support-icon-button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleDeleteTicket(ticket.id);
+                        }}
+                        title="Delete ticket"
+                      >
+                        <i className="fas fa-trash" style={{ color: '#dc4c64' }}></i>
+                      </button>
+                    </div>
+                    <p className="support-ticket-preview" style={{ margin: '0.7rem 0 0.8rem' }}>
+                      {(ticket.message || '').slice(0, 90)}{ticket.message?.length > 90 ? '…' : ''}
+                    </p>
+                    <div className="support-ticket-bottom">
+                      <span className="support-inline-copy"><i className="fas fa-comments"></i> {(ticket.replies || []).length} replies</span>
+                      <span className="support-inline-copy">{formatSupportTime(ticket.updatedAt || ticket.createdAt)}</span>
+                    </div>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </aside>
+
+        {selectedTicket ? (
+          <section className="support-conversation-panel">
+            <div className="support-conversation-header">
+              <div>
+                <h2 className="support-conversation-title">{selectedTicket.subject}</h2>
+                <div className="support-conversation-meta">
+                  <span className="support-chip"><i className="fas fa-hashtag"></i> {selectedTicket.id}</span>
+                  <span className="support-chip"><i className="fas fa-signal"></i> {selectedTicket.status.replace('_', ' ')}</span>
+                  <span className="support-chip"><i className="fas fa-bolt"></i> {selectedTicket.priority}</span>
                 </div>
-              </form>
-            </section>
-          ) : (
-            <div style={{ marginTop: '1.1rem' }}>
-              <button type="button" className="support-primary-button" onClick={() => setShowForm(true)}>
-                <i className="fas fa-plus"></i> New Ticket
+              </div>
+              <button type="button" className="support-danger-button" onClick={() => handleDeleteTicket(selectedTicket.id)}>
+                <i className="fas fa-trash"></i> Delete
               </button>
             </div>
-          )}
 
-          <section className="support-messenger-layout">
-            <aside className="support-sidebar">
-              <div className="support-sidebar-header">
-                <label className="support-field-label">Search your tickets</label>
-                <input
-                  className="support-search-input"
-                  value={ticketSearch}
-                  onChange={(event) => setTicketSearch(event.target.value)}
-                  placeholder="Search by subject, message, or ticket #"
-                />
-              </div>
-              <div className="support-ticket-list">
-                {filteredTickets.length === 0 ? (
-                  <div className="support-empty-card" style={{ margin: '0.75rem' }}>
-                    <p className="support-empty-copy" style={{ margin: 0 }}>No tickets yet. Start one above and the conversation will appear here.</p>
-                  </div>
-                ) : (
-                  filteredTickets.map((ticket) => (
-                    <button
-                      key={ticket.id}
-                      type="button"
-                      className={`support-ticket-card${selectedTicket?.id === ticket.id ? ' is-active' : ''}`}
-                      style={{ '--ticket-accent': statusColor(ticket.status) }}
-                      onClick={() => {
-                        setSelectedTicket(ticket);
-                        setReplyMessage('');
-                        setAttachedFiles([]);
-                      }}
-                    >
-                      <div className="support-ticket-card-content">
-                        <div className="support-ticket-top">
-                          <div>
-                            <p className="support-ticket-title">#{ticket.id} · {ticket.subject}</p>
-                            <div className="support-badge-row" style={{ marginTop: '0.45rem' }}>
-                              <span className="support-badge" style={{ backgroundColor: statusColor(ticket.status), color: '#fff' }}>{ticket.status.replace('_', ' ')}</span>
-                              <span className="support-badge" style={{ backgroundColor: priorityBadge(ticket.priority), color: '#fff' }}>{ticket.priority}</span>
-                            </div>
+            <div className="support-conversation-body">
+              <div className="support-message-stack">
+                {conversationMessages.map((message) => {
+                  const isSelf = message.senderId === user?.id;
+                  return (
+                    <div key={message.id} className={`support-message-row ${isSelf ? 'is-self' : 'is-other'}`}>
+                      <div className="support-message-bubble">
+                        <div className="support-badge-row" style={{ justifyContent: 'space-between' }}>
+                          <span className="support-message-author">{isSelf ? 'You' : (message.senderLabel || 'Support Team')}</span>
+                          <span className="support-message-time">{formatSupportTime(message.createdAt)}</span>
+                        </div>
+                        <p className="support-message-text">{message.message}</p>
+                        {message.attachments?.length > 0 && (
+                          <div className="support-attachments">
+                            {message.attachments.map((attachment, index) => (
+                              <a
+                                key={`${message.id}-attachment-${index}`}
+                                className="support-attachment-link"
+                                href={buildSupportAttachmentDownloadUrl(api, attachment)}
+                                download={attachment.fileName}
+                                title={`${attachment.fileName} (${(attachment.fileSize / 1024).toFixed(1)} KB)`}
+                              >
+                                <i className={`fas ${getSupportAttachmentIcon(attachment.fileName, attachment.mimeType)}`}></i>
+                                <span className="support-attachment-name">
+                                  <strong>{attachment.fileName}</strong>
+                                  <span>{(attachment.fileSize / 1024).toFixed(1)} KB</span>
+                                </span>
+                              </a>
+                            ))}
                           </div>
-                          <button
-                            type="button"
-                            className="support-icon-button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleDeleteTicket(ticket.id);
-                            }}
-                            title="Delete ticket"
-                          >
-                            <i className="fas fa-trash" style={{ color: '#dc4c64' }}></i>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                {typingUser && <div className="support-typing"><i className="fas fa-ellipsis"></i> Support is typing…</div>}
+                <div ref={messagesEndRef}></div>
+              </div>
+            </div>
+
+            <div className="support-composer">
+              {selectedTicket.status === 'CLOSED' ? (
+                <div className="support-alert is-success" style={{ marginTop: 0 }}>
+                  <i className="fas fa-lock"></i>
+                  <span>This ticket is closed. Create a new ticket if you need more help.</span>
+                </div>
+              ) : (
+                <form onSubmit={handleSendReply} className="support-compose-surface" onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+                  {attachedFiles.length > 0 && (
+                    <div className="support-attachments" style={{ marginBottom: '0.8rem' }}>
+                      {attachedFiles.map((file, index) => (
+                        <div key={`${file.name}-${file.size}-${index}`} className="support-attachment-chip">
+                          <i className={`fas ${getSupportAttachmentIcon(file.name, file.type)}`}></i>
+                          <span className="support-attachment-name">
+                            <strong>{file.name}</strong>
+                            <span>{(file.size / 1024).toFixed(1)} KB</span>
+                          </span>
+                          <button type="button" className="support-icon-button" onClick={() => removeAttachedFile(index)}>
+                            <i className="fas fa-xmark"></i>
                           </button>
                         </div>
-                        <p className="support-ticket-preview" style={{ margin: '0.7rem 0 0.8rem' }}>
-                          {(ticket.message || '').slice(0, 90)}{ticket.message?.length > 90 ? '…' : ''}
-                        </p>
-                        <div className="support-ticket-bottom">
-                          <span className="support-inline-copy"><i className="fas fa-comments"></i> {(ticket.replies || []).length} replies</span>
-                          <span className="support-inline-copy">{formatSupportTime(ticket.updatedAt || ticket.createdAt)}</span>
-                        </div>
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
-            </aside>
-
-            {selectedTicket ? (
-              <section className="support-conversation-panel">
-                <div className="support-conversation-header">
-                  <div>
-                    <h2 className="support-conversation-title">{selectedTicket.subject}</h2>
-                    <div className="support-conversation-meta">
-                      <span className="support-chip"><i className="fas fa-hashtag"></i> {selectedTicket.id}</span>
-                      <span className="support-chip"><i className="fas fa-signal"></i> {selectedTicket.status.replace('_', ' ')}</span>
-                      <span className="support-chip"><i className="fas fa-bolt"></i> {selectedTicket.priority}</span>
+                      ))}
                     </div>
-                  </div>
-                  <button type="button" className="support-danger-button" onClick={() => handleDeleteTicket(selectedTicket.id)}>
-                    <i className="fas fa-trash"></i> Delete
-                  </button>
-                </div>
-
-                <div className="support-conversation-body">
-                  <div className="support-message-stack">
-                    {conversationMessages.map((message) => {
-                      const isSelf = message.senderId === user?.id;
-                      return (
-                        <div key={message.id} className={`support-message-row ${isSelf ? 'is-self' : 'is-other'}`}>
-                          <div className="support-message-bubble">
-                            <div className="support-badge-row" style={{ justifyContent: 'space-between' }}>
-                              <span className="support-message-author">{isSelf ? 'You' : (message.senderLabel || 'Support Team')}</span>
-                              <span className="support-message-time">{formatSupportTime(message.createdAt)}</span>
-                            </div>
-                            <p className="support-message-text">{message.message}</p>
-                            {message.attachments?.length > 0 && (
-                              <div className="support-attachments">
-                                {message.attachments.map((attachment, index) => (
-                                  <a
-                                    key={`${message.id}-attachment-${index}`}
-                                    className="support-attachment-link"
-                                    href={buildSupportAttachmentDownloadUrl(api, attachment)}
-                                    download={attachment.fileName}
-                                    title={`${attachment.fileName} (${(attachment.fileSize / 1024).toFixed(1)} KB)`}
-                                  >
-                                    <i className={`fas ${getSupportAttachmentIcon(attachment.fileName, attachment.mimeType)}`}></i>
-                                    <span className="support-attachment-name">
-                                      <strong>{attachment.fileName}</strong>
-                                      <span>{(attachment.fileSize / 1024).toFixed(1)} KB</span>
-                                    </span>
-                                  </a>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {typingUser && <div className="support-typing"><i className="fas fa-ellipsis"></i> Support is typing…</div>}
-                    <div ref={messagesEndRef}></div>
-                  </div>
-                </div>
-
-                <div className="support-composer">
-                  {selectedTicket.status === 'CLOSED' ? (
-                    <div className="support-alert is-success" style={{ marginTop: 0 }}>
-                      <i className="fas fa-lock"></i>
-                      <span>This ticket is closed. Create a new ticket if you need more help.</span>
-                    </div>
-                  ) : (
-                    <form onSubmit={handleSendReply} className="support-compose-surface" onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
-                      {attachedFiles.length > 0 && (
-                        <div className="support-attachments" style={{ marginBottom: '0.8rem' }}>
-                          {attachedFiles.map((file, index) => (
-                            <div key={`${file.name}-${file.size}-${index}`} className="support-attachment-chip">
-                              <i className={`fas ${getSupportAttachmentIcon(file.name, file.type)}`}></i>
-                              <span className="support-attachment-name">
-                                <strong>{file.name}</strong>
-                                <span>{(file.size / 1024).toFixed(1)} KB</span>
-                              </span>
-                              <button type="button" className="support-icon-button" onClick={() => removeAttachedFile(index)}>
-                                <i className="fas fa-xmark"></i>
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      <textarea
-                        className="support-textarea"
-                        value={replyMessage}
-                        onChange={handleTyping}
-                        placeholder={dragOver ? 'Drop files here, then finish your message…' : 'Type your message…'}
-                        rows={3}
-                        disabled={isSendingReply}
-                      />
-                      <div className="support-composer-toolbar" style={{ justifyContent: 'space-between', marginTop: '0.75rem' }}>
-                        <div className="support-chip-row">
-                          <button type="button" className="support-secondary-button" onClick={() => fileInputRef.current?.click()} disabled={isSendingReply}>
-                            <i className="fas fa-paperclip"></i> Add Files
-                          </button>
-                          <span className="support-inline-copy">Drag files into the composer or browse. Max 5MB each.</span>
-                        </div>
-                        <button type="submit" className="support-primary-button" disabled={isSendingReply}>
-                          <i className={`fas ${isSendingReply ? 'fa-spinner fa-spin' : 'fa-paper-plane'}`}></i> {isSendingReply ? 'Sending…' : 'Send'}
-                        </button>
-                      </div>
-                      <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} style={{ display: 'none' }} accept={SUPPORT_ATTACHMENT_ACCEPT} />
-                    </form>
                   )}
-                </div>
-              </section>
-            ) : (
-              <section className="support-empty-state">
-                <div className="support-empty-card">
-                  <i className="fas fa-headset" style={{ fontSize: '2rem', color: '#2D8659' }}></i>
-                  <h3 className="support-section-title" style={{ marginTop: '1rem' }}>Choose a conversation</h3>
-                  <p className="support-empty-copy">Select a ticket to see the full message thread in the new chat view.</p>
-                </div>
-              </section>
-            )}
+                  <textarea
+                    className="support-textarea"
+                    value={replyMessage}
+                    onChange={handleTyping}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        if (!isSendingReply && replyMessage.trim()) handleSendReply(e);
+                      }
+                    }}
+                    placeholder={dragOver ? 'Drop files here, then finish your message…' : 'Type your message… (Enter to send, Shift+Enter for new line)'}
+                    rows={3}
+                    disabled={isSendingReply}
+                  />
+                  <div className="support-composer-toolbar" style={{ justifyContent: 'space-between', marginTop: '0.75rem' }}>
+                    <div className="support-chip-row">
+                      <button type="button" className="support-secondary-button" onClick={() => fileInputRef.current?.click()} disabled={isSendingReply}>
+                        <i className="fas fa-paperclip"></i> Add Files
+                      </button>
+                      <span className="support-inline-copy">Drag files into the composer or browse. Max 5MB each.</span>
+                    </div>
+                    <button type="submit" className="support-primary-button" disabled={isSendingReply}>
+                      <i className={`fas ${isSendingReply ? 'fa-spinner fa-spin' : 'fa-paper-plane'}`}></i> {isSendingReply ? 'Sending…' : 'Send'}
+                    </button>
+                  </div>
+                  <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} style={{ display: 'none' }} accept={SUPPORT_ATTACHMENT_ACCEPT} />
+                </form>
+              )}
+            </div>
           </section>
-        </div>
-      </div>
+        ) : (
+          <section className="support-empty-state">
+            <div className="support-empty-card">
+              <i className="fas fa-headset" style={{ fontSize: '2rem', color: '#2D8659' }}></i>
+              <h3 className="support-section-title" style={{ marginTop: '1rem' }}>Choose a conversation</h3>
+              <p className="support-empty-copy">Select a ticket to see the full message thread in the new chat view.</p>
+            </div>
+          </section>
+        )}
+      </section>
+
       <Modal
         isOpen={modal.isOpen}
         title={modal.title}

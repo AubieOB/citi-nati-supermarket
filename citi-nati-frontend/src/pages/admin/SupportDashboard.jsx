@@ -795,7 +795,13 @@ const SupportDashboard = ({ openTicketRequest }) => {
                           className="support-textarea"
                           value={replyText}
                           onChange={handleReplyInputChange}
-                          placeholder="Write a reply like a real conversation update…"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              if (!isSendingReply && replyText.trim()) handleReply(e);
+                            }
+                          }}
+                          placeholder="Write a reply… (Enter to send, Shift+Enter for new line)"
                           rows={3}
                           disabled={isSendingReply}
                         />

@@ -664,3 +664,128 @@
     max-width: 92%;
   }
 }
+
+/* ========================================
+   PUBLIC HELP CENTER — SEALED LAYOUT
+   ======================================== */
+
+.support-public-sealed {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  overflow-x: hidden;
+}
+
+/* Remove all border radius on public sealed page */
+.support-public-sealed :is(
+  .support-sidebar,
+  .support-sidebar-header,
+  .support-conversation-panel,
+  .support-conversation-header,
+  .support-ticket-card,
+  .support-empty-card,
+  .support-empty-state,
+  .support-compose-surface,
+  .support-select,
+  .support-search-input,
+  .support-input,
+  .support-textarea,
+  .support-chip,
+  .support-badge,
+  .support-primary-button,
+  .support-secondary-button,
+  .support-ghost-button,
+  .support-danger-button,
+  .support-icon-button,
+  .support-attachment-link,
+  .support-attachment-chip,
+  .support-alert,
+  .support-message-bubble,
+  .support-ticket-creator
+) {
+  border-radius: 0 !important;
+}
+
+/* Help center top bar */
+.help-center-top-bar {
+  padding: 0.85rem 1.25rem 0.75rem;
+  border-bottom: 1px solid var(--support-border, #e0e0e0);
+  background: var(--support-panel-strong, #fff);
+}
+
+.help-center-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.1rem;
+}
+
+.help-center-heading {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--support-text, #102132);
+}
+
+/* Messenger layout fills remaining height */
+.support-public-sealed .support-messenger-layout {
+  overflow: hidden;
+  margin-top: 0;
+}
+
+/* Sidebar self-scroll */
+.support-public-sealed .support-sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.support-public-sealed .support-ticket-list {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+}
+
+/* Conversation panel self-scroll */
+.support-public-sealed .support-conversation-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.support-public-sealed .support-conversation-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Ticket creator form inside top bar */
+.support-public-sealed .support-ticket-creator {
+  margin-top: 0.75rem;
+  border: none;
+  padding: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+@media (max-width: 980px) {
+  .support-public-sealed .support-messenger-layout {
+    height: auto !important;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .support-public-sealed .support-sidebar,
+  .support-public-sealed .support-conversation-panel {
+    height: auto;
+  }
+
+  .support-public-sealed .support-ticket-list,
+  .support-public-sealed .support-conversation-body {
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+}
