@@ -50,6 +50,41 @@ function parseAllowedOrigins() {
   ].filter(Boolean)));
 }
 
+async function connectPrismaWithRetry(options = {}) {
+  const maxAttempts = Number(options.maxAttempts || process.env.DB_CONNECT_MAX_ATTEMPTS || 6);
+  const baseDelayMs = Number(options.baseDelayMs || process.env.DB_CONNECT_RETRY_DELAY_MS || 1500);
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await prisma.$connect();
+      logger.info('Connected to the database via Prisma');
+      return;
+    } catch (error) {
+      const message = String(error?.message || '');
+      const isTransient =
+        /recovery mode/i.test(message) ||
+        /starting up/i.test(message) ||
+        /timed out/i.test(message) ||
+        /ECONNREFUSED/i.test(message) ||
+        error?.code === 'P1001';
+
+      if (!isTransient || attempt === maxAttempts) {
+        throw error;
+      }
+
+      const delayMs = baseDelayMs * attempt;
+      logger.warn('[DB INIT] prisma connect failed, retrying', {
+        attempt,
+        maxAttempts,
+        delayMs,
+        message,
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+}
+
 async function start() {
   try {
     // Ensure upload directories exist
@@ -67,8 +102,7 @@ async function start() {
     });
 
     // Connect to the database before starting the server
-    await prisma.$connect();
-    logger.info('Connected to the database via Prisma');
+    await connectPrismaWithRetry();
 
     // Initialize mail configuration
     mailConfig.initializeMailConfig();

@@ -214,34 +214,34 @@ function encodeExpiryBatchReference(stockDetailId, grnNo, fallbackValue = null) 
 (async () => {
   try {
     // Existing trigram index for search
-    await prisma.$executeRaw(`
+    await prisma.$executeRaw`
       CREATE INDEX IF NOT EXISTS idx_product_name_search
       ON "Product" USING gin (name gin_trgm_ops);
-    `);
+    `;
     
     // Index for visibility filtering (enabled = true)
-    await prisma.$executeRaw(`
+    await prisma.$executeRaw`
       CREATE INDEX IF NOT EXISTS idx_product_enabled
       ON "Product"(enabled);
-    `);
+    `;
     
     // Index for category filtering
-    await prisma.$executeRaw(`
+    await prisma.$executeRaw`
       CREATE INDEX IF NOT EXISTS idx_product_category
       ON "Product"(category);
-    `);
+    `;
     
     // Combined index for enabled + category queries
-    await prisma.$executeRaw(`
+    await prisma.$executeRaw`
       CREATE INDEX IF NOT EXISTS idx_product_enabled_category
       ON "Product"(enabled, category);
-    `);
+    `;
     
     // Index for isOnSale filtering
-    await prisma.$executeRaw(`
+    await prisma.$executeRaw`
       CREATE INDEX IF NOT EXISTS idx_product_on_sale
       ON "Product"(isOnSale);
-    `);
+    `;
     
     console.log('[DB INIT] ensured all performance indexes on Product table');
   } catch (err) {
