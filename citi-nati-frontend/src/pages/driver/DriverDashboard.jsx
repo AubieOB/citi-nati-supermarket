@@ -844,8 +844,9 @@ const DriverDashboard = () => {
                     const statuses = ['ASSIGNED', 'IN_TRANSIT', 'DELIVERED'];
                     const currentIdx = statuses.indexOf(selectedOrder.status);
                     const statusIdx = statuses.indexOf(status);
-                    const isActive = statusIdx === currentIdx;
-                    const isCompleted = statusIdx < currentIdx;
+                    const isCompleted = currentIdx >= 0 && statusIdx <= currentIdx;
+                    const isActive = statusIdx === currentIdx && !isCompleted;
+                    const isPending = !isCompleted && !isActive;
 
                     return (
                       <div
@@ -876,7 +877,6 @@ const DriverDashboard = () => {
                           }}
                         >
                           {isCompleted && <i className="fas fa-check"></i>}
-                          {isActive && <i className="fas fa-spinner"></i>}
                           {!isCompleted && !isActive && idx + 1}
                         </div>
 
