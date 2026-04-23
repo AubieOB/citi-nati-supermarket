@@ -210,8 +210,10 @@ function encodeExpiryBatchReference(stockDetailId, grnNo, fallbackValue = null) 
   return parts.join('|');
 }
 
-// ensure a trigram index for fast case-insensitive name searches (autocomplete)
-(async () => {
+// Ensure product indexes needed for query performance.
+// This is intentionally callable from server startup instead of running at import time,
+// so it does not compete for DB connections before the app is ready.
+const ensureProductPerformanceIndexes = async () => {
   const ensureIndex = async (label, statement) => {
     try {
       await statement();
@@ -265,7 +267,7 @@ function encodeExpiryBatchReference(stockDetailId, grnNo, fallbackValue = null) 
   } catch (err) {
     console.error('[DB INIT] failed to create indexes:', err.message);
   }
-})();
+};
 
 /**
  * Helper: Format product with computed fields
@@ -3005,6 +3007,7 @@ const reconcileProductImages = async (req, res) => {
 };
 
 module.exports = {
+  ensureProductPerformanceIndexes,
   createProduct,
   getProducts,
   getProductById,

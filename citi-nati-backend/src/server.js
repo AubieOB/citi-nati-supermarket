@@ -34,6 +34,7 @@ const logger = require('./utils/logger');
 const { adminRateLimiter, posAgentRateLimiter } = require('./middleware/rateLimit.middleware');
 const mailConfig = require('./config/mailConfig');
 const { startDataRetentionScheduler } = require('./services/dataRetention.service');
+const { ensureProductPerformanceIndexes } = require('./controllers/product.controller');
 
 const prisma = new PrismaClient();
 
@@ -67,7 +68,9 @@ async function connectPrismaWithRetry(options = {}) {
         /starting up/i.test(message) ||
         /timed out/i.test(message) ||
         /ECONNREFUSED/i.test(message) ||
-        error?.code === 'P1001';
+        error?.code === 'P1001' ||
+        error?.code === 'P2037' ||
+        /remaining connection slots are reserved/i.test(message);
 
       if (!isTransient || attempt === maxAttempts) {
         throw error;
@@ -104,6 +107,17 @@ async function start() {
 
     // Connect to the database before starting the server
     await connectPrismaWithRetry();
+
+    // Run non-critical DB index setup after a successful connection.
+    // Do not block startup if the provider is temporarily connection-constrained.
+    try {
+      await ensureProductPerformanceIndexes();
+    } catch (error) {
+      logger.warn('[DB INIT] product index setup skipped', {
+        code: error?.code,
+        message: String(error?.message || error),
+      });
+    }
 
     // Keep high-churn operational tables trimmed so the DB does not hit storage limits.
     startDataRetentionScheduler({ prisma, logger });
