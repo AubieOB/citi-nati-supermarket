@@ -2772,7 +2772,7 @@ button:disabled,
   border: 1px solid #dde3ee;
   border-radius: var(--sf-radius);
   box-shadow: var(--sf-shadow-sm);
-  background: linear-gradient(180deg, #ffffff 0%, #fafcff 100%);
+  background: #ffffff;
 }
 
 /* 10) Respect reduced-motion preference */

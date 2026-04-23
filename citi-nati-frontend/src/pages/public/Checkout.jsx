@@ -839,12 +839,14 @@ const CheckoutContent = () => {
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  padding: '1rem',
-                  backgroundColor: '#f8f9fa',
-                  borderRadius: '4px',
+                  padding: '0.35rem 0',
+                  backgroundColor: 'transparent',
+                  borderRadius: 0,
                   fontSize: '1.25rem',
                   fontWeight: '700',
                   color: '#2D8659',
+                  border: 'none',
+                  boxShadow: 'none',
                 }}>
                   <span>Final Total:</span>
                   <span>{formatMWK(checkoutFinalTotal)}</span>
