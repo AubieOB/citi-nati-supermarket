@@ -2535,16 +2535,22 @@ body.menu-open {
   right: 0;
   z-index: 1000;
 }
-.layout__content {
+.layout:not(.layout--no-header) .layout__content {
   padding-top: 92px;
 }
+.layout.layout--no-header .layout__content {
+  padding-top: 0;
+}
 @media (max-width: 768px) {
-  .layout__content {
+  .layout:not(.layout--no-header) .layout__content {
     padding-top: 80px;
   }
 }
 @media (max-width: 480px) {
-  .layout__content {
+  .layout:not(.layout--no-header) .layout__content {
     padding-top: 72px;
   }
 }
+
+
+

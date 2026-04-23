@@ -22,7 +22,7 @@ const Layout = ({ children }) => {
                      location.pathname === '/admin-login';
 
   return (
-    <div className="layout">
+    <div className={`layout${hideHeader ? ' layout--no-header' : ''}`}>
       {!hideHeader && (
         <div className="layout__header">
           <Header />
@@ -44,3 +44,4 @@ const Layout = ({ children }) => {
 };
 
 export default Layout;
+
