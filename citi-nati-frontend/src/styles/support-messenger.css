@@ -869,20 +869,20 @@
 
 .help-center-heading {
   margin: 0;
-  font-size: clamp(1.4rem, 2.8vw, 2.25rem);
-  font-weight: 800;
-  line-height: 1.05;
-  color: var(--support-text);
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #5B4B8A;
 }
 
 .admin-theme-dark .help-center-heading {
-  color: var(--support-text);
+  color: #5B4B8A;
 }
 
 .help-center-subtitle {
   margin: 0.15rem 0 0;
   font-size: 0.84rem;
-  color: var(--support-text-muted);
+  color: #666;
 }
 
 /* Messenger layout fills remaining height */
