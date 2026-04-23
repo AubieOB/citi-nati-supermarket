@@ -787,6 +787,9 @@ const CheckoutContent = () => {
                   marginBottom: '0.55rem',
                   color: '#475569',
                   fontWeight: 600,
+                  border: 'none',
+                  boxShadow: 'none',
+                  backgroundColor: 'transparent',
                 }}>
                   <span>Subtotal:</span>
                   <span>{formatMWK(cartItemsSubtotal)}</span>
@@ -818,6 +821,9 @@ const CheckoutContent = () => {
                   color: '#64748b',
                   fontWeight: 600,
                   fontSize: '0.88rem',
+                  border: 'none',
+                  boxShadow: 'none',
+                  backgroundColor: 'transparent',
                 }}>
                   <span>{vatLabel}</span>
                   <span>{formatMWK(cart.vat ?? 0)}</span>

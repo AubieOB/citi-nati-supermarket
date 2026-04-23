@@ -410,12 +410,12 @@ const Cart = () => {
             }}>
               <h3 style={{ marginBottom: '1rem' }}>Order Summary</h3>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.55rem', color: '#475569', fontSize: '0.95rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.55rem', color: '#475569', fontSize: '0.95rem', border: 'none', boxShadow: 'none', backgroundColor: 'transparent' }}>
                 <span>Subtotal:</span>
                 <span>{formatMWK(cart.subtotal ?? cart.total ?? 0)}</span>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.55rem', color: '#475569', fontSize: '0.95rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.55rem', color: '#475569', fontSize: '0.95rem', border: 'none', boxShadow: 'none', backgroundColor: 'transparent' }}>
                 <span>{vatLabel}</span>
                 <span>{formatMWK(cart.vat ?? 0)}</span>
               </div>

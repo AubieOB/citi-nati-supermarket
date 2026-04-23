@@ -2767,8 +2767,7 @@ button:disabled,
   }
 }
 
-/* 9) Checkout trust and clarity visuals */
-.checkout-grid > div:last-child,
+/* 9) Checkout/cart summary panel visuals */
 .cart-summary-grid > div:last-child > div {
   border: 1px solid #dde3ee;
   border-radius: var(--sf-radius);
