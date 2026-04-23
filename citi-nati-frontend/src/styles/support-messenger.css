@@ -869,13 +869,14 @@
 
 .help-center-heading {
   margin: 0;
-  font-size: 1.3rem;
+  font-size: clamp(1.4rem, 2.8vw, 2.25rem);
   font-weight: 800;
-  color: #5B4B8A;
+  line-height: 1.05;
+  color: var(--support-text);
 }
 
 .admin-theme-dark .help-center-heading {
-  color: #9388FF;
+  color: var(--support-text);
 }
 
 .help-center-subtitle {
