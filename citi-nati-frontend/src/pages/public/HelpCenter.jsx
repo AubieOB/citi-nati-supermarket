@@ -855,7 +855,7 @@ const HelpCenter = () => {
           <section className="support-empty-state">
             <div className="support-empty-card">
               <i className="fas fa-headset" style={{ fontSize: '2rem', color: '#2D8659' }}></i>
-              <h3 className="support-section-title" style={{ marginTop: '1rem' }}>Choose a conversation</h3>
+              <h3 className="help-center-empty-title" style={{ marginTop: '1rem' }}>Choose a conversation</h3>
               <p className="support-empty-copy">Choose a ticket from your list to open the conversation and read the latest replies.</p>
             </div>
           </section>

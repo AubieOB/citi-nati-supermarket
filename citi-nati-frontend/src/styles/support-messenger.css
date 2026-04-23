@@ -885,6 +885,14 @@
   color: #666;
 }
 
+.help-center-empty-title {
+  margin-bottom: 1rem;
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #5B4B8A;
+}
+
 /* Messenger layout fills remaining height */
 .support-public-sealed .support-messenger-layout {
   overflow: hidden;
