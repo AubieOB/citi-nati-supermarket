@@ -13,12 +13,20 @@ const Header = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showEmailPopup, setShowEmailPopup] = useState(false);
   const [showAccountLabel, setShowAccountLabel] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const popupRef = useRef(null);
   const menuRef = useRef(null);
   const { user, isAuthenticated, logout, isLoading: authLoading } = useAuth();
   const { cartCount, fetchCartCount, resetCart } = useCart();
   const navigate = useNavigate();
   const { modal, closeModal, showConfirm } = useModal();
+
+  // Scroll detection for header elevation
+  useEffect(() => {
+    const handleScroll = () => setIsScrolled(window.scrollY > 10);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Fetch cart count on mount and when auth is ready (only if authenticated)
   useEffect(() => {
@@ -146,7 +154,7 @@ const Header = () => {
   const dashboardLink = getDashboardLink();
 
   return (
-    <header className="header">
+    <header className={`header${isScrolled ? ' header--scrolled' : ''}`}>
       <Link to="/" className="header__logo" onClick={closeMenu} style={{ marginLeft: '-2rem', paddingLeft: '2rem' }}>
         <img 
           src={logo} 

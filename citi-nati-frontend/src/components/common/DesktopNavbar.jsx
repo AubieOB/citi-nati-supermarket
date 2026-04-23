@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useCart } from '../../context/CartContext.jsx';
@@ -9,6 +9,13 @@ const DesktopNavbar = ({ onCartClick, onAccountClick, navigate }) => {
   const location = useLocation();
   const { isAuthenticated, user } = useAuth();
   const { cartCount } = useCart();
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => setIsScrolled(window.scrollY > 10);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const isActive = (path) => {
     return location.pathname === path;
@@ -21,7 +28,7 @@ const DesktopNavbar = ({ onCartClick, onAccountClick, navigate }) => {
   };
 
   return (
-    <nav className="desktop-navbar">
+    <nav className={`desktop-navbar${isScrolled ? ' desktop-navbar--scrolled' : ''}`}>
       {/* Logo */}
       <img 
         src={logo} 

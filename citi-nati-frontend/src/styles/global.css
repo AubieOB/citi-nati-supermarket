@@ -2450,3 +2450,79 @@ body.menu-open {
     transform: rotate(360deg);
   }
 }
+
+/* ===========================
+   STOREFRONT MOTION & POLISH
+   =========================== */
+
+/* Smooth header shadow transition — enhanced when scrolled */
+.header {
+  transition: box-shadow 0.3s ease, background-color 0.3s ease;
+}
+.header--scrolled {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.13);
+}
+.layout__header {
+  transition: box-shadow 0.3s ease;
+}
+
+/* Desktop fixed navbar: glass effect on scroll */
+.desktop-navbar {
+  transition: box-shadow 0.3s ease, background-color 0.3s ease;
+}
+.desktop-navbar--scrolled {
+  background-color: rgba(255, 255, 255, 0.95);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.13);
+  border-bottom-color: transparent;
+}
+
+/* Desktop sticky header nav links: underline slide on hover */
+@media (min-width: 769px) {
+  .header__link {
+    position: relative;
+  }
+  .header__link:not(.header__link--active)::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0%;
+    height: 2px;
+    background: #5B4B8A;
+    border-radius: 2px;
+    transition: width 0.25s ease;
+  }
+  .header__link:hover:not(.header__link--active)::after {
+    width: 100%;
+  }
+}
+
+/* Mobile bottom nav: icon lift + active pill indicator */
+.mobile-bottom-nav__item i {
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s ease;
+}
+.mobile-bottom-nav__item--active i {
+  transform: scale(1.18) translateY(-2px);
+}
+.mobile-bottom-nav__item--active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 28px;
+  height: 3px;
+  border-radius: 0 0 4px 4px;
+  background: #5B4B8A;
+}
+
+/* Footer links: subtle slide on hover */
+.footer__link {
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+.footer__link:hover {
+  transform: translateX(4px);
+}
