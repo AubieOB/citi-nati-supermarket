@@ -948,6 +948,10 @@
     width: min(calc(100% - 1.5rem), 1180px);
   }
 
+  .help-center-top-bar {
+    padding: 0.7rem 0.9rem 0.65rem;
+  }
+
   .support-public-sealed .support-messenger-layout {
     height: auto !important;
     min-height: 0;
@@ -957,6 +961,23 @@
   .support-public-sealed .support-sidebar,
   .support-public-sealed .support-conversation-panel {
     height: auto;
+  }
+
+  .support-public-sealed.help-center-no-selection .support-sidebar {
+    order: 1;
+  }
+
+  .support-public-sealed.help-center-no-selection .support-conversation-panel,
+  .support-public-sealed.help-center-no-selection .support-empty-state {
+    order: 2;
+  }
+
+  .support-public-sealed.help-center-has-selection .support-sidebar {
+    order: 2;
+  }
+
+  .support-public-sealed.help-center-has-selection .support-conversation-panel {
+    order: 1;
   }
 
   .support-public-sealed .support-ticket-list,
@@ -995,6 +1016,26 @@
   .help-center-composer-actions {
     width: 100%;
     justify-content: flex-end;
+  }
+
+  .support-empty-state {
+    min-height: 22rem;
+    padding: 1rem 0.8rem;
+  }
+
+  .support-empty-card {
+    max-width: 100%;
+    padding: 1.35rem 1rem;
+  }
+
+  .help-center-empty-title {
+    font-size: 1.55rem;
+    margin-top: 0.8rem !important;
+    margin-bottom: 0.55rem;
+  }
+
+  .support-public-sealed .support-sidebar {
+    margin-top: 0.35rem;
   }
 }
 

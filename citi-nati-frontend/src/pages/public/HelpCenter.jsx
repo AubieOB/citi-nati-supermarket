@@ -637,7 +637,7 @@ const HelpCenter = () => {
 
       {/* Two-pane messenger layout — height fills remainder of viewport below top bar + navbar */}
       <section
-        className="support-messenger-layout"
+        className={`support-messenger-layout ${selectedTicket ? 'help-center-has-selection' : 'help-center-no-selection'}`}
         style={{
           height: topBarHeight > 0 ? `calc(100vh - 70px - ${topBarHeight}px - 0.5rem)` : '70vh',
           minHeight: '28rem',
