@@ -430,7 +430,10 @@ const Cart = () => {
                 marginBottom: '1.5rem',
                 paddingBottom: '1.5rem',
                 borderBottom: 'none',
-                color: '#007bff'
+                color: '#007bff',
+                boxShadow: 'none',
+                border: 'none',
+                backgroundColor: 'transparent'
               }}>
                 <span>Total:</span>
                 <span>{formatMWK(cart.total)}</span>
