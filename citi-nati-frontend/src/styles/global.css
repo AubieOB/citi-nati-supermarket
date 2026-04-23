@@ -2526,3 +2526,25 @@ body.menu-open {
 .footer__link:hover {
   transform: translateX(4px);
 }
+/* Fix sticky header: overflow-x:hidden on html/body breaks position:sticky,
+   so force fixed positioning and offset the content */
+.layout__header {
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+}
+.layout__content {
+  padding-top: 92px;
+}
+@media (max-width: 768px) {
+  .layout__content {
+    padding-top: 80px;
+  }
+}
+@media (max-width: 480px) {
+  .layout__content {
+    padding-top: 72px;
+  }
+}
