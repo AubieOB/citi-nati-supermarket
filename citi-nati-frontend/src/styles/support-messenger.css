@@ -963,20 +963,20 @@
     height: auto;
   }
 
-  .support-public-sealed.help-center-no-selection .support-sidebar {
+  .help-center-no-selection .support-sidebar {
     order: 1;
   }
 
-  .support-public-sealed.help-center-no-selection .support-conversation-panel,
-  .support-public-sealed.help-center-no-selection .support-empty-state {
+  .help-center-no-selection .support-conversation-panel,
+  .help-center-no-selection .support-empty-state {
     order: 2;
   }
 
-  .support-public-sealed.help-center-has-selection .support-sidebar {
+  .help-center-has-selection .support-sidebar {
     order: 2;
   }
 
-  .support-public-sealed.help-center-has-selection .support-conversation-panel {
+  .help-center-has-selection .support-conversation-panel {
     order: 1;
   }
 
