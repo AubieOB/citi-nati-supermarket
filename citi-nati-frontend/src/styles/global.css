@@ -2574,3 +2574,13 @@ body.menu-open {
     transform: translateY(-1px);
   }
 }
+
+/* Restore header default shadow (box-shadow: none was incorrectly added) */
+.layout__header {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.header--scrolled,
+.layout__header:has(.header--scrolled) {
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.14);
+}
