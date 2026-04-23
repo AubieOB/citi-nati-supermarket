@@ -823,7 +823,7 @@
 /* Help center top bar */
 .help-center-top-bar {
   width: min(calc(100% - 2.5rem), 1180px);
-  padding: 0.85rem 1.25rem 0.75rem;
+    padding: 1.25rem 1.25rem 1rem;
   margin: 0 auto;
   border-bottom: 1px solid var(--support-border, #e0e0e0);
   background: var(--support-panel-strong, #fff);
@@ -883,8 +883,9 @@
 
 .help-center-subtitle {
   margin: 0.15rem 0 0;
-  font-size: 0.84rem;
-  color: #666;
+    margin: 0.3rem 0 0;
+    font-size: 0.84rem;
+    color: #666;
 }
 
 .help-center-empty-title {
