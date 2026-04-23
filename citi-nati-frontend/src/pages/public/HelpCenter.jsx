@@ -596,7 +596,7 @@ const HelpCenter = () => {
         {showForm && (
           <section className="support-ticket-creator">
             <h2 className="support-section-title" style={{ marginTop: 0 }}>Start a new conversation</h2>
-            <p className="support-empty-copy" style={{ marginTop: '0.35rem' }}>Give the team enough detail so they can help without extra back-and-forth.</p>
+            <p className="support-empty-copy" style={{ marginTop: '0.35rem' }}>Share a short summary and a few details so the support team can help you quickly.</p>
             <form onSubmit={handleCreateTicket} className="support-form-stack" style={{ marginTop: '1rem' }}>
               <div className="support-form-grid">
                 <div>
@@ -615,7 +615,7 @@ const HelpCenter = () => {
               </div>
               <div>
                 <label className="support-field-label">Message</label>
-                <textarea className="support-textarea" name="message" value={formData.message} onChange={handleFormChange} rows={4} placeholder="Explain what happened, what you expected, and any order numbers or details that matter." />
+                <textarea className="support-textarea" name="message" value={formData.message} onChange={handleFormChange} rows={4} placeholder="Tell us what you need help with and include any helpful details." />
               </div>
               <div className="support-form-actions">
                 <button type="submit" className="support-primary-button"><i className="fas fa-paper-plane"></i> Submit Ticket</button>
@@ -645,19 +645,25 @@ const HelpCenter = () => {
         }}
       >
         <aside className="support-sidebar">
-          <div className="support-sidebar-header">
-            <label className="support-field-label">Search your tickets</label>
-            <input
-              className="support-search-input"
-              value={ticketSearch}
-              onChange={(event) => setTicketSearch(event.target.value)}
-              placeholder="Search by subject, message, or ticket #"
-            />
-          </div>
+          {tickets.length > 0 && (
+            <div className="support-sidebar-header">
+              <label className="support-field-label">Search your tickets</label>
+              <input
+                className="support-search-input"
+                value={ticketSearch}
+                onChange={(event) => setTicketSearch(event.target.value)}
+                placeholder="Search by subject, message, or ticket number"
+              />
+            </div>
+          )}
           <div className="support-ticket-list">
             {filteredTickets.length === 0 ? (
               <div className="support-empty-card" style={{ margin: '0.75rem' }}>
-                <p className="support-empty-copy" style={{ margin: 0 }}>No tickets yet. Start one above and the conversation will appear here.</p>
+                <p className="support-empty-copy" style={{ margin: 0 }}>
+                  {tickets.length === 0
+                    ? 'You do not have any support tickets yet. Start a new one above and it will appear in this list.'
+                    : 'No tickets match your search right now. Try a different word or clear the search.'}
+                </p>
               </div>
             ) : (
               filteredTickets.map((ticket) => (
@@ -827,16 +833,16 @@ const HelpCenter = () => {
                           if (!isSendingReply && replyMessage.trim()) handleSendReply(e);
                         }
                       }}
-                      placeholder={dragOver ? 'Drop files here…' : 'Type a message…'}
+                      placeholder={dragOver ? 'Drop files here to attach them.' : 'Write your message here.'}
                       rows={2}
                       disabled={isSendingReply}
                     />
                     <div className="hc-compose-actions">
-                      <button type="button" className="support-icon-button" onClick={() => fileInputRef.current?.click()} disabled={isSendingReply} title="Attach files">
-                        <i className="fas fa-paperclip"></i>
-                      </button>
                       <button type="submit" className="support-icon-button hc-send-button" disabled={isSendingReply || (!replyMessage.trim() && attachedFiles.length === 0)} title={isSendingReply ? 'Sending…' : 'Send'}>
                         <i className={`fas ${isSendingReply ? 'fa-spinner fa-spin' : 'fa-paper-plane'}`}></i>
+                      </button>
+                      <button type="button" className="support-icon-button" onClick={() => fileInputRef.current?.click()} disabled={isSendingReply} title="Attach files">
+                        <i className="fas fa-paperclip"></i>
                       </button>
                     </div>
                   </div>
@@ -850,7 +856,7 @@ const HelpCenter = () => {
             <div className="support-empty-card">
               <i className="fas fa-headset" style={{ fontSize: '2rem', color: '#2D8659' }}></i>
               <h3 className="support-section-title" style={{ marginTop: '1rem' }}>Choose a conversation</h3>
-              <p className="support-empty-copy">Select a ticket to see the full message thread in the new chat view.</p>
+              <p className="support-empty-copy">Choose a ticket from your list to open the conversation and read the latest replies.</p>
             </div>
           </section>
         )}
