@@ -24,6 +24,7 @@ const Header = () => {
   // Scroll detection for header elevation
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 10);
+    handleScroll();
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
@@ -546,3 +547,4 @@ const Header = () => {
 };
 
 export default Header;
+

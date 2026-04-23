@@ -2554,3 +2554,23 @@ body.menu-open {
 
 
 
+
+/* Header transition refinements */
+.layout__header {
+  box-shadow: none;
+}
+.header {
+  transition: box-shadow 0.35s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.35s ease;
+  will-change: box-shadow, background-color;
+}
+.header--scrolled {
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.14);
+}
+.header__link {
+  transition: color 0.25s ease, transform 0.25s ease;
+}
+@media (min-width: 769px) {
+  .header__link:hover {
+    transform: translateY(-1px);
+  }
+}
