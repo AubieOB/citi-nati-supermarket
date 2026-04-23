@@ -134,7 +134,9 @@ function AppInner() {
   // Set up global notifications for all pages
   useGlobalNotifications();
 
-  const loadingFallback = <div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>Loading...</div>;
+  const loadingFallback = <div className="storefront-loading-state">Loading...</div>;
+
+
   const isMaintenanceRoute = location.pathname === '/maintenance';
   const isExemptPath = MAINTENANCE_EXEMPT_PATHS.some((path) => location.pathname === path || location.pathname.startsWith(`${path}/`));
   const isAdminDuringMaintenance = hasPermission(user, PERMISSION_KEYS.ADMIN_DASHBOARD_ACCESS);
@@ -293,3 +295,7 @@ function App() {
 }
 
 export default App;
+
+
+
+

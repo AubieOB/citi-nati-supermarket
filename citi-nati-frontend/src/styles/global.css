@@ -2611,3 +2611,195 @@ body.menu-open {
     width: 100%;
   }
 }
+
+/* ===========================
+   STOREFRONT CRUCIAL STYLE PACK
+   =========================== */
+
+:root {
+  --sf-primary: #5B4B8A;
+  --sf-success: #2D8659;
+  --sf-danger: #ff3860;
+  --sf-focus: rgba(91, 75, 138, 0.32);
+  --sf-radius: 10px;
+  --sf-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --sf-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --sf-duration-fast: 180ms;
+  --sf-duration: 260ms;
+  --sf-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* 1) Keyboard accessibility and clear focus states */
+:where(a, button, input, select, textarea, [role='button']):focus-visible {
+  outline: 3px solid var(--sf-focus);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* 2) Unified interaction tiers */
+.btn,
+.product-card__button,
+.desktop-navbar__item,
+.mobile-bottom-nav__item,
+.header__link,
+.products-top-link,
+.footer__link {
+  transition-duration: var(--sf-duration);
+  transition-timing-function: var(--sf-ease);
+}
+
+.btn:active,
+.product-card__button:active,
+.desktop-navbar__item:active,
+.products-top-link:active {
+  transform: translateY(0) scale(0.98);
+}
+
+button:disabled,
+.btn:disabled,
+.product-card__button:disabled,
+.desktop-navbar__item:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+  filter: grayscale(0.08);
+}
+
+/* 3) Loading polish */
+.storefront-loading-state {
+  position: relative;
+  display: inline-block;
+  font-weight: 600;
+  color: #566173 !important;
+  letter-spacing: 0.02em;
+}
+
+.storefront-loading-state::after {
+  content: '';
+  display: block;
+  height: 2px;
+  margin-top: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent 0%, rgba(91, 75, 138, 0.35) 50%, transparent 100%);
+  background-size: 220% 100%;
+  animation: storefrontShimmer 1.25s linear infinite;
+}
+
+/* 4) Better empty-state presentation */
+.storefront-empty-state,
+.products-page div[style*='backgroundColor: #f8f9fa'] {
+  border: 1px solid #e8eaf0;
+  box-shadow: var(--sf-shadow-sm);
+  border-radius: 12px !important;
+}
+
+/* 5) Product card information hierarchy */
+.product-card__title {
+  font-weight: 700;
+  color: #31405a;
+  letter-spacing: 0.01em;
+}
+
+.product-card__price {
+  color: var(--sf-success);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.product-card__content {
+  gap: 0.15rem;
+}
+
+/* 6) Mobile touch affordance */
+@media (max-width: 768px) {
+  .mobile-bottom-nav__item,
+  .product-card__button,
+  .btn,
+  .cart-checkout-cta .btn {
+    min-height: 44px;
+  }
+
+  .products-page input,
+  .products-page select,
+  .products-page button {
+    min-height: 40px;
+  }
+}
+
+/* 7) Sticky conversion action in cart summary */
+@media (min-width: 769px) {
+  .cart-summary-grid > div:last-child {
+    position: sticky;
+    top: 96px;
+    align-self: start;
+  }
+}
+
+@media (max-width: 768px) {
+  .cart-checkout-cta {
+    position: sticky;
+    bottom: 10px;
+    display: block;
+    z-index: 2;
+  }
+
+  .cart-checkout-cta .btn {
+    box-shadow: 0 10px 24px rgba(45, 134, 89, 0.25);
+  }
+}
+
+/* 8) Motion consistency and smooth reveal */
+@keyframes storefrontShimmer {
+  from { background-position: 100% 50%; }
+  to { background-position: -100% 50%; }
+}
+
+.products-grid > .product-card {
+  animation: storefrontCardIn 360ms var(--sf-ease) both;
+}
+
+@keyframes storefrontCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 9) Checkout trust and clarity visuals */
+.checkout-grid > div:last-child,
+.cart-summary-grid > div:last-child > div {
+  border: 1px solid #dde3ee;
+  border-radius: var(--sf-radius);
+  box-shadow: var(--sf-shadow-sm);
+  background: linear-gradient(180deg, #ffffff 0%, #fafcff 100%);
+}
+
+.checkout-grid > div:last-child::before,
+.cart-summary-grid > div:last-child > div::before {
+  content: 'Secure checkout';
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #366a50;
+  background: rgba(45, 134, 89, 0.12);
+  border: 1px solid rgba(45, 134, 89, 0.22);
+  border-radius: 999px;
+  padding: 0.25rem 0.55rem;
+  margin-bottom: 0.7rem;
+}
+
+/* 10) Respect reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

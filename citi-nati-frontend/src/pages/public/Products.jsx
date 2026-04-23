@@ -803,7 +803,7 @@ const Products = () => {
     return (
       <div className="page products-page">
         <Container>
-          <p style={{ textAlign: 'center', color: '#666', padding: '2rem' }}>Loading products...</p>
+          <p className="storefront-loading-state" style={{ textAlign: 'center', color: '#666', padding: '2rem' }}>Loading products...</p>
         </Container>
       </div>
     );
@@ -1403,5 +1403,7 @@ const Products = () => {
 };
 
 export default Products;
+
+
 
 

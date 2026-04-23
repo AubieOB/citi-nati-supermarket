@@ -230,7 +230,7 @@ const Cart = () => {
       <div className="page cart-page">
         <Container>
           <h1 style={{ marginTop: '2rem', marginBottom: '2rem' }}>Shopping Cart</h1>
-          <p style={{ textAlign: 'center', color: '#666', padding: '2rem' }}>
+          <p className="storefront-loading-state" style={{ textAlign: 'center', color: '#666', padding: '2rem' }}>
             Verifying your session...
           </p>
         </Container>
@@ -244,7 +244,7 @@ const Cart = () => {
       <div className="page cart-page">
         <Container>
           <h1 style={{ marginTop: '2rem', marginBottom: '2rem' }}>Shopping Cart</h1>
-          <p style={{ textAlign: 'center', color: '#666', padding: '2rem' }}>
+          <p className="storefront-loading-state" style={{ textAlign: 'center', color: '#666', padding: '2rem' }}>
             Loading your cart...
           </p>
         </Container>
@@ -453,7 +453,7 @@ const Cart = () => {
               )}
 
               {/* CHECKOUT BUTTON: Disabled if cart empty or below minimum */}
-              <Link to={isBelowMinimumOrderValue ? '#' : '/checkout'}>
+              <Link className="cart-checkout-cta" to={isBelowMinimumOrderValue ? '#' : '/checkout'}>
                 <Button
                   variant="primary"
                   size="large"
@@ -483,3 +483,6 @@ const Cart = () => {
 };
 
 export default Cart;
+
+
+
