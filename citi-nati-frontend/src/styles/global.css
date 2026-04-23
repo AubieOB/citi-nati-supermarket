@@ -2584,3 +2584,30 @@ body.menu-open {
 .layout__header:has(.header--scrolled) {
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.14);
 }
+
+/* Products page top links: match main header hover underline behavior */
+@media (min-width: 769px) {
+  .products-top-link {
+    position: relative;
+    transition: color 0.25s ease, transform 0.25s ease;
+  }
+  .products-top-link::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 2px;
+    background: #5B4B8A;
+    border-radius: 2px;
+    transition: width 0.25s ease;
+  }
+  .products-top-link:hover {
+    color: #5B4B8A;
+    transform: translateY(-1px);
+  }
+  .products-top-link:hover::after {
+    width: 100%;
+  }
+}

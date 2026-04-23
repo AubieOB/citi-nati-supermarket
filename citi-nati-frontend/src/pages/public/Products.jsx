@@ -973,6 +973,7 @@ const Products = () => {
               {/* Home Button */}
               <button
                 onClick={() => navigate('/')}
+                className="products-top-link"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -989,12 +990,6 @@ const Products = () => {
                   transition: 'all 0.3s ease',
                   whiteSpace: 'nowrap'
                 }}
-                onMouseEnter={(e) => {
-                  e.target.style.color = '#5B4B8A';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.color = '#666';
-                }}
                 title="Go to Home"
               >
                 Home
@@ -1003,6 +998,7 @@ const Products = () => {
               {/* Cart Button */}
               <button
                 onClick={handleNavCartClick}
+                className="products-top-link products-top-link--cart"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -1019,12 +1015,6 @@ const Products = () => {
                   transition: 'all 0.3s ease',
                   position: 'relative',
                   whiteSpace: 'nowrap'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.color = '#5B4B8A';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.color = '#666';
                 }}
                 title="View Cart"
               >
@@ -1413,3 +1403,5 @@ const Products = () => {
 };
 
 export default Products;
+
+
