@@ -778,6 +778,23 @@
   .support-message-bubble {
     max-width: 92%;
   }
+
+  .support-public-sealed .support-ticket-creator .support-form-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+    flex-wrap: nowrap;
+  }
+
+  .support-public-sealed .support-ticket-creator .support-form-actions .support-primary-button,
+  .support-public-sealed .support-ticket-creator .support-form-actions .support-ghost-button {
+    width: 100%;
+    min-height: 2.35rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+  }
 }
 
 /* ========================================
