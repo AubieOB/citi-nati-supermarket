@@ -72,7 +72,7 @@ const HelpCenter = () => {
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
   const [isSendingReply, setIsSendingReply] = useState(false);
-  const [ticketSearch, setTicketSearch] = useState('');
+
 
   // Real-time state
   const [replyMessage, setReplyMessage] = useState('');
@@ -483,14 +483,7 @@ const HelpCenter = () => {
   };
 
   const filteredTickets = tickets
-    .filter((ticket) => {
-      const query = ticketSearch.trim().toLowerCase();
-      if (!query) return true;
-
-      return [ticket.subject, ticket.message, String(ticket.id)]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(query));
-    })
+    .slice()
     .sort((left, right) => new Date(right.updatedAt || right.createdAt).getTime() - new Date(left.updatedAt || left.createdAt).getTime());
 
   const conversationMessages = selectedTicket
@@ -645,24 +638,11 @@ const HelpCenter = () => {
         }}
       >
         <aside className="support-sidebar">
-          {tickets.length > 0 && (
-            <div className="support-sidebar-header">
-              <label className="support-field-label">Search your tickets</label>
-              <input
-                className="support-search-input"
-                value={ticketSearch}
-                onChange={(event) => setTicketSearch(event.target.value)}
-                placeholder="Search by subject, message, or ticket number"
-              />
-            </div>
-          )}
           <div className="support-ticket-list">
             {filteredTickets.length === 0 ? (
               <div className="support-empty-card" style={{ margin: '0.75rem' }}>
                 <p className="support-empty-copy" style={{ margin: 0 }}>
-                  {tickets.length === 0
-                    ? 'You do not have any support tickets yet. Start a new one above and it will appear in this list.'
-                    : 'No tickets match your search right now. Try a different word or clear the search.'}
+                  You do not have any support tickets yet. Start a new one above and it will appear in this list.
                 </p>
               </div>
             ) : (
