@@ -7,6 +7,7 @@ const { deriveBranchCodeFromLocationCode } = require('../../utils/operationalSco
 const prisma = new PrismaClient();
 
 const BLANTYRE_LOCATION_CODE = 'BT';
+const DEFAULT_OPEN_STOCK_BALANCES_CODE = 'OPEN STOCK BALANCES';
 
 /**
  * Resolve the Blantyre POS agent URL and secret from environment variables.
@@ -37,6 +38,42 @@ function generateGrnNo(intakeId, date) {
   const dd   = d.getDate();        // no leading zero
   const seq  = String((Number(intakeId) % 999) + 1).padStart(3, '0');
   return `GRN_${yyyy}${m}${dd}-${seq}`;
+}
+
+function resolveSupplierCodeForTransfer(intake) {
+  const explicitSupplierCode = String(intake?.supplier?.supplierCode || '').trim();
+  if (explicitSupplierCode) {
+    return { supplierCode: explicitSupplierCode, usedFallback: false };
+  }
+
+  const supplierName = String(intake?.supplier?.name || '').trim().toUpperCase();
+  const manualSupplierName = String(intake?.manualSupplierName || '').trim().toUpperCase();
+  const isOpenStockBalances = supplierName === DEFAULT_OPEN_STOCK_BALANCES_CODE
+    || manualSupplierName === DEFAULT_OPEN_STOCK_BALANCES_CODE;
+
+  if (!isOpenStockBalances) {
+    return {
+      supplierCode: '',
+      usedFallback: false,
+      error: 'Supplier with a valid SupplierCode is required for POS transfer. Update the intake to link a registered supplier.',
+    };
+  }
+
+  const fallbackCode = String(
+    process.env.POS_OPEN_STOCK_BALANCES_SUPPLIER_CODE
+    || process.env.POS_FALLBACK_SUPPLIER_CODE
+    || DEFAULT_OPEN_STOCK_BALANCES_CODE
+  ).trim();
+
+  if (!fallbackCode) {
+    return {
+      supplierCode: '',
+      usedFallback: false,
+      error: 'OPEN STOCK BALANCES fallback supplier code is not configured. Set POS_OPEN_STOCK_BALANCES_SUPPLIER_CODE.',
+    };
+  }
+
+  return { supplierCode: fallbackCode, usedFallback: true };
 }
 
 /**
@@ -86,11 +123,12 @@ async function transferGoodsIntakeToBlantyrePosPending(intakeId) {
     };
   }
 
-  // --- Supplier guard ---
-  if (!intake.supplier || !intake.supplier.supplierCode) {
+  // --- Supplier guard (supports OPEN STOCK BALANCES fallback) ---
+  const supplierResolution = resolveSupplierCodeForTransfer(intake);
+  if (supplierResolution.error) {
     return {
       success: false,
-      error: 'Supplier with a valid SupplierCode is required for POS transfer. Update the intake to link a registered supplier.',
+      error: supplierResolution.error,
     };
   }
 
@@ -124,7 +162,7 @@ async function transferGoodsIntakeToBlantyrePosPending(intakeId) {
   // --- Build transfer payload ---
   const grnDate   = intake.purchaseDate ? new Date(intake.purchaseDate) : new Date();
   const grnNo     = generateGrnNo(intakeId, grnDate);
-  const supplierCode = intake.supplier.supplierCode;
+  const supplierCode = supplierResolution.supplierCode;
 
   const detailItems = intake.items.map((item) => ({
     productCode: item.product?.sourceCode
@@ -139,7 +177,7 @@ async function transferGoodsIntakeToBlantyrePosPending(intakeId) {
 
   console.log(
     `[BO][GOODS_INTAKE][TRANSFER] intakeId=${intakeId} ref=${intake.intakeRef} grnNo=${grnNo}` +
-    ` supplier=${supplierCode} location=${locationCode} lines=${detailItems.length}`
+    ` supplier=${supplierCode} location=${locationCode} lines=${detailItems.length} fallbackSupplier=${supplierResolution.usedFallback ? 'yes' : 'no'}`
   );
 
   // --- Call Blantyre POS agent ---
