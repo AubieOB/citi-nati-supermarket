@@ -49,6 +49,29 @@ function isLoopbackUrl(value) {
   return normalized.includes('localhost') || normalized.includes('127.0.0.1');
 }
 
+function isPrivateNetworkUrl(value) {
+  try {
+    const parsed = new URL(String(value || '').trim());
+    const host = String(parsed.hostname || '').trim().toLowerCase();
+
+    if (!host) return false;
+    if (host === 'localhost' || host === '127.0.0.1') return true;
+    if (host.startsWith('10.')) return true;
+    if (host.startsWith('192.168.')) return true;
+    if (host.startsWith('172.')) {
+      const parts = host.split('.');
+      const secondOctet = Number(parts[1]);
+      if (Number.isFinite(secondOctet) && secondOctet >= 16 && secondOctet <= 31) {
+        return true;
+      }
+    }
+
+    return false;
+  } catch (_error) {
+    return false;
+  }
+}
+
 function formatTransferAgentError(error, agentConfig, endpoint) {
   const target = `${agentConfig.url}${endpoint}`;
 
@@ -223,8 +246,8 @@ async function transferGoodsIntakeToBlantyrePosPending(intakeId) {
   // --- Call Blantyre POS agent ---
   const agentConfig = resolveAgentConfig();
   const endpoint = '/pos-sync/submit-pending-stock';
-  if (process.env.NODE_ENV === 'production' && isLoopbackUrl(agentConfig.url)) {
-    const configError = `POS agent URL is configured as ${agentConfig.url} (${agentConfig.urlSource}) in production. Render cannot reach a local Blantyre agent via localhost. Set BLANTYRE_POS_AGENT_URL to the publicly reachable agent/tunnel URL.`;
+  if (process.env.NODE_ENV === 'production' && isPrivateNetworkUrl(agentConfig.url)) {
+    const configError = `POS agent URL is configured as ${agentConfig.url} (${agentConfig.urlSource}) in production. Render cannot reach a private LAN or local Blantyre agent address from the public cloud. Set BLANTYRE_POS_AGENT_URL to a publicly reachable agent or tunnel URL.`;
     console.error(`[BO][GOODS_INTAKE][TRANSFER] ${configError}`);
     return { success: false, error: configError };
   }
