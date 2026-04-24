@@ -1018,12 +1018,12 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
   );
 
   return (
-    <div style={{ display: 'grid', gap: '1rem', width: '100%', minWidth: 0 }}>
+    <div style={{ display: 'grid', gap: '1rem', width: '100%', minWidth: 0, fontSize: '0.92rem' }}>
       {canViewForm && (
         <section style={{ ...themedCardStyle, padding: '1rem', width: '100%', minWidth: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             <div>
-              <h2 style={{ margin: 0, color: colors.strongText }}>Stock Intake & POS Transfer</h2>
+              <h2 style={{ margin: 0, color: colors.strongText, fontSize: '1.35rem', lineHeight: 1.2 }}>Stock Intake & POS Transfer</h2>
               <div style={{ marginTop: '0.25rem', fontSize: '0.84rem', color: colors.mutedText }}>
                 Use launcher actions to record intake, finalize, export, queue POS transfer, and review sync history.
               </div>
@@ -1045,7 +1045,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
               style={{ textAlign: 'left', border: '1px solid #bfdbfe', background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 65%)', borderRadius: '18px', padding: '1rem', cursor: 'pointer' }}
             >
               <div style={{ fontSize: '0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: '#1d4ed8', fontWeight: 800 }}>Launcher</div>
-              <div style={{ marginTop: '0.35rem', fontSize: '1.05rem', color: '#0f172a', fontWeight: 800 }}>Start New Stock Intake</div>
+                <div style={{ marginTop: '0.35rem', fontSize: '0.96rem', color: '#0f172a', fontWeight: 800 }}>Start New Stock Intake</div>
               <div style={{ marginTop: '0.3rem', fontSize: '0.82rem', color: '#475569' }}>Open a clean intake workflow modal with fresh line entries.</div>
             </button>
 
@@ -1055,7 +1055,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
               style={{ textAlign: 'left', border: '1px solid #d8b4fe', background: 'linear-gradient(135deg, #f8f5ff 0%, #ffffff 65%)', borderRadius: '18px', padding: '1rem', cursor: 'pointer' }}
             >
               <div style={{ fontSize: '0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: '#7c3aed', fontWeight: 800 }}>Launcher</div>
-              <div style={{ marginTop: '0.35rem', fontSize: '1.05rem', color: '#0f172a', fontWeight: 800 }}>Continue Current Intake</div>
+                <div style={{ marginTop: '0.35rem', fontSize: '0.96rem', color: '#0f172a', fontWeight: 800 }}>Continue Current Intake</div>
               <div style={{ marginTop: '0.3rem', fontSize: '0.82rem', color: '#475569' }}>Resume the current draft/finalized intake and manage transfer actions.</div>
             </button>
 
@@ -1065,7 +1065,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
               style={{ textAlign: 'left', border: '1px solid #bbf7d0', background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 65%)', borderRadius: '18px', padding: '1rem', cursor: 'pointer' }}
             >
               <div style={{ fontSize: '0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: '#166534', fontWeight: 800 }}>History</div>
-              <div style={{ marginTop: '0.35rem', fontSize: '1.05rem', color: '#0f172a', fontWeight: 800 }}>Finalized Intake Records</div>
+                <div style={{ marginTop: '0.35rem', fontSize: '0.96rem', color: '#0f172a', fontWeight: 800 }}>Finalized Intake Records</div>
               <div style={{ marginTop: '0.3rem', fontSize: '0.82rem', color: '#475569' }}>Review finalized entries, export files, and open transfer details.</div>
             </button>
 
@@ -1075,7 +1075,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
               style={{ textAlign: 'left', border: '1px solid #fed7aa', background: 'linear-gradient(135deg, #fff7ed 0%, #ffffff 65%)', borderRadius: '18px', padding: '1rem', cursor: 'pointer' }}
             >
               <div style={{ fontSize: '0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: '#c2410c', fontWeight: 800 }}>Sync</div>
-              <div style={{ marginTop: '0.35rem', fontSize: '1.05rem', color: '#0f172a', fontWeight: 800 }}>POS Transfer History</div>
+                <div style={{ marginTop: '0.35rem', fontSize: '0.96rem', color: '#0f172a', fontWeight: 800 }}>POS Transfer History</div>
               <div style={{ marginTop: '0.3rem', fontSize: '0.82rem', color: '#475569' }}>Track queue status, processing results, and transfer failures.</div>
             </button>
           </div>
@@ -1085,7 +1085,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
       {canViewHistory && (
         <section ref={intakeHistorySectionRef} style={{ ...themedCardStyle, padding: '1rem', width: '100%', minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <h3 style={{ margin: 0, color: colors.text }}>Intake Records</h3>
+            <h3 style={{ margin: 0, color: colors.text, fontSize: '1.05rem', lineHeight: 1.2 }}>Intake Records</h3>
             <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
               <input placeholder="Search ref/supplier/product" value={search} onFocus={selectInputText} onChange={(event) => setSearch(event.target.value)} style={{ ...themedInputStyle, width: '220px' }} />
               <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} style={{ ...themedInputStyle, width: '130px' }}>
@@ -1105,7 +1105,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
               <thead>
                 <tr>
                   {['Ref', 'Date', 'Supplier', 'Location', 'Intake Status', 'POS Transfer', 'Items', 'Total Cost', 'Actions'].map((label) => (
-                    <th key={label} style={{ textAlign: 'left', padding: '0.55rem 0.45rem', fontSize: '0.76rem', color: colors.mutedText, borderBottom: `1px solid ${isAdminDarkTheme ? '#334155' : '#e2e8f0'}` }}>{label}</th>
+                    <th key={label} style={{ textAlign: 'left', padding: '0.48rem 0.4rem', fontSize: '0.72rem', color: colors.mutedText, borderBottom: `1px solid ${isAdminDarkTheme ? '#334155' : '#e2e8f0'}` }}>{label}</th>
                   ))}
                 </tr>
               </thead>
@@ -1116,19 +1116,19 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                   <tr><td colSpan={9} style={{ padding: '1rem', color: colors.mutedText }}>No records found for current filters.</td></tr>
                 ) : records.map((record) => (
                   <tr key={record.id}>
-                    <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, fontWeight: 700, color: colors.strongText }}>{record.intakeRef}</td>
-                    <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{dateInputValue(record.purchaseDate)}</td>
-                    <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{record.supplier?.name || record.manualSupplierName || '-'}</td>
-                    <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{record.locationName || record.locationCode || '-'}</td>
-                    <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}` }}>
+                    <td style={{ padding: '0.5rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, fontWeight: 700, color: colors.strongText, fontSize: '0.86rem' }}>{record.intakeRef}</td>
+                    <td style={{ padding: '0.5rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.84rem' }}>{dateInputValue(record.purchaseDate)}</td>
+                    <td style={{ padding: '0.5rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.84rem' }}>{record.supplier?.name || record.manualSupplierName || '-'}</td>
+                    <td style={{ padding: '0.5rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.84rem' }}>{record.locationName || record.locationCode || '-'}</td>
+                    <td style={{ padding: '0.5rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}` }}>
                       <span style={{ padding: '0.2rem 0.5rem', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 700, color: record.status === 'finalized' ? '#166534' : '#1d4ed8', backgroundColor: record.status === 'finalized' ? '#ecfdf3' : '#eff6ff', border: `1px solid ${record.status === 'finalized' ? '#bbf7d0' : '#bfdbfe'}` }}>
                         {String(record.status || 'draft').toUpperCase()}
                       </span>
                     </td>
-                    <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}` }}>{renderTransferBadge(record)}</td>
-                    <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{record.totalItems || record._count?.items || 0}</td>
-                    <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, fontWeight: 700, color: colors.strongText }}>{money(record.totalCost)}</td>
-                    <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}` }}>
+                    <td style={{ padding: '0.5rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}` }}>{renderTransferBadge(record)}</td>
+                    <td style={{ padding: '0.5rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.84rem' }}>{record.totalItems || record._count?.items || 0}</td>
+                    <td style={{ padding: '0.5rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, fontWeight: 700, color: colors.strongText, fontSize: '0.84rem' }}>{money(record.totalCost)}</td>
+                    <td style={{ padding: '0.5rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}` }}>
                       <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
                         {canEdit && canViewForm && <button type="button" onClick={() => handleEditRecord(record.id)} style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #cbd5e1', background: isAdminDarkTheme ? '#0f172a' : '#fff', color: isAdminDarkTheme ? '#e2e8f0' : '#0f172a', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>Open</button>}
                         {canExport && <button type="button" onClick={() => handleExportRecord(record.id)} style={{ border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>PDF</button>}
@@ -1162,7 +1162,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
       {canViewHistory && (
         <section ref={transferHistorySectionRef} style={{ ...themedCardStyle, padding: '1rem', width: '100%', minWidth: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <h3 style={{ margin: 0, color: colors.text }}>POS Transfer History</h3>
+            <h3 style={{ margin: 0, color: colors.text, fontSize: '1.05rem', lineHeight: 1.2 }}>POS Transfer History</h3>
             <div style={{ fontSize: '0.8rem', color: colors.mutedText }}>
               Showing {transferHistoryRecords.length} finalized intake records on this page
             </div>
@@ -1198,7 +1198,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
               <thead>
                 <tr>
                   {['Ref', 'GRN', 'Supplier', 'Location', 'Intake Date', 'Items', 'Total Cost', 'Transfer Status', 'Queued Time', 'Completed Time', 'Agent Message', 'Actions'].map((label) => (
-                    <th key={label} style={{ textAlign: 'left', padding: '0.55rem 0.45rem', fontSize: '0.76rem', color: colors.mutedText, borderBottom: `1px solid ${isAdminDarkTheme ? '#334155' : '#e2e8f0'}` }}>{label}</th>
+                    <th key={label} style={{ textAlign: 'left', padding: '0.48rem 0.4rem', fontSize: '0.72rem', color: colors.mutedText, borderBottom: `1px solid ${isAdminDarkTheme ? '#334155' : '#e2e8f0'}` }}>{label}</th>
                   ))}
                 </tr>
               </thead>
@@ -1212,18 +1212,18 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                   const responseSummary = transferCommand?.resultSummary?.message || transferCommand?.errorMessage || '-';
                   return (
                     <tr key={`transfer-${record.id}`}>
-                      <td style={{ padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, fontWeight: 700, color: colors.strongText }}>{record.intakeRef}</td>
-                      <td style={{ padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{record.posTransferGrn || '-'}</td>
-                      <td style={{ padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{record.supplier?.name || record.manualSupplierName || '-'}</td>
-                      <td style={{ padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{record.locationName || record.locationCode || '-'}</td>
-                      <td style={{ padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{dateInputValue(record.purchaseDate)}</td>
-                      <td style={{ padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{record.totalItems || record._count?.items || 0}</td>
-                      <td style={{ padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, fontWeight: 700, color: colors.strongText }}>{money(record.totalCost)}</td>
-                      <td style={{ padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}` }}>{renderTransferBadge(record)}</td>
-                      <td style={{ padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{formatDateTime(record.posTransferAt || transferCommand.createdAt)}</td>
-                      <td style={{ padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{formatDateTime(transferCommand.processedAt)}</td>
-                      <td style={{ padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: String(responseSummary).toLowerCase().includes('fail') ? '#b91c1c' : colors.text, maxWidth: '260px' }}>{String(responseSummary).slice(0, 120)}</td>
-                      <td style={{ padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}` }}>
+                      <td style={{ padding: '0.48rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, fontWeight: 700, color: colors.strongText, fontSize: '0.85rem' }}>{record.intakeRef}</td>
+                      <td style={{ padding: '0.48rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.84rem' }}>{record.posTransferGrn || '-'}</td>
+                      <td style={{ padding: '0.48rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.84rem' }}>{record.supplier?.name || record.manualSupplierName || '-'}</td>
+                      <td style={{ padding: '0.48rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.84rem' }}>{record.locationName || record.locationCode || '-'}</td>
+                      <td style={{ padding: '0.48rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.84rem' }}>{dateInputValue(record.purchaseDate)}</td>
+                      <td style={{ padding: '0.48rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.84rem' }}>{record.totalItems || record._count?.items || 0}</td>
+                      <td style={{ padding: '0.48rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, fontWeight: 700, color: colors.strongText, fontSize: '0.84rem' }}>{money(record.totalCost)}</td>
+                      <td style={{ padding: '0.48rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}` }}>{renderTransferBadge(record)}</td>
+                      <td style={{ padding: '0.48rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.84rem' }}>{formatDateTime(record.posTransferAt || transferCommand.createdAt)}</td>
+                      <td style={{ padding: '0.48rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.84rem' }}>{formatDateTime(transferCommand.processedAt)}</td>
+                      <td style={{ padding: '0.48rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, color: String(responseSummary).toLowerCase().includes('fail') ? '#b91c1c' : colors.text, maxWidth: '260px', fontSize: '0.82rem' }}>{String(responseSummary).slice(0, 120)}</td>
+                      <td style={{ padding: '0.48rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}` }}>
                         <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
                           <button type="button" onClick={() => openTransferDetail(record.id)} style={{ border: '1px solid #c7d2fe', background: '#eef2ff', color: '#4338ca', borderRadius: '7px', padding: '0.25rem 0.5rem', fontWeight: 700, cursor: 'pointer' }}>View</button>
                           {canExport && <button type="button" onClick={() => handleExportRecord(record.id)} style={{ border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: '7px', padding: '0.25rem 0.5rem', fontWeight: 700, cursor: 'pointer' }}>PDF</button>}
