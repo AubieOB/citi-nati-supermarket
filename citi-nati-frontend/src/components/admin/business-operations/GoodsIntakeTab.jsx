@@ -571,8 +571,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
       const response = await api.post(`/business-operations/goods-intake/${recordId}/transfer-to-pos`);
       const result = response.data;
       await boAlert({
-        title: 'Transferred to POS',
-        message: `Pending stock request created in POS.\nGRN: ${result.grnNo}\nLines: ${result.linesInserted}\n\nThe POS operator must approve this in the POS software before stock is live.`,
+        title: 'Queued for POS Transfer',
+        message: `Transfer queued successfully.\nGRN: ${result.grnNo}\nLines: ${result.linesQueued ?? result.linesInserted}\n\nThe Blantyre POS agent will pick this up within seconds and write it to pending stock. The POS operator must then approve it inside the POS software before stock is live.`,
         type: 'success',
       });
       // Reload the record to reflect new posTransferStatus / posTransferGrn
@@ -682,10 +682,16 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                     title={`GRN: ${form.posTransferGrn || ''}`}>
                     ✓ Sent to POS{form.posTransferGrn ? ` (${form.posTransferGrn})` : ''}
                   </span>
+                ) : form.posTransferStatus === 'queued'
+                ? (
+                  <span style={{ border: '1px solid #fde68a', background: '#fefce8', color: '#92400e', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 700, fontSize: '0.85rem' }}
+                    title={`GRN: ${form.posTransferGrn || ''} — Agent will process shortly`}>
+                    ⏳ Queued for POS{form.posTransferGrn ? ` (${form.posTransferGrn})` : ''}
+                  </span>
                 ) : (
                   <button type="button" onClick={() => handleTransferToPOS(form.id)} disabled={transferring || saving}
                     style={{ border: '1px solid #fb923c', background: '#fff7ed', color: '#c2410c', borderRadius: '8px', padding: '0.45rem 0.9rem', fontWeight: 700, cursor: 'pointer' }}>
-                    {transferring ? 'Sending to POS…' : '→ Transfer to POS'}
+                    {transferring ? 'Queuing for POS…' : '→ Transfer to POS'}
                   </button>
                 )
             )}
@@ -1011,6 +1017,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                       {canEdit && record.status === 'finalized' && String(record.locationCode || '').trim().toUpperCase() === 'BT' && (
                         record.posTransferStatus === 'transferred'
                           ? <span style={{ border: '1px solid #99f6e4', background: '#f0fdfa', color: '#0f766e', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, fontSize: '0.78rem' }} title={`GRN: ${record.posTransferGrn || ''}`}>✓ POS</span>
+                          : record.posTransferStatus === 'queued'
+                          ? <span style={{ border: '1px solid #fde68a', background: '#fefce8', color: '#92400e', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, fontSize: '0.78rem' }} title={`GRN: ${record.posTransferGrn || ''} — queued`}>⏳ POS</span>
                           : <button type="button" onClick={() => handleTransferToPOS(record.id)} disabled={transferring} style={{ border: '1px solid #fb923c', background: '#fff7ed', color: '#c2410c', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>→ POS</button>
                       )}
                     </div>

@@ -1,94 +1,13 @@
 'use strict';
 
-const axios = require('axios');
 const { PrismaClient } = require('@prisma/client');
 const { deriveBranchCodeFromLocationCode } = require('../../utils/operationalScope');
+const posCommandQueueService = require('../posCommandQueue.service');
 
 const prisma = new PrismaClient();
 
 const BLANTYRE_LOCATION_CODE = 'BT';
 const DEFAULT_OPEN_STOCK_BALANCES_CODE = 'OPEN STOCK BALANCES';
-const DEFAULT_AGENT_TIMEOUT_MS = 30000;
-
-function resolveAgentTimeoutMs() {
-  const parsed = parseInt(
-    process.env.GOODS_INTAKE_POS_AGENT_TIMEOUT_MS
-      || process.env.BLANTYRE_POS_AGENT_TIMEOUT_MS
-      || process.env.POS_AGENT_TIMEOUT_MS
-      || String(DEFAULT_AGENT_TIMEOUT_MS),
-    10
-  );
-
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_AGENT_TIMEOUT_MS;
-}
-
-/**
- * Resolve the Blantyre POS agent URL and secret from environment variables.
- * Falls back to the default POS_AGENT_URL / POS_SECRET.
- */
-function resolveAgentConfig() {
-  const rawUrl = process.env.BLANTYRE_POS_AGENT_URL || process.env.POS_AGENT_URL || 'http://localhost:3001';
-  const rawSecret = process.env.BLANTYRE_POS_SECRET || process.env.POS_SECRET || '';
-  const url = String(
-    rawUrl
-  ).trim();
-  const secret = String(
-    rawSecret
-  ).trim();
-  return {
-    url,
-    secret,
-    urlSource: process.env.BLANTYRE_POS_AGENT_URL ? 'BLANTYRE_POS_AGENT_URL' : (process.env.POS_AGENT_URL ? 'POS_AGENT_URL' : 'default'),
-    secretSource: process.env.BLANTYRE_POS_SECRET ? 'BLANTYRE_POS_SECRET' : (process.env.POS_SECRET ? 'POS_SECRET' : 'none'),
-    timeoutMs: resolveAgentTimeoutMs(),
-  };
-}
-
-function isLoopbackUrl(value) {
-  const normalized = String(value || '').trim().toLowerCase();
-  return normalized.includes('localhost') || normalized.includes('127.0.0.1');
-}
-
-function isPrivateNetworkUrl(value) {
-  try {
-    const parsed = new URL(String(value || '').trim());
-    const host = String(parsed.hostname || '').trim().toLowerCase();
-
-    if (!host) return false;
-    if (host === 'localhost' || host === '127.0.0.1') return true;
-    if (host.startsWith('10.')) return true;
-    if (host.startsWith('192.168.')) return true;
-    if (host.startsWith('172.')) {
-      const parts = host.split('.');
-      const secondOctet = Number(parts[1]);
-      if (Number.isFinite(secondOctet) && secondOctet >= 16 && secondOctet <= 31) {
-        return true;
-      }
-    }
-
-    return false;
-  } catch (_error) {
-    return false;
-  }
-}
-
-function formatTransferAgentError(error, agentConfig, endpoint) {
-  const target = `${agentConfig.url}${endpoint}`;
-
-  if (error.code === 'ECONNABORTED') {
-    return `Request to POS agent timed out after ${agentConfig.timeoutMs}ms (${target}). Verify the Blantyre POS Sync Agent is running, reachable from the backend, and that the endpoint is not blocked by SQL connectivity.`;
-  }
-
-  if (error.code === 'ECONNREFUSED') {
-    return `Could not connect to POS agent at ${target}. Verify the Blantyre POS Sync Agent is running and BLANTYRE_POS_AGENT_URL/POS_AGENT_URL is correct.`;
-  }
-
-  if (error.response) {
-    return error.response.data?.error || `POS agent request failed with status ${error.response.status} (${target})`;
-  }
-
-  return `${error.message} (${target})`;
-}
 
 /**
  * Generate a GRN number from intake ID + date.
@@ -213,10 +132,11 @@ async function transferGoodsIntakeToBlantyrePosPending(intakeId) {
   }
 
   // --- Duplicate protection ---
-  if (intake.posTransferStatus === 'transferred') {
+  if (intake.posTransferStatus === 'transferred' || intake.posTransferStatus === 'queued') {
+    const existingLabel = intake.posTransferStatus === 'queued' ? 'queued for' : 'already transferred to';
     return {
       success: false,
-      error: `This intake has already been transferred to POS pending stock (GRN: ${intake.posTransferGrn}).`,
+      error: `This intake has ${existingLabel} POS pending stock (GRN: ${intake.posTransferGrn}).`,
       alreadyTransferred: true,
       existingGrn: intake.posTransferGrn,
     };
@@ -243,93 +163,63 @@ async function transferGoodsIntakeToBlantyrePosPending(intakeId) {
     ` supplier=${supplierCode} location=${locationCode} lines=${detailItems.length} fallbackSupplier=${supplierResolution.usedFallback ? 'yes' : 'no'}`
   );
 
-  // --- Call Blantyre POS agent ---
-  const agentConfig = resolveAgentConfig();
-  const endpoint = '/pos-sync/submit-pending-stock';
-  if (process.env.NODE_ENV === 'production' && isPrivateNetworkUrl(agentConfig.url)) {
-    const configError = `POS agent URL is configured as ${agentConfig.url} (${agentConfig.urlSource}) in production. Render cannot reach a private LAN or local Blantyre agent address from the public cloud. Set BLANTYRE_POS_AGENT_URL to a publicly reachable agent or tunnel URL.`;
-    console.error(`[BO][GOODS_INTAKE][TRANSFER] ${configError}`);
-    return { success: false, error: configError };
-  }
+  // --- Enqueue command for Blantyre POS agent (polling model — no direct LAN call) ---
+  const posLocationCode = mapToPostLocationCode(locationCode); // BT → SH
 
-  let agentResult;
-  try {
-    const response = await axios.post(
-      `${agentConfig.url}${endpoint}`,
-      {
-        grnNo,
-        grnDate:       grnDate.toISOString(),
-        supplierCode,
-        locationCode:  appConfig_locationCode(intake.locationCode),  // map BT → SH (Blantyre shelf)
-        intakeRef:     intake.intakeRef,
-        intakeId,
-        items:         detailItems,
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-pos-secret': agentConfig.secret,
-        },
-        timeout: agentConfig.timeoutMs,
-      }
-    );
-    agentResult = response.data;
-  } catch (agentError) {
-    const msg = formatTransferAgentError(agentError, agentConfig, endpoint);
-    console.error(`[BO][GOODS_INTAKE][TRANSFER] Agent call failed for intakeId=${intakeId}: ${msg}`, {
-      endpoint,
-      agentUrl: agentConfig.url,
-      agentUrlSource: agentConfig.urlSource,
-      hasSecret: Boolean(agentConfig.secret),
-      secretSource: agentConfig.secretSource,
-      timeoutMs: agentConfig.timeoutMs,
-    });
-    return { success: false, error: `POS agent call failed: ${msg}` };
-  }
+  const queued = await posCommandQueueService.enqueueCommand(
+    'CREATE_PENDING_STOCK_INTAKE',
+    {
+      intakeId,
+      intakeRef:    intake.intakeRef,
+      grnNo,
+      grnDate:      grnDate.toISOString(),
+      supplierCode,
+      locationCode: posLocationCode,
+      items:        detailItems,
+      usedFallbackSupplier: supplierResolution.usedFallback,
+    },
+    {
+      source:            'goods-intake-transfer',
+      relatedEntityType: 'GoodsIntake',
+      relatedEntityId:   String(intakeId),
+      createdBy:         null,
+      maxRetries:        3,
+    }
+  );
 
-  if (!agentResult || !agentResult.success) {
-    const reason = agentResult?.error || 'Unknown failure from POS agent';
-    console.error(`[BO][GOODS_INTAKE][TRANSFER] Agent returned failure for intakeId=${intakeId}: ${reason}`);
-    return { success: false, error: reason };
-  }
-
-  // --- Mark intake as transferred ---
-  const updated = await prisma.goodsIntake.update({
+  // --- Mark intake as queued ---
+  await prisma.goodsIntake.update({
     where: { id: intakeId },
     data: {
-      posTransferStatus:       'transferred',
+      posTransferStatus:       'queued',
       posTransferGrn:          grnNo,
       posTransferAt:           new Date(),
-      posTransferLocationCode: locationCode,
-    },
-    include: {
-      supplier: { select: { id: true, name: true, supplierCode: true } },
-      items:    { orderBy: { lineNo: 'asc' } },
+      posTransferLocationCode: posLocationCode,
     },
   });
 
   console.log(
-    `[BO][GOODS_INTAKE][TRANSFER] SUCCESS intakeId=${intakeId} grnNo=${grnNo}` +
-    ` supplier=${supplierCode} location=${locationCode} lines=${detailItems.length}`
+    `[BO][GOODS_INTAKE][TRANSFER] QUEUED intakeId=${intakeId} grnNo=${grnNo}` +
+    ` commandId=${queued.id} supplier=${supplierCode} lines=${detailItems.length}`
   );
 
   return {
-    success:      true,
+    success:    true,
+    queued:     true,
     grnNo,
+    commandId:  queued.id,
     supplierCode,
-    locationCode,
-    linesInserted: detailItems.length,
-    data:          updated,
+    locationCode: posLocationCode,
+    linesQueued:  detailItems.length,
   };
 }
 
 /**
  * Map the website location code (BT) to the POS location code (SH for Blantyre shelf).
- * If the code is already the right POS format, return as-is.
  */
-function appConfig_locationCode(websiteLocationCode) {
+function mapToPostLocationCode(websiteLocationCode) {
   const code = String(websiteLocationCode || '').toUpperCase().trim();
-  if (code === 'BT') return 'SH';   // Blantyre website code → Blantyre POS shelf code
+  if (code === 'BT') return 'SH';
   return code;
 }
 

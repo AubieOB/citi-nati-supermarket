@@ -461,6 +461,125 @@ async function executeWriteInvoice(pool, payload, commandId) {
   }
 }
 
+async function executeCreatePendingStockIntake(pool, payload, commandId) {
+  const { grnNo, grnDate, supplierCode, locationCode, intakeRef, intakeId, items } = payload;
+
+  console.log('[INTAKE PENDING] CREATE_PENDING_STOCK_INTAKE start', {
+    commandId,
+    grnNo,
+    intakeRef,
+    intakeId,
+    supplierCode,
+    locationCode,
+    itemCount: Array.isArray(items) ? items.length : 0,
+  });
+
+  if (!grnNo) {
+    throw new Error('NON_RETRYABLE: CREATE_PENDING_STOCK_INTAKE payload missing grnNo');
+  }
+  if (!supplierCode) {
+    throw new Error('NON_RETRYABLE: CREATE_PENDING_STOCK_INTAKE payload missing supplierCode');
+  }
+  if (!locationCode) {
+    throw new Error('NON_RETRYABLE: CREATE_PENDING_STOCK_INTAKE payload missing locationCode');
+  }
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new Error('NON_RETRYABLE: CREATE_PENDING_STOCK_INTAKE payload has no items');
+  }
+
+  const transaction = new sql.Transaction(pool);
+
+  try {
+    await transaction.begin();
+
+    const checkRequest = new sql.Request(transaction);
+    checkRequest.input('grnNo', sql.NVarChar(50), grnNo);
+
+    // Duplicate GRN check in stocks_temp
+    const dupTempResult = await checkRequest.query(
+      `SELECT TOP 1 GRNNo FROM [POS].[dbo].[stocks_temp] WHERE GRNNo = @grnNo`
+    );
+    if (dupTempResult.recordset && dupTempResult.recordset.length > 0) {
+      throw new Error(`NON_RETRYABLE: GRN ${grnNo} already exists in stocks_temp (duplicate transfer)`);
+    }
+
+    // Duplicate GRN check in live stocks
+    const dupLiveResult = await checkRequest.query(
+      `SELECT TOP 1 GRNNo FROM [POS].[dbo].[stocks] WHERE GRNNo = @grnNo`
+    );
+    if (dupLiveResult.recordset && dupLiveResult.recordset.length > 0) {
+      throw new Error(`NON_RETRYABLE: GRN ${grnNo} already exists in live stocks table (already approved)`);
+    }
+
+    // Insert header into stocks_temp
+    const headerRequest = new sql.Request(transaction);
+    const parsedGrnDate = grnDate ? new Date(grnDate) : new Date();
+    headerRequest.input('grnNo',        sql.NVarChar(50),   grnNo);
+    headerRequest.input('grnDate',      sql.DateTime,       parsedGrnDate);
+    headerRequest.input('supplierCode', sql.NVarChar(50),   supplierCode);
+    headerRequest.input('locationCode', sql.NVarChar(10),   locationCode);
+    headerRequest.input('intakeRef',    sql.NVarChar(100),  intakeRef || null);
+    headerRequest.input('intakeId',     sql.NVarChar(50),   intakeId ? String(intakeId) : null);
+    headerRequest.input('commandId',    sql.NVarChar(50),   String(commandId));
+
+    await headerRequest.query(`
+      INSERT INTO [POS].[dbo].[stocks_temp]
+        (GRNNo, GRNDate, SupplierCode, LocationCode, IntakeRef, IntakeId, CommandId, CreatedAt)
+      VALUES
+        (@grnNo, @grnDate, @supplierCode, @locationCode, @intakeRef, @intakeId, @commandId, GETDATE())
+    `);
+
+    console.log(`[INTAKE PENDING] stocks_temp header inserted GRN=${grnNo}`);
+
+    // Insert detail lines into stockdetails_temp
+    let linesInserted = 0;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const detailRequest = new sql.Request(transaction);
+      detailRequest.input('grnNo',        sql.NVarChar(50),   grnNo);
+      detailRequest.input('lineNo',       sql.Int,            i + 1);
+      detailRequest.input('productCode',  sql.NVarChar(50),   String(item.productCode || '').trim());
+      detailRequest.input('productName',  sql.NVarChar(200),  String(item.productName || '').trim());
+      detailRequest.input('stockQty',     sql.Decimal(18, 4), Number(item.stockQty) || 0);
+      detailRequest.input('unit',         sql.NVarChar(20),   String(item.unit || '').trim());
+      detailRequest.input('costPrice',    sql.Decimal(18, 4), Number(item.costPrice) || 0);
+      detailRequest.input('expiryDate',   sql.DateTime,       item.expiryDate ? new Date(item.expiryDate) : null);
+
+      await detailRequest.query(`
+        INSERT INTO [POS].[dbo].[stockdetails_temp]
+          (GRNNo, LineNo, ProductCode, ProductName, StockQty, Unit, CostPrice, ExpiryDate, CreatedAt)
+        VALUES
+          (@grnNo, @lineNo, @productCode, @productName, @stockQty, @unit, @costPrice, @expiryDate, GETDATE())
+      `);
+      linesInserted++;
+    }
+
+    await transaction.commit();
+    console.log(`[INTAKE PENDING] transaction committed GRN=${grnNo} lines=${linesInserted}`);
+
+    return {
+      message:       'CREATE_PENDING_STOCK_INTAKE executed successfully',
+      grnNo,
+      linesInserted,
+      intakeRef:     intakeRef || null,
+      intakeId:      intakeId || null,
+    };
+  } catch (error) {
+    try {
+      await transaction.rollback();
+      console.log('[INTAKE PENDING ERROR] rollback completed');
+    } catch (rollbackErr) {
+      console.log('[INTAKE PENDING ERROR] rollback note (already aborted):', rollbackErr.message);
+    }
+
+    if (String(error.message || '').startsWith('NON_RETRYABLE:')) {
+      throw error;
+    }
+
+    throw error;
+  }
+}
+
 async function executeCommand(pool, command) {
   const { commandType, payload } = command;
 
@@ -480,6 +599,8 @@ async function executeCommand(pool, command) {
       return executeRevertPromotion(pool, payload, command.id);
     case 'WRITE_INVOICE':
       return executeWriteInvoice(pool, payload, command.id);
+    case 'CREATE_PENDING_STOCK_INTAKE':
+      return executeCreatePendingStockIntake(pool, payload, command.id);
     default:
       throw new Error(`Unsupported command type: ${commandType}`);
   }

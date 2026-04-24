@@ -14,6 +14,7 @@ enum PosCommandType {
   APPLY_PROMOTION
   REVERT_PROMOTION
   WRITE_INVOICE
+  CREATE_PENDING_STOCK_INTAKE
 }
 
 enum PosCommandStatus {

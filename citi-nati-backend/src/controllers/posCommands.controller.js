@@ -1,4 +1,7 @@
 const queueService = require('../services/posCommandQueue.service');
+const { PrismaClient } = require('@prisma/client');
+
+const prisma = new PrismaClient();
 
 function isAuthorizedAgent(req) {
   const provided = req.headers['x-pos-secret'];
@@ -46,7 +49,27 @@ async function completeCommand(req, res) {
     const { resultSummary } = req.body;
     const agentId = getAgentId(req);
 
+    // Fetch command before marking complete (need commandType + relatedEntityId for side-effects)
+    const command = await queueService.getCommandById(id);
+
     await queueService.markCommandCompleted(id, resultSummary || {}, agentId);
+
+    // Side-effect: mark related GoodsIntake as 'transferred' when the agent reports success
+    if (command && command.commandType === 'CREATE_PENDING_STOCK_INTAKE' && command.relatedEntityType === 'GoodsIntake' && command.relatedEntityId) {
+      try {
+        const intakeId = parseInt(command.relatedEntityId, 10);
+        if (Number.isFinite(intakeId)) {
+          await prisma.goodsIntake.update({
+            where: { id: intakeId },
+            data: { posTransferStatus: 'transferred' },
+          });
+          console.log(`[POS COMMAND QUEUE] GoodsIntake ${intakeId} marked as transferred after command ${id} completed`);
+        }
+      } catch (sideEffectError) {
+        // Non-fatal — log but don't fail the command complete response
+        console.error(`[POS COMMAND QUEUE] Failed to update GoodsIntake status after command ${id}:`, sideEffectError.message);
+      }
+    }
 
     return res.json({ success: true, id, status: 'COMPLETED' });
   } catch (error) {
@@ -65,12 +88,31 @@ async function failCommand(req, res) {
     const { errorMessage, retryable } = req.body;
     const agentId = getAgentId(req);
 
+    // Fetch command before marking failed (need commandType + relatedEntityId for side-effects)
+    const command = await queueService.getCommandById(id);
+
     await queueService.markCommandFailed(
       id,
       errorMessage || 'Command failed without details',
       retryable !== false,
       agentId
     );
+
+    // Side-effect: mark related GoodsIntake as 'failed' when retries exhausted (retryable=false)
+    if (retryable === false && command && command.commandType === 'CREATE_PENDING_STOCK_INTAKE' && command.relatedEntityType === 'GoodsIntake' && command.relatedEntityId) {
+      try {
+        const intakeId = parseInt(command.relatedEntityId, 10);
+        if (Number.isFinite(intakeId)) {
+          await prisma.goodsIntake.update({
+            where: { id: intakeId },
+            data: { posTransferStatus: 'failed' },
+          });
+          console.log(`[POS COMMAND QUEUE] GoodsIntake ${intakeId} marked as failed after command ${id} non-retryable failure`);
+        }
+      } catch (sideEffectError) {
+        console.error(`[POS COMMAND QUEUE] Failed to update GoodsIntake status after command ${id} failure:`, sideEffectError.message);
+      }
+    }
 
     return res.json({ success: true, id });
   } catch (error) {
