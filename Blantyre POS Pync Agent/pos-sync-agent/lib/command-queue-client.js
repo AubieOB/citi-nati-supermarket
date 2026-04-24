@@ -44,7 +44,13 @@ function withMetadata(payload = {}) {
 
 async function pollCommands(limit = 10) {
   const client = createClient();
-  const response = await client.post('/api/pos-commands/poll', withMetadata({ limit }));
+  const config = buildConfig();
+  const payload = withMetadata({ 
+    limit,
+    // Send location codes this agent handles to filter queue commands
+    locationCode: config.posDb.locationCode || 'SH',
+  });
+  const response = await client.post('/api/pos-commands/poll', payload);
   return (response.data && response.data.commands) || [];
 }
 

@@ -22,7 +22,16 @@ async function pollCommands(req, res) {
 
     const agentId = getAgentId(req);
     const limit = req.body && req.body.limit ? req.body.limit : 10;
-    const claimed = await queueService.claimPendingCommands(limit, agentId);
+    
+    // Extract target location codes from request (agent specifies which locations it handles)
+    let targetLocationCodes = [];
+    if (req.body && Array.isArray(req.body.locationCodes)) {
+      targetLocationCodes = req.body.locationCodes;
+    } else if (req.body && typeof req.body.locationCode === 'string') {
+      targetLocationCodes = [req.body.locationCode];
+    }
+    
+    const claimed = await queueService.claimPendingCommands(limit, agentId, targetLocationCodes);
 
     return res.json({
       success: true,

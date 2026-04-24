@@ -91,29 +91,45 @@ async function enqueueCommand(commandType, payload, meta = {}) {
   }
 }
 
-async function claimPendingCommands(limit = 10, agentId = 'unknown-agent') {
+async function claimPendingCommands(limit = 10, agentId = 'unknown-agent', targetLocationCodes = []) {
   const safeLimit = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
   const lockToken = crypto.randomUUID();
+  
+  // Normalize target location codes to uppercase array
+  const normalizedLocations = (Array.isArray(targetLocationCodes) ? targetLocationCodes : [])
+    .map(code => String(code || '').trim().toUpperCase())
+    .filter(code => code.length > 0);
 
   try {
     return await prisma.$transaction(async (tx) => {
+      // Build the WHERE clause - if specific locations provided, filter by them
+      const whereClause = {
+        status: POS_COMMAND_STATUS.PENDING,
+        OR: [
+          { nextRetryAt: null },
+          { nextRetryAt: { lte: new Date() } },
+        ],
+      };
+      
       const candidates = await tx.posWriteCommand.findMany({
-        where: {
-          status: POS_COMMAND_STATUS.PENDING,
-          OR: [
-            { nextRetryAt: null },
-            { nextRetryAt: { lte: new Date() } },
-          ],
-        },
+        where: whereClause,
         orderBy: {
           createdAt: 'asc',
         },
-        take: safeLimit,
+        take: safeLimit * 2, // Fetch extra to account for filtering by location
       });
 
+      // Filter candidates by target location if specified
+      const filteredCandidates = normalizedLocations.length > 0
+        ? candidates.filter(cmd => {
+            const cmdLocationCode = String(cmd.payload?.locationCode || '').trim().toUpperCase();
+            return normalizedLocations.includes(cmdLocationCode);
+          })
+        : candidates;
+      
       const claimedIds = [];
 
-      for (const candidate of candidates) {
+      for (const candidate of filteredCandidates) {
         if (candidate.retryCount >= candidate.maxRetries) {
           continue;
         }
@@ -157,6 +173,7 @@ async function claimPendingCommands(limit = 10, agentId = 'unknown-agent') {
         agentId,
         count: claimed.length,
         ids: claimed.map((item) => item.id),
+        locationFilter: normalizedLocations.length > 0 ? normalizedLocations.join(',') : 'none',
       });
 
       if (claimed.length > 0) {
