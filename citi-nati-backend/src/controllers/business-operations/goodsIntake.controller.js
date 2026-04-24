@@ -190,7 +190,6 @@ async function lookupGoodsIntakeProducts(req, res) {
   }
 }
 
-module.exports = {
 async function transferToPOS(req, res) {
   try {
     const id = toInt(req.params.id);
