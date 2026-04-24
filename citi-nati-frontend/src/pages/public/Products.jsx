@@ -639,8 +639,9 @@ const Products = () => {
           priceChangedCount: syncData?.priceChangedCount,
           affectedLocations: syncData?.affectedLocations,
         });
-        // Keep current UI stable and silently refresh current product page scope.
-        void fetchProducts(false, { bypassCache: true, silent: true });
+        // Do not refetch the paginated storefront list here. Frequent sync events can
+        // collapse a user's expanded load-more window back to the first batch.
+        // Visible products already receive targeted real-time updates via socket events.
       };
 
       // Listen for stock updates, product updates, promotion changes, and POS product updates
