@@ -559,7 +559,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
     }
   };
 
-  const handleLookup = async (index) => {
   const handleTransferToPOS = async (recordId) => {
     if (!canEdit) return;
     const confirmed = await boConfirm({
