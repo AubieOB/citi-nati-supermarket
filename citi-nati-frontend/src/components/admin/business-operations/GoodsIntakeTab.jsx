@@ -133,6 +133,8 @@ function buildNewForm(selectedLocation) {
     receiptTotalAmount: '',
     status: 'draft',
     items: [createEmptyLine()],
+    posTransferStatus: null,
+    posTransferGrn: null,
   };
 }
 
@@ -191,6 +193,8 @@ function toFormFromRecord(record) {
           lineNotes: item.lineNotes || '',
         }))
       : [createEmptyLine()],
+    posTransferStatus: record.posTransferStatus || null,
+    posTransferGrn: record.posTransferGrn || null,
   };
 }
 
@@ -251,6 +255,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
 
   const [form, setForm] = useState(() => buildNewForm(selectedLocation));
   const [saving, setSaving] = useState(false);
+  const [transferring, setTransferring] = useState(false);
   const [activeLookupRow, setActiveLookupRow] = useState(-1);
   const [lookupWarning, setLookupWarning] = useState('');
   const [isIntakeWorkspaceOpen, setIsIntakeWorkspaceOpen] = useState(false);
@@ -555,6 +560,33 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
   };
 
   const handleLookup = async (index) => {
+  const handleTransferToPOS = async (recordId) => {
+    if (!canEdit) return;
+    const confirmed = await boConfirm({
+      title: 'Transfer to POS Pending Stock?',
+      message: 'This will create a pending stock-add request in the Blantyre POS system. The final approval must still happen inside the POS software. Proceed?',
+    });
+    if (!confirmed) return;
+    setTransferring(true);
+    try {
+      const response = await api.post(`/business-operations/goods-intake/${recordId}/transfer-to-pos`);
+      const result = response.data;
+      await boAlert({
+        title: 'Transferred to POS',
+        message: `Pending stock request created in POS.\nGRN: ${result.grnNo}\nLines: ${result.linesInserted}\n\nThe POS operator must approve this in the POS software before stock is live.`,
+        type: 'success',
+      });
+      // Reload the record to reflect new posTransferStatus / posTransferGrn
+      await handleEditRecord(recordId);
+    } catch (error) {
+      const msg = error.response?.data?.error || 'Failed to transfer to POS.';
+      await boAlert({ title: 'Transfer Failed', message: msg, type: 'error' });
+    } finally {
+      setTransferring(false);
+    }
+  };
+
+  const handleLookup = async (index) => {
     const line = form.items[index];
     const query = String(line?.barcode || line?.productName || '').trim();
     if (!query) return;
@@ -643,6 +675,20 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
               <button type="button" onClick={() => saveRecord('finalized')} disabled={saving} style={{ border: 'none', background: '#0f766e', color: '#fff', borderRadius: '8px', padding: '0.45rem 0.9rem', fontWeight: 700, cursor: 'pointer' }}>
                 {saving ? 'Saving...' : 'Finalize Intake'}
               </button>
+            )}
+            {form.id && canEdit && form.status === 'finalized' && String(form.locationCode || '').trim().toUpperCase() === 'BT' && (
+              form.posTransferStatus === 'transferred'
+                ? (
+                  <span style={{ border: '1px solid #99f6e4', background: '#f0fdfa', color: '#0f766e', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 700, fontSize: '0.85rem' }}
+                    title={`GRN: ${form.posTransferGrn || ''}`}>
+                    ✓ Sent to POS{form.posTransferGrn ? ` (${form.posTransferGrn})` : ''}
+                  </span>
+                ) : (
+                  <button type="button" onClick={() => handleTransferToPOS(form.id)} disabled={transferring || saving}
+                    style={{ border: '1px solid #fb923c', background: '#fff7ed', color: '#c2410c', borderRadius: '8px', padding: '0.45rem 0.9rem', fontWeight: 700, cursor: 'pointer' }}>
+                    {transferring ? 'Sending to POS…' : '→ Transfer to POS'}
+                  </button>
+                )
             )}
           </div>
         </div>
@@ -963,6 +1009,11 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                       {canEdit && canViewForm && <button type="button" onClick={() => handleEditRecord(record.id)} style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #cbd5e1', background: isAdminDarkTheme ? '#0f172a' : '#fff', color: isAdminDarkTheme ? '#e2e8f0' : '#0f172a', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>Edit</button>}
                       {canExport && <button type="button" onClick={() => handleExportRecord(record.id)} style={{ border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>PDF</button>}
                       {canDelete && <button type="button" onClick={() => handleDeleteRecord(record)} style={{ border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 600, cursor: 'pointer' }}>Delete</button>}
+                      {canEdit && record.status === 'finalized' && String(record.locationCode || '').trim().toUpperCase() === 'BT' && (
+                        record.posTransferStatus === 'transferred'
+                          ? <span style={{ border: '1px solid #99f6e4', background: '#f0fdfa', color: '#0f766e', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, fontSize: '0.78rem' }} title={`GRN: ${record.posTransferGrn || ''}`}>✓ POS</span>
+                          : <button type="button" onClick={() => handleTransferToPOS(record.id)} disabled={transferring} style={{ border: '1px solid #fb923c', background: '#fff7ed', color: '#c2410c', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>→ POS</button>
+                      )}
                     </div>
                   </td>
                 </tr>

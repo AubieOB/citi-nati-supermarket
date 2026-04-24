@@ -1,6 +1,7 @@
 'use strict';
 
 const goodsIntakeService = require('../../services/business-operations/goodsIntake.service');
+const goodsIntakePosTransferService = require('../../services/business-operations/goodsIntakePosTransfer.service');
 const {
   parsePagination,
   parseSort,
@@ -190,10 +191,29 @@ async function lookupGoodsIntakeProducts(req, res) {
 }
 
 module.exports = {
+async function transferToPOS(req, res) {
+  try {
+    const id = toInt(req.params.id);
+    if (!id) return res.status(400).json({ success: false, error: 'Invalid goods intake id' });
+
+    const result = await goodsIntakePosTransferService.transferGoodsIntakeToBlantyrePosPending(id);
+    if (!result.success) {
+      const statusCode = result.alreadyTransferred ? 409 : 422;
+      return res.status(statusCode).json({ success: false, error: result.error, grnNo: result.existingGrn });
+    }
+    return res.json({ success: true, data: result.data, grnNo: result.grnNo, linesInserted: result.linesInserted });
+  } catch (error) {
+    console.error('[BO][GOODS_INTAKE] transfer-to-pos error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to transfer goods intake to POS' });
+  }
+}
+
+module.exports = {
   createGoodsIntake,
   updateGoodsIntake,
   deleteGoodsIntake,
   getGoodsIntakeById,
   listGoodsIntakes,
   lookupGoodsIntakeProducts,
+  transferToPOS,
 };

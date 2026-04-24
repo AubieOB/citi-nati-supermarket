@@ -1664,6 +1664,160 @@ app.get('/pos-sync/get-resolved-price/:productCode', validateApiKey, async (req,
   }
 });
 
+/**
+ * POST /pos-sync/submit-pending-stock
+ * Blantyre ONLY — Insert a finalized goods intake as pending stock rows into
+ * POS.dbo.stocks_temp (header) and POS.dbo.stockdetails_temp (details).
+ * Does NOT write to live stocks / stockdetails tables.
+ * Final approval must still happen inside the POS software.
+ *
+ * Request body:
+ *   grnNo        {string}  — unique GRN identifier, e.g. "GRN_2026423-001"
+ *   grnDate      {string}  — ISO date string for the GRN date
+ *   supplierCode {string}  — POS supplier code
+ *   locationCode {string}  — POS location code (e.g. "SH")
+ *   intakeRef    {string}  — website intake reference (for logging)
+ *   intakeId     {number}  — website intake ID (for logging)
+ *   items        {Array}   — array of { productCode, stockQty, unit, costPrice, expiryDate? }
+ */
+app.post('/pos-sync/submit-pending-stock', validateApiKey, async (req, res) => {
+  const logPrefix = '[PENDING STOCK]';
+  try {
+    console.log(`${logPrefix} POST /pos-sync/submit-pending-stock called (Blantyre only)`);
+    if (!pool) await initializePool();
+
+    const { grnNo, grnDate, supplierCode, locationCode, items, intakeRef, intakeId } = req.body;
+
+    // --- Input validation ---
+    if (!grnNo || typeof grnNo !== 'string' || !grnNo.trim()) {
+      return res.status(400).json({ success: false, error: 'grnNo is required' });
+    }
+    if (supplierCode === undefined || supplierCode === null || String(supplierCode).trim() === '') {
+      return res.status(400).json({ success: false, error: 'supplierCode is required' });
+    }
+    if (!locationCode || typeof locationCode !== 'string') {
+      return res.status(400).json({ success: false, error: 'locationCode is required' });
+    }
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, error: 'items must be a non-empty array' });
+    }
+
+    const safeGrnNo       = String(grnNo).trim();
+    const safeSupplierCode = String(supplierCode).trim();
+    const safeLocationCode = String(locationCode).trim();
+    const safeGrnDate     = grnDate ? new Date(grnDate) : new Date();
+
+    if (isNaN(safeGrnDate.getTime())) {
+      return res.status(400).json({ success: false, error: 'grnDate is invalid' });
+    }
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (!item.productCode || !String(item.productCode).trim()) {
+        return res.status(400).json({ success: false, error: `items[${i}].productCode is required` });
+      }
+      if (!Number.isFinite(Number(item.stockQty)) || Number(item.stockQty) <= 0) {
+        return res.status(400).json({ success: false, error: `items[${i}].stockQty must be > 0` });
+      }
+      if (!Number.isFinite(Number(item.costPrice)) || Number(item.costPrice) < 0) {
+        return res.status(400).json({ success: false, error: `items[${i}].costPrice must be >= 0` });
+      }
+    }
+
+    // --- Duplicate GRN check (stocks_temp and live stocks) ---
+    const dupReq = pool.request();
+    dupReq.input('GRNNo', sql.VarChar(100), safeGrnNo);
+    const dupResult = await dupReq.query(`
+      SELECT COUNT(*) AS cnt FROM (
+        SELECT GRNNo FROM POS.dbo.stocks_temp WHERE GRNNo = @GRNNo
+        UNION ALL
+        SELECT GRNNo FROM POS.dbo.stocks WHERE GRNNo = @GRNNo
+      ) AS combined
+    `);
+    const dupCount = Number(dupResult.recordset[0] && dupResult.recordset[0].cnt) || 0;
+    if (dupCount > 0) {
+      console.warn(`${logPrefix} Duplicate GRN: ${safeGrnNo}`);
+      return res.status(409).json({
+        success: false,
+        error: `GRN ${safeGrnNo} already exists in POS (stocks_temp or stocks). Cannot insert duplicate.`,
+        grnNo: safeGrnNo,
+        duplicate: true,
+      });
+    }
+
+    // --- Insert header into stocks_temp ---
+    const headerReq = pool.request();
+    headerReq.input('GRNNo',       sql.VarChar(100),  safeGrnNo);
+    headerReq.input('GRNDate',     sql.DateTime,      safeGrnDate);
+    headerReq.input('SupplierCode', sql.VarChar(50),  safeSupplierCode);
+    headerReq.input('LocationCode', sql.VarChar(10),  safeLocationCode);
+    await headerReq.query(`
+      INSERT INTO POS.dbo.stocks_temp
+        (GRNNo, GRNDate, SupplierCode, LocationCode, UploadStatus, OrderNumber)
+      VALUES
+        (@GRNNo, @GRNDate, @SupplierCode, @LocationCode, 0, 0)
+    `);
+    console.log(`${logPrefix} Header inserted: GRN=${safeGrnNo} supplier=${safeSupplierCode} location=${safeLocationCode}`);
+
+    // --- Insert each detail into stockdetails_temp ---
+    let linesInserted = 0;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const safeProductCode = String(item.productCode).trim();
+      const safeStockQty    = Number(item.stockQty);
+      const safeUnit        = String(item.unit || '').trim();
+      const safeCostPrice   = Number(item.costPrice);
+      const rawExpiry       = item.expiryDate ? new Date(item.expiryDate) : null;
+      const safeExpiryDate  = (rawExpiry && !isNaN(rawExpiry.getTime())) ? rawExpiry : null;
+
+      const detailReq = pool.request();
+      detailReq.input('GRNNo',       sql.VarChar(100), safeGrnNo);
+      detailReq.input('ProductCode', sql.VarChar(100), safeProductCode);
+      detailReq.input('StockQty',    sql.Float,        safeStockQty);
+      detailReq.input('Unit',        sql.VarChar(20),  safeUnit);
+      detailReq.input('CostPrice',   sql.Float,        safeCostPrice);
+
+      if (safeExpiryDate) {
+        detailReq.input('ExpiryDate', sql.DateTime, safeExpiryDate);
+        await detailReq.query(`
+          INSERT INTO POS.dbo.stockdetails_temp
+            (GRNNo, ProductCode, StockQty, Unit, StockOut, CostPrice, ExpiryDate, StartSerialNo, EndSerialNo, UploadStatus, Qty1, Qty1Out)
+          VALUES
+            (@GRNNo, @ProductCode, @StockQty, @Unit, 0, @CostPrice, @ExpiryDate, '', '', 0, 0, 0)
+        `);
+      } else {
+        await detailReq.query(`
+          INSERT INTO POS.dbo.stockdetails_temp
+            (GRNNo, ProductCode, StockQty, Unit, StockOut, CostPrice, ExpiryDate, StartSerialNo, EndSerialNo, UploadStatus, Qty1, Qty1Out)
+          VALUES
+            (@GRNNo, @ProductCode, @StockQty, @Unit, 0, @CostPrice, NULL, '', '', 0, 0, 0)
+        `);
+      }
+
+      linesInserted++;
+      console.log(`${logPrefix} Detail ${i + 1}/${items.length}: ProductCode=${safeProductCode} Qty=${safeStockQty} Cost=${safeCostPrice}`);
+    }
+
+    console.log(`${logPrefix} SUCCESS GRN=${safeGrnNo} intakeRef=${intakeRef || 'N/A'} intakeId=${intakeId || 'N/A'} supplier=${safeSupplierCode} location=${safeLocationCode} lines=${linesInserted}`);
+
+    return res.json({
+      success: true,
+      grnNo: safeGrnNo,
+      supplierCode: safeSupplierCode,
+      locationCode: safeLocationCode,
+      linesInserted,
+      message: `Pending stock created: GRN ${safeGrnNo} with ${linesInserted} line(s). Awaiting POS approval.`,
+    });
+  } catch (err) {
+    console.error(`${logPrefix} Error in /pos-sync/submit-pending-stock:`, err.message);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error: Failed to submit pending stock',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined,
+    });
+  }
+});
+
 /** Health check endpoint */
 app.get('/health', (req, res) => {
   res.json({

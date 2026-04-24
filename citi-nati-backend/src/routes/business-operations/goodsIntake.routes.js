@@ -8,6 +8,7 @@ const {
   getGoodsIntakeById,
   listGoodsIntakes,
   lookupGoodsIntakeProducts,
+  transferToPOS,
 } = require('../../controllers/business-operations/goodsIntake.controller');
 
 const router = express.Router();
@@ -15,6 +16,7 @@ const router = express.Router();
 router.get('/lookup-products', lookupGoodsIntakeProducts);
 router.post('/', createGoodsIntake);
 router.put('/:id', updateGoodsIntake);
+router.post('/:id/transfer-to-pos', transferToPOS);
 router.delete('/:id', deleteGoodsIntake);
 router.get('/:id', getGoodsIntakeById);
 router.get('/', listGoodsIntakes);
