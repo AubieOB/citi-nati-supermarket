@@ -74,6 +74,7 @@ const Products = () => {
     const searchRequestIdRef = useRef(0); // Monotonic counter — only apply results from the latest request
   const selectedCategoryRef = useRef(''); // Track selected category in socket handlers
   const productsRef = useRef([]); // Keep products in ref for search callback
+  const offsetRef = useRef(0); // Keep pagination offset current for background refreshes
   const selectedCategorySearchRef = useRef(''); // Keep category for search callback
   const onSaleOnlyRef = useRef(false); // Keep sale filter for search callback
 
@@ -201,11 +202,16 @@ const Products = () => {
         setError(null);
       }
 
-      // Calculate offset based on current products
-      const currentOffset = isLoadMore ? offset + limit : 0;
+      // Silent refreshes should preserve the full loaded window instead of
+      // replacing the UI with just the first page again.
+      const currentOffsetBase = offsetRef.current;
+      const requestLimit = !isLoadMore && silent && currentOffsetBase > 0
+        ? currentOffsetBase + limit
+        : limit;
+      const currentOffset = isLoadMore ? currentOffsetBase + limit : 0;
       
       // Create cache key
-      const cacheKey = `offset_${currentOffset}_category_${effectiveCategory || 'all'}_sale_${effectiveOnSaleOnly}`;
+      const cacheKey = `offset_${currentOffset}_limit_${requestLimit}_category_${effectiveCategory || 'all'}_sale_${effectiveOnSaleOnly}`;
 
       // Check cache (only for initial loads, not Load More to ensure fresh data)
       if (!isLoadMore && !bypassCache && productsCacheRef.current.has(cacheKey)) {
@@ -228,13 +234,13 @@ const Products = () => {
       }
 
       const params = new URLSearchParams();
-      params.append('limit', limit);
+    params.append('limit', requestLimit);
       params.append('offset', currentOffset);
       params.append('locationCode', STOREFRONT_LOCATION_CODE);
       if (effectiveCategory) params.append('category', effectiveCategory);
       if (effectiveOnSaleOnly) params.append('onSale', 'true');
 
-      console.log(`[PRODUCTS FETCH] ${isLoadMore ? 'Load More' : 'Initial'} | Offset: ${currentOffset} | Limit: ${limit} | Category: ${effectiveCategory || 'all'} | OnSale: ${effectiveOnSaleOnly}`);
+    console.log(`[PRODUCTS FETCH] ${isLoadMore ? 'Load More' : silent ? 'Background Refresh' : 'Initial'} | Offset: ${currentOffset} | Limit: ${requestLimit} | Category: ${effectiveCategory || 'all'} | OnSale: ${effectiveOnSaleOnly}`);
       
       const response = await api.get(`/products?${params.toString()}`);
       const data = response.data;
@@ -247,9 +253,18 @@ const Products = () => {
       
       // Filter out hidden products
       const visibleProducts = fetchedProducts.filter(p => !p.hideFromProductsPage);
+
+      const currentLoadedWindowSize = offsetRef.current > 0
+        ? offsetRef.current + limit
+        : limit;
+
+      if (!isLoadMore && silent && requestLimit < currentLoadedWindowSize) {
+        console.log(`[PRODUCTS FETCH] Skipping stale background refresh | Requested: ${requestLimit} | Current window: ${currentLoadedWindowSize}`);
+        return;
+      }
       
       // Determine if there are more products
-      const hasMore = fetchedProducts.length === limit;
+      const hasMore = fetchedProducts.length === requestLimit;
       
       // Cache the data
       productsCacheRef.current.set(cacheKey, {
@@ -347,6 +362,10 @@ const Products = () => {
   useEffect(() => {
     productsRef.current = products;
   }, [products]);
+
+  useEffect(() => {
+    offsetRef.current = offset;
+  }, [offset]);
 
   useEffect(() => {
     onSaleOnlyRef.current = onSaleOnly;
@@ -595,8 +614,8 @@ const Products = () => {
           return;
         }
         console.log('[PRODUCTS] 🎯 Promotion updated:', promotion.type);
-        // Refetch all products to get updated discount prices
-        fetchProducts();
+        // Preserve the currently loaded window when promotions change.
+        void fetchProducts(false, { bypassCache: true, silent: true });
       };
 
       const handlePOSSync = (syncData) => {
