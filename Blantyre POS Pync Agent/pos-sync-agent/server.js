@@ -60,17 +60,6 @@ let reportingSyncState;
 let reportingSyncService;
 let instanceLockServer = null;
 
-const REQUIRED_PENDING_STOCK_SCHEMA = {
-  stocks_temp: ['GRNNo', 'GRNDate', 'SupplierCode', 'LocationCode', 'UploadStatus', 'OrderNumber'],
-  stockdetails_temp: ['GRNNo', 'ProductCode', 'StockQty', 'Unit', 'StockOut', 'CostPrice', 'ExpiryDate', 'StartSerialNo', 'EndSerialNo', 'UploadStatus', 'Qty1', 'Qty1Out'],
-};
-
-const pendingStockSchemaState = {
-  checked: false,
-  ok: false,
-  missingByTable: {},
-};
-
 function acquireInstanceLock() {
   return new Promise((resolve) => {
     const requestedLockPort = Number(appConfig.server.instanceLockPort || 0);
@@ -182,55 +171,6 @@ async function initializePool() {
     }
   }
   return pool;
-}
-
-async function validatePendingStockIntakeSchema() {
-  if (!pool) {
-    throw new Error('Pool not initialized');
-  }
-
-  const requiredTableNames = Object.keys(REQUIRED_PENDING_STOCK_SCHEMA);
-  const existingColumns = {};
-
-  for (const tableName of requiredTableNames) {
-    const request = pool.request();
-    request.input('tableName', sql.NVarChar(128), tableName);
-
-    const result = await request.query(`
-      SELECT COLUMN_NAME
-      FROM INFORMATION_SCHEMA.COLUMNS
-      WHERE TABLE_SCHEMA = 'dbo'
-        AND TABLE_NAME = @tableName
-    `);
-
-    existingColumns[tableName] = new Set(
-      (result.recordset || []).map((row) => String(row.COLUMN_NAME || '').trim())
-    );
-  }
-
-  const missingByTable = {};
-
-  for (const [tableName, requiredColumns] of Object.entries(REQUIRED_PENDING_STOCK_SCHEMA)) {
-    const present = existingColumns[tableName] || new Set();
-    const missing = requiredColumns.filter((column) => !present.has(column));
-    if (missing.length > 0) {
-      missingByTable[tableName] = missing;
-    }
-  }
-
-  pendingStockSchemaState.checked = true;
-  pendingStockSchemaState.ok = Object.keys(missingByTable).length === 0;
-  pendingStockSchemaState.missingByTable = missingByTable;
-
-  if (pendingStockSchemaState.ok) {
-    console.log(`${BRANCH_TAG} [BOOT] Pending stock intake schema check passed for stocks_temp and stockdetails_temp`);
-    return;
-  }
-
-  console.error(`${BRANCH_TAG} [BOOT][ERROR] Pending stock intake schema mismatch detected. CREATE_PENDING_STOCK_INTAKE commands will be failed as non-retryable until schema is corrected.`);
-  for (const [tableName, missing] of Object.entries(missingByTable)) {
-    console.error(`${BRANCH_TAG} [BOOT][ERROR] Missing columns in ${tableName}: ${missing.join(', ')}`);
-  }
 }
 
 /** Middleware: API Key Validation */
@@ -1997,10 +1937,6 @@ async function pollAndProcessCommands() {
 
     for (const command of commands) {
       try {
-        if (command.commandType === 'CREATE_PENDING_STOCK_INTAKE' && !pendingStockSchemaState.ok) {
-          throw new Error('NON_RETRYABLE: Pending stock intake schema is incompatible on this POS database. Missing required columns in stocks_temp/stockdetails_temp.');
-        }
-
         console.log('[POS COMMAND EXECUTOR] start:', {
           id: command.id,
           commandType: command.commandType,
@@ -2197,7 +2133,6 @@ async function startServer() {
     }
 
     await initializePool();
-    await validatePendingStockIntakeSchema();
     await validateBackendConnection();
 
     if (ENABLE_REPORTING_SYNC) {
