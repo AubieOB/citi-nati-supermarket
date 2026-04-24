@@ -8,23 +8,63 @@ const prisma = new PrismaClient();
 
 const BLANTYRE_LOCATION_CODE = 'BT';
 const DEFAULT_OPEN_STOCK_BALANCES_CODE = 'OPEN STOCK BALANCES';
+const DEFAULT_AGENT_TIMEOUT_MS = 30000;
+
+function resolveAgentTimeoutMs() {
+  const parsed = parseInt(
+    process.env.GOODS_INTAKE_POS_AGENT_TIMEOUT_MS
+      || process.env.BLANTYRE_POS_AGENT_TIMEOUT_MS
+      || process.env.POS_AGENT_TIMEOUT_MS
+      || String(DEFAULT_AGENT_TIMEOUT_MS),
+    10
+  );
+
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_AGENT_TIMEOUT_MS;
+}
 
 /**
  * Resolve the Blantyre POS agent URL and secret from environment variables.
  * Falls back to the default POS_AGENT_URL / POS_SECRET.
  */
 function resolveAgentConfig() {
+  const rawUrl = process.env.BLANTYRE_POS_AGENT_URL || process.env.POS_AGENT_URL || 'http://localhost:3001';
+  const rawSecret = process.env.BLANTYRE_POS_SECRET || process.env.POS_SECRET || '';
   const url = String(
-    process.env.BLANTYRE_POS_AGENT_URL ||
-    process.env.POS_AGENT_URL ||
-    'http://localhost:3001'
+    rawUrl
   ).trim();
   const secret = String(
-    process.env.BLANTYRE_POS_SECRET ||
-    process.env.POS_SECRET ||
-    ''
+    rawSecret
   ).trim();
-  return { url, secret };
+  return {
+    url,
+    secret,
+    urlSource: process.env.BLANTYRE_POS_AGENT_URL ? 'BLANTYRE_POS_AGENT_URL' : (process.env.POS_AGENT_URL ? 'POS_AGENT_URL' : 'default'),
+    secretSource: process.env.BLANTYRE_POS_SECRET ? 'BLANTYRE_POS_SECRET' : (process.env.POS_SECRET ? 'POS_SECRET' : 'none'),
+    timeoutMs: resolveAgentTimeoutMs(),
+  };
+}
+
+function isLoopbackUrl(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return normalized.includes('localhost') || normalized.includes('127.0.0.1');
+}
+
+function formatTransferAgentError(error, agentConfig, endpoint) {
+  const target = `${agentConfig.url}${endpoint}`;
+
+  if (error.code === 'ECONNABORTED') {
+    return `Request to POS agent timed out after ${agentConfig.timeoutMs}ms (${target}). Verify the Blantyre POS Sync Agent is running, reachable from the backend, and that the endpoint is not blocked by SQL connectivity.`;
+  }
+
+  if (error.code === 'ECONNREFUSED') {
+    return `Could not connect to POS agent at ${target}. Verify the Blantyre POS Sync Agent is running and BLANTYRE_POS_AGENT_URL/POS_AGENT_URL is correct.`;
+  }
+
+  if (error.response) {
+    return error.response.data?.error || `POS agent request failed with status ${error.response.status} (${target})`;
+  }
+
+  return `${error.message} (${target})`;
 }
 
 /**
@@ -182,10 +222,17 @@ async function transferGoodsIntakeToBlantyrePosPending(intakeId) {
 
   // --- Call Blantyre POS agent ---
   const agentConfig = resolveAgentConfig();
+  const endpoint = '/pos-sync/submit-pending-stock';
+  if (process.env.NODE_ENV === 'production' && isLoopbackUrl(agentConfig.url)) {
+    const configError = `POS agent URL is configured as ${agentConfig.url} (${agentConfig.urlSource}) in production. Render cannot reach a local Blantyre agent via localhost. Set BLANTYRE_POS_AGENT_URL to the publicly reachable agent/tunnel URL.`;
+    console.error(`[BO][GOODS_INTAKE][TRANSFER] ${configError}`);
+    return { success: false, error: configError };
+  }
+
   let agentResult;
   try {
     const response = await axios.post(
-      `${agentConfig.url}/pos-sync/submit-pending-stock`,
+      `${agentConfig.url}${endpoint}`,
       {
         grnNo,
         grnDate:       grnDate.toISOString(),
@@ -200,13 +247,20 @@ async function transferGoodsIntakeToBlantyrePosPending(intakeId) {
           'Content-Type': 'application/json',
           'x-pos-secret': agentConfig.secret,
         },
-        timeout: 30000,
+        timeout: agentConfig.timeoutMs,
       }
     );
     agentResult = response.data;
   } catch (agentError) {
-    const msg = agentError.response?.data?.error || agentError.message || 'Unknown agent error';
-    console.error(`[BO][GOODS_INTAKE][TRANSFER] Agent call failed for intakeId=${intakeId}: ${msg}`);
+    const msg = formatTransferAgentError(agentError, agentConfig, endpoint);
+    console.error(`[BO][GOODS_INTAKE][TRANSFER] Agent call failed for intakeId=${intakeId}: ${msg}`, {
+      endpoint,
+      agentUrl: agentConfig.url,
+      agentUrlSource: agentConfig.urlSource,
+      hasSecret: Boolean(agentConfig.secret),
+      secretSource: agentConfig.secretSource,
+      timeoutMs: agentConfig.timeoutMs,
+    });
     return { success: false, error: `POS agent call failed: ${msg}` };
   }
 
