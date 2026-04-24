@@ -22,6 +22,39 @@ const tableInputStyle = {
 
 const DEFAULT_STATUS_FILTER = 'all';
 
+const TRANSFER_STATUS_META = {
+  not_transferred: { label: 'Not Transferred', short: 'Not Sent', tone: { border: '#cbd5e1', bg: '#f8fafc', color: '#475569' } },
+  queued: { label: 'Queued', short: 'Queued', tone: { border: '#fde68a', bg: '#fefce8', color: '#92400e' } },
+  transferred: { label: 'Transferred to POS', short: 'Transferred', tone: { border: '#99f6e4', bg: '#f0fdfa', color: '#0f766e' } },
+  failed: { label: 'Failed', short: 'Failed', tone: { border: '#fecaca', bg: '#fff1f2', color: '#b91c1c' } },
+  approved: { label: 'Approved in POS', short: 'Approved', tone: { border: '#bbf7d0', bg: '#f0fdf4', color: '#166534' } },
+};
+
+function resolveTransferStatus(record) {
+  const status = String(record?.posTransferStatus || '').trim().toLowerCase();
+  if (status === 'queued') return 'queued';
+  if (status === 'failed') return 'failed';
+  if (status === 'approved') return 'approved';
+  if (status === 'transferred') {
+    const approvedFlag = Boolean(record?.posTransferCommand?.resultSummary?.approvedInPos);
+    return approvedFlag ? 'approved' : 'transferred';
+  }
+  return 'not_transferred';
+}
+
+function formatDateTime(value) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleString('en-GB', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 function toMoney(value) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return 0;
@@ -200,6 +233,8 @@ function toFormFromRecord(record) {
 
 const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions = {} }) => {
   const workspaceRef = useRef(null);
+  const intakeHistorySectionRef = useRef(null);
+  const transferHistorySectionRef = useRef(null);
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
   const canViewForm = permissions.canViewForm !== false;
   const canViewHistory = permissions.canViewHistory !== false;
@@ -260,6 +295,14 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
   const [lookupWarning, setLookupWarning] = useState('');
   const [isIntakeWorkspaceOpen, setIsIntakeWorkspaceOpen] = useState(false);
   const [isIntakeWorkspaceMaximized, setIsIntakeWorkspaceMaximized] = useState(false);
+  const [isTransferDetailOpen, setIsTransferDetailOpen] = useState(false);
+  const [transferDetailRecord, setTransferDetailRecord] = useState(null);
+
+  const [transferStatusFilter, setTransferStatusFilter] = useState('all');
+  const [transferSupplierFilter, setTransferSupplierFilter] = useState('all');
+  const [transferLocationFilter, setTransferLocationFilter] = useState('all');
+  const [transferStartDate, setTransferStartDate] = useState('');
+  const [transferEndDate, setTransferEndDate] = useState('');
 
   const activeLookupLocationCode = useMemo(() => {
     const formLocationCode = String(form.locationCode || '').trim().toUpperCase();
@@ -309,6 +352,38 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
     if (String(form.manualSupplierName || '').trim()) return String(form.manualSupplierName).trim();
     return 'Supplier Name';
   }, [form.manualSupplierName, form.supplierId, suppliers]);
+
+  const finalizedRecordsCount = useMemo(
+    () => records.filter((record) => String(record.status || '').toLowerCase() === 'finalized').length,
+    [records]
+  );
+
+  const transferHistoryRecords = useMemo(() => {
+    return records.filter((record) => {
+      if (String(record.status || '').toLowerCase() !== 'finalized') return false;
+
+      const transferStatus = resolveTransferStatus(record);
+      if (transferStatusFilter !== 'all' && transferStatus !== transferStatusFilter) return false;
+
+      if (transferSupplierFilter !== 'all' && String(record.supplierId || '') !== String(transferSupplierFilter)) return false;
+
+      if (transferLocationFilter !== 'all') {
+        const recordLocation = String(record.locationCode || '').toUpperCase();
+        if (recordLocation !== String(transferLocationFilter || '').toUpperCase()) return false;
+      }
+
+      const purchaseDateKey = dateInputValue(record.purchaseDate);
+      if (transferStartDate && purchaseDateKey && purchaseDateKey < transferStartDate) return false;
+      if (transferEndDate && purchaseDateKey && purchaseDateKey > transferEndDate) return false;
+
+      return true;
+    });
+  }, [records, transferEndDate, transferLocationFilter, transferStartDate, transferStatusFilter, transferSupplierFilter]);
+
+  const queuedTransfersCount = useMemo(
+    () => records.filter((record) => resolveTransferStatus(record) === 'queued').length,
+    [records]
+  );
 
   const fetchRecords = useCallback(async () => {
     setListLoading(true);
@@ -377,13 +452,14 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
     if (!isIntakeWorkspaceOpen) return;
     const handler = (event) => {
       if (event.key === 'Escape') {
-        setIsIntakeWorkspaceOpen(false);
-        setIsIntakeWorkspaceMaximized(false);
+        event.preventDefault();
+        // Route Escape through the same safe close flow as the modal close button.
+        handleCloseWorkspace();
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isIntakeWorkspaceOpen]);
+  }, [handleCloseWorkspace, isIntakeWorkspaceOpen]);
 
   const setLineValue = (index, key, value) => {
     setForm((prev) => ({
@@ -585,6 +661,41 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
     }
   };
 
+  async function handleCloseWorkspace() {
+    if (saving || transferring) return;
+    const confirmed = await boConfirm({
+      title: 'Close Intake Workspace?',
+      message: 'Any unsaved line edits will be lost. Do you want to close this workspace now?',
+      confirmText: 'Close',
+      cancelText: 'Continue Editing',
+      type: 'warning',
+    });
+    if (!confirmed) return;
+    setIsIntakeWorkspaceOpen(false);
+    setIsIntakeWorkspaceMaximized(false);
+  }
+
+  const openTransferDetail = async (recordId) => {
+    try {
+      const response = await api.get(`/business-operations/goods-intake/${recordId}`);
+      const data = response.data?.data;
+      if (!data) return;
+      setTransferDetailRecord(data);
+      setIsTransferDetailOpen(true);
+    } catch (error) {
+      await boAlert({
+        title: 'Details Unavailable',
+        message: error.response?.data?.error || 'Failed to load transfer details.',
+        type: 'error',
+      });
+    }
+  };
+
+  const jumpToSection = (ref) => {
+    if (!ref?.current) return;
+    ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const handleLookup = async (index) => {
     const line = form.items[index];
     const query = String(line?.barcode || line?.productName || '').trim();
@@ -645,13 +756,38 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
     focusNextWorkspaceField(workspaceRef.current, event.currentTarget);
   }, [handleLookup]);
 
+  const renderTransferBadge = (record, { compact = false } = {}) => {
+    const key = resolveTransferStatus(record);
+    const meta = TRANSFER_STATUS_META[key] || TRANSFER_STATUS_META.not_transferred;
+    const label = compact ? meta.short : meta.label;
+    const grn = record?.posTransferGrn ? ` (${record.posTransferGrn})` : '';
+
+    return (
+      <span
+        style={{
+          border: `1px solid ${meta.tone.border}`,
+          background: meta.tone.bg,
+          color: meta.tone.color,
+          borderRadius: compact ? '7px' : '999px',
+          padding: compact ? '0.28rem 0.55rem' : '0.3rem 0.65rem',
+          fontWeight: 700,
+          fontSize: compact ? '0.78rem' : '0.74rem',
+          whiteSpace: 'nowrap',
+        }}
+        title={record?.posTransferGrn ? `GRN: ${record.posTransferGrn}` : meta.label}
+      >
+        {label}{compact && (key === 'queued' || key === 'transferred' || key === 'approved') ? grn : ''}
+      </span>
+    );
+  };
+
   const workspaceContent = (
     <section ref={workspaceRef} style={{ ...cardStyle, padding: '1rem', width: '100%', minWidth: 0, boxShadow: 'none', border: 'none', background: 'transparent' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <div>
-            <h2 style={{ margin: 0, color: colors.text }}>Goods Intake</h2>
+            <h2 style={{ margin: 0, color: colors.text }}>Stock Intake Workflow</h2>
             <div style={{ fontSize: '0.86rem', color: colors.mutedText, marginTop: '0.2rem' }}>
-              Digital Purchase Intake Register for supplier receipt entry and printable filing.
+              Record stock intake, finalize, export, and transfer to POS pending stock from one workspace.
             </div>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -676,24 +812,15 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
               </button>
             )}
             {form.id && canEdit && form.status === 'finalized' && String(form.locationCode || '').trim().toUpperCase() === 'BT' && (
-              form.posTransferStatus === 'transferred'
-                ? (
-                  <span style={{ border: '1px solid #99f6e4', background: '#f0fdfa', color: '#0f766e', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 700, fontSize: '0.85rem' }}
-                    title={`GRN: ${form.posTransferGrn || ''}`}>
-                    ✓ Sent to POS{form.posTransferGrn ? ` (${form.posTransferGrn})` : ''}
-                  </span>
-                ) : form.posTransferStatus === 'queued'
-                ? (
-                  <span style={{ border: '1px solid #fde68a', background: '#fefce8', color: '#92400e', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 700, fontSize: '0.85rem' }}
-                    title={`GRN: ${form.posTransferGrn || ''} — Agent will process shortly`}>
-                    ⏳ Queued for POS{form.posTransferGrn ? ` (${form.posTransferGrn})` : ''}
-                  </span>
-                ) : (
+              <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                {renderTransferBadge(form)}
+                {(resolveTransferStatus(form) === 'not_transferred' || resolveTransferStatus(form) === 'failed') && (
                   <button type="button" onClick={() => handleTransferToPOS(form.id)} disabled={transferring || saving}
                     style={{ border: '1px solid #fb923c', background: '#fff7ed', color: '#c2410c', borderRadius: '8px', padding: '0.45rem 0.9rem', fontWeight: 700, cursor: 'pointer' }}>
-                    {transferring ? 'Queuing for POS…' : '→ Transfer to POS'}
+                    {transferring ? 'Queuing for POS…' : resolveTransferStatus(form) === 'failed' ? '↻ Retry Transfer' : '→ Transfer to POS'}
                   </button>
-                )
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -894,160 +1021,231 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
     <div style={{ display: 'grid', gap: '1rem', width: '100%', minWidth: 0 }}>
       {canViewForm && (
         <section style={{ ...themedCardStyle, padding: '1rem', width: '100%', minWidth: 0 }}>
-        <div style={{ display: 'grid', gap: '0.9rem', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
-          <button
-            type="button"
-            onClick={() => openWorkspace()}
-            style={{
-              textAlign: 'left',
-              border: `1px solid ${colors.launchCardOneBorder}`,
-              background: colors.launchCardOneBg,
-              borderRadius: '20px',
-              padding: '1.1rem',
-              cursor: 'pointer',
-              boxShadow: isAdminDarkTheme ? '0 14px 30px rgba(0, 0, 0, 0.45)' : '0 16px 35px rgba(91, 75, 138, 0.10)',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'start' }}>
-              <div>
-                <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: isAdminDarkTheme ? '#c4b5fd' : '#6d28d9', fontWeight: 800 }}>Purchase Register</div>
-                <div style={{ marginTop: '0.4rem', fontSize: '1.2rem', fontWeight: 800, color: colors.strongText, lineHeight: 1.25 }}>
-                  Register Intake For "{selectedSupplierName}"
-                </div>
-                <div style={{ marginTop: '0.35rem', color: isAdminDarkTheme ? '#cbd5e1' : '#64748b', fontSize: '0.84rem', lineHeight: 1.45 }}>
-                  Continue with the current supplier and complete item-by-item intake.
-                </div>
-              </div>
-              <div style={{ width: '42px', height: '42px', borderRadius: '14px', background: isAdminDarkTheme ? '#7c6cb0' : '#5b4b8a', color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                <i className="fas fa-arrow-up-right-from-square" />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <div>
+              <h2 style={{ margin: 0, color: colors.strongText }}>Stock Intake & POS Transfer</h2>
+              <div style={{ marginTop: '0.25rem', fontSize: '0.84rem', color: colors.mutedText }}>
+                Use launcher actions to record intake, finalize, export, queue POS transfer, and review sync history.
               </div>
             </div>
-          </button>
+            <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
+              <span style={{ border: '1px solid #dbeafe', background: '#eff6ff', color: '#1d4ed8', borderRadius: '999px', fontSize: '0.74rem', fontWeight: 700, padding: '0.22rem 0.55rem' }}>
+                Finalized: {finalizedRecordsCount}
+              </span>
+              <span style={{ border: '1px solid #fde68a', background: '#fefce8', color: '#92400e', borderRadius: '999px', fontSize: '0.74rem', fontWeight: 700, padding: '0.22rem 0.55rem' }}>
+                Queued POS: {queuedTransfersCount}
+              </span>
+            </div>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => openWorkspace({ reset: true })}
-            style={{
-              textAlign: 'left',
-              border: `1px solid ${colors.launchCardTwoBorder}`,
-              background: colors.launchCardTwoBg,
-              borderRadius: '20px',
-              padding: '1.1rem',
-              cursor: 'pointer',
-              boxShadow: isAdminDarkTheme ? '0 14px 30px rgba(0, 0, 0, 0.45)' : '0 14px 30px rgba(37, 99, 235, 0.08)',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'start' }}>
-              <div>
-                <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: isAdminDarkTheme ? '#93c5fd' : '#1d4ed8', fontWeight: 800 }}>Quick Start</div>
-                <div style={{ marginTop: '0.4rem', fontSize: '1.2rem', fontWeight: 800, color: colors.strongText, lineHeight: 1.25 }}>
-                  Start A Fresh Goods Intake
-                </div>
-                <div style={{ marginTop: '0.35rem', color: isAdminDarkTheme ? '#cbd5e1' : '#64748b', fontSize: '0.84rem', lineHeight: 1.45 }}>
-                  Open a new blank intake form and begin with fresh line entries.
-                </div>
-              </div>
-              <div style={{ width: '42px', height: '42px', borderRadius: '14px', background: isAdminDarkTheme ? '#3b82f6' : '#2563eb', color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                <i className="fas fa-plus" />
-              </div>
-            </div>
-          </button>
-        </div>
+          <div style={{ display: 'grid', gap: '0.9rem', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', marginTop: '0.9rem' }}>
+            <button
+              type="button"
+              onClick={() => openWorkspace({ reset: true })}
+              style={{ textAlign: 'left', border: '1px solid #bfdbfe', background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 65%)', borderRadius: '18px', padding: '1rem', cursor: 'pointer' }}
+            >
+              <div style={{ fontSize: '0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: '#1d4ed8', fontWeight: 800 }}>Launcher</div>
+              <div style={{ marginTop: '0.35rem', fontSize: '1.05rem', color: '#0f172a', fontWeight: 800 }}>Start New Stock Intake</div>
+              <div style={{ marginTop: '0.3rem', fontSize: '0.82rem', color: '#475569' }}>Open a clean intake workflow modal with fresh line entries.</div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => openWorkspace()}
+              style={{ textAlign: 'left', border: '1px solid #d8b4fe', background: 'linear-gradient(135deg, #f8f5ff 0%, #ffffff 65%)', borderRadius: '18px', padding: '1rem', cursor: 'pointer' }}
+            >
+              <div style={{ fontSize: '0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: '#7c3aed', fontWeight: 800 }}>Launcher</div>
+              <div style={{ marginTop: '0.35rem', fontSize: '1.05rem', color: '#0f172a', fontWeight: 800 }}>Continue Current Intake</div>
+              <div style={{ marginTop: '0.3rem', fontSize: '0.82rem', color: '#475569' }}>Resume the current draft/finalized intake and manage transfer actions.</div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => jumpToSection(intakeHistorySectionRef)}
+              style={{ textAlign: 'left', border: '1px solid #bbf7d0', background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 65%)', borderRadius: '18px', padding: '1rem', cursor: 'pointer' }}
+            >
+              <div style={{ fontSize: '0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: '#166534', fontWeight: 800 }}>History</div>
+              <div style={{ marginTop: '0.35rem', fontSize: '1.05rem', color: '#0f172a', fontWeight: 800 }}>Finalized Intake Records</div>
+              <div style={{ marginTop: '0.3rem', fontSize: '0.82rem', color: '#475569' }}>Review finalized entries, export files, and open transfer details.</div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => jumpToSection(transferHistorySectionRef)}
+              style={{ textAlign: 'left', border: '1px solid #fed7aa', background: 'linear-gradient(135deg, #fff7ed 0%, #ffffff 65%)', borderRadius: '18px', padding: '1rem', cursor: 'pointer' }}
+            >
+              <div style={{ fontSize: '0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: '#c2410c', fontWeight: 800 }}>Sync</div>
+              <div style={{ marginTop: '0.35rem', fontSize: '1.05rem', color: '#0f172a', fontWeight: 800 }}>POS Transfer History</div>
+              <div style={{ marginTop: '0.3rem', fontSize: '0.82rem', color: '#475569' }}>Track queue status, processing results, and transfer failures.</div>
+            </button>
+          </div>
         </section>
       )}
 
       {canViewHistory && (
-      <section style={{ ...themedCardStyle, padding: '1rem', width: '100%', minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <h3 style={{ margin: 0, color: colors.text }}>Purchase Intake History</h3>
-          <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
-            <input placeholder="Search ref/supplier/product" value={search} onFocus={selectInputText} onChange={(event) => setSearch(event.target.value)} style={{ ...themedInputStyle, width: '220px' }} />
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} style={{ ...themedInputStyle, width: '130px' }}>
-              <option value="all">All Status</option>
-              <option value="draft">Draft</option>
-              <option value="finalized">Finalized</option>
-            </select>
-            <input type="date" value={startDate} onFocus={selectInputText} onChange={(event) => setStartDate(event.target.value)} style={{ ...themedInputStyle, width: '140px' }} />
-            <input type="date" value={endDate} onFocus={selectInputText} onChange={(event) => setEndDate(event.target.value)} style={{ ...themedInputStyle, width: '140px' }} />
+        <section ref={intakeHistorySectionRef} style={{ ...themedCardStyle, padding: '1rem', width: '100%', minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <h3 style={{ margin: 0, color: colors.text }}>Intake Records</h3>
+            <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
+              <input placeholder="Search ref/supplier/product" value={search} onFocus={selectInputText} onChange={(event) => setSearch(event.target.value)} style={{ ...themedInputStyle, width: '220px' }} />
+              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} style={{ ...themedInputStyle, width: '130px' }}>
+                <option value="all">All Intake</option>
+                <option value="draft">Draft</option>
+                <option value="finalized">Finalized</option>
+              </select>
+              <input type="date" value={startDate} onFocus={selectInputText} onChange={(event) => setStartDate(event.target.value)} style={{ ...themedInputStyle, width: '140px' }} />
+              <input type="date" value={endDate} onFocus={selectInputText} onChange={(event) => setEndDate(event.target.value)} style={{ ...themedInputStyle, width: '140px' }} />
+            </div>
           </div>
-        </div>
 
-        {listError && <div style={{ marginTop: '0.8rem', fontSize: '0.86rem', color: '#b91c1c' }}>{listError}</div>}
+          {listError && <div style={{ marginTop: '0.8rem', fontSize: '0.86rem', color: '#b91c1c' }}>{listError}</div>}
 
-        <div style={{ marginTop: '0.8rem', flex: 1, minHeight: 0, width: '100%', maxWidth: '100%', overflow: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '980px' }}>
-            <thead>
-              <tr>
-                {['Ref', 'Purchase Date', 'Supplier', 'Location', 'Status', 'Items', 'Total Cost', 'Actions'].map((label) => (
-                  <th key={label} style={{ textAlign: 'left', padding: '0.55rem 0.45rem', fontSize: '0.76rem', color: colors.mutedText, borderBottom: `1px solid ${isAdminDarkTheme ? '#334155' : '#e2e8f0'}` }}>{label}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {listLoading ? (
-                <tr><td colSpan={8} style={{ padding: '1rem', color: colors.mutedText }}>Loading records...</td></tr>
-              ) : records.length === 0 ? (
-                <tr><td colSpan={8} style={{ padding: '1rem', color: colors.mutedText }}>No records found for current filters.</td></tr>
-              ) : records.map((record) => (
-                <tr key={record.id}>
-                  <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, fontWeight: 700, color: colors.strongText }}>{record.intakeRef}</td>
-                  <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{dateInputValue(record.purchaseDate)}</td>
-                  <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{record.supplier?.name || record.manualSupplierName || '-'}</td>
-                  <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{record.locationName || record.locationCode || '-'}</td>
-                  <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}` }}>
-                    <span style={{
-                      padding: '0.2rem 0.5rem',
-                      borderRadius: '999px',
-                      fontSize: '0.72rem',
-                      fontWeight: 700,
-                      color: record.status === 'finalized' ? '#166534' : '#1d4ed8',
-                      backgroundColor: record.status === 'finalized' ? '#ecfdf3' : '#eff6ff',
-                      border: `1px solid ${record.status === 'finalized' ? '#bbf7d0' : '#bfdbfe'}`,
-                    }}>
-                      {String(record.status || 'draft').toUpperCase()}
-                    </span>
-                  </td>
-                  <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{record.totalItems || record._count?.items || 0}</td>
-                  <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, fontWeight: 700, color: colors.strongText }}>{money(record.totalCost)}</td>
-                  <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}` }}>
-                    <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                      {canEdit && canViewForm && <button type="button" onClick={() => handleEditRecord(record.id)} style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #cbd5e1', background: isAdminDarkTheme ? '#0f172a' : '#fff', color: isAdminDarkTheme ? '#e2e8f0' : '#0f172a', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>Edit</button>}
-                      {canExport && <button type="button" onClick={() => handleExportRecord(record.id)} style={{ border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>PDF</button>}
-                      {canDelete && <button type="button" onClick={() => handleDeleteRecord(record)} style={{ border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 600, cursor: 'pointer' }}>Delete</button>}
-                      {canEdit && record.status === 'finalized' && String(record.locationCode || '').trim().toUpperCase() === 'BT' && (
-                        record.posTransferStatus === 'transferred'
-                          ? <span style={{ border: '1px solid #99f6e4', background: '#f0fdfa', color: '#0f766e', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, fontSize: '0.78rem' }} title={`GRN: ${record.posTransferGrn || ''}`}>✓ POS</span>
-                          : record.posTransferStatus === 'queued'
-                          ? <span style={{ border: '1px solid #fde68a', background: '#fefce8', color: '#92400e', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, fontSize: '0.78rem' }} title={`GRN: ${record.posTransferGrn || ''} — queued`}>⏳ POS</span>
-                          : <button type="button" onClick={() => handleTransferToPOS(record.id)} disabled={transferring} style={{ border: '1px solid #fb923c', background: '#fff7ed', color: '#c2410c', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>→ POS</button>
-                      )}
-                    </div>
-                  </td>
+          <div style={{ marginTop: '0.8rem', flex: 1, minHeight: 0, width: '100%', maxWidth: '100%', overflow: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1180px' }}>
+              <thead>
+                <tr>
+                  {['Ref', 'Date', 'Supplier', 'Location', 'Intake Status', 'POS Transfer', 'Items', 'Total Cost', 'Actions'].map((label) => (
+                    <th key={label} style={{ textAlign: 'left', padding: '0.55rem 0.45rem', fontSize: '0.76rem', color: colors.mutedText, borderBottom: `1px solid ${isAdminDarkTheme ? '#334155' : '#e2e8f0'}` }}>{label}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {listLoading ? (
+                  <tr><td colSpan={9} style={{ padding: '1rem', color: colors.mutedText }}>Loading records...</td></tr>
+                ) : records.length === 0 ? (
+                  <tr><td colSpan={9} style={{ padding: '1rem', color: colors.mutedText }}>No records found for current filters.</td></tr>
+                ) : records.map((record) => (
+                  <tr key={record.id}>
+                    <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, fontWeight: 700, color: colors.strongText }}>{record.intakeRef}</td>
+                    <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{dateInputValue(record.purchaseDate)}</td>
+                    <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{record.supplier?.name || record.manualSupplierName || '-'}</td>
+                    <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{record.locationName || record.locationCode || '-'}</td>
+                    <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}` }}>
+                      <span style={{ padding: '0.2rem 0.5rem', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 700, color: record.status === 'finalized' ? '#166534' : '#1d4ed8', backgroundColor: record.status === 'finalized' ? '#ecfdf3' : '#eff6ff', border: `1px solid ${record.status === 'finalized' ? '#bbf7d0' : '#bfdbfe'}` }}>
+                        {String(record.status || 'draft').toUpperCase()}
+                      </span>
+                    </td>
+                    <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}` }}>{renderTransferBadge(record)}</td>
+                    <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{record.totalItems || record._count?.items || 0}</td>
+                    <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, fontWeight: 700, color: colors.strongText }}>{money(record.totalCost)}</td>
+                    <td style={{ padding: '0.6rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}` }}>
+                      <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                        {canEdit && canViewForm && <button type="button" onClick={() => handleEditRecord(record.id)} style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #cbd5e1', background: isAdminDarkTheme ? '#0f172a' : '#fff', color: isAdminDarkTheme ? '#e2e8f0' : '#0f172a', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>Open</button>}
+                        {canExport && <button type="button" onClick={() => handleExportRecord(record.id)} style={{ border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>PDF</button>}
+                        {canDelete && <button type="button" onClick={() => handleDeleteRecord(record)} style={{ border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 600, cursor: 'pointer' }}>Delete</button>}
+                        {canViewHistory && <button type="button" onClick={() => openTransferDetail(record.id)} style={{ border: '1px solid #e9d5ff', background: '#faf5ff', color: '#6b21a8', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>Details</button>}
+                        {canEdit && record.status === 'finalized' && String(record.locationCode || '').trim().toUpperCase() === 'BT' && (resolveTransferStatus(record) === 'not_transferred' || resolveTransferStatus(record) === 'failed') && (
+                          <button type="button" onClick={() => handleTransferToPOS(record.id)} disabled={transferring} style={{ border: '1px solid #fb923c', background: '#fff7ed', color: '#c2410c', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>
+                            {resolveTransferStatus(record) === 'failed' ? 'Retry POS' : '→ POS'}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-        {pagination && pagination.totalPages > 1 && (
-          <div style={{ marginTop: '0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontSize: '0.8rem', color: colors.mutedText }}>
-              Page {pagination.page} of {pagination.totalPages} ({pagination.total} records)
+          {pagination && pagination.totalPages > 1 && (
+            <div style={{ marginTop: '0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.7rem', flexWrap: 'wrap' }}>
+              <div style={{ fontSize: '0.8rem', color: colors.mutedText }}>Page {pagination.page} of {pagination.totalPages} ({pagination.total} records)</div>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button type="button" onClick={() => setPage((prev) => Math.max(1, prev - 1))} disabled={pagination.page <= 1} style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #cbd5e1', borderRadius: '7px', background: isAdminDarkTheme ? '#0f172a' : '#fff', color: isAdminDarkTheme ? '#e2e8f0' : '#0f172a', padding: '0.3rem 0.65rem', cursor: 'pointer' }}>Prev</button>
+                <button type="button" onClick={() => setPage((prev) => Math.min(pagination.totalPages, prev + 1))} disabled={pagination.page >= pagination.totalPages} style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #cbd5e1', borderRadius: '7px', background: isAdminDarkTheme ? '#0f172a' : '#fff', color: isAdminDarkTheme ? '#e2e8f0' : '#0f172a', padding: '0.3rem 0.65rem', cursor: 'pointer' }}>Next</button>
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button type="button" onClick={() => setPage((prev) => Math.max(1, prev - 1))} disabled={pagination.page <= 1} style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #cbd5e1', borderRadius: '7px', background: isAdminDarkTheme ? '#0f172a' : '#fff', color: isAdminDarkTheme ? '#e2e8f0' : '#0f172a', padding: '0.3rem 0.65rem', cursor: 'pointer' }}>Prev</button>
-              <button type="button" onClick={() => setPage((prev) => Math.min(pagination.totalPages, prev + 1))} disabled={pagination.page >= pagination.totalPages} style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #cbd5e1', borderRadius: '7px', background: isAdminDarkTheme ? '#0f172a' : '#fff', color: isAdminDarkTheme ? '#e2e8f0' : '#0f172a', padding: '0.3rem 0.65rem', cursor: 'pointer' }}>Next</button>
+          )}
+        </section>
+      )}
+
+      {canViewHistory && (
+        <section ref={transferHistorySectionRef} style={{ ...themedCardStyle, padding: '1rem', width: '100%', minWidth: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <h3 style={{ margin: 0, color: colors.text }}>POS Transfer History</h3>
+            <div style={{ fontSize: '0.8rem', color: colors.mutedText }}>
+              Showing {transferHistoryRecords.length} finalized intake records on this page
             </div>
           </div>
-        )}
-      </section>
+
+          <div style={{ marginTop: '0.75rem', display: 'grid', gap: '0.55rem', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))' }}>
+            <select value={transferStatusFilter} onChange={(event) => setTransferStatusFilter(event.target.value)} style={themedInputStyle}>
+              <option value="all">All Transfer Status</option>
+              <option value="not_transferred">Not Transferred</option>
+              <option value="queued">Queued</option>
+              <option value="transferred">Transferred</option>
+              <option value="failed">Failed</option>
+              <option value="approved">Approved in POS</option>
+            </select>
+            <select value={transferSupplierFilter} onChange={(event) => setTransferSupplierFilter(event.target.value)} style={themedInputStyle}>
+              <option value="all">All Suppliers</option>
+              {suppliers.map((supplier) => (
+                <option key={supplier.id} value={String(supplier.id)}>{supplier.name}</option>
+              ))}
+            </select>
+            <select value={transferLocationFilter} onChange={(event) => setTransferLocationFilter(event.target.value)} style={themedInputStyle}>
+              <option value="all">All Locations</option>
+              {locations.map((location) => (
+                <option key={location.id} value={String(location.code || normalizeLocationCode(location)).toUpperCase()}>{location.name}</option>
+              ))}
+            </select>
+            <input type="date" value={transferStartDate} onFocus={selectInputText} onChange={(event) => setTransferStartDate(event.target.value)} style={themedInputStyle} />
+            <input type="date" value={transferEndDate} onFocus={selectInputText} onChange={(event) => setTransferEndDate(event.target.value)} style={themedInputStyle} />
+          </div>
+
+          <div style={{ marginTop: '0.8rem', width: '100%', maxWidth: '100%', overflow: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1280px' }}>
+              <thead>
+                <tr>
+                  {['Ref', 'GRN', 'Supplier', 'Location', 'Intake Date', 'Items', 'Total Cost', 'Transfer Status', 'Queued Time', 'Completed Time', 'Agent Message', 'Actions'].map((label) => (
+                    <th key={label} style={{ textAlign: 'left', padding: '0.55rem 0.45rem', fontSize: '0.76rem', color: colors.mutedText, borderBottom: `1px solid ${isAdminDarkTheme ? '#334155' : '#e2e8f0'}` }}>{label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {listLoading ? (
+                  <tr><td colSpan={12} style={{ padding: '1rem', color: colors.mutedText }}>Loading transfer history...</td></tr>
+                ) : transferHistoryRecords.length === 0 ? (
+                  <tr><td colSpan={12} style={{ padding: '1rem', color: colors.mutedText }}>No transfer history matches current filters.</td></tr>
+                ) : transferHistoryRecords.map((record) => {
+                  const transferCommand = record.posTransferCommand || {};
+                  const responseSummary = transferCommand?.resultSummary?.message || transferCommand?.errorMessage || '-';
+                  return (
+                    <tr key={`transfer-${record.id}`}>
+                      <td style={{ padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, fontWeight: 700, color: colors.strongText }}>{record.intakeRef}</td>
+                      <td style={{ padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{record.posTransferGrn || '-'}</td>
+                      <td style={{ padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{record.supplier?.name || record.manualSupplierName || '-'}</td>
+                      <td style={{ padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{record.locationName || record.locationCode || '-'}</td>
+                      <td style={{ padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{dateInputValue(record.purchaseDate)}</td>
+                      <td style={{ padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{record.totalItems || record._count?.items || 0}</td>
+                      <td style={{ padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, fontWeight: 700, color: colors.strongText }}>{money(record.totalCost)}</td>
+                      <td style={{ padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}` }}>{renderTransferBadge(record)}</td>
+                      <td style={{ padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{formatDateTime(record.posTransferAt || transferCommand.createdAt)}</td>
+                      <td style={{ padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text }}>{formatDateTime(transferCommand.processedAt)}</td>
+                      <td style={{ padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, color: String(responseSummary).toLowerCase().includes('fail') ? '#b91c1c' : colors.text, maxWidth: '260px' }}>{String(responseSummary).slice(0, 120)}</td>
+                      <td style={{ padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}` }}>
+                        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                          <button type="button" onClick={() => openTransferDetail(record.id)} style={{ border: '1px solid #c7d2fe', background: '#eef2ff', color: '#4338ca', borderRadius: '7px', padding: '0.25rem 0.5rem', fontWeight: 700, cursor: 'pointer' }}>View</button>
+                          {canExport && <button type="button" onClick={() => handleExportRecord(record.id)} style={{ border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: '7px', padding: '0.25rem 0.5rem', fontWeight: 700, cursor: 'pointer' }}>PDF</button>}
+                          {canEdit && resolveTransferStatus(record) === 'failed' && (
+                            <button type="button" onClick={() => handleTransferToPOS(record.id)} disabled={transferring} style={{ border: '1px solid #fb923c', background: '#fff7ed', color: '#c2410c', borderRadius: '7px', padding: '0.25rem 0.5rem', fontWeight: 700, cursor: 'pointer' }}>Retry</button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
       )}
 
       {!canViewForm && !canViewHistory && (
         <section style={{ ...themedCardStyle, padding: '1rem', width: '100%', minWidth: 0 }}>
           <h3 style={{ marginTop: 0, marginBottom: '0.4rem', color: colors.strongText }}>No Permitted Sections</h3>
           <p style={{ margin: 0, color: colors.mutedText }}>
-            You do not currently have access to Goods Intake form or history sections.
+            You do not currently have access to Stock Intake & POS Transfer form or history sections.
           </p>
         </section>
       )}
@@ -1057,8 +1255,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
           <div style={{ ...themedCardStyle, width: isIntakeWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1480px, 98vw)', height: isIntakeWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isIntakeWorkspaceMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column', padding: '0.95rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
               <div>
-                <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b7280', fontWeight: 800 }}>Goods Intake Workspace</div>
-                <div style={{ fontSize: '1.12rem', fontWeight: 800, color: '#111827' }}>Register Intake For "{selectedSupplierName}"</div>
+                <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b7280', fontWeight: 800 }}>Stock Intake Workflow Modal</div>
+                <div style={{ fontSize: '1.12rem', fontWeight: 800, color: '#111827' }}>Supplier: {selectedSupplierName}</div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                 <button
@@ -1072,7 +1270,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setIsIntakeWorkspaceOpen(false); setIsIntakeWorkspaceMaximized(false); }}
+                  onClick={handleCloseWorkspace}
                   style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}
                 >
                   <i className="fas fa-times" />
@@ -1082,6 +1280,73 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
 
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingRight: '0.2rem' }}>
               {workspaceContent}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isTransferDetailOpen && transferDetailRecord && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 175, display: 'grid', placeItems: 'center', padding: '1rem' }}>
+          <div style={{ ...themedCardStyle, width: 'min(1320px, 98vw)', height: '90vh', overflow: 'hidden', borderRadius: '18px', display: 'flex', flexDirection: 'column', padding: '0.95rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.7rem', flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b7280', fontWeight: 800 }}>Transfer Detail</div>
+                <div style={{ fontSize: '1.12rem', fontWeight: 800, color: '#111827' }}>
+                  {transferDetailRecord.intakeRef} {transferDetailRecord.posTransferGrn ? `• ${transferDetailRecord.posTransferGrn}` : ''}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
+                {renderTransferBadge(transferDetailRecord)}
+                {canExport && <button type="button" onClick={() => handleExportRecord(transferDetailRecord.id)} style={{ border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: '8px', padding: '0.38rem 0.75rem', fontWeight: 700, cursor: 'pointer' }}>Export PDF</button>}
+                {canEdit && resolveTransferStatus(transferDetailRecord) === 'failed' && (
+                  <button type="button" onClick={() => handleTransferToPOS(transferDetailRecord.id)} disabled={transferring} style={{ border: '1px solid #fb923c', background: '#fff7ed', color: '#c2410c', borderRadius: '8px', padding: '0.38rem 0.75rem', fontWeight: 700, cursor: 'pointer' }}>Retry Transfer</button>
+                )}
+                <button type="button" onClick={() => setIsTransferDetailOpen(false)} style={{ border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', borderRadius: '8px', padding: '0.38rem 0.75rem', fontWeight: 700, cursor: 'pointer' }}>Close</button>
+              </div>
+            </div>
+
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingRight: '0.2rem' }}>
+              <div style={{ display: 'grid', gap: '0.65rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem' }}><strong>Supplier:</strong> {transferDetailRecord.supplier?.name || transferDetailRecord.manualSupplierName || '-'}</div>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem' }}><strong>Location:</strong> {transferDetailRecord.locationName || transferDetailRecord.locationCode || '-'}</div>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem' }}><strong>Intake Date:</strong> {dateInputValue(transferDetailRecord.purchaseDate)}</div>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem' }}><strong>Queued:</strong> {formatDateTime(transferDetailRecord.posTransferAt || transferDetailRecord.posTransferCommand?.createdAt)}</div>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem' }}><strong>Completed:</strong> {formatDateTime(transferDetailRecord.posTransferCommand?.processedAt)}</div>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem' }}><strong>Command ID:</strong> {transferDetailRecord.posTransferCommand?.id || '-'}</div>
+              </div>
+
+              <div style={{ marginTop: '0.75rem', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.7rem', background: '#f8fafc' }}>
+                <div style={{ fontSize: '0.8rem', color: '#334155', fontWeight: 700 }}>POS Agent Response</div>
+                <div style={{ marginTop: '0.3rem', fontSize: '0.85rem', color: '#475569' }}>
+                  {transferDetailRecord.posTransferCommand?.resultSummary?.message
+                    || transferDetailRecord.posTransferCommand?.errorMessage
+                    || 'No response captured yet.'}
+                </div>
+              </div>
+
+              <div style={{ marginTop: '0.85rem', width: '100%', maxWidth: '100%', overflow: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '980px' }}>
+                  <thead>
+                    <tr>
+                      {['Product Code', 'Product Name', 'Quantity', 'Unit Cost', 'Total Cost', 'Expiry Date'].map((label) => (
+                        <th key={label} style={{ textAlign: 'left', padding: '0.55rem 0.45rem', fontSize: '0.75rem', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>{label}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(transferDetailRecord.items || []).map((line, index) => (
+                      <tr key={`detail-line-${line.id || index}`}>
+                        <td style={{ padding: '0.55rem 0.45rem', borderBottom: '1px solid #f1f5f9', color: '#0f172a' }}>{line.barcode || '-'}</td>
+                        <td style={{ padding: '0.55rem 0.45rem', borderBottom: '1px solid #f1f5f9', color: '#0f172a' }}>{line.productName || '-'}</td>
+                        <td style={{ padding: '0.55rem 0.45rem', borderBottom: '1px solid #f1f5f9', color: '#0f172a' }}>{Number(line.quantity || 0).toLocaleString('en-US')}</td>
+                        <td style={{ padding: '0.55rem 0.45rem', borderBottom: '1px solid #f1f5f9', color: '#0f172a' }}>{money(line.unitCost || 0)}</td>
+                        <td style={{ padding: '0.55rem 0.45rem', borderBottom: '1px solid #f1f5f9', fontWeight: 700, color: '#111827' }}>{money(line.totalCost || (Number(line.quantity || 0) * Number(line.unitCost || 0)))}</td>
+                        <td style={{ padding: '0.55rem 0.45rem', borderBottom: '1px solid #f1f5f9', color: '#0f172a' }}>{dateInputValue(line.expiryDate) || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>

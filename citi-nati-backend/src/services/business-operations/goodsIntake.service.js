@@ -136,6 +136,69 @@ function includeShape() {
   };
 }
 
+async function attachTransferCommandMetadata(records) {
+  const list = Array.isArray(records) ? records : [];
+  if (list.length === 0) return list;
+
+  const intakeIds = list
+    .map((record) => Number(record?.id))
+    .filter((value) => Number.isFinite(value))
+    .map((value) => String(value));
+
+  if (intakeIds.length === 0) return list;
+
+  const commands = await prisma.posWriteCommand.findMany({
+    where: {
+      commandType: 'CREATE_PENDING_STOCK_INTAKE',
+      relatedEntityType: 'GoodsIntake',
+      relatedEntityId: { in: intakeIds },
+    },
+    orderBy: [{ createdAt: 'desc' }],
+    select: {
+      id: true,
+      relatedEntityId: true,
+      status: true,
+      errorMessage: true,
+      resultSummary: true,
+      createdAt: true,
+      processedAt: true,
+      updatedAt: true,
+      retryCount: true,
+      maxRetries: true,
+      agentId: true,
+    },
+  });
+
+  const latestByIntakeId = new Map();
+  for (const command of commands) {
+    const key = String(command.relatedEntityId || '');
+    if (!key || latestByIntakeId.has(key)) continue;
+    latestByIntakeId.set(key, command);
+  }
+
+  return list.map((record) => {
+    const key = String(record.id || '');
+    const command = latestByIntakeId.get(key) || null;
+    return {
+      ...record,
+      posTransferCommand: command
+        ? {
+            id: command.id,
+            status: command.status,
+            errorMessage: command.errorMessage,
+            resultSummary: command.resultSummary,
+            createdAt: command.createdAt,
+            processedAt: command.processedAt,
+            updatedAt: command.updatedAt,
+            retryCount: command.retryCount,
+            maxRetries: command.maxRetries,
+            agentId: command.agentId,
+          }
+        : null,
+    };
+  });
+}
+
 async function lookupGoodsIntakeProducts({ query, locationCode, take = 20 }) {
   const normalizedQuery = String(query || '').trim();
   const normalizedLocationCode = normalizeScopeCode(locationCode);
@@ -276,10 +339,14 @@ async function deleteGoodsIntake(id) {
 }
 
 async function getGoodsIntakeById(id) {
-  return prisma.goodsIntake.findUnique({
+  const record = await prisma.goodsIntake.findUnique({
     where: { id },
     include: includeShape(),
   });
+
+  if (!record) return null;
+  const [enriched] = await attachTransferCommandMetadata([record]);
+  return enriched;
 }
 
 async function listGoodsIntakes({ filters, skip, take, sortBy, sortOrder }) {
@@ -306,7 +373,9 @@ async function listGoodsIntakes({ filters, skip, take, sortBy, sortOrder }) {
     prisma.goodsIntake.count({ where }),
   ]);
 
-  return { data, total, where };
+  const enrichedData = await attachTransferCommandMetadata(data);
+
+  return { data: enrichedData, total, where };
 }
 
 module.exports = {

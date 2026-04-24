@@ -200,7 +200,14 @@ async function transferToPOS(req, res) {
       const statusCode = result.alreadyTransferred ? 409 : 422;
       return res.status(statusCode).json({ success: false, error: result.error, grnNo: result.existingGrn });
     }
-    return res.json({ success: true, data: result.data, grnNo: result.grnNo, linesInserted: result.linesInserted });
+    return res.json({
+      success: true,
+      data: result.data,
+      grnNo: result.grnNo,
+      linesInserted: result.linesInserted,
+      linesQueued: result.linesQueued,
+      commandId: result.commandId,
+    });
   } catch (error) {
     console.error('[BO][GOODS_INTAKE] transfer-to-pos error:', error);
     return res.status(500).json({ success: false, error: 'Failed to transfer goods intake to POS' });
