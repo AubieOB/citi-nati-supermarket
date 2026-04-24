@@ -518,15 +518,12 @@ async function executeCreatePendingStockIntake(pool, payload, commandId) {
     headerRequest.input('grnDate',      sql.DateTime,       parsedGrnDate);
     headerRequest.input('supplierCode', sql.NVarChar(50),   supplierCode);
     headerRequest.input('locationCode', sql.NVarChar(10),   locationCode);
-    headerRequest.input('intakeRef',    sql.NVarChar(100),  intakeRef || null);
-    headerRequest.input('intakeId',     sql.NVarChar(50),   intakeId ? String(intakeId) : null);
-    headerRequest.input('commandId',    sql.NVarChar(50),   String(commandId));
 
     await headerRequest.query(`
       INSERT INTO [POS].[dbo].[stocks_temp]
-        (GRNNo, GRNDate, SupplierCode, LocationCode, IntakeRef, IntakeId, CommandId, CreatedAt)
+        (GRNNo, GRNDate, SupplierCode, LocationCode, UploadStatus, OrderNumber)
       VALUES
-        (@grnNo, @grnDate, @supplierCode, @locationCode, @intakeRef, @intakeId, @commandId, GETDATE())
+        (@grnNo, @grnDate, @supplierCode, @locationCode, 0, 0)
     `);
 
     console.log(`[INTAKE PENDING] stocks_temp header inserted GRN=${grnNo}`);
@@ -537,19 +534,17 @@ async function executeCreatePendingStockIntake(pool, payload, commandId) {
       const item = items[i];
       const detailRequest = new sql.Request(transaction);
       detailRequest.input('grnNo',        sql.NVarChar(50),   grnNo);
-      detailRequest.input('lineNo',       sql.Int,            i + 1);
       detailRequest.input('productCode',  sql.NVarChar(50),   String(item.productCode || '').trim());
-      detailRequest.input('productName',  sql.NVarChar(200),  String(item.productName || '').trim());
-      detailRequest.input('stockQty',     sql.Decimal(18, 4), Number(item.stockQty) || 0);
+      detailRequest.input('stockQty',     sql.Float,          Number(item.stockQty) || 0);
       detailRequest.input('unit',         sql.NVarChar(20),   String(item.unit || '').trim());
-      detailRequest.input('costPrice',    sql.Decimal(18, 4), Number(item.costPrice) || 0);
+      detailRequest.input('costPrice',    sql.Float,          Number(item.costPrice) || 0);
       detailRequest.input('expiryDate',   sql.DateTime,       item.expiryDate ? new Date(item.expiryDate) : null);
 
       await detailRequest.query(`
         INSERT INTO [POS].[dbo].[stockdetails_temp]
-          (GRNNo, LineNo, ProductCode, ProductName, StockQty, Unit, CostPrice, ExpiryDate, CreatedAt)
+          (GRNNo, ProductCode, StockQty, Unit, StockOut, CostPrice, ExpiryDate, StartSerialNo, EndSerialNo, UploadStatus, Qty1, Qty1Out)
         VALUES
-          (@grnNo, @lineNo, @productCode, @productName, @stockQty, @unit, @costPrice, @expiryDate, GETDATE())
+          (@grnNo, @productCode, @stockQty, @unit, 0, @costPrice, @expiryDate, '', '', 0, 0, 0)
       `);
       linesInserted++;
     }
