@@ -34,6 +34,20 @@ function getEffectiveStock(product) {
   return resolveEffectiveStock(product);
 }
 
+function mergeUniqueProducts(existingProducts, incomingProducts) {
+  const productMap = new Map();
+
+  [...existingProducts, ...incomingProducts].forEach((product) => {
+    const key = product?.id ?? product?.sourceCode;
+    if (key == null) {
+      return;
+    }
+    productMap.set(key, product);
+  });
+
+  return Array.from(productMap.values());
+}
+
 /**
  * Products Page - Enhanced with Search, Filters, and Promotions
  * 
@@ -275,9 +289,9 @@ const Products = () => {
 
       // If Load More, append; otherwise replace
       if (isLoadMore) {
-        setProducts(prev => [...prev, ...visibleProducts]);
+        setProducts((prev) => mergeUniqueProducts(prev, visibleProducts));
       } else {
-        setProducts(visibleProducts);
+        setProducts(mergeUniqueProducts([], visibleProducts));
       }
       
       setHasMoreProducts(hasMore);

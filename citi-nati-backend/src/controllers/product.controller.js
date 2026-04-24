@@ -1349,9 +1349,14 @@ const getProducts = async (req, res) => {
       },
       skip,
       take,
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: [
+        {
+          createdAt: 'desc',
+        },
+        {
+          id: 'desc',
+        },
+      ],
     });
 
     // Debug logging
