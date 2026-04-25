@@ -7,7 +7,8 @@ const posCommandQueueService = require('../posCommandQueue.service');
 const prisma = new PrismaClient();
 
 const BLANTYRE_LOCATION_CODE = 'BT';
-const DEFAULT_OPEN_STOCK_BALANCES_CODE = 'OPEN STOCK BALANCES';
+const DEFAULT_OPEN_STOCK_BALANCES_CODE = 'OPEN STOCK BALANCES';   // Blantyre POS supplier name
+const ZOMBA_OPEN_BALANCES_CODE = 'OPEN BALANCES';                 // Zomba POS supplier name
 const GRN_PATTERN = /^GRN_(\d{4}\d{1,2}\d{1,2})-(\d{3})$/i;
 
 function buildGrnDatePart(date) {
@@ -75,6 +76,51 @@ function resolveSupplierCodeForTransfer(intake) {
       supplierCode: '',
       usedFallback: false,
       error: 'OPEN STOCK BALANCES fallback supplier code is not configured. Set POS_OPEN_STOCK_BALANCES_SUPPLIER_CODE.',
+    };
+  }
+
+  return { supplierCode: fallbackCode, usedFallback: true };
+}
+
+/**
+ * Resolve supplier code for a Zomba intake transfer.
+ * Recognises "OPEN BALANCES" as the Zomba-specific open-stock fallback supplier
+ * (Blantyre uses "OPEN STOCK BALANCES" — they are different POS supplier records).
+ */
+function resolveZombaSupplierCodeForTransfer(intake) {
+  const explicitSupplierCode = String(intake?.supplier?.supplierCode || '').trim();
+  if (explicitSupplierCode) {
+    return { supplierCode: explicitSupplierCode, usedFallback: false };
+  }
+
+  const supplierName = String(intake?.supplier?.name || '').trim().toUpperCase();
+  const manualSupplierName = String(intake?.manualSupplierName || '').trim().toUpperCase();
+  const isOpenBalances = supplierName === ZOMBA_OPEN_BALANCES_CODE
+    || manualSupplierName === ZOMBA_OPEN_BALANCES_CODE
+    // also accept Blantyre's name here so mis-labeled intakes still work
+    || supplierName === DEFAULT_OPEN_STOCK_BALANCES_CODE
+    || manualSupplierName === DEFAULT_OPEN_STOCK_BALANCES_CODE;
+
+  if (!isOpenBalances) {
+    return {
+      supplierCode: '',
+      usedFallback: false,
+      error: 'Supplier with a valid SupplierCode is required for POS transfer. Update the intake to link a registered supplier.',
+    };
+  }
+
+  const fallbackCode = String(
+    process.env.POS_ZOMBA_OPEN_BALANCES_SUPPLIER_CODE
+    || process.env.POS_OPEN_STOCK_BALANCES_SUPPLIER_CODE
+    || process.env.POS_FALLBACK_SUPPLIER_CODE
+    || ZOMBA_OPEN_BALANCES_CODE
+  ).trim();
+
+  if (!fallbackCode) {
+    return {
+      supplierCode: '',
+      usedFallback: false,
+      error: 'OPEN BALANCES fallback supplier code is not configured for Zomba. Set POS_ZOMBA_OPEN_BALANCES_SUPPLIER_CODE.',
     };
   }
 
@@ -331,7 +377,7 @@ async function transferGoodsIntakeToZombaPosPending(intakeId, options) {
     };
   }
 
-  const supplierResolution = resolveSupplierCodeForTransfer(intake);
+  const supplierResolution = resolveZombaSupplierCodeForTransfer(intake);
   if (supplierResolution.error) {
     return { success: false, error: supplierResolution.error };
   }
