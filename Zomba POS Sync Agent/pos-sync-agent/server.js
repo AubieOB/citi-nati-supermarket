@@ -2565,6 +2565,8 @@ function isCommandTypeEnabled(commandType) {
   const { features } = appConfig;
 
   switch (commandType) {
+    case 'CREATE_PENDING_STOCK_INTAKE':
+      return features.enableStockWriteback;
     case 'UPDATE_PRICE':
       return features.enablePriceSync;
     case 'UPDATE_PRODUCT_NAME':
