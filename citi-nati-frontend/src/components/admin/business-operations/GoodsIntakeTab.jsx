@@ -21,6 +21,8 @@ const tableInputStyle = {
 };
 
 const DEFAULT_STATUS_FILTER = 'all';
+const GOODS_INTAKE_AUTOSAVE_STORAGE_KEY = 'goods-intake-autosaves:v1';
+const GOODS_INTAKE_AUTOSAVE_MAX_ITEMS = 30;
 
 const TRANSFER_STATUS_META = {
   not_transferred: { label: 'Not Transferred', short: 'Not Sent', tone: { border: '#cbd5e1', bg: '#f8fafc', color: '#475569' } },
@@ -201,6 +203,92 @@ function buildNewForm(selectedLocation) {
   };
 }
 
+function createGoodsIntakeAutosaveId() {
+  return `gi-auto-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function readGoodsIntakeAutosaves() {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(GOODS_INTAKE_AUTOSAVE_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((entry) => entry && typeof entry === 'object') : [];
+  } catch (_error) {
+    return [];
+  }
+}
+
+function writeGoodsIntakeAutosaves(entries) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(GOODS_INTAKE_AUTOSAVE_STORAGE_KEY, JSON.stringify(entries));
+  } catch (_error) {
+    // Keep intake workflow uninterrupted if storage quota fails.
+  }
+}
+
+function hasGoodsIntakeAutosaveContent(form) {
+  const hasMetadata = [
+    form?.supplierId,
+    form?.manualSupplierName,
+    form?.supplierStoreRef,
+    form?.receiptReference,
+    form?.overallNotes,
+    form?.receiptTotalAmount,
+  ].some((value) => String(value || '').trim().length > 0);
+
+  const hasLineContent = Array.isArray(form?.items) && form.items.some((line) => {
+    if (!line || typeof line !== 'object') return false;
+    if (String(line.barcode || '').trim()) return true;
+    if (String(line.productName || '').trim()) return true;
+    if (String(line.batchRef || '').trim()) return true;
+    if (String(line.lineNotes || '').trim()) return true;
+    if (String(line.expiryDate || '').trim()) return true;
+    if (line.quantity != null && Number(line.quantity || 0) !== 1) return true;
+    if (String(line.unitCost ?? '').trim()) return true;
+    if (String(line.sellingPrice ?? '').trim()) return true;
+    return false;
+  });
+
+  return hasMetadata || hasLineContent;
+}
+
+function sanitizeGoodsIntakeAutosaveForm(form) {
+  return {
+    id: null,
+    intakeRef: '',
+    supplierId: form?.supplierId || '',
+    manualSupplierName: form?.manualSupplierName || '',
+    supplierStoreRef: form?.supplierStoreRef || '',
+    purchaseDate: form?.purchaseDate || localDateKey(new Date()),
+    receiptReference: form?.receiptReference || '',
+    locationId: form?.locationId || '',
+    locationCode: form?.locationCode || '',
+    locationName: form?.locationName || '',
+    overallNotes: form?.overallNotes || '',
+    receiptTotalAmount: form?.receiptTotalAmount ?? '',
+    status: 'draft',
+    items: Array.isArray(form?.items) && form.items.length
+      ? form.items.map((item) => ({
+          barcode: item?.barcode || '',
+          productId: item?.productId || null,
+          productName: item?.productName || '',
+          quantity: item?.quantity ?? 1,
+          unitCost: item?.unitCost ?? '',
+          sellingPrice: item?.sellingPrice ?? '',
+          expiryDate: item?.expiryDate || '',
+          batchRef: item?.batchRef || '',
+          lineNotes: item?.lineNotes || '',
+        }))
+      : [createEmptyLine()],
+    posTransferStatus: null,
+    posTransferGrn: null,
+    transferGrnMode: form?.transferGrnMode === 'manual' ? 'manual' : 'auto',
+    transferManualGrn: form?.transferManualGrn || '',
+  };
+}
+
 function toPayload(form, items) {
   return {
     supplierId: form.supplierId ? Number(form.supplierId) : null,
@@ -320,12 +408,15 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
   }, [locations, selectedLocationId]);
 
   const [form, setForm] = useState(() => buildNewForm(selectedLocation));
+  const [activeAutosaveId, setActiveAutosaveId] = useState(() => createGoodsIntakeAutosaveId());
+  const [autosaveEntries, setAutosaveEntries] = useState(() => readGoodsIntakeAutosaves());
   const [saving, setSaving] = useState(false);
   const [transferring, setTransferring] = useState(false);
   const [activeLookupRow, setActiveLookupRow] = useState(-1);
   const [lookupWarning, setLookupWarning] = useState('');
   const [isIntakeWorkspaceOpen, setIsIntakeWorkspaceOpen] = useState(false);
   const [isIntakeWorkspaceMaximized, setIsIntakeWorkspaceMaximized] = useState(false);
+  const [isAutosaveRecoveryOpen, setIsAutosaveRecoveryOpen] = useState(false);
   const [isFinalizedHistoryOpen, setIsFinalizedHistoryOpen] = useState(false);
   const [isFinalizedHistoryMaximized, setIsFinalizedHistoryMaximized] = useState(false);
   const [isTransferHistoryOpen, setIsTransferHistoryOpen] = useState(false);
@@ -360,6 +451,40 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
       setLookupWarning('');
     }
   }, [activeLookupLocationCode]);
+
+  useEffect(() => {
+    const existing = readGoodsIntakeAutosaves();
+    const withoutCurrent = existing.filter((entry) => String(entry.id || '') !== String(activeAutosaveId || ''));
+
+    if (form.id || !hasGoodsIntakeAutosaveContent(form)) {
+      writeGoodsIntakeAutosaves(withoutCurrent);
+      setAutosaveEntries(withoutCurrent);
+      return;
+    }
+
+    const supplier = suppliers.find((entry) => String(entry.id) === String(form.supplierId || ''));
+    const supplierName = supplier?.name || String(form.manualSupplierName || '').trim() || 'Unassigned Supplier';
+    const lineCount = Array.isArray(form.items)
+      ? form.items.filter((item) => String(item?.productName || item?.barcode || '').trim()).length
+      : 0;
+    const payload = {
+      id: activeAutosaveId,
+      savedAt: new Date().toISOString(),
+      supplierName,
+      lineCount,
+      locationCode: form.locationCode || normalizeLocationCode(selectedLocation) || '',
+      locationName: form.locationName || selectedLocation?.name || '',
+      purchaseDate: form.purchaseDate || '',
+      form: sanitizeGoodsIntakeAutosaveForm(form),
+    };
+
+    const next = [payload, ...withoutCurrent]
+      .sort((a, b) => new Date(b.savedAt || 0).getTime() - new Date(a.savedAt || 0).getTime())
+      .slice(0, GOODS_INTAKE_AUTOSAVE_MAX_ITEMS);
+
+    writeGoodsIntakeAutosaves(next);
+    setAutosaveEntries(next);
+  }, [activeAutosaveId, form, selectedLocation, suppliers]);
 
   const calculatedItems = useMemo(() => form.items.map(withCalculatedLine), [form.items]);
 
@@ -421,6 +546,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
     () => records.filter((record) => resolveTransferStatus(record) === 'queued').length,
     [records]
   );
+
+  const autosaveCount = useMemo(() => autosaveEntries.length, [autosaveEntries]);
 
   const fetchRecords = useCallback(async () => {
     setListLoading(true);
@@ -537,14 +664,49 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
     });
   };
 
+  const removeAutosaveEntry = useCallback((autosaveId) => {
+    const next = readGoodsIntakeAutosaves().filter((entry) => String(entry.id || '') !== String(autosaveId || ''));
+    writeGoodsIntakeAutosaves(next);
+    setAutosaveEntries(next);
+  }, []);
+
+  const openAutosaveRecoveryModal = () => {
+    if (!canViewForm) return;
+    setAutosaveEntries(readGoodsIntakeAutosaves());
+    setIsAutosaveRecoveryOpen(true);
+  };
+
+  const restoreAutosaveEntry = (entry) => {
+    if (!entry?.form || typeof entry.form !== 'object') return;
+    const restoredItems = Array.isArray(entry.form.items) && entry.form.items.length
+      ? entry.form.items
+      : [createEmptyLine()];
+
+    setForm({
+      ...buildNewForm(selectedLocation),
+      ...entry.form,
+      id: null,
+      intakeRef: '',
+      status: 'draft',
+      items: restoredItems,
+    });
+    setLookupWarning('');
+    setActiveAutosaveId(String(entry.id || createGoodsIntakeAutosaveId()));
+    setIsAutosaveRecoveryOpen(false);
+    setIsIntakeWorkspaceMaximized(false);
+    setIsIntakeWorkspaceOpen(true);
+  };
+
   const clearForm = () => {
     setLookupWarning('');
+    setActiveAutosaveId(createGoodsIntakeAutosaveId());
     setForm(buildNewForm(selectedLocation));
   };
 
   const openWorkspace = ({ reset = false } = {}) => {
     if (!canViewForm) return;
     if (reset) {
+      setActiveAutosaveId(createGoodsIntakeAutosaveId());
       setForm(buildNewForm(selectedLocation));
     }
     setIsIntakeWorkspaceMaximized(false);
@@ -616,6 +778,10 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
       const saved = response.data?.data;
       if (saved) {
         setForm(toFormFromRecord(saved));
+        if (!isEditingExisting) {
+          removeAutosaveEntry(activeAutosaveId);
+        }
+        setActiveAutosaveId(createGoodsIntakeAutosaveId());
       }
 
       await fetchRecords();
@@ -641,6 +807,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
       const response = await api.get(`/business-operations/goods-intake/${recordId}`);
       const data = response.data?.data;
       if (!data) return;
+      setActiveAutosaveId(createGoodsIntakeAutosaveId());
       setForm(toFormFromRecord(data));
       setIsIntakeWorkspaceOpen(true);
     } catch (error) {
@@ -1212,6 +1379,19 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
 
             <button
               type="button"
+              onClick={openAutosaveRecoveryModal}
+              style={{ textAlign: 'left', border: '1px solid #fcd34d', background: 'linear-gradient(135deg, #fffbeb 0%, #ffffff 65%)', borderRadius: '18px', padding: '1rem', cursor: 'pointer' }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ fontSize: '0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: '#92400e', fontWeight: 800 }}>Recovery</div>
+                <span style={{ border: '1px solid #fde68a', background: '#fef3c7', color: '#92400e', borderRadius: '999px', fontSize: '0.71rem', fontWeight: 800, padding: '0.14rem 0.45rem' }}>{autosaveCount}</span>
+              </div>
+              <div style={{ marginTop: '0.35rem', fontSize: '0.96rem', color: '#0f172a', fontWeight: 800 }}>Recover Auto-Saved Intake</div>
+              <div style={{ marginTop: '0.3rem', fontSize: '0.82rem', color: '#475569' }}>Open unsaved intake sessions and continue where you left off.</div>
+            </button>
+
+            <button
+              type="button"
               onClick={openFinalizedHistoryModal}
               style={{ textAlign: 'left', border: '1px solid #bbf7d0', background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 65%)', borderRadius: '18px', padding: '1rem', cursor: 'pointer' }}
             >
@@ -1273,6 +1453,66 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
 
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0.35rem', borderRadius: '14px', border: isAdminDarkTheme ? '1px solid #1e293b' : '1px solid #e2e8f0', background: isAdminDarkTheme ? '#0b1220' : '#f8fbff' }}>
               {workspaceContent}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isAutosaveRecoveryOpen && canViewForm && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.5)', zIndex: 171, display: 'grid', placeItems: 'center', padding: '1rem' }}>
+          <div style={{ ...themedCardStyle, width: 'min(980px, 97vw)', maxHeight: '86vh', overflow: 'hidden', borderRadius: '16px', display: 'flex', flexDirection: 'column', padding: '0.9rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.65rem', marginBottom: '0.65rem', flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#111827' }}>Recover Auto-Saved Intake Sessions</div>
+                <div style={{ marginTop: '0.2rem', fontSize: '0.8rem', color: '#64748b' }}>These sessions were auto-saved before finalizing or saving as draft.</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAutosaveRecoveryOpen(false)}
+                style={{ width: '34px', height: '34px', borderRadius: '10px', border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}
+              >
+                <i className="fas fa-times" />
+              </button>
+            </div>
+
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingRight: '0.15rem' }}>
+              {autosaveEntries.length === 0 ? (
+                <div style={{ border: '1px dashed #cbd5e1', borderRadius: '12px', padding: '1rem', color: '#475569', fontSize: '0.84rem' }}>
+                  No auto-saved intake sessions found.
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: '0.6rem' }}>
+                  {autosaveEntries.map((entry) => (
+                    <div key={entry.id} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.75rem', background: '#fff' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.7rem', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'grid', gap: '0.2rem' }}>
+                          <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>{entry.supplierName || 'Unassigned Supplier'}</div>
+                          <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                            {entry.locationName || entry.locationCode || 'No location'} • Purchase Date: {entry.purchaseDate || '-'} • Lines: {Number(entry.lineCount || 0)}
+                          </div>
+                          <div style={{ fontSize: '0.76rem', color: '#94a3b8' }}>Last auto-save: {formatDateTime(entry.savedAt)}</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            onClick={() => restoreAutosaveEntry(entry)}
+                            style={{ border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: '8px', padding: '0.34rem 0.7rem', fontWeight: 700, cursor: 'pointer' }}
+                          >
+                            Continue
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeAutosaveEntry(entry.id)}
+                            style={{ border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', borderRadius: '8px', padding: '0.34rem 0.7rem', fontWeight: 700, cursor: 'pointer' }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
