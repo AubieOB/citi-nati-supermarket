@@ -20,6 +20,16 @@ const prisma = new PrismaClient();
 const MIN_VALID_EXPIRY_DATE = new Date('2000-01-01T00:00:00.000Z');
 const POS_DEFAULT_LOCATION_CODE = normalizeOperationalScopeCode(process.env.POS_LOCATION_CODE) || 'BT';
 const POS_DEFAULT_PRICE_TYPE_CODE = process.env.POS_PRICE_TYPE_CODE || 'RT';
+const POS_BLANTYRE_SELLING_LOCATION_CODE = normalizeOperationalScopeCode(
+  process.env.POS_BLANTYRE_SELLING_LOCATION_CODE
+  || process.env.POS_BLANTYRE_PROMOTION_LOCATION_CODE
+  || 'SH'
+) || 'SH';
+const POS_ZOMBA_SELLING_LOCATION_CODE = normalizeOperationalScopeCode(
+  process.env.POS_ZOMBA_SELLING_LOCATION_CODE
+  || process.env.POS_ZOMBA_PROMOTION_LOCATION_CODE
+  || 'SH'
+) || 'SH';
 
 const productImageMappingService = require('../services/productImageMapping.service');
 const { recordAuditLog } = require('../services/auditLog.service');
@@ -77,7 +87,7 @@ function normalizeBranchCode(value) {
 
 function getDefaultPosLocationCodeForBranch(branchCode, requestedLocationCode) {
   if (branchCode === 'BLANTYRE') {
-    return 'BT';
+    return POS_BLANTYRE_SELLING_LOCATION_CODE;
   }
 
   if (branchCode === 'ZOMBA') {
@@ -85,7 +95,7 @@ function getDefaultPosLocationCodeForBranch(branchCode, requestedLocationCode) {
     if (normalizedRequestedLocation && CORE_ZOMBA_LOCATION_CODES.includes(normalizedRequestedLocation)) {
       return normalizedRequestedLocation;
     }
-    return 'SH';
+    return POS_ZOMBA_SELLING_LOCATION_CODE;
   }
 
   return normalizeOperationalScopeCode(requestedLocationCode) || POS_DEFAULT_LOCATION_CODE;

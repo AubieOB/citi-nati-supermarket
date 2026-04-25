@@ -13,6 +13,16 @@ const { enrichProductStock } = require('../../utils/stockResolver');
 const prisma = new PrismaClient();
 const POS_DEFAULT_LOCATION_CODE = normalizeScopeCode(process.env.POS_LOCATION_CODE) || 'BT';
 const POS_DEFAULT_PRICE_TYPE_CODE = process.env.POS_PRICE_TYPE_CODE || 'RT';
+const POS_BLANTYRE_SELLING_LOCATION_CODE = normalizeScopeCode(
+  process.env.POS_BLANTYRE_SELLING_LOCATION_CODE
+  || process.env.POS_BLANTYRE_PROMOTION_LOCATION_CODE
+  || 'SH'
+) || 'SH';
+const POS_ZOMBA_SELLING_LOCATION_CODE = normalizeScopeCode(
+  process.env.POS_ZOMBA_SELLING_LOCATION_CODE
+  || process.env.POS_ZOMBA_PROMOTION_LOCATION_CODE
+  || 'SH'
+) || 'SH';
 
 function roundMoney(value) {
   const parsed = Number(value);
@@ -173,14 +183,14 @@ function buildProductScopeWhere(normalizedLocationCode) {
 }
 
 function getDefaultPosLocationCodeForBranch(branchCode, requestedLocationCode) {
-  if (branchCode === 'BLANTYRE') return 'BT';
+  if (branchCode === 'BLANTYRE') return POS_BLANTYRE_SELLING_LOCATION_CODE;
 
   if (branchCode === 'ZOMBA') {
     const normalizedRequestedLocation = normalizeScopeCode(requestedLocationCode);
     if (normalizedRequestedLocation && normalizedRequestedLocation !== 'ZA') {
       return normalizedRequestedLocation;
     }
-    return 'SH';
+    return POS_ZOMBA_SELLING_LOCATION_CODE;
   }
 
   return normalizeScopeCode(requestedLocationCode) || POS_DEFAULT_LOCATION_CODE;
