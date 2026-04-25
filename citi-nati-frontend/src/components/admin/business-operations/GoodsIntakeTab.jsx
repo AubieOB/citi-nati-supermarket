@@ -1203,7 +1203,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
           <div style={{ ...themedCardStyle, width: isIntakeWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1480px, 98vw)', height: isIntakeWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isIntakeWorkspaceMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column', padding: '0.95rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
               <div>
-                <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b7280', fontWeight: 800 }}>Stock Intake Workflow Modal</div>
                 <div style={{ fontSize: '1.12rem', fontWeight: 800, color: '#111827' }}>Supplier: {selectedSupplierName}</div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
@@ -1238,7 +1237,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
           <div style={{ ...themedCardStyle, width: isFinalizedHistoryMaximized ? 'calc(100vw - 0.7rem)' : 'min(1500px, 98vw)', height: isFinalizedHistoryMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isFinalizedHistoryMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column', padding: '0.95rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
               <div>
-                <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b7280', fontWeight: 800 }}>History Modal</div>
                 <div style={{ fontSize: '1.12rem', fontWeight: 800, color: '#111827' }}>Finalized Intake Records</div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
@@ -1347,7 +1345,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
           <div style={{ ...themedCardStyle, width: isTransferHistoryMaximized ? 'calc(100vw - 0.7rem)' : 'min(1520px, 98vw)', height: isTransferHistoryMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isTransferHistoryMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column', padding: '0.95rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
               <div>
-                <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b7280', fontWeight: 800 }}>Sync Modal</div>
                 <div style={{ fontSize: '1.12rem', fontWeight: 800, color: '#111827' }}>POS Transfer History</div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
