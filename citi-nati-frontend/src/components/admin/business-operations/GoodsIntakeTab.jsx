@@ -118,6 +118,8 @@ function createEmptyLine() {
     unitCost: '',
     sellingPrice: '',
     expiryDate: '',
+    latestSyncedStock: null,
+    stockStatus: '',
     batchRef: '',
     lineNotes: '',
   };
@@ -280,6 +282,8 @@ function sanitizeGoodsIntakeAutosaveForm(form) {
           expiryDate: item?.expiryDate || '',
           batchRef: item?.batchRef || '',
           lineNotes: item?.lineNotes || '',
+          latestSyncedStock: null,
+          stockStatus: '',
         }))
       : [createEmptyLine()],
     posTransferStatus: null,
@@ -343,6 +347,8 @@ function toFormFromRecord(record) {
           expiryDate: dateInputValue(item.expiryDate),
           batchRef: item.batchRef || '',
           lineNotes: item.lineNotes || '',
+          latestSyncedStock: null,
+          stockStatus: '',
         }))
       : [createEmptyLine()],
     posTransferStatus: record.posTransferStatus || null,
@@ -628,7 +634,16 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
   const setLineValue = (index, key, value) => {
     setForm((prev) => ({
       ...prev,
-      items: prev.items.map((item, itemIndex) => (itemIndex === index ? { ...item, [key]: value } : item)),
+      items: prev.items.map((item, itemIndex) => {
+        if (itemIndex !== index) return item;
+        const nextItem = { ...item, [key]: value };
+        if (key === 'barcode' || key === 'productName') {
+          nextItem.productId = null;
+          nextItem.latestSyncedStock = null;
+          nextItem.stockStatus = '';
+        }
+        return nextItem;
+      }),
     }));
   };
 
@@ -983,6 +998,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
         chosen?.price,
       ];
       const resolvedSellingPrice = lookupPriceCandidates.find((value) => Number.isFinite(Number(value)) && Number(value) >= 0);
+      const resolvedEffectiveStockRaw = chosen?.effectiveStock ?? chosen?.effective_stock ?? chosen?.posStock ?? chosen?.pos_stock ?? chosen?.stock;
+      const resolvedEffectiveStock = Number.isFinite(Number(resolvedEffectiveStockRaw)) ? Number(resolvedEffectiveStockRaw) : null;
       setForm((prev) => ({
         ...prev,
         items: prev.items.map((item, itemIndex) => {
@@ -993,6 +1010,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
             barcode: item.barcode || chosen.barcode || chosen.productCode || '',
             productName: chosen.name || item.productName,
             sellingPrice: resolvedSellingPrice ?? item.sellingPrice ?? '',
+            latestSyncedStock: resolvedEffectiveStock,
+            stockStatus: String(chosen?.stockStatus || chosen?.stock_status || ''),
           };
         }),
       }));
@@ -1266,6 +1285,11 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
               {calculatedItems.map((line, index) => {
                 const compactLineInputStyle = { ...tableInputStyle, padding: '0.34rem 0.4rem', fontSize: '0.8rem' };
                 const belowCost = line.sellingPrice != null && Number(line.sellingPrice) < Number(line.unitCost || 0);
+                const syncedStockTone = line.stockStatus === 'out_of_stock'
+                  ? { color: '#b91c1c', bg: '#fff1f2', border: '#fecdd3', label: 'Out of stock' }
+                  : line.stockStatus === 'low_stock'
+                    ? { color: '#b45309', bg: '#fffbeb', border: '#fcd34d', label: 'Low stock' }
+                    : { color: '#166534', bg: '#f0fdf4', border: '#bbf7d0', label: 'In stock' };
                 return (
                   <tr key={`line-${index}`}>
                     <td style={{ fontWeight: 700, color: '#334155', fontSize: '0.8rem', padding: '0.5rem 0.45rem', borderBottom: '1px solid #eef2f7', verticalAlign: 'top' }}>{index + 1}</td>
@@ -1292,6 +1316,17 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                         placeholder="Product name"
                       />
                       <div style={{ marginTop: '0.18rem', fontSize: '0.72rem', color: '#334155', lineHeight: 1.25, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{line.productName || '-'}</div>
+                      <div style={{ marginTop: '0.28rem', display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Latest synced stock</span>
+                        <span style={{ fontSize: '0.74rem', fontWeight: 800, color: line.latestSyncedStock == null ? '#64748b' : syncedStockTone.color }}>
+                          {line.latestSyncedStock == null ? 'Resolve product to view' : Number(line.latestSyncedStock).toLocaleString('en-US')}
+                        </span>
+                        {line.latestSyncedStock != null && (
+                          <span style={{ border: `1px solid ${syncedStockTone.border}`, background: syncedStockTone.bg, color: syncedStockTone.color, borderRadius: '999px', padding: '0.08rem 0.4rem', fontSize: '0.66rem', fontWeight: 800 }}>
+                            {syncedStockTone.label}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td style={{ padding: '0.4rem 0.45rem', borderBottom: '1px solid #eef2f7', verticalAlign: 'top' }}>
                       <input type="number" min="0" step="1" value={line.quantity} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'quantity', event.target.value)} style={compactLineInputStyle} />

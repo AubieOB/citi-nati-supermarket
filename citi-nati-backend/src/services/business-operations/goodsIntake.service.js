@@ -6,6 +6,7 @@ const {
   expandLocationScopeCodes,
   deriveBranchCodeFromLocationCode,
 } = require('../../utils/operationalScope');
+const { enrichProductStock } = require('../../utils/stockResolver');
 
 const prisma = new PrismaClient();
 
@@ -250,6 +251,10 @@ async function lookupGoodsIntakeProducts({ query, locationCode, take = 20 }) {
       sourceCode: true,
       barcode: true,
       price: true,
+      stock: true,
+      overrideActive: true,
+      overrideStock: true,
+      lowStockThreshold: true,
       category: true,
       branchCode: true,
       locationCode: true,
@@ -272,15 +277,18 @@ async function lookupGoodsIntakeProducts({ query, locationCode, take = 20 }) {
   };
 
   return products
-    .map((product) => ({
-      ...product,
+    .map((product) => {
+      const stockAwareProduct = enrichProductStock(product);
+      return {
+        ...stockAwareProduct,
       productCode: product.sourceCode,
       product_code: product.sourceCode,
       sellingPrice: Number(product.price || 0),
       selling_price: Number(product.price || 0),
       unitPrice: Number(product.price || 0),
       unit_price: Number(product.price || 0),
-    }))
+      };
+    })
     .sort((a, b) => {
       const aExact = String(a.barcode || '').toLowerCase() === loweredQuery
         || String(a.sourceCode || '').toLowerCase() === loweredQuery;
