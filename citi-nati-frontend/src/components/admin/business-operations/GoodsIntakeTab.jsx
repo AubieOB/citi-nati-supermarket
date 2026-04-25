@@ -1057,7 +1057,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                 return (
                   <tr key={`line-${index}`}>
                     <td style={{ width: '2%', fontWeight: 700, color: '#334155', fontSize: '0.8rem', padding: '0 0.25rem' }}>{index + 1}</td>
-                    <td style={{ width: '8%', padding: '0 0.25rem' }}>
+                    <td style={{ width: '11%', padding: '0 0.25rem' }}>
                       <input
                         value={line.barcode || ''}
                         onFocus={selectInputText}
@@ -1068,7 +1068,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                         placeholder="scan/manual"
                       />
                     </td>
-                    <td style={{ width: '14%', padding: '0 0.25rem' }}>
+                    <td style={{ width: '20%', padding: '0 0.25rem' }}>
                       <input
                         value={line.productName || ''}
                         onFocus={selectInputText}
@@ -1089,18 +1089,18 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                     <td style={{ width: '8%', padding: '0 0.25rem' }}>
                       <input type="number" min="0" step="0.01" value={line.sellingPrice == null ? '' : line.sellingPrice} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'sellingPrice', event.target.value)} style={{ ...compactLineInputStyle, borderColor: belowCost ? '#f59e0b' : '#cbd5e1', backgroundColor: belowCost ? '#fffbeb' : '#fff' }} />
                     </td>
-                    <td style={{ width: '7%', fontWeight: 700, color: '#334155', fontSize: '0.8rem', padding: '0 0.25rem', whiteSpace: 'nowrap' }}>{line.marginPercent == null ? '-' : `${line.marginPercent.toFixed(2)}%`}</td>
+                    <td style={{ width: '5%', fontWeight: 700, color: '#334155', fontSize: '0.8rem', padding: '0 0.25rem', whiteSpace: 'nowrap' }}>{line.marginPercent == null ? '-' : `${line.marginPercent.toFixed(2)}%`}</td>
                     <td style={{ width: '8%', fontWeight: 700, color: line.estimatedProfit >= 0 ? '#166534' : '#b91c1c', fontSize: '0.8rem', padding: '0 0.25rem', whiteSpace: 'nowrap' }}>{money(line.estimatedProfit)}</td>
                     <td style={{ width: '9%', padding: '0 0.25rem' }}>
                       <input type="date" value={line.expiryDate || ''} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'expiryDate', event.target.value)} style={{ ...compactLineInputStyle, backgroundColor: line.productName && !line.expiryDate ? '#fff7ed' : '#fff' }} />
                     </td>
-                    <td style={{ width: '7%', padding: '0 0.25rem' }}>
+                    <td style={{ width: '5%', padding: '0 0.25rem' }}>
                       <input value={line.batchRef || ''} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'batchRef', event.target.value)} style={compactLineInputStyle} />
                     </td>
-                    <td style={{ width: '10%', padding: '0 0.25rem' }}>
+                    <td style={{ width: '6%', padding: '0 0.25rem' }}>
                       <input value={line.lineNotes || ''} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'lineNotes', event.target.value)} style={compactLineInputStyle} />
                     </td>
-                    <td style={{ width: '7%', padding: '0 0.25rem' }}>
+                    <td style={{ width: '5%', padding: '0 0.25rem' }}>
                       {(canCreate || canEdit) && (
                         <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
                           <button type="button" onClick={() => duplicateLine(index)} style={{ border: '1px solid #cbd5e1', background: '#fff', borderRadius: '7px', padding: '0.25rem 0.45rem', fontWeight: 600, fontSize: '0.76rem', cursor: 'pointer' }}>Dup</button>
