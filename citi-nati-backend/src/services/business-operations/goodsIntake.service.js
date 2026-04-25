@@ -231,13 +231,17 @@ async function lookupGoodsIntakeProducts({ query, locationCode, take = 20 }) {
 
   const products = await prisma.product.findMany({
     where: {
-      ...scopeWhere,
-      OR: [
-        { barcode: { equals: normalizedQuery, mode: 'insensitive' } },
-        { sourceCode: { equals: normalizedQuery, mode: 'insensitive' } },
-        { name: { contains: normalizedQuery, mode: 'insensitive' } },
-        { barcode: { contains: normalizedQuery, mode: 'insensitive' } },
-        { sourceCode: { contains: normalizedQuery, mode: 'insensitive' } },
+      AND: [
+        scopeWhere,
+        {
+          OR: [
+            { barcode: { equals: normalizedQuery, mode: 'insensitive' } },
+            { sourceCode: { equals: normalizedQuery, mode: 'insensitive' } },
+            { name: { contains: normalizedQuery, mode: 'insensitive' } },
+            { barcode: { contains: normalizedQuery, mode: 'insensitive' } },
+            { sourceCode: { contains: normalizedQuery, mode: 'insensitive' } },
+          ],
+        },
       ],
     },
     select: {
