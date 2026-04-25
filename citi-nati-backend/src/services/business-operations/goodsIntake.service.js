@@ -20,6 +20,15 @@ function roundMoney(value) {
   return Number(parsed.toFixed(2));
 }
 
+function normalizeProductCode(value) {
+  const normalized = String(value || '').trim();
+  return normalized || null;
+}
+
+function resolveGoodsIntakePosProductCode(product) {
+  return normalizeProductCode(product?.sourceCode) || normalizeProductCode(product?.barcode);
+}
+
 function buildLineItem(line, index) {
   const quantity = Math.max(0, Number(line.quantity || 0));
   const unitCost = Math.max(0, Number(line.unitCost || 0));
@@ -426,6 +435,7 @@ async function syncGoodsIntakeSellingPrices({ goodsIntakeId, items = [], locatio
     select: {
       id: true,
       sourceCode: true,
+      barcode: true,
       price: true,
       branchCode: true,
       locationCode: true,
@@ -444,10 +454,13 @@ async function syncGoodsIntakeSellingPrices({ goodsIntakeId, items = [], locatio
   for (const product of products) {
     const newPrice = candidateMap.get(Number(product.id));
     const oldPrice = roundMoney(product.price);
+    const resolvedPosCode = resolveGoodsIntakePosProductCode(product);
 
     console.log('[GOODS INTAKE PRICE SYNC] Processing product:', {
       productId: product.id,
-      code: product.sourceCode,
+      sourceCode: product.sourceCode,
+      barcode: product.barcode,
+      resolvedPosCode,
       oldPrice,
       newPrice,
       unchanged: newPrice === oldPrice,
@@ -470,18 +483,18 @@ async function syncGoodsIntakeSellingPrices({ goodsIntakeId, items = [], locatio
       newPrice,
     });
 
-    if (!product.sourceCode) {
-      console.log('[GOODS INTAKE PRICE SYNC] Skipping POS sync (no sourceCode):', {
+    if (!resolvedPosCode) {
+      console.log('[GOODS INTAKE PRICE SYNC] Skipping POS sync (no POS product code):', {
         productId: product.id,
       });
       continue;
     }
 
     try {
-      await updateCachedProductPrice(product.sourceCode, newPrice);
+      await updateCachedProductPrice(resolvedPosCode, newPrice);
     } catch (cacheError) {
       console.warn('[GOODS INTAKE PRICE SYNC] Cache update failed (non-fatal):', {
-        productCode: product.sourceCode,
+        productCode: resolvedPosCode,
         error: cacheError.message,
       });
     }
@@ -496,7 +509,7 @@ async function syncGoodsIntakeSellingPrices({ goodsIntakeId, items = [], locatio
       console.log('[POS COMMAND QUEUE] enqueue UPDATE_PRICE start (from goods intake)');
       const payload = {
         productId: String(product.id),
-        productCode: product.sourceCode,
+        productCode: resolvedPosCode,
         newPrice,
         oldPrice,
         requestedLocationCode: scope.requestedLocationCode,
@@ -524,7 +537,7 @@ async function syncGoodsIntakeSellingPrices({ goodsIntakeId, items = [], locatio
       failed += 1;
       console.error('[POS COMMAND QUEUE ERROR] enqueue UPDATE_PRICE failed (goods intake):', {
         productId: product.id,
-        productCode: product.sourceCode,
+        productCode: resolvedPosCode,
         error: queueErr.message,
         stack: queueErr.stack,
       });

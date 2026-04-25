@@ -1716,21 +1716,29 @@ const updateProduct = async (req, res) => {
       commandType: null,
     };
 
-    // Phase 1: enqueue UPDATE_PRICE command for POS-linked products with actual price changes
+    const resolvedPriceProductCode = normalizeProductCode(updatedProduct.sourceCode)
+      || normalizeProductCode(updatedProduct.barcode)
+      || normalizeProductCode(existingProduct.barcode);
+
+    // Phase 1: enqueue UPDATE_PRICE command for products with actual price changes.
+    // Product code resolution mirrors promotion sync behavior by requiring a valid POS product code.
     console.log('[UPDATE_PRICE CHECK] Conditions:', {
       hasSourceCode: Boolean(updatedProduct.sourceCode),
+      hasBarcode: Boolean(updatedProduct.barcode || existingProduct.barcode),
       sourceCode: updatedProduct.sourceCode || null,
+      barcode: updatedProduct.barcode || existingProduct.barcode || null,
+      resolvedProductCode: resolvedPriceProductCode,
       incomingPriceProvided,
       priceChanged,
       existingPrice: Number(existingProduct.price),
       incomingParsedPrice,
-      conditionMet: Boolean(updatedProduct.sourceCode && incomingPriceProvided && priceChanged),
+      conditionMet: Boolean(resolvedPriceProductCode && incomingPriceProvided && priceChanged),
     });
 
-    if (updatedProduct.sourceCode && incomingPriceProvided && priceChanged) {
+    if (resolvedPriceProductCode && incomingPriceProvided && priceChanged) {
       const payload = {
         productId: String(updatedProduct.id),
-        productCode: updatedProduct.sourceCode,
+        productCode: resolvedPriceProductCode,
         newPrice: incomingParsedPrice,
         oldPrice: Number(existingProduct.price),
         requestedLocationCode: writebackScope.requestedLocationCode,
