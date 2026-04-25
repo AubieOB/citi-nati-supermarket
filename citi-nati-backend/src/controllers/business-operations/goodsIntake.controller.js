@@ -72,7 +72,21 @@ async function createGoodsIntake(req, res) {
     if (validationError) return res.status(400).json({ success: false, error: validationError });
 
     const created = await goodsIntakeService.createGoodsIntake(payload);
-    return res.status(201).json({ success: true, data: created });
+    let priceSync = { attempted: 0, updated: 0, queued: 0, failed: 0 };
+
+    try {
+      priceSync = await goodsIntakeService.syncGoodsIntakeSellingPrices({
+        goodsIntakeId: created.id,
+        items: payload.items,
+        locationCode: payload.locationCode,
+        createdBy: payload.enteredBy,
+        source: 'goodsIntake.createGoodsIntake',
+      });
+    } catch (priceSyncError) {
+      console.error('[BO][GOODS_INTAKE] create price sync error:', priceSyncError);
+    }
+
+    return res.status(201).json({ success: true, data: created, priceSync });
   } catch (error) {
     console.error('[BO][GOODS_INTAKE] create error:', error);
     return res.status(500).json({ success: false, error: 'Failed to create goods intake record' });
@@ -89,7 +103,21 @@ async function updateGoodsIntake(req, res) {
     if (validationError) return res.status(400).json({ success: false, error: validationError });
 
     const updated = await goodsIntakeService.updateGoodsIntake(id, payload);
-    return res.json({ success: true, data: updated });
+    let priceSync = { attempted: 0, updated: 0, queued: 0, failed: 0 };
+
+    try {
+      priceSync = await goodsIntakeService.syncGoodsIntakeSellingPrices({
+        goodsIntakeId: id,
+        items: payload.items,
+        locationCode: payload.locationCode,
+        createdBy: payload.enteredBy,
+        source: 'goodsIntake.updateGoodsIntake',
+      });
+    } catch (priceSyncError) {
+      console.error('[BO][GOODS_INTAKE] update price sync error:', priceSyncError);
+    }
+
+    return res.json({ success: true, data: updated, priceSync });
   } catch (error) {
     console.error('[BO][GOODS_INTAKE] update error:', error);
     return res.status(500).json({ success: false, error: 'Failed to update goods intake record' });

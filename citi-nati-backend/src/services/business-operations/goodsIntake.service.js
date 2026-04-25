@@ -1,6 +1,8 @@
 'use strict';
 
 const { PrismaClient } = require('@prisma/client');
+const posCommandQueueService = require('../posCommandQueue.service');
+const { updateProductPrice: updateCachedProductPrice } = require('../cache.service');
 const {
   normalizeScopeCode,
   expandLocationScopeCodes,
@@ -9,6 +11,8 @@ const {
 const { enrichProductStock } = require('../../utils/stockResolver');
 
 const prisma = new PrismaClient();
+const POS_DEFAULT_LOCATION_CODE = normalizeScopeCode(process.env.POS_LOCATION_CODE) || 'BT';
+const POS_DEFAULT_PRICE_TYPE_CODE = process.env.POS_PRICE_TYPE_CODE || 'RT';
 
 function roundMoney(value) {
   const parsed = Number(value);
@@ -156,6 +160,32 @@ function buildProductScopeWhere(normalizedLocationCode) {
       })),
       ...(scopeCodes.includes('BT') ? [{ branchCode: 'BLANTYRE' }] : []),
     ],
+  };
+}
+
+function getDefaultPosLocationCodeForBranch(branchCode, requestedLocationCode) {
+  if (branchCode === 'BLANTYRE') return 'BT';
+
+  if (branchCode === 'ZOMBA') {
+    const normalizedRequestedLocation = normalizeScopeCode(requestedLocationCode);
+    if (normalizedRequestedLocation && normalizedRequestedLocation !== 'ZA') {
+      return normalizedRequestedLocation;
+    }
+    return 'SH';
+  }
+
+  return normalizeScopeCode(requestedLocationCode) || POS_DEFAULT_LOCATION_CODE;
+}
+
+function buildGoodsIntakePriceWritebackScope(product, payloadLocationCode) {
+  const requestedLocationCode = normalizeScopeCode(payloadLocationCode || product?.locationCode || POS_DEFAULT_LOCATION_CODE) || POS_DEFAULT_LOCATION_CODE;
+  const branchCode = String(product?.branchCode || deriveBranchCodeFromLocationCode(requestedLocationCode) || 'BLANTYRE').trim().toUpperCase();
+
+  return {
+    requestedLocationCode,
+    locationCode: getDefaultPosLocationCodeForBranch(branchCode, requestedLocationCode),
+    branchCode,
+    priceTypeCode: POS_DEFAULT_PRICE_TYPE_CODE,
   };
 }
 
@@ -367,6 +397,94 @@ async function getGoodsIntakeLineStock({ locationCode, productIds = [] }) {
   });
 }
 
+async function syncGoodsIntakeSellingPrices({ goodsIntakeId, items = [], locationCode = null, createdBy = null, source = 'goodsIntake.save' }) {
+  const candidateMap = new Map();
+
+  for (const item of Array.isArray(items) ? items : []) {
+    const productId = Number(item?.productId);
+    const sellingPrice = item?.sellingPrice == null || item?.sellingPrice === '' ? null : roundMoney(item.sellingPrice);
+
+    if (!Number.isFinite(productId) || productId <= 0) continue;
+    if (!Number.isFinite(sellingPrice) || sellingPrice <= 0) continue;
+
+    candidateMap.set(productId, sellingPrice);
+  }
+
+  if (candidateMap.size === 0) {
+    return { attempted: 0, updated: 0, queued: 0, failed: 0 };
+  }
+
+  const products = await prisma.product.findMany({
+    where: { id: { in: Array.from(candidateMap.keys()) } },
+    select: {
+      id: true,
+      sourceCode: true,
+      price: true,
+      branchCode: true,
+      locationCode: true,
+    },
+  });
+
+  let updated = 0;
+  let queued = 0;
+  let failed = 0;
+
+  for (const product of products) {
+    const newPrice = candidateMap.get(Number(product.id));
+    const oldPrice = roundMoney(product.price);
+
+    if (!Number.isFinite(newPrice) || newPrice <= 0 || newPrice === oldPrice) {
+      continue;
+    }
+
+    await prisma.product.update({
+      where: { id: product.id },
+      data: { price: newPrice },
+    });
+    updated += 1;
+
+    if (!product.sourceCode) {
+      continue;
+    }
+
+    try {
+      await updateCachedProductPrice(product.sourceCode, newPrice);
+    } catch (_error) {
+      // Keep goods intake save flow moving if no website cache row exists yet.
+    }
+
+    const scope = buildGoodsIntakePriceWritebackScope(product, locationCode);
+
+    try {
+      await posCommandQueueService.enqueueCommand('UPDATE_PRICE', {
+        productId: String(product.id),
+        productCode: product.sourceCode,
+        newPrice,
+        oldPrice,
+        requestedLocationCode: scope.requestedLocationCode,
+        locationCode: scope.locationCode,
+        branchCode: scope.branchCode,
+        priceTypeCode: scope.priceTypeCode,
+      }, {
+        source,
+        relatedEntityType: 'GoodsIntake',
+        relatedEntityId: goodsIntakeId,
+        createdBy,
+      });
+      queued += 1;
+    } catch (_error) {
+      failed += 1;
+    }
+  }
+
+  return {
+    attempted: candidateMap.size,
+    updated,
+    queued,
+    failed,
+  };
+}
+
 async function createGoodsIntake(payload) {
   const items = payload.items.map(buildLineItem).filter((line) => line.productName);
   const totals = computeTotals(items);
@@ -475,4 +593,6 @@ module.exports = {
   getGoodsIntakeById,
   listGoodsIntakes,
   lookupGoodsIntakeProducts,
+  getGoodsIntakeLineStock,
+  syncGoodsIntakeSellingPrices,
 };
