@@ -56,7 +56,7 @@ You now have **fully functional multi-branch location support** across the entir
    ↓
 2. Sees "Location Scope" dropdown in header
    - All Locations (default)
-   - Blantyre (BT)
+   - Blantyre (SH)
    - Zomba (ZA)
    ↓
 3. User selects "Blantyre"
@@ -172,7 +172,7 @@ Supports query param: ?locationId=1
 | Option | ID | Code | Notes |
 |--------|----|----|-------|
 | All Locations | - | - | Returns combined data from all branches |
-| Blantyre | 1 | BT | Primary branch |
+| Blantyre | 1 | SH | Primary branch |
 | Zomba | 2 | ZA | Secondary branch |
 
 **To Add More Locations**:

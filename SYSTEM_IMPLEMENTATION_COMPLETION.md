@@ -105,7 +105,7 @@ The system implements branch-aware and location-aware behavior instead of treati
 
 Current location behavior in the frontend utility layer includes:
 
-- `BLANTYRE_SH -> branchCode=BLANTYRE, locationCode=BT`
+- `BLANTYRE_SH -> branchCode=BLANTYRE, locationCode=SH`
 - `ZOMBA_SH -> branchCode=ZOMBA, locationCode=SH`
 - `ZOMBA_BAR -> branchCode=ZOMBA, locationCode=BAR`
 - `ZOMBA_RES -> branchCode=ZOMBA, locationCode=ST999`

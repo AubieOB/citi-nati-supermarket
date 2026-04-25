@@ -47,7 +47,7 @@ The parent component maintains:
 
 **Options**:
 - ✅ All Locations (returns null locationId to backend)
-- ✅ Blantyre (code: BT, id: 1)
+- ✅ Blantyre (code: SH, id: 1)
 - ✅ Zomba (code: ZA, id: 2)
 - ✅ Extensible via API endpoint `/business-operations/locations`
 
@@ -547,7 +547,7 @@ All backend API endpoints already support location filtering:
 
 **Current Supported Locations**:
 - All Locations (no filter)
-- Blantyre (BT)
+- Blantyre (SH)
 - Zomba (ZA)
 - Extensible via API
 

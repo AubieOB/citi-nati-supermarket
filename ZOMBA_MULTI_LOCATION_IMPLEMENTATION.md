@@ -92,7 +92,7 @@ The Zomba POS Sync Agent has been upgraded to properly support multiple operatio
 - For Zomba branch specifically:
   - If explicit location provided: use that specific location
   - If no explicit location: fetch from ALL Zomba sub-locations (SH, BAR, WH, ST999)
-- For Blantyre: continues to use single BT location
+- For Blantyre: continues to use single SH location
 - For other branches: maintains backward compatibility
 
 **Files Modified**:

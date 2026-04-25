@@ -79,7 +79,7 @@ Location-aware behavior is core to safe admin operations.
 
 Typical scopes include:
 
-- Blantyre SH (`BT`)
+- Blantyre SH (`SH`)
 - Zomba SH (`SH`)
 - Zomba BAR (`BAR`)
 - Zomba RES (`ST999`)

@@ -23,7 +23,7 @@ This guide provides step-by-step instructions to verify that multi-branch locati
 2. Look at the header section
 3. **Verify**: Location Scope dropdown appears with options:
    - ✅ "All Locations"
-   - ✅ "Blantyre (BT)" 
+   - ✅ "Blantyre (SH)" 
    - ✅ "Zomba (ZA)"
 
 ### Test 2: Location Selection Persists

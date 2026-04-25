@@ -116,7 +116,7 @@ async function transferGoodsIntakeToBlantyrePosPending(intakeId, options = {}) {
     const branch = deriveBranchCodeFromLocationCode(intake.locationCode);
     return {
       success: false,
-      error: `Transfer to POS pending stock is available for Blantyre (BT) location only. This intake is for ${intake.locationName || branch || locationCode || '(unknown location)'}.`,
+      error: `Transfer to POS pending stock is available for Blantyre (SH) location only. This intake is for ${intake.locationName || branch || locationCode || '(unknown location)'}.`,
     };
   }
 
@@ -250,7 +250,7 @@ async function transferGoodsIntakeToBlantyrePosPending(intakeId, options = {}) {
 }
 
 /**
- * Map the website location code (BT) to the POS location code (SH for Blantyre shelf).
+ * Map Blantyre's internal website scope code to the POS shelf location code (SH).
  */
 function mapToPostLocationCode(websiteLocationCode) {
   const code = String(websiteLocationCode || '').toUpperCase().trim();

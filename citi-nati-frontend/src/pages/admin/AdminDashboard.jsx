@@ -998,7 +998,7 @@ const AdminDashboard = () => {
           >
             {sidebarCollapsed ? (
               <>
-                <option value="BLANTYRE_SH">BT SH</option>
+                <option value="BLANTYRE_SH">SH</option>
                 <option value="ZOMBA_SH">ZA SH</option>
                 <option value="ZOMBA_BAR">ZA BAR</option>
                 <option value="ZOMBA_RES">ZA RES</option>
