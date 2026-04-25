@@ -357,6 +357,7 @@ async function attachPriceSyncCommandMetadata(records) {
         status: command.status,
         productId: command.payload?.productId || null,
         productCode: command.payload?.productCode || null,
+        productName: command.payload?.productName || null,
         oldPrice: command.payload?.oldPrice ?? null,
         newPrice: command.payload?.newPrice ?? null,
         locationCode: command.payload?.locationCode || null,
@@ -544,6 +545,7 @@ async function syncGoodsIntakeSellingPrices({ goodsIntakeId, items = [], locatio
     where: { id: { in: Array.from(candidateMap.keys()) } },
     select: {
       id: true,
+      name: true,
       sourceCode: true,
       barcode: true,
       price: true,
@@ -620,6 +622,7 @@ async function syncGoodsIntakeSellingPrices({ goodsIntakeId, items = [], locatio
       const payload = {
         productId: String(product.id),
         productCode: resolvedPosCode,
+        productName: String(product.name || '').trim() || null,
         newPrice,
         oldPrice,
         requestedLocationCode: scope.requestedLocationCode,

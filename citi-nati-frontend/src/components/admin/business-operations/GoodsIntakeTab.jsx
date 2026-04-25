@@ -2214,14 +2214,14 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                 <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1020px' }}>
                   <thead>
                     <tr>
-                      {['Command ID', 'Product Code', 'Location', 'Price Type', 'Old Price', 'New Price', 'Status', 'Queued', 'Processed', 'Agent Message'].map((label) => (
+                      {['Command ID', 'Product Code', 'Product Name', 'Location', 'Price Type', 'Old Price', 'New Price', 'Status', 'Queued', 'Processed', 'Agent Message'].map((label) => (
                         <th key={label} style={{ textAlign: 'left', padding: '0.55rem 0.45rem', fontSize: '0.75rem', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>{label}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {(activePriceSyncRecord.priceSyncCommands || []).length === 0 ? (
-                      <tr><td colSpan={10} style={{ padding: '0.9rem', color: '#64748b' }}>No command rows available for this record.</td></tr>
+                      <tr><td colSpan={11} style={{ padding: '0.9rem', color: '#64748b' }}>No command rows available for this record.</td></tr>
                     ) : (activePriceSyncRecord.priceSyncCommands || []).map((command) => {
                       const commandStatus = String(command.status || '').trim().toLowerCase();
                       const tone = commandStatus === 'completed'
@@ -2237,6 +2237,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                         <tr key={`price-sync-detail-cmd-${command.id}`}>
                           <td style={{ padding: '0.55rem 0.45rem', borderBottom: '1px solid #f1f5f9', color: '#0f172a' }}>{command.id}</td>
                           <td style={{ padding: '0.55rem 0.45rem', borderBottom: '1px solid #f1f5f9', color: '#0f172a' }}>{command.productCode || command.productId || '-'}</td>
+                          <td style={{ padding: '0.55rem 0.45rem', borderBottom: '1px solid #f1f5f9', color: '#0f172a' }}>{command.productName || '-'}</td>
                           <td style={{ padding: '0.55rem 0.45rem', borderBottom: '1px solid #f1f5f9', color: '#0f172a' }}>{command.locationCode || command.requestedLocationCode || '-'}</td>
                           <td style={{ padding: '0.55rem 0.45rem', borderBottom: '1px solid #f1f5f9', color: '#0f172a' }}>{command.priceTypeCode || '-'}</td>
                           <td style={{ padding: '0.55rem 0.45rem', borderBottom: '1px solid #f1f5f9', color: '#0f172a' }}>{command.oldPrice == null ? '-' : money(command.oldPrice)}</td>
