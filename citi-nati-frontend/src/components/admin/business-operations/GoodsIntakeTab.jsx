@@ -381,6 +381,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
     [calculatedItems]
   );
 
+  const isLineEntryDisabled = !activeLookupLocationCode;
+
   const selectedSupplierName = useMemo(() => {
     const supplier = suppliers.find((entry) => String(entry.id) === String(form.supplierId || ''));
     if (supplier?.name) return supplier.name;
@@ -1036,21 +1038,28 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
           </div>
         </div>
 
-        <div style={{ marginTop: '1rem', display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          {(canCreate || canEdit) && <button type="button" onClick={addLine} style={{ border: '1px solid #93c5fd', background: '#eff6ff', color: '#1d4ed8', borderRadius: '8px', padding: '0.35rem 0.7rem', fontWeight: 600, cursor: 'pointer' }}>Add Row</button>}
-          <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Checks:</span>
-          <span style={{ fontSize: '0.78rem', color: missingBarcodeCount ? '#b45309' : '#64748b' }}>Missing barcode: {missingBarcodeCount}</span>
-          <span style={{ fontSize: '0.78rem', color: missingExpiryCount ? '#b45309' : '#64748b' }}>Missing expiry: {missingExpiryCount}</span>
-        </div>
-
-        {lookupWarning && (
-          <div style={{ marginTop: '0.75rem', border: '1px solid #fdba74', background: '#fff7ed', color: '#9a3412', borderRadius: '10px', padding: '0.7rem 0.85rem', fontSize: '0.84rem', fontWeight: 600 }}>
-            {lookupWarning}
+        {isLineEntryDisabled && (
+          <div style={{ marginTop: '1rem', border: '1px solid #bfdbfe', background: '#eff6ff', color: '#1e3a8a', borderRadius: '10px', padding: '0.65rem 0.8rem', fontSize: '0.82rem', fontWeight: 600 }}>
+            Select Branch / Location to enable line entry.
           </div>
         )}
 
-        <div style={{ marginTop: '0.8rem', width: '100%', maxWidth: '100%', overflowX: 'auto', border: '1px solid #dbe5f0', borderRadius: '12px', background: '#ffffff' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+        <fieldset disabled={isLineEntryDisabled} style={{ margin: 0, padding: 0, border: 'none', minInlineSize: 0, opacity: isLineEntryDisabled ? 0.56 : 1 }}>
+          <div style={{ marginTop: '1rem', display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            {(canCreate || canEdit) && <button type="button" onClick={addLine} style={{ border: '1px solid #93c5fd', background: '#eff6ff', color: '#1d4ed8', borderRadius: '8px', padding: '0.35rem 0.7rem', fontWeight: 600, cursor: isLineEntryDisabled ? 'not-allowed' : 'pointer' }}>Add Row</button>}
+            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Checks:</span>
+            <span style={{ fontSize: '0.78rem', color: missingBarcodeCount ? '#b45309' : '#64748b' }}>Missing barcode: {missingBarcodeCount}</span>
+            <span style={{ fontSize: '0.78rem', color: missingExpiryCount ? '#b45309' : '#64748b' }}>Missing expiry: {missingExpiryCount}</span>
+          </div>
+
+          {lookupWarning && (
+            <div style={{ marginTop: '0.75rem', border: '1px solid #fdba74', background: '#fff7ed', color: '#9a3412', borderRadius: '10px', padding: '0.7rem 0.85rem', fontSize: '0.84rem', fontWeight: 600 }}>
+              {lookupWarning}
+            </div>
+          )}
+
+          <div style={{ marginTop: '0.8rem', width: '100%', maxWidth: '100%', overflowX: 'auto', border: '1px solid #dbe5f0', borderRadius: '12px', background: '#ffffff' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
             <colgroup>
               <col style={{ width: '3%' }} />
               <col style={{ width: '15%' }} />
@@ -1134,8 +1143,9 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                 );
               })}
             </tbody>
-          </table>
-        </div>
+            </table>
+          </div>
+        </fieldset>
 
         <div style={{ marginTop: '0.8rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.55rem', width: '100%', minWidth: 0 }}>
           <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.65rem', background: '#f8fafc' }}>
