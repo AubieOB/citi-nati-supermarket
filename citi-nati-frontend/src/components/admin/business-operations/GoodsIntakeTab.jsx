@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../../../utils/api.js';
 import { boAlert, boConfirm } from '../../../utils/boDialogBus.js';
-import { exportStockIntakeTransferRecordPdf } from '../../../utils/businessOperationsPdfExports.js';
+import { exportStockIntakeOnlyRecordPdf, exportStockIntakeTransferRecordPdf } from '../../../utils/businessOperationsPdfExports.js';
 
 const cardStyle = {
   backgroundColor: '#fff',
@@ -667,16 +667,23 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
     }
   };
 
-  const handleExportRecord = async (recordId) => {
+  const handleExportRecord = async (recordId, exportType = 'full') => {
     if (!canExport) return;
     try {
       const response = await api.get(`/business-operations/goods-intake/${recordId}`);
       const data = response.data?.data;
       if (!data) return;
-      exportStockIntakeTransferRecordPdf({
-        record: data,
-        companyName: 'Citi-Nati Supermarket',
-      });
+      if (exportType === 'intake-only') {
+        exportStockIntakeOnlyRecordPdf({
+          record: data,
+          companyName: 'Citi-Nati Supermarket',
+        });
+      } else {
+        exportStockIntakeTransferRecordPdf({
+          record: data,
+          companyName: 'Citi-Nati Supermarket',
+        });
+      }
     } catch (error) {
       await boAlert({ title: 'Export Failed', message: error.response?.data?.error || 'Failed to export PDF.', type: 'error' });
     }
@@ -860,9 +867,14 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
               </button>
             )}
             {form.id && canExport && (
-              <button type="button" onClick={() => handleExportRecord(form.id)} style={{ border: isAdminDarkTheme ? '1px solid #2f7f58' : '1px solid #bbf7d0', background: isAdminDarkTheme ? '#153828' : '#f0fdf4', color: isAdminDarkTheme ? '#91e0b4' : '#166534', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}>
-                Export PDF
-              </button>
+              <>
+                <button type="button" onClick={() => handleExportRecord(form.id, 'full')} style={{ border: isAdminDarkTheme ? '1px solid #2f7f58' : '1px solid #bbf7d0', background: isAdminDarkTheme ? '#153828' : '#f0fdf4', color: isAdminDarkTheme ? '#91e0b4' : '#166534', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}>
+                  Export Intake + Transfer Report
+                </button>
+                <button type="button" onClick={() => handleExportRecord(form.id, 'intake-only')} style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #cbd5e1', background: isAdminDarkTheme ? '#0f172a' : '#fff', color: isAdminDarkTheme ? '#e2e8f0' : '#0f172a', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}>
+                  Export Intake Only
+                </button>
+              </>
             )}
             {((form.id && canEdit) || (!form.id && canCreate)) && (
               <button type="button" onClick={() => saveRecord('draft')} disabled={saving} style={{ border: isAdminDarkTheme ? '1px solid #365f98' : '1px solid #dbeafe', background: isAdminDarkTheme ? '#18273f' : '#eff6ff', color: isAdminDarkTheme ? '#b9d7ff' : '#1d4ed8', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}>
@@ -1310,7 +1322,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                         <td style={{ padding: '0.5rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}` }}>
                           <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
                             {canEdit && canViewForm && <button type="button" onClick={() => handleEditRecord(record.id)} style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #cbd5e1', background: isAdminDarkTheme ? '#0f172a' : '#fff', color: isAdminDarkTheme ? '#e2e8f0' : '#0f172a', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>Open</button>}
-                            {canExport && <button type="button" onClick={() => handleExportRecord(record.id)} style={{ border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>PDF</button>}
+                            {canExport && <button type="button" onClick={() => handleExportRecord(record.id, 'full')} style={{ border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>Export Intake + Transfer Report</button>}
+                            {canExport && <button type="button" onClick={() => handleExportRecord(record.id, 'intake-only')} style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>Export Intake Only</button>}
                             {canDelete && <button type="button" onClick={() => handleDeleteRecord(record)} style={{ border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 600, cursor: 'pointer' }}>Delete</button>}
                             {canViewHistory && <button type="button" onClick={() => openTransferDetail(record.id)} style={{ border: '1px solid #e9d5ff', background: '#faf5ff', color: '#6b21a8', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>Details</button>}
                             {canEdit && record.status === 'finalized' && String(record.locationCode || '').trim().toUpperCase() === 'BT' && (resolveTransferStatus(record) === 'not_transferred' || resolveTransferStatus(record) === 'failed') && (
@@ -1443,7 +1456,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                           <td style={{ padding: '0.48rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}` }}>
                             <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
                               <button type="button" onClick={() => openTransferDetail(record.id)} style={{ border: '1px solid #c7d2fe', background: '#eef2ff', color: '#4338ca', borderRadius: '7px', padding: '0.25rem 0.5rem', fontWeight: 700, cursor: 'pointer' }}>View</button>
-                              {canExport && <button type="button" onClick={() => handleExportRecord(record.id)} style={{ border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: '7px', padding: '0.25rem 0.5rem', fontWeight: 700, cursor: 'pointer' }}>PDF</button>}
+                              {canExport && <button type="button" onClick={() => handleExportRecord(record.id, 'full')} style={{ border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: '7px', padding: '0.25rem 0.5rem', fontWeight: 700, cursor: 'pointer' }}>Export Intake + Transfer Report</button>}
+                              {canExport && <button type="button" onClick={() => handleExportRecord(record.id, 'intake-only')} style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: '7px', padding: '0.25rem 0.5rem', fontWeight: 700, cursor: 'pointer' }}>Export Intake Only</button>}
                               {canEdit && resolveTransferStatus(record) === 'failed' && (
                                 <button type="button" onClick={() => handleTransferToPOS(record.id)} disabled={transferring} style={{ border: '1px solid #fb923c', background: '#fff7ed', color: '#c2410c', borderRadius: '7px', padding: '0.25rem 0.5rem', fontWeight: 700, cursor: 'pointer' }}>Retry</button>
                               )}

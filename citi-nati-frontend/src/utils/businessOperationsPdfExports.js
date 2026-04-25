@@ -799,7 +799,116 @@ export function exportStockIntakeTransferRecordPdf({ record, companyName = 'Citi
   doc.save(`stock_intake_transfer_${safeRef}.pdf`);
 }
 
+export function exportStockIntakeOnlyRecordPdf({ record, companyName = 'Citi-Nati Supermarket' }) {
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const generatedText = formatGeneratedTimestamp();
+  const purchaseDate = toDate(record?.purchaseDate);
+  const supplierName = record?.supplier?.name || record?.manualSupplierName || '-';
+  const locationName = record?.locationName || record?.locationCode || '-';
+  const intakeRef = record?.intakeRef || `GI-${localDateKey(new Date())}`;
+  const receiptReference = record?.receiptReference || '-';
+  const supplierStoreRef = record?.supplierStoreRef || '-';
+  const status = String(record?.status || 'draft').toUpperCase();
+  const notes = record?.overallNotes || '-';
+  const totalItems = Number(record?.totalItems || record?._count?.items || (record?.items || []).length || 0);
+  const totalQty = Number(record?.totalQuantity || 0);
+  const totalCost = Number(record?.totalCost || 0);
+  const totalProfit = Number(record?.totalEstimatedProfit || 0);
+
+  const headerContext = {
+    reportTitle: 'Stock Intake Record',
+    viewLabel: 'Intake Register',
+    periodText: purchaseDate,
+    generatedText,
+  };
+
+  drawHeader(doc, headerContext);
+  const summaryCards = [
+    { label: 'Intake Ref', value: intakeRef, color: BRAND_PURPLE },
+    { label: 'Status', value: status, color: status === 'FINALIZED' ? BRAND_GREEN : '#1d4ed8' },
+    { label: 'Total Cost', value: fmtCurrency(totalCost), color: '#0f766e' },
+    { label: 'Est. Profit', value: fmtCurrency(totalProfit), color: totalProfit >= 0 ? '#166534' : '#b91c1c' },
+  ];
+
+  let y = 33;
+  y = drawSummaryCards(doc, summaryCards, y);
+  drawSectionTitle(doc, 'Intake Header', y);
+  y += 3.2;
+
+  const metadataRows = [
+    ['Company', companyName],
+    ['Stock Intake Ref', intakeRef],
+    ['Supplier', supplierName],
+    ['Supplier/Store Ref', supplierStoreRef],
+    ['Purchase Date', purchaseDate],
+    ['Receipt Reference', receiptReference],
+    ['Branch/Location', locationName],
+    ['Entered By', record?.enteredBy || '-'],
+    ['Receipt Total (Optional)', record?.receiptTotalAmount == null ? '-' : fmtCurrency(record.receiptTotalAmount)],
+    ['Total Lines', fmtCount(totalItems)],
+    ['Total Quantity', fmtCount(totalQty)],
+    ['Overall Notes', notes],
+  ];
+
+  y = drawMetadataTable(doc, metadataRows, y);
+  drawSectionTitle(doc, 'Purchased Items', y);
+  y += 3.2;
+
+  const rows = (record?.items || []).map((item, index) => [
+    String(index + 1),
+    item?.barcode || '-',
+    item?.productName || '-',
+    fmtCount(item?.quantity || 0),
+    fmtCurrency(item?.unitCost || 0),
+    fmtCurrency(item?.totalCost || 0),
+    item?.sellingPrice == null ? '-' : fmtCurrency(item.sellingPrice),
+    item?.marginPercent == null ? '-' : `${Number(item.marginPercent).toFixed(2)}%`,
+    fmtCurrency(item?.estimatedProfit || 0),
+    `${toDate(item?.expiryDate)}${item?.batchRef ? ` | ${item.batchRef}` : ''}`,
+    item?.lineNotes || '-',
+  ]);
+
+  drawMainDataTable(doc, {
+    headers: ['#', 'Barcode', 'Product Name', 'Qty', 'Unit Cost', 'Total Cost', 'Sell Price', 'Margin', 'Est. Profit', 'Expiry / Batch', 'Notes'],
+    rows,
+    styles: {
+      fontSize: 7.6,
+      cellPadding: 1.8,
+      overflow: 'linebreak',
+    },
+    headStyles: {
+      fontSize: 7.4,
+      minCellHeight: 6.8,
+    },
+    columnStyles: {
+      0: { cellWidth: 8, halign: 'center' },
+      1: { cellWidth: 24 },
+      2: { cellWidth: 48 },
+      3: { cellWidth: 12, halign: 'right' },
+      4: { cellWidth: 22, halign: 'right' },
+      5: { cellWidth: 22, halign: 'right' },
+      6: { cellWidth: 22, halign: 'right' },
+      7: { cellWidth: 14, halign: 'right' },
+      8: { cellWidth: 22, halign: 'right' },
+      9: { cellWidth: 24 },
+      10: { cellWidth: 38 },
+    },
+  }, y, headerContext);
+
+  const finalY = doc.lastAutoTable?.finalY || y;
+  drawSignatureBlock(doc, finalY + 10, headerContext);
+
+  const totalPages = doc.getNumberOfPages();
+  for (let page = 1; page <= totalPages; page += 1) {
+    doc.setPage(page);
+    drawFooter(doc, page, totalPages);
+  }
+
+  const safeRef = String(intakeRef).replace(/[^A-Za-z0-9_-]/g, '_');
+  doc.save(`stock_intake_${safeRef}.pdf`);
+}
+
 // Backward compatible alias for existing imports during migration.
 export function exportGoodsIntakeRecordPdf({ record, companyName = 'Citi-Nati Supermarket' }) {
-  exportStockIntakeTransferRecordPdf({ record, companyName });
+  exportStockIntakeOnlyRecordPdf({ record, companyName });
 }
