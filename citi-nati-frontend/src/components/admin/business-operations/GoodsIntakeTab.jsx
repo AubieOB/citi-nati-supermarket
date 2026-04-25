@@ -429,8 +429,12 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
   const [isFinalizedHistoryMaximized, setIsFinalizedHistoryMaximized] = useState(false);
   const [isTransferHistoryOpen, setIsTransferHistoryOpen] = useState(false);
   const [isTransferHistoryMaximized, setIsTransferHistoryMaximized] = useState(false);
+  const [isPriceSyncHistoryOpen, setIsPriceSyncHistoryOpen] = useState(false);
+  const [isPriceSyncHistoryMaximized, setIsPriceSyncHistoryMaximized] = useState(false);
   const [isTransferDetailOpen, setIsTransferDetailOpen] = useState(false);
   const [transferDetailRecord, setTransferDetailRecord] = useState(null);
+  const [lastFinalizePriceSync, setLastFinalizePriceSync] = useState(null);
+  const [activePriceSyncRecord, setActivePriceSyncRecord] = useState(null);
 
   const [transferStatusFilter, setTransferStatusFilter] = useState('all');
   const [transferSupplierFilter, setTransferSupplierFilter] = useState('all');
@@ -553,6 +557,19 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
   const queuedTransfersCount = useMemo(
     () => records.filter((record) => resolveTransferStatus(record) === 'queued').length,
     [records]
+  );
+
+  const priceSyncHistoryRecords = useMemo(() => {
+    return records.filter((record) => {
+      if (String(record.status || '').toLowerCase() !== 'finalized') return false;
+      const attempted = Number(record?.priceSyncSummary?.attempted || 0);
+      return attempted > 0;
+    });
+  }, [records]);
+
+  const priceSyncRecordsCount = useMemo(
+    () => priceSyncHistoryRecords.length,
+    [priceSyncHistoryRecords]
   );
 
   const resolvedLineProductIds = useMemo(() => Array.from(new Set(
@@ -738,6 +755,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
   const clearForm = () => {
     setLookupWarning('');
     setLiveLineStockByProductId({});
+    setLastFinalizePriceSync(null);
+    setActivePriceSyncRecord(null);
     setActiveAutosaveId(createGoodsIntakeAutosaveId());
     setForm(buildNewForm(selectedLocation));
   };
@@ -746,6 +765,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
     if (!canViewForm) return;
     if (reset) {
       setLiveLineStockByProductId({});
+      setLastFinalizePriceSync(null);
+      setActivePriceSyncRecord(null);
       setActiveAutosaveId(createGoodsIntakeAutosaveId());
       setForm(buildNewForm(selectedLocation));
     }
@@ -763,6 +784,13 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
     if (!canViewHistory) return;
     setIsTransferHistoryMaximized(false);
     setIsTransferHistoryOpen(true);
+  };
+
+  const openPriceSyncHistoryModal = () => {
+    if (!canViewHistory) return;
+    setIsPriceSyncHistoryMaximized(false);
+    setActivePriceSyncRecord(null);
+    setIsPriceSyncHistoryOpen(true);
   };
 
   const validateBeforeSave = () => {
@@ -816,12 +844,27 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
         : await api.post('/business-operations/goods-intake', payload);
 
       const saved = response.data?.data;
+      const priceSync = response.data?.priceSync || null;
       if (saved) {
         setForm(toFormFromRecord(saved));
+        setActivePriceSyncRecord(saved);
         if (!isEditingExisting) {
           removeAutosaveEntry(activeAutosaveId);
         }
         setActiveAutosaveId(createGoodsIntakeAutosaveId());
+      }
+
+      if (status === 'finalized' && priceSync) {
+        const attempted = Number(priceSync.attempted || 0);
+        setLastFinalizePriceSync(attempted > 0 ? {
+          attempted,
+          updated: Number(priceSync.updated || 0),
+          queued: Number(priceSync.queued || 0),
+          failed: Number(priceSync.failed || 0),
+          capturedAt: new Date().toISOString(),
+        } : null);
+      } else if (status !== 'finalized') {
+        setLastFinalizePriceSync(null);
       }
 
       await fetchRecords();
@@ -850,6 +893,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
       setLiveLineStockByProductId({});
       setActiveAutosaveId(createGoodsIntakeAutosaveId());
       setForm(toFormFromRecord(data));
+      setActivePriceSyncRecord(data);
+      setLastFinalizePriceSync(null);
       setIsIntakeWorkspaceOpen(true);
     } catch (error) {
       await boAlert({ title: 'Load Failed', message: error.response?.data?.error || 'Failed to load record.', type: 'error' });
@@ -1156,6 +1201,46 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
     );
   };
 
+  const renderPriceSyncStatusBadge = (summary, { compact = false } = {}) => {
+    const attempted = Number(summary?.attempted || 0);
+    const queued = Number(summary?.queued || 0);
+    const processing = Number(summary?.processing || 0);
+    const completed = Number(summary?.completed || 0);
+    const failed = Number(summary?.failed || 0);
+
+    let tone = { border: '#cbd5e1', bg: '#f8fafc', color: '#475569' };
+    let label = 'No Price Sync';
+
+    if (attempted > 0 && failed > 0) {
+      tone = { border: '#fecaca', bg: '#fff1f2', color: '#b91c1c' };
+      label = 'Price Sync Failed';
+    } else if (attempted > 0 && (queued > 0 || processing > 0)) {
+      tone = { border: '#fde68a', bg: '#fefce8', color: '#92400e' };
+      label = 'Price Sync Queued';
+    } else if (attempted > 0 && completed > 0) {
+      tone = { border: '#bbf7d0', bg: '#f0fdf4', color: '#166534' };
+      label = 'Price Synced';
+    }
+
+    return (
+      <span
+        style={{
+          border: `1px solid ${tone.border}`,
+          background: tone.bg,
+          color: tone.color,
+          borderRadius: compact ? '7px' : '999px',
+          padding: compact ? '0.28rem 0.55rem' : '0.3rem 0.65rem',
+          fontWeight: 700,
+          fontSize: compact ? '0.78rem' : '0.74rem',
+          whiteSpace: 'nowrap',
+        }}
+        title={`attempted ${attempted}, completed ${completed}, queued ${queued + processing}, failed ${failed}`}
+      >
+        {label}
+      </span>
+    );
+  };
+
   const workspaceContent = (
     <section ref={workspaceRef} style={{ ...cardStyle, padding: '1rem', width: '100%', minWidth: 0, boxShadow: 'none', border: 'none', background: 'transparent' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -1245,6 +1330,38 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                   }}
                 />
               </div>
+            </div>
+          </div>
+        )}
+
+        {form.status === 'finalized' && lastFinalizePriceSync && (
+          <div style={{ marginTop: '0.85rem', border: '1px solid #bfdbfe', background: '#eff6ff', borderRadius: '12px', padding: '0.8rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.65rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1d4ed8' }}>Price Sync Status After Finalize</div>
+              {renderPriceSyncStatusBadge({
+                attempted: lastFinalizePriceSync.attempted,
+                queued: lastFinalizePriceSync.queued,
+                processing: 0,
+                completed: Math.max(0, lastFinalizePriceSync.queued - lastFinalizePriceSync.failed),
+                failed: lastFinalizePriceSync.failed,
+              }, { compact: true })}
+            </div>
+            <div style={{ marginTop: '0.45rem', display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
+              <span style={{ border: '1px solid #dbeafe', background: '#fff', color: '#1e3a8a', borderRadius: '999px', padding: '0.18rem 0.5rem', fontSize: '0.74rem', fontWeight: 700 }}>
+                Attempted: {lastFinalizePriceSync.attempted}
+              </span>
+              <span style={{ border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: '999px', padding: '0.18rem 0.5rem', fontSize: '0.74rem', fontWeight: 700 }}>
+                Updated local: {lastFinalizePriceSync.updated}
+              </span>
+              <span style={{ border: '1px solid #fde68a', background: '#fefce8', color: '#92400e', borderRadius: '999px', padding: '0.18rem 0.5rem', fontSize: '0.74rem', fontWeight: 700 }}>
+                Queued to POS: {lastFinalizePriceSync.queued}
+              </span>
+              <span style={{ border: '1px solid #fecaca', background: '#fff1f2', color: '#b91c1c', borderRadius: '999px', padding: '0.18rem 0.5rem', fontSize: '0.74rem', fontWeight: 700 }}>
+                Failed queue: {lastFinalizePriceSync.failed}
+              </span>
+            </div>
+            <div style={{ marginTop: '0.35rem', fontSize: '0.76rem', color: '#475569' }}>
+              Captured at {formatDateTime(lastFinalizePriceSync.capturedAt)}. Use Price Sync History for per-product command status and agent results.
             </div>
           </div>
         )}
@@ -1500,6 +1617,9 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
               <span style={{ border: '1px solid #fde68a', background: '#fefce8', color: '#92400e', borderRadius: '999px', fontSize: '0.74rem', fontWeight: 700, padding: '0.22rem 0.55rem' }}>
                 Queued POS: {queuedTransfersCount}
               </span>
+              <span style={{ border: '1px solid #bfdbfe', background: '#eff6ff', color: '#1e40af', borderRadius: '999px', fontSize: '0.74rem', fontWeight: 700, padding: '0.22rem 0.55rem' }}>
+                Price Sync Records: {priceSyncRecordsCount}
+              </span>
             </div>
           </div>
 
@@ -1555,6 +1675,19 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
               <div style={{ fontSize: '0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: '#c2410c', fontWeight: 800 }}>Sync</div>
                 <div style={{ marginTop: '0.35rem', fontSize: '0.96rem', color: '#0f172a', fontWeight: 800 }}>POS Transfer History</div>
               <div style={{ marginTop: '0.3rem', fontSize: '0.82rem', color: '#475569' }}>Track queue status, processing results, and transfer failures.</div>
+            </button>
+
+            <button
+              type="button"
+              onClick={openPriceSyncHistoryModal}
+              style={{ textAlign: 'left', border: '1px solid #bfdbfe', background: 'linear-gradient(135deg, #e0f2fe 0%, #ffffff 65%)', borderRadius: '18px', padding: '1rem', cursor: 'pointer' }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ fontSize: '0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: '#1e40af', fontWeight: 800 }}>Sync</div>
+                <span style={{ border: '1px solid #bfdbfe', background: '#dbeafe', color: '#1e40af', borderRadius: '999px', fontSize: '0.71rem', fontWeight: 800, padding: '0.14rem 0.45rem' }}>{priceSyncRecordsCount}</span>
+              </div>
+              <div style={{ marginTop: '0.35rem', fontSize: '0.96rem', color: '#0f172a', fontWeight: 800 }}>Price Sync History</div>
+              <div style={{ marginTop: '0.3rem', fontSize: '0.82rem', color: '#475569' }}>View product-level price sync commands, statuses, errors, and agent outcomes.</div>
             </button>
           </div>
         </section>
@@ -1902,6 +2035,163 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                     })}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isPriceSyncHistoryOpen && canViewHistory && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 174, display: 'grid', placeItems: 'center', padding: isPriceSyncHistoryMaximized ? '0.35rem' : '1rem' }}>
+          <div style={{ ...themedCardStyle, width: isPriceSyncHistoryMaximized ? 'calc(100vw - 0.7rem)' : 'min(1560px, 98vw)', height: isPriceSyncHistoryMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isPriceSyncHistoryMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column', padding: '0.95rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#111827' }}>Price Sync History</div>
+                <div style={{ marginTop: '0.16rem', fontSize: '0.78rem', color: '#64748b' }}>Review queued, processing, completed, and failed price sync commands from finalized intakes.</div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <button
+                  type="button"
+                  title={isPriceSyncHistoryMaximized ? 'Restore' : 'Maximize'}
+                  aria-label={isPriceSyncHistoryMaximized ? 'Restore price sync history' : 'Maximize price sync history'}
+                  onClick={() => setIsPriceSyncHistoryMaximized((prev) => !prev)}
+                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', color: '#334155', cursor: 'pointer' }}
+                >
+                  <i className={`fas ${isPriceSyncHistoryMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPriceSyncHistoryOpen(false);
+                    setIsPriceSyncHistoryMaximized(false);
+                    setActivePriceSyncRecord(null);
+                  }}
+                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}
+                >
+                  <i className="fas fa-times" />
+                </button>
+              </div>
+            </div>
+
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingRight: '0.2rem', display: 'grid', gap: '0.85rem', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)' }}>
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', background: '#fff' }}>
+                <div style={{ padding: '0.7rem 0.8rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <h3 style={{ margin: 0, color: colors.text, fontSize: '0.88rem' }}>Finalized Intake Records With Price Sync</h3>
+                  <span style={{ fontSize: '0.78rem', color: colors.mutedText }}>{priceSyncHistoryRecords.length} records</span>
+                </div>
+                <div style={{ width: '100%', maxWidth: '100%', overflow: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '860px' }}>
+                    <thead>
+                      <tr>
+                        {['Ref', 'Supplier', 'Location', 'Intake Date', 'Sync Status', 'Attempted', 'Queued', 'Completed', 'Failed', 'Last Activity', 'Actions'].map((label) => (
+                          <th key={label} style={{ textAlign: 'left', padding: '0.46rem 0.38rem', fontSize: '0.72rem', color: colors.mutedText, borderBottom: `1px solid ${isAdminDarkTheme ? '#334155' : '#e2e8f0'}` }}>{label}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {listLoading ? (
+                        <tr><td colSpan={11} style={{ padding: '1rem', color: colors.mutedText }}>Loading price sync history...</td></tr>
+                      ) : priceSyncHistoryRecords.length === 0 ? (
+                        <tr><td colSpan={11} style={{ padding: '1rem', color: colors.mutedText }}>No finalized intake records with price sync commands yet.</td></tr>
+                      ) : priceSyncHistoryRecords.map((record) => {
+                        const summary = record.priceSyncSummary || {};
+                        return (
+                          <tr key={`price-sync-${record.id}`}>
+                            <td style={{ padding: '0.48rem 0.38rem', borderBottom: `1px solid ${colors.tableBorder}`, fontWeight: 700, color: colors.strongText, fontSize: '0.84rem' }}>{record.intakeRef}</td>
+                            <td style={{ padding: '0.48rem 0.38rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.82rem' }}>{record.supplier?.name || record.manualSupplierName || '-'}</td>
+                            <td style={{ padding: '0.48rem 0.38rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.82rem' }}>{record.locationName || record.locationCode || '-'}</td>
+                            <td style={{ padding: '0.48rem 0.38rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.82rem' }}>{dateInputValue(record.purchaseDate)}</td>
+                            <td style={{ padding: '0.48rem 0.38rem', borderBottom: `1px solid ${colors.tableBorder}` }}>{renderPriceSyncStatusBadge(summary)}</td>
+                            <td style={{ padding: '0.48rem 0.38rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.82rem' }}>{Number(summary.attempted || 0)}</td>
+                            <td style={{ padding: '0.48rem 0.38rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.82rem' }}>{Number(summary.queued || 0) + Number(summary.processing || 0)}</td>
+                            <td style={{ padding: '0.48rem 0.38rem', borderBottom: `1px solid ${colors.tableBorder}`, color: '#166534', fontSize: '0.82rem', fontWeight: 700 }}>{Number(summary.completed || 0)}</td>
+                            <td style={{ padding: '0.48rem 0.38rem', borderBottom: `1px solid ${colors.tableBorder}`, color: Number(summary.failed || 0) > 0 ? '#b91c1c' : colors.text, fontSize: '0.82rem', fontWeight: Number(summary.failed || 0) > 0 ? 700 : 500 }}>{Number(summary.failed || 0)}</td>
+                            <td style={{ padding: '0.48rem 0.38rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.82rem' }}>{formatDateTime(summary.lastProcessedAt || summary.lastQueuedAt)}</td>
+                            <td style={{ padding: '0.48rem 0.38rem', borderBottom: `1px solid ${colors.tableBorder}` }}>
+                              <button
+                                type="button"
+                                onClick={() => setActivePriceSyncRecord(record)}
+                                style={{ border: '1px solid #bfdbfe', background: '#eff6ff', color: '#1d4ed8', borderRadius: '7px', padding: '0.24rem 0.5rem', fontWeight: 700, cursor: 'pointer' }}
+                              >
+                                View Details
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', background: '#fff', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                <div style={{ padding: '0.7rem 0.8rem', borderBottom: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a' }}>
+                    {activePriceSyncRecord ? `Price Sync Details: ${activePriceSyncRecord.intakeRef}` : 'Price Sync Details'}
+                  </div>
+                </div>
+                <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0.75rem' }}>
+                  {!activePriceSyncRecord ? (
+                    <div style={{ border: '1px dashed #cbd5e1', borderRadius: '10px', padding: '0.85rem', fontSize: '0.82rem', color: '#64748b' }}>
+                      Select a record from the table to view all product-level price sync commands and statuses.
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'grid', gap: '0.55rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+                        <div style={{ border: '1px solid #e2e8f0', borderRadius: '9px', padding: '0.55rem' }}><strong>Supplier:</strong> {activePriceSyncRecord.supplier?.name || activePriceSyncRecord.manualSupplierName || '-'}</div>
+                        <div style={{ border: '1px solid #e2e8f0', borderRadius: '9px', padding: '0.55rem' }}><strong>Location:</strong> {activePriceSyncRecord.locationName || activePriceSyncRecord.locationCode || '-'}</div>
+                        <div style={{ border: '1px solid #e2e8f0', borderRadius: '9px', padding: '0.55rem' }}><strong>Date:</strong> {dateInputValue(activePriceSyncRecord.purchaseDate)}</div>
+                        <div style={{ border: '1px solid #e2e8f0', borderRadius: '9px', padding: '0.55rem' }}><strong>Commands:</strong> {Number(activePriceSyncRecord?.priceSyncSummary?.attempted || 0)}</div>
+                      </div>
+
+                      <div style={{ marginTop: '0.7rem', width: '100%', maxWidth: '100%', overflow: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '980px' }}>
+                          <thead>
+                            <tr>
+                              {['Command ID', 'Product Code', 'Location', 'Price Type', 'Old Price', 'New Price', 'Status', 'Queued', 'Processed', 'Agent Message'].map((label) => (
+                                <th key={label} style={{ textAlign: 'left', padding: '0.46rem 0.38rem', fontSize: '0.72rem', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>{label}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(activePriceSyncRecord.priceSyncCommands || []).length === 0 ? (
+                              <tr><td colSpan={10} style={{ padding: '0.9rem', color: '#64748b' }}>No command rows available for this record.</td></tr>
+                            ) : (activePriceSyncRecord.priceSyncCommands || []).map((command) => {
+                              const commandStatus = String(command.status || '').trim().toLowerCase();
+                              const tone = commandStatus === 'completed'
+                                ? { border: '#bbf7d0', bg: '#f0fdf4', color: '#166534' }
+                                : commandStatus === 'failed'
+                                  ? { border: '#fecaca', bg: '#fff1f2', color: '#b91c1c' }
+                                  : commandStatus === 'processing'
+                                    ? { border: '#c7d2fe', bg: '#eef2ff', color: '#4338ca' }
+                                    : { border: '#fde68a', bg: '#fefce8', color: '#92400e' };
+
+                              const message = command.resultSummary?.message || command.errorMessage || '-';
+                              return (
+                                <tr key={`cmd-${command.id}`}>
+                                  <td style={{ padding: '0.48rem 0.38rem', borderBottom: '1px solid #f1f5f9', color: '#0f172a', fontSize: '0.82rem' }}>{command.id}</td>
+                                  <td style={{ padding: '0.48rem 0.38rem', borderBottom: '1px solid #f1f5f9', color: '#0f172a', fontSize: '0.82rem' }}>{command.productCode || command.productId || '-'}</td>
+                                  <td style={{ padding: '0.48rem 0.38rem', borderBottom: '1px solid #f1f5f9', color: '#0f172a', fontSize: '0.82rem' }}>{command.locationCode || command.requestedLocationCode || '-'}</td>
+                                  <td style={{ padding: '0.48rem 0.38rem', borderBottom: '1px solid #f1f5f9', color: '#0f172a', fontSize: '0.82rem' }}>{command.priceTypeCode || '-'}</td>
+                                  <td style={{ padding: '0.48rem 0.38rem', borderBottom: '1px solid #f1f5f9', color: '#0f172a', fontSize: '0.82rem' }}>{command.oldPrice == null ? '-' : money(command.oldPrice)}</td>
+                                  <td style={{ padding: '0.48rem 0.38rem', borderBottom: '1px solid #f1f5f9', color: '#0f172a', fontSize: '0.82rem', fontWeight: 700 }}>{command.newPrice == null ? '-' : money(command.newPrice)}</td>
+                                  <td style={{ padding: '0.48rem 0.38rem', borderBottom: '1px solid #f1f5f9' }}>
+                                    <span style={{ border: `1px solid ${tone.border}`, background: tone.bg, color: tone.color, borderRadius: '999px', padding: '0.14rem 0.48rem', fontSize: '0.72rem', fontWeight: 700 }}>
+                                      {String(command.status || 'pending').toUpperCase()}
+                                    </span>
+                                  </td>
+                                  <td style={{ padding: '0.48rem 0.38rem', borderBottom: '1px solid #f1f5f9', color: '#0f172a', fontSize: '0.82rem' }}>{formatDateTime(command.createdAt)}</td>
+                                  <td style={{ padding: '0.48rem 0.38rem', borderBottom: '1px solid #f1f5f9', color: '#0f172a', fontSize: '0.82rem' }}>{formatDateTime(command.processedAt)}</td>
+                                  <td style={{ padding: '0.48rem 0.38rem', borderBottom: '1px solid #f1f5f9', color: String(message).toLowerCase().includes('fail') ? '#b91c1c' : '#475569', fontSize: '0.8rem', maxWidth: '260px' }}>{String(message).slice(0, 170)}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>

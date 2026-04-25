@@ -276,6 +276,106 @@ async function attachTransferCommandMetadata(records) {
   });
 }
 
+function toPriceSyncStatusCounts(commands) {
+  return commands.reduce((acc, command) => {
+    const status = String(command?.status || '').trim().toLowerCase();
+    if (status === 'completed') acc.completed += 1;
+    else if (status === 'failed') acc.failed += 1;
+    else if (status === 'processing') acc.processing += 1;
+    else acc.queued += 1;
+    return acc;
+  }, {
+    queued: 0,
+    processing: 0,
+    completed: 0,
+    failed: 0,
+  });
+}
+
+async function attachPriceSyncCommandMetadata(records) {
+  const list = Array.isArray(records) ? records : [];
+  if (list.length === 0) return list;
+
+  const intakeIds = list
+    .map((record) => Number(record?.id))
+    .filter((value) => Number.isFinite(value))
+    .map((value) => String(value));
+
+  if (intakeIds.length === 0) return list;
+
+  const commands = await prisma.posWriteCommand.findMany({
+    where: {
+      commandType: 'UPDATE_PRICE',
+      relatedEntityType: 'GoodsIntake',
+      relatedEntityId: { in: intakeIds },
+    },
+    orderBy: [{ createdAt: 'desc' }],
+    select: {
+      id: true,
+      relatedEntityId: true,
+      status: true,
+      payload: true,
+      errorMessage: true,
+      resultSummary: true,
+      createdAt: true,
+      processedAt: true,
+      updatedAt: true,
+      retryCount: true,
+      maxRetries: true,
+      agentId: true,
+    },
+  });
+
+  const commandsByIntakeId = new Map();
+  for (const command of commands) {
+    const key = String(command.relatedEntityId || '');
+    if (!key) continue;
+    if (!commandsByIntakeId.has(key)) {
+      commandsByIntakeId.set(key, []);
+    }
+    commandsByIntakeId.get(key).push(command);
+  }
+
+  return list.map((record) => {
+    const key = String(record.id || '');
+    const priceCommands = commandsByIntakeId.get(key) || [];
+    const statusCounts = toPriceSyncStatusCounts(priceCommands);
+
+    return {
+      ...record,
+      priceSyncSummary: {
+        attempted: priceCommands.length,
+        queued: statusCounts.queued,
+        processing: statusCounts.processing,
+        completed: statusCounts.completed,
+        failed: statusCounts.failed,
+        lastQueuedAt: priceCommands[0]?.createdAt || null,
+        lastProcessedAt: priceCommands.find((entry) => entry?.processedAt)?.processedAt || null,
+      },
+      priceSyncCommands: priceCommands.map((command) => ({
+        id: command.id,
+        status: command.status,
+        productId: command.payload?.productId || null,
+        productCode: command.payload?.productCode || null,
+        oldPrice: command.payload?.oldPrice ?? null,
+        newPrice: command.payload?.newPrice ?? null,
+        locationCode: command.payload?.locationCode || null,
+        requestedLocationCode: command.payload?.requestedLocationCode || null,
+        branchCode: command.payload?.branchCode || null,
+        priceTypeCode: command.payload?.priceTypeCode || null,
+        errorMessage: command.errorMessage,
+        resultSummary: command.resultSummary,
+        createdAt: command.createdAt,
+        processedAt: command.processedAt,
+        updatedAt: command.updatedAt,
+        retryCount: command.retryCount,
+        maxRetries: command.maxRetries,
+        agentId: command.agentId,
+      })),
+    };
+  });
+}
+
 async function lookupGoodsIntakeProducts({ query, locationCode, take = 20 }) {
   const normalizedQuery = String(query || '').trim();
   const normalizedLocationCode = normalizeScopeCode(locationCode);
@@ -637,8 +737,9 @@ async function getGoodsIntakeById(id) {
   });
 
   if (!record) return null;
-  const [enriched] = await attachTransferCommandMetadata([record]);
-  return enriched;
+  const [transferEnriched] = await attachTransferCommandMetadata([record]);
+  const [priceEnriched] = await attachPriceSyncCommandMetadata([transferEnriched]);
+  return priceEnriched;
 }
 
 async function listGoodsIntakes({ filters, skip, take, sortBy, sortOrder }) {
@@ -665,7 +766,8 @@ async function listGoodsIntakes({ filters, skip, take, sortBy, sortOrder }) {
     prisma.goodsIntake.count({ where }),
   ]);
 
-  const enrichedData = await attachTransferCommandMetadata(data);
+  const transferEnrichedData = await attachTransferCommandMetadata(data);
+  const enrichedData = await attachPriceSyncCommandMetadata(transferEnrichedData);
 
   return { data: enrichedData, total, where };
 }
