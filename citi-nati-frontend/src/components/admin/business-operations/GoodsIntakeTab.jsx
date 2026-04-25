@@ -441,6 +441,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
   const [transferLocationFilter, setTransferLocationFilter] = useState('all');
   const [transferStartDate, setTransferStartDate] = useState('');
   const [transferEndDate, setTransferEndDate] = useState('');
+  const [priceSyncStatusFilter, setPriceSyncStatusFilter] = useState('all');
 
   const activeLookupLocationCode = useMemo(() => {
     const formLocationCode = String(form.locationCode || '').trim().toUpperCase();
@@ -566,6 +567,23 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
       return attempted > 0;
     });
   }, [records]);
+
+  const filteredPriceSyncHistoryRecords = useMemo(() => {
+    if (priceSyncStatusFilter === 'all') return priceSyncHistoryRecords;
+
+    return priceSyncHistoryRecords.filter((record) => {
+      const summary = record?.priceSyncSummary || {};
+      const queued = Number(summary.queued || 0) + Number(summary.processing || 0);
+      const completed = Number(summary.completed || 0);
+      const failed = Number(summary.failed || 0);
+
+      if (priceSyncStatusFilter === 'failed') return failed > 0;
+      if (priceSyncStatusFilter === 'queued') return queued > 0;
+      if (priceSyncStatusFilter === 'completed') return completed > 0 && failed === 0 && queued === 0;
+      if (priceSyncStatusFilter === 'mixed') return failed > 0 && (completed > 0 || queued > 0);
+      return true;
+    });
+  }, [priceSyncHistoryRecords, priceSyncStatusFilter]);
 
   const priceSyncRecordsCount = useMemo(
     () => priceSyncHistoryRecords.length,
@@ -789,6 +807,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
   const openPriceSyncHistoryModal = () => {
     if (!canViewHistory) return;
     setIsPriceSyncHistoryMaximized(false);
+    setPriceSyncStatusFilter('all');
     setActivePriceSyncRecord(null);
     setIsPriceSyncHistoryOpen(true);
   };
@@ -2077,7 +2096,20 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
               <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', background: '#fff' }}>
                 <div style={{ padding: '0.7rem 0.8rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <h3 style={{ margin: 0, color: colors.text, fontSize: '0.88rem' }}>Finalized Intake Records With Price Sync</h3>
-                  <span style={{ fontSize: '0.78rem', color: colors.mutedText }}>{priceSyncHistoryRecords.length} records</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                    <select
+                      value={priceSyncStatusFilter}
+                      onChange={(event) => setPriceSyncStatusFilter(event.target.value)}
+                      style={{ ...themedInputStyle, width: '170px', fontSize: '0.78rem', padding: '0.3rem 0.45rem' }}
+                    >
+                      <option value="all">All Status</option>
+                      <option value="queued">Queued/Processing</option>
+                      <option value="completed">Completed Only</option>
+                      <option value="failed">Failed</option>
+                      <option value="mixed">Mixed Outcome</option>
+                    </select>
+                    <span style={{ fontSize: '0.78rem', color: colors.mutedText }}>{filteredPriceSyncHistoryRecords.length} records</span>
+                  </div>
                 </div>
                 <div style={{ width: '100%', maxWidth: '100%', overflow: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '860px' }}>
@@ -2091,9 +2123,9 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                     <tbody>
                       {listLoading ? (
                         <tr><td colSpan={11} style={{ padding: '1rem', color: colors.mutedText }}>Loading price sync history...</td></tr>
-                      ) : priceSyncHistoryRecords.length === 0 ? (
+                      ) : filteredPriceSyncHistoryRecords.length === 0 ? (
                         <tr><td colSpan={11} style={{ padding: '1rem', color: colors.mutedText }}>No finalized intake records with price sync commands yet.</td></tr>
-                      ) : priceSyncHistoryRecords.map((record) => {
+                      ) : filteredPriceSyncHistoryRecords.map((record) => {
                         const summary = record.priceSyncSummary || {};
                         return (
                           <tr key={`price-sync-${record.id}`}>

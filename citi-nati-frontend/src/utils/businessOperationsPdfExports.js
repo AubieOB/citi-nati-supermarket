@@ -65,6 +65,73 @@ const transferStatusLabel = (status) => {
   return map[status] || titleCase(status || 'not_transferred');
 };
 
+const summarizePriceSync = (record = {}) => {
+  const summary = record?.priceSyncSummary || {};
+  const commands = Array.isArray(record?.priceSyncCommands) ? record.priceSyncCommands : [];
+
+  if (Number(summary?.attempted || 0) > 0 || commands.length === 0) {
+    return {
+      attempted: Number(summary?.attempted || 0),
+      queued: Number(summary?.queued || 0),
+      processing: Number(summary?.processing || 0),
+      completed: Number(summary?.completed || 0),
+      failed: Number(summary?.failed || 0),
+      lastQueuedAt: summary?.lastQueuedAt || null,
+      lastProcessedAt: summary?.lastProcessedAt || null,
+    };
+  }
+
+  return commands.reduce((acc, command) => {
+    const status = String(command?.status || '').trim().toLowerCase();
+    acc.attempted += 1;
+    if (status === 'completed') acc.completed += 1;
+    else if (status === 'failed') acc.failed += 1;
+    else if (status === 'processing') acc.processing += 1;
+    else acc.queued += 1;
+    if (!acc.lastQueuedAt || new Date(command?.createdAt || 0).getTime() > new Date(acc.lastQueuedAt).getTime()) {
+      acc.lastQueuedAt = command?.createdAt || acc.lastQueuedAt;
+    }
+    if (command?.processedAt && (!acc.lastProcessedAt || new Date(command.processedAt).getTime() > new Date(acc.lastProcessedAt).getTime())) {
+      acc.lastProcessedAt = command.processedAt;
+    }
+    return acc;
+  }, {
+    attempted: 0,
+    queued: 0,
+    processing: 0,
+    completed: 0,
+    failed: 0,
+    lastQueuedAt: null,
+    lastProcessedAt: null,
+  });
+};
+
+const normalizePriceSyncStatus = (record = {}) => {
+  const summary = summarizePriceSync(record);
+  const queuedCount = Number(summary.queued || 0) + Number(summary.processing || 0);
+  const failedCount = Number(summary.failed || 0);
+  const completedCount = Number(summary.completed || 0);
+  const attemptedCount = Number(summary.attempted || 0);
+
+  if (attemptedCount <= 0) return 'not_attempted';
+  if (failedCount > 0 && (queuedCount > 0 || completedCount > 0)) return 'mixed';
+  if (failedCount > 0) return 'failed';
+  if (queuedCount > 0) return 'queued';
+  if (completedCount > 0) return 'completed';
+  return 'queued';
+};
+
+const priceSyncStatusLabel = (status) => {
+  const map = {
+    not_attempted: 'Not Attempted',
+    queued: 'Queued/Processing',
+    completed: 'Completed',
+    failed: 'Failed',
+    mixed: 'Mixed Outcome',
+  };
+  return map[status] || titleCase(status || 'not_attempted');
+};
+
 const normalizeTransferGrn = (value) => String(value || '').trim().toUpperCase();
 
 const resolveRequestedTransferGrn = (record = {}) => normalizeTransferGrn(record?.posTransferCommand?.requestedGrn || '');
@@ -678,8 +745,16 @@ export function exportStockIntakeTransferRecordPdf({ record, companyName = 'Citi
   const totalQty = Number(record?.totalQuantity || 0);
   const totalCost = Number(record?.totalCost || 0);
   const totalProfit = Number(record?.totalEstimatedProfit || 0);
+  const priceSyncSummary = summarizePriceSync(record);
+  const priceSyncStatus = normalizePriceSyncStatus(record);
+  const priceSyncStatusText = priceSyncStatusLabel(priceSyncStatus);
+  const priceSyncCommands = Array.isArray(record?.priceSyncCommands) ? record.priceSyncCommands : [];
   const transferStatus = normalizeTransferStatus(record);
   const transferStatusText = transferStatusLabel(transferStatus);
+  const priceSyncSummary = summarizePriceSync(record);
+  const priceSyncStatus = normalizePriceSyncStatus(record);
+  const priceSyncStatusText = priceSyncStatusLabel(priceSyncStatus);
+  const priceSyncCommands = Array.isArray(record?.priceSyncCommands) ? record.priceSyncCommands : [];
   const requestedGrn = resolveRequestedTransferGrn(record);
   const finalGrn = resolveFinalTransferGrn(record);
   const displayedGrn = finalGrn || requestedGrn || '-';
@@ -698,9 +773,10 @@ export function exportStockIntakeTransferRecordPdf({ record, companyName = 'Citi
     { label: 'Intake Ref', value: intakeRef, color: BRAND_PURPLE },
     { label: 'Status', value: status, color: status === 'FINALIZED' ? BRAND_GREEN : '#1d4ed8' },
     { label: 'POS Transfer', value: transferStatusText, color: transferStatus === 'failed' ? '#b91c1c' : '#0f766e' },
+    { label: 'Price Sync', value: priceSyncStatusText, color: priceSyncStatus === 'failed' ? '#b91c1c' : (priceSyncStatus === 'completed' ? '#166534' : '#92400e') },
     { label: 'Total Cost', value: fmtCurrency(totalCost), color: '#0f766e' },
     { label: 'GRN', value: displayedGrn, color: '#1d4ed8' },
-    { label: 'Est. Profit', value: fmtCurrency(totalProfit), color: totalProfit >= 0 ? '#166534' : '#b91c1c' },
+    { label: 'Sync Commands', value: fmtCount(priceSyncSummary.attempted), color: '#1d4ed8' },
   ];
 
   let y = 33;
@@ -742,6 +818,66 @@ export function exportStockIntakeTransferRecordPdf({ record, companyName = 'Citi
   ];
 
   y = drawMetadataTable(doc, transferRows, y);
+  drawSectionTitle(doc, 'Price Sync Audit', y);
+  y += 3.2;
+
+  const priceSyncRows = [
+    ['Price Sync Status', priceSyncStatusText],
+    ['Commands Attempted', fmtCount(priceSyncSummary.attempted)],
+    ['Queued/Processing', fmtCount(Number(priceSyncSummary.queued || 0) + Number(priceSyncSummary.processing || 0))],
+    ['Completed', fmtCount(priceSyncSummary.completed)],
+    ['Failed', fmtCount(priceSyncSummary.failed)],
+    ['Last Queued', toDateTime(priceSyncSummary.lastQueuedAt)],
+    ['Last Processed', toDateTime(priceSyncSummary.lastProcessedAt)],
+  ];
+
+  y = drawMetadataTable(doc, priceSyncRows, y);
+
+  if (priceSyncCommands.length > 0) {
+    drawSectionTitle(doc, 'Price Sync Command Details', y);
+    y += 3.2;
+
+    const priceSyncCommandRows = priceSyncCommands.slice(0, 120).map((command) => [
+      command?.id || '-',
+      command?.productCode || command?.productId || '-',
+      command?.locationCode || command?.requestedLocationCode || '-',
+      command?.priceTypeCode || '-',
+      command?.oldPrice == null ? '-' : fmtCurrency(command.oldPrice),
+      command?.newPrice == null ? '-' : fmtCurrency(command.newPrice),
+      String(command?.status || 'pending').toUpperCase(),
+      toDateTime(command?.createdAt),
+      toDateTime(command?.processedAt),
+      String(command?.resultSummary?.message || command?.errorMessage || '-').slice(0, 90),
+    ]);
+
+    drawMainDataTable(doc, {
+      headers: ['Command', 'Product', 'Location', 'Type', 'Old', 'New', 'Status', 'Queued', 'Processed', 'Message'],
+      rows: priceSyncCommandRows,
+      styles: {
+        fontSize: 7.2,
+        cellPadding: 1.6,
+        overflow: 'linebreak',
+      },
+      headStyles: {
+        fontSize: 7.2,
+        minCellHeight: 6.2,
+      },
+      columnStyles: {
+        0: { cellWidth: 18 },
+        1: { cellWidth: 22 },
+        2: { cellWidth: 16 },
+        3: { cellWidth: 10 },
+        4: { cellWidth: 16, halign: 'right' },
+        5: { cellWidth: 16, halign: 'right' },
+        6: { cellWidth: 16 },
+        7: { cellWidth: 24 },
+        8: { cellWidth: 24 },
+        9: { cellWidth: 90 },
+      },
+    }, y, headerContext);
+    y = (doc.lastAutoTable?.finalY || y) + 6;
+  }
+
   drawSectionTitle(doc, 'Purchased Items', y);
   y += 3.2;
 
@@ -826,7 +962,9 @@ export function exportStockIntakeOnlyRecordPdf({ record, companyName = 'Citi-Nat
   const summaryCards = [
     { label: 'Intake Ref', value: intakeRef, color: BRAND_PURPLE },
     { label: 'Status', value: status, color: status === 'FINALIZED' ? BRAND_GREEN : '#1d4ed8' },
+    { label: 'Price Sync', value: priceSyncStatusText, color: priceSyncStatus === 'failed' ? '#b91c1c' : (priceSyncStatus === 'completed' ? '#166534' : '#92400e') },
     { label: 'Total Cost', value: fmtCurrency(totalCost), color: '#0f766e' },
+    { label: 'Sync Commands', value: fmtCount(priceSyncSummary.attempted), color: '#1d4ed8' },
     { label: 'Est. Profit', value: fmtCurrency(totalProfit), color: totalProfit >= 0 ? '#166534' : '#b91c1c' },
   ];
 
@@ -847,10 +985,61 @@ export function exportStockIntakeOnlyRecordPdf({ record, companyName = 'Citi-Nat
     ['Receipt Total (Optional)', record?.receiptTotalAmount == null ? '-' : fmtCurrency(record.receiptTotalAmount)],
     ['Total Lines', fmtCount(totalItems)],
     ['Total Quantity', fmtCount(totalQty)],
+    ['Price Sync Status', priceSyncStatusText],
+    ['Price Sync Attempted', fmtCount(priceSyncSummary.attempted)],
+    ['Price Sync Queued/Processing', fmtCount(Number(priceSyncSummary.queued || 0) + Number(priceSyncSummary.processing || 0))],
+    ['Price Sync Completed', fmtCount(priceSyncSummary.completed)],
+    ['Price Sync Failed', fmtCount(priceSyncSummary.failed)],
     ['Overall Notes', notes],
   ];
 
   y = drawMetadataTable(doc, metadataRows, y);
+
+  if (priceSyncCommands.length > 0) {
+    drawSectionTitle(doc, 'Price Sync Command Details', y);
+    y += 3.2;
+
+    const priceSyncCommandRows = priceSyncCommands.slice(0, 120).map((command) => [
+      command?.id || '-',
+      command?.productCode || command?.productId || '-',
+      command?.locationCode || command?.requestedLocationCode || '-',
+      command?.priceTypeCode || '-',
+      command?.oldPrice == null ? '-' : fmtCurrency(command.oldPrice),
+      command?.newPrice == null ? '-' : fmtCurrency(command.newPrice),
+      String(command?.status || 'pending').toUpperCase(),
+      toDateTime(command?.createdAt),
+      toDateTime(command?.processedAt),
+      String(command?.resultSummary?.message || command?.errorMessage || '-').slice(0, 90),
+    ]);
+
+    drawMainDataTable(doc, {
+      headers: ['Command', 'Product', 'Location', 'Type', 'Old', 'New', 'Status', 'Queued', 'Processed', 'Message'],
+      rows: priceSyncCommandRows,
+      styles: {
+        fontSize: 7.2,
+        cellPadding: 1.6,
+        overflow: 'linebreak',
+      },
+      headStyles: {
+        fontSize: 7.2,
+        minCellHeight: 6.2,
+      },
+      columnStyles: {
+        0: { cellWidth: 18 },
+        1: { cellWidth: 22 },
+        2: { cellWidth: 16 },
+        3: { cellWidth: 10 },
+        4: { cellWidth: 16, halign: 'right' },
+        5: { cellWidth: 16, halign: 'right' },
+        6: { cellWidth: 16 },
+        7: { cellWidth: 24 },
+        8: { cellWidth: 24 },
+        9: { cellWidth: 90 },
+      },
+    }, y, headerContext);
+    y = (doc.lastAutoTable?.finalY || y) + 6;
+  }
+
   drawSectionTitle(doc, 'Purchased Items', y);
   y += 3.2;
 
