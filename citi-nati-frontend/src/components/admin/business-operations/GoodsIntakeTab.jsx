@@ -393,6 +393,14 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
     launchCardOneBg: isAdminDarkTheme ? 'linear-gradient(135deg, #231b38 0%, #151a28 65%)' : 'linear-gradient(135deg, #f8f5ff 0%, #ffffff 60%)',
     launchCardTwoBorder: isAdminDarkTheme ? '#365f98' : '#bfdbfe',
     launchCardTwoBg: isAdminDarkTheme ? 'linear-gradient(135deg, #18273f 0%, #151a28 65%)' : 'linear-gradient(135deg, #eff6ff 0%, #ffffff 60%)',
+    launchCardThreeBorder: isAdminDarkTheme ? '#7a5f2a' : '#fcd34d',
+    launchCardThreeBg: isAdminDarkTheme ? 'linear-gradient(135deg, #2c2615 0%, #151a28 65%)' : 'linear-gradient(135deg, #fffbeb 0%, #ffffff 60%)',
+    launchCardFourBorder: isAdminDarkTheme ? '#2f7f58' : '#bbf7d0',
+    launchCardFourBg: isAdminDarkTheme ? 'linear-gradient(135deg, #173127 0%, #151a28 65%)' : 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 60%)',
+    launchCardFiveBorder: isAdminDarkTheme ? '#7f4a2f' : '#fed7aa',
+    launchCardFiveBg: isAdminDarkTheme ? 'linear-gradient(135deg, #2e211b 0%, #151a28 65%)' : 'linear-gradient(135deg, #fff7ed 0%, #ffffff 60%)',
+    launchCardSixBorder: isAdminDarkTheme ? '#305a96' : '#bfdbfe',
+    launchCardSixBg: isAdminDarkTheme ? 'linear-gradient(135deg, #17243a 0%, #151a28 65%)' : 'linear-gradient(135deg, #e0f2fe 0%, #ffffff 60%)',
   }), [isAdminDarkTheme]);
 
   const [records, setRecords] = useState([]);
@@ -1636,13 +1644,13 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
               </div>
             </div>
             <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
-              <span style={{ border: '1px solid #dbeafe', background: '#eff6ff', color: '#1d4ed8', borderRadius: '999px', fontSize: '0.74rem', fontWeight: 700, padding: '0.22rem 0.55rem' }}>
+              <span style={{ border: isAdminDarkTheme ? '1px solid #365f98' : '1px solid #dbeafe', background: isAdminDarkTheme ? '#18273f' : '#eff6ff', color: isAdminDarkTheme ? '#b9d7ff' : '#1d4ed8', borderRadius: '999px', fontSize: '0.74rem', fontWeight: 700, padding: '0.22rem 0.55rem' }}>
                 Finalized: {finalizedRecordsCount}
               </span>
-              <span style={{ border: '1px solid #fde68a', background: '#fefce8', color: '#92400e', borderRadius: '999px', fontSize: '0.74rem', fontWeight: 700, padding: '0.22rem 0.55rem' }}>
+              <span style={{ border: isAdminDarkTheme ? '1px solid #7a5f2a' : '1px solid #fde68a', background: isAdminDarkTheme ? '#2c2615' : '#fefce8', color: isAdminDarkTheme ? '#facc15' : '#92400e', borderRadius: '999px', fontSize: '0.74rem', fontWeight: 700, padding: '0.22rem 0.55rem' }}>
                 Queued POS: {queuedTransfersCount}
               </span>
-              <span style={{ border: '1px solid #bfdbfe', background: '#eff6ff', color: '#1e40af', borderRadius: '999px', fontSize: '0.74rem', fontWeight: 700, padding: '0.22rem 0.55rem' }}>
+              <span style={{ border: isAdminDarkTheme ? '1px solid #305a96' : '1px solid #bfdbfe', background: isAdminDarkTheme ? '#17243a' : '#eff6ff', color: isAdminDarkTheme ? '#93c5fd' : '#1e40af', borderRadius: '999px', fontSize: '0.74rem', fontWeight: 700, padding: '0.22rem 0.55rem' }}>
                 Price Sync Records: {priceSyncRecordsCount}
               </span>
             </div>
@@ -1652,67 +1660,67 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
             <button
               type="button"
               onClick={() => openWorkspace({ reset: true })}
-              style={{ textAlign: 'left', border: '1px solid #bfdbfe', background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 65%)', borderRadius: '18px', padding: '1rem', cursor: 'pointer' }}
+              style={{ textAlign: 'left', border: `1px solid ${colors.launchCardTwoBorder}`, background: colors.launchCardTwoBg, borderRadius: '18px', padding: '1rem', cursor: 'pointer' }}
             >
-              <div style={{ fontSize: '0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: '#1d4ed8', fontWeight: 800 }}>Launcher</div>
-                <div style={{ marginTop: '0.35rem', fontSize: '0.96rem', color: '#0f172a', fontWeight: 800 }}>Start New Stock Intake</div>
-              <div style={{ marginTop: '0.3rem', fontSize: '0.82rem', color: '#475569' }}>Open a clean intake workflow modal with fresh line entries.</div>
+              <div style={{ fontSize: '0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: isAdminDarkTheme ? '#b9d7ff' : '#1d4ed8', fontWeight: 800 }}>Launcher</div>
+                <div style={{ marginTop: '0.35rem', fontSize: '0.96rem', color: colors.strongText, fontWeight: 800 }}>Start New Stock Intake</div>
+              <div style={{ marginTop: '0.3rem', fontSize: '0.82rem', color: colors.mutedText }}>Open a clean intake workflow modal with fresh line entries.</div>
             </button>
 
             <button
               type="button"
               onClick={() => openWorkspace()}
-              style={{ textAlign: 'left', border: '1px solid #d8b4fe', background: 'linear-gradient(135deg, #f8f5ff 0%, #ffffff 65%)', borderRadius: '18px', padding: '1rem', cursor: 'pointer' }}
+              style={{ textAlign: 'left', border: `1px solid ${colors.launchCardOneBorder}`, background: colors.launchCardOneBg, borderRadius: '18px', padding: '1rem', cursor: 'pointer' }}
             >
-              <div style={{ fontSize: '0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: '#7c3aed', fontWeight: 800 }}>Launcher</div>
-                <div style={{ marginTop: '0.35rem', fontSize: '0.96rem', color: '#0f172a', fontWeight: 800 }}>Continue Current Intake</div>
-              <div style={{ marginTop: '0.3rem', fontSize: '0.82rem', color: '#475569' }}>Resume the current draft/finalized intake and manage transfer actions.</div>
+              <div style={{ fontSize: '0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: isAdminDarkTheme ? '#c4b5fd' : '#7c3aed', fontWeight: 800 }}>Launcher</div>
+                <div style={{ marginTop: '0.35rem', fontSize: '0.96rem', color: colors.strongText, fontWeight: 800 }}>Continue Current Intake</div>
+              <div style={{ marginTop: '0.3rem', fontSize: '0.82rem', color: colors.mutedText }}>Resume the current draft/finalized intake and manage transfer actions.</div>
             </button>
 
             <button
               type="button"
               onClick={openAutosaveRecoveryModal}
-              style={{ textAlign: 'left', border: '1px solid #fcd34d', background: 'linear-gradient(135deg, #fffbeb 0%, #ffffff 65%)', borderRadius: '18px', padding: '1rem', cursor: 'pointer' }}
+              style={{ textAlign: 'left', border: `1px solid ${colors.launchCardThreeBorder}`, background: colors.launchCardThreeBg, borderRadius: '18px', padding: '1rem', cursor: 'pointer' }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
-                <div style={{ fontSize: '0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: '#92400e', fontWeight: 800 }}>Recovery</div>
-                <span style={{ border: '1px solid #fde68a', background: '#fef3c7', color: '#92400e', borderRadius: '999px', fontSize: '0.71rem', fontWeight: 800, padding: '0.14rem 0.45rem' }}>{autosaveCount}</span>
+                <div style={{ fontSize: '0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: isAdminDarkTheme ? '#facc15' : '#92400e', fontWeight: 800 }}>Recovery</div>
+                <span style={{ border: isAdminDarkTheme ? '1px solid #7a5f2a' : '1px solid #fde68a', background: isAdminDarkTheme ? '#3a331e' : '#fef3c7', color: isAdminDarkTheme ? '#facc15' : '#92400e', borderRadius: '999px', fontSize: '0.71rem', fontWeight: 800, padding: '0.14rem 0.45rem' }}>{autosaveCount}</span>
               </div>
-              <div style={{ marginTop: '0.35rem', fontSize: '0.96rem', color: '#0f172a', fontWeight: 800 }}>Recover Auto-Saved Intake</div>
-              <div style={{ marginTop: '0.3rem', fontSize: '0.82rem', color: '#475569' }}>Open unsaved intake sessions and continue where you left off.</div>
+              <div style={{ marginTop: '0.35rem', fontSize: '0.96rem', color: colors.strongText, fontWeight: 800 }}>Recover Auto-Saved Intake</div>
+              <div style={{ marginTop: '0.3rem', fontSize: '0.82rem', color: colors.mutedText }}>Open unsaved intake sessions and continue where you left off.</div>
             </button>
 
             <button
               type="button"
               onClick={openFinalizedHistoryModal}
-              style={{ textAlign: 'left', border: '1px solid #bbf7d0', background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 65%)', borderRadius: '18px', padding: '1rem', cursor: 'pointer' }}
+              style={{ textAlign: 'left', border: `1px solid ${colors.launchCardFourBorder}`, background: colors.launchCardFourBg, borderRadius: '18px', padding: '1rem', cursor: 'pointer' }}
             >
-              <div style={{ fontSize: '0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: '#166534', fontWeight: 800 }}>History</div>
-                <div style={{ marginTop: '0.35rem', fontSize: '0.96rem', color: '#0f172a', fontWeight: 800 }}>Finalized Intake Records</div>
-              <div style={{ marginTop: '0.3rem', fontSize: '0.82rem', color: '#475569' }}>Review finalized entries, export files, and open transfer details.</div>
+              <div style={{ fontSize: '0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: isAdminDarkTheme ? '#86efac' : '#166534', fontWeight: 800 }}>History</div>
+                <div style={{ marginTop: '0.35rem', fontSize: '0.96rem', color: colors.strongText, fontWeight: 800 }}>Finalized Intake Records</div>
+              <div style={{ marginTop: '0.3rem', fontSize: '0.82rem', color: colors.mutedText }}>Review finalized entries, export files, and open transfer details.</div>
             </button>
 
             <button
               type="button"
               onClick={openTransferHistoryModal}
-              style={{ textAlign: 'left', border: '1px solid #fed7aa', background: 'linear-gradient(135deg, #fff7ed 0%, #ffffff 65%)', borderRadius: '18px', padding: '1rem', cursor: 'pointer' }}
+              style={{ textAlign: 'left', border: `1px solid ${colors.launchCardFiveBorder}`, background: colors.launchCardFiveBg, borderRadius: '18px', padding: '1rem', cursor: 'pointer' }}
             >
-              <div style={{ fontSize: '0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: '#c2410c', fontWeight: 800 }}>Sync</div>
-                <div style={{ marginTop: '0.35rem', fontSize: '0.96rem', color: '#0f172a', fontWeight: 800 }}>POS Transfer History</div>
-              <div style={{ marginTop: '0.3rem', fontSize: '0.82rem', color: '#475569' }}>Track queue status, processing results, and transfer failures.</div>
+              <div style={{ fontSize: '0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: isAdminDarkTheme ? '#fdba74' : '#c2410c', fontWeight: 800 }}>Sync</div>
+                <div style={{ marginTop: '0.35rem', fontSize: '0.96rem', color: colors.strongText, fontWeight: 800 }}>POS Transfer History</div>
+              <div style={{ marginTop: '0.3rem', fontSize: '0.82rem', color: colors.mutedText }}>Track queue status, processing results, and transfer failures.</div>
             </button>
 
             <button
               type="button"
               onClick={openPriceSyncHistoryModal}
-              style={{ textAlign: 'left', border: '1px solid #bfdbfe', background: 'linear-gradient(135deg, #e0f2fe 0%, #ffffff 65%)', borderRadius: '18px', padding: '1rem', cursor: 'pointer' }}
+              style={{ textAlign: 'left', border: `1px solid ${colors.launchCardSixBorder}`, background: colors.launchCardSixBg, borderRadius: '18px', padding: '1rem', cursor: 'pointer' }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
-                <div style={{ fontSize: '0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: '#1e40af', fontWeight: 800 }}>Sync</div>
-                <span style={{ border: '1px solid #bfdbfe', background: '#dbeafe', color: '#1e40af', borderRadius: '999px', fontSize: '0.71rem', fontWeight: 800, padding: '0.14rem 0.45rem' }}>{priceSyncRecordsCount}</span>
+                <div style={{ fontSize: '0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: isAdminDarkTheme ? '#93c5fd' : '#1e40af', fontWeight: 800 }}>Sync</div>
+                <span style={{ border: isAdminDarkTheme ? '1px solid #305a96' : '1px solid #bfdbfe', background: isAdminDarkTheme ? '#1e3a5f' : '#dbeafe', color: isAdminDarkTheme ? '#bfdbfe' : '#1e40af', borderRadius: '999px', fontSize: '0.71rem', fontWeight: 800, padding: '0.14rem 0.45rem' }}>{priceSyncRecordsCount}</span>
               </div>
-              <div style={{ marginTop: '0.35rem', fontSize: '0.96rem', color: '#0f172a', fontWeight: 800 }}>Price Sync History</div>
-              <div style={{ marginTop: '0.3rem', fontSize: '0.82rem', color: '#475569' }}>View product-level price sync commands, statuses, errors, and agent outcomes.</div>
+              <div style={{ marginTop: '0.35rem', fontSize: '0.96rem', color: colors.strongText, fontWeight: 800 }}>Price Sync History</div>
+              <div style={{ marginTop: '0.3rem', fontSize: '0.82rem', color: colors.mutedText }}>View product-level price sync commands, statuses, errors, and agent outcomes.</div>
             </button>
           </div>
         </section>
@@ -1768,7 +1776,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
           <div style={{ ...themedCardStyle, width: 'min(980px, 97vw)', maxHeight: '86vh', overflow: 'hidden', borderRadius: '16px', display: 'flex', flexDirection: 'column', padding: '0.9rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.65rem', marginBottom: '0.65rem', flexWrap: 'wrap' }}>
               <div>
-                <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#111827' }}>Recover Auto-Saved Intake Sessions</div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 800, color: colors.strongText }}>Recover Auto-Saved Intake Sessions</div>
                 <div style={{ marginTop: '0.2rem', fontSize: '0.8rem', color: '#64748b' }}>These sessions were auto-saved before finalizing or saving as draft.</div>
               </div>
               <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1799,7 +1807,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
               ) : (
                 <div style={{ display: 'grid', gap: '0.6rem' }}>
                   {autosaveEntries.map((entry) => (
-                    <div key={entry.id} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.75rem', background: '#fff' }}>
+                    <div key={entry.id} style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #e2e8f0', borderRadius: '12px', padding: '0.75rem', background: isAdminDarkTheme ? '#0f172a' : '#fff' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.7rem', flexWrap: 'wrap' }}>
                         <div style={{ display: 'grid', gap: '0.2rem' }}>
                           <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>{entry.supplierName || 'Unassigned Supplier'}</div>
@@ -1950,7 +1958,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
           <div style={{ ...themedCardStyle, width: isTransferHistoryMaximized ? 'calc(100vw - 0.7rem)' : 'min(1520px, 98vw)', height: isTransferHistoryMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isTransferHistoryMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column', padding: '0.95rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
               <div>
-                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#111827' }}>POS Transfer History</div>
+                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: colors.strongText }}>POS Transfer History</div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                 <button
@@ -1958,7 +1966,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                   title={isTransferHistoryMaximized ? 'Restore' : 'Maximize'}
                   aria-label={isTransferHistoryMaximized ? 'Restore transfer history' : 'Maximize transfer history'}
                   onClick={() => setIsTransferHistoryMaximized((prev) => !prev)}
-                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', color: '#334155', cursor: 'pointer' }}
+                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #e2e8f0', background: isAdminDarkTheme ? '#0f172a' : '#fff', color: isAdminDarkTheme ? '#cbd5e1' : '#334155', cursor: 'pointer' }}
                 >
                   <i className={`fas ${isTransferHistoryMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
                 </button>
@@ -2071,7 +2079,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
           <div style={{ ...themedCardStyle, width: isPriceSyncHistoryMaximized ? 'calc(100vw - 0.7rem)' : 'min(1560px, 98vw)', height: isPriceSyncHistoryMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isPriceSyncHistoryMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column', padding: '0.95rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
               <div>
-                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#111827' }}>Price Sync History</div>
+                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: colors.strongText }}>Price Sync History</div>
                 <div style={{ marginTop: '0.16rem', fontSize: '0.78rem', color: '#64748b' }}>Review queued, processing, completed, and failed price sync commands from finalized intakes.</div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
@@ -2080,7 +2088,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                   title={isPriceSyncHistoryMaximized ? 'Restore' : 'Maximize'}
                   aria-label={isPriceSyncHistoryMaximized ? 'Restore price sync history' : 'Maximize price sync history'}
                   onClick={() => setIsPriceSyncHistoryMaximized((prev) => !prev)}
-                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', color: '#334155', cursor: 'pointer' }}
+                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #e2e8f0', background: isAdminDarkTheme ? '#0f172a' : '#fff', color: isAdminDarkTheme ? '#cbd5e1' : '#334155', cursor: 'pointer' }}
                 >
                   <i className={`fas ${isPriceSyncHistoryMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
                 </button>
@@ -2099,8 +2107,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
             </div>
 
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingRight: '0.2rem' }}>
-              <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', background: '#fff' }}>
-                <div style={{ padding: '0.7rem 0.8rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <div style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', background: isAdminDarkTheme ? '#0f172a' : '#fff' }}>
+                <div style={{ padding: '0.7rem 0.8rem', borderBottom: isAdminDarkTheme ? '1px solid #334155' : '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <h3 style={{ margin: 0, color: colors.text, fontSize: '0.88rem' }}>Finalized Intake Records With Price Sync</h3>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
                     <select
@@ -2192,7 +2200,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.7rem', flexWrap: 'wrap' }}>
               <div>
                 <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b7280', fontWeight: 800 }}>Price Sync Detail</div>
-                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#111827' }}>{activePriceSyncRecord.intakeRef}</div>
+                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: colors.strongText }}>{activePriceSyncRecord.intakeRef}</div>
               </div>
               <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
                 {renderPriceSyncStatusBadge(activePriceSyncRecord.priceSyncSummary || {}, { compact: true })}
@@ -2202,10 +2210,10 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
 
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingRight: '0.2rem' }}>
               <div style={{ display: 'grid', gap: '0.65rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem' }}><strong>Supplier:</strong> {activePriceSyncRecord.supplier?.name || activePriceSyncRecord.manualSupplierName || '-'}</div>
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem' }}><strong>Location:</strong> {activePriceSyncRecord.locationName || activePriceSyncRecord.locationCode || '-'}</div>
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem' }}><strong>Intake Date:</strong> {dateInputValue(activePriceSyncRecord.purchaseDate)}</div>
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem' }}><strong>Commands:</strong> {Number(activePriceSyncRecord?.priceSyncSummary?.attempted || 0)}</div>
+                <div style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#111827' : '#fff', color: colors.text }}><strong>Supplier:</strong> {activePriceSyncRecord.supplier?.name || activePriceSyncRecord.manualSupplierName || '-'}</div>
+                <div style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#111827' : '#fff', color: colors.text }}><strong>Location:</strong> {activePriceSyncRecord.locationName || activePriceSyncRecord.locationCode || '-'}</div>
+                <div style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#111827' : '#fff', color: colors.text }}><strong>Intake Date:</strong> {dateInputValue(activePriceSyncRecord.purchaseDate)}</div>
+                <div style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#111827' : '#fff', color: colors.text }}><strong>Commands:</strong> {Number(activePriceSyncRecord?.priceSyncSummary?.attempted || 0)}</div>
               </div>
 
               <div style={{ marginTop: '0.85rem', width: '100%', maxWidth: '100%', overflow: 'auto' }}>
@@ -2213,7 +2221,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                   <thead>
                     <tr>
                       {['Command ID', 'Product Code', 'Product Name', 'Location', 'Price Type', 'Old Price', 'New Price', 'Status', 'Queued', 'Processed', 'Agent Message'].map((label) => (
-                        <th key={label} style={{ textAlign: 'left', padding: '0.55rem 0.45rem', fontSize: '0.75rem', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>{label}</th>
+                        <th key={label} style={{ textAlign: 'left', padding: '0.55rem 0.45rem', fontSize: '0.75rem', color: colors.mutedText, borderBottom: isAdminDarkTheme ? '1px solid #334155' : '1px solid #e2e8f0' }}>{label}</th>
                       ))}
                     </tr>
                   </thead>
@@ -2265,7 +2273,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.7rem', flexWrap: 'wrap' }}>
               <div>
                 <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b7280', fontWeight: 800 }}>Transfer Detail</div>
-                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#111827' }}>
+                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: colors.strongText }}>
                   {transferDetailRecord.intakeRef} {resolveDisplayedTransferGrn(transferDetailRecord) ? `• ${resolveDisplayedTransferGrn(transferDetailRecord)}` : ''}
                 </div>
               </div>
@@ -2281,19 +2289,19 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
 
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingRight: '0.2rem' }}>
               <div style={{ display: 'grid', gap: '0.65rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem' }}><strong>Supplier:</strong> {transferDetailRecord.supplier?.name || transferDetailRecord.manualSupplierName || '-'}</div>
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem' }}><strong>Location:</strong> {transferDetailRecord.locationName || transferDetailRecord.locationCode || '-'}</div>
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem' }}><strong>Intake Date:</strong> {dateInputValue(transferDetailRecord.purchaseDate)}</div>
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem' }}><strong>Queued:</strong> {formatDateTime(transferDetailRecord.posTransferAt || transferDetailRecord.posTransferCommand?.createdAt)}</div>
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem' }}><strong>Completed:</strong> {formatDateTime(transferDetailRecord.posTransferCommand?.processedAt)}</div>
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem' }}><strong>Command ID:</strong> {transferDetailRecord.posTransferCommand?.id || '-'}</div>
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem' }}><strong>Requested GRN:</strong> {resolveRequestedTransferGrn(transferDetailRecord) || 'Auto-generated in POS'}</div>
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem' }}><strong>Final GRN Used:</strong> {resolveFinalTransferGrn(transferDetailRecord) || '-'}</div>
+                <div style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#111827' : '#fff', color: colors.text }}><strong>Supplier:</strong> {transferDetailRecord.supplier?.name || transferDetailRecord.manualSupplierName || '-'}</div>
+                <div style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#111827' : '#fff', color: colors.text }}><strong>Location:</strong> {transferDetailRecord.locationName || transferDetailRecord.locationCode || '-'}</div>
+                <div style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#111827' : '#fff', color: colors.text }}><strong>Intake Date:</strong> {dateInputValue(transferDetailRecord.purchaseDate)}</div>
+                <div style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#111827' : '#fff', color: colors.text }}><strong>Queued:</strong> {formatDateTime(transferDetailRecord.posTransferAt || transferDetailRecord.posTransferCommand?.createdAt)}</div>
+                <div style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#111827' : '#fff', color: colors.text }}><strong>Completed:</strong> {formatDateTime(transferDetailRecord.posTransferCommand?.processedAt)}</div>
+                <div style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#111827' : '#fff', color: colors.text }}><strong>Command ID:</strong> {transferDetailRecord.posTransferCommand?.id || '-'}</div>
+                <div style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#111827' : '#fff', color: colors.text }}><strong>Requested GRN:</strong> {resolveRequestedTransferGrn(transferDetailRecord) || 'Auto-generated in POS'}</div>
+                <div style={{ border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#111827' : '#fff', color: colors.text }}><strong>Final GRN Used:</strong> {resolveFinalTransferGrn(transferDetailRecord) || '-'}</div>
               </div>
 
-              <div style={{ marginTop: '0.75rem', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.7rem', background: '#f8fafc' }}>
-                <div style={{ fontSize: '0.8rem', color: '#334155', fontWeight: 700 }}>POS Agent Response</div>
-                <div style={{ marginTop: '0.3rem', fontSize: '0.85rem', color: '#475569' }}>
+              <div style={{ marginTop: '0.75rem', border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.7rem', background: isAdminDarkTheme ? '#111827' : '#f8fafc' }}>
+                <div style={{ fontSize: '0.8rem', color: colors.strongText, fontWeight: 700 }}>POS Agent Response</div>
+                <div style={{ marginTop: '0.3rem', fontSize: '0.85rem', color: colors.mutedText }}>
                   {transferDetailRecord.posTransferCommand?.resultSummary?.message
                     || transferDetailRecord.posTransferCommand?.errorMessage
                     || 'No response captured yet.'}
@@ -2305,7 +2313,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                   <thead>
                     <tr>
                       {['Product Code', 'Product Name', 'Quantity', 'Unit Cost', 'Total Cost', 'Expiry Date'].map((label) => (
-                        <th key={label} style={{ textAlign: 'left', padding: '0.55rem 0.45rem', fontSize: '0.75rem', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>{label}</th>
+                        <th key={label} style={{ textAlign: 'left', padding: '0.55rem 0.45rem', fontSize: '0.75rem', color: colors.mutedText, borderBottom: isAdminDarkTheme ? '1px solid #334155' : '1px solid #e2e8f0' }}>{label}</th>
                       ))}
                     </tr>
                   </thead>
