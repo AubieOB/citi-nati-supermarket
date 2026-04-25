@@ -2,6 +2,7 @@
 
 const goodsIntakeService = require('../../services/business-operations/goodsIntake.service');
 const goodsIntakePosTransferService = require('../../services/business-operations/goodsIntakePosTransfer.service');
+const { isZombaLocationCode } = goodsIntakePosTransferService;
 const {
   parsePagination,
   parseSort,
@@ -244,7 +245,17 @@ async function transferToPOS(req, res) {
     const id = toInt(req.params.id);
     if (!id) return res.status(400).json({ success: false, error: 'Invalid goods intake id' });
 
-    const result = await goodsIntakePosTransferService.transferGoodsIntakeToBlantyrePosPending(id, req.body || {});
+    // Determine which agent should handle this transfer based on the intake's location code.
+    // We fetch the location code from the request body hint if provided, otherwise the service
+    // will validate the intake's own locationCode.
+    const hintLocationCode = String((req.body && req.body.locationCode) || '').trim().toUpperCase();
+    const useZomba = hintLocationCode
+      ? isZombaLocationCode(hintLocationCode)
+      : false; // service-level guard will handle unknown codes
+
+    const result = useZomba
+      ? await goodsIntakePosTransferService.transferGoodsIntakeToZombaPosPending(id, req.body || {})
+      : await goodsIntakePosTransferService.transferGoodsIntakeToBlantyrePosPending(id, req.body || {});
     if (!result.success) {
       const statusCode = result.alreadyTransferred ? 409 : 422;
       return res.status(statusCode).json({ success: false, error: result.error, grnNo: result.existingGrn });

@@ -30,8 +30,17 @@ async function pollCommands(req, res) {
     } else if (req.body && typeof req.body.locationCode === 'string') {
       targetLocationCodes = [req.body.locationCode];
     }
+
+    // Optional branchCode filter — allows agents that share a locationCode (e.g. both Blantyre
+    // and Zomba use 'SH') to claim only their own branch's commands.
+    let targetBranchCodes = [];
+    if (req.body && Array.isArray(req.body.branchCodes)) {
+      targetBranchCodes = req.body.branchCodes;
+    } else if (req.body && typeof req.body.branchCode === 'string') {
+      targetBranchCodes = [req.body.branchCode];
+    }
     
-    const claimed = await queueService.claimPendingCommands(limit, agentId, targetLocationCodes);
+    const claimed = await queueService.claimPendingCommands(limit, agentId, targetLocationCodes, targetBranchCodes);
 
     return res.json({
       success: true,

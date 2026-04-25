@@ -91,12 +91,17 @@ async function enqueueCommand(commandType, payload, meta = {}) {
   }
 }
 
-async function claimPendingCommands(limit = 10, agentId = 'unknown-agent', targetLocationCodes = []) {
+async function claimPendingCommands(limit = 10, agentId = 'unknown-agent', targetLocationCodes = [], targetBranchCodes = []) {
   const safeLimit = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
   const lockToken = crypto.randomUUID();
   
   // Normalize target location codes to uppercase array
   const normalizedLocations = (Array.isArray(targetLocationCodes) ? targetLocationCodes : [])
+    .map(code => String(code || '').trim().toUpperCase())
+    .filter(code => code.length > 0);
+
+  // Optional branch code filter — used when multiple agents share a location code (e.g. 'SH')
+  const normalizedBranches = (Array.isArray(targetBranchCodes) ? targetBranchCodes : [])
     .map(code => String(code || '').trim().toUpperCase())
     .filter(code => code.length > 0);
 
@@ -121,9 +126,17 @@ async function claimPendingCommands(limit = 10, agentId = 'unknown-agent', targe
 
       // Filter candidates by target location if specified
       const filteredCandidates = normalizedLocations.length > 0
-        ? candidates.filter(cmd => {
-            const cmdLocationCode = String(cmd.payload?.locationCode || '').trim().toUpperCase();
-            return normalizedLocations.includes(cmdLocationCode);
+        ? candidates.filter(function(cmd) {
+            const cmdLocationCode = String((cmd.payload && cmd.payload.locationCode) || '').trim().toUpperCase();
+            if (!normalizedLocations.includes(cmdLocationCode)) return false;
+            // If the agent also specifies target branch codes, further filter by branchCode in payload
+            if (normalizedBranches.length > 0) {
+              const cmdBranchCode = String((cmd.payload && cmd.payload.branchCode) || '').trim().toUpperCase();
+              // Only apply branch filter if the command actually has a branchCode set —
+              // commands without branchCode are legacy/untagged and are claimed by any matching location agent.
+              if (cmdBranchCode && !normalizedBranches.includes(cmdBranchCode)) return false;
+            }
+            return true;
           })
         : candidates;
       

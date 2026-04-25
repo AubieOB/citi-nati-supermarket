@@ -42,15 +42,16 @@ function withMetadata(payload = {}) {
   };
 }
 
-async function pollCommands(limit = 10) {
-  const client = createClient();
-  const config = buildConfig();
-  // Send location codes this agent handles to filter queue commands
-  // Zomba operates multiple locations but excludes 'SH' since stock intake is Blantyre-only
-  // and we can't distinguish between Blantyre's SH and Zomba's SH in the shared queue
-  const response = await client.post('/api/pos-commands/poll', withMetadata({ 
-    limit,
-    locationCodes: ['BAR', 'ST999'],
+async function pollCommands(limit) {
+  if (limit === undefined) limit = 10;
+  var client = createClient();
+  // Poll all Zomba location codes: SH (main shelf), BAR, ST999 (restaurant).
+  // branchCodes: ['ZOMBA'] ensures this agent only claims Zomba-tagged commands
+  // when location code SH overlaps with Blantyre.
+  var response = await client.post('/api/pos-commands/poll', withMetadata({
+    limit: limit,
+    locationCodes: ['SH', 'BAR', 'ST999'],
+    branchCodes: ['ZOMBA'],
   }));
   return (response.data && response.data.commands) || [];
 }
