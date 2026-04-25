@@ -323,6 +323,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
   const [saving, setSaving] = useState(false);
   const [transferring, setTransferring] = useState(false);
   const [activeLookupRow, setActiveLookupRow] = useState(-1);
+  const [expandedLineRows, setExpandedLineRows] = useState({});
   const [lookupWarning, setLookupWarning] = useState('');
   const [isIntakeWorkspaceOpen, setIsIntakeWorkspaceOpen] = useState(false);
   const [isIntakeWorkspaceMaximized, setIsIntakeWorkspaceMaximized] = useState(false);
@@ -1054,6 +1055,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
               {calculatedItems.map((line, index) => {
                 const compactLineInputStyle = { ...tableInputStyle, padding: '0.32rem 0.38rem', fontSize: '0.8rem' };
                 const belowCost = line.sellingPrice != null && Number(line.sellingPrice) < Number(line.unitCost || 0);
+                const isLineExpanded = Boolean(expandedLineRows[index]);
                 return (
                   <React.Fragment key={`line-${index}`}>
                     <tr>
@@ -1101,6 +1103,13 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                       <td style={{ width: '5%', padding: '0 0.25rem' }}>
                         {(canCreate || canEdit) && (
                           <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedLineRows((prev) => ({ ...prev, [index]: !prev[index] }))}
+                              style={{ border: '1px solid #bfdbfe', background: '#eff6ff', color: '#1d4ed8', borderRadius: '7px', padding: '0.25rem 0.45rem', fontWeight: 700, fontSize: '0.76rem', cursor: 'pointer' }}
+                            >
+                              {isLineExpanded ? 'Hide' : 'Full'}
+                            </button>
                             <button type="button" onClick={() => duplicateLine(index)} style={{ border: '1px solid #cbd5e1', background: '#fff', borderRadius: '7px', padding: '0.25rem 0.45rem', fontWeight: 600, fontSize: '0.76rem', cursor: 'pointer' }}>Dup</button>
                             <button type="button" onClick={() => removeLine(index)} style={{ border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', borderRadius: '7px', padding: '0.25rem 0.45rem', fontWeight: 600, fontSize: '0.76rem', cursor: 'pointer' }}>Del</button>
                           </div>
@@ -1108,20 +1117,22 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                         {activeLookupRow === index && <div style={{ marginTop: '0.25rem', fontSize: '0.72rem', color: '#2563eb' }}>Looking up...</div>}
                       </td>
                     </tr>
-                    <tr>
-                      <td colSpan={12} style={{ padding: '0 0.25rem 0.15rem 0.25rem' }}>
-                        <div style={{ display: 'grid', gap: '0.45rem', gridTemplateColumns: 'minmax(220px, 1fr) minmax(280px, 1.4fr)', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.45rem 0.6rem', background: '#f8fafc' }}>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#64748b' }}>Full Barcode</div>
-                            <div style={{ marginTop: '0.12rem', fontSize: '0.78rem', color: '#0f172a', fontWeight: 600, wordBreak: 'break-all', lineHeight: 1.35 }}>{line.barcode || '-'}</div>
+                    {isLineExpanded && (
+                      <tr>
+                        <td colSpan={12} style={{ padding: '0 0.25rem 0.15rem 0.25rem' }}>
+                          <div style={{ display: 'grid', gap: '0.45rem', gridTemplateColumns: 'minmax(220px, 1fr) minmax(280px, 1.4fr)', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.45rem 0.6rem', background: '#f8fafc' }}>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#64748b' }}>Full Barcode</div>
+                              <div style={{ marginTop: '0.12rem', fontSize: '0.78rem', color: '#0f172a', fontWeight: 600, wordBreak: 'break-all', lineHeight: 1.35 }}>{line.barcode || '-'}</div>
+                            </div>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#64748b' }}>Full Product Name</div>
+                              <div style={{ marginTop: '0.12rem', fontSize: '0.8rem', color: '#0f172a', fontWeight: 700, wordBreak: 'break-word', lineHeight: 1.35 }}>{line.productName || '-'}</div>
+                            </div>
                           </div>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: '0.67rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#64748b' }}>Full Product Name</div>
-                            <div style={{ marginTop: '0.12rem', fontSize: '0.8rem', color: '#0f172a', fontWeight: 700, wordBreak: 'break-word', lineHeight: 1.35 }}>{line.productName || '-'}</div>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
+                        </td>
+                      </tr>
+                    )}
                   </React.Fragment>
                 );
               })}
