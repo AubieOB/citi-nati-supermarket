@@ -2115,20 +2115,38 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                   <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '860px' }}>
                     <thead>
                       <tr>
-                        {['Ref', 'Supplier', 'Location', 'Intake Date', 'Sync Status', 'Attempted', 'Queued', 'Completed', 'Failed', 'Last Activity', 'Actions'].map((label) => (
+                        {['Ref', 'Supplier', 'Location', 'Intake Date', 'Sync Status', 'Attempted', 'Queued', 'Completed', 'Failed', 'Last Activity'].map((label) => (
                           <th key={label} style={{ textAlign: 'left', padding: '0.46rem 0.38rem', fontSize: '0.72rem', color: colors.mutedText, borderBottom: `1px solid ${isAdminDarkTheme ? '#334155' : '#e2e8f0'}` }}>{label}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {listLoading ? (
-                        <tr><td colSpan={11} style={{ padding: '1rem', color: colors.mutedText }}>Loading price sync history...</td></tr>
+                        <tr><td colSpan={10} style={{ padding: '1rem', color: colors.mutedText }}>Loading price sync history...</td></tr>
                       ) : filteredPriceSyncHistoryRecords.length === 0 ? (
-                        <tr><td colSpan={11} style={{ padding: '1rem', color: colors.mutedText }}>No finalized intake records with price sync commands yet.</td></tr>
+                        <tr><td colSpan={10} style={{ padding: '1rem', color: colors.mutedText }}>No finalized intake records with price sync commands yet.</td></tr>
                       ) : filteredPriceSyncHistoryRecords.map((record) => {
                         const summary = record.priceSyncSummary || {};
+                        const isSelected = Number(activePriceSyncRecord?.id) === Number(record.id);
                         return (
-                          <tr key={`price-sync-${record.id}`}>
+                          <tr
+                            key={`price-sync-${record.id}`}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => setActivePriceSyncRecord(record)}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                setActivePriceSyncRecord(record);
+                              }
+                            }}
+                            style={{
+                              cursor: 'pointer',
+                              backgroundColor: isSelected ? '#e0f2fe' : 'transparent',
+                              outline: 'none',
+                            }}
+                            aria-label={`Open price sync details for ${record.intakeRef}`}
+                          >
                             <td style={{ padding: '0.48rem 0.38rem', borderBottom: `1px solid ${colors.tableBorder}`, fontWeight: 700, color: colors.strongText, fontSize: '0.84rem' }}>{record.intakeRef}</td>
                             <td style={{ padding: '0.48rem 0.38rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.82rem' }}>{record.supplier?.name || record.manualSupplierName || '-'}</td>
                             <td style={{ padding: '0.48rem 0.38rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.82rem' }}>{record.locationName || record.locationCode || '-'}</td>
@@ -2139,15 +2157,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                             <td style={{ padding: '0.48rem 0.38rem', borderBottom: `1px solid ${colors.tableBorder}`, color: '#166534', fontSize: '0.82rem', fontWeight: 700 }}>{Number(summary.completed || 0)}</td>
                             <td style={{ padding: '0.48rem 0.38rem', borderBottom: `1px solid ${colors.tableBorder}`, color: Number(summary.failed || 0) > 0 ? '#b91c1c' : colors.text, fontSize: '0.82rem', fontWeight: Number(summary.failed || 0) > 0 ? 700 : 500 }}>{Number(summary.failed || 0)}</td>
                             <td style={{ padding: '0.48rem 0.38rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.82rem' }}>{formatDateTime(summary.lastProcessedAt || summary.lastQueuedAt)}</td>
-                            <td style={{ padding: '0.48rem 0.38rem', borderBottom: `1px solid ${colors.tableBorder}` }}>
-                              <button
-                                type="button"
-                                onClick={() => setActivePriceSyncRecord(record)}
-                                style={{ border: '1px solid #bfdbfe', background: '#eff6ff', color: '#1d4ed8', borderRadius: '7px', padding: '0.24rem 0.5rem', fontWeight: 700, cursor: 'pointer' }}
-                              >
-                                View Details
-                              </button>
-                            </td>
                           </tr>
                         );
                       })}
