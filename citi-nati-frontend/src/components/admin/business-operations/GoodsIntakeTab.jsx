@@ -417,6 +417,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
   const [form, setForm] = useState(() => buildNewForm(selectedLocation));
   const [activeAutosaveId, setActiveAutosaveId] = useState(() => createGoodsIntakeAutosaveId());
   const [autosaveEntries, setAutosaveEntries] = useState(() => readGoodsIntakeAutosaves());
+  const [liveLineStockByProductId, setLiveLineStockByProductId] = useState({});
   const [saving, setSaving] = useState(false);
   const [transferring, setTransferring] = useState(false);
   const [activeLookupRow, setActiveLookupRow] = useState(-1);
@@ -727,6 +728,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
       items: restoredItems,
     });
     setLookupWarning('');
+    setLiveLineStockByProductId({});
     setActiveAutosaveId(String(entry.id || createGoodsIntakeAutosaveId()));
     setIsAutosaveRecoveryOpen(false);
     setIsIntakeWorkspaceMaximized(false);
@@ -735,6 +737,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
 
   const clearForm = () => {
     setLookupWarning('');
+    setLiveLineStockByProductId({});
     setActiveAutosaveId(createGoodsIntakeAutosaveId());
     setForm(buildNewForm(selectedLocation));
   };
@@ -742,6 +745,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
   const openWorkspace = ({ reset = false } = {}) => {
     if (!canViewForm) return;
     if (reset) {
+      setLiveLineStockByProductId({});
       setActiveAutosaveId(createGoodsIntakeAutosaveId());
       setForm(buildNewForm(selectedLocation));
     }
@@ -843,6 +847,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
       const response = await api.get(`/business-operations/goods-intake/${recordId}`);
       const data = response.data?.data;
       if (!data) return;
+      setLiveLineStockByProductId({});
       setActiveAutosaveId(createGoodsIntakeAutosaveId());
       setForm(toFormFromRecord(data));
       setIsIntakeWorkspaceOpen(true);
@@ -1007,6 +1012,13 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
       const resolvedSellingPrice = lookupPriceCandidates.find((value) => Number.isFinite(Number(value)) && Number(value) >= 0);
       const resolvedEffectiveStockRaw = chosen?.effectiveStock ?? chosen?.effective_stock ?? chosen?.posStock ?? chosen?.pos_stock ?? chosen?.stock;
       const resolvedEffectiveStock = Number.isFinite(Number(resolvedEffectiveStockRaw)) ? Number(resolvedEffectiveStockRaw) : null;
+      setLiveLineStockByProductId((prev) => ({
+        ...prev,
+        [Number(chosen.id || 0)]: {
+          latestSyncedStock: resolvedEffectiveStock,
+          stockStatus: String(chosen?.stockStatus || chosen?.stock_status || ''),
+        },
+      }));
       setForm((prev) => ({
         ...prev,
         items: prev.items.map((item, itemIndex) => {
@@ -1041,34 +1053,30 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
       });
 
       const stockLines = Array.isArray(response.data?.lines) ? response.data.lines : [];
-      const stockMap = new Map(stockLines.map((entry) => [Number(entry.productId || entry.id), entry]));
-
-      setForm((prev) => {
+      setLiveLineStockByProductId((prev) => {
         let changed = false;
-        const nextItems = prev.items.map((item) => {
-          const productId = Number(item?.productId);
-          if (!Number.isFinite(productId) || productId <= 0) return item;
+        const next = { ...prev };
 
-          const latest = stockMap.get(productId);
-          if (!latest) return item;
-
-          const nextStockRaw = latest.effectiveStock ?? latest.effective_stock ?? latest.stock ?? null;
+        stockLines.forEach((entry) => {
+          const productId = Number(entry.productId || entry.id);
+          if (!Number.isFinite(productId) || productId <= 0) return;
+          const nextStockRaw = entry.effectiveStock ?? entry.effective_stock ?? entry.stock ?? null;
           const nextStock = Number.isFinite(Number(nextStockRaw)) ? Number(nextStockRaw) : null;
-          const nextStatus = String(latest.stockStatus || latest.stock_status || '');
+          const nextStatus = String(entry.stockStatus || entry.stock_status || '');
+          const current = prev[productId] || {};
 
-          if (item.latestSyncedStock === nextStock && String(item.stockStatus || '') === nextStatus) {
-            return item;
+          if (current.latestSyncedStock === nextStock && String(current.stockStatus || '') === nextStatus) {
+            return;
           }
 
           changed = true;
-          return {
-            ...item,
+          next[productId] = {
             latestSyncedStock: nextStock,
             stockStatus: nextStatus,
           };
         });
 
-        return changed ? { ...prev, items: nextItems } : prev;
+        return changed ? next : prev;
       });
     } catch (_error) {
       // Keep entry flow uninterrupted if background stock refresh fails.
@@ -1372,9 +1380,12 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
               {calculatedItems.map((line, index) => {
                 const compactLineInputStyle = { ...tableInputStyle, padding: '0.34rem 0.4rem', fontSize: '0.8rem' };
                 const belowCost = line.sellingPrice != null && Number(line.sellingPrice) < Number(line.unitCost || 0);
-                const syncedStockTone = line.stockStatus === 'out_of_stock'
+                const lineLiveStock = Number.isFinite(Number(line.productId)) ? liveLineStockByProductId[Number(line.productId)] : null;
+                const displayStock = lineLiveStock?.latestSyncedStock ?? line.latestSyncedStock;
+                const displayStockStatus = String(lineLiveStock?.stockStatus || line.stockStatus || '');
+                const syncedStockTone = displayStockStatus === 'out_of_stock'
                   ? { color: '#b91c1c', bg: '#fff1f2', border: '#fecdd3', label: 'Out of stock' }
-                  : line.stockStatus === 'low_stock'
+                  : displayStockStatus === 'low_stock'
                     ? { color: '#b45309', bg: '#fffbeb', border: '#fcd34d', label: 'Low stock' }
                     : { color: '#166534', bg: '#f0fdf4', border: '#bbf7d0', label: 'In stock' };
                 return (
@@ -1405,10 +1416,10 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                       <div style={{ marginTop: '0.18rem', fontSize: '0.72rem', color: '#334155', lineHeight: 1.25, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{line.productName || '-'}</div>
                       <div style={{ marginTop: '0.28rem', display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Latest synced stock</span>
-                        <span style={{ fontSize: '0.74rem', fontWeight: 800, color: line.latestSyncedStock == null ? '#64748b' : syncedStockTone.color }}>
-                          {line.latestSyncedStock == null ? 'Resolve product to view' : Number(line.latestSyncedStock).toLocaleString('en-US')}
+                        <span style={{ fontSize: '0.74rem', fontWeight: 800, color: displayStock == null ? '#64748b' : syncedStockTone.color }}>
+                          {displayStock == null ? 'Resolve product to view' : Number(displayStock).toLocaleString('en-US')}
                         </span>
-                        {line.latestSyncedStock != null && (
+                        {displayStock != null && (
                           <span style={{ border: `1px solid ${syncedStockTone.border}`, background: syncedStockTone.bg, color: syncedStockTone.color, borderRadius: '999px', padding: '0.08rem 0.4rem', fontSize: '0.66rem', fontWeight: 800 }}>
                             {syncedStockTone.label}
                           </span>
