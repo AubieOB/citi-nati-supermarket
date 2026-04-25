@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../../../utils/api.js';
 import { boAlert, boConfirm } from '../../../utils/boDialogBus.js';
-import { exportGoodsIntakeRecordPdf } from '../../../utils/businessOperationsPdfExports.js';
+import { exportStockIntakeTransferRecordPdf } from '../../../utils/businessOperationsPdfExports.js';
 
 const cardStyle = {
   backgroundColor: '#fff',
@@ -673,7 +673,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
       const response = await api.get(`/business-operations/goods-intake/${recordId}`);
       const data = response.data?.data;
       if (!data) return;
-      exportGoodsIntakeRecordPdf({
+      exportStockIntakeTransferRecordPdf({
         record: data,
         companyName: 'Citi-Nati Supermarket',
       });

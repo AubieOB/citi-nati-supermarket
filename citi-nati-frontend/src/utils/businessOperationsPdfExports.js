@@ -29,6 +29,53 @@ const toDate = (value) => {
   return date.toLocaleDateString('en-GB');
 };
 
+const toDateTime = (value) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleString('en-GB', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
+const normalizeTransferStatus = (record = {}) => {
+  const status = String(record?.posTransferStatus || '').trim().toLowerCase();
+  if (status === 'queued') return 'queued';
+  if (status === 'failed') return 'failed';
+  if (status === 'approved') return 'approved';
+  if (status === 'transferred') {
+    const approvedFlag = Boolean(record?.posTransferCommand?.resultSummary?.approvedInPos);
+    return approvedFlag ? 'approved' : 'transferred';
+  }
+  return 'not_transferred';
+};
+
+const transferStatusLabel = (status) => {
+  const map = {
+    not_transferred: 'Not Transferred',
+    queued: 'Queued',
+    transferred: 'Transferred to POS',
+    failed: 'Failed',
+    approved: 'Approved in POS',
+  };
+  return map[status] || titleCase(status || 'not_transferred');
+};
+
+const normalizeTransferGrn = (value) => String(value || '').trim().toUpperCase();
+
+const resolveRequestedTransferGrn = (record = {}) => normalizeTransferGrn(record?.posTransferCommand?.requestedGrn || '');
+
+const resolveFinalTransferGrn = (record = {}) => normalizeTransferGrn(
+  record?.posTransferCommand?.finalGrn
+  || record?.posTransferGrn
+  || record?.posTransferCommand?.resultSummary?.grnNo
+  || ''
+);
+
 const toRgb = (hex) => {
   const normalized = String(hex || '').replace('#', '');
   const value = normalized.length === 3
@@ -616,7 +663,7 @@ export function exportMonthlySummaryPdf({
   });
 }
 
-export function exportGoodsIntakeRecordPdf({ record, companyName = 'Citi-Nati Supermarket' }) {
+export function exportStockIntakeTransferRecordPdf({ record, companyName = 'Citi-Nati Supermarket' }) {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const generatedText = formatGeneratedTimestamp();
   const purchaseDate = toDate(record?.purchaseDate);
@@ -631,10 +678,17 @@ export function exportGoodsIntakeRecordPdf({ record, companyName = 'Citi-Nati Su
   const totalQty = Number(record?.totalQuantity || 0);
   const totalCost = Number(record?.totalCost || 0);
   const totalProfit = Number(record?.totalEstimatedProfit || 0);
+  const transferStatus = normalizeTransferStatus(record);
+  const transferStatusText = transferStatusLabel(transferStatus);
+  const requestedGrn = resolveRequestedTransferGrn(record);
+  const finalGrn = resolveFinalTransferGrn(record);
+  const displayedGrn = finalGrn || requestedGrn || '-';
+  const transferCommand = record?.posTransferCommand || {};
+  const transferMessage = transferCommand?.resultSummary?.message || transferCommand?.errorMessage || '-';
 
   const headerContext = {
-    reportTitle: 'Goods Intake Record',
-    viewLabel: 'Purchase Intake Register',
+    reportTitle: 'Stock Intake and POS Transfer Record',
+    viewLabel: 'Intake Register and Transfer Audit',
     periodText: purchaseDate,
     generatedText,
   };
@@ -643,7 +697,9 @@ export function exportGoodsIntakeRecordPdf({ record, companyName = 'Citi-Nati Su
   const summaryCards = [
     { label: 'Intake Ref', value: intakeRef, color: BRAND_PURPLE },
     { label: 'Status', value: status, color: status === 'FINALIZED' ? BRAND_GREEN : '#1d4ed8' },
+    { label: 'POS Transfer', value: transferStatusText, color: transferStatus === 'failed' ? '#b91c1c' : '#0f766e' },
     { label: 'Total Cost', value: fmtCurrency(totalCost), color: '#0f766e' },
+    { label: 'GRN', value: displayedGrn, color: '#1d4ed8' },
     { label: 'Est. Profit', value: fmtCurrency(totalProfit), color: totalProfit >= 0 ? '#166534' : '#b91c1c' },
   ];
 
@@ -654,6 +710,7 @@ export function exportGoodsIntakeRecordPdf({ record, companyName = 'Citi-Nati Su
 
   const metadataRows = [
     ['Company', companyName],
+    ['Stock Intake Ref', intakeRef],
     ['Supplier', supplierName],
     ['Supplier/Store Ref', supplierStoreRef],
     ['Purchase Date', purchaseDate],
@@ -667,6 +724,24 @@ export function exportGoodsIntakeRecordPdf({ record, companyName = 'Citi-Nati Su
   ];
 
   y = drawMetadataTable(doc, metadataRows, y);
+  drawSectionTitle(doc, 'POS Transfer Audit', y);
+  y += 3.2;
+
+  const transferRows = [
+    ['Transfer Status', transferStatusText],
+    ['Requested GRN', requestedGrn || '-'],
+    ['Final GRN', finalGrn || '-'],
+    ['GRN Mode', transferCommand?.manualGrnOverride ? 'Manual Override' : 'Auto (Agent Generated)'],
+    ['Queued Time', toDateTime(record?.posTransferAt || transferCommand?.createdAt)],
+    ['Completed Time', toDateTime(transferCommand?.processedAt)],
+    ['Command ID', transferCommand?.id || '-'],
+    ['Agent', transferCommand?.agentId || '-'],
+    ['Lines Sent', fmtCount(transferCommand?.resultSummary?.linesInserted || totalItems)],
+    ['Approved in POS', transferCommand?.resultSummary?.approvedInPos ? 'Yes' : 'No'],
+    ['Agent Message', String(transferMessage)],
+  ];
+
+  y = drawMetadataTable(doc, transferRows, y);
   drawSectionTitle(doc, 'Purchased Items', y);
   y += 3.2;
 
@@ -721,5 +796,10 @@ export function exportGoodsIntakeRecordPdf({ record, companyName = 'Citi-Nati Su
   }
 
   const safeRef = String(intakeRef).replace(/[^A-Za-z0-9_-]/g, '_');
-  doc.save(`goods_intake_${safeRef}.pdf`);
+  doc.save(`stock_intake_transfer_${safeRef}.pdf`);
+}
+
+// Backward compatible alias for existing imports during migration.
+export function exportGoodsIntakeRecordPdf({ record, companyName = 'Citi-Nati Supermarket' }) {
+  exportStockIntakeTransferRecordPdf({ record, companyName });
 }
