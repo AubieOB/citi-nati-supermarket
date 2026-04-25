@@ -44,6 +44,28 @@ async function createSupplier(req, res) {
     return res.status(201).json({ success: true, data: supplier });
   } catch (err) {
     console.error('[BO][SUPPLIERS] createSupplier error:', err);
+
+    if (err && Number.isInteger(err.statusCode) && err.statusCode >= 400 && err.statusCode < 500) {
+      return res.status(err.statusCode).json({ success: false, error: err.message || 'Invalid supplier payload' });
+    }
+
+    // Prisma unique constraint (e.g., duplicate supplier_code)
+    if (err && err.code === 'P2002') {
+      const target = Array.isArray(err.meta?.target) ? err.meta.target.join(', ') : String(err.meta?.target || 'unique field');
+      return res.status(409).json({
+        success: false,
+        error: 'Duplicate value for ' + target + '. Please use a different supplier code.',
+      });
+    }
+
+    // Prisma foreign key constraint (e.g., invalid locationId)
+    if (err && err.code === 'P2003') {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid location selected. Please refresh locations and try again.',
+      });
+    }
+
     return res.status(500).json({ success: false, error: 'Failed to create supplier' });
   }
 }

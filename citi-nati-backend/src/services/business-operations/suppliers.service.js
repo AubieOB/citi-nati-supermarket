@@ -4,6 +4,12 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
+const OPEN_BALANCE_SUPPLIER_NAMES = new Set([
+  'OPEN BALANCES',
+  'OPEN BALANCE',
+  'OPEN STOCK BALANCES',
+]);
+
 function modelHasField(modelName, fieldName) {
   try {
     const model = prisma?._runtimeDataModel?.models?.[modelName];
@@ -21,9 +27,38 @@ function normalizeSupplierStatus(status) {
   return String(status).toLowerCase();
 }
 
+function normalizeSupplierCode(value) {
+  const normalized = String(value || '').trim();
+  return normalized || null;
+}
+
+function isOpenBalanceSupplierName(name) {
+  return OPEN_BALANCE_SUPPLIER_NAMES.has(String(name || '').trim().toUpperCase());
+}
+
 async function createSupplier(payload) {
+  const normalizedSupplierCode = normalizeSupplierCode(payload.supplierCode);
+  let supplierCodeForCreate = normalizedSupplierCode;
+
+  if (normalizedSupplierCode) {
+    const existingByCode = await prisma.supplier.findUnique({ where: { supplierCode: normalizedSupplierCode } });
+    if (existingByCode) {
+      if (isOpenBalanceSupplierName(payload.name)) {
+        // Allow per-location OPEN BALANCES supplier rows to be created even when
+        // global supplier code is already taken; transfer logic uses name mapping.
+        supplierCodeForCreate = null;
+      } else {
+        const error = new Error(
+          'Supplier code "' + normalizedSupplierCode + '" already exists on supplier "' + existingByCode.name + '". Use a different supplier code.'
+        );
+        error.statusCode = 409;
+        throw error;
+      }
+    }
+  }
+
   const createData = {
-    supplierCode: payload.supplierCode || null,
+    supplierCode: supplierCodeForCreate,
     name: payload.name,
     contactPerson: payload.contactPerson || null,
     phone: payload.phone || null,
