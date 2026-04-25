@@ -676,6 +676,20 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
     setIsAutosaveRecoveryOpen(true);
   };
 
+  const clearAllAutosaveEntries = async () => {
+    if (autosaveEntries.length === 0) return;
+    const confirmed = await boConfirm({
+      title: 'Clear All Auto-Saved Sessions?',
+      message: 'This will permanently remove all unsaved intake autosave sessions from this browser.',
+      confirmText: 'Clear All',
+      cancelText: 'Cancel',
+      type: 'warning',
+    });
+    if (!confirmed) return;
+    writeGoodsIntakeAutosaves([]);
+    setAutosaveEntries([]);
+  };
+
   const restoreAutosaveEntry = (entry) => {
     if (!entry?.form || typeof entry.form !== 'object') return;
     const restoredItems = Array.isArray(entry.form.items) && entry.form.items.length
@@ -1466,13 +1480,24 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                 <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#111827' }}>Recover Auto-Saved Intake Sessions</div>
                 <div style={{ marginTop: '0.2rem', fontSize: '0.8rem', color: '#64748b' }}>These sessions were auto-saved before finalizing or saving as draft.</div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsAutosaveRecoveryOpen(false)}
-                style={{ width: '34px', height: '34px', borderRadius: '10px', border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}
-              >
-                <i className="fas fa-times" />
-              </button>
+              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                {autosaveEntries.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={clearAllAutosaveEntries}
+                    style={{ border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', borderRadius: '8px', padding: '0.34rem 0.7rem', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    Clear All
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsAutosaveRecoveryOpen(false)}
+                  style={{ width: '34px', height: '34px', borderRadius: '10px', border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}
+                >
+                  <i className="fas fa-times" />
+                </button>
+              </div>
             </div>
 
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingRight: '0.15rem' }}>
