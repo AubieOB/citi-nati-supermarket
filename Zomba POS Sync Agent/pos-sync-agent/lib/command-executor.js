@@ -152,6 +152,15 @@ async function executeCreatePendingStockIntake(pool, payload, commandId) {
   if (!supplierCode) {
     throw new Error('NON_RETRYABLE: CREATE_PENDING_STOCK_INTAKE payload missing supplierCode');
   }
+  if (typeof supplierCode === 'string') {
+    throw new Error('NON_RETRYABLE: CREATE_PENDING_STOCK_INTAKE supplierCode must be a numeric POS SupplierCode (integer), not a supplier name string. Received: ' + supplierCode);
+  }
+
+  var normalizedSupplierCode = Number(supplierCode);
+  if (!isFinite(normalizedSupplierCode) || normalizedSupplierCode <= 0 || Math.floor(normalizedSupplierCode) !== normalizedSupplierCode) {
+    throw new Error('NON_RETRYABLE: CREATE_PENDING_STOCK_INTAKE supplierCode must be a positive integer POS SupplierCode. Received: ' + String(supplierCode));
+  }
+
   if (!locationCode) {
     throw new Error('NON_RETRYABLE: CREATE_PENDING_STOCK_INTAKE payload missing locationCode');
   }
@@ -179,7 +188,7 @@ async function executeCreatePendingStockIntake(pool, payload, commandId) {
     var headerRequest = new sql.Request(transaction);
     headerRequest.input('grnNo', sql.NVarChar(50), grnResolution.finalGrn);
     headerRequest.input('grnDate', sql.DateTime, parsedGrnDate);
-    headerRequest.input('supplierCode', sql.NVarChar(50), supplierCode);
+    headerRequest.input('supplierCode', sql.Int, normalizedSupplierCode);
     headerRequest.input('locationCode', sql.NVarChar(10), locationCode);
 
     await headerRequest.query([

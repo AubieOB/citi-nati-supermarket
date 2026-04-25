@@ -9,6 +9,7 @@ const prisma = new PrismaClient();
 const BLANTYRE_LOCATION_CODE = 'BT';
 const DEFAULT_OPEN_STOCK_BALANCES_CODE = 'OPEN STOCK BALANCES';   // Blantyre POS supplier name
 const ZOMBA_OPEN_BALANCES_CODE = 'OPEN BALANCES';                 // Zomba POS supplier name
+const ZOMBA_OPEN_BALANCES_SUPPLIER_CODE = 1;
 const GRN_PATTERN = /^GRN_(\d{4}\d{1,2}\d{1,2})-(\d{3})$/i;
 
 function buildGrnDatePart(date) {
@@ -46,9 +47,21 @@ function validateRequestedGrnForDate(requestedGrn, grnDate) {
   return { requestedGrn: normalized, error: null };
 }
 
+function parsePositiveIntegerSupplierCode(rawValue) {
+  if (rawValue === null || rawValue === undefined) return null;
+
+  const normalized = String(rawValue).trim();
+  if (!normalized) return null;
+  if (!/^\d+$/.test(normalized)) return null;
+
+  const parsed = Number(normalized);
+  if (!Number.isInteger(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
 function resolveSupplierCodeForTransfer(intake) {
-  const explicitSupplierCode = String(intake?.supplier?.supplierCode || '').trim();
-  if (explicitSupplierCode) {
+  const explicitSupplierCode = parsePositiveIntegerSupplierCode(intake?.supplier?.supplierCode);
+  if (explicitSupplierCode !== null) {
     return { supplierCode: explicitSupplierCode, usedFallback: false };
   }
 
@@ -65,17 +78,16 @@ function resolveSupplierCodeForTransfer(intake) {
     };
   }
 
-  const fallbackCode = String(
+  const fallbackCode = parsePositiveIntegerSupplierCode(
     process.env.POS_OPEN_STOCK_BALANCES_SUPPLIER_CODE
     || process.env.POS_FALLBACK_SUPPLIER_CODE
-    || DEFAULT_OPEN_STOCK_BALANCES_CODE
-  ).trim();
+  );
 
-  if (!fallbackCode) {
+  if (fallbackCode === null) {
     return {
-      supplierCode: '',
+      supplierCode: null,
       usedFallback: false,
-      error: 'OPEN STOCK BALANCES fallback supplier code is not configured. Set POS_OPEN_STOCK_BALANCES_SUPPLIER_CODE.',
+      error: 'OPEN STOCK BALANCES fallback SupplierCode must be a positive integer. Set POS_OPEN_STOCK_BALANCES_SUPPLIER_CODE.',
     };
   }
 
@@ -88,43 +100,27 @@ function resolveSupplierCodeForTransfer(intake) {
  * (Blantyre uses "OPEN STOCK BALANCES" — they are different POS supplier records).
  */
 function resolveZombaSupplierCodeForTransfer(intake) {
-  const explicitSupplierCode = String(intake?.supplier?.supplierCode || '').trim();
-  if (explicitSupplierCode) {
-    return { supplierCode: explicitSupplierCode, usedFallback: false };
-  }
-
   const supplierName = String(intake?.supplier?.name || '').trim().toUpperCase();
   const manualSupplierName = String(intake?.manualSupplierName || '').trim().toUpperCase();
   const isOpenBalances = supplierName === ZOMBA_OPEN_BALANCES_CODE
-    || manualSupplierName === ZOMBA_OPEN_BALANCES_CODE
-    // also accept Blantyre's name here so mis-labeled intakes still work
-    || supplierName === DEFAULT_OPEN_STOCK_BALANCES_CODE
-    || manualSupplierName === DEFAULT_OPEN_STOCK_BALANCES_CODE;
+    || manualSupplierName === ZOMBA_OPEN_BALANCES_CODE;
 
-  if (!isOpenBalances) {
-    return {
-      supplierCode: '',
-      usedFallback: false,
-      error: 'Supplier with a valid SupplierCode is required for POS transfer. Update the intake to link a registered supplier.',
-    };
+  // Zomba default supplier mapping: OPEN BALANCES -> SupplierCode 1 (integer).
+  // Keep payload SQL-safe and future-proof by always using numeric POS supplier codes.
+  if (isOpenBalances) {
+    return { supplierCode: ZOMBA_OPEN_BALANCES_SUPPLIER_CODE, usedFallback: true };
   }
 
-  const fallbackCode = String(
-    process.env.POS_ZOMBA_OPEN_BALANCES_SUPPLIER_CODE
-    || process.env.POS_OPEN_STOCK_BALANCES_SUPPLIER_CODE
-    || process.env.POS_FALLBACK_SUPPLIER_CODE
-    || ZOMBA_OPEN_BALANCES_CODE
-  ).trim();
-
-  if (!fallbackCode) {
-    return {
-      supplierCode: '',
-      usedFallback: false,
-      error: 'OPEN BALANCES fallback supplier code is not configured for Zomba. Set POS_ZOMBA_OPEN_BALANCES_SUPPLIER_CODE.',
-    };
+  const explicitSupplierCode = parsePositiveIntegerSupplierCode(intake?.supplier?.supplierCode);
+  if (explicitSupplierCode !== null) {
+    return { supplierCode: explicitSupplierCode, usedFallback: false };
   }
 
-  return { supplierCode: fallbackCode, usedFallback: true };
+  return {
+    supplierCode: null,
+    usedFallback: false,
+    error: 'Supplier with a valid numeric SupplierCode is required for POS transfer. Update the intake to link a registered supplier.',
+  };
 }
 
 /**
