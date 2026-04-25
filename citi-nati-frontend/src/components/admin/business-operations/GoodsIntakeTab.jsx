@@ -855,7 +855,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
     <section ref={workspaceRef} style={{ ...cardStyle, padding: '1rem', width: '100%', minWidth: 0, boxShadow: 'none', border: 'none', background: 'transparent' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <div>
-            <h2 style={{ margin: 0, color: colors.text, fontSize: '1.6rem', lineHeight: 1.15 }}>Stock Intake Workflow</h2>
+            <h2 style={{ margin: 0, color: colors.text, fontSize: '1.2rem', lineHeight: 1.15 }}>Stock Intake Workflow</h2>
             <div style={{ fontSize: '0.86rem', color: colors.mutedText, marginTop: '0.2rem' }}>
               Record stock intake, finalize, export, and transfer to POS pending stock from one workspace.
             </div>
@@ -1143,7 +1143,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
         <section style={{ ...themedCardStyle, padding: '1rem', width: '100%', minWidth: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             <div>
-              <h2 style={{ margin: 0, color: colors.strongText, fontSize: '1.35rem', lineHeight: 1.2 }}>Stock Intake & POS Transfer</h2>
+              <h2 style={{ margin: 0, color: colors.strongText, fontSize: '1.05rem', lineHeight: 1.2 }}>Stock Intake & POS Transfer</h2>
               <div style={{ marginTop: '0.25rem', fontSize: '0.84rem', color: colors.mutedText }}>
                 Use launcher actions to record intake, finalize, export, queue POS transfer, and review sync history.
               </div>
@@ -1204,7 +1204,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
 
       {!canViewForm && !canViewHistory && (
         <section style={{ ...themedCardStyle, padding: '1rem', width: '100%', minWidth: 0 }}>
-          <h3 style={{ marginTop: 0, marginBottom: '0.4rem', color: colors.strongText }}>No Permitted Sections</h3>
+          <h3 style={{ marginTop: 0, marginBottom: '0.4rem', color: colors.strongText, fontSize: '0.95rem' }}>No Permitted Sections</h3>
           <p style={{ margin: 0, color: colors.mutedText }}>
             You do not currently have access to Stock Intake & POS Transfer form or history sections.
           </p>
@@ -1216,7 +1216,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
           <div style={{ ...themedCardStyle, width: isIntakeWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1480px, 98vw)', height: isIntakeWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isIntakeWorkspaceMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column', padding: '0.95rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
               <div>
-                <div style={{ fontSize: '1.12rem', fontWeight: 800, color: '#111827' }}>Supplier: {selectedSupplierName}</div>
+                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#111827' }}>Supplier: {selectedSupplierName}</div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                 <button
@@ -1250,7 +1250,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
           <div style={{ ...themedCardStyle, width: isFinalizedHistoryMaximized ? 'calc(100vw - 0.7rem)' : 'min(1500px, 98vw)', height: isFinalizedHistoryMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isFinalizedHistoryMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column', padding: '0.95rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
               <div>
-                <div style={{ fontSize: '1.12rem', fontWeight: 800, color: '#111827' }}>Finalized Intake Records</div>
+                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#111827' }}>Finalized Intake Records</div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                 <button
@@ -1277,7 +1277,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
 
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingRight: '0.2rem', display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <h3 style={{ margin: 0, color: colors.text, fontSize: '1.05rem', lineHeight: 1.2 }}>Intake Records</h3>
+                <h3 style={{ margin: 0, color: colors.text, fontSize: '0.9rem', lineHeight: 1.2 }}>Intake Records</h3>
                 <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
                   <input placeholder="Search ref/supplier/product" value={search} onFocus={selectInputText} onChange={(event) => setSearch(event.target.value)} style={{ ...themedInputStyle, width: '220px' }} />
                   <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} style={{ ...themedInputStyle, width: '130px' }}>
@@ -1359,7 +1359,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
           <div style={{ ...themedCardStyle, width: isTransferHistoryMaximized ? 'calc(100vw - 0.7rem)' : 'min(1520px, 98vw)', height: isTransferHistoryMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isTransferHistoryMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column', padding: '0.95rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
               <div>
-                <div style={{ fontSize: '1.12rem', fontWeight: 800, color: '#111827' }}>POS Transfer History</div>
+                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#111827' }}>POS Transfer History</div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                 <button
@@ -1386,7 +1386,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
 
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingRight: '0.2rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <h3 style={{ margin: 0, color: colors.text, fontSize: '1.05rem', lineHeight: 1.2 }}>POS Transfer History</h3>
+                <h3 style={{ margin: 0, color: colors.text, fontSize: '0.9rem', lineHeight: 1.2 }}>POS Transfer History</h3>
                 <div style={{ fontSize: '0.8rem', color: colors.mutedText }}>
                   Showing {transferHistoryRecords.length} finalized intake records on this page
                 </div>
@@ -1481,7 +1481,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.7rem', flexWrap: 'wrap' }}>
               <div>
                 <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b7280', fontWeight: 800 }}>Transfer Detail</div>
-                <div style={{ fontSize: '1.12rem', fontWeight: 800, color: '#111827' }}>
+                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#111827' }}>
                   {transferDetailRecord.intakeRef} {resolveDisplayedTransferGrn(transferDetailRecord) ? `• ${resolveDisplayedTransferGrn(transferDetailRecord)}` : ''}
                 </div>
               </div>
