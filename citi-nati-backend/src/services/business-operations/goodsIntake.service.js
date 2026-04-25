@@ -183,7 +183,7 @@ function buildProductScopeWhere(normalizedLocationCode) {
 }
 
 function getDefaultPosLocationCodeForBranch(branchCode, requestedLocationCode) {
-  if (branchCode === 'BLANTYRE') return POS_BLANTYRE_SELLING_LOCATION_CODE;
+  if (branchCode === 'BLANTYRE') return 'SH';
 
   if (branchCode === 'ZOMBA') {
     const normalizedRequestedLocation = normalizeScopeCode(requestedLocationCode);

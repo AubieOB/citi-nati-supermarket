@@ -133,13 +133,15 @@ async function resolveFinalGrn(transaction, parsedGrnDate, requestedGrn, manualG
 
 async function executeUpdatePrice(pool, payload) {
   const productCode = payload.productCode;
-  const locationCode = payload.locationCode || process.env.POS_LOCATION_CODE || 'SH';
+  const rawLocationCode = payload.locationCode || process.env.POS_LOCATION_CODE || 'SH';
+  const locationCode = String(rawLocationCode || '').trim().toUpperCase() === 'BT' ? 'SH' : rawLocationCode;
   const priceTypeCode = payload.priceTypeCode || null;
   const newPrice = Number(payload.newPrice);
 
   console.log('[PRICE] UPDATE_PRICE payload:', {
     productCode,
     locationCode,
+    rawLocationCode,
     priceTypeCode,
     newPrice,
   });

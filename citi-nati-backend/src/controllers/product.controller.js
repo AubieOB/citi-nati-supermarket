@@ -87,7 +87,7 @@ function normalizeBranchCode(value) {
 
 function getDefaultPosLocationCodeForBranch(branchCode, requestedLocationCode) {
   if (branchCode === 'BLANTYRE') {
-    return POS_BLANTYRE_SELLING_LOCATION_CODE;
+    return 'SH';
   }
 
   if (branchCode === 'ZOMBA') {
