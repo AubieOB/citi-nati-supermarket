@@ -23,6 +23,7 @@ const tableInputStyle = {
 const DEFAULT_STATUS_FILTER = 'all';
 const GOODS_INTAKE_AUTOSAVE_STORAGE_KEY = 'goods-intake-autosaves:v1';
 const GOODS_INTAKE_AUTOSAVE_MAX_ITEMS = 30;
+const GOODS_INTAKE_STOCK_REFRESH_INTERVAL_MS = 12000;
 
 const TRANSFER_STATUS_META = {
   not_transferred: { label: 'Not Transferred', short: 'Not Sent', tone: { border: '#cbd5e1', bg: '#f8fafc', color: '#475569' } },
@@ -553,6 +554,12 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
     [records]
   );
 
+  const resolvedLineProductIds = useMemo(() => Array.from(new Set(
+    (form.items || [])
+      .map((item) => Number(item?.productId))
+      .filter((value) => Number.isFinite(value) && value > 0)
+  )), [form.items]);
+
   const autosaveCount = useMemo(() => autosaveEntries.length, [autosaveEntries]);
 
   const fetchRecords = useCallback(async () => {
@@ -1021,6 +1028,86 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
       setActiveLookupRow(-1);
     }
   };
+
+  const refreshResolvedLineStock = useCallback(async () => {
+    if (!isIntakeWorkspaceOpen || !activeLookupLocationCode || resolvedLineProductIds.length === 0) {
+      return;
+    }
+
+    try {
+      const response = await api.post('/business-operations/goods-intake/line-stock', {
+        locationCode: activeLookupLocationCode,
+        productIds: resolvedLineProductIds,
+      });
+
+      const stockLines = Array.isArray(response.data?.lines) ? response.data.lines : [];
+      const stockMap = new Map(stockLines.map((entry) => [Number(entry.productId || entry.id), entry]));
+
+      setForm((prev) => {
+        let changed = false;
+        const nextItems = prev.items.map((item) => {
+          const productId = Number(item?.productId);
+          if (!Number.isFinite(productId) || productId <= 0) return item;
+
+          const latest = stockMap.get(productId);
+          if (!latest) return item;
+
+          const nextStockRaw = latest.effectiveStock ?? latest.effective_stock ?? latest.stock ?? null;
+          const nextStock = Number.isFinite(Number(nextStockRaw)) ? Number(nextStockRaw) : null;
+          const nextStatus = String(latest.stockStatus || latest.stock_status || '');
+
+          if (item.latestSyncedStock === nextStock && String(item.stockStatus || '') === nextStatus) {
+            return item;
+          }
+
+          changed = true;
+          return {
+            ...item,
+            latestSyncedStock: nextStock,
+            stockStatus: nextStatus,
+          };
+        });
+
+        return changed ? { ...prev, items: nextItems } : prev;
+      });
+    } catch (_error) {
+      // Keep entry flow uninterrupted if background stock refresh fails.
+    }
+  }, [activeLookupLocationCode, isIntakeWorkspaceOpen, resolvedLineProductIds]);
+
+  useEffect(() => {
+    if (!isIntakeWorkspaceOpen || !activeLookupLocationCode || resolvedLineProductIds.length === 0) {
+      return undefined;
+    }
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return undefined;
+    }
+
+    let disposed = false;
+
+    const silentRefresh = () => {
+      if (disposed || document.visibilityState !== 'visible') return;
+      void refreshResolvedLineStock();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        silentRefresh();
+      }
+    };
+
+    silentRefresh();
+    const intervalId = window.setInterval(silentRefresh, GOODS_INTAKE_STOCK_REFRESH_INTERVAL_MS);
+    window.addEventListener('focus', silentRefresh);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', silentRefresh);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [activeLookupLocationCode, isIntakeWorkspaceOpen, refreshResolvedLineStock, resolvedLineProductIds.length]);
 
   const handleEntryFieldEnter = useCallback((event, options = {}) => {
     if (event.key !== 'Enter') return;

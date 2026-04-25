@@ -8,12 +8,14 @@ const {
   getGoodsIntakeById,
   listGoodsIntakes,
   lookupGoodsIntakeProducts,
+  getGoodsIntakeLineStock,
   transferToPOS,
 } = require('../../controllers/business-operations/goodsIntake.controller');
 
 const router = express.Router();
 
 router.get('/lookup-products', lookupGoodsIntakeProducts);
+router.post('/line-stock', getGoodsIntakeLineStock);
 router.post('/', createGoodsIntake);
 router.put('/:id', updateGoodsIntake);
 router.post('/:id/transfer-to-pos', transferToPOS);

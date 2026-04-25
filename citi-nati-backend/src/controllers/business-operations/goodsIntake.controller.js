@@ -190,6 +190,27 @@ async function lookupGoodsIntakeProducts(req, res) {
   }
 }
 
+async function getGoodsIntakeLineStock(req, res) {
+  try {
+    const locationCode = req.body?.locationCode ? String(req.body.locationCode).trim() : null;
+    const productIds = Array.isArray(req.body?.productIds) ? req.body.productIds : [];
+
+    if (!locationCode) {
+      return res.status(400).json({ success: false, error: 'locationCode is required for goods intake stock refresh' });
+    }
+
+    const lines = await goodsIntakeService.getGoodsIntakeLineStock({
+      locationCode,
+      productIds,
+    });
+
+    return res.json({ success: true, lines });
+  } catch (error) {
+    console.error('[BO][GOODS_INTAKE] line stock refresh error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to refresh goods intake line stock' });
+  }
+}
+
 async function transferToPOS(req, res) {
   try {
     const id = toInt(req.params.id);
@@ -223,5 +244,6 @@ module.exports = {
   getGoodsIntakeById,
   listGoodsIntakes,
   lookupGoodsIntakeProducts,
+  getGoodsIntakeLineStock,
   transferToPOS,
 };

@@ -137,6 +137,28 @@ function includeShape() {
   };
 }
 
+function buildProductScopeWhere(normalizedLocationCode) {
+  const scopeCodes = expandLocationScopeCodes(normalizedLocationCode);
+  const branchCode = deriveBranchCodeFromLocationCode(normalizedLocationCode);
+  const isConcreteZombaScope = branchCode === 'ZOMBA' && normalizedLocationCode !== 'ZA';
+
+  if (isConcreteZombaScope) {
+    return {
+      branchCode: 'ZOMBA',
+      locationCode: { equals: normalizedLocationCode, mode: 'insensitive' },
+    };
+  }
+
+  return {
+    OR: [
+      ...scopeCodes.map((code) => ({
+        locationCode: { equals: code, mode: 'insensitive' },
+      })),
+      ...(scopeCodes.includes('BT') ? [{ branchCode: 'BLANTYRE' }] : []),
+    ],
+  };
+}
+
 async function attachTransferCommandMetadata(records) {
   const list = Array.isArray(records) ? records : [];
   if (list.length === 0) return list;
@@ -212,23 +234,8 @@ async function lookupGoodsIntakeProducts({ query, locationCode, take = 20 }) {
     return [];
   }
 
+  const scopeWhere = buildProductScopeWhere(normalizedLocationCode);
   const scopeCodes = expandLocationScopeCodes(normalizedLocationCode);
-  const branchCode = deriveBranchCodeFromLocationCode(normalizedLocationCode);
-  const isConcreteZombaScope = branchCode === 'ZOMBA' && normalizedLocationCode !== 'ZA';
-
-  const scopeWhere = isConcreteZombaScope
-    ? {
-        branchCode: 'ZOMBA',
-        locationCode: { equals: normalizedLocationCode, mode: 'insensitive' },
-      }
-    : {
-        OR: [
-          ...scopeCodes.map((code) => ({
-            locationCode: { equals: code, mode: 'insensitive' },
-          })),
-          ...(scopeCodes.includes('BT') ? [{ branchCode: 'BLANTYRE' }] : []),
-        ],
-      };
 
   const products = await prisma.product.findMany({
     where: {
@@ -281,12 +288,12 @@ async function lookupGoodsIntakeProducts({ query, locationCode, take = 20 }) {
       const stockAwareProduct = enrichProductStock(product);
       return {
         ...stockAwareProduct,
-      productCode: product.sourceCode,
-      product_code: product.sourceCode,
-      sellingPrice: Number(product.price || 0),
-      selling_price: Number(product.price || 0),
-      unitPrice: Number(product.price || 0),
-      unit_price: Number(product.price || 0),
+        productCode: product.sourceCode,
+        product_code: product.sourceCode,
+        sellingPrice: Number(product.price || 0),
+        selling_price: Number(product.price || 0),
+        unitPrice: Number(product.price || 0),
+        unit_price: Number(product.price || 0),
       };
     })
     .sort((a, b) => {
@@ -306,6 +313,58 @@ async function lookupGoodsIntakeProducts({ query, locationCode, take = 20 }) {
 
       return String(a.name || '').localeCompare(String(b.name || ''));
     });
+}
+
+async function getGoodsIntakeLineStock({ locationCode, productIds = [] }) {
+  const normalizedLocationCode = normalizeScopeCode(locationCode);
+  const ids = Array.from(new Set((Array.isArray(productIds) ? productIds : [])
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value) && value > 0)));
+
+  if (!normalizedLocationCode || ids.length === 0) {
+    return [];
+  }
+
+  const products = await prisma.product.findMany({
+    where: {
+      AND: [
+        buildProductScopeWhere(normalizedLocationCode),
+        { id: { in: ids } },
+      ],
+    },
+    select: {
+      id: true,
+      name: true,
+      sourceCode: true,
+      barcode: true,
+      price: true,
+      stock: true,
+      overrideActive: true,
+      overrideStock: true,
+      lowStockThreshold: true,
+      branchCode: true,
+      locationCode: true,
+      enabled: true,
+      isActive: true,
+    },
+  });
+
+  return products.map((product) => {
+    const stockAwareProduct = enrichProductStock(product);
+    return {
+      id: stockAwareProduct.id,
+      productId: stockAwareProduct.id,
+      productCode: stockAwareProduct.sourceCode,
+      barcode: stockAwareProduct.barcode,
+      effectiveStock: stockAwareProduct.effectiveStock,
+      effective_stock: stockAwareProduct.effective_stock,
+      stockStatus: stockAwareProduct.stockStatus,
+      stock_status: stockAwareProduct.stock_status,
+      locationCode: stockAwareProduct.locationCode,
+      branchCode: stockAwareProduct.branchCode,
+      syncedAt: new Date().toISOString(),
+    };
+  });
 }
 
 async function createGoodsIntake(payload) {
