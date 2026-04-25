@@ -1489,14 +1489,23 @@ const getProductById = async (req, res) => {
 const updateProduct = async (req, res) => {
   try {
     console.log('[BACKEND PRODUCT EDIT] updateProduct hit');
+    console.log('[BACKEND PRODUCT EDIT] req.body:', req.body);
     const updatedBy = getAdjustmentActor(req);
 
     // Extract and convert id to integer
     const id = parseInt(req.params.id);
+    console.log('[BACKEND PRODUCT EDIT] Product ID:', id);
 
     // Check if product exists
     const existingProduct = await prisma.product.findUnique({
       where: { id },
+    });
+
+    console.log('[BACKEND PRODUCT EDIT] Existing product found:', {
+      id: existingProduct?.id,
+      name: existingProduct?.name,
+      price: existingProduct?.price,
+      sourceCode: existingProduct?.sourceCode,
     });
 
     if (!existingProduct) {
@@ -1662,6 +1671,13 @@ const updateProduct = async (req, res) => {
       data: updateData,
     });
 
+    console.log('[BACKEND PRODUCT EDIT] Updated product:', {
+      id: updatedProduct.id,
+      name: updatedProduct.name,
+      price: updatedProduct.price,
+      sourceCode: updatedProduct.sourceCode,
+    });
+
     // Persist updated image mapping by productCode / sourceCode when image was changed
     if (req.file && updatedProduct.sourceCode) {
       try {
@@ -1701,6 +1717,16 @@ const updateProduct = async (req, res) => {
     };
 
     // Phase 1: enqueue UPDATE_PRICE command for POS-linked products with actual price changes
+    console.log('[UPDATE_PRICE CHECK] Conditions:', {
+      hasSourceCode: Boolean(updatedProduct.sourceCode),
+      sourceCode: updatedProduct.sourceCode || null,
+      incomingPriceProvided,
+      priceChanged,
+      existingPrice: Number(existingProduct.price),
+      incomingParsedPrice,
+      conditionMet: Boolean(updatedProduct.sourceCode && incomingPriceProvided && priceChanged),
+    });
+
     if (updatedProduct.sourceCode && incomingPriceProvided && priceChanged) {
       const payload = {
         productId: String(updatedProduct.id),
