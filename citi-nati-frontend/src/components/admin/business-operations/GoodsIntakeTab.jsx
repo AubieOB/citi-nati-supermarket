@@ -1522,7 +1522,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
             <thead>
               <tr>
                 {['#', 'Barcode', 'Product Name', 'Qty', 'Unit Cost', 'Total Cost', 'Selling Price', 'Margin %', 'Est. Profit', 'Expiry Date', 'Comments', 'Actions'].map((label) => (
-                  <th key={label} style={{ textAlign: 'left', fontSize: '0.72rem', color: colors.mutedText, fontWeight: 700, padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, background: isAdminDarkTheme ? '#111827' : '#f8fafc', whiteSpace: 'nowrap' }}>{label}</th>
+                  <th key={label} style={{ textAlign: 'left', fontSize: '0.72rem', color: colors.mutedText, fontWeight: 700, padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, background: isAdminDarkTheme ? '#1b2027' : '#f8fafc', whiteSpace: 'nowrap' }}>{label}</th>
                 ))}
               </tr>
             </thead>
@@ -2340,3 +2340,4 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
 };
 
 export default GoodsIntakeTab;
+
