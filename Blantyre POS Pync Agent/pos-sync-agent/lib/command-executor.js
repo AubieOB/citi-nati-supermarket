@@ -4,6 +4,133 @@ const productNameUpdates = require('./product-name-updates');
 const stockUpdates = require('./stock-updates');
 const invoiceWriteback = require('./invoice-writeback');
 
+function formatGrnDatePart(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error('NON_RETRYABLE: CREATE_PENDING_STOCK_INTAKE payload has invalid grnDate');
+  }
+
+  return `${date.getFullYear()}${date.getMonth() + 1}${date.getDate()}`;
+}
+
+function buildGrnForSequence(datePart, sequenceNumber) {
+  return `GRN_${datePart}-${String(sequenceNumber).padStart(3, '0')}`;
+}
+
+function normalizeGrn(value) {
+  return String(value || '').trim().toUpperCase();
+}
+
+function isValidGrnForDate(grnNo, datePart) {
+  return new RegExp(`^GRN_${datePart}-(\\d{3})$`).test(normalizeGrn(grnNo));
+}
+
+async function acquireGrnAllocationLock(transaction, datePart) {
+  const request = new sql.Request(transaction);
+  request.input('resource', sql.NVarChar(255), `CREATE_PENDING_STOCK_INTAKE_GRN_${datePart}`);
+
+  const result = await request.query(`
+    DECLARE @lockResult int;
+    EXEC @lockResult = sp_getapplock
+      @Resource = @resource,
+      @LockMode = 'Exclusive',
+      @LockOwner = 'Transaction',
+      @LockTimeout = 10000;
+
+    SELECT @lockResult AS lockResult;
+  `);
+
+  const lockResult = Number(result.recordset?.[0]?.lockResult);
+  if (!Number.isFinite(lockResult) || lockResult < 0) {
+    throw new Error('NON_RETRYABLE: Unable to reserve a GRN slot for this intake date. Please try again.');
+  }
+}
+
+async function fetchExistingGrnsForDate(transaction, datePart) {
+  const prefix = `GRN_${datePart}-%`;
+  const request = new sql.Request(transaction);
+  request.input('prefix', sql.NVarChar(50), prefix);
+
+  const result = await request.query(`
+    SELECT GRNNo
+    FROM [POS].[dbo].[stocks_temp]
+    WHERE GRNNo LIKE @prefix
+
+    UNION
+
+    SELECT GRNNo
+    FROM [POS].[dbo].[stocks]
+    WHERE GRNNo LIKE @prefix
+  `);
+
+  return new Set(
+    (result.recordset || [])
+      .map((row) => normalizeGrn(row.GRNNo))
+      .filter(Boolean)
+  );
+}
+
+async function ensureGrnIsStillAvailable(transaction, grnNo) {
+  const request = new sql.Request(transaction);
+  request.input('grnNo', sql.NVarChar(50), grnNo);
+
+  const result = await request.query(`
+    SELECT TOP 1 GRNNo
+    FROM (
+      SELECT GRNNo FROM [POS].[dbo].[stocks_temp] WHERE GRNNo = @grnNo
+      UNION ALL
+      SELECT GRNNo FROM [POS].[dbo].[stocks] WHERE GRNNo = @grnNo
+    ) existing
+  `);
+
+  return Array.isArray(result.recordset) && result.recordset.length > 0;
+}
+
+async function resolveFinalGrn(transaction, parsedGrnDate, requestedGrn, manualGrnOverride) {
+  const datePart = formatGrnDatePart(parsedGrnDate);
+  await acquireGrnAllocationLock(transaction, datePart);
+
+  const normalizedRequestedGrn = normalizeGrn(requestedGrn);
+  if (normalizedRequestedGrn && !isValidGrnForDate(normalizedRequestedGrn, datePart)) {
+    throw new Error(`NON_RETRYABLE: GRN ${normalizedRequestedGrn} is invalid for intake date ${datePart}. Use format GRN_${datePart}-###.`);
+  }
+
+  const existingGrns = await fetchExistingGrnsForDate(transaction, datePart);
+
+  if (manualGrnOverride) {
+    if (!normalizedRequestedGrn) {
+      throw new Error('NON_RETRYABLE: Manual GRN override was selected but no GRN was provided.');
+    }
+
+    if (existingGrns.has(normalizedRequestedGrn)) {
+      throw new Error(`NON_RETRYABLE: Manual GRN ${normalizedRequestedGrn} already exists in POS. Use a different GRN or switch back to auto-generated GRN.`);
+    }
+
+    return {
+      requestedGrn: normalizedRequestedGrn,
+      finalGrn: normalizedRequestedGrn,
+      grnWasRegenerated: false,
+      generatedFromDuplicate: false,
+      datePart,
+    };
+  }
+
+  for (let sequenceNumber = 1; sequenceNumber <= 999; sequenceNumber += 1) {
+    const candidate = buildGrnForSequence(datePart, sequenceNumber);
+    if (!existingGrns.has(candidate)) {
+      return {
+        requestedGrn: normalizedRequestedGrn || candidate,
+        finalGrn: candidate,
+        grnWasRegenerated: Boolean(normalizedRequestedGrn) && normalizedRequestedGrn !== candidate,
+        generatedFromDuplicate: Boolean(normalizedRequestedGrn) && existingGrns.has(normalizedRequestedGrn),
+        datePart,
+      };
+    }
+  }
+
+  throw new Error('NON_RETRYABLE: Unable to generate a unique GRN for this intake date. Please try again.');
+}
+
 async function executeUpdatePrice(pool, payload) {
   const productCode = payload.productCode;
   const locationCode = payload.locationCode || process.env.POS_LOCATION_CODE || 'SH';
@@ -462,11 +589,24 @@ async function executeWriteInvoice(pool, payload, commandId) {
 }
 
 async function executeCreatePendingStockIntake(pool, payload, commandId) {
-  const { grnNo, grnDate, supplierCode, locationCode, intakeRef, intakeId, items } = payload;
+  const {
+    grnNo,
+    requestedGrn,
+    manualGrnOverride,
+    grnDate,
+    supplierCode,
+    locationCode,
+    intakeRef,
+    intakeId,
+    items,
+  } = payload;
+
+  const normalizedRequestedGrn = normalizeGrn(requestedGrn || grnNo || '');
 
   console.log('[INTAKE PENDING] CREATE_PENDING_STOCK_INTAKE start', {
     commandId,
-    grnNo,
+    requestedGrn: normalizedRequestedGrn || null,
+    manualGrnOverride: Boolean(manualGrnOverride),
     intakeRef,
     intakeId,
     supplierCode,
@@ -474,9 +614,6 @@ async function executeCreatePendingStockIntake(pool, payload, commandId) {
     itemCount: Array.isArray(items) ? items.length : 0,
   });
 
-  if (!grnNo) {
-    throw new Error('NON_RETRYABLE: CREATE_PENDING_STOCK_INTAKE payload missing grnNo');
-  }
   if (!supplierCode) {
     throw new Error('NON_RETRYABLE: CREATE_PENDING_STOCK_INTAKE payload missing supplierCode');
   }
@@ -490,31 +627,23 @@ async function executeCreatePendingStockIntake(pool, payload, commandId) {
   const transaction = new sql.Transaction(pool);
 
   try {
-    await transaction.begin();
+    await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
 
-    const checkRequest = new sql.Request(transaction);
-    checkRequest.input('grnNo', sql.NVarChar(50), grnNo);
-
-    // Duplicate GRN check in stocks_temp
-    const dupTempResult = await checkRequest.query(
-      `SELECT TOP 1 GRNNo FROM [POS].[dbo].[stocks_temp] WHERE GRNNo = @grnNo`
+    const parsedGrnDate = grnDate ? new Date(grnDate) : new Date();
+    const grnResolution = await resolveFinalGrn(
+      transaction,
+      parsedGrnDate,
+      normalizedRequestedGrn,
+      Boolean(manualGrnOverride)
     );
-    if (dupTempResult.recordset && dupTempResult.recordset.length > 0) {
-      throw new Error(`NON_RETRYABLE: GRN ${grnNo} already exists in stocks_temp (duplicate transfer)`);
-    }
 
-    // Duplicate GRN check in live stocks
-    const dupLiveResult = await checkRequest.query(
-      `SELECT TOP 1 GRNNo FROM [POS].[dbo].[stocks] WHERE GRNNo = @grnNo`
-    );
-    if (dupLiveResult.recordset && dupLiveResult.recordset.length > 0) {
-      throw new Error(`NON_RETRYABLE: GRN ${grnNo} already exists in live stocks table (already approved)`);
+    if (await ensureGrnIsStillAvailable(transaction, grnResolution.finalGrn)) {
+      throw new Error(`NON_RETRYABLE: GRN ${grnResolution.finalGrn} already exists in POS. Unable to reserve a unique GRN for this intake date. Please try again.`);
     }
 
     // Insert header into stocks_temp
     const headerRequest = new sql.Request(transaction);
-    const parsedGrnDate = grnDate ? new Date(grnDate) : new Date();
-    headerRequest.input('grnNo',        sql.NVarChar(50),   grnNo);
+    headerRequest.input('grnNo',        sql.NVarChar(50),   grnResolution.finalGrn);
     headerRequest.input('grnDate',      sql.DateTime,       parsedGrnDate);
     headerRequest.input('supplierCode', sql.NVarChar(50),   supplierCode);
     headerRequest.input('locationCode', sql.NVarChar(10),   locationCode);
@@ -526,14 +655,14 @@ async function executeCreatePendingStockIntake(pool, payload, commandId) {
         (@grnNo, @grnDate, @supplierCode, @locationCode, 0, 0)
     `);
 
-    console.log(`[INTAKE PENDING] stocks_temp header inserted GRN=${grnNo}`);
+    console.log(`[INTAKE PENDING] stocks_temp header inserted GRN=${grnResolution.finalGrn}`);
 
     // Insert detail lines into stockdetails_temp
     let linesInserted = 0;
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       const detailRequest = new sql.Request(transaction);
-      detailRequest.input('grnNo',        sql.NVarChar(50),   grnNo);
+      detailRequest.input('grnNo',        sql.NVarChar(50),   grnResolution.finalGrn);
       detailRequest.input('productCode',  sql.NVarChar(50),   String(item.productCode || '').trim());
       detailRequest.input('stockQty',     sql.Float,          Number(item.stockQty) || 0);
       detailRequest.input('unit',         sql.NVarChar(20),   String(item.unit || '').trim());
@@ -550,11 +679,18 @@ async function executeCreatePendingStockIntake(pool, payload, commandId) {
     }
 
     await transaction.commit();
-    console.log(`[INTAKE PENDING] transaction committed GRN=${grnNo} lines=${linesInserted}`);
+    console.log(`[INTAKE PENDING] transaction committed GRN=${grnResolution.finalGrn} lines=${linesInserted}`);
+
+    const resultMessage = grnResolution.grnWasRegenerated && grnResolution.generatedFromDuplicate
+      ? `GRN ${grnResolution.requestedGrn} already exists in POS. The system generated GRN ${grnResolution.finalGrn} instead.`
+      : `CREATE_PENDING_STOCK_INTAKE executed successfully with GRN ${grnResolution.finalGrn}`;
 
     return {
-      message:       'CREATE_PENDING_STOCK_INTAKE executed successfully',
-      grnNo,
+      message:       resultMessage,
+      requestedGrn: grnResolution.requestedGrn || null,
+      finalGrn:     grnResolution.finalGrn,
+      grnNo:        grnResolution.finalGrn,
+      grnWasRegenerated: grnResolution.grnWasRegenerated,
       linesInserted,
       intakeRef:     intakeRef || null,
       intakeId:      intakeId || null,

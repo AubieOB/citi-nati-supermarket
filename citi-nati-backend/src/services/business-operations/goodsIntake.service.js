@@ -158,6 +158,7 @@ async function attachTransferCommandMetadata(records) {
       id: true,
       relatedEntityId: true,
       status: true,
+      payload: true,
       errorMessage: true,
       resultSummary: true,
       createdAt: true,
@@ -185,6 +186,10 @@ async function attachTransferCommandMetadata(records) {
         ? {
             id: command.id,
             status: command.status,
+          requestedGrn: String(command.payload?.requestedGrn || command.payload?.grnNo || '').trim() || null,
+          manualGrnOverride: Boolean(command.payload?.manualGrnOverride),
+          grnDate: command.payload?.grnDate || null,
+          finalGrn: String(command.resultSummary?.finalGrn || command.resultSummary?.grnNo || '').trim() || null,
             errorMessage: command.errorMessage,
             resultSummary: command.resultSummary,
             createdAt: command.createdAt,

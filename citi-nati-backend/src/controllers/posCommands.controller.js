@@ -67,10 +67,14 @@ async function completeCommand(req, res) {
     if (command && command.commandType === 'CREATE_PENDING_STOCK_INTAKE' && command.relatedEntityType === 'GoodsIntake' && command.relatedEntityId) {
       try {
         const intakeId = parseInt(command.relatedEntityId, 10);
+        const finalGrn = resultSummary?.finalGrn || resultSummary?.grnNo || null;
         if (Number.isFinite(intakeId)) {
           await prisma.goodsIntake.update({
             where: { id: intakeId },
-            data: { posTransferStatus: 'transferred' },
+            data: {
+              posTransferStatus: 'transferred',
+              ...(finalGrn ? { posTransferGrn: String(finalGrn) } : {}),
+            },
           });
           console.log(`[POS COMMAND QUEUE] GoodsIntake ${intakeId} marked as transferred after command ${id} completed`);
         }

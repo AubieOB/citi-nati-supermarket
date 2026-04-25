@@ -8,18 +8,41 @@ const prisma = new PrismaClient();
 
 const BLANTYRE_LOCATION_CODE = 'BT';
 const DEFAULT_OPEN_STOCK_BALANCES_CODE = 'OPEN STOCK BALANCES';
+const GRN_PATTERN = /^GRN_(\d{4}\d{1,2}\d{1,2})-(\d{3})$/i;
 
-/**
- * Generate a GRN number from intake ID + date.
- * Format: GRN_YYYYMDD-NNN  (month/day without leading zeros per spec example GRN_2026423-002)
- */
-function generateGrnNo(intakeId, date) {
-  const d = date instanceof Date && !isNaN(date.getTime()) ? date : new Date(date);
-  const yyyy = d.getFullYear();
-  const m    = d.getMonth() + 1;  // no leading zero
-  const dd   = d.getDate();        // no leading zero
-  const seq  = String((Number(intakeId) % 999) + 1).padStart(3, '0');
-  return `GRN_${yyyy}${m}${dd}-${seq}`;
+function buildGrnDatePart(date) {
+  const d = date instanceof Date && !Number.isNaN(date.getTime()) ? date : new Date(date);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}${d.getMonth() + 1}${d.getDate()}`;
+}
+
+function normalizeRequestedGrn(value) {
+  return String(value || '').trim().toUpperCase();
+}
+
+function validateRequestedGrnForDate(requestedGrn, grnDate) {
+  const normalized = normalizeRequestedGrn(requestedGrn);
+  if (!normalized) {
+    return { requestedGrn: '', error: null };
+  }
+
+  const match = normalized.match(GRN_PATTERN);
+  if (!match) {
+    return {
+      requestedGrn: normalized,
+      error: 'Manual GRN must use POS format GRN_YYYYMDD-###.',
+    };
+  }
+
+  const expectedDatePart = buildGrnDatePart(grnDate);
+  if (match[1] !== expectedDatePart) {
+    return {
+      requestedGrn: normalized,
+      error: `Manual GRN must match the intake date. Use format GRN_${expectedDatePart}-###.`,
+    };
+  }
+
+  return { requestedGrn: normalized, error: null };
 }
 
 function resolveSupplierCodeForTransfer(intake) {
@@ -65,7 +88,7 @@ function resolveSupplierCodeForTransfer(intake) {
  * @param {number} intakeId
  * @returns {{ success, grnNo?, linesInserted?, data?, error?, alreadyTransferred?, existingGrn? }}
  */
-async function transferGoodsIntakeToBlantyrePosPending(intakeId) {
+async function transferGoodsIntakeToBlantyrePosPending(intakeId, options = {}) {
   const intake = await prisma.goodsIntake.findUnique({
     where: { id: intakeId },
     include: {
@@ -134,9 +157,10 @@ async function transferGoodsIntakeToBlantyrePosPending(intakeId) {
   // --- Duplicate protection ---
   if (intake.posTransferStatus === 'transferred' || intake.posTransferStatus === 'queued') {
     const existingLabel = intake.posTransferStatus === 'queued' ? 'queued for' : 'already transferred to';
+    const existingGrnLabel = intake.posTransferGrn ? ` (GRN: ${intake.posTransferGrn})` : '';
     return {
       success: false,
-      error: `This intake has ${existingLabel} POS pending stock (GRN: ${intake.posTransferGrn}).`,
+      error: `This intake has ${existingLabel} POS pending stock${existingGrnLabel}.`,
       alreadyTransferred: true,
       existingGrn: intake.posTransferGrn,
     };
@@ -144,8 +168,16 @@ async function transferGoodsIntakeToBlantyrePosPending(intakeId) {
 
   // --- Build transfer payload ---
   const grnDate   = intake.purchaseDate ? new Date(intake.purchaseDate) : new Date();
-  const grnNo     = generateGrnNo(intakeId, grnDate);
   const supplierCode = supplierResolution.supplierCode;
+  const manualGrnOverride = Boolean(options?.manualGrnOverride);
+  const requestedGrnValidation = validateRequestedGrnForDate(options?.requestedGrn, grnDate);
+
+  if (manualGrnOverride && requestedGrnValidation.error) {
+    return {
+      success: false,
+      error: requestedGrnValidation.error,
+    };
+  }
 
   const detailItems = intake.items.map((item) => ({
     productCode: item.product?.sourceCode
@@ -159,8 +191,9 @@ async function transferGoodsIntakeToBlantyrePosPending(intakeId) {
   }));
 
   console.log(
-    `[BO][GOODS_INTAKE][TRANSFER] intakeId=${intakeId} ref=${intake.intakeRef} grnNo=${grnNo}` +
-    ` supplier=${supplierCode} location=${locationCode} lines=${detailItems.length} fallbackSupplier=${supplierResolution.usedFallback ? 'yes' : 'no'}`
+    `[BO][GOODS_INTAKE][TRANSFER] intakeId=${intakeId} ref=${intake.intakeRef}` +
+    ` requestedGrn=${requestedGrnValidation.requestedGrn || 'AUTO'} supplier=${supplierCode} location=${locationCode}` +
+    ` lines=${detailItems.length} fallbackSupplier=${supplierResolution.usedFallback ? 'yes' : 'no'}`
   );
 
   // --- Enqueue command for Blantyre POS agent (polling model — no direct LAN call) ---
@@ -171,8 +204,9 @@ async function transferGoodsIntakeToBlantyrePosPending(intakeId) {
     {
       intakeId,
       intakeRef:    intake.intakeRef,
-      grnNo,
       grnDate:      grnDate.toISOString(),
+      requestedGrn: requestedGrnValidation.requestedGrn || null,
+      manualGrnOverride,
       supplierCode,
       locationCode: posLocationCode,
       items:        detailItems,
@@ -192,21 +226,22 @@ async function transferGoodsIntakeToBlantyrePosPending(intakeId) {
     where: { id: intakeId },
     data: {
       posTransferStatus:       'queued',
-      posTransferGrn:          grnNo,
+      posTransferGrn:          null,
       posTransferAt:           new Date(),
       posTransferLocationCode: posLocationCode,
     },
   });
 
   console.log(
-    `[BO][GOODS_INTAKE][TRANSFER] QUEUED intakeId=${intakeId} grnNo=${grnNo}` +
+    `[BO][GOODS_INTAKE][TRANSFER] QUEUED intakeId=${intakeId} requestedGrn=${requestedGrnValidation.requestedGrn || 'AUTO'}` +
     ` commandId=${queued.id} supplier=${supplierCode} lines=${detailItems.length}`
   );
 
   return {
     success:    true,
     queued:     true,
-    grnNo,
+    grnMode:    manualGrnOverride ? 'manual' : 'auto',
+    requestedGrn: requestedGrnValidation.requestedGrn || null,
     commandId:  queued.id,
     supplierCode,
     locationCode: posLocationCode,

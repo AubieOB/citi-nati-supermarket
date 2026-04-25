@@ -195,7 +195,7 @@ async function transferToPOS(req, res) {
     const id = toInt(req.params.id);
     if (!id) return res.status(400).json({ success: false, error: 'Invalid goods intake id' });
 
-    const result = await goodsIntakePosTransferService.transferGoodsIntakeToBlantyrePosPending(id);
+    const result = await goodsIntakePosTransferService.transferGoodsIntakeToBlantyrePosPending(id, req.body || {});
     if (!result.success) {
       const statusCode = result.alreadyTransferred ? 409 : 422;
       return res.status(statusCode).json({ success: false, error: result.error, grnNo: result.existingGrn });
@@ -204,6 +204,8 @@ async function transferToPOS(req, res) {
       success: true,
       data: result.data,
       grnNo: result.grnNo,
+      grnMode: result.grnMode,
+      requestedGrn: result.requestedGrn,
       linesInserted: result.linesInserted,
       linesQueued: result.linesQueued,
       commandId: result.commandId,
