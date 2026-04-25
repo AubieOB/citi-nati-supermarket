@@ -45,10 +45,12 @@ function withMetadata(payload = {}) {
 async function pollCommands(limit = 10) {
   const client = createClient();
   const config = buildConfig();
+  const primaryLocationCode = String(config.posDb.locationCode || 'SH').trim().toUpperCase();
+  const locationCodes = Array.from(new Set([primaryLocationCode, 'SH', 'BT'].filter(Boolean)));
   const payload = withMetadata({ 
     limit,
-    // Send location codes this agent handles to filter queue commands
-    locationCode: config.posDb.locationCode || 'SH',
+    // Poll both SH and BT so older BT-tagged writeback commands are still claimable.
+    locationCodes,
   });
   const response = await client.post('/api/pos-commands/poll', payload);
   return (response.data && response.data.commands) || [];
