@@ -855,7 +855,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
     <section ref={workspaceRef} style={{ ...cardStyle, padding: '1rem', width: '100%', minWidth: 0, boxShadow: 'none', border: 'none', background: 'transparent' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <div>
-            <h2 style={{ margin: 0, color: colors.text }}>Stock Intake Workflow</h2>
+            <h2 style={{ margin: 0, color: colors.text, fontSize: '1.6rem', lineHeight: 1.15 }}>Stock Intake Workflow</h2>
             <div style={{ fontSize: '0.86rem', color: colors.mutedText, marginTop: '0.2rem' }}>
               Record stock intake, finalize, export, and transfer to POS pending stock from one workspace.
             </div>
@@ -1041,69 +1041,70 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
           </div>
         )}
 
-        <div style={{ marginTop: '0.8rem', width: '100%', maxWidth: '100%', overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 0.45rem', minWidth: '1220px' }}>
+        <div style={{ marginTop: '0.8rem', width: '100%', maxWidth: '100%', overflowX: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 0.35rem', tableLayout: 'fixed' }}>
             <thead>
               <tr>
                 {['#', 'Barcode', 'Product Name', 'Qty', 'Unit Cost', 'Total Cost', 'Selling Price', 'Margin %', 'Est. Profit', 'Expiry Date', 'Batch/Lot', 'Comments', 'Actions'].map((label) => (
-                  <th key={label} style={{ textAlign: 'left', fontSize: '0.75rem', color: '#64748b', fontWeight: 700, padding: '0 0.35rem' }}>{label}</th>
+                  <th key={label} style={{ textAlign: 'left', fontSize: '0.71rem', color: '#64748b', fontWeight: 700, padding: '0 0.25rem', whiteSpace: 'nowrap' }}>{label}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {calculatedItems.map((line, index) => {
+                const compactLineInputStyle = { ...tableInputStyle, padding: '0.32rem 0.38rem', fontSize: '0.8rem' };
                 const belowCost = line.sellingPrice != null && Number(line.sellingPrice) < Number(line.unitCost || 0);
                 return (
                   <tr key={`line-${index}`}>
-                    <td style={{ fontWeight: 700, color: '#334155', fontSize: '0.85rem', padding: '0 0.35rem' }}>{index + 1}</td>
-                    <td style={{ minWidth: '120px', padding: '0 0.35rem' }}>
+                    <td style={{ width: '2%', fontWeight: 700, color: '#334155', fontSize: '0.8rem', padding: '0 0.25rem' }}>{index + 1}</td>
+                    <td style={{ width: '8%', padding: '0 0.25rem' }}>
                       <input
                         value={line.barcode || ''}
                         onFocus={selectInputText}
                         onKeyDown={(event) => handleEntryFieldEnter(event, { lookupRowIndex: index })}
                         onChange={(event) => setLineValue(index, 'barcode', event.target.value)}
                         onBlur={() => handleLookup(index)}
-                        style={{ ...tableInputStyle, backgroundColor: line.productName && !line.barcode ? '#fff7ed' : '#fff' }}
+                        style={{ ...compactLineInputStyle, backgroundColor: line.productName && !line.barcode ? '#fff7ed' : '#fff' }}
                         placeholder="scan/manual"
                       />
                     </td>
-                    <td style={{ minWidth: '220px', padding: '0 0.35rem' }}>
+                    <td style={{ width: '14%', padding: '0 0.25rem' }}>
                       <input
                         value={line.productName || ''}
                         onFocus={selectInputText}
                         onKeyDown={(event) => handleEntryFieldEnter(event, { lookupRowIndex: index })}
                         onChange={(event) => setLineValue(index, 'productName', event.target.value)}
                         onBlur={() => { if (!line.productName) return; handleLookup(index); }}
-                        style={tableInputStyle}
+                        style={compactLineInputStyle}
                         placeholder="Product name"
                       />
                     </td>
-                    <td style={{ minWidth: '70px', padding: '0 0.35rem' }}>
-                      <input type="number" min="0" step="1" value={line.quantity} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'quantity', event.target.value)} style={tableInputStyle} />
+                    <td style={{ width: '5%', padding: '0 0.25rem' }}>
+                      <input type="number" min="0" step="1" value={line.quantity} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'quantity', event.target.value)} style={compactLineInputStyle} />
                     </td>
-                    <td style={{ minWidth: '110px', padding: '0 0.35rem' }}>
-                      <input type="number" min="0" step="0.01" value={line.unitCost} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'unitCost', event.target.value)} style={tableInputStyle} />
+                    <td style={{ width: '7%', padding: '0 0.25rem' }}>
+                      <input type="number" min="0" step="0.01" value={line.unitCost} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'unitCost', event.target.value)} style={compactLineInputStyle} />
                     </td>
-                    <td style={{ minWidth: '115px', color: '#0f172a', fontWeight: 700, fontSize: '0.85rem', padding: '0 0.35rem' }}>{money(line.totalCost)}</td>
-                    <td style={{ minWidth: '120px', padding: '0 0.35rem' }}>
-                      <input type="number" min="0" step="0.01" value={line.sellingPrice == null ? '' : line.sellingPrice} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'sellingPrice', event.target.value)} style={{ ...tableInputStyle, borderColor: belowCost ? '#f59e0b' : '#cbd5e1', backgroundColor: belowCost ? '#fffbeb' : '#fff' }} />
+                    <td style={{ width: '8%', color: '#0f172a', fontWeight: 700, fontSize: '0.8rem', padding: '0 0.25rem', whiteSpace: 'nowrap' }}>{money(line.totalCost)}</td>
+                    <td style={{ width: '8%', padding: '0 0.25rem' }}>
+                      <input type="number" min="0" step="0.01" value={line.sellingPrice == null ? '' : line.sellingPrice} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'sellingPrice', event.target.value)} style={{ ...compactLineInputStyle, borderColor: belowCost ? '#f59e0b' : '#cbd5e1', backgroundColor: belowCost ? '#fffbeb' : '#fff' }} />
                     </td>
-                    <td style={{ minWidth: '92px', fontWeight: 700, color: '#334155', fontSize: '0.84rem', padding: '0 0.35rem' }}>{line.marginPercent == null ? '-' : `${line.marginPercent.toFixed(2)}%`}</td>
-                    <td style={{ minWidth: '110px', fontWeight: 700, color: line.estimatedProfit >= 0 ? '#166534' : '#b91c1c', fontSize: '0.84rem', padding: '0 0.35rem' }}>{money(line.estimatedProfit)}</td>
-                    <td style={{ minWidth: '132px', padding: '0 0.35rem' }}>
-                      <input type="date" value={line.expiryDate || ''} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'expiryDate', event.target.value)} style={{ ...tableInputStyle, backgroundColor: line.productName && !line.expiryDate ? '#fff7ed' : '#fff' }} />
+                    <td style={{ width: '7%', fontWeight: 700, color: '#334155', fontSize: '0.8rem', padding: '0 0.25rem', whiteSpace: 'nowrap' }}>{line.marginPercent == null ? '-' : `${line.marginPercent.toFixed(2)}%`}</td>
+                    <td style={{ width: '8%', fontWeight: 700, color: line.estimatedProfit >= 0 ? '#166534' : '#b91c1c', fontSize: '0.8rem', padding: '0 0.25rem', whiteSpace: 'nowrap' }}>{money(line.estimatedProfit)}</td>
+                    <td style={{ width: '9%', padding: '0 0.25rem' }}>
+                      <input type="date" value={line.expiryDate || ''} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'expiryDate', event.target.value)} style={{ ...compactLineInputStyle, backgroundColor: line.productName && !line.expiryDate ? '#fff7ed' : '#fff' }} />
                     </td>
-                    <td style={{ minWidth: '120px', padding: '0 0.35rem' }}>
-                      <input value={line.batchRef || ''} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'batchRef', event.target.value)} style={tableInputStyle} />
+                    <td style={{ width: '7%', padding: '0 0.25rem' }}>
+                      <input value={line.batchRef || ''} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'batchRef', event.target.value)} style={compactLineInputStyle} />
                     </td>
-                    <td style={{ minWidth: '180px', padding: '0 0.35rem' }}>
-                      <input value={line.lineNotes || ''} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'lineNotes', event.target.value)} style={tableInputStyle} />
+                    <td style={{ width: '10%', padding: '0 0.25rem' }}>
+                      <input value={line.lineNotes || ''} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'lineNotes', event.target.value)} style={compactLineInputStyle} />
                     </td>
-                    <td style={{ minWidth: '130px', padding: '0 0.35rem' }}>
+                    <td style={{ width: '7%', padding: '0 0.25rem' }}>
                       {(canCreate || canEdit) && (
-                        <div style={{ display: 'flex', gap: '0.35rem' }}>
-                          <button type="button" onClick={() => duplicateLine(index)} style={{ border: '1px solid #cbd5e1', background: '#fff', borderRadius: '8px', padding: '0.3rem 0.55rem', fontWeight: 600, cursor: 'pointer' }}>Dup</button>
-                          <button type="button" onClick={() => removeLine(index)} style={{ border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', borderRadius: '8px', padding: '0.3rem 0.55rem', fontWeight: 600, cursor: 'pointer' }}>Del</button>
+                        <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+                          <button type="button" onClick={() => duplicateLine(index)} style={{ border: '1px solid #cbd5e1', background: '#fff', borderRadius: '7px', padding: '0.25rem 0.45rem', fontWeight: 600, fontSize: '0.76rem', cursor: 'pointer' }}>Dup</button>
+                          <button type="button" onClick={() => removeLine(index)} style={{ border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', borderRadius: '7px', padding: '0.25rem 0.45rem', fontWeight: 600, fontSize: '0.76rem', cursor: 'pointer' }}>Del</button>
                         </div>
                       )}
                       {activeLookupRow === index && <div style={{ marginTop: '0.25rem', fontSize: '0.72rem', color: '#2563eb' }}>Looking up...</div>}
