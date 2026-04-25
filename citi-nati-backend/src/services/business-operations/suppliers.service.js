@@ -4,12 +4,6 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
-const OPEN_BALANCE_SUPPLIER_NAMES = new Set([
-  'OPEN BALANCES',
-  'OPEN BALANCE',
-  'OPEN STOCK BALANCES',
-]);
-
 function modelHasField(modelName, fieldName) {
   try {
     const model = prisma?._runtimeDataModel?.models?.[modelName];
@@ -32,10 +26,6 @@ function normalizeSupplierCode(value) {
   return normalized || null;
 }
 
-function isOpenBalanceSupplierName(name) {
-  return OPEN_BALANCE_SUPPLIER_NAMES.has(String(name || '').trim().toUpperCase());
-}
-
 async function createSupplier(payload) {
   const normalizedSupplierCode = normalizeSupplierCode(payload.supplierCode);
   let supplierCodeForCreate = normalizedSupplierCode;
@@ -43,9 +33,14 @@ async function createSupplier(payload) {
   if (normalizedSupplierCode) {
     const existingByCode = await prisma.supplier.findUnique({ where: { supplierCode: normalizedSupplierCode } });
     if (existingByCode) {
-      if (isOpenBalanceSupplierName(payload.name)) {
-        // Allow per-location OPEN BALANCES supplier rows to be created even when
-        // global supplier code is already taken; transfer logic uses name mapping.
+      const existingLocationId = supplierHasLocation ? Number(existingByCode.locationId || 0) : 0;
+      const requestedLocationId = supplierHasLocation ? Number(payload.locationId || 0) : 0;
+      const isSameLocation = existingLocationId === requestedLocationId;
+
+      if (!isSameLocation && supplierHasLocation) {
+        // Current schema keeps supplier_code globally unique. To allow the same
+        // supplier to be created in multiple locations, we create the new row
+        // without supplierCode when the code already exists in another location.
         supplierCodeForCreate = null;
       } else {
         const error = new Error(
