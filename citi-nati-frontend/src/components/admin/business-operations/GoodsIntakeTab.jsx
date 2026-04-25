@@ -1209,11 +1209,13 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
       )}
 
       {isIntakeWorkspaceOpen && canViewForm && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: isIntakeWorkspaceMaximized ? '0.35rem' : '1rem' }}>
-          <div style={{ ...themedCardStyle, width: isIntakeWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1480px, 98vw)', height: isIntakeWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isIntakeWorkspaceMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column', padding: '0.95rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'radial-gradient(circle at 22% 12%, rgba(56, 189, 248, 0.22), rgba(15, 23, 42, 0.65) 45%)', backdropFilter: 'blur(2px)', zIndex: 170, display: 'grid', placeItems: 'center', padding: isIntakeWorkspaceMaximized ? '0.35rem' : '1rem' }}>
+          <div style={{ ...themedCardStyle, width: isIntakeWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1480px, 98vw)', height: isIntakeWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isIntakeWorkspaceMaximized ? '10px' : '20px', display: 'flex', flexDirection: 'column', padding: '0.95rem', boxShadow: isAdminDarkTheme ? '0 28px 70px rgba(0, 0, 0, 0.56)' : '0 28px 70px rgba(15, 23, 42, 0.25)', border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #dbeafe' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', border: isAdminDarkTheme ? '1px solid #1e293b' : '1px solid #dbeafe', borderRadius: '14px', padding: '0.75rem 0.85rem', background: isAdminDarkTheme ? 'linear-gradient(140deg, #0f172a 0%, #111827 55%)' : 'linear-gradient(140deg, #eff6ff 0%, #ffffff 55%)' }}>
               <div>
-                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#111827' }}>Supplier: {selectedSupplierName}</div>
+                <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: isAdminDarkTheme ? '#93c5fd' : '#2563eb', fontWeight: 800 }}>Stock Intake</div>
+                <div style={{ marginTop: '0.2rem', fontSize: '0.95rem', fontWeight: 800, color: isAdminDarkTheme ? '#f8fafc' : '#111827' }}>Supplier: {selectedSupplierName}</div>
+                <div style={{ marginTop: '0.16rem', fontSize: '0.75rem', color: isAdminDarkTheme ? '#94a3b8' : '#475569' }}>Capture intake lines, save progress, and finalize from one workspace.</div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                 <button
@@ -1221,21 +1223,21 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                   title={isIntakeWorkspaceMaximized ? 'Restore' : 'Maximize'}
                   aria-label={isIntakeWorkspaceMaximized ? 'Restore workspace' : 'Maximize workspace'}
                   onClick={() => setIsIntakeWorkspaceMaximized((prev) => !prev)}
-                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', color: '#334155', cursor: 'pointer' }}
+                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #bfdbfe', background: isAdminDarkTheme ? '#0f172a' : '#fff', color: isAdminDarkTheme ? '#cbd5e1' : '#334155', cursor: 'pointer' }}
                 >
                   <i className={`fas ${isIntakeWorkspaceMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
                 </button>
                 <button
                   type="button"
                   onClick={handleCloseWorkspace}
-                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}
+                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: isAdminDarkTheme ? '#3a1115' : '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}
                 >
                   <i className="fas fa-times" />
                 </button>
               </div>
             </div>
 
-            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingRight: '0.2rem' }}>
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0.35rem', borderRadius: '14px', border: isAdminDarkTheme ? '1px solid #1e293b' : '1px solid #e2e8f0', background: isAdminDarkTheme ? '#0b1220' : '#f8fbff' }}>
               {workspaceContent}
             </div>
           </div>
@@ -1243,11 +1245,13 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
       )}
 
       {isFinalizedHistoryOpen && canViewHistory && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 172, display: 'grid', placeItems: 'center', padding: isFinalizedHistoryMaximized ? '0.35rem' : '1rem' }}>
-          <div style={{ ...themedCardStyle, width: isFinalizedHistoryMaximized ? 'calc(100vw - 0.7rem)' : 'min(1500px, 98vw)', height: isFinalizedHistoryMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isFinalizedHistoryMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column', padding: '0.95rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'radial-gradient(circle at 78% 10%, rgba(34, 197, 94, 0.2), rgba(15, 23, 42, 0.64) 48%)', backdropFilter: 'blur(2px)', zIndex: 172, display: 'grid', placeItems: 'center', padding: isFinalizedHistoryMaximized ? '0.35rem' : '1rem' }}>
+          <div style={{ ...themedCardStyle, width: isFinalizedHistoryMaximized ? 'calc(100vw - 0.7rem)' : 'min(1500px, 98vw)', height: isFinalizedHistoryMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isFinalizedHistoryMaximized ? '10px' : '20px', display: 'flex', flexDirection: 'column', padding: '0.95rem', boxShadow: isAdminDarkTheme ? '0 28px 70px rgba(0, 0, 0, 0.56)' : '0 28px 70px rgba(15, 23, 42, 0.25)', border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #bbf7d0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap', border: isAdminDarkTheme ? '1px solid #1e293b' : '1px solid #bbf7d0', borderRadius: '14px', padding: '0.75rem 0.85rem', background: isAdminDarkTheme ? 'linear-gradient(140deg, #0f172a 0%, #111827 55%)' : 'linear-gradient(140deg, #f0fdf4 0%, #ffffff 55%)' }}>
               <div>
-                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#111827' }}>Finalized Intake Records</div>
+                <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: isAdminDarkTheme ? '#86efac' : '#166534', fontWeight: 800 }}>History</div>
+                <div style={{ marginTop: '0.2rem', fontSize: '0.95rem', fontWeight: 800, color: isAdminDarkTheme ? '#f8fafc' : '#111827' }}>Finalized Intake Records</div>
+                <div style={{ marginTop: '0.16rem', fontSize: '0.75rem', color: isAdminDarkTheme ? '#94a3b8' : '#475569' }}>Filter finalized and draft entries, then open, export, or transfer safely.</div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                 <button
@@ -1255,7 +1259,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                   title={isFinalizedHistoryMaximized ? 'Restore' : 'Maximize'}
                   aria-label={isFinalizedHistoryMaximized ? 'Restore finalized history' : 'Maximize finalized history'}
                   onClick={() => setIsFinalizedHistoryMaximized((prev) => !prev)}
-                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', color: '#334155', cursor: 'pointer' }}
+                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #bbf7d0', background: isAdminDarkTheme ? '#0f172a' : '#fff', color: isAdminDarkTheme ? '#cbd5e1' : '#334155', cursor: 'pointer' }}
                 >
                   <i className={`fas ${isFinalizedHistoryMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
                 </button>
@@ -1265,15 +1269,15 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                     setIsFinalizedHistoryOpen(false);
                     setIsFinalizedHistoryMaximized(false);
                   }}
-                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}
+                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: isAdminDarkTheme ? '#3a1115' : '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}
                 >
                   <i className="fas fa-times" />
                 </button>
               </div>
             </div>
 
-            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingRight: '0.2rem', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0.45rem', borderRadius: '14px', border: isAdminDarkTheme ? '1px solid #1e293b' : '1px solid #e2e8f0', background: isAdminDarkTheme ? '#0b1220' : '#f8fbff', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', padding: '0.6rem 0.65rem', borderRadius: '10px', background: isAdminDarkTheme ? 'rgba(30, 41, 59, 0.45)' : '#ffffff', border: isAdminDarkTheme ? '1px solid #334155' : '1px solid #dbeafe' }}>
                 <h3 style={{ margin: 0, color: colors.text, fontSize: '0.9rem', lineHeight: 1.2 }}>Intake Records</h3>
                 <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
                   <input placeholder="Search ref/supplier/product" value={search} onFocus={selectInputText} onChange={(event) => setSearch(event.target.value)} style={{ ...themedInputStyle, width: '220px' }} />
