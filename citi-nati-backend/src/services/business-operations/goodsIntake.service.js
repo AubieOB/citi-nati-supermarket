@@ -410,7 +410,14 @@ async function syncGoodsIntakeSellingPrices({ goodsIntakeId, items = [], locatio
     candidateMap.set(productId, sellingPrice);
   }
 
+  console.log('[GOODS INTAKE PRICE SYNC] syncGoodsIntakeSellingPrices called:', {
+    goodsIntakeId,
+    locationCode,
+    candidateCount: candidateMap.size,
+  });
+
   if (candidateMap.size === 0) {
+    console.log('[GOODS INTAKE PRICE SYNC] No candidates to sync');
     return { attempted: 0, updated: 0, queued: 0, failed: 0 };
   }
 
@@ -425,6 +432,11 @@ async function syncGoodsIntakeSellingPrices({ goodsIntakeId, items = [], locatio
     },
   });
 
+  console.log('[GOODS INTAKE PRICE SYNC] Found products:', {
+    count: products.length,
+    products: products.map(p => ({ id: p.id, code: p.sourceCode, price: p.price })),
+  });
+
   let updated = 0;
   let queued = 0;
   let failed = 0;
@@ -433,7 +445,18 @@ async function syncGoodsIntakeSellingPrices({ goodsIntakeId, items = [], locatio
     const newPrice = candidateMap.get(Number(product.id));
     const oldPrice = roundMoney(product.price);
 
+    console.log('[GOODS INTAKE PRICE SYNC] Processing product:', {
+      productId: product.id,
+      code: product.sourceCode,
+      oldPrice,
+      newPrice,
+      unchanged: newPrice === oldPrice,
+    });
+
     if (!Number.isFinite(newPrice) || newPrice <= 0 || newPrice === oldPrice) {
+      console.log('[GOODS INTAKE PRICE SYNC] Skipping product (no valid price change):', {
+        productId: product.id,
+      });
       continue;
     }
 
@@ -442,21 +465,36 @@ async function syncGoodsIntakeSellingPrices({ goodsIntakeId, items = [], locatio
       data: { price: newPrice },
     });
     updated += 1;
+    console.log('[GOODS INTAKE PRICE SYNC] Updated product price in DB:', {
+      productId: product.id,
+      newPrice,
+    });
 
     if (!product.sourceCode) {
+      console.log('[GOODS INTAKE PRICE SYNC] Skipping POS sync (no sourceCode):', {
+        productId: product.id,
+      });
       continue;
     }
 
     try {
       await updateCachedProductPrice(product.sourceCode, newPrice);
-    } catch (_error) {
-      // Keep goods intake save flow moving if no website cache row exists yet.
+    } catch (cacheError) {
+      console.warn('[GOODS INTAKE PRICE SYNC] Cache update failed (non-fatal):', {
+        productCode: product.sourceCode,
+        error: cacheError.message,
+      });
     }
 
     const scope = buildGoodsIntakePriceWritebackScope(product, locationCode);
+    console.log('[GOODS INTAKE PRICE SYNC] Built writeback scope:', {
+      productId: product.id,
+      scope,
+    });
 
     try {
-      await posCommandQueueService.enqueueCommand('UPDATE_PRICE', {
+      console.log('[POS COMMAND QUEUE] enqueue UPDATE_PRICE start (from goods intake)');
+      const payload = {
         productId: String(product.id),
         productCode: product.sourceCode,
         newPrice,
@@ -465,17 +503,40 @@ async function syncGoodsIntakeSellingPrices({ goodsIntakeId, items = [], locatio
         locationCode: scope.locationCode,
         branchCode: scope.branchCode,
         priceTypeCode: scope.priceTypeCode,
-      }, {
+      };
+      console.log('[POS COMMAND QUEUE] enqueue payload:', payload);
+
+      const queuedCommand = await posCommandQueueService.enqueueCommand('UPDATE_PRICE', payload, {
         source,
         relatedEntityType: 'GoodsIntake',
         relatedEntityId: goodsIntakeId,
         createdBy,
       });
+
       queued += 1;
-    } catch (_error) {
+      console.log('[POS COMMAND QUEUE] UPDATE_PRICE queued (goods intake):', {
+        commandId: queuedCommand.id,
+        productCode: payload.productCode,
+        locationCode: payload.locationCode,
+        branchCode: payload.branchCode,
+      });
+    } catch (queueErr) {
       failed += 1;
+      console.error('[POS COMMAND QUEUE ERROR] enqueue UPDATE_PRICE failed (goods intake):', {
+        productId: product.id,
+        productCode: product.sourceCode,
+        error: queueErr.message,
+        stack: queueErr.stack,
+      });
     }
   }
+
+  console.log('[GOODS INTAKE PRICE SYNC] Completed:', {
+    attempted: candidateMap.size,
+    updated,
+    queued,
+    failed,
+  });
 
   return {
     attempted: candidateMap.size,
