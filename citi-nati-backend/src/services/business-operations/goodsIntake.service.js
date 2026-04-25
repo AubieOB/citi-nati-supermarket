@@ -263,12 +263,21 @@ async function lookupGoodsIntakeProducts({ query, locationCode, take = 20 }) {
   });
 
   const loweredQuery = normalizedQuery.toLowerCase();
+  const scoreLocationPriority = (product) => {
+    const code = normalizeScopeCode(product?.locationCode);
+    if (code === normalizedLocationCode) return 0;
+    if (!code) return 1;
+    if (scopeCodes.includes(code)) return 2;
+    return 3;
+  };
 
   return products
     .map((product) => ({
       ...product,
       productCode: product.sourceCode,
       product_code: product.sourceCode,
+      sellingPrice: Number(product.price || 0),
+      selling_price: Number(product.price || 0),
       unitPrice: Number(product.price || 0),
       unit_price: Number(product.price || 0),
     }))
@@ -278,11 +287,16 @@ async function lookupGoodsIntakeProducts({ query, locationCode, take = 20 }) {
       const bExact = String(b.barcode || '').toLowerCase() === loweredQuery
         || String(b.sourceCode || '').toLowerCase() === loweredQuery;
 
-      if (aExact === bExact) {
-        return String(a.name || '').localeCompare(String(b.name || ''));
+      if (aExact !== bExact) {
+        return aExact ? -1 : 1;
       }
 
-      return aExact ? -1 : 1;
+      const locationDelta = scoreLocationPriority(a) - scoreLocationPriority(b);
+      if (locationDelta !== 0) {
+        return locationDelta;
+      }
+
+      return String(a.name || '').localeCompare(String(b.name || ''));
     });
 }
 

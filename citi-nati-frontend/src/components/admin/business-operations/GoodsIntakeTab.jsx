@@ -792,6 +792,14 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
       );
 
       const chosen = exact || products[0];
+      const lookupPriceCandidates = [
+        chosen?.sellingPrice,
+        chosen?.selling_price,
+        chosen?.unitPrice,
+        chosen?.unit_price,
+        chosen?.price,
+      ];
+      const resolvedSellingPrice = lookupPriceCandidates.find((value) => Number.isFinite(Number(value)) && Number(value) >= 0);
       setForm((prev) => ({
         ...prev,
         items: prev.items.map((item, itemIndex) => {
@@ -801,7 +809,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
             productId: chosen.id || null,
             barcode: item.barcode || chosen.barcode || chosen.productCode || '',
             productName: chosen.name || item.productName,
-            sellingPrice: item.sellingPrice || chosen.price || '',
+            sellingPrice: resolvedSellingPrice ?? item.sellingPrice ?? '',
           };
         }),
       }));
