@@ -809,8 +809,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
     if (!canViewHistory) return;
     setIsPriceSyncHistoryMaximized(false);
     setPriceSyncStatusFilter('all');
-    setIsPriceSyncDetailOpen(false);
-    setActivePriceSyncRecord(null);
     setIsPriceSyncHistoryOpen(true);
   };
 
