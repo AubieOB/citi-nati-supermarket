@@ -1045,7 +1045,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
           <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 0.35rem', tableLayout: 'fixed' }}>
             <thead>
               <tr>
-                {['#', 'Barcode', 'Product Name', 'Qty', 'Unit Cost', 'Total Cost', 'Selling Price', 'Margin %', 'Est. Profit', 'Expiry Date', 'Batch/Lot', 'Comments', 'Actions'].map((label) => (
+                {['#', 'Barcode', 'Product Name', 'Qty', 'Unit Cost', 'Total Cost', 'Selling Price', 'Margin %', 'Est. Profit', 'Expiry Date', 'Comments', 'Actions'].map((label) => (
                   <th key={label} style={{ textAlign: 'left', fontSize: '0.71rem', color: '#64748b', fontWeight: 700, padding: '0 0.25rem', whiteSpace: 'nowrap' }}>{label}</th>
                 ))}
               </tr>
@@ -1056,8 +1056,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                 const belowCost = line.sellingPrice != null && Number(line.sellingPrice) < Number(line.unitCost || 0);
                 return (
                   <tr key={`line-${index}`}>
-                    <td style={{ width: '2%', fontWeight: 700, color: '#334155', fontSize: '0.8rem', padding: '0 0.25rem' }}>{index + 1}</td>
-                    <td style={{ width: '11%', padding: '0 0.25rem' }}>
+                    <td style={{ width: '1%', fontWeight: 700, color: '#334155', fontSize: '0.8rem', padding: '0 0.25rem' }}>{index + 1}</td>
+                    <td style={{ width: '14%', padding: '0 0.25rem' }}>
                       <input
                         value={line.barcode || ''}
                         onFocus={selectInputText}
@@ -1068,7 +1068,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                         placeholder="scan/manual"
                       />
                     </td>
-                    <td style={{ width: '20%', padding: '0 0.25rem' }}>
+                    <td style={{ width: '24%', padding: '0 0.25rem' }}>
                       <input
                         value={line.productName || ''}
                         onFocus={selectInputText}
@@ -1093,9 +1093,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                     <td style={{ width: '8%', fontWeight: 700, color: line.estimatedProfit >= 0 ? '#166534' : '#b91c1c', fontSize: '0.8rem', padding: '0 0.25rem', whiteSpace: 'nowrap' }}>{money(line.estimatedProfit)}</td>
                     <td style={{ width: '9%', padding: '0 0.25rem' }}>
                       <input type="date" value={line.expiryDate || ''} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'expiryDate', event.target.value)} style={{ ...compactLineInputStyle, backgroundColor: line.productName && !line.expiryDate ? '#fff7ed' : '#fff' }} />
-                    </td>
-                    <td style={{ width: '5%', padding: '0 0.25rem' }}>
-                      <input value={line.batchRef || ''} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'batchRef', event.target.value)} style={compactLineInputStyle} />
                     </td>
                     <td style={{ width: '6%', padding: '0 0.25rem' }}>
                       <input value={line.lineNotes || ''} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'lineNotes', event.target.value)} style={compactLineInputStyle} />
