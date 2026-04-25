@@ -327,6 +327,9 @@ async function attachPriceSyncCommandMetadata(records) {
   });
 
   const commandsByIntakeId = new Map();
+  const unresolvedProductIds = new Set();
+  const unresolvedProductCodes = new Set();
+
   for (const command of commands) {
     const key = String(command.relatedEntityId || '');
     if (!key) continue;
@@ -334,6 +337,55 @@ async function attachPriceSyncCommandMetadata(records) {
       commandsByIntakeId.set(key, []);
     }
     commandsByIntakeId.get(key).push(command);
+
+    const payloadName = String(command?.payload?.productName || '').trim();
+    if (!payloadName) {
+      const payloadProductId = Number(command?.payload?.productId);
+      const payloadProductCode = String(command?.payload?.productCode || '').trim();
+      if (Number.isFinite(payloadProductId) && payloadProductId > 0) {
+        unresolvedProductIds.add(payloadProductId);
+      }
+      if (payloadProductCode) {
+        unresolvedProductCodes.add(payloadProductCode.toUpperCase());
+      }
+    }
+  }
+
+  let products = [];
+  if (unresolvedProductIds.size > 0 || unresolvedProductCodes.size > 0) {
+    const codeMatchers = Array.from(unresolvedProductCodes).flatMap((code) => ([
+      { sourceCode: { equals: code, mode: 'insensitive' } },
+      { barcode: { equals: code, mode: 'insensitive' } },
+    ]));
+
+    products = await prisma.product.findMany({
+      where: {
+        OR: [
+          ...(unresolvedProductIds.size > 0 ? [{ id: { in: Array.from(unresolvedProductIds) } }] : []),
+          ...codeMatchers,
+        ],
+      },
+      select: {
+        id: true,
+        name: true,
+        sourceCode: true,
+        barcode: true,
+      },
+    });
+  }
+
+  const productNameById = new Map();
+  const productNameByCode = new Map();
+  for (const product of products) {
+    const productName = String(product?.name || '').trim();
+    if (!productName) continue;
+    if (Number.isFinite(Number(product?.id))) {
+      productNameById.set(Number(product.id), productName);
+    }
+    const sourceCode = String(product?.sourceCode || '').trim().toUpperCase();
+    const barcode = String(product?.barcode || '').trim().toUpperCase();
+    if (sourceCode) productNameByCode.set(sourceCode, productName);
+    if (barcode) productNameByCode.set(barcode, productName);
   }
 
   return list.map((record) => {
@@ -353,11 +405,23 @@ async function attachPriceSyncCommandMetadata(records) {
         lastProcessedAt: priceCommands.find((entry) => entry?.processedAt)?.processedAt || null,
       },
       priceSyncCommands: priceCommands.map((command) => ({
+        ...(() => {
+          const payloadName = String(command?.payload?.productName || '').trim();
+          const payloadProductId = Number(command?.payload?.productId);
+          const payloadProductCode = String(command?.payload?.productCode || '').trim().toUpperCase();
+          const resolvedName = payloadName
+            || (Number.isFinite(payloadProductId) ? productNameById.get(payloadProductId) : null)
+            || (payloadProductCode ? productNameByCode.get(payloadProductCode) : null)
+            || null;
+
+          return {
+            productName: resolvedName,
+          };
+        })(),
         id: command.id,
         status: command.status,
         productId: command.payload?.productId || null,
         productCode: command.payload?.productCode || null,
-        productName: command.payload?.productName || null,
         oldPrice: command.payload?.oldPrice ?? null,
         newPrice: command.payload?.newPrice ?? null,
         locationCode: command.payload?.locationCode || null,
