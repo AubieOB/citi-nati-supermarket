@@ -371,15 +371,15 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
 
   const themedCardStyle = useMemo(() => ({
     ...cardStyle,
-    backgroundColor: isAdminDarkTheme ? '#1b2027' : '#fff',
-    border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #e2e8f0',
+    backgroundColor: isAdminDarkTheme ? '#1e1e1e' : '#fff',
+    border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0',
     boxShadow: isAdminDarkTheme ? '0 12px 28px rgba(0, 0, 0, 0.45)' : cardStyle.boxShadow,
   }), [isAdminDarkTheme]);
 
   const themedInputStyle = useMemo(() => ({
     ...tableInputStyle,
-    border: isAdminDarkTheme ? '1px solid #3a4048' : tableInputStyle.border,
-    backgroundColor: isAdminDarkTheme ? '#14181f' : '#fff',
+    border: isAdminDarkTheme ? '1px solid #333333' : tableInputStyle.border,
+    backgroundColor: isAdminDarkTheme ? '#1a1a1a' : '#fff',
     color: isAdminDarkTheme ? '#e5e7eb' : '#0f172a',
   }), [isAdminDarkTheme]);
 
@@ -388,19 +388,19 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
     strongText: isAdminDarkTheme ? '#e5e7eb' : '#1f2937',
     mutedText: isAdminDarkTheme ? '#a1a1aa' : '#64748b',
     subtleText: isAdminDarkTheme ? '#71717a' : '#64748b',
-    tableBorder: isAdminDarkTheme ? '#2f353d' : '#f1f5f9',
-    launchCardOneBorder: isAdminDarkTheme ? '#464c55' : '#d8b4fe',
-    launchCardOneBg: isAdminDarkTheme ? 'linear-gradient(135deg, #232831 0%, #1b2027 65%)' : 'linear-gradient(135deg, #f8f5ff 0%, #ffffff 60%)',
-    launchCardTwoBorder: isAdminDarkTheme ? '#4a505a' : '#bfdbfe',
-    launchCardTwoBg: isAdminDarkTheme ? 'linear-gradient(135deg, #242a33 0%, #1b2027 65%)' : 'linear-gradient(135deg, #eff6ff 0%, #ffffff 60%)',
-    launchCardThreeBorder: isAdminDarkTheme ? '#4d535c' : '#fcd34d',
-    launchCardThreeBg: isAdminDarkTheme ? 'linear-gradient(135deg, #252b34 0%, #1b2027 65%)' : 'linear-gradient(135deg, #fffbeb 0%, #ffffff 60%)',
-    launchCardFourBorder: isAdminDarkTheme ? '#434a53' : '#bbf7d0',
-    launchCardFourBg: isAdminDarkTheme ? 'linear-gradient(135deg, #222830 0%, #1b2027 65%)' : 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 60%)',
-    launchCardFiveBorder: isAdminDarkTheme ? '#4f555f' : '#fed7aa',
-    launchCardFiveBg: isAdminDarkTheme ? 'linear-gradient(135deg, #262c35 0%, #1b2027 65%)' : 'linear-gradient(135deg, #fff7ed 0%, #ffffff 60%)',
-    launchCardSixBorder: isAdminDarkTheme ? '#454b55' : '#bfdbfe',
-    launchCardSixBg: isAdminDarkTheme ? 'linear-gradient(135deg, #232931 0%, #1b2027 65%)' : 'linear-gradient(135deg, #e0f2fe 0%, #ffffff 60%)',
+    tableBorder: isAdminDarkTheme ? '#2d2d2d' : '#f1f5f9',
+    launchCardOneBorder: isAdminDarkTheme ? '#3a3a3a' : '#d8b4fe',
+    launchCardOneBg: isAdminDarkTheme ? 'linear-gradient(135deg, #232323 0%, #1c1c1c 65%)' : 'linear-gradient(135deg, #f8f5ff 0%, #ffffff 60%)',
+    launchCardTwoBorder: isAdminDarkTheme ? '#3f3f3f' : '#bfdbfe',
+    launchCardTwoBg: isAdminDarkTheme ? 'linear-gradient(135deg, #242424 0%, #1c1c1c 65%)' : 'linear-gradient(135deg, #eff6ff 0%, #ffffff 60%)',
+    launchCardThreeBorder: isAdminDarkTheme ? '#404040' : '#fcd34d',
+    launchCardThreeBg: isAdminDarkTheme ? 'linear-gradient(135deg, #252525 0%, #1c1c1c 65%)' : 'linear-gradient(135deg, #fffbeb 0%, #ffffff 60%)',
+    launchCardFourBorder: isAdminDarkTheme ? '#383838' : '#bbf7d0',
+    launchCardFourBg: isAdminDarkTheme ? 'linear-gradient(135deg, #222222 0%, #1c1c1c 65%)' : 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 60%)',
+    launchCardFiveBorder: isAdminDarkTheme ? '#424242' : '#fed7aa',
+    launchCardFiveBg: isAdminDarkTheme ? 'linear-gradient(135deg, #262626 0%, #1c1c1c 65%)' : 'linear-gradient(135deg, #fff7ed 0%, #ffffff 60%)',
+    launchCardSixBorder: isAdminDarkTheme ? '#3a3a3a' : '#bfdbfe',
+    launchCardSixBg: isAdminDarkTheme ? 'linear-gradient(135deg, #232323 0%, #1c1c1c 65%)' : 'linear-gradient(135deg, #e0f2fe 0%, #ffffff 60%)',
   }), [isAdminDarkTheme]);
 
   const [records, setRecords] = useState([]);
@@ -1285,22 +1285,22 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             {canCreate && (
-              <button type="button" onClick={() => clearForm()} style={{ border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #cbd5e1', background: isAdminDarkTheme ? '#14181f' : '#fff', color: isAdminDarkTheme ? '#e5e7eb' : '#0f172a', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}>
+              <button type="button" onClick={() => clearForm()} style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #cbd5e1', background: isAdminDarkTheme ? '#1a1a1a' : '#fff', color: isAdminDarkTheme ? '#e5e7eb' : '#0f172a', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}>
                 New Record
               </button>
             )}
             {form.id && canExport && (
               <>
-                <button type="button" onClick={() => handleExportRecord(form.id, 'full')} style={{ border: isAdminDarkTheme ? '1px solid #2f7f58' : '1px solid #bbf7d0', background: isAdminDarkTheme ? '#153828' : '#f0fdf4', color: isAdminDarkTheme ? '#91e0b4' : '#166534', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}>
+                <button type="button" onClick={() => handleExportRecord(form.id, 'full')} style={{ border: isAdminDarkTheme ? '1px solid #2f7f58' : '1px solid #bbf7d0', background: isAdminDarkTheme ? '#1a2a1a' : '#f0fdf4', color: isAdminDarkTheme ? '#91e0b4' : '#166534', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}>
                   Export Intake + Transfer Report
                 </button>
-                <button type="button" onClick={() => handleExportRecord(form.id, 'intake-only')} style={{ border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #cbd5e1', background: isAdminDarkTheme ? '#14181f' : '#fff', color: isAdminDarkTheme ? '#e5e7eb' : '#0f172a', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}>
+                <button type="button" onClick={() => handleExportRecord(form.id, 'intake-only')} style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #cbd5e1', background: isAdminDarkTheme ? '#1a1a1a' : '#fff', color: isAdminDarkTheme ? '#e5e7eb' : '#0f172a', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}>
                   Export Intake Only
                 </button>
               </>
             )}
             {((form.id && canEdit) || (!form.id && canCreate)) && (
-              <button type="button" onClick={() => saveRecord('draft')} disabled={saving} style={{ border: isAdminDarkTheme ? '1px solid #4a505a' : '1px solid #dbeafe', background: isAdminDarkTheme ? '#242a33' : '#eff6ff', color: isAdminDarkTheme ? '#e4e4e7' : '#1d4ed8', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}>
+              <button type="button" onClick={() => saveRecord('draft')} disabled={saving} style={{ border: isAdminDarkTheme ? '1px solid #3f3f3f' : '1px solid #dbeafe', background: isAdminDarkTheme ? '#242424' : '#eff6ff', color: isAdminDarkTheme ? '#e4e4e7' : '#1d4ed8', borderRadius: '8px', padding: '0.45rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}>
                 {saving ? 'Saving...' : 'Save Draft'}
               </button>
             )}
@@ -1324,7 +1324,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
         </div>
 
         {form.id && canEdit && form.status === 'finalized' && String(form.locationCode || '').trim().toUpperCase() === 'BT' && (
-          <div style={{ marginTop: '0.85rem', border: isAdminDarkTheme ? '1px solid #4a505a' : '1px solid #dbeafe', background: isAdminDarkTheme ? '#232931' : '#f8fbff', borderRadius: '12px', padding: '0.8rem' }}>
+          <div style={{ marginTop: '0.85rem', border: isAdminDarkTheme ? '1px solid #3f3f3f' : '1px solid #dbeafe', background: isAdminDarkTheme ? '#222222' : '#f8fbff', borderRadius: '12px', padding: '0.8rem' }}>
             <div style={{ fontSize: '0.8rem', fontWeight: 800, color: isAdminDarkTheme ? '#e4e4e7' : '#1d4ed8' }}>GRN Handling</div>
             <div style={{ marginTop: '0.25rem', fontSize: '0.82rem', color: colors.mutedText, lineHeight: 1.5 }}>
               Default mode is auto-generated GRN. The Blantyre POS agent checks both pending and approved POS stock tables for the intake date and picks the next safe GRN in format {`GRN_${buildGrnDatePartFromInput(form.purchaseDate)}-###`}.
@@ -1358,7 +1358,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                   placeholder={`GRN_${buildGrnDatePartFromInput(form.purchaseDate)}-001`}
                   style={{
                     ...themedInputStyle,
-                    backgroundColor: form.transferGrnMode === 'manual' ? themedInputStyle.backgroundColor : (isAdminDarkTheme ? '#12161c' : '#f8fafc'),
+                    backgroundColor: form.transferGrnMode === 'manual' ? themedInputStyle.backgroundColor : (isAdminDarkTheme ? '#181818' : '#f8fafc'),
                     color: form.transferGrnMode === 'manual' ? themedInputStyle.color : colors.subtleText,
                   }}
                 />
@@ -1368,7 +1368,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
         )}
 
         {form.status === 'finalized' && lastFinalizePriceSync && (
-          <div style={{ marginTop: '0.85rem', border: isAdminDarkTheme ? '1px solid #4a505a' : '1px solid #bfdbfe', background: isAdminDarkTheme ? '#242a33' : '#eff6ff', borderRadius: '12px', padding: '0.8rem' }}>
+          <div style={{ marginTop: '0.85rem', border: isAdminDarkTheme ? '1px solid #3f3f3f' : '1px solid #bfdbfe', background: isAdminDarkTheme ? '#242424' : '#eff6ff', borderRadius: '12px', padding: '0.8rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.65rem', flexWrap: 'wrap', alignItems: 'center' }}>
               <div style={{ fontSize: '0.82rem', fontWeight: 800, color: isAdminDarkTheme ? '#e4e4e7' : '#1d4ed8' }}>Price Sync Status After Finalize</div>
               {renderPriceSyncStatusBadge({
@@ -1380,7 +1380,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
               }, { compact: true })}
             </div>
             <div style={{ marginTop: '0.45rem', display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
-              <span style={{ border: isAdminDarkTheme ? '1px solid #4a505a' : '1px solid #dbeafe', background: isAdminDarkTheme ? '#1b2027' : '#fff', color: isAdminDarkTheme ? '#e4e4e7' : '#1e3a8a', borderRadius: '999px', padding: '0.18rem 0.5rem', fontSize: '0.74rem', fontWeight: 700 }}>
+              <span style={{ border: isAdminDarkTheme ? '1px solid #3f3f3f' : '1px solid #dbeafe', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: isAdminDarkTheme ? '#e4e4e7' : '#1e3a8a', borderRadius: '999px', padding: '0.18rem 0.5rem', fontSize: '0.74rem', fontWeight: 700 }}>
                 Attempted: {lastFinalizePriceSync.attempted}
               </span>
               <span style={{ border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: '999px', padding: '0.18rem 0.5rem', fontSize: '0.74rem', fontWeight: 700 }}>
@@ -1406,7 +1406,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
               value={form.supplierId}
               onChange={(event) => setForm((prev) => ({ ...prev, supplierId: event.target.value }))}
               onKeyDown={handleEntryFieldEnter}
-              style={{ ...themedInputStyle, backgroundColor: supplierLoading ? (isAdminDarkTheme ? '#12161c' : '#f8fafc') : themedInputStyle.backgroundColor }}
+              style={{ ...themedInputStyle, backgroundColor: supplierLoading ? (isAdminDarkTheme ? '#181818' : '#f8fafc') : themedInputStyle.backgroundColor }}
             >
               <option value="">Select supplier</option>
               {suppliers.map((supplier) => (
@@ -1427,7 +1427,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
 
           <div>
             <label style={{ display: 'block', fontSize: '0.78rem', color: '#64748b', marginBottom: '0.25rem' }}>Status</label>
-            <input value={String(form.status || 'draft').toUpperCase()} disabled style={{ ...themedInputStyle, backgroundColor: isAdminDarkTheme ? '#1b2027' : '#f8fafc', color: isAdminDarkTheme ? '#d4d4d8' : '#334155' }} />
+            <input value={String(form.status || 'draft').toUpperCase()} disabled style={{ ...themedInputStyle, backgroundColor: isAdminDarkTheme ? '#1e1e1e' : '#f8fafc', color: isAdminDarkTheme ? '#d4d4d8' : '#334155' }} />
           </div>
 
           <div>
@@ -1484,26 +1484,26 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
         </div>
 
         {isLineEntryDisabled && (
-          <div style={{ marginTop: '1rem', border: isAdminDarkTheme ? '1px solid #4a505a' : '1px solid #bfdbfe', background: isAdminDarkTheme ? '#242a33' : '#eff6ff', color: isAdminDarkTheme ? '#e4e4e7' : '#1e3a8a', borderRadius: '10px', padding: '0.65rem 0.8rem', fontSize: '0.82rem', fontWeight: 600 }}>
+          <div style={{ marginTop: '1rem', border: isAdminDarkTheme ? '1px solid #3f3f3f' : '1px solid #bfdbfe', background: isAdminDarkTheme ? '#242424' : '#eff6ff', color: isAdminDarkTheme ? '#e4e4e7' : '#1e3a8a', borderRadius: '10px', padding: '0.65rem 0.8rem', fontSize: '0.82rem', fontWeight: 600 }}>
             Select Branch / Location to enable line entry.
           </div>
         )}
 
         <fieldset disabled={isLineEntryDisabled} style={{ margin: 0, padding: 0, border: 'none', minInlineSize: 0, opacity: isLineEntryDisabled ? 0.56 : 1 }}>
           <div style={{ marginTop: '1rem', display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            {(canCreate || canEdit) && <button type="button" onClick={addLine} style={{ border: isAdminDarkTheme ? '1px solid #4a505a' : '1px solid #93c5fd', background: isAdminDarkTheme ? '#242a33' : '#eff6ff', color: isAdminDarkTheme ? '#e4e4e7' : '#1d4ed8', borderRadius: '8px', padding: '0.35rem 0.7rem', fontWeight: 600, cursor: isLineEntryDisabled ? 'not-allowed' : 'pointer' }}>Add Row</button>}
+            {(canCreate || canEdit) && <button type="button" onClick={addLine} style={{ border: isAdminDarkTheme ? '1px solid #3f3f3f' : '1px solid #93c5fd', background: isAdminDarkTheme ? '#242424' : '#eff6ff', color: isAdminDarkTheme ? '#e4e4e7' : '#1d4ed8', borderRadius: '8px', padding: '0.35rem 0.7rem', fontWeight: 600, cursor: isLineEntryDisabled ? 'not-allowed' : 'pointer' }}>Add Row</button>}
             <span style={{ fontSize: '0.8rem', color: colors.mutedText }}>Checks:</span>
             <span style={{ fontSize: '0.78rem', color: missingBarcodeCount ? '#b45309' : colors.mutedText }}>Missing barcode: {missingBarcodeCount}</span>
             <span style={{ fontSize: '0.78rem', color: missingExpiryCount ? '#b45309' : colors.mutedText }}>Missing expiry: {missingExpiryCount}</span>
           </div>
 
           {lookupWarning && (
-            <div style={{ marginTop: '0.75rem', border: isAdminDarkTheme ? '1px solid #7f4a2f' : '1px solid #fdba74', background: isAdminDarkTheme ? '#2e211b' : '#fff7ed', color: isAdminDarkTheme ? '#fdba74' : '#9a3412', borderRadius: '10px', padding: '0.7rem 0.85rem', fontSize: '0.84rem', fontWeight: 600 }}>
+            <div style={{ marginTop: '0.75rem', border: isAdminDarkTheme ? '1px solid #7f4a2f' : '1px solid #fdba74', background: isAdminDarkTheme ? '#26201a' : '#fff7ed', color: isAdminDarkTheme ? '#fdba74' : '#9a3412', borderRadius: '10px', padding: '0.7rem 0.85rem', fontSize: '0.84rem', fontWeight: 600 }}>
               {lookupWarning}
             </div>
           )}
 
-          <div style={{ marginTop: '0.8rem', width: '100%', maxWidth: '100%', overflowX: 'auto', border: isAdminDarkTheme ? '1px solid #2f353d' : '1px solid #dbe5f0', borderRadius: '12px', background: isAdminDarkTheme ? '#12161c' : '#ffffff' }}>
+          <div style={{ marginTop: '0.8rem', width: '100%', maxWidth: '100%', overflowX: 'auto', border: isAdminDarkTheme ? '1px solid #2d2d2d' : '1px solid #dbe5f0', borderRadius: '12px', background: isAdminDarkTheme ? '#181818' : '#ffffff' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
             <colgroup>
               <col style={{ width: '3%' }} />
@@ -1522,7 +1522,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
             <thead>
               <tr>
                 {['#', 'Barcode', 'Product Name', 'Qty', 'Unit Cost', 'Total Cost', 'Selling Price', 'Margin %', 'Est. Profit', 'Expiry Date', 'Comments', 'Actions'].map((label) => (
-                  <th key={label} style={{ textAlign: 'left', fontSize: '0.72rem', color: colors.mutedText, fontWeight: 700, padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, background: isAdminDarkTheme ? '#1b2027' : '#f8fafc', whiteSpace: 'nowrap' }}>{label}</th>
+                  <th key={label} style={{ textAlign: 'left', fontSize: '0.72rem', color: colors.mutedText, fontWeight: 700, padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, background: isAdminDarkTheme ? '#1e1e1e' : '#f8fafc', whiteSpace: 'nowrap' }}>{label}</th>
                 ))}
               </tr>
             </thead>
@@ -1534,10 +1534,10 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                 const displayStock = lineLiveStock?.latestSyncedStock ?? line.latestSyncedStock;
                 const displayStockStatus = String(lineLiveStock?.stockStatus || line.stockStatus || '');
                 const syncedStockTone = displayStockStatus === 'out_of_stock'
-                  ? { color: '#b91c1c', bg: isAdminDarkTheme ? '#3a1115' : '#fff1f2', border: isAdminDarkTheme ? '#7f1d1d' : '#fecdd3', label: 'Out of stock' }
+                  ? { color: '#b91c1c', bg: isAdminDarkTheme ? '#2d1a1a' : '#fff1f2', border: isAdminDarkTheme ? '#7f1d1d' : '#fecdd3', label: 'Out of stock' }
                   : displayStockStatus === 'low_stock'
-                    ? { color: '#b45309', bg: isAdminDarkTheme ? '#2c2615' : '#fffbeb', border: isAdminDarkTheme ? '#7a5f2a' : '#fcd34d', label: 'Low stock' }
-                    : { color: '#166534', bg: isAdminDarkTheme ? '#173127' : '#f0fdf4', border: isAdminDarkTheme ? '#2f7f58' : '#bbf7d0', label: 'In stock' };
+                    ? { color: '#b45309', bg: isAdminDarkTheme ? '#242418' : '#fffbeb', border: isAdminDarkTheme ? '#7a5f2a' : '#fcd34d', label: 'Low stock' }
+                    : { color: '#166534', bg: isAdminDarkTheme ? '#1a2a1a' : '#f0fdf4', border: isAdminDarkTheme ? '#2f7f58' : '#bbf7d0', label: 'In stock' };
                 return (
                   <tr key={`line-${index}`}>
                     <td style={{ fontWeight: 700, color: colors.subtleText, fontSize: '0.8rem', padding: '0.5rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>{index + 1}</td>
@@ -1548,7 +1548,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                         onKeyDown={(event) => handleEntryFieldEnter(event, { lookupRowIndex: index })}
                         onChange={(event) => setLineValue(index, 'barcode', event.target.value)}
                         onBlur={() => handleLookup(index)}
-                        style={{ ...compactLineInputStyle, backgroundColor: line.productName && !line.barcode ? (isAdminDarkTheme ? '#2e211b' : '#fff7ed') : compactLineInputStyle.backgroundColor }}
+                        style={{ ...compactLineInputStyle, backgroundColor: line.productName && !line.barcode ? (isAdminDarkTheme ? '#26201a' : '#fff7ed') : compactLineInputStyle.backgroundColor }}
                         placeholder="scan/manual"
                       />
                       <div style={{ marginTop: '0.18rem', fontSize: '0.7rem', color: colors.mutedText, lineHeight: 1.25, overflowWrap: 'anywhere' }}>{line.barcode || '-'}</div>
@@ -1584,12 +1584,12 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                     </td>
                     <td style={{ color: colors.text, fontWeight: 700, fontSize: '0.8rem', padding: '0.5rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, whiteSpace: 'nowrap', verticalAlign: 'top' }}>{money(line.totalCost)}</td>
                     <td style={{ padding: '0.4rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
-                      <input type="number" min="0" step="0.01" value={line.sellingPrice == null ? '' : line.sellingPrice} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'sellingPrice', event.target.value)} style={{ ...compactLineInputStyle, borderColor: belowCost ? '#f59e0b' : (isAdminDarkTheme ? '#3a4048' : '#cbd5e1'), backgroundColor: belowCost ? (isAdminDarkTheme ? '#2c2615' : '#fffbeb') : compactLineInputStyle.backgroundColor }} />
+                      <input type="number" min="0" step="0.01" value={line.sellingPrice == null ? '' : line.sellingPrice} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'sellingPrice', event.target.value)} style={{ ...compactLineInputStyle, borderColor: belowCost ? '#f59e0b' : (isAdminDarkTheme ? '#333333' : '#cbd5e1'), backgroundColor: belowCost ? (isAdminDarkTheme ? '#242418' : '#fffbeb') : compactLineInputStyle.backgroundColor }} />
                     </td>
                     <td style={{ fontWeight: 700, color: colors.subtleText, fontSize: '0.8rem', padding: '0.5rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, whiteSpace: 'nowrap', verticalAlign: 'top' }}>{line.marginPercent == null ? '-' : `${line.marginPercent.toFixed(2)}%`}</td>
                     <td style={{ fontWeight: 700, color: line.estimatedProfit >= 0 ? '#166534' : '#b91c1c', fontSize: '0.8rem', padding: '0.5rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, whiteSpace: 'nowrap', verticalAlign: 'top' }}>{money(line.estimatedProfit)}</td>
                     <td style={{ padding: '0.4rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
-                      <input type="date" value={line.expiryDate || ''} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'expiryDate', event.target.value)} style={{ ...compactLineInputStyle, backgroundColor: line.productName && !line.expiryDate ? (isAdminDarkTheme ? '#2e211b' : '#fff7ed') : compactLineInputStyle.backgroundColor }} />
+                      <input type="date" value={line.expiryDate || ''} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'expiryDate', event.target.value)} style={{ ...compactLineInputStyle, backgroundColor: line.productName && !line.expiryDate ? (isAdminDarkTheme ? '#26201a' : '#fff7ed') : compactLineInputStyle.backgroundColor }} />
                     </td>
                     <td style={{ padding: '0.4rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
                       <input value={line.lineNotes || ''} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'lineNotes', event.target.value)} style={compactLineInputStyle} />
@@ -1597,8 +1597,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                     <td style={{ padding: '0.4rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
                       {(canCreate || canEdit) && (
                         <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
-                          <button type="button" onClick={() => duplicateLine(index)} style={{ border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #cbd5e1', background: isAdminDarkTheme ? '#1b2027' : '#fff', color: colors.text, borderRadius: '7px', padding: '0.25rem 0.45rem', fontWeight: 600, fontSize: '0.76rem', cursor: 'pointer' }}>Dup</button>
-                          <button type="button" onClick={() => removeLine(index)} style={{ border: '1px solid #fecaca', background: isAdminDarkTheme ? '#3a1115' : '#fff5f5', color: '#b91c1c', borderRadius: '7px', padding: '0.25rem 0.45rem', fontWeight: 600, fontSize: '0.76rem', cursor: 'pointer' }}>Del</button>
+                          <button type="button" onClick={() => duplicateLine(index)} style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #cbd5e1', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text, borderRadius: '7px', padding: '0.25rem 0.45rem', fontWeight: 600, fontSize: '0.76rem', cursor: 'pointer' }}>Dup</button>
+                          <button type="button" onClick={() => removeLine(index)} style={{ border: '1px solid #fecaca', background: isAdminDarkTheme ? '#2d1a1a' : '#fff5f5', color: '#b91c1c', borderRadius: '7px', padding: '0.25rem 0.45rem', fontWeight: 600, fontSize: '0.76rem', cursor: 'pointer' }}>Del</button>
                         </div>
                       )}
                       {activeLookupRow === index && <div style={{ marginTop: '0.25rem', fontSize: '0.72rem', color: '#2563eb' }}>Looking up...</div>}
@@ -1612,19 +1612,19 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
         </fieldset>
 
         <div style={{ marginTop: '0.8rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.55rem', width: '100%', minWidth: 0 }}>
-          <div style={{ border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #e2e8f0', borderRadius: '12px', padding: '0.65rem', background: isAdminDarkTheme ? '#14181f' : '#f8fafc' }}>
+          <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '12px', padding: '0.65rem', background: isAdminDarkTheme ? '#1a1a1a' : '#f8fafc' }}>
             <div style={{ fontSize: '0.72rem', color: colors.mutedText, fontWeight: 700 }}>TOTAL LINES</div>
             <div style={{ fontSize: '1.15rem', fontWeight: 800, color: colors.strongText }}>{totals.totalItems}</div>
           </div>
-          <div style={{ border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #e2e8f0', borderRadius: '12px', padding: '0.65rem', background: isAdminDarkTheme ? '#14181f' : '#f8fafc' }}>
+          <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '12px', padding: '0.65rem', background: isAdminDarkTheme ? '#1a1a1a' : '#f8fafc' }}>
             <div style={{ fontSize: '0.72rem', color: colors.mutedText, fontWeight: 700 }}>TOTAL QUANTITY</div>
             <div style={{ fontSize: '1.15rem', fontWeight: 800, color: colors.strongText }}>{totals.totalQuantity.toLocaleString('en-US')}</div>
           </div>
-          <div style={{ border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #e2e8f0', borderRadius: '12px', padding: '0.65rem', background: isAdminDarkTheme ? '#14181f' : '#f8fafc' }}>
+          <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '12px', padding: '0.65rem', background: isAdminDarkTheme ? '#1a1a1a' : '#f8fafc' }}>
             <div style={{ fontSize: '0.72rem', color: colors.mutedText, fontWeight: 700 }}>TOTAL COST</div>
             <div style={{ fontSize: '1.15rem', fontWeight: 800, color: colors.strongText }}>{money(totals.totalCost)}</div>
           </div>
-          <div style={{ border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #e2e8f0', borderRadius: '12px', padding: '0.65rem', background: isAdminDarkTheme ? '#14181f' : '#f8fafc' }}>
+          <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '12px', padding: '0.65rem', background: isAdminDarkTheme ? '#1a1a1a' : '#f8fafc' }}>
             <div style={{ fontSize: '0.72rem', color: colors.mutedText, fontWeight: 700 }}>EST. PROFIT</div>
             <div style={{ fontSize: '1.15rem', fontWeight: 800, color: totals.totalEstimatedProfit >= 0 ? '#166534' : '#b91c1c' }}>{money(totals.totalEstimatedProfit)}</div>
           </div>
@@ -1644,13 +1644,13 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
               </div>
             </div>
             <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
-              <span style={{ border: isAdminDarkTheme ? '1px solid #4a505a' : '1px solid #dbeafe', background: isAdminDarkTheme ? '#242a33' : '#eff6ff', color: isAdminDarkTheme ? '#e4e4e7' : '#1d4ed8', borderRadius: '999px', fontSize: '0.74rem', fontWeight: 700, padding: '0.22rem 0.55rem' }}>
+              <span style={{ border: isAdminDarkTheme ? '1px solid #3f3f3f' : '1px solid #dbeafe', background: isAdminDarkTheme ? '#242424' : '#eff6ff', color: isAdminDarkTheme ? '#e4e4e7' : '#1d4ed8', borderRadius: '999px', fontSize: '0.74rem', fontWeight: 700, padding: '0.22rem 0.55rem' }}>
                 Finalized: {finalizedRecordsCount}
               </span>
-              <span style={{ border: isAdminDarkTheme ? '1px solid #7a5f2a' : '1px solid #fde68a', background: isAdminDarkTheme ? '#2c2615' : '#fefce8', color: isAdminDarkTheme ? '#facc15' : '#92400e', borderRadius: '999px', fontSize: '0.74rem', fontWeight: 700, padding: '0.22rem 0.55rem' }}>
+              <span style={{ border: isAdminDarkTheme ? '1px solid #7a5f2a' : '1px solid #fde68a', background: isAdminDarkTheme ? '#242418' : '#fefce8', color: isAdminDarkTheme ? '#facc15' : '#92400e', borderRadius: '999px', fontSize: '0.74rem', fontWeight: 700, padding: '0.22rem 0.55rem' }}>
                 Queued POS: {queuedTransfersCount}
               </span>
-              <span style={{ border: isAdminDarkTheme ? '1px solid #454b55' : '1px solid #bfdbfe', background: isAdminDarkTheme ? '#232931' : '#eff6ff', color: isAdminDarkTheme ? '#d4d4d8' : '#1e40af', borderRadius: '999px', fontSize: '0.74rem', fontWeight: 700, padding: '0.22rem 0.55rem' }}>
+              <span style={{ border: isAdminDarkTheme ? '1px solid #3a3a3a' : '1px solid #bfdbfe', background: isAdminDarkTheme ? '#222222' : '#eff6ff', color: isAdminDarkTheme ? '#d4d4d8' : '#1e40af', borderRadius: '999px', fontSize: '0.74rem', fontWeight: 700, padding: '0.22rem 0.55rem' }}>
                 Price Sync Records: {priceSyncRecordsCount}
               </span>
             </div>
@@ -1684,7 +1684,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
                 <div style={{ fontSize: '0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: isAdminDarkTheme ? '#facc15' : '#92400e', fontWeight: 800 }}>Recovery</div>
-                <span style={{ border: isAdminDarkTheme ? '1px solid #7a5f2a' : '1px solid #fde68a', background: isAdminDarkTheme ? '#3a331e' : '#fef3c7', color: isAdminDarkTheme ? '#facc15' : '#92400e', borderRadius: '999px', fontSize: '0.71rem', fontWeight: 800, padding: '0.14rem 0.45rem' }}>{autosaveCount}</span>
+                <span style={{ border: isAdminDarkTheme ? '1px solid #7a5f2a' : '1px solid #fde68a', background: isAdminDarkTheme ? '#2e2a18' : '#fef3c7', color: isAdminDarkTheme ? '#facc15' : '#92400e', borderRadius: '999px', fontSize: '0.71rem', fontWeight: 800, padding: '0.14rem 0.45rem' }}>{autosaveCount}</span>
               </div>
               <div style={{ marginTop: '0.35rem', fontSize: '0.96rem', color: colors.strongText, fontWeight: 800 }}>Recover Auto-Saved Intake</div>
               <div style={{ marginTop: '0.3rem', fontSize: '0.82rem', color: colors.mutedText }}>Open unsaved intake sessions and continue where you left off.</div>
@@ -1717,7 +1717,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
                 <div style={{ fontSize: '0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: isAdminDarkTheme ? '#d4d4d8' : '#1e40af', fontWeight: 800 }}>Sync</div>
-                <span style={{ border: isAdminDarkTheme ? '1px solid #454b55' : '1px solid #bfdbfe', background: isAdminDarkTheme ? '#2a3038' : '#dbeafe', color: isAdminDarkTheme ? '#d4d4d8' : '#1e40af', borderRadius: '999px', fontSize: '0.71rem', fontWeight: 800, padding: '0.14rem 0.45rem' }}>{priceSyncRecordsCount}</span>
+                <span style={{ border: isAdminDarkTheme ? '1px solid #3a3a3a' : '1px solid #bfdbfe', background: isAdminDarkTheme ? '#282828' : '#dbeafe', color: isAdminDarkTheme ? '#d4d4d8' : '#1e40af', borderRadius: '999px', fontSize: '0.71rem', fontWeight: 800, padding: '0.14rem 0.45rem' }}>{priceSyncRecordsCount}</span>
               </div>
               <div style={{ marginTop: '0.35rem', fontSize: '0.96rem', color: colors.strongText, fontWeight: 800 }}>Price Sync History</div>
               <div style={{ marginTop: '0.3rem', fontSize: '0.82rem', color: colors.mutedText }}>View product-level price sync commands, statuses, errors, and agent outcomes.</div>
@@ -1737,12 +1737,12 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
 
       {isIntakeWorkspaceOpen && canViewForm && (
         <div style={{ position: 'fixed', inset: 0, background: 'radial-gradient(circle at 22% 12%, rgba(120, 120, 120, 0.18), rgba(12, 14, 18, 0.72) 45%)', backdropFilter: 'blur(2px)', zIndex: 170, display: 'grid', placeItems: 'center', padding: isIntakeWorkspaceMaximized ? '0.35rem' : '1rem' }}>
-          <div style={{ ...themedCardStyle, width: isIntakeWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1480px, 98vw)', height: isIntakeWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isIntakeWorkspaceMaximized ? '10px' : '20px', display: 'flex', flexDirection: 'column', padding: '0.95rem', boxShadow: isAdminDarkTheme ? '0 28px 70px rgba(0, 0, 0, 0.56)' : '0 28px 70px rgba(15, 23, 42, 0.25)', border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #dbeafe' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', border: isAdminDarkTheme ? '1px solid #2f353d' : '1px solid #dbeafe', borderRadius: '14px', padding: '0.75rem 0.85rem', background: isAdminDarkTheme ? 'linear-gradient(140deg, #14181f 0%, #1b2027 55%)' : 'linear-gradient(140deg, #eff6ff 0%, #ffffff 55%)' }}>
+          <div style={{ ...themedCardStyle, width: isIntakeWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1480px, 98vw)', height: isIntakeWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isIntakeWorkspaceMaximized ? '10px' : '20px', display: 'flex', flexDirection: 'column', padding: '0.95rem', boxShadow: isAdminDarkTheme ? '0 28px 70px rgba(0, 0, 0, 0.56)' : '0 28px 70px rgba(15, 23, 42, 0.25)', border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #dbeafe' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', border: isAdminDarkTheme ? '1px solid #2d2d2d' : '1px solid #dbeafe', borderRadius: '14px', padding: '0.75rem 0.85rem', background: isAdminDarkTheme ? 'linear-gradient(140deg, #1a1a1a 0%, #1e1e1e 55%)' : 'linear-gradient(140deg, #eff6ff 0%, #ffffff 55%)' }}>
               <div>
                 <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: isAdminDarkTheme ? '#d4d4d8' : '#2563eb', fontWeight: 800 }}>Stock Intake</div>
                 <div style={{ marginTop: '0.2rem', fontSize: '0.95rem', fontWeight: 800, color: isAdminDarkTheme ? '#f8fafc' : '#111827' }}>Supplier: {selectedSupplierName}</div>
-                <div style={{ marginTop: '0.16rem', fontSize: '0.75rem', color: isAdminDarkTheme ? '#94a3b8' : '#475569' }}>Capture intake lines, save progress, and finalize from one workspace.</div>
+                <div style={{ marginTop: '0.16rem', fontSize: '0.75rem', color: isAdminDarkTheme ? '#a0a0a0' : '#475569' }}>Capture intake lines, save progress, and finalize from one workspace.</div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                 <button
@@ -1750,21 +1750,21 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                   title={isIntakeWorkspaceMaximized ? 'Restore' : 'Maximize'}
                   aria-label={isIntakeWorkspaceMaximized ? 'Restore workspace' : 'Maximize workspace'}
                   onClick={() => setIsIntakeWorkspaceMaximized((prev) => !prev)}
-                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #bfdbfe', background: isAdminDarkTheme ? '#14181f' : '#fff', color: isAdminDarkTheme ? '#d4d4d8' : '#334155', cursor: 'pointer' }}
+                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #bfdbfe', background: isAdminDarkTheme ? '#1a1a1a' : '#fff', color: isAdminDarkTheme ? '#d4d4d8' : '#334155', cursor: 'pointer' }}
                 >
                   <i className={`fas ${isIntakeWorkspaceMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
                 </button>
                 <button
                   type="button"
                   onClick={handleCloseWorkspace}
-                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: isAdminDarkTheme ? '#3a1115' : '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}
+                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: isAdminDarkTheme ? '#2d1a1a' : '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}
                 >
                   <i className="fas fa-times" />
                 </button>
               </div>
             </div>
 
-            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0.35rem', borderRadius: '14px', border: isAdminDarkTheme ? '1px solid #2f353d' : '1px solid #e2e8f0', background: isAdminDarkTheme ? '#12161c' : '#f8fbff' }}>
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0.35rem', borderRadius: '14px', border: isAdminDarkTheme ? '1px solid #2d2d2d' : '1px solid #e2e8f0', background: isAdminDarkTheme ? '#181818' : '#f8fbff' }}>
               {workspaceContent}
             </div>
           </div>
@@ -1784,7 +1784,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                   <button
                     type="button"
                     onClick={clearAllAutosaveEntries}
-                    style={{ border: '1px solid #fecaca', background: isAdminDarkTheme ? '#3a1115' : '#fff5f5', color: '#b91c1c', borderRadius: '8px', padding: '0.34rem 0.7rem', fontWeight: 700, cursor: 'pointer' }}
+                    style={{ border: '1px solid #fecaca', background: isAdminDarkTheme ? '#2d1a1a' : '#fff5f5', color: '#b91c1c', borderRadius: '8px', padding: '0.34rem 0.7rem', fontWeight: 700, cursor: 'pointer' }}
                   >
                     Clear All
                   </button>
@@ -1792,7 +1792,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                 <button
                   type="button"
                   onClick={() => setIsAutosaveRecoveryOpen(false)}
-                  style={{ width: '34px', height: '34px', borderRadius: '10px', border: '1px solid #fecaca', background: isAdminDarkTheme ? '#3a1115' : '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}
+                  style={{ width: '34px', height: '34px', borderRadius: '10px', border: '1px solid #fecaca', background: isAdminDarkTheme ? '#2d1a1a' : '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}
                 >
                   <i className="fas fa-times" />
                 </button>
@@ -1807,14 +1807,14 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
               ) : (
                 <div style={{ display: 'grid', gap: '0.6rem' }}>
                   {autosaveEntries.map((entry) => (
-                    <div key={entry.id} style={{ border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #e2e8f0', borderRadius: '12px', padding: '0.75rem', background: isAdminDarkTheme ? '#14181f' : '#fff' }}>
+                    <div key={entry.id} style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '12px', padding: '0.75rem', background: isAdminDarkTheme ? '#1a1a1a' : '#fff' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.7rem', flexWrap: 'wrap' }}>
                         <div style={{ display: 'grid', gap: '0.2rem' }}>
                           <div style={{ fontSize: '0.88rem', fontWeight: 800, color: colors.strongText }}>{entry.supplierName || 'Unassigned Supplier'}</div>
                           <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
                             {entry.locationName || entry.locationCode || 'No location'} • Purchase Date: {entry.purchaseDate || '-'} • Lines: {Number(entry.lineCount || 0)}
                           </div>
-                          <div style={{ fontSize: '0.76rem', color: '#94a3b8' }}>Last auto-save: {formatDateTime(entry.savedAt)}</div>
+                          <div style={{ fontSize: '0.76rem', color: '#a0a0a0' }}>Last auto-save: {formatDateTime(entry.savedAt)}</div>
                         </div>
                         <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                           <button
@@ -1827,7 +1827,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                           <button
                             type="button"
                             onClick={() => removeAutosaveEntry(entry.id)}
-                            style={{ border: '1px solid #fecaca', background: isAdminDarkTheme ? '#3a1115' : '#fff5f5', color: '#b91c1c', borderRadius: '8px', padding: '0.34rem 0.7rem', fontWeight: 700, cursor: 'pointer' }}
+                            style={{ border: '1px solid #fecaca', background: isAdminDarkTheme ? '#2d1a1a' : '#fff5f5', color: '#b91c1c', borderRadius: '8px', padding: '0.34rem 0.7rem', fontWeight: 700, cursor: 'pointer' }}
                           >
                             Delete
                           </button>
@@ -1844,8 +1844,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
 
       {isFinalizedHistoryOpen && canViewHistory && (
         <div style={{ position: 'fixed', inset: 0, background: 'radial-gradient(circle at 78% 10%, rgba(110, 110, 110, 0.16), rgba(12, 14, 18, 0.72) 48%)', backdropFilter: 'blur(2px)', zIndex: 172, display: 'grid', placeItems: 'center', padding: isFinalizedHistoryMaximized ? '0.35rem' : '1rem' }}>
-          <div style={{ ...themedCardStyle, width: isFinalizedHistoryMaximized ? 'calc(100vw - 0.7rem)' : 'min(1500px, 98vw)', height: isFinalizedHistoryMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isFinalizedHistoryMaximized ? '10px' : '20px', display: 'flex', flexDirection: 'column', padding: '0.95rem', boxShadow: isAdminDarkTheme ? '0 28px 70px rgba(0, 0, 0, 0.56)' : '0 28px 70px rgba(15, 23, 42, 0.25)', border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #bbf7d0' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap', border: isAdminDarkTheme ? '1px solid #2f353d' : '1px solid #bbf7d0', borderRadius: '14px', padding: '0.75rem 0.85rem', background: isAdminDarkTheme ? 'linear-gradient(140deg, #14181f 0%, #1b2027 55%)' : 'linear-gradient(140deg, #f0fdf4 0%, #ffffff 55%)' }}>
+          <div style={{ ...themedCardStyle, width: isFinalizedHistoryMaximized ? 'calc(100vw - 0.7rem)' : 'min(1500px, 98vw)', height: isFinalizedHistoryMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isFinalizedHistoryMaximized ? '10px' : '20px', display: 'flex', flexDirection: 'column', padding: '0.95rem', boxShadow: isAdminDarkTheme ? '0 28px 70px rgba(0, 0, 0, 0.56)' : '0 28px 70px rgba(15, 23, 42, 0.25)', border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #bbf7d0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap', border: isAdminDarkTheme ? '1px solid #2d2d2d' : '1px solid #bbf7d0', borderRadius: '14px', padding: '0.75rem 0.85rem', background: isAdminDarkTheme ? 'linear-gradient(140deg, #1a1a1a 0%, #1e1e1e 55%)' : 'linear-gradient(140deg, #f0fdf4 0%, #ffffff 55%)' }}>
               <div>
                 <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: isAdminDarkTheme ? '#86efac' : '#166534', fontWeight: 800 }}>History</div>
                 <div style={{ marginTop: '0.2rem', fontSize: '0.95rem', fontWeight: 800, color: isAdminDarkTheme ? '#f8fafc' : '#111827' }}>Finalized Intake Records</div>
@@ -1857,7 +1857,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                   title={isFinalizedHistoryMaximized ? 'Restore' : 'Maximize'}
                   aria-label={isFinalizedHistoryMaximized ? 'Restore finalized history' : 'Maximize finalized history'}
                   onClick={() => setIsFinalizedHistoryMaximized((prev) => !prev)}
-                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #bbf7d0', background: isAdminDarkTheme ? '#14181f' : '#fff', color: isAdminDarkTheme ? '#d4d4d8' : '#334155', cursor: 'pointer' }}
+                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #bbf7d0', background: isAdminDarkTheme ? '#1a1a1a' : '#fff', color: isAdminDarkTheme ? '#d4d4d8' : '#334155', cursor: 'pointer' }}
                 >
                   <i className={`fas ${isFinalizedHistoryMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
                 </button>
@@ -1867,15 +1867,15 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                     setIsFinalizedHistoryOpen(false);
                     setIsFinalizedHistoryMaximized(false);
                   }}
-                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: isAdminDarkTheme ? '#3a1115' : '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}
+                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: isAdminDarkTheme ? '#2d1a1a' : '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}
                 >
                   <i className="fas fa-times" />
                 </button>
               </div>
             </div>
 
-            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0.45rem', borderRadius: '14px', border: isAdminDarkTheme ? '1px solid #2f353d' : '1px solid #e2e8f0', background: isAdminDarkTheme ? '#12161c' : '#f8fbff', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', padding: '0.6rem 0.65rem', borderRadius: '10px', background: isAdminDarkTheme ? 'rgba(52, 58, 67, 0.45)' : '#ffffff', border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #dbeafe' }}>
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0.45rem', borderRadius: '14px', border: isAdminDarkTheme ? '1px solid #2d2d2d' : '1px solid #e2e8f0', background: isAdminDarkTheme ? '#181818' : '#f8fbff', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', padding: '0.6rem 0.65rem', borderRadius: '10px', background: isAdminDarkTheme ? 'rgba(0, 0, 0, 0.45)' : '#ffffff', border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #dbeafe' }}>
                 <h3 style={{ margin: 0, color: colors.text, fontSize: '0.9rem', lineHeight: 1.2 }}>Intake Records</h3>
                 <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
                   <input placeholder="Search ref/supplier/product" value={search} onFocus={selectInputText} onChange={(event) => setSearch(event.target.value)} style={{ ...themedInputStyle, width: '220px' }} />
@@ -1896,7 +1896,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                   <thead>
                     <tr>
                       {['Ref', 'Date', 'Supplier', 'Location', 'Intake Status', 'POS Transfer', 'Items', 'Total Cost', 'Actions'].map((label) => (
-                        <th key={label} style={{ textAlign: 'left', padding: '0.48rem 0.4rem', fontSize: '0.72rem', color: colors.mutedText, borderBottom: `1px solid ${isAdminDarkTheme ? '#3a4048' : '#e2e8f0'}` }}>{label}</th>
+                        <th key={label} style={{ textAlign: 'left', padding: '0.48rem 0.4rem', fontSize: '0.72rem', color: colors.mutedText, borderBottom: `1px solid ${isAdminDarkTheme ? '#333333' : '#e2e8f0'}` }}>{label}</th>
                       ))}
                     </tr>
                   </thead>
@@ -1921,9 +1921,9 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                         <td style={{ padding: '0.5rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, fontWeight: 700, color: colors.strongText, fontSize: '0.84rem' }}>{money(record.totalCost)}</td>
                         <td style={{ padding: '0.5rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}` }}>
                           <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                            {canEdit && canViewForm && <button type="button" onClick={() => handleEditRecord(record.id)} style={{ border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #cbd5e1', background: isAdminDarkTheme ? '#14181f' : '#fff', color: isAdminDarkTheme ? '#e5e7eb' : '#0f172a', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>Open</button>}
+                            {canEdit && canViewForm && <button type="button" onClick={() => handleEditRecord(record.id)} style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #cbd5e1', background: isAdminDarkTheme ? '#1a1a1a' : '#fff', color: isAdminDarkTheme ? '#e5e7eb' : '#0f172a', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>Open</button>}
                             {canExport && <button type="button" onClick={() => handleExportRecord(record.id, 'full')} style={{ border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>Export Intake + Transfer Report</button>}
-                            {canExport && <button type="button" onClick={() => handleExportRecord(record.id, 'intake-only')} style={{ border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #cbd5e1', background: isAdminDarkTheme ? '#1b2027' : '#fff', color: colors.text, borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>Export Intake Only</button>}
+                            {canExport && <button type="button" onClick={() => handleExportRecord(record.id, 'intake-only')} style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #cbd5e1', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text, borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>Export Intake Only</button>}
                             {canDelete && <button type="button" onClick={() => handleDeleteRecord(record)} style={{ border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 600, cursor: 'pointer' }}>Delete</button>}
                             {canViewHistory && <button type="button" onClick={() => openTransferDetail(record.id)} style={{ border: '1px solid #e9d5ff', background: '#faf5ff', color: '#6b21a8', borderRadius: '7px', padding: '0.28rem 0.55rem', fontWeight: 700, cursor: 'pointer' }}>Details</button>}
                             {canEdit && record.status === 'finalized' && String(record.locationCode || '').trim().toUpperCase() === 'BT' && (resolveTransferStatus(record) === 'not_transferred' || resolveTransferStatus(record) === 'failed') && (
@@ -1943,8 +1943,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                 <div style={{ marginTop: '0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.7rem', flexWrap: 'wrap' }}>
                   <div style={{ fontSize: '0.8rem', color: colors.mutedText }}>Page {pagination.page} of {pagination.totalPages} ({pagination.total} records)</div>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button type="button" onClick={() => setPage((prev) => Math.max(1, prev - 1))} disabled={pagination.page <= 1} style={{ border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #cbd5e1', borderRadius: '7px', background: isAdminDarkTheme ? '#14181f' : '#fff', color: isAdminDarkTheme ? '#e5e7eb' : '#0f172a', padding: '0.3rem 0.65rem', cursor: 'pointer' }}>Prev</button>
-                    <button type="button" onClick={() => setPage((prev) => Math.min(pagination.totalPages, prev + 1))} disabled={pagination.page >= pagination.totalPages} style={{ border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #cbd5e1', borderRadius: '7px', background: isAdminDarkTheme ? '#14181f' : '#fff', color: isAdminDarkTheme ? '#e5e7eb' : '#0f172a', padding: '0.3rem 0.65rem', cursor: 'pointer' }}>Next</button>
+                    <button type="button" onClick={() => setPage((prev) => Math.max(1, prev - 1))} disabled={pagination.page <= 1} style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #cbd5e1', borderRadius: '7px', background: isAdminDarkTheme ? '#1a1a1a' : '#fff', color: isAdminDarkTheme ? '#e5e7eb' : '#0f172a', padding: '0.3rem 0.65rem', cursor: 'pointer' }}>Prev</button>
+                    <button type="button" onClick={() => setPage((prev) => Math.min(pagination.totalPages, prev + 1))} disabled={pagination.page >= pagination.totalPages} style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #cbd5e1', borderRadius: '7px', background: isAdminDarkTheme ? '#1a1a1a' : '#fff', color: isAdminDarkTheme ? '#e5e7eb' : '#0f172a', padding: '0.3rem 0.65rem', cursor: 'pointer' }}>Next</button>
                   </div>
                 </div>
               )}
@@ -1966,7 +1966,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                   title={isTransferHistoryMaximized ? 'Restore' : 'Maximize'}
                   aria-label={isTransferHistoryMaximized ? 'Restore transfer history' : 'Maximize transfer history'}
                   onClick={() => setIsTransferHistoryMaximized((prev) => !prev)}
-                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #e2e8f0', background: isAdminDarkTheme ? '#14181f' : '#fff', color: isAdminDarkTheme ? '#d4d4d8' : '#334155', cursor: 'pointer' }}
+                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', background: isAdminDarkTheme ? '#1a1a1a' : '#fff', color: isAdminDarkTheme ? '#d4d4d8' : '#334155', cursor: 'pointer' }}
                 >
                   <i className={`fas ${isTransferHistoryMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
                 </button>
@@ -1976,7 +1976,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                     setIsTransferHistoryOpen(false);
                     setIsTransferHistoryMaximized(false);
                   }}
-                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: isAdminDarkTheme ? '#3a1115' : '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}
+                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: isAdminDarkTheme ? '#2d1a1a' : '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}
                 >
                   <i className="fas fa-times" />
                 </button>
@@ -2021,7 +2021,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                   <thead>
                     <tr>
                       {['Ref', 'GRN', 'Supplier', 'Location', 'Intake Date', 'Items', 'Total Cost', 'Transfer Status', 'Queued Time', 'Completed Time', 'Agent Message', 'Actions'].map((label) => (
-                        <th key={label} style={{ textAlign: 'left', padding: '0.48rem 0.4rem', fontSize: '0.72rem', color: colors.mutedText, borderBottom: `1px solid ${isAdminDarkTheme ? '#3a4048' : '#e2e8f0'}` }}>{label}</th>
+                        <th key={label} style={{ textAlign: 'left', padding: '0.48rem 0.4rem', fontSize: '0.72rem', color: colors.mutedText, borderBottom: `1px solid ${isAdminDarkTheme ? '#333333' : '#e2e8f0'}` }}>{label}</th>
                       ))}
                     </tr>
                   </thead>
@@ -2057,7 +2057,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                             <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
                               <button type="button" onClick={() => openTransferDetail(record.id)} style={{ border: '1px solid #c7d2fe', background: '#eef2ff', color: '#4338ca', borderRadius: '7px', padding: '0.25rem 0.5rem', fontWeight: 700, cursor: 'pointer' }}>View</button>
                               {canExport && <button type="button" onClick={() => handleExportRecord(record.id, 'full')} style={{ border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: '7px', padding: '0.25rem 0.5rem', fontWeight: 700, cursor: 'pointer' }}>Export Intake + Transfer Report</button>}
-                              {canExport && <button type="button" onClick={() => handleExportRecord(record.id, 'intake-only')} style={{ border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #cbd5e1', background: isAdminDarkTheme ? '#1b2027' : '#fff', color: colors.text, borderRadius: '7px', padding: '0.25rem 0.5rem', fontWeight: 700, cursor: 'pointer' }}>Export Intake Only</button>}
+                              {canExport && <button type="button" onClick={() => handleExportRecord(record.id, 'intake-only')} style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #cbd5e1', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text, borderRadius: '7px', padding: '0.25rem 0.5rem', fontWeight: 700, cursor: 'pointer' }}>Export Intake Only</button>}
                               {canEdit && resolveTransferStatus(record) === 'failed' && (
                                 <button type="button" onClick={() => handleTransferToPOS(record.id)} disabled={transferring} style={{ border: '1px solid #fb923c', background: '#fff7ed', color: '#c2410c', borderRadius: '7px', padding: '0.25rem 0.5rem', fontWeight: 700, cursor: 'pointer' }}>Retry</button>
                               )}
@@ -2088,7 +2088,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                   title={isPriceSyncHistoryMaximized ? 'Restore' : 'Maximize'}
                   aria-label={isPriceSyncHistoryMaximized ? 'Restore price sync history' : 'Maximize price sync history'}
                   onClick={() => setIsPriceSyncHistoryMaximized((prev) => !prev)}
-                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #e2e8f0', background: isAdminDarkTheme ? '#14181f' : '#fff', color: isAdminDarkTheme ? '#d4d4d8' : '#334155', cursor: 'pointer' }}
+                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', background: isAdminDarkTheme ? '#1a1a1a' : '#fff', color: isAdminDarkTheme ? '#d4d4d8' : '#334155', cursor: 'pointer' }}
                 >
                   <i className={`fas ${isPriceSyncHistoryMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
                 </button>
@@ -2099,7 +2099,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                     setIsPriceSyncHistoryMaximized(false);
                     setActivePriceSyncRecord(null);
                   }}
-                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: isAdminDarkTheme ? '#3a1115' : '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}
+                  style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: isAdminDarkTheme ? '#2d1a1a' : '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}
                 >
                   <i className="fas fa-times" />
                 </button>
@@ -2107,8 +2107,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
             </div>
 
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingRight: '0.2rem' }}>
-              <div style={{ border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', background: isAdminDarkTheme ? '#14181f' : '#fff' }}>
-                <div style={{ padding: '0.7rem 0.8rem', borderBottom: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', background: isAdminDarkTheme ? '#1a1a1a' : '#fff' }}>
+                <div style={{ padding: '0.7rem 0.8rem', borderBottom: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <h3 style={{ margin: 0, color: colors.text, fontSize: '0.88rem' }}>Finalized Intake Records With Price Sync</h3>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
                     <select
@@ -2130,7 +2130,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                     <thead>
                       <tr>
                         {['Ref', 'Supplier', 'Location', 'Intake Date', 'Sync Status', 'Attempted', 'Queued', 'Completed', 'Failed', 'Last Activity', 'Actions'].map((label) => (
-                          <th key={label} style={{ textAlign: 'left', padding: '0.46rem 0.38rem', fontSize: '0.72rem', color: colors.mutedText, borderBottom: `1px solid ${isAdminDarkTheme ? '#3a4048' : '#e2e8f0'}` }}>{label}</th>
+                          <th key={label} style={{ textAlign: 'left', padding: '0.46rem 0.38rem', fontSize: '0.72rem', color: colors.mutedText, borderBottom: `1px solid ${isAdminDarkTheme ? '#333333' : '#e2e8f0'}` }}>{label}</th>
                         ))}
                       </tr>
                     </thead>
@@ -2204,16 +2204,16 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
               </div>
               <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
                 {renderPriceSyncStatusBadge(activePriceSyncRecord.priceSyncSummary || {}, { compact: true })}
-                <button type="button" onClick={() => setIsPriceSyncDetailOpen(false)} style={{ border: '1px solid #fecaca', background: isAdminDarkTheme ? '#3a1115' : '#fff5f5', color: '#b91c1c', borderRadius: '8px', padding: '0.38rem 0.75rem', fontWeight: 700, cursor: 'pointer' }}>Close</button>
+                <button type="button" onClick={() => setIsPriceSyncDetailOpen(false)} style={{ border: '1px solid #fecaca', background: isAdminDarkTheme ? '#2d1a1a' : '#fff5f5', color: '#b91c1c', borderRadius: '8px', padding: '0.38rem 0.75rem', fontWeight: 700, cursor: 'pointer' }}>Close</button>
               </div>
             </div>
 
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingRight: '0.2rem' }}>
               <div style={{ display: 'grid', gap: '0.65rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-                <div style={{ border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1b2027' : '#fff', color: colors.text }}><strong>Supplier:</strong> {activePriceSyncRecord.supplier?.name || activePriceSyncRecord.manualSupplierName || '-'}</div>
-                <div style={{ border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1b2027' : '#fff', color: colors.text }}><strong>Location:</strong> {activePriceSyncRecord.locationName || activePriceSyncRecord.locationCode || '-'}</div>
-                <div style={{ border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1b2027' : '#fff', color: colors.text }}><strong>Intake Date:</strong> {dateInputValue(activePriceSyncRecord.purchaseDate)}</div>
-                <div style={{ border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1b2027' : '#fff', color: colors.text }}><strong>Commands:</strong> {Number(activePriceSyncRecord?.priceSyncSummary?.attempted || 0)}</div>
+                <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text }}><strong>Supplier:</strong> {activePriceSyncRecord.supplier?.name || activePriceSyncRecord.manualSupplierName || '-'}</div>
+                <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text }}><strong>Location:</strong> {activePriceSyncRecord.locationName || activePriceSyncRecord.locationCode || '-'}</div>
+                <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text }}><strong>Intake Date:</strong> {dateInputValue(activePriceSyncRecord.purchaseDate)}</div>
+                <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text }}><strong>Commands:</strong> {Number(activePriceSyncRecord?.priceSyncSummary?.attempted || 0)}</div>
               </div>
 
               <div style={{ marginTop: '0.85rem', width: '100%', maxWidth: '100%', overflow: 'auto' }}>
@@ -2221,7 +2221,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                   <thead>
                     <tr>
                       {['Command ID', 'Product Code', 'Product Name', 'Location', 'Price Type', 'Old Price', 'New Price', 'Status', 'Queued', 'Processed', 'Agent Message'].map((label) => (
-                        <th key={label} style={{ textAlign: 'left', padding: '0.55rem 0.45rem', fontSize: '0.75rem', color: colors.mutedText, borderBottom: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #e2e8f0' }}>{label}</th>
+                        <th key={label} style={{ textAlign: 'left', padding: '0.55rem 0.45rem', fontSize: '0.75rem', color: colors.mutedText, borderBottom: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0' }}>{label}</th>
                       ))}
                     </tr>
                   </thead>
@@ -2283,23 +2283,23 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                 {canEdit && resolveTransferStatus(transferDetailRecord) === 'failed' && (
                   <button type="button" onClick={() => handleTransferToPOS(transferDetailRecord.id)} disabled={transferring} style={{ border: '1px solid #fb923c', background: '#fff7ed', color: '#c2410c', borderRadius: '8px', padding: '0.38rem 0.75rem', fontWeight: 700, cursor: 'pointer' }}>Retry Transfer</button>
                 )}
-                <button type="button" onClick={() => setIsTransferDetailOpen(false)} style={{ border: '1px solid #fecaca', background: isAdminDarkTheme ? '#3a1115' : '#fff5f5', color: '#b91c1c', borderRadius: '8px', padding: '0.38rem 0.75rem', fontWeight: 700, cursor: 'pointer' }}>Close</button>
+                <button type="button" onClick={() => setIsTransferDetailOpen(false)} style={{ border: '1px solid #fecaca', background: isAdminDarkTheme ? '#2d1a1a' : '#fff5f5', color: '#b91c1c', borderRadius: '8px', padding: '0.38rem 0.75rem', fontWeight: 700, cursor: 'pointer' }}>Close</button>
               </div>
             </div>
 
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingRight: '0.2rem' }}>
               <div style={{ display: 'grid', gap: '0.65rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-                <div style={{ border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1b2027' : '#fff', color: colors.text }}><strong>Supplier:</strong> {transferDetailRecord.supplier?.name || transferDetailRecord.manualSupplierName || '-'}</div>
-                <div style={{ border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1b2027' : '#fff', color: colors.text }}><strong>Location:</strong> {transferDetailRecord.locationName || transferDetailRecord.locationCode || '-'}</div>
-                <div style={{ border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1b2027' : '#fff', color: colors.text }}><strong>Intake Date:</strong> {dateInputValue(transferDetailRecord.purchaseDate)}</div>
-                <div style={{ border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1b2027' : '#fff', color: colors.text }}><strong>Queued:</strong> {formatDateTime(transferDetailRecord.posTransferAt || transferDetailRecord.posTransferCommand?.createdAt)}</div>
-                <div style={{ border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1b2027' : '#fff', color: colors.text }}><strong>Completed:</strong> {formatDateTime(transferDetailRecord.posTransferCommand?.processedAt)}</div>
-                <div style={{ border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1b2027' : '#fff', color: colors.text }}><strong>Command ID:</strong> {transferDetailRecord.posTransferCommand?.id || '-'}</div>
-                <div style={{ border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1b2027' : '#fff', color: colors.text }}><strong>Requested GRN:</strong> {resolveRequestedTransferGrn(transferDetailRecord) || 'Auto-generated in POS'}</div>
-                <div style={{ border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1b2027' : '#fff', color: colors.text }}><strong>Final GRN Used:</strong> {resolveFinalTransferGrn(transferDetailRecord) || '-'}</div>
+                <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text }}><strong>Supplier:</strong> {transferDetailRecord.supplier?.name || transferDetailRecord.manualSupplierName || '-'}</div>
+                <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text }}><strong>Location:</strong> {transferDetailRecord.locationName || transferDetailRecord.locationCode || '-'}</div>
+                <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text }}><strong>Intake Date:</strong> {dateInputValue(transferDetailRecord.purchaseDate)}</div>
+                <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text }}><strong>Queued:</strong> {formatDateTime(transferDetailRecord.posTransferAt || transferDetailRecord.posTransferCommand?.createdAt)}</div>
+                <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text }}><strong>Completed:</strong> {formatDateTime(transferDetailRecord.posTransferCommand?.processedAt)}</div>
+                <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text }}><strong>Command ID:</strong> {transferDetailRecord.posTransferCommand?.id || '-'}</div>
+                <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text }}><strong>Requested GRN:</strong> {resolveRequestedTransferGrn(transferDetailRecord) || 'Auto-generated in POS'}</div>
+                <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text }}><strong>Final GRN Used:</strong> {resolveFinalTransferGrn(transferDetailRecord) || '-'}</div>
               </div>
 
-              <div style={{ marginTop: '0.75rem', border: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.7rem', background: isAdminDarkTheme ? '#1b2027' : '#f8fafc' }}>
+              <div style={{ marginTop: '0.75rem', border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.7rem', background: isAdminDarkTheme ? '#1e1e1e' : '#f8fafc' }}>
                 <div style={{ fontSize: '0.8rem', color: colors.strongText, fontWeight: 700 }}>POS Agent Response</div>
                 <div style={{ marginTop: '0.3rem', fontSize: '0.85rem', color: colors.mutedText }}>
                   {transferDetailRecord.posTransferCommand?.resultSummary?.message
@@ -2313,7 +2313,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
                   <thead>
                     <tr>
                       {['Product Code', 'Product Name', 'Quantity', 'Unit Cost', 'Total Cost', 'Expiry Date'].map((label) => (
-                        <th key={label} style={{ textAlign: 'left', padding: '0.55rem 0.45rem', fontSize: '0.75rem', color: colors.mutedText, borderBottom: isAdminDarkTheme ? '1px solid #3a4048' : '1px solid #e2e8f0' }}>{label}</th>
+                        <th key={label} style={{ textAlign: 'left', padding: '0.55rem 0.45rem', fontSize: '0.75rem', color: colors.mutedText, borderBottom: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0' }}>{label}</th>
                       ))}
                     </tr>
                   </thead>
