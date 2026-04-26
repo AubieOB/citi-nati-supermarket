@@ -2609,7 +2609,6 @@ let isReportingSyncRunning = false;
 /** Supplier sync interval */
 let supplierSyncInterval;
 let isSupplierSyncRunning = false;
-let lastSupplierSyncAttemptAtMs = 0;
 
 async function syncSuppliersToBackend() {
   lastSupplierSyncAttemptAtMs = Date.now();
