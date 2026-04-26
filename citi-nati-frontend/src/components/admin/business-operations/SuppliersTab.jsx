@@ -51,6 +51,25 @@ const INITIAL_DETAIL_STATE = {
   transactionPagination: null,
 };
 
+function deriveBranchCodeFromLocation(location) {
+  if (!location) return null;
+
+  const explicitBranchCode = String(location.branchCode || '').trim().toUpperCase();
+  if (explicitBranchCode === 'BLANTYRE' || explicitBranchCode === 'ZOMBA') {
+    return explicitBranchCode;
+  }
+
+  const locationCode = String(location.code || '').trim().toUpperCase();
+  if (locationCode === 'BT') return 'BLANTYRE';
+  if (locationCode === 'ZA' || locationCode === 'SH' || locationCode === 'BAR' || locationCode === 'ST999') return 'ZOMBA';
+
+  const locationName = String(location.name || '').trim().toUpperCase();
+  if (locationName.includes('BLANTYRE')) return 'BLANTYRE';
+  if (locationName.includes('ZOMBA')) return 'ZOMBA';
+
+  return null;
+}
+
 const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] }) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -107,10 +126,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
 
   const selectedBranchCode = useMemo(() => {
     const selectedLocation = locations.find((location) => Number(location.id) === Number(selectedLocationId));
-    const locationCode = String(selectedLocation?.code || '').trim().toUpperCase();
-    if (locationCode === 'BT') return 'BLANTYRE';
-    if (locationCode === 'ZA' || locationCode === 'SH' || locationCode === 'BAR' || locationCode === 'ST999') return 'ZOMBA';
-    return null;
+    return deriveBranchCodeFromLocation(selectedLocation);
   }, [locations, selectedLocationId]);
 
   const fetchSuppliers = useCallback(async () => {
