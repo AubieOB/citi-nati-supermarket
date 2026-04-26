@@ -102,29 +102,57 @@ async function completeCommand(req, res) {
         const posSupplierName = String((resultSummary && (resultSummary.posSupplierName || resultSummary.supplierName)) || '').trim() || null;
 
         if (Number.isFinite(supplierId) && payloadBranchCode && Number.isFinite(posSupplierCode) && posSupplierCode > 0) {
-          await prisma.supplierPosLink.upsert({
-            where: {
-              supplierId_branchCode: {
+          await prisma.$transaction(async (tx) => {
+            const conflictingLink = await tx.supplierPosLink.findUnique({
+              where: {
+                branchCode_posSupplierCode: {
+                  branchCode: payloadBranchCode,
+                  posSupplierCode,
+                },
+              },
+              select: { id: true, supplierId: true },
+            });
+
+            if (conflictingLink && conflictingLink.supplierId !== supplierId) {
+              await tx.supplierPosLink.update({
+                where: { id: conflictingLink.id },
+                data: {
+                  posSupplierCode: null,
+                  syncStatus: 'failed',
+                  syncedAt: null,
+                  syncError: `POS supplier code ${posSupplierCode} reassigned to supplier ${supplierId}`,
+                },
+              });
+
+              console.warn(
+                `[POS COMMAND QUEUE] Reassigned POS supplier code ${posSupplierCode} in branch ${payloadBranchCode} from supplier ${conflictingLink.supplierId} to ${supplierId}`
+              );
+            }
+
+            await tx.supplierPosLink.upsert({
+              where: {
+                supplierId_branchCode: {
+                  supplierId,
+                  branchCode: payloadBranchCode,
+                },
+              },
+              create: {
                 supplierId,
                 branchCode: payloadBranchCode,
+                posSupplierCode,
+                posSupplierName,
+                syncStatus: 'synced',
+                syncedAt: new Date(),
+                syncError: null,
               },
-            },
-            create: {
-              supplierId,
-              branchCode: payloadBranchCode,
-              posSupplierCode,
-              posSupplierName,
-              syncStatus: 'synced',
-              syncedAt: new Date(),
-              syncError: null,
-            },
-            update: {
-              posSupplierCode,
-              posSupplierName,
-              syncStatus: 'synced',
-              syncedAt: new Date(),
-              syncError: null,
-            },
+              update: {
+                posSupplierCode,
+                posSupplierName,
+                syncStatus: 'synced',
+                syncedAt: new Date(),
+                syncError: null,
+              },
+            });
           });
 
           console.log(`[POS COMMAND QUEUE] Supplier ${supplierId} linked to POS branch ${payloadBranchCode} code ${posSupplierCode} after command ${id} completed`);

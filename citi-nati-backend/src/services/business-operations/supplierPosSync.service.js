@@ -174,6 +174,35 @@ async function ingestSuppliersFromPos(payload) {
         result.updatedSuppliers += 1;
       }
 
+      const conflictingLink = await tx.supplierPosLink.findUnique({
+        where: {
+          branchCode_posSupplierCode: {
+            branchCode,
+            posSupplierCode,
+          },
+        },
+        select: { id: true, supplierId: true },
+      });
+
+      if (conflictingLink && conflictingLink.supplierId !== supplier.id) {
+        await tx.supplierPosLink.update({
+          where: { id: conflictingLink.id },
+          data: {
+            posSupplierCode: null,
+            syncStatus: 'failed',
+            syncedAt: null,
+            syncError: `POS supplier code ${posSupplierCode} reassigned to supplier ${supplier.id}`,
+          },
+        });
+
+        console.warn('[BO][SUPPLIER_SYNC][PULL] reassigned conflicting POS supplier code', {
+          branchCode,
+          posSupplierCode,
+          fromSupplierId: conflictingLink.supplierId,
+          toSupplierId: supplier.id,
+        });
+      }
+
       await tx.supplierPosLink.upsert({
         where: {
           supplierId_branchCode: {
