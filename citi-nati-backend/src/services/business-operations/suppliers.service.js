@@ -14,6 +14,7 @@ function modelHasField(modelName, fieldName) {
 }
 
 const supplierHasLocation = modelHasField('Supplier', 'locationId');
+const supplierHasPosLinks = modelHasField('Supplier', 'posLinks');
 const supplierTransactionHasLocation = modelHasField('SupplierTransaction', 'locationId');
 
 function normalizeSupplierStatus(status) {
@@ -99,11 +100,9 @@ async function updateSupplier(id, payload) {
 async function getSupplierById(id) {
   return prisma.supplier.findUnique({
     where: { id },
-    include: {
-      posLinks: {
-        orderBy: { branchCode: 'asc' },
-      },
-    },
+    include: supplierHasPosLinks
+      ? { posLinks: { orderBy: { branchCode: 'asc' } } }
+      : undefined,
   });
 }
 
@@ -128,29 +127,29 @@ async function listSuppliers({ search, status, locationId, branchCode, requirePo
     where.locationId = locationId;
   }
 
-  if (branchCode) {
-    where.posLinks = {
-      some: {
-        branchCode: String(branchCode).trim().toUpperCase(),
-        ...(requirePosLinked ? { posSupplierCode: { not: null } } : {}),
-      },
-    };
-  } else if (requirePosLinked) {
-    where.posLinks = {
-      some: {
-        posSupplierCode: { not: null },
-      },
-    };
+  if (supplierHasPosLinks) {
+    if (branchCode) {
+      where.posLinks = {
+        some: {
+          branchCode: String(branchCode).trim().toUpperCase(),
+          ...(requirePosLinked ? { posSupplierCode: { not: null } } : {}),
+        },
+      };
+    } else if (requirePosLinked) {
+      where.posLinks = {
+        some: {
+          posSupplierCode: { not: null },
+        },
+      };
+    }
   }
 
   const [data, total] = await Promise.all([
     prisma.supplier.findMany({
       where,
-      include: {
-        posLinks: {
-          orderBy: { branchCode: 'asc' },
-        },
-      },
+      include: supplierHasPosLinks
+        ? { posLinks: { orderBy: { branchCode: 'asc' } } }
+        : undefined,
       skip,
       take,
       orderBy: { [sortBy]: sortOrder },
@@ -278,7 +277,6 @@ async function listSupplierTransactions({
     if (startDate) where.transactionDate.gte = startDate;
     if (endDate) where.transactionDate.lte = endDate;
   }
-
   if (search) {
     where.OR = [
       { description: { contains: search, mode: 'insensitive' } },
