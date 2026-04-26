@@ -215,7 +215,9 @@ async function ingestSuppliersFromPos(payload) {
     updatedSuppliers: result.updatedSuppliers,
     skipped: result.skipped,
     uniquePosSupplierCodeCount: uniquePosSupplierCodes.size,
+    uniquePosSupplierCodeSample: Array.from(uniquePosSupplierCodes).slice(0, 10),
     uniqueLinkedSupplierCount: uniqueLinkedSupplierIds.size,
+    uniqueLinkedSupplierIdSample: Array.from(uniqueLinkedSupplierIds).slice(0, 10),
     repeatedSupplierBindingCount: repeatedSupplierBindings.length,
     repeatedSupplierBindingSample: repeatedSupplierBindings.slice(0, 5).map((entry) => ({
       supplierId: entry[0],

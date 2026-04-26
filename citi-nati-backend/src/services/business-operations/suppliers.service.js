@@ -148,6 +148,8 @@ async function getSupplierById(id) {
 
 async function listSuppliers({ search, status, locationId, branchCode, requirePosLinked = false, skip, take, sortBy, sortOrder }) {
   const where = {};
+  let branchAliasesForDiagnostics = [];
+  let fallbackLocationIdsForDiagnostics = [];
 
   if (status) {
     where.status = String(status).toLowerCase();
@@ -170,6 +172,7 @@ async function listSuppliers({ search, status, locationId, branchCode, requirePo
   if (supplierHasPosLinks) {
     if (branchCode) {
       const branchAliases = resolveBranchCodeAliases(branchCode);
+      branchAliasesForDiagnostics = branchAliases.slice();
       const branchCodeInsensitiveOr = buildBranchCodeInsensitiveOr(branchAliases);
       const posLinkFilter = {
         posLinks: {
@@ -184,6 +187,7 @@ async function listSuppliers({ search, status, locationId, branchCode, requirePo
         where.posLinks = posLinkFilter.posLinks;
       } else {
         const fallbackLocationIds = resolveBranchLocationFallbackIds(branchCode);
+        fallbackLocationIdsForDiagnostics = fallbackLocationIds.slice();
         where.AND = where.AND || [];
         where.AND.push({
           OR: [
@@ -213,6 +217,44 @@ async function listSuppliers({ search, status, locationId, branchCode, requirePo
     }),
     prisma.supplier.count({ where }),
   ]);
+
+  if (branchCode && total === 0 && supplierHasPosLinks) {
+    const aliasCounts = await Promise.all(
+      branchAliasesForDiagnostics.map(async (alias) => {
+        const count = await prisma.supplierPosLink.count({
+          where: {
+            branchCode: {
+              equals: alias,
+              mode: 'insensitive',
+            },
+            ...(requirePosLinked ? { posSupplierCode: { not: null } } : {}),
+          },
+        });
+        return { alias, count };
+      })
+    );
+
+    let locationFallbackSupplierCount = null;
+    if (!requirePosLinked && supplierHasLocation && fallbackLocationIdsForDiagnostics.length > 0) {
+      locationFallbackSupplierCount = await prisma.supplier.count({
+        where: {
+          locationId: { in: fallbackLocationIdsForDiagnostics },
+        },
+      });
+    }
+
+    console.warn('[BO][SUPPLIERS][LIST][ZERO_RESULTS]', {
+      branchCode: String(branchCode || '').trim().toUpperCase(),
+      requirePosLinked: Boolean(requirePosLinked),
+      search: search || null,
+      status: status || null,
+      requestedLocationId: locationId || null,
+      branchAliases: branchAliasesForDiagnostics,
+      aliasLinkCounts: aliasCounts,
+      fallbackLocationIds: fallbackLocationIdsForDiagnostics,
+      fallbackLocationSupplierCount: locationFallbackSupplierCount,
+    });
+  }
 
   if (!data.length) {
     return { data, total, where };
