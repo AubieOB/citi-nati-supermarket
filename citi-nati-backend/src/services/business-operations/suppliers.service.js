@@ -17,6 +17,34 @@ const supplierHasLocation = modelHasField('Supplier', 'locationId');
 const supplierHasPosLinks = modelHasField('Supplier', 'posLinks');
 const supplierTransactionHasLocation = modelHasField('SupplierTransaction', 'locationId');
 
+function resolveBranchCodeAliases(branchCode) {
+  const normalized = String(branchCode || '').trim().toUpperCase();
+  if (!normalized) return [];
+
+  if (normalized === 'BLANTYRE' || normalized === 'BT') {
+    return ['BLANTYRE', 'BT'];
+  }
+
+  if (normalized === 'ZOMBA' || normalized === 'ZA' || normalized === 'SH' || normalized === 'BAR' || normalized === 'ST999') {
+    return ['ZOMBA', 'ZA', 'SH', 'BAR', 'ST999'];
+  }
+
+  return [normalized];
+}
+
+function resolveBranchLocationFallbackIds(branchCode) {
+  const normalized = String(branchCode || '').trim().toUpperCase();
+  if (normalized === 'BLANTYRE' || normalized === 'BT') {
+    return [1];
+  }
+
+  if (normalized === 'ZOMBA' || normalized === 'ZA' || normalized === 'SH' || normalized === 'BAR' || normalized === 'ST999') {
+    return [2];
+  }
+
+  return [];
+}
+
 function normalizeSupplierStatus(status) {
   if (!status) return 'active';
   return String(status).toLowerCase();
@@ -129,12 +157,28 @@ async function listSuppliers({ search, status, locationId, branchCode, requirePo
 
   if (supplierHasPosLinks) {
     if (branchCode) {
-      where.posLinks = {
-        some: {
-          branchCode: String(branchCode).trim().toUpperCase(),
-          ...(requirePosLinked ? { posSupplierCode: { not: null } } : {}),
+      const branchAliases = resolveBranchCodeAliases(branchCode);
+      const posLinkFilter = {
+        posLinks: {
+          some: {
+            branchCode: { in: branchAliases },
+            ...(requirePosLinked ? { posSupplierCode: { not: null } } : {}),
+          },
         },
       };
+
+      if (requirePosLinked || !supplierHasLocation) {
+        where.posLinks = posLinkFilter.posLinks;
+      } else {
+        const fallbackLocationIds = resolveBranchLocationFallbackIds(branchCode);
+        where.AND = where.AND || [];
+        where.AND.push({
+          OR: [
+            posLinkFilter,
+            ...(fallbackLocationIds.length > 0 ? [{ locationId: { in: fallbackLocationIds } }] : []),
+          ],
+        });
+      }
     } else if (requirePosLinked) {
       where.posLinks = {
         some: {
