@@ -27,14 +27,16 @@ const SupplierFormModal = ({ isOpen, supplier, selectedLocationId = null, locati
   const [form, setForm] = useState(defaultForm);
   const [validationError, setValidationError] = useState('');
   const isCreateMode = !supplier;
-  const isLocationLocked = isCreateMode && Boolean(selectedLocationId);
+  const scopedLocationIdNumber = Number(selectedLocationId);
+  const hasConcreteScopedLocation = Number.isFinite(scopedLocationIdNumber) && scopedLocationIdNumber > 0;
+  const isLocationLocked = isCreateMode && hasConcreteScopedLocation;
 
   const title = useMemo(() => (supplier ? 'Edit Supplier' : 'Add New Supplier'), [supplier]);
 
   useEffect(() => {
     if (!isOpen) return;
     setValidationError('');
-    const scopedLocationId = selectedLocationId ? String(selectedLocationId) : '';
+    const scopedLocationId = hasConcreteScopedLocation ? String(scopedLocationIdNumber) : '';
     const existingLocationId = supplier?.locationId ? String(supplier.locationId) : '';
     setForm({
       locationId: existingLocationId || scopedLocationId,
@@ -48,7 +50,7 @@ const SupplierFormModal = ({ isOpen, supplier, selectedLocationId = null, locati
       status: supplier?.status || 'active',
       notes: supplier?.notes || '',
     });
-  }, [isOpen, supplier, selectedLocationId]);
+  }, [hasConcreteScopedLocation, isOpen, scopedLocationIdNumber, supplier]);
 
   useEffect(() => {
     if (!isOpen) return;

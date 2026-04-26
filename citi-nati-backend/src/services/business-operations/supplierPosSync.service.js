@@ -429,11 +429,13 @@ async function queueSupplierDeleteFromPos(supplierId) {
   const queued = [];
 
   for (const link of links) {
+    const branchCode = normalizeBranchCode(link.branchCode);
     const posSupplierCode = parsePositiveInt(link.posSupplierCode);
-    if (!posSupplierCode) continue; // no POS code yet – nothing to delete in POS
+    if (!branchCode || !posSupplierCode) continue; // no canonical branch or POS code yet – nothing to delete in POS
 
     const commandPayload = {
-      branchCode: link.branchCode,
+      branchCode,
+      locationCode: BRANCH_DEFAULTS[branchCode].locationCode,
       posSupplierCode,
       supplierId: supplier.id,
       supplierName: normalizeSupplierName(supplier.name),
@@ -454,11 +456,11 @@ async function queueSupplierDeleteFromPos(supplierId) {
     console.log('[BO][SUPPLIER_SYNC][DELETE] queued DELETE_SUPPLIER command', {
       commandId: command.id,
       supplierId: supplier.id,
-      branchCode: link.branchCode,
+      branchCode,
       posSupplierCode,
     });
 
-    queued.push({ commandId: command.id, branchCode: link.branchCode, posSupplierCode });
+    queued.push({ commandId: command.id, branchCode, posSupplierCode });
   }
 
   return { queued: queued.length, links: queued };
