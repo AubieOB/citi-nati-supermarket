@@ -14,6 +14,7 @@ const commandExecutor = require('./lib/command-executor');
 const { buildConfig, getBranchTag, getSyncMetadata, validateStartupConfig, buildStartupSummary } = require('./lib/config');
 const ReportingSyncService = require('./lib/reporting-sync');
 const ReportingSyncState = require('./lib/reporting-sync-state');
+const DeltaSyncState = require('./lib/delta-sync-state');
 
 const app = express();
 app.use(express.json());
@@ -54,19 +55,24 @@ let reportingSyncState;
 let reportingSyncService;
 let instanceLockServer = null;
 
-/** Expiry batch cache - refreshed every 5 minutes so heavy view query doesn't block every 15s product push tick */
+/** Delta sync state persistence */
+let deltaSyncState = null;
+
+/** Expiry batch cache */
 let expiryBatchCache = null;
 let expiryBatchCachedAt = 0;
-const EXPIRY_BATCH_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+/** Zomba operational locations */
 const ZOMBA_OPERATIONAL_LOCATION_CODES = ['SH', 'BAR', 'ST999'];
-const PRODUCT_ACTIVITY_FRESHNESS_WINDOW_MINUTES = Number.parseInt(process.env.PRODUCT_ACTIVITY_FRESHNESS_WINDOW_MINUTES || '5', 10);
-const PRODUCT_ACTIVITY_FALLBACK_MAX_ABS_STOCK = Number.parseInt(process.env.PRODUCT_ACTIVITY_FALLBACK_MAX_ABS_STOCK || '2000', 10);
-const DAILY_STOCK_MAX_STALENESS_DAYS = Number.parseInt(process.env.DAILY_STOCK_MAX_STALENESS_DAYS || '1', 10);
+
+/** Stock source resolution config (resolved once at startup) */
 let liveStockSourceConfig = null;
-const ENABLE_DELTA_PRODUCT_SYNC = String(process.env.ENABLE_DELTA_PRODUCT_SYNC || 'true').trim().toLowerCase() !== 'false';
-const DELTA_FULL_SYNC_EVERY_CYCLES = Number.parseInt(process.env.DELTA_FULL_SYNC_EVERY_CYCLES || '40', 10);
-let lastProductSyncSnapshot = new Map();
-let productSyncCycleCounter = 0;
+
+/** Stock reconciliation state (populated from appConfig at startup) */
+let stockConfig = null;
+
+/** Supplier sync tracking */
+let lastSupplierSyncAttemptAtMs = null;
 
 function acquireInstanceLock() {
   return new Promise((resolve) => {
@@ -396,6 +402,30 @@ async function initializePool() {
       throw err;
     }
   }
+
+  // Initialize stock config from appConfig
+  if (!stockConfig) {
+    stockConfig = {
+      dailyStockMaxStalenessDays: appConfig.stock.dailyStockMaxStalenessDays,
+      activityFreshnessMins: appConfig.stock.activityFreshnessMins,
+      activityMaxAbsStock: appConfig.stock.activityMaxAbsStock,
+      expiryBatchCacheTtlMs: appConfig.stock.expiryBatchCacheTtlMs,
+      enableDeltaSync: appConfig.stock.enableDeltaSync,
+      deltaFullSyncCycles: appConfig.stock.deltaFullSyncCycles,
+      persistDeltaState: appConfig.stock.persistDeltaState,
+      debugStockResolution: appConfig.stock.debugStockResolution,
+    };
+  }
+
+  // Initialize delta sync state
+  if (!deltaSyncState && appConfig.stock.persistDeltaState) {
+    deltaSyncState = new DeltaSyncState(appConfig.branch.branchCode, appConfig.stock.deltaStateDir);
+    deltaSyncState.load();
+    const loadedCycleCounter = deltaSyncState.getCycleCounter();
+    const snapshotSize = deltaSyncState.getSnapshot().size;
+    console.log(`${BRANCH_TAG} [DELTA SYNC] Loaded persistent state: cycle=${loadedCycleCounter}, snapshot=${snapshotSize} products`);
+  }
+
   return pool;
 }
 
@@ -883,30 +913,30 @@ async function fetchProductsFromPOS(locationCode) {
     request.input('LocationCode', sql.VarChar(10), LOCATION_CODE);
 
     // Log BEFORE query so BAR/ST999 fetch attempts are visible even if SQL throws
-    console.log(`${SYNC_LOG_PREFIX} [FETCH] querying POS for location: ${LOCATION_CODE}`, {
-      stockReadLocations: [LOCATION_CODE],
-      aggregationMode: false,
-      stockResolutionMode: 'LOCATION_SPECIFIC',
-      stockSourceMode: isGuardedZombaLocation && stockConfig.hasDailyStockBalance && stockConfig.hasProductActivity
-        ? 'ZOMBA_DailyStockBalancePrimary_GuardedProductActivityFallback'
-        : (stockConfig.hasDailyStockBalance && stockConfig.hasProductActivity
-          ? 'DailyStockBalancePrimary+MissingRowProductActivityFallback'
-          : (stockConfig.hasDailyStockBalance
-            ? 'DailyStockBalance'
-            : (stockConfig.hasProductActivity ? 'ProductActivityFallbackOnly' : 'Unavailable'))),
-      guardedLocationMode: isGuardedZombaLocation,
-      locationCode: normalizedLocationCode,
-      dailyStockBalanceAvailable: stockConfig.hasDailyStockBalance,
-      productActivityAvailable: stockConfig.hasProductActivity,
-      productActivityFallbackTimestampRequired: true,
-      canUseFreshProductActivityFallback,
-      productActivityFallbackMaxAbsStock: PRODUCT_ACTIVITY_FALLBACK_MAX_ABS_STOCK,
-      productActivityTimestampColumnConfigured: Boolean(safeActivityTimestampColumn),
-      productActivityTimestampColumn: safeActivityTimestampColumn,
-      productActivityFreshnessWindowMinutes: PRODUCT_ACTIVITY_FRESHNESS_WINDOW_MINUTES,
-      stockDetailsLiveAvailable: Boolean(stockConfig.hasStockDetailsLive),
-      dailyStockMaxStalenessDays: DAILY_STOCK_MAX_STALENESS_DAYS,
-    });
+    if (appConfig.stock.debugStockResolution) {
+      console.log(`${SYNC_LOG_PREFIX} [FETCH DEBUG] querying POS for location: ${LOCATION_CODE}`, {
+        stockReadLocations: [LOCATION_CODE],
+        aggregationMode: false,
+        stockResolutionMode: 'LOCATION_SPECIFIC',
+        stockSourceMode: isGuardedZombaLocation && stockConfig.hasDailyStockBalance && stockConfig.hasProductActivity
+          ? 'ZOMBA_DailyStockBalancePrimary_GuardedProductActivityFallback'
+          : (stockConfig.hasDailyStockBalance && stockConfig.hasProductActivity
+            ? 'DailyStockBalancePrimary+MissingRowProductActivityFallback'
+            : (stockConfig.hasDailyStockBalance
+              ? 'DailyStockBalance'
+              : (stockConfig.hasProductActivity ? 'ProductActivityFallbackOnly' : 'Unavailable'))),
+        guardedLocationMode: isGuardedZombaLocation,
+        locationCode: normalizedLocationCode,
+        dailyStockBalanceAvailable: stockConfig.hasDailyStockBalance,
+        productActivityAvailable: stockConfig.hasProductActivity,
+        canUseFreshProductActivityFallback,
+        productActivityFallbackMaxAbsStock: appConfig.stock.activityMaxAbsStock,
+        productActivityTimestampColumn: safeActivityTimestampColumn,
+        productActivityFreshnessWindowMinutes: appConfig.stock.activityFreshnessMins,
+        stockDetailsLiveAvailable: Boolean(stockConfig.hasStockDetailsLive),
+        dailyStockMaxStalenessDays: appConfig.stock.dailyStockMaxStalenessDays,
+      });
+    }
     let result = await request.query(query);
 
     const locationStockDateRow = result.recordset.find((row) => row && (row.EffectiveStockDate || row.LatestBalanceDate)) || null;
@@ -921,7 +951,7 @@ async function fetchProductsFromPOS(locationCode) {
     const dailyStockStalenessDays = effectiveStockDateObj && !Number.isNaN(effectiveStockDateObj.getTime())
       ? Math.floor((Date.now() - effectiveStockDateObj.getTime()) / (24 * 60 * 60 * 1000))
       : null;
-    const dailyStockIsStale = Number.isFinite(dailyStockStalenessDays) && dailyStockStalenessDays > DAILY_STOCK_MAX_STALENESS_DAYS;
+    const dailyStockIsStale = Number.isFinite(dailyStockStalenessDays) && dailyStockStalenessDays > appConfig.stock.dailyStockMaxStalenessDays;
 
     const stockDetailsLiveMap = isGuardedZombaLocation
       ? await fetchStockDetailsLiveStockMap(LOCATION_CODE, stockConfig)
@@ -954,10 +984,10 @@ async function fetchProductsFromPOS(locationCode) {
         const activityAgeMinutes = activityDate && !Number.isNaN(activityDate.getTime())
           ? (nowMs - activityDate.getTime()) / 60000
           : null;
-        const activityIsFresh = activityAgeMinutes != null && activityAgeMinutes <= PRODUCT_ACTIVITY_FRESHNESS_WINDOW_MINUTES;
+        const activityIsFresh = activityAgeMinutes != null && activityAgeMinutes <= appConfig.stock.activityFreshnessMins;
         const activityIsSafe = hasActivity
           && activityValue >= 0
-          && Math.abs(activityValue) <= PRODUCT_ACTIVITY_FALLBACK_MAX_ABS_STOCK;
+          && Math.abs(activityValue) <= appConfig.stock.activityMaxAbsStock;
 
         let finalStock = hasDaily ? dailyValue : 0;
         let finalSource = hasDaily ? 'DailyStockBalance' : 'NoStockRow';
@@ -1007,8 +1037,8 @@ async function fetchProductsFromPOS(locationCode) {
           });
         }
 
-        if (hasDaily && hasActivity && (activityValue < 0 || Math.abs(activityValue - dailyValue) > PRODUCT_ACTIVITY_FALLBACK_MAX_ABS_STOCK)) {
-          console.warn(`${SYNC_LOG_PREFIX} [ZOMBA STOCK ALERT] ProductActivity diverges from DailyStockBalance`, {
+        if (appConfig.stock.debugStockResolution && hasDaily && hasActivity && (activityValue < 0 || Math.abs(activityValue - dailyValue) > appConfig.stock.activityMaxAbsStock)) {
+          console.warn(`${SYNC_LOG_PREFIX} [DEBUG] ProductActivity diverges from DailyStockBalance`, {
             locationCode: LOCATION_CODE,
             productCode: row.ProductCode,
             dailyStock: dailyValue,
@@ -1038,21 +1068,23 @@ async function fetchProductsFromPOS(locationCode) {
         };
       });
 
-      console.log(`${SYNC_LOG_PREFIX} [ZOMBA STOCK DIAGNOSTICS]`, {
-        locationCode: LOCATION_CODE,
-        dailyStockBalancePrimary: true,
-        canUseFreshProductActivityFallback,
-        dailyStockStalenessDays,
-        dailyStockIsStale,
-        fallbackAccepted,
-        fallbackAcceptedNoTimestamp,
-        fallbackRejectedMissingTimestamp,
-        fallbackRejectedStale,
-        fallbackRejectedUnsafe,
-        fallbackToStockDetailsNoDaily,
-        fallbackToStockDetailsDailyStale,
-        sampleComparison: comparisonSamples,
-      });
+      if (appConfig.stock.debugStockResolution) {
+        console.log(`${SYNC_LOG_PREFIX} [DEBUG] Stock resolution summary`, {
+          locationCode: LOCATION_CODE,
+          dailyStockBalancePrimary: true,
+          canUseFreshProductActivityFallback,
+          dailyStockStalenessDays,
+          dailyStockIsStale,
+          fallbackAccepted,
+          fallbackAcceptedNoTimestamp,
+          fallbackRejectedMissingTimestamp,
+          fallbackRejectedStale,
+          fallbackRejectedUnsafe,
+          fallbackToStockDetailsNoDaily,
+          fallbackToStockDetailsDailyStale,
+          sampleComparison: comparisonSamples,
+        });
+      }
 
       result = {
         ...result,
@@ -1062,10 +1094,13 @@ async function fetchProductsFromPOS(locationCode) {
 
     const stockDateSample = result.recordset.find((row) => String(row.StockSource || '').includes('DailyStockBalance'))
       || result.recordset.find((row) => Number.isFinite(Number(row.QuantityAvailable)));
-    console.log(`${SYNC_LOG_PREFIX} [STOCK DATE RESOLUTION] location=${LOCATION_CODE} serverDate=${new Date().toISOString()} effectiveStockDate=${effectiveStockDate || 'NULL'} latestBalanceDate=${latestBalanceDate || 'NULL'} dailyStockStalenessDays=${Number.isFinite(dailyStockStalenessDays) ? dailyStockStalenessDays : 'NULL'} dailyStockIsStale=${dailyStockIsStale}`);
-    if (stockDateSample) {
-      const sampleStockDate = stockDateSample.StockDate ? new Date(stockDateSample.StockDate).toISOString().slice(0, 10) : 'NULL';
-      console.log(`${SYNC_LOG_PREFIX} [STOCK DATE SAMPLE] location=${LOCATION_CODE} productCode=${stockDateSample.ProductCode} stockDate=${sampleStockDate} stock=${Number(stockDateSample.QuantityAvailable || 0)} source=${stockDateSample.StockSource || 'Unknown'}`);
+    
+    if (appConfig.stock.debugStockResolution) {
+      console.log(`${SYNC_LOG_PREFIX} [DEBUG] Stock date resolution: location=${LOCATION_CODE} effectiveStockDate=${effectiveStockDate || 'NULL'} dailyStockStalenessDays=${Number.isFinite(dailyStockStalenessDays) ? dailyStockStalenessDays : 'NULL'} dailyStockIsStale=${dailyStockIsStale}`);
+      if (stockDateSample) {
+        const sampleStockDate = stockDateSample.StockDate ? new Date(stockDateSample.StockDate).toISOString().slice(0, 10) : 'NULL';
+        console.log(`${SYNC_LOG_PREFIX} [DEBUG] Sample product: ${stockDateSample.ProductCode} | stockDate=${sampleStockDate} | stock=${Number(stockDateSample.QuantityAvailable || 0)} | source=${stockDateSample.StockSource || 'Unknown'}`);
+      }
     }
 
     console.log(`${SYNC_LOG_PREFIX} [FETCH] done — fetched ${result.recordset.length} products for location ${LOCATION_CODE}`);
@@ -1086,34 +1121,33 @@ async function fetchProductsFromPOS(locationCode) {
     if (totalCount > 0 && noStockCount === totalCount) {
       console.warn(`${SYNC_LOG_PREFIX} [STOCK WARNING] ALL ${totalCount} products for location '${LOCATION_CODE}' resolved with NoStockRow`);
     } else if (totalCount > 0 && noStockCount > 0) {
-      console.log(`${SYNC_LOG_PREFIX} [STOCK INFO] ${noStockCount}/${totalCount} products for '${LOCATION_CODE}' resolved with NoStockRow`);
-    }
-    console.log(`${SYNC_LOG_PREFIX} stock-source diagnostics`, {
-      locationCode: LOCATION_CODE,
-      stockReadLocations: [LOCATION_CODE],
-      aggregationMode: false,
-      stockResolutionMode: 'LOCATION_SPECIFIC',
-      sourceBreakdown: stockSourceSummary,
-      priceSourceBreakdown: priceSourceSummary,
-    });
-    
-    // Debug log first 5 products (with location and stock source)
-    if (result.recordset.length > 0) {
-      console.log(`${SYNC_LOG_PREFIX} [DEBUG] sample product stock (locationCode=${LOCATION_CODE}):`);
-      result.recordset.slice(0, 5).forEach(product => {
-        const stockDateLabel = product.StockDate ? new Date(product.StockDate).toISOString().slice(0, 10) : 'NULL';
-        console.log(`${SYNC_LOG_PREFIX} [DEBUG]  ${product.ProductCode}: ${product.ProductName} | stockDate=${stockDateLabel} | stock=${product.QuantityAvailable} | source=${product.StockSource} | price=${product.SellingPrice} | priceSource=${product.PriceSource}`);
-      });
+      console.log(`${SYNC_LOG_PREFIX} [STOCK] ${noStockCount}/${totalCount} products for '${LOCATION_CODE}' resolved with NoStockRow`);
     }
 
-    const debugProductCode = String(process.env.STOCK_DEBUG_PRODUCT_CODE || '').trim();
-    if (debugProductCode) {
-      const matched = result.recordset.find((row) => String(row.ProductCode || '').trim() === debugProductCode);
-      if (matched) {
-        const stockDateLabel = matched.StockDate ? new Date(matched.StockDate).toISOString().slice(0, 19) : 'NULL';
-        console.log(`${SYNC_LOG_PREFIX} [STOCK DEBUG] productCode=${debugProductCode} locationCode=${LOCATION_CODE} stockSource=${matched.StockSource} stockDate=${stockDateLabel} resolvedStock=${Number(matched.QuantityAvailable || 0)} price=${Number(matched.SellingPrice || 0)} priceSource=${matched.PriceSource || 'Unknown'}`);
-      } else {
-        console.log(`${SYNC_LOG_PREFIX} [STOCK DEBUG] productCode=${debugProductCode} locationCode=${LOCATION_CODE} not found in fetched product set`);
+    if (appConfig.stock.debugStockResolution) {
+      console.log(`${SYNC_LOG_PREFIX} [DEBUG] Source breakdown:`, {
+        locationCode: LOCATION_CODE,
+        sourceBreakdown: stockSourceSummary,
+        priceSourceBreakdown: priceSourceSummary,
+      });
+      
+      if (result.recordset.length > 0) {
+        console.log(`${SYNC_LOG_PREFIX} [DEBUG] First 5 products for location ${LOCATION_CODE}:`);
+        result.recordset.slice(0, 5).forEach(product => {
+          const stockDateLabel = product.StockDate ? new Date(product.StockDate).toISOString().slice(0, 10) : 'NULL';
+          console.log(`${SYNC_LOG_PREFIX} [DEBUG]  ${product.ProductCode}: ${product.ProductName} | stock=${product.QuantityAvailable} | source=${product.StockSource} | price=${product.SellingPrice}`);
+        });
+      }
+
+      const debugProductCode = String(process.env.STOCK_DEBUG_PRODUCT_CODE || '').trim();
+      if (debugProductCode) {
+        const matched = result.recordset.find((row) => String(row.ProductCode || '').trim() === debugProductCode);
+        if (matched) {
+          const stockDateLabel = matched.StockDate ? new Date(matched.StockDate).toISOString().slice(0, 19) : 'NULL';
+          console.log(`${SYNC_LOG_PREFIX} [DEBUG] Product ${debugProductCode} at ${LOCATION_CODE}: stock=${Number(matched.QuantityAvailable || 0)} source=${matched.StockSource} price=${Number(matched.SellingPrice || 0)}`);
+        } else {
+          console.log(`${SYNC_LOG_PREFIX} [DEBUG] Product ${debugProductCode} not found at location ${LOCATION_CODE}`);
+        }
       }
     }
 
@@ -2574,7 +2608,6 @@ let isReportingSyncRunning = false;
 
 /** Supplier sync interval */
 let supplierSyncInterval;
-const SUPPLIER_SYNC_INTERVAL_MS = Number.parseInt(process.env.SUPPLIER_SYNC_INTERVAL_MS || '300000', 10);
 let isSupplierSyncRunning = false;
 let lastSupplierSyncAttemptAtMs = 0;
 
@@ -2603,11 +2636,7 @@ async function syncSuppliersToBackend() {
   isSupplierSyncRunning = true;
 
   try {
-    console.log(`${BRANCH_TAG} [SUPPLIER SYNC] Tick started`, {
-      branchCode: appConfig.branch.branchCode,
-      syncSourceCode: appConfig.branch.syncSourceCode,
-      intervalMs: SUPPLIER_SYNC_INTERVAL_MS,
-    });
+    console.log(`${BRANCH_TAG} [SUPPLIER SYNC] Starting sync...`);
 
     const queryResult = await pool.request().query([
       'SELECT SupplierCode, SupplierName, Address, Telephone, Fax, Email, ContactName, UploadStatus',
@@ -2691,16 +2720,10 @@ async function autoSync() {
   try {
     const nowMs = Date.now();
     const supplierSyncIsDue = !lastSupplierSyncAttemptAtMs
-      || (nowMs - lastSupplierSyncAttemptAtMs) >= SUPPLIER_SYNC_INTERVAL_MS;
+      || (nowMs - lastSupplierSyncAttemptAtMs) >= appConfig.stock.supplierSyncIntervalMs;
 
     if (supplierSyncIsDue) {
-      console.log(`${BRANCH_TAG} [AUTO SYNC] Triggering supplier sync catch-up before product batching`, {
-        branchCode: appConfig.branch.branchCode,
-        supplierSyncIntervalMs: SUPPLIER_SYNC_INTERVAL_MS,
-        lastSupplierSyncAttemptAt: lastSupplierSyncAttemptAtMs
-          ? new Date(lastSupplierSyncAttemptAtMs).toISOString()
-          : null,
-      });
+      console.log(`${BRANCH_TAG} [AUTO SYNC] Supplier sync due - running before product sync`);
       await syncSuppliersToBackend();
     }
 
@@ -2708,16 +2731,6 @@ async function autoSync() {
     const allProducts = [];
     const syncLocations = getOperationalSyncLocations();
     
-    console.log(`${BRANCH_TAG} [AUTO SYNC] operational stock scope diagnostics`, {
-      branchCode: appConfig.branch.branchCode,
-      configuredLocationCode: appConfig.posDb.locationCode,
-      includedLocations: syncLocations,
-      mode: appConfig.branch.branchCode === 'ZOMBA' ? 'CONFIGURED_ZOMBA_OPERATIONAL_LOCATIONS' : 'CONFIGURED_LOCATION_ONLY',
-      stockSource: 'All Zomba operational locations (SH/BAR/ST999) use guarded location-specific strategy: DailyStockBalance primary when present, ProductActivity fallback with safety checks',
-      stockResolutionMode: 'LOCATION_SPECIFIC',
-      aggregationEnabled: false,
-    });
-
     const locationResults = await Promise.allSettled(
       syncLocations.map(async (locationCode) => {
         const locationProducts = await fetchProductsFromPOS(locationCode);
@@ -2731,7 +2744,7 @@ async function autoSync() {
     for (const locationResult of locationResults) {
       if (locationResult.status === 'fulfilled') {
         const { locationCode, products: locationProducts } = locationResult.value;
-        console.log(`${BRANCH_TAG} [AUTO SYNC] Fetched ${locationProducts.length} products from ${locationCode} (stock from ${locationCode})`);
+        console.log(`${BRANCH_TAG} [AUTO SYNC] Fetched ${locationProducts.length} products from location ${locationCode}`);
         allProducts.push(...locationProducts);
         continue;
       }
@@ -2741,8 +2754,7 @@ async function autoSync() {
       const failureReason = locationResult.reason && locationResult.reason.message
         ? locationResult.reason.message
         : locationResult.reason;
-      console.error(`${BRANCH_TAG} [AUTO SYNC] Error fetching products from ${failedLocationCode}:`, failureReason);
-      // Continue with other locations even if one fails
+      console.error(`${BRANCH_TAG} [AUTO SYNC ERROR] Failed to fetch products from location ${failedLocationCode}: ${failureReason}`);
     }
 
     const autoSyncLocationBreakdown = allProducts.reduce((acc, product) => {
@@ -2750,16 +2762,27 @@ async function autoSync() {
       acc[key] = (acc[key] || 0) + 1;
       return acc;
     }, {});
-    console.log(`${BRANCH_TAG} [AUTO SYNC] stock read locations: ${syncLocations.join(', ')}`);
-    console.log(`${BRANCH_TAG} [AUTO SYNC] aggregation mode: disabled`);
-    console.log(`${BRANCH_TAG} [AUTO SYNC] location breakdown`, autoSyncLocationBreakdown);
+
+    // Log location breakdown when multiple locations are configured
+    if (syncLocations.length > 1) {
+      console.log(`${BRANCH_TAG} [AUTO SYNC] Location breakdown:`, autoSyncLocationBreakdown);
+    }
     
     if (allProducts.length > 0) {
+      // Get cycle counter and snapshot from persistent state or in-memory fallback
+      let productSyncCycleCounter = 0;
+      let lastProductSyncSnapshot = new Map();
+      
+      if (appConfig.stock.persistDeltaState && deltaSyncState) {
+        productSyncCycleCounter = deltaSyncState.getCycleCounter();
+        lastProductSyncSnapshot = deltaSyncState.getSnapshot();
+      }
+
       productSyncCycleCounter += 1;
 
-      const shouldForceFullSync = !ENABLE_DELTA_PRODUCT_SYNC
+      const shouldForceFullSync = !appConfig.stock.enableDeltaSync
         || lastProductSyncSnapshot.size === 0
-        || (!Number.isNaN(DELTA_FULL_SYNC_EVERY_CYCLES) && DELTA_FULL_SYNC_EVERY_CYCLES > 0 && (productSyncCycleCounter % DELTA_FULL_SYNC_EVERY_CYCLES) === 0);
+        || (!Number.isNaN(appConfig.stock.deltaFullSyncCycles) && appConfig.stock.deltaFullSyncCycles > 0 && (productSyncCycleCounter % appConfig.stock.deltaFullSyncCycles) === 0);
 
       const nextSnapshot = new Map();
       const changedProducts = [];
@@ -2787,31 +2810,25 @@ async function autoSync() {
         fullSyncRemainder = allProducts.filter((product) => !changedProductKeys.has(buildProductDeltaKey(product)));
       }
 
-      console.log(`${BRANCH_TAG} [AUTO SYNC] Total: ${allProducts.length} products from operational scope (${syncLocations.join(', ')})`);
-      console.log(`${BRANCH_TAG} [AUTO SYNC] delta sync`, {
-        enabled: ENABLE_DELTA_PRODUCT_SYNC,
-        cycle: productSyncCycleCounter,
-        forceFullSync: shouldForceFullSync,
-        priorityLane: shouldRunPriorityLane,
-        queued: productsToSync.length,
-        remainderQueued: fullSyncRemainder.length,
-      });
+      if (appConfig.stock.debugStockResolution || shouldForceFullSync) {
+        console.log(`${BRANCH_TAG} [AUTO SYNC] Delta sync: cycle=${productSyncCycleCounter} full=${shouldForceFullSync} queued=${productsToSync.length}/${allProducts.length}`);
+      }
 
       if (productsToSync.length > 0) {
         const syncResult = await sendProductsToLiveServer(productsToSync, { syncLocations });
         let remainderSyncSucceeded = true;
 
         if (syncResult && syncResult.success && shouldRunPriorityLane && fullSyncRemainder.length > 0) {
-          console.log(`${BRANCH_TAG} [AUTO SYNC] priority lane complete, sending full-sync remainder`, {
-            changedQueued: productsToSync.length,
-            remainderQueued: fullSyncRemainder.length,
-          });
+          console.log(`${BRANCH_TAG} [AUTO SYNC] Sending full-sync remainder: ${fullSyncRemainder.length} products`);
           const remainderResult = await sendProductsToLiveServer(fullSyncRemainder, { syncLocations });
           remainderSyncSucceeded = Boolean(remainderResult && remainderResult.success);
         }
 
         if (syncResult && syncResult.success && remainderSyncSucceeded) {
-          lastProductSyncSnapshot = nextSnapshot;
+          // Persist delta state if enabled
+          if (appConfig.stock.persistDeltaState && deltaSyncState) {
+            deltaSyncState.save(nextSnapshot, productSyncCycleCounter);
+          }
         }
       } else {
         console.log(`${BRANCH_TAG} [AUTO SYNC] No product changes detected for this cycle`);
@@ -3177,8 +3194,8 @@ async function startServer() {
         console.log(`${BRANCH_TAG} [REPORTING SYNC] ⏸ Polling disabled by ENABLE_REPORTING_SYNC=false`);
       }
 
-      supplierSyncInterval = setInterval(syncSuppliersToBackend, SUPPLIER_SYNC_INTERVAL_MS);
-      console.log(`${BRANCH_TAG} [SUPPLIER SYNC] ✅ Polling enabled (${SUPPLIER_SYNC_INTERVAL_MS}ms)`);
+      supplierSyncInterval = setInterval(syncSuppliersToBackend, appConfig.stock.supplierSyncIntervalMs);
+      console.log(`${BRANCH_TAG} [SUPPLIER SYNC] ✅ Polling enabled (interval: ${appConfig.stock.supplierSyncIntervalMs}ms)`);
       syncSuppliersToBackend();
     });
   } catch (err) {

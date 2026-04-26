@@ -139,6 +139,19 @@ function buildConfig() {
     limitToRecentDays: parseNonNegativeInteger(process.env.REPORTING_LIMIT_TO_RECENT_DAYS, 0),
   };
 
+  config.stock = {
+    dailyStockMaxStalenessDays: parseInteger(process.env.DAILY_STOCK_MAX_STALENESS_DAYS, 1),
+    activityFreshnessMins: parseInteger(process.env.PRODUCT_ACTIVITY_FRESHNESS_WINDOW_MINUTES, 5),
+    activityMaxAbsStock: parseInteger(process.env.PRODUCT_ACTIVITY_FALLBACK_MAX_ABS_STOCK, 2000),
+    expiryBatchCacheTtlMs: parseInteger(process.env.EXPIRY_BATCH_CACHE_TTL_MS, 5 * 60 * 1000),
+    deltaFullSyncCycles: parseInteger(process.env.DELTA_FULL_SYNC_EVERY_CYCLES, 40),
+    enableDeltaSync: parseBoolean(process.env.ENABLE_DELTA_PRODUCT_SYNC, true),
+    debugStockResolution: parseBoolean(process.env.DEBUG_STOCK_RESOLUTION, false),
+    persistDeltaState: parseBoolean(process.env.PERSIST_DELTA_SYNC_STATE, true),
+    supplierSyncIntervalMs: parseInteger(process.env.SUPPLIER_SYNC_INTERVAL_MS, 300000),
+    deltaStateDir: normalizeString(process.env.DELTA_STATE_DIR, './.sync-state'),
+  };
+
   return config;
 }
 
