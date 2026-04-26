@@ -99,8 +99,9 @@ const SuppliersList = ({
                   onMouseEnter={(event) => { if (!selected) event.currentTarget.style.backgroundColor = '#f8fafc'; }}
                   onMouseLeave={(event) => { if (!selected) event.currentTarget.style.backgroundColor = zebraBase; }}
                   style={{
-                    backgroundColor: selected ? '#f8fafc' : zebraBase,
+                    backgroundColor: selected ? '#dbeafe' : zebraBase,
                     cursor: 'pointer',
+                    borderLeft: selected ? '4px solid #1d4ed8' : '4px solid transparent',
                     transition: 'background-color 0.12s ease',
                   }}
                 >
