@@ -84,6 +84,10 @@ async function ingestSuppliersFromPos(payload) {
   }
 
   const suppliers = Array.isArray(payload && payload.suppliers) ? payload.suppliers : [];
+  const verboseLogsEnabled = String(process.env.SUPPLIER_SYNC_VERBOSE_LOGS || '').trim().toLowerCase() === 'true';
+  const uniquePosSupplierCodes = new Set();
+  const uniqueLinkedSupplierIds = new Set();
+  const supplierLinkFrequency = new Map();
   const result = {
     branchCode,
     received: suppliers.length,
@@ -132,12 +136,14 @@ async function ingestSuppliersFromPos(payload) {
           },
         });
         result.createdSuppliers += 1;
-        console.log('[BO][SUPPLIER_SYNC][PULL] created website supplier', {
-          supplierId: supplier.id,
-          branchCode,
-          posSupplierCode,
-          posSupplierName,
-        });
+        if (verboseLogsEnabled) {
+          console.log('[BO][SUPPLIER_SYNC][PULL] created website supplier', {
+            supplierId: supplier.id,
+            branchCode,
+            posSupplierCode,
+            posSupplierName,
+          });
+        }
       } else {
         await tx.supplier.update({
           where: { id: supplier.id },
@@ -179,15 +185,44 @@ async function ingestSuppliersFromPos(payload) {
       });
 
       result.linked += 1;
+      uniquePosSupplierCodes.add(posSupplierCode);
+      uniqueLinkedSupplierIds.add(supplier.id);
+      supplierLinkFrequency.set(
+        supplier.id,
+        Number(supplierLinkFrequency.get(supplier.id) || 0) + 1
+      );
 
-      console.log('[BO][SUPPLIER_SYNC][PULL] linked supplier', {
-        supplierId: supplier.id,
-        branchCode,
-        posSupplierCode,
-        posSupplierName,
-      });
+      if (verboseLogsEnabled) {
+        console.log('[BO][SUPPLIER_SYNC][PULL] linked supplier', {
+          supplierId: supplier.id,
+          branchCode,
+          posSupplierCode,
+          posSupplierName,
+        });
+      }
     });
   }
+
+  const repeatedSupplierBindings = Array.from(supplierLinkFrequency.entries())
+    .filter((entry) => Number(entry[1] || 0) > 1)
+    .sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0));
+
+  console.log('[BO][SUPPLIER_SYNC][PULL][SUMMARY]', {
+    branchCode,
+    received: result.received,
+    linked: result.linked,
+    createdSuppliers: result.createdSuppliers,
+    updatedSuppliers: result.updatedSuppliers,
+    skipped: result.skipped,
+    uniquePosSupplierCodeCount: uniquePosSupplierCodes.size,
+    uniqueLinkedSupplierCount: uniqueLinkedSupplierIds.size,
+    repeatedSupplierBindingCount: repeatedSupplierBindings.length,
+    repeatedSupplierBindingSample: repeatedSupplierBindings.slice(0, 5).map((entry) => ({
+      supplierId: entry[0],
+      linkCount: entry[1],
+    })),
+    verboseLogsEnabled,
+  });
 
   return result;
 }
