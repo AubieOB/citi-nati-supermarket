@@ -45,6 +45,18 @@ function resolveBranchLocationFallbackIds(branchCode) {
   return [];
 }
 
+function buildBranchCodeInsensitiveOr(branchAliases = []) {
+  return branchAliases
+    .map((alias) => String(alias || '').trim())
+    .filter(Boolean)
+    .map((alias) => ({
+      branchCode: {
+        equals: alias,
+        mode: 'insensitive',
+      },
+    }));
+}
+
 function normalizeSupplierStatus(status) {
   if (!status) return 'active';
   return String(status).toLowerCase();
@@ -158,10 +170,11 @@ async function listSuppliers({ search, status, locationId, branchCode, requirePo
   if (supplierHasPosLinks) {
     if (branchCode) {
       const branchAliases = resolveBranchCodeAliases(branchCode);
+      const branchCodeInsensitiveOr = buildBranchCodeInsensitiveOr(branchAliases);
       const posLinkFilter = {
         posLinks: {
           some: {
-            branchCode: { in: branchAliases },
+            ...(branchCodeInsensitiveOr.length > 0 ? { OR: branchCodeInsensitiveOr } : {}),
             ...(requirePosLinked ? { posSupplierCode: { not: null } } : {}),
           },
         },
