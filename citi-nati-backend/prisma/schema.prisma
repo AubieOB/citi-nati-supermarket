@@ -16,6 +16,7 @@ enum PosCommandType {
   WRITE_INVOICE
   CREATE_PENDING_STOCK_INTAKE
   CREATE_OR_LINK_SUPPLIER
+  DELETE_SUPPLIER
 }
 
 enum PosCommandStatus {

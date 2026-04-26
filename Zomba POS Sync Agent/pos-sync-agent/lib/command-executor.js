@@ -339,6 +339,34 @@ async function executeCreateOrLinkSupplier(pool, payload, commandId) {
   }
 }
 
+async function executeDeleteSupplier(pool, payload, commandId) {
+  var posSupplierCode = Number(payload.posSupplierCode);
+  if (!isFinite(posSupplierCode) || posSupplierCode <= 0 || Math.floor(posSupplierCode) !== posSupplierCode) {
+    throw new Error('NON_RETRYABLE: DELETE_SUPPLIER payload missing valid posSupplierCode');
+  }
+
+  var request = new sql.Request(pool);
+  request.input('posSupplierCode', sql.Int, posSupplierCode);
+
+  var result = await request.query(
+    'DELETE FROM [POS].[dbo].[suppliers] WHERE SupplierCode = @posSupplierCode'
+  );
+
+  var rowsAffected = result.rowsAffected && result.rowsAffected[0];
+
+  console.log('[SUPPLIER DELETE] DELETE_SUPPLIER executed', {
+    commandId: commandId,
+    posSupplierCode: posSupplierCode,
+    rowsAffected: rowsAffected,
+  });
+
+  return {
+    message: 'DELETE_SUPPLIER executed for posSupplierCode ' + posSupplierCode,
+    posSupplierCode: posSupplierCode,
+    rowsAffected: rowsAffected,
+  };
+}
+
 async function executeUpdatePrice(pool, payload) {
   const config = buildConfig();
   const productCode = payload.productCode;
@@ -820,6 +848,8 @@ async function executeCommand(pool, command) {
       return executeCreatePendingStockIntake(pool, payload, command.id);
     case 'CREATE_OR_LINK_SUPPLIER':
       return executeCreateOrLinkSupplier(pool, payload, command.id);
+    case 'DELETE_SUPPLIER':
+      return executeDeleteSupplier(pool, payload, command.id);
     default:
       throw new Error(`Unsupported command type: ${commandType}`);
   }

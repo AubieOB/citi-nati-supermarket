@@ -337,8 +337,10 @@ async function deleteSupplier(req, res) {
   try {
     const id = toInt(req.params.id);
     if (!id) return res.status(400).json({ success: false, error: 'Invalid supplier id' });
+    // Queue DELETE_SUPPLIER commands to POS before the record is removed
+    const posDeleteResult = await supplierPosSyncService.queueSupplierDeleteFromPos(id);
     await suppliersService.deleteSupplier(id);
-    return res.json({ success: true });
+    return res.json({ success: true, posDeleteQueued: posDeleteResult.queued });
   } catch (err) {
     console.error('[BO][SUPPLIERS] deleteSupplier error:', err);
     return res.status(500).json({ success: false, error: 'Failed to delete supplier' });

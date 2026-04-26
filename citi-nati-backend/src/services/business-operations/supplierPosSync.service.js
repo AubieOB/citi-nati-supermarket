@@ -244,6 +244,42 @@ async function ingestSuppliersFromPos(payload) {
     verboseLogsEnabled,
   });
 
+  // Detect POS-side deletions: any SupplierPosLink for this branch whose posSupplierCode
+  // is no longer present in the incoming set means the supplier was deleted in POS.
+  // We soft-deactivate the website supplier and remove the stale link.
+  if (uniquePosSupplierCodes.size > 0) {
+    const allLinksForBranch = await prisma.supplierPosLink.findMany({
+      where: { branchCode },
+      select: { id: true, supplierId: true, posSupplierCode: true },
+    });
+
+    const staleLinkIds = [];
+    const staleSupplierIds = [];
+
+    for (const link of allLinksForBranch) {
+      const code = parsePositiveInt(link.posSupplierCode);
+      if (code && !uniquePosSupplierCodes.has(code)) {
+        staleLinkIds.push(link.id);
+        staleSupplierIds.push(link.supplierId);
+      }
+    }
+
+    if (staleLinkIds.length > 0) {
+      await prisma.supplierPosLink.deleteMany({ where: { id: { in: staleLinkIds } } });
+      await prisma.supplier.updateMany({
+        where: { id: { in: staleSupplierIds } },
+        data: { status: 'inactive' },
+      });
+      console.log('[BO][SUPPLIER_SYNC][PULL][POS_DELETE_DETECTED]', {
+        branchCode,
+        staleLinksRemoved: staleLinkIds.length,
+        suppliersDeactivated: staleSupplierIds.length,
+        staleSupplierIdSample: staleSupplierIds.slice(0, 10),
+      });
+      result.posDeletedDeactivated = staleLinkIds.length;
+    }
+  }
+
   return result;
 }
 
@@ -344,8 +380,56 @@ async function queueSupplierPushToPos(supplierId, branchCodeInput, createdBy) {
   };
 }
 
+async function queueSupplierDeleteFromPos(supplierId) {
+  const supplier = await prisma.supplier.findUnique({
+    where: { id: supplierId },
+    include: { posLinks: true },
+  });
+
+  if (!supplier) return { queued: 0, links: [] };
+
+  const links = Array.isArray(supplier.posLinks) ? supplier.posLinks : [];
+  const queued = [];
+
+  for (const link of links) {
+    const posSupplierCode = parsePositiveInt(link.posSupplierCode);
+    if (!posSupplierCode) continue; // no POS code yet – nothing to delete in POS
+
+    const commandPayload = {
+      branchCode: link.branchCode,
+      posSupplierCode,
+      supplierId: supplier.id,
+      supplierName: normalizeSupplierName(supplier.name),
+    };
+
+    const command = await posCommandQueueService.enqueueCommand(
+      'DELETE_SUPPLIER',
+      commandPayload,
+      {
+        source: 'supplier-pos-sync',
+        relatedEntityType: 'Supplier',
+        relatedEntityId: String(supplier.id),
+        createdBy: null,
+        maxRetries: 3,
+      }
+    );
+
+    console.log('[BO][SUPPLIER_SYNC][DELETE] queued DELETE_SUPPLIER command', {
+      commandId: command.id,
+      supplierId: supplier.id,
+      branchCode: link.branchCode,
+      posSupplierCode,
+    });
+
+    queued.push({ commandId: command.id, branchCode: link.branchCode, posSupplierCode });
+  }
+
+  return { queued: queued.length, links: queued };
+}
+
 module.exports = {
   normalizeBranchCode,
   ingestSuppliersFromPos,
   queueSupplierPushToPos,
+  queueSupplierDeleteFromPos,
 };
