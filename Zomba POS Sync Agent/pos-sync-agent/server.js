@@ -2576,8 +2576,11 @@ let isReportingSyncRunning = false;
 let supplierSyncInterval;
 const SUPPLIER_SYNC_INTERVAL_MS = Number.parseInt(process.env.SUPPLIER_SYNC_INTERVAL_MS || '300000', 10);
 let isSupplierSyncRunning = false;
+let lastSupplierSyncAttemptAtMs = 0;
 
 async function syncSuppliersToBackend() {
+  lastSupplierSyncAttemptAtMs = Date.now();
+
   if (!appConfig.backend.baseUrl || !appConfig.backend.apiToken) {
     console.warn(`${BRANCH_TAG} [SUPPLIER SYNC] Skipped tick - backend config missing`, {
       hasBackendUrl: Boolean(appConfig.backend.baseUrl),
@@ -2686,6 +2689,21 @@ async function autoSync() {
 
   isAutoSyncRunning = true;
   try {
+    const nowMs = Date.now();
+    const supplierSyncIsDue = !lastSupplierSyncAttemptAtMs
+      || (nowMs - lastSupplierSyncAttemptAtMs) >= SUPPLIER_SYNC_INTERVAL_MS;
+
+    if (supplierSyncIsDue) {
+      console.log(`${BRANCH_TAG} [AUTO SYNC] Triggering supplier sync catch-up before product batching`, {
+        branchCode: appConfig.branch.branchCode,
+        supplierSyncIntervalMs: SUPPLIER_SYNC_INTERVAL_MS,
+        lastSupplierSyncAttemptAt: lastSupplierSyncAttemptAtMs
+          ? new Date(lastSupplierSyncAttemptAtMs).toISOString()
+          : null,
+      });
+      await syncSuppliersToBackend();
+    }
+
     // Fetch products from operational location scope only.
     const allProducts = [];
     const syncLocations = getOperationalSyncLocations();
