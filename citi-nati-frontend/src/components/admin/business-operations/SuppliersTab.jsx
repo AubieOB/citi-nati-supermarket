@@ -7,7 +7,8 @@ import SuppliersList from './SuppliersList.jsx';
 import SupplierDetailPanel from './SupplierDetailPanel.jsx';
 import SupplierFormModal from './SupplierFormModal.jsx';
 import SupplierTransactionFormModal from './SupplierTransactionFormModal.jsx';
-import SupplierEmptyState from './SupplierEmptyState.jsx';
+import SupplierBalanceCards from './SupplierBalanceCards.jsx';
+import SupplierTransactionTable from './SupplierTransactionTable.jsx';
 
 const cardStyle = {
   backgroundColor: '#fff',
@@ -76,6 +77,10 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
   const [showFilters, setShowFilters] = useState(false);
   const [isSuppliersWorkspaceModalOpen, setIsSuppliersWorkspaceModalOpen] = useState(false);
   const [isSuppliersWorkspaceMaximized, setIsSuppliersWorkspaceMaximized] = useState(false);
+  const [isSupplierProfileModalOpen, setIsSupplierProfileModalOpen] = useState(false);
+  const [isSupplierProfileModalMaximized, setIsSupplierProfileModalMaximized] = useState(false);
+  const [isSupplierTransactionsModalOpen, setIsSupplierTransactionsModalOpen] = useState(false);
+  const [isSupplierTransactionsModalMaximized, setIsSupplierTransactionsModalMaximized] = useState(false);
   const [page, setPage] = useState(1);
   const [transactionPage, setTransactionPage] = useState(1);
 
@@ -316,6 +321,18 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
     setTransactionModalState({ open: true, transaction });
   };
 
+  const openSupplierProfileModal = () => {
+    if (!selectedSupplierId) return;
+    setIsSupplierProfileModalMaximized(false);
+    setIsSupplierProfileModalOpen(true);
+  };
+
+  const openSupplierTransactionsModal = () => {
+    if (!selectedSupplierId) return;
+    setIsSupplierTransactionsModalMaximized(false);
+    setIsSupplierTransactionsModalOpen(true);
+  };
+
   const handleDeleteSupplier = async (supplier) => {
     try {
       const response = await api.delete(`/business-operations/suppliers/${supplier.id}`);
@@ -411,11 +428,47 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
   };
 
   useEffect(() => {
-    if (!isSuppliersWorkspaceModalOpen || supplierModalState.open || transactionModalState.open) return;
+    if (
+      !isSuppliersWorkspaceModalOpen
+      || supplierModalState.open
+      || transactionModalState.open
+      || isSupplierProfileModalOpen
+      || isSupplierTransactionsModalOpen
+    ) return;
     const handler = (event) => { if (event.key === 'Escape') { setIsSuppliersWorkspaceModalOpen(false); setIsSuppliersWorkspaceMaximized(false); } };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isSuppliersWorkspaceModalOpen, supplierModalState.open, transactionModalState.open]);
+  }, [
+    isSuppliersWorkspaceModalOpen,
+    supplierModalState.open,
+    transactionModalState.open,
+    isSupplierProfileModalOpen,
+    isSupplierTransactionsModalOpen,
+  ]);
+
+  useEffect(() => {
+    if (!isSupplierProfileModalOpen || supplierModalState.open || transactionModalState.open) return;
+    const handler = (event) => {
+      if (event.key === 'Escape') {
+        setIsSupplierProfileModalOpen(false);
+        setIsSupplierProfileModalMaximized(false);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isSupplierProfileModalOpen, supplierModalState.open, transactionModalState.open]);
+
+  useEffect(() => {
+    if (!isSupplierTransactionsModalOpen || supplierModalState.open || transactionModalState.open) return;
+    const handler = (event) => {
+      if (event.key === 'Escape') {
+        setIsSupplierTransactionsModalOpen(false);
+        setIsSupplierTransactionsModalMaximized(false);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isSupplierTransactionsModalOpen, supplierModalState.open, transactionModalState.open]);
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
@@ -576,81 +629,186 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
               </div>
             </div>
 
-            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'minmax(360px, 420px) 1fr', minHeight: 0 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, borderRight: '1px solid #e2e8f0' }}>
-                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-                  <div style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '0.52rem 0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
-                    <span>Visible: {suppliers.length} {suppliers.length === 1 ? 'supplier' : 'suppliers'}</span>
-                    <span style={{ color: '#334155', maxWidth: '170px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.85rem' }}>
+              <div style={{ ...cardStyle, overflow: 'hidden' }}>
+                <div style={{ padding: '0.75rem 1.05rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'grid', gap: '0.2rem' }}>
+                    <strong style={{ color: '#0f172a' }}>Supplier Register</strong>
+                    <span style={{ color: '#64748b', fontSize: '0.8rem' }}>
                       Selected: {selectedSupplier ? selectedSupplier.name : 'None'}
                     </span>
                   </div>
-                  <div style={{ padding: '0.85rem' }}>
-                    <div style={{ ...cardStyle, overflow: 'hidden' }}>
-                      <div style={{ padding: '1rem 1.05rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-                        <strong style={{ color: '#0f172a' }}>Supplier Register</strong>
-                      </div>
-                      <SuppliersList
-                        suppliers={suppliers}
-                        loading={listLoading}
-                        error={listError}
-                        pagination={pagination}
-                        page={page}
-                        onPageChange={setPage}
-                        selectedSupplierId={selectedSupplierId}
-                        onSelectSupplier={(supplier) => setSelectedSupplierId(supplier.id)}
-                        onEditSupplier={openEditSupplier}
-                        onDeleteSupplier={handleDeleteSupplier}
-                      />
-                    </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={openSupplierProfileModal}
+                      disabled={!selectedSupplierId}
+                      style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.5rem 0.8rem', fontWeight: 700, cursor: selectedSupplierId ? 'pointer' : 'not-allowed', opacity: selectedSupplierId ? 1 : 0.65 }}
+                    >
+                      Open Supplier Profile
+                    </button>
+                    <button
+                      type="button"
+                      onClick={openSupplierTransactionsModal}
+                      disabled={!selectedSupplierId}
+                      style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.5rem 0.8rem', fontWeight: 700, cursor: selectedSupplierId ? 'pointer' : 'not-allowed', opacity: selectedSupplierId ? 1 : 0.65 }}
+                    >
+                      Supplier Transactions
+                    </button>
                   </div>
+                </div>
+                <SuppliersList
+                  suppliers={suppliers}
+                  loading={listLoading}
+                  error={listError}
+                  pagination={pagination}
+                  page={page}
+                  onPageChange={setPage}
+                  selectedSupplierId={selectedSupplierId}
+                  onSelectSupplier={(supplier) => setSelectedSupplierId(supplier.id)}
+                  onEditSupplier={openEditSupplier}
+                  onDeleteSupplier={handleDeleteSupplier}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isSupplierProfileModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.5)', zIndex: 180, display: 'grid', placeItems: 'center', padding: isSupplierProfileModalMaximized ? '0.35rem' : '1rem' }}>
+          <div style={{ ...cardStyle, width: isSupplierProfileModalMaximized ? 'calc(100vw - 0.7rem)' : 'min(1100px, 96vw)', height: isSupplierProfileModalMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isSupplierProfileModalMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ flexShrink: 0, padding: '0.8rem 1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <div>
+                <h3 style={{ margin: 0, color: '#0f172a' }}>Supplier Profile</h3>
+                <div style={{ color: '#64748b', fontSize: '0.84rem' }}>
+                  {selectedSupplier ? `${selectedSupplier.name}${selectedSupplier.supplierCode ? ` · ${selectedSupplier.supplierCode}` : ''}` : 'No supplier selected'}
                 </div>
               </div>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  title={isSupplierProfileModalMaximized ? 'Restore' : 'Maximize'}
+                  aria-label={isSupplierProfileModalMaximized ? 'Restore supplier profile modal' : 'Maximize supplier profile modal'}
+                  onClick={() => setIsSupplierProfileModalMaximized((prev) => !prev)}
+                  style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
+                >
+                  <i className={`fas ${isSupplierProfileModalMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
+                </button>
+                <button
+                  type="button"
+                  title="Close"
+                  aria-label="Close supplier profile modal"
+                  onClick={() => { setIsSupplierProfileModalOpen(false); setIsSupplierProfileModalMaximized(false); }}
+                  style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
+                >
+                  <i className="fas fa-times" />
+                </button>
+              </div>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.9rem' }}>
+              <SupplierDetailPanel
+                supplier={selectedSupplier}
+                balanceSummary={selectedSummary}
+                detailLoading={detailLoading}
+                detailError={detailError}
+                transactions={detailState.transactions}
+                transactionsLoading={transactionsLoading}
+                transactionsError={transactionsError}
+                transactionPagination={detailState.transactionPagination}
+                transactionPage={transactionPage}
+                onTransactionPageChange={setTransactionPage}
+                onEditSupplier={() => openEditSupplier(selectedSupplier)}
+                onAddTransaction={openCreateTransaction}
+                selectedBranchCode={selectedBranchCode}
+                syncingBranches={syncingBranches}
+                onSyncPosBranch={(branchCode) => handleSyncSupplierToBranch(selectedSupplier, branchCode)}
+                onEditTransaction={openEditTransaction}
+                onDeleteTransaction={handleDeleteTransaction}
+                showTransactionsSection={false}
+                onOpenTransactions={openSupplierTransactionsModal}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
-              <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-                  <div style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '0.52rem 0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
-                    <span style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {selectedSupplier ? `${selectedSupplier.name}${selectedSupplier.supplierCode ? ` · ${selectedSupplier.supplierCode}` : ''}` : 'No supplier selected'}
-                    </span>
-                    <span style={{ color: String(selectedSupplier?.status || '').toLowerCase() === 'active' ? '#166534' : '#334155', fontWeight: 700, textTransform: 'capitalize' }}>
-                      {selectedSupplier ? `Status: ${selectedSupplier.status || 'unknown'}` : '—'}
-                    </span>
-                  </div>
-                  <div style={{ padding: '0.85rem' }}>
-                    {selectedSupplierId || detailLoading ? (
-                      <SupplierDetailPanel
-                        supplier={selectedSupplier}
-                        balanceSummary={selectedSummary}
-                        detailLoading={detailLoading}
-                        detailError={detailError}
-                        transactions={detailState.transactions}
-                        transactionsLoading={transactionsLoading}
-                        transactionsError={transactionsError}
-                        transactionPagination={detailState.transactionPagination}
-                        transactionPage={transactionPage}
-                        onTransactionPageChange={setTransactionPage}
-                        onEditSupplier={() => openEditSupplier(selectedSupplier)}
-                        onAddTransaction={openCreateTransaction}
-                        selectedBranchCode={selectedBranchCode}
-                        syncingBranches={syncingBranches}
-                        onSyncPosBranch={(branchCode) => handleSyncSupplierToBranch(selectedSupplier, branchCode)}
-                        onEditTransaction={openEditTransaction}
-                        onDeleteTransaction={handleDeleteTransaction}
-                      />
-                    ) : (
-                      <div style={{ ...cardStyle, padding: '1rem' }}>
-                        <SupplierEmptyState
-                          title="No supplier selected"
-                          message="Add your first supplier or choose one from the register to begin supplier operations."
-                          actionLabel="Add New Supplier"
-                          onAction={openCreateSupplier}
-                          icon="fa-truck-field"
-                        />
-                      </div>
-                    )}
-                  </div>
+      {isSupplierTransactionsModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.5)', zIndex: 185, display: 'grid', placeItems: 'center', padding: isSupplierTransactionsModalMaximized ? '0.35rem' : '1rem' }}>
+          <div style={{ ...cardStyle, width: isSupplierTransactionsModalMaximized ? 'calc(100vw - 0.7rem)' : 'min(1100px, 96vw)', height: isSupplierTransactionsModalMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isSupplierTransactionsModalMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ flexShrink: 0, padding: '0.8rem 1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <div>
+                <h3 style={{ margin: 0, color: '#0f172a' }}>Supplier Transactions</h3>
+                <div style={{ color: '#64748b', fontSize: '0.84rem' }}>
+                  {selectedSupplier ? `${selectedSupplier.name}${selectedSupplier.supplierCode ? ` · ${selectedSupplier.supplierCode}` : ''}` : 'No supplier selected'}
                 </div>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={openCreateTransaction}
+                  style={{ border: 'none', backgroundColor: '#0f766e', color: '#fff', borderRadius: '10px', padding: '0.55rem 0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Add Transaction
+                </button>
+                <button
+                  type="button"
+                  title={isSupplierTransactionsModalMaximized ? 'Restore' : 'Maximize'}
+                  aria-label={isSupplierTransactionsModalMaximized ? 'Restore supplier transactions modal' : 'Maximize supplier transactions modal'}
+                  onClick={() => setIsSupplierTransactionsModalMaximized((prev) => !prev)}
+                  style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
+                >
+                  <i className={`fas ${isSupplierTransactionsModalMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
+                </button>
+                <button
+                  type="button"
+                  title="Close"
+                  aria-label="Close supplier transactions modal"
+                  onClick={() => { setIsSupplierTransactionsModalOpen(false); setIsSupplierTransactionsModalMaximized(false); }}
+                  style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
+                >
+                  <i className="fas fa-times" />
+                </button>
+              </div>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.9rem', display: 'grid', gap: '1rem' }}>
+              <SupplierBalanceCards summary={selectedSummary} />
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: '18px', overflow: 'hidden', backgroundColor: '#fff' }}>
+                <div style={{ padding: '1rem 1.05rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+                  <strong style={{ color: '#0f172a' }}>Transaction History</strong>
+                </div>
+                <SupplierTransactionTable
+                  transactions={detailState.transactions}
+                  loading={transactionsLoading}
+                  error={transactionsError || detailError}
+                  onEditTransaction={openEditTransaction}
+                  onDeleteTransaction={handleDeleteTransaction}
+                />
+                {detailState.transactionPagination && (detailState.transactionPagination.totalPages || 0) > 1 ? (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', padding: '0.95rem 1rem', borderTop: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
+                    <span style={{ color: '#64748b', fontSize: '0.86rem' }}>
+                      Page {detailState.transactionPagination.page || transactionPage} of {detailState.transactionPagination.totalPages || 1} with {(detailState.transactionPagination.total || 0).toLocaleString('en-US')} transactions.
+                    </span>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => setTransactionPage(Math.max(1, transactionPage - 1))}
+                        disabled={(detailState.transactionPagination.page || transactionPage) <= 1}
+                        style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.5rem 0.85rem', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        Previous
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTransactionPage(transactionPage + 1)}
+                        disabled={(detailState.transactionPagination.page || transactionPage) >= (detailState.transactionPagination.totalPages || 1)}
+                        style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.5rem 0.85rem', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>

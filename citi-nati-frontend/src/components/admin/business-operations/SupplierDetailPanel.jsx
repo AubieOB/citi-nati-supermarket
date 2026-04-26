@@ -66,6 +66,8 @@ const SupplierDetailPanel = ({
   onSyncPosBranch,
   onEditTransaction,
   onDeleteTransaction,
+  showTransactionsSection = true,
+  onOpenTransactions,
 }) => {
   if (!supplier && !detailLoading) {
     return (
@@ -113,6 +115,15 @@ const SupplierDetailPanel = ({
             >
               Add Transaction
             </button>
+            {!showTransactionsSection && (
+              <button
+                type="button"
+                onClick={onOpenTransactions}
+                style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.65rem 0.9rem', fontWeight: 700, cursor: 'pointer' }}
+              >
+                Supplier Transactions
+              </button>
+            )}
           </div>
         </div>
 
@@ -209,44 +220,62 @@ const SupplierDetailPanel = ({
 
       <SupplierBalanceCards summary={balanceSummary} />
 
-      <div style={{ border: '1px solid #e2e8f0', borderRadius: '18px', overflow: 'hidden', backgroundColor: '#fff' }}>
-        <div style={{ padding: '1rem 1.05rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-          <strong style={{ color: '#0f172a' }}>Supplier Transactions</strong>
-          <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>Track debt, payments, adjustments, and audit context for the selected supplier.</p>
-        </div>
-        <SupplierTransactionTable
-          transactions={transactions}
-          loading={transactionsLoading}
-          error={transactionsError || detailError}
-          onEditTransaction={onEditTransaction}
-          onDeleteTransaction={onDeleteTransaction}
-        />
-        {transactionPagination && (transactionPagination.totalPages || 0) > 1 ? (
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', padding: '0.95rem 1rem', borderTop: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
-            <span style={{ color: '#64748b', fontSize: '0.86rem' }}>
-              Page {transactionPagination.page || transactionPage} of {transactionPagination.totalPages || 1} with {(transactionPagination.total || 0).toLocaleString('en-US')} transactions.
-            </span>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button
-                type="button"
-                onClick={() => onTransactionPageChange(Math.max(1, transactionPage - 1))}
-                disabled={(transactionPagination.page || transactionPage) <= 1}
-                style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.5rem 0.85rem', fontWeight: 700, cursor: 'pointer' }}
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                onClick={() => onTransactionPageChange(transactionPage + 1)}
-                disabled={(transactionPagination.page || transactionPage) >= (transactionPagination.totalPages || 1)}
-                style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.5rem 0.85rem', fontWeight: 700, cursor: 'pointer' }}
-              >
-                Next
-              </button>
-            </div>
+      {showTransactionsSection ? (
+        <div style={{ border: '1px solid #e2e8f0', borderRadius: '18px', overflow: 'hidden', backgroundColor: '#fff' }}>
+          <div style={{ padding: '1rem 1.05rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+            <strong style={{ color: '#0f172a' }}>Supplier Transactions</strong>
+            <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>Track debt, payments, adjustments, and audit context for the selected supplier.</p>
           </div>
-        ) : null}
-      </div>
+          <SupplierTransactionTable
+            transactions={transactions}
+            loading={transactionsLoading}
+            error={transactionsError || detailError}
+            onEditTransaction={onEditTransaction}
+            onDeleteTransaction={onDeleteTransaction}
+          />
+          {transactionPagination && (transactionPagination.totalPages || 0) > 1 ? (
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', padding: '0.95rem 1rem', borderTop: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
+              <span style={{ color: '#64748b', fontSize: '0.86rem' }}>
+                Page {transactionPagination.page || transactionPage} of {transactionPagination.totalPages || 1} with {(transactionPagination.total || 0).toLocaleString('en-US')} transactions.
+              </span>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => onTransactionPageChange(Math.max(1, transactionPage - 1))}
+                  disabled={(transactionPagination.page || transactionPage) <= 1}
+                  style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.5rem 0.85rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onTransactionPageChange(transactionPage + 1)}
+                  disabled={(transactionPagination.page || transactionPage) >= (transactionPagination.totalPages || 1)}
+                  style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.5rem 0.85rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <div style={{ border: '1px solid #e2e8f0', borderRadius: '18px', backgroundColor: '#fff', padding: '1rem 1.05rem', display: 'grid', gap: '0.5rem' }}>
+          <strong style={{ color: '#0f172a' }}>Supplier Transactions</strong>
+          <p style={{ margin: 0, color: '#64748b', fontSize: '0.88rem' }}>
+            Open the transactions workspace for this supplier to review history, balances, and actions.
+          </p>
+          <div>
+            <button
+              type="button"
+              onClick={onOpenTransactions}
+              style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}
+            >
+              Open Supplier Transactions
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
