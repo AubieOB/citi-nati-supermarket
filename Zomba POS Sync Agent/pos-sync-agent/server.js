@@ -372,7 +372,7 @@ async function fetchStockDetailsLiveStockMap(locationCode, stockConfig) {
 
 async function getCachedExpiryBatches() {
   const now = Date.now();
-  if (expiryBatchCache && (now - expiryBatchCachedAt) < EXPIRY_BATCH_CACHE_TTL_MS) {
+  if (expiryBatchCache && (now - expiryBatchCachedAt) < appConfig.stock.expiryBatchCacheTtlMs) {
     console.log(`[POS FETCH][EXPIRY] using cached expiry batch map (age=${Math.round((now - expiryBatchCachedAt) / 1000)}s, size=${expiryBatchCache.size})`);
     return expiryBatchCache;
   }
