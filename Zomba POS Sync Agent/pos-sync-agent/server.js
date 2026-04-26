@@ -3114,6 +3114,13 @@ async function startServer() {
       }
     }
 
+    try {
+      console.log(`${BRANCH_TAG} [SUPPLIER SYNC] Startup warm-up trigger`);
+      await syncSuppliersToBackend();
+    } catch (supplierWarmupError) {
+      console.error(`${BRANCH_TAG} [SUPPLIER SYNC] Startup warm-up failed:`, supplierWarmupError.message);
+    }
+
     app.listen(PORT, () => {
       console.log(`${BRANCH_TAG} POS Sync Agent listening on port ${PORT}`);
       console.log(`${BRANCH_TAG} API Key validation: ENABLED`);
