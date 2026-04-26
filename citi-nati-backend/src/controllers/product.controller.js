@@ -573,6 +573,9 @@ function normalizeBranchCodeForIngest(value, fallbackLocationCode = null) {
 }
 
 const ZOMBA_LOCATION_CODES = ['ZA'].concat(CORE_ZOMBA_LOCATION_CODES);
+const BLANTYRE_DISALLOWED_LOCATION_CODES = ['ZA'].concat(
+  CORE_ZOMBA_LOCATION_CODES.filter((code) => String(code || '').trim().toUpperCase() !== 'SH')
+);
 
 function isConcreteZombaOperationalLocationCode(locationCode) {
   return CORE_ZOMBA_LOCATION_CODES.includes(String(locationCode || '').trim().toUpperCase());
@@ -2410,7 +2413,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
           continue;
         }
 
-        if (branchCode === 'BLANTYRE' && CORE_ZOMBA_LOCATION_CODES.includes(productLocationCode)) {
+        if (branchCode === 'BLANTYRE' && BLANTYRE_DISALLOWED_LOCATION_CODES.includes(productLocationCode)) {
           skipped++;
           const rejection = `[POS PRODUCT INGEST][REJECTED] product=${sourceCode} branch=${branchCode} location=${productLocationCode} reason=BRANCH_LOCATION_MISMATCH`;
           errors.push(rejection);
