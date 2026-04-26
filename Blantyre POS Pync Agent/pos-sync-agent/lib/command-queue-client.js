@@ -47,10 +47,13 @@ async function pollCommands(limit = 10) {
   const config = buildConfig();
   const primaryLocationCode = String(config.posDb.locationCode || 'SH').trim().toUpperCase();
   const locationCodes = Array.from(new Set([primaryLocationCode, 'SH', 'BT'].filter(Boolean)));
+  const branchCode = String((config.branch && config.branch.branchCode) || 'BLANTYRE').trim().toUpperCase();
   const payload = withMetadata({ 
     limit,
     // Poll both SH and BT so older BT-tagged writeback commands are still claimable.
     locationCodes,
+    // Critical for shared location codes (e.g. SH): only claim this agent's branch commands.
+    branchCodes: [branchCode],
   });
   const response = await client.post('/api/pos-commands/poll', payload);
   return (response.data && response.data.commands) || [];
