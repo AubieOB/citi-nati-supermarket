@@ -342,28 +342,36 @@ async function queueSupplierPushToPos(supplierId, branchCodeInput, createdBy) {
     }
   );
 
-  await prisma.supplierPosLink.upsert({
+  const existingPendingLink = await prisma.supplierPosLink.findFirst({
     where: {
-      supplierId_branchCode: {
-        supplierId: supplier.id,
-        branchCode,
-      },
-    },
-    create: {
       supplierId: supplier.id,
       branchCode,
-      posSupplierCode: null,
-      posSupplierName: normalizeSupplierName(supplier.name),
-      syncStatus: 'pending',
-      syncedAt: null,
-      syncError: null,
     },
-    update: {
-      syncStatus: 'pending',
-      syncError: null,
-      posSupplierName: normalizeSupplierName(supplier.name),
-    },
+    select: { id: true },
   });
+
+  if (existingPendingLink) {
+    await prisma.supplierPosLink.update({
+      where: { id: existingPendingLink.id },
+      data: {
+        syncStatus: 'pending',
+        syncError: null,
+        posSupplierName: normalizeSupplierName(supplier.name),
+      },
+    });
+  } else {
+    await prisma.supplierPosLink.create({
+      data: {
+        supplierId: supplier.id,
+        branchCode,
+        posSupplierCode: null,
+        posSupplierName: normalizeSupplierName(supplier.name),
+        syncStatus: 'pending',
+        syncedAt: null,
+        syncError: null,
+      },
+    });
+  }
 
   console.log('[BO][SUPPLIER_SYNC][PUSH] queued supplier push command', {
     commandId: queued.id,
