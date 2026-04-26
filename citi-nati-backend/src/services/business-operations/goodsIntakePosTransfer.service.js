@@ -59,7 +59,25 @@ function parsePositiveIntegerSupplierCode(rawValue) {
   return parsed;
 }
 
+function resolveLinkedSupplierCodeForBranch(supplier, branchCode) {
+  if (!supplier || !Array.isArray(supplier.posLinks)) return null;
+
+  for (const link of supplier.posLinks) {
+    const linkBranchCode = String(link && link.branchCode || '').trim().toUpperCase();
+    if (linkBranchCode !== String(branchCode || '').trim().toUpperCase()) continue;
+    const parsed = parsePositiveIntegerSupplierCode(link && link.posSupplierCode);
+    if (parsed !== null) return parsed;
+  }
+
+  return null;
+}
+
 function resolveSupplierCodeForTransfer(intake) {
+  const linkedBlantyreCode = resolveLinkedSupplierCodeForBranch(intake && intake.supplier, 'BLANTYRE');
+  if (linkedBlantyreCode !== null) {
+    return { supplierCode: linkedBlantyreCode, usedFallback: false };
+  }
+
   const explicitSupplierCode = parsePositiveIntegerSupplierCode(intake?.supplier?.supplierCode);
   if (explicitSupplierCode !== null) {
     return { supplierCode: explicitSupplierCode, usedFallback: false };
@@ -74,13 +92,14 @@ function resolveSupplierCodeForTransfer(intake) {
     return {
       supplierCode: '',
       usedFallback: false,
-      error: 'Supplier with a valid SupplierCode is required for POS transfer. Update the intake to link a registered supplier.',
+      error: 'This supplier is not linked to a POS SupplierCode for this branch. Sync or link supplier first.',
     };
   }
 
   const fallbackCode = parsePositiveIntegerSupplierCode(
     process.env.POS_OPEN_STOCK_BALANCES_SUPPLIER_CODE
     || process.env.POS_FALLBACK_SUPPLIER_CODE
+    || 1
   );
 
   if (fallbackCode === null) {
@@ -100,6 +119,11 @@ function resolveSupplierCodeForTransfer(intake) {
  * (Blantyre uses "OPEN STOCK BALANCES" — they are different POS supplier records).
  */
 function resolveZombaSupplierCodeForTransfer(intake) {
+  const linkedZombaCode = resolveLinkedSupplierCodeForBranch(intake && intake.supplier, 'ZOMBA');
+  if (linkedZombaCode !== null) {
+    return { supplierCode: linkedZombaCode, usedFallback: false };
+  }
+
   const supplierName = String(intake?.supplier?.name || '').trim().toUpperCase();
   const manualSupplierName = String(intake?.manualSupplierName || '').trim().toUpperCase();
   const isOpenBalances = supplierName === ZOMBA_OPEN_BALANCES_CODE
@@ -112,14 +136,14 @@ function resolveZombaSupplierCodeForTransfer(intake) {
   }
 
   const explicitSupplierCode = parsePositiveIntegerSupplierCode(intake?.supplier?.supplierCode);
-  if (explicitSupplierCode !== null) {
+  if (explicitSupplierCode !== null && !intake?.supplier?.id) {
     return { supplierCode: explicitSupplierCode, usedFallback: false };
   }
 
   return {
     supplierCode: null,
     usedFallback: false,
-    error: 'Supplier with a valid numeric SupplierCode is required for POS transfer. Update the intake to link a registered supplier.',
+    error: 'This supplier is not linked to a POS SupplierCode for this branch. Sync or link supplier first.',
   };
 }
 
@@ -135,7 +159,18 @@ async function transferGoodsIntakeToBlantyrePosPending(intakeId, options = {}) {
     where: { id: intakeId },
     include: {
       supplier: {
-        select: { id: true, name: true, supplierCode: true },
+        select: {
+          id: true,
+          name: true,
+          supplierCode: true,
+          posLinks: {
+            select: {
+              branchCode: true,
+              posSupplierCode: true,
+              posSupplierName: true,
+            },
+          },
+        },
       },
       items: {
         orderBy: { lineNo: 'asc' },
@@ -341,7 +376,18 @@ async function transferGoodsIntakeToZombaPosPending(intakeId, options) {
     where: { id: intakeId },
     include: {
       supplier: {
-        select: { id: true, name: true, supplierCode: true },
+        select: {
+          id: true,
+          name: true,
+          supplierCode: true,
+          posLinks: {
+            select: {
+              branchCode: true,
+              posSupplierCode: true,
+              posSupplierName: true,
+            },
+          },
+        },
       },
       items: {
         orderBy: { lineNo: 'asc' },

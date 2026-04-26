@@ -13,6 +13,7 @@ const {
   deleteSupplierTransaction,
   getSupplierBalance,
   importSuppliers,
+  syncSupplierToPosBranch,
 } = require('../../controllers/business-operations/suppliers.controller');
 
 const router = express.Router();
@@ -25,6 +26,7 @@ router.delete('/transactions/:id', deleteSupplierTransaction);
 router.get('/transactions/list', listSupplierTransactions);
 
 router.post('/', createSupplier);
+router.post('/:id/sync-pos', syncSupplierToPosBranch);
 router.put('/:id', updateSupplier);
 router.delete('/:id', deleteSupplier);
 router.get('/:id', getSupplierById);

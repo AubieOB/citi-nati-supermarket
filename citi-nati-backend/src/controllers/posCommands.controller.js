@@ -93,6 +93,47 @@ async function completeCommand(req, res) {
       }
     }
 
+    // Side-effect: persist supplier branch-link when POS supplier sync command succeeds
+    if (command && command.commandType === 'CREATE_OR_LINK_SUPPLIER' && command.relatedEntityType === 'Supplier' && command.relatedEntityId) {
+      try {
+        const supplierId = parseInt(command.relatedEntityId, 10);
+        const payloadBranchCode = String((command.payload && command.payload.branchCode) || '').trim().toUpperCase();
+        const posSupplierCode = Number(resultSummary && (resultSummary.posSupplierCode || resultSummary.supplierCode));
+        const posSupplierName = String((resultSummary && (resultSummary.posSupplierName || resultSummary.supplierName)) || '').trim() || null;
+
+        if (Number.isFinite(supplierId) && payloadBranchCode && Number.isFinite(posSupplierCode) && posSupplierCode > 0) {
+          await prisma.supplierPosLink.upsert({
+            where: {
+              supplierId_branchCode: {
+                supplierId,
+                branchCode: payloadBranchCode,
+              },
+            },
+            create: {
+              supplierId,
+              branchCode: payloadBranchCode,
+              posSupplierCode,
+              posSupplierName,
+              syncStatus: 'synced',
+              syncedAt: new Date(),
+              syncError: null,
+            },
+            update: {
+              posSupplierCode,
+              posSupplierName,
+              syncStatus: 'synced',
+              syncedAt: new Date(),
+              syncError: null,
+            },
+          });
+
+          console.log(`[POS COMMAND QUEUE] Supplier ${supplierId} linked to POS branch ${payloadBranchCode} code ${posSupplierCode} after command ${id} completed`);
+        }
+      } catch (sideEffectError) {
+        console.error(`[POS COMMAND QUEUE] Failed to update supplier POS link after command ${id}:`, sideEffectError.message);
+      }
+    }
+
     return res.json({ success: true, id, status: 'COMPLETED' });
   } catch (error) {
     console.error('[POS COMMAND QUEUE ERROR] complete failed:', error.message);
@@ -133,6 +174,41 @@ async function failCommand(req, res) {
         }
       } catch (sideEffectError) {
         console.error(`[POS COMMAND QUEUE] Failed to update GoodsIntake status after command ${id} failure:`, sideEffectError.message);
+      }
+    }
+
+    // Side-effect: mark supplier branch-link sync as failed on non-retryable supplier sync command
+    if (retryable === false && command && command.commandType === 'CREATE_OR_LINK_SUPPLIER' && command.relatedEntityType === 'Supplier' && command.relatedEntityId) {
+      try {
+        const supplierId = parseInt(command.relatedEntityId, 10);
+        const payloadBranchCode = String((command.payload && command.payload.branchCode) || '').trim().toUpperCase();
+        if (Number.isFinite(supplierId) && payloadBranchCode) {
+          await prisma.supplierPosLink.upsert({
+            where: {
+              supplierId_branchCode: {
+                supplierId,
+                branchCode: payloadBranchCode,
+              },
+            },
+            create: {
+              supplierId,
+              branchCode: payloadBranchCode,
+              posSupplierCode: null,
+              posSupplierName: String((command.payload && command.payload.supplierName) || '').trim() || null,
+              syncStatus: 'failed',
+              syncedAt: null,
+              syncError: errorMessage || 'Supplier sync failed',
+            },
+            update: {
+              syncStatus: 'failed',
+              syncError: errorMessage || 'Supplier sync failed',
+            },
+          });
+
+          console.log(`[POS COMMAND QUEUE] Supplier ${supplierId} marked failed for POS branch ${payloadBranchCode} after command ${id} non-retryable failure`);
+        }
+      } catch (sideEffectError) {
+        console.error(`[POS COMMAND QUEUE] Failed to update supplier POS link failure status after command ${id}:`, sideEffectError.message);
       }
     }
 

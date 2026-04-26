@@ -108,6 +108,24 @@ const SuppliersList = ({
                     <div style={{ display: 'grid', gap: '0.25rem' }}>
                       <strong>{supplier.name}</strong>
                       <span style={{ color: '#64748b', fontSize: '0.84rem' }}>{supplier.supplierCode || 'No supplier code'}</span>
+                      <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                        {(supplier.posLinks || []).map((link) => (
+                          <span
+                            key={`${supplier.id}-${link.branchCode}-${link.posSupplierCode || 'pending'}`}
+                            style={{
+                              borderRadius: '999px',
+                              padding: '0.16rem 0.52rem',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              border: '1px solid #bfdbfe',
+                              backgroundColor: '#eff6ff',
+                              color: '#1d4ed8',
+                            }}
+                          >
+                            {link.branchCode}{link.posSupplierCode ? ` #${link.posSupplierCode}` : ' pending'}
+                          </span>
+                        ))}
+                      </div>
                       {locationLabel(supplier) && <span style={{ color: '#94a3b8', fontSize: '0.79rem' }}>{locationLabel(supplier)}</span>}
                     </div>
                   </td>

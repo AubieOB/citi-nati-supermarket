@@ -174,6 +174,14 @@ function posAgentLabel(code) {
   return 'POS Agent';
 }
 
+function branchCodeForLocationCode(code) {
+  var c = String(code || '').trim().toUpperCase();
+  if (!c) return null;
+  if (c === 'BT') return 'BLANTYRE';
+  if (c === 'ZA' || c === 'SH' || c === 'BAR' || c === 'ST999') return 'ZOMBA';
+  return null;
+}
+
 function normalizeLocationCode(location) {
   const name = String(location?.name || '').trim().toLowerCase();
   if (name === 'blantyre') return 'BT';
@@ -666,6 +674,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
   const fetchSuppliers = useCallback(async () => {
     setSupplierLoading(true);
     try {
+      const branchCode = branchCodeForLocationCode(activeLookupLocationCode || normalizeLocationCode(selectedLocation));
       const response = await api.get('/business-operations/suppliers', {
         params: {
           page: 1,
@@ -673,6 +682,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
           sortBy: 'name',
           sortOrder: 'asc',
           locationId: selectedLocationId || undefined,
+          branchCode: branchCode || undefined,
+          requirePosLinked: branchCode ? true : undefined,
           status: 'active',
         },
       });
@@ -682,7 +693,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
     } finally {
       setSupplierLoading(false);
     }
-  }, [selectedLocationId]);
+  }, [activeLookupLocationCode, selectedLocation, selectedLocationId]);
 
   useEffect(() => {
     fetchRecords();
@@ -1015,6 +1026,25 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
     const manualGrn = normalizeTransferGrnInput(isCurrentFormRecord ? form.transferManualGrn : '');
     const manualGrnOverride = isCurrentFormRecord && form.transferGrnMode === 'manual';
     const agentLabel = posAgentLabel(recordLocationCode);
+    const recordBranchCode = branchCodeForLocationCode(recordLocationCode);
+    const transferSupplierId = isCurrentFormRecord
+      ? Number(form.supplierId || 0)
+      : Number(matchedRecord?.supplierId || 0);
+
+    if (transferSupplierId > 0 && recordBranchCode) {
+      const selectedSupplier = suppliers.find((entry) => Number(entry.id) === transferSupplierId);
+      const hasBranchLink = Array.isArray(selectedSupplier?.posLinks)
+        && selectedSupplier.posLinks.some((link) => String(link.branchCode || '').trim().toUpperCase() === recordBranchCode && Number(link.posSupplierCode || 0) > 0);
+
+      if (!hasBranchLink) {
+        await boAlert({
+          title: 'Supplier Not POS-Linked',
+          message: 'This supplier is not linked to a POS SupplierCode for this branch. Sync or link supplier first.',
+          type: 'warning',
+        });
+        return;
+      }
+    }
 
     if (manualGrnOverride && !manualGrn) {
       await boAlert({

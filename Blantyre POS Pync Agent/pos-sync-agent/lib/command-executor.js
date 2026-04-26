@@ -722,6 +722,92 @@ async function executeCreatePendingStockIntake(pool, payload, commandId) {
   }
 }
 
+async function executeCreateOrLinkSupplier(pool, payload, commandId) {
+  const supplierName = String(payload.supplierName || '').trim();
+  const address = String(payload.address || '').trim();
+  const telephone = String(payload.telephone || '').trim();
+  const fax = String(payload.fax || '').trim();
+  const email = String(payload.email || '').trim();
+  const contactName = String(payload.contactName || '').trim();
+  const uploadStatus = Number.isFinite(Number(payload.uploadStatus)) ? Number(payload.uploadStatus) : 1;
+
+  if (!supplierName) {
+    throw new Error('NON_RETRYABLE: CREATE_OR_LINK_SUPPLIER payload missing supplierName');
+  }
+
+  const normalizedName = supplierName.toUpperCase().replace(/\s+/g, ' ').trim();
+  const transaction = new sql.Transaction(pool);
+
+  try {
+    await transaction.begin(sql.ISOLATION_LEVEL.READ_COMMITTED);
+
+    const lookupRequest = new sql.Request(transaction);
+    lookupRequest.input('normalizedName', sql.NVarChar(255), normalizedName);
+    const existing = await lookupRequest.query(`
+      SELECT TOP 1 SupplierCode, SupplierName
+      FROM [POS].[dbo].[suppliers]
+      WHERE UPPER(LTRIM(RTRIM(SupplierName))) = @normalizedName
+      ORDER BY SupplierCode ASC
+    `);
+
+    if (Array.isArray(existing.recordset) && existing.recordset.length > 0) {
+      const row = existing.recordset[0];
+      await transaction.commit();
+      return {
+        message: `Linked to existing POS supplier ${row.SupplierName}`,
+        posSupplierCode: Number(row.SupplierCode),
+        posSupplierName: String(row.SupplierName || supplierName),
+        commandId,
+        linkedExisting: true,
+      };
+    }
+
+    const insertRequest = new sql.Request(transaction);
+    insertRequest.input('supplierName', sql.NVarChar(255), supplierName);
+    insertRequest.input('address', sql.NVarChar(255), address);
+    insertRequest.input('telephone', sql.NVarChar(255), telephone);
+    insertRequest.input('fax', sql.NVarChar(255), fax);
+    insertRequest.input('email', sql.NVarChar(255), email);
+    insertRequest.input('contactName', sql.NVarChar(255), contactName);
+    insertRequest.input('uploadStatus', sql.Int, uploadStatus);
+
+    const inserted = await insertRequest.query(`
+      INSERT INTO [POS].[dbo].[suppliers]
+        (SupplierName, Address, Telephone, Fax, Email, ContactName, UploadStatus)
+      VALUES
+        (@supplierName, @address, @telephone, @fax, @email, @contactName, @uploadStatus);
+
+      SELECT CAST(SCOPE_IDENTITY() AS int) AS SupplierCode;
+    `);
+
+    const generatedSupplierCode = Number(inserted.recordset?.[0]?.SupplierCode);
+    if (!Number.isInteger(generatedSupplierCode) || generatedSupplierCode <= 0) {
+      throw new Error('NON_RETRYABLE: POS supplier insert did not return a valid SupplierCode identity value');
+    }
+
+    await transaction.commit();
+
+    return {
+      message: `Created POS supplier ${supplierName}`,
+      posSupplierCode: generatedSupplierCode,
+      posSupplierName: supplierName,
+      commandId,
+      linkedExisting: false,
+    };
+  } catch (error) {
+    try {
+      await transaction.rollback();
+    } catch (rollbackErr) {
+      console.error('[POS COMMAND EXECUTOR ERROR] supplier rollback failed:', rollbackErr.message);
+    }
+
+    if (String(error.message || '').startsWith('NON_RETRYABLE:')) {
+      throw error;
+    }
+    throw error;
+  }
+}
+
 async function executeCommand(pool, command) {
   const { commandType, payload } = command;
 
@@ -743,6 +829,8 @@ async function executeCommand(pool, command) {
       return executeWriteInvoice(pool, payload, command.id);
     case 'CREATE_PENDING_STOCK_INTAKE':
       return executeCreatePendingStockIntake(pool, payload, command.id);
+    case 'CREATE_OR_LINK_SUPPLIER':
+      return executeCreateOrLinkSupplier(pool, payload, command.id);
     default:
       throw new Error(`Unsupported command type: ${commandType}`);
   }

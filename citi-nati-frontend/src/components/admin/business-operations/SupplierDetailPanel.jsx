@@ -61,6 +61,9 @@ const SupplierDetailPanel = ({
   onTransactionPageChange,
   onEditSupplier,
   onAddTransaction,
+  selectedBranchCode,
+  syncingBranches = {},
+  onSyncPosBranch,
   onEditTransaction,
   onDeleteTransaction,
 }) => {
@@ -143,6 +146,59 @@ const SupplierDetailPanel = ({
         <div style={{ marginTop: '1rem', display: 'grid', gap: '0.35rem' }}>
           <span style={{ color: '#64748b', fontSize: '0.8rem' }}>Address</span>
           <div style={{ color: '#0f172a', lineHeight: 1.6 }}>{supplier?.address || 'No address recorded.'}</div>
+        </div>
+
+        <div style={{ marginTop: '0.9rem', display: 'grid', gap: '0.4rem' }}>
+          <span style={{ color: '#64748b', fontSize: '0.8rem' }}>POS Branch Links</span>
+          <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
+            {(supplier?.posLinks || []).length === 0 ? (
+              <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>No POS branch links yet</span>
+            ) : (
+              (supplier?.posLinks || []).map((link) => (
+                <span
+                  key={`${link.branchCode}-${link.posSupplierCode || 'pending'}`}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    borderRadius: '999px',
+                    padding: '0.3rem 0.68rem',
+                    fontSize: '0.77rem',
+                    fontWeight: 700,
+                    border: '1px solid #bfdbfe',
+                    backgroundColor: '#eff6ff',
+                    color: '#1d4ed8',
+                  }}
+                >
+                  {link.branchCode}: {link.posSupplierCode ? `#${link.posSupplierCode}` : (link.syncStatus || 'pending')}
+                </span>
+              ))
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.3rem' }}>
+            {['BLANTYRE', 'ZOMBA'].map((branchCode) => {
+              const busy = Boolean(syncingBranches[`${supplier?.id}:${branchCode}`]);
+              const recommended = selectedBranchCode === branchCode;
+              return (
+                <button
+                  key={branchCode}
+                  type="button"
+                  onClick={() => onSyncPosBranch && onSyncPosBranch(branchCode)}
+                  disabled={busy}
+                  style={{
+                    border: recommended ? '1px solid #0f766e' : '1px solid #cbd5e1',
+                    backgroundColor: recommended ? '#f0fdfa' : '#ffffff',
+                    color: recommended ? '#0f766e' : '#0f172a',
+                    borderRadius: '10px',
+                    padding: '0.45rem 0.75rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {busy ? `Syncing ${branchCode}...` : `Sync to ${branchCode} POS`}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <div style={{ marginTop: '0.9rem', display: 'grid', gap: '0.35rem' }}>

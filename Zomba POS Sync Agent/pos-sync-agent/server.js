@@ -2387,6 +2387,10 @@ async function gracefulShutdown() {
     clearInterval(emergencySalesPollInterval);
     console.log('Emergency sales poll interval cleared');
   }
+  if (supplierSyncInterval) {
+    clearInterval(supplierSyncInterval);
+    console.log('Supplier sync interval cleared');
+  }
   if (pool) {
     await pool.close();
     console.log('Database connection pool closed');
@@ -2422,6 +2426,71 @@ let isEmergencySalesPollRunning = false;
 let reportingSyncInterval;
 const REPORTING_SYNC_INTERVAL_MS = appConfig.reporting.pollingIntervalMs;
 let isReportingSyncRunning = false;
+
+/** Supplier sync interval */
+let supplierSyncInterval;
+const SUPPLIER_SYNC_INTERVAL_MS = Number.parseInt(process.env.SUPPLIER_SYNC_INTERVAL_MS || '300000', 10);
+let isSupplierSyncRunning = false;
+
+async function syncSuppliersToBackend() {
+  if (!appConfig.backend.baseUrl || !appConfig.backend.apiToken) {
+    return;
+  }
+
+  if (isSupplierSyncRunning) {
+    console.log(`${BRANCH_TAG} [SUPPLIER SYNC] Skipped tick - previous cycle still running`);
+    return;
+  }
+
+  isSupplierSyncRunning = true;
+
+  try {
+    const queryResult = await pool.request().query([
+      'SELECT SupplierCode, SupplierName, Address, Telephone, Fax, Email, ContactName, UploadStatus',
+      'FROM [POS].[dbo].[suppliers]',
+      'ORDER BY SupplierCode ASC',
+    ].join('\n'));
+
+    const suppliers = (queryResult.recordset || []).map((row) => ({
+      supplierCode: Number(row.SupplierCode),
+      supplierName: String(row.SupplierName || '').trim(),
+      address: String(row.Address || '').trim(),
+      telephone: String(row.Telephone || '').trim(),
+      fax: String(row.Fax || '').trim(),
+      email: String(row.Email || '').trim(),
+      contactName: String(row.ContactName || '').trim(),
+      uploadStatus: Number(row.UploadStatus || 0),
+    }));
+
+    console.log(`${BRANCH_TAG} [SUPPLIER SYNC] Pulling ${suppliers.length} supplier rows from POS`);
+
+    const response = await axios.post(
+      `${appConfig.backend.baseUrl}/api/pos-sync/suppliers/pull`,
+      {
+        branchCode: appConfig.branch.branchCode,
+        branchName: appConfig.branch.branchName,
+        locationId: appConfig.branch.locationId,
+        syncSourceCode: appConfig.branch.syncSourceCode,
+        syncedAt: new Date().toISOString(),
+        suppliers,
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-pos-secret': appConfig.backend.apiToken,
+          'x-branch-code': appConfig.branch.branchCode,
+          'x-sync-source-code': appConfig.branch.syncSourceCode,
+        },
+      }
+    );
+
+    console.log(`${BRANCH_TAG} [SUPPLIER SYNC] Backend ingest complete`, response.data && response.data.data ? response.data.data : {});
+  } catch (error) {
+    console.error(`${BRANCH_TAG} [SUPPLIER SYNC] Failed:`, error.message);
+  } finally {
+    isSupplierSyncRunning = false;
+  }
+}
 
 /**
  * Automatic sync function - runs on interval
@@ -2565,6 +2634,8 @@ function isCommandTypeEnabled(commandType) {
   const { features } = appConfig;
 
   switch (commandType) {
+    case 'CREATE_OR_LINK_SUPPLIER':
+      return features.enableStockWriteback;
     case 'CREATE_PENDING_STOCK_INTAKE':
       return features.enableStockWriteback;
     case 'UPDATE_PRICE':
@@ -2901,6 +2972,10 @@ async function startServer() {
       } else if (!appConfig.features.enableReportingSync) {
         console.log(`${BRANCH_TAG} [REPORTING SYNC] ⏸ Polling disabled by ENABLE_REPORTING_SYNC=false`);
       }
+
+      supplierSyncInterval = setInterval(syncSuppliersToBackend, SUPPLIER_SYNC_INTERVAL_MS);
+      console.log(`${BRANCH_TAG} [SUPPLIER SYNC] ✅ Polling enabled (${SUPPLIER_SYNC_INTERVAL_MS}ms)`);
+      syncSuppliersToBackend();
     });
   } catch (err) {
     console.error(`${BRANCH_TAG} Failed to start server:`, err.message);

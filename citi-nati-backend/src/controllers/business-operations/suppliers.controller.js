@@ -1,6 +1,7 @@
 'use strict';
 
 const suppliersService = require('../../services/business-operations/suppliers.service');
+const supplierPosSyncService = require('../../services/business-operations/supplierPosSync.service');
 const importsService = require('../../services/business-operations/imports.service');
 const {
   parsePagination,
@@ -125,11 +126,15 @@ async function listSuppliers(req, res) {
     const search = req.query.search ? String(req.query.search).trim() : null;
     const status = req.query.status ? String(req.query.status).trim().toLowerCase() : null;
     const locationId = toInt(req.query.locationId);
+    const branchCode = req.query.branchCode ? String(req.query.branchCode).trim().toUpperCase() : null;
+    const requirePosLinked = ['1', 'true', 'yes'].includes(String(req.query.requirePosLinked || '').trim().toLowerCase());
 
     const { data, total } = await suppliersService.listSuppliers({
       search,
       status,
       locationId,
+      branchCode,
+      requirePosLinked,
       skip: pagination.skip,
       take: pagination.take,
       sortBy: sort.sortBy,
@@ -141,11 +146,34 @@ async function listSuppliers(req, res) {
       total,
       page: pagination.page,
       pageSize: pagination.pageSize,
-      filters: { search, status, locationId },
+      filters: { search, status, locationId, branchCode, requirePosLinked },
     }));
   } catch (err) {
     console.error('[BO][SUPPLIERS] listSuppliers error:', err);
     return res.status(500).json({ success: false, error: 'Failed to list suppliers' });
+  }
+}
+
+async function syncSupplierToPosBranch(req, res) {
+  try {
+    const supplierId = toInt(req.params.id);
+    if (!supplierId) return res.status(400).json({ success: false, error: 'Invalid supplier id' });
+
+    const branchCode = req.body && req.body.branchCode ? String(req.body.branchCode).trim().toUpperCase() : '';
+    if (!branchCode) {
+      return res.status(400).json({ success: false, error: 'branchCode is required' });
+    }
+
+    const result = await supplierPosSyncService.queueSupplierPushToPos(
+      supplierId,
+      branchCode,
+      req.user && (req.user.email || req.user.name || req.user.userId) ? (req.user.email || req.user.name || req.user.userId) : null
+    );
+
+    return res.json({ success: true, data: result });
+  } catch (err) {
+    console.error('[BO][SUPPLIERS] syncSupplierToPosBranch error:', err);
+    return res.status(err.statusCode || 500).json({ success: false, error: err.message || 'Failed to queue supplier POS sync' });
   }
 }
 
@@ -341,4 +369,5 @@ module.exports = {
   deleteSupplierTransaction,
   getSupplierBalance,
   importSuppliers,
+  syncSupplierToPosBranch,
 };

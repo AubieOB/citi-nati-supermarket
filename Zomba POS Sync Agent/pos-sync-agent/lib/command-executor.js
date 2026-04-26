@@ -252,6 +252,93 @@ async function executeCreatePendingStockIntake(pool, payload, commandId) {
   }
 }
 
+async function executeCreateOrLinkSupplier(pool, payload, commandId) {
+  var supplierName = String(payload.supplierName || '').trim();
+  var address = String(payload.address || '').trim();
+  var telephone = String(payload.telephone || '').trim();
+  var fax = String(payload.fax || '').trim();
+  var email = String(payload.email || '').trim();
+  var contactName = String(payload.contactName || '').trim();
+  var uploadStatus = Number(payload.uploadStatus);
+  if (!isFinite(uploadStatus)) uploadStatus = 1;
+
+  if (!supplierName) {
+    throw new Error('NON_RETRYABLE: CREATE_OR_LINK_SUPPLIER payload missing supplierName');
+  }
+
+  var normalizedName = supplierName.toUpperCase().replace(/\s+/g, ' ').trim();
+  var transaction = new sql.Transaction(pool);
+
+  try {
+    await transaction.begin(sql.ISOLATION_LEVEL.READ_COMMITTED);
+
+    var lookupRequest = new sql.Request(transaction);
+    lookupRequest.input('normalizedName', sql.NVarChar(255), normalizedName);
+    var existing = await lookupRequest.query([
+      'SELECT TOP 1 SupplierCode, SupplierName',
+      'FROM [POS].[dbo].[suppliers]',
+      'WHERE UPPER(LTRIM(RTRIM(SupplierName))) = @normalizedName',
+      'ORDER BY SupplierCode ASC',
+    ].join('\n'));
+
+    if (Array.isArray(existing.recordset) && existing.recordset.length > 0) {
+      var row = existing.recordset[0];
+      await transaction.commit();
+      return {
+        message: 'Linked to existing POS supplier ' + String(row.SupplierName || supplierName),
+        posSupplierCode: Number(row.SupplierCode),
+        posSupplierName: String(row.SupplierName || supplierName),
+        commandId: commandId,
+        linkedExisting: true,
+      };
+    }
+
+    var insertRequest = new sql.Request(transaction);
+    insertRequest.input('supplierName', sql.NVarChar(255), supplierName);
+    insertRequest.input('address', sql.NVarChar(255), address);
+    insertRequest.input('telephone', sql.NVarChar(255), telephone);
+    insertRequest.input('fax', sql.NVarChar(255), fax);
+    insertRequest.input('email', sql.NVarChar(255), email);
+    insertRequest.input('contactName', sql.NVarChar(255), contactName);
+    insertRequest.input('uploadStatus', sql.Int, uploadStatus);
+
+    var inserted = await insertRequest.query([
+      'INSERT INTO [POS].[dbo].[suppliers]',
+      '  (SupplierName, Address, Telephone, Fax, Email, ContactName, UploadStatus)',
+      'VALUES',
+      '  (@supplierName, @address, @telephone, @fax, @email, @contactName, @uploadStatus);',
+      '',
+      'SELECT CAST(SCOPE_IDENTITY() AS int) AS SupplierCode;',
+    ].join('\n'));
+
+    var generatedSupplierCode = Number(inserted.recordset && inserted.recordset[0] && inserted.recordset[0].SupplierCode);
+    if (!isFinite(generatedSupplierCode) || Math.floor(generatedSupplierCode) !== generatedSupplierCode || generatedSupplierCode <= 0) {
+      throw new Error('NON_RETRYABLE: POS supplier insert did not return a valid SupplierCode identity value');
+    }
+
+    await transaction.commit();
+
+    return {
+      message: 'Created POS supplier ' + supplierName,
+      posSupplierCode: generatedSupplierCode,
+      posSupplierName: supplierName,
+      commandId: commandId,
+      linkedExisting: false,
+    };
+  } catch (error) {
+    try {
+      await transaction.rollback();
+    } catch (rollbackErr) {
+      console.log('[SUPPLIER SYNC ERROR] rollback note (already aborted):', rollbackErr.message);
+    }
+
+    if (String(error.message || '').startsWith('NON_RETRYABLE:')) {
+      throw error;
+    }
+    throw error;
+  }
+}
+
 async function executeUpdatePrice(pool, payload) {
   const config = buildConfig();
   const productCode = payload.productCode;
@@ -731,6 +818,8 @@ async function executeCommand(pool, command) {
       return executeWriteInvoice(pool, payload, command.id);
     case 'CREATE_PENDING_STOCK_INTAKE':
       return executeCreatePendingStockIntake(pool, payload, command.id);
+    case 'CREATE_OR_LINK_SUPPLIER':
+      return executeCreateOrLinkSupplier(pool, payload, command.id);
     default:
       throw new Error(`Unsupported command type: ${commandType}`);
   }

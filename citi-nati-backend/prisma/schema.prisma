@@ -726,11 +726,32 @@ model Supplier {
   transactions      SupplierTransaction[]
   balances          SupplierBalance[]
   goodsIntakes      GoodsIntake[]
+  posLinks          SupplierPosLink[]
 
   @@index([name])
   @@index([locationId])
   @@index([status])
   @@map("suppliers")
+}
+
+model SupplierPosLink {
+  id              Int       @id @default(autoincrement())
+  supplierId      Int       @map("supplier_id")
+  supplier        Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  branchCode      String    @map("branch_code")
+  posSupplierCode Int?      @map("pos_supplier_code")
+  posSupplierName String?   @map("pos_supplier_name")
+  syncStatus      String    @default("synced") @map("sync_status")
+  syncedAt        DateTime? @map("synced_at")
+  syncError       String?   @map("sync_error")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@unique([supplierId, branchCode])
+  @@unique([branchCode, posSupplierCode])
+  @@index([branchCode])
+  @@index([syncStatus])
+  @@map("supplier_pos_links")
 }
 
 model SupplierTransaction {

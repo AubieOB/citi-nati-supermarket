@@ -81,6 +81,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
   const [transactionFormError, setTransactionFormError] = useState('');
   const [exportingExcel, setExportingExcel] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [syncingBranches, setSyncingBranches] = useState({});
 
   const [pendingSelectedSupplierId, setPendingSelectedSupplierId] = useState(null);
 
@@ -103,6 +104,14 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
       pageBalance,
     };
   }, [pagination?.total, suppliers]);
+
+  const selectedBranchCode = useMemo(() => {
+    const selectedLocation = locations.find((location) => Number(location.id) === Number(selectedLocationId));
+    const locationCode = String(selectedLocation?.code || '').trim().toUpperCase();
+    if (locationCode === 'BT') return 'BLANTYRE';
+    if (locationCode === 'ZA' || locationCode === 'SH' || locationCode === 'BAR' || locationCode === 'ST999') return 'ZOMBA';
+    return null;
+  }, [locations, selectedLocationId]);
 
   const fetchSuppliers = useCallback(async () => {
     setListLoading(true);
@@ -304,6 +313,33 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
       await refreshData({ selectedId: selectedSupplierId, nextTransactionPage: 1 });
     } catch (err) {
       await boAlert({ title: 'Delete Failed', message: err.response?.data?.error || 'Failed to delete transaction', type: 'error' });
+    }
+  };
+
+  const handleSyncSupplierToBranch = async (supplier, branchCode) => {
+    if (!supplier?.id || !branchCode) return;
+    const key = `${supplier.id}:${branchCode}`;
+    setSyncingBranches((current) => ({ ...current, [key]: true }));
+
+    try {
+      const response = await api.post(`/business-operations/suppliers/${supplier.id}/sync-pos`, { branchCode });
+      const data = response.data?.data || {};
+      await boAlert({
+        title: 'Supplier Sync Queued',
+        message: data.alreadyLinked
+          ? `Supplier already linked for ${branchCode} POS with code ${data.posSupplierCode}.`
+          : `Supplier sync queued for ${branchCode}. Command ID: ${data.commandId}`,
+        type: 'success',
+      });
+      await refreshData({ selectedId: supplier.id, nextTransactionPage: transactionPage });
+    } catch (error) {
+      await boAlert({
+        title: 'Supplier Sync Failed',
+        message: error.response?.data?.error || 'Failed to queue supplier POS sync',
+        type: 'error',
+      });
+    } finally {
+      setSyncingBranches((current) => ({ ...current, [key]: false }));
     }
   };
 
@@ -572,6 +608,9 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
                         onTransactionPageChange={setTransactionPage}
                         onEditSupplier={() => openEditSupplier(selectedSupplier)}
                         onAddTransaction={openCreateTransaction}
+                        selectedBranchCode={selectedBranchCode}
+                        syncingBranches={syncingBranches}
+                        onSyncPosBranch={(branchCode) => handleSyncSupplierToBranch(selectedSupplier, branchCode)}
                         onEditTransaction={openEditTransaction}
                         onDeleteTransaction={handleDeleteTransaction}
                       />

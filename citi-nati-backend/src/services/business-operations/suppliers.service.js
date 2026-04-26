@@ -99,10 +99,15 @@ async function updateSupplier(id, payload) {
 async function getSupplierById(id) {
   return prisma.supplier.findUnique({
     where: { id },
+    include: {
+      posLinks: {
+        orderBy: { branchCode: 'asc' },
+      },
+    },
   });
 }
 
-async function listSuppliers({ search, status, locationId, skip, take, sortBy, sortOrder }) {
+async function listSuppliers({ search, status, locationId, branchCode, requirePosLinked = false, skip, take, sortBy, sortOrder }) {
   const where = {};
 
   if (status) {
@@ -123,8 +128,33 @@ async function listSuppliers({ search, status, locationId, skip, take, sortBy, s
     where.locationId = locationId;
   }
 
+  if (branchCode) {
+    where.posLinks = {
+      some: {
+        branchCode: String(branchCode).trim().toUpperCase(),
+        ...(requirePosLinked ? { posSupplierCode: { not: null } } : {}),
+      },
+    };
+  } else if (requirePosLinked) {
+    where.posLinks = {
+      some: {
+        posSupplierCode: { not: null },
+      },
+    };
+  }
+
   const [data, total] = await Promise.all([
-    prisma.supplier.findMany({ where, skip, take, orderBy: { [sortBy]: sortOrder } }),
+    prisma.supplier.findMany({
+      where,
+      include: {
+        posLinks: {
+          orderBy: { branchCode: 'asc' },
+        },
+      },
+      skip,
+      take,
+      orderBy: { [sortBy]: sortOrder },
+    }),
     prisma.supplier.count({ where }),
   ]);
 
