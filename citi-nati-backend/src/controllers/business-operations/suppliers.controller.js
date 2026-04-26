@@ -337,13 +337,29 @@ async function deleteSupplier(req, res) {
   try {
     const id = toInt(req.params.id);
     if (!id) return res.status(400).json({ success: false, error: 'Invalid supplier id' });
-    // Queue DELETE_SUPPLIER commands to POS before the record is removed
-    const posDeleteResult = await supplierPosSyncService.queueSupplierDeleteFromPos(id);
-    await suppliersService.deleteSupplier(id);
-    return res.json({ success: true, posDeleteQueued: posDeleteResult.queued });
+    const deletion = await suppliersService.deleteSupplier(id);
+
+    const message = deletion.wasPosLinked
+      ? 'Supplier removed from website selection and marked inactive. It was not deleted from POS to preserve POS history/references.'
+      : 'Supplier removed from website selection and marked inactive.';
+
+    return res.json({
+      success: true,
+      data: {
+        supplierId: id,
+        status: 'inactive',
+        wasAlreadyInactive: Boolean(deletion.wasAlreadyInactive),
+        wasPosLinked: Boolean(deletion.wasPosLinked),
+        posLinkCount: Number(deletion.posLinkCount || 0),
+      },
+      message,
+    });
   } catch (err) {
     console.error('[BO][SUPPLIERS] deleteSupplier error:', err);
-    return res.status(500).json({ success: false, error: 'Failed to delete supplier' });
+    if (err && Number.isInteger(err.statusCode) && err.statusCode === 404) {
+      return res.status(404).json({ success: false, error: err.message || 'Supplier not found' });
+    }
+    return res.status(500).json({ success: false, error: 'Failed to remove supplier from website selection' });
   }
 }
 

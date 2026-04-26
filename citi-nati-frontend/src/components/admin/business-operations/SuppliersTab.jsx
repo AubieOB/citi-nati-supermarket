@@ -318,9 +318,14 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
 
   const handleDeleteSupplier = async (supplier) => {
     try {
-      await api.delete(`/business-operations/suppliers/${supplier.id}`);
+      const response = await api.delete(`/business-operations/suppliers/${supplier.id}`);
       if (selectedSupplierId === supplier.id) setSelectedSupplierId(null);
       await refreshData({ selectedId: null, nextTransactionPage: 1 });
+      await boAlert({
+        title: 'Supplier Removed from Website Selection',
+        message: response?.data?.message || 'Supplier marked inactive on website. POS records were preserved.',
+        type: 'success',
+      });
     } catch (err) {
       await boAlert({ title: 'Delete Failed', message: err.response?.data?.error || 'Failed to delete supplier', type: 'error' });
     }

@@ -151,9 +151,8 @@ async function listSuppliers({ search, status, locationId, branchCode, requirePo
   let branchAliasesForDiagnostics = [];
   let fallbackLocationIdsForDiagnostics = [];
 
-  if (status) {
-    where.status = String(status).toLowerCase();
-  }
+  // Default to active suppliers so archived/soft-deleted suppliers stay out of normal selectors.
+  where.status = status ? String(status).toLowerCase() : 'active';
 
   if (search) {
     where.OR = [
@@ -592,7 +591,54 @@ async function bulkImportSupplierTransactions(records = []) {
 }
 
 async function deleteSupplier(id) {
-  return prisma.supplier.delete({ where: { id } });
+  const supplier = await prisma.supplier.findUnique({
+    where: { id },
+    include: supplierHasPosLinks
+      ? { posLinks: true }
+      : undefined,
+  });
+
+  if (!supplier) {
+    const error = new Error('Supplier not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (String(supplier.status || '').toLowerCase() === 'inactive') {
+    return {
+      supplier: await prisma.supplier.update({
+        where: { id },
+        data: {
+          notes: supplier.notes || null,
+        },
+      }),
+      wasAlreadyInactive: true,
+      wasPosLinked: Array.isArray(supplier.posLinks) && supplier.posLinks.some((link) => Number(link.posSupplierCode || 0) > 0),
+      posLinkCount: Array.isArray(supplier.posLinks) ? supplier.posLinks.length : 0,
+    };
+  }
+
+  const softDeleteMarker = '[SOFT_DELETED]';
+  const currentNotes = String(supplier.notes || '');
+  const hasSoftDeleteMarker = currentNotes.indexOf(softDeleteMarker) >= 0;
+  const nextNotes = hasSoftDeleteMarker
+    ? currentNotes
+    : (currentNotes ? `${currentNotes}\n${softDeleteMarker}` : softDeleteMarker);
+
+  const updatedSupplier = await prisma.supplier.update({
+    where: { id },
+    data: {
+      status: 'inactive',
+      notes: nextNotes,
+    },
+  });
+
+  return {
+    supplier: updatedSupplier,
+    wasAlreadyInactive: false,
+    wasPosLinked: Array.isArray(supplier.posLinks) && supplier.posLinks.some((link) => Number(link.posSupplierCode || 0) > 0),
+    posLinkCount: Array.isArray(supplier.posLinks) ? supplier.posLinks.length : 0,
+  };
 }
 
 async function deleteSupplierTransaction(id) {
