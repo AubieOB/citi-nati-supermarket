@@ -125,20 +125,41 @@ async function claimPendingCommands(limit = 10, agentId = 'unknown-agent', targe
       });
 
       // Filter candidates by target location if specified
-      const filteredCandidates = normalizedLocations.length > 0
-        ? candidates.filter(function(cmd) {
-            const cmdLocationCode = String((cmd.payload && cmd.payload.locationCode) || '').trim().toUpperCase();
-            if (!normalizedLocations.includes(cmdLocationCode)) return false;
-            // If the agent also specifies target branch codes, further filter by branchCode in payload
-            if (normalizedBranches.length > 0) {
-              const cmdBranchCode = String((cmd.payload && cmd.payload.branchCode) || '').trim().toUpperCase();
-              // Only apply branch filter if the command actually has a branchCode set —
-              // commands without branchCode are legacy/untagged and are claimed by any matching location agent.
-              if (cmdBranchCode && !normalizedBranches.includes(cmdBranchCode)) return false;
-            }
-            return true;
-          })
-        : candidates;
+     const filteredCandidates = normalizedLocations.length > 0
+  ? candidates.filter(function(cmd) {
+      const cmdLocationCode = String(
+        (cmd.payload && (cmd.payload.requestedLocationCode || cmd.payload.locationCode)) || ''
+      ).trim().toUpperCase();
+
+      const cmdBranchCode = String(
+        (cmd.payload && cmd.payload.branchCode) || ''
+      ).trim().toUpperCase();
+
+      // Must match location
+      if (!normalizedLocations.includes(cmdLocationCode)) return false;
+
+      // 🔥 CRITICAL FIX:
+      // If agent provides branchCodes, command MUST match branchCode
+      // No fallback, no exceptions
+      if (normalizedBranches.length > 0) {
+        if (!cmdBranchCode) return false;
+        if (!normalizedBranches.includes(cmdBranchCode)) return false;
+      }
+
+      return true;
+    })
+  : candidates.filter(function(cmd) {
+      const cmdBranchCode = String(
+        (cmd.payload && cmd.payload.branchCode) || ''
+      ).trim().toUpperCase();
+
+      if (normalizedBranches.length > 0) {
+        if (!cmdBranchCode) return false;
+        if (!normalizedBranches.includes(cmdBranchCode)) return false;
+      }
+
+      return true;
+    });
       
       const claimedIds = [];
 
@@ -183,11 +204,12 @@ async function claimPendingCommands(limit = 10, agentId = 'unknown-agent', targe
       });
 
       console.log('[POS COMMAND QUEUE] claimed commands:', {
-        agentId,
-        count: claimed.length,
-        ids: claimed.map((item) => item.id),
-        locationFilter: normalizedLocations.length > 0 ? normalizedLocations.join(',') : 'none',
-      });
+      agentId,
+      count: claimed.length,
+      ids: claimed.map((item) => item.id),
+      locationFilter: normalizedLocations.length > 0 ? normalizedLocations.join(',') : 'none',
+      branchFilter: normalizedBranches.length > 0 ? normalizedBranches.join(',') : 'none',
+    });
 
       if (claimed.length > 0) {
         await recordMonitorEvent({
