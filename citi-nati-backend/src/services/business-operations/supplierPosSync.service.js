@@ -20,11 +20,20 @@ const BRANCH_DEFAULTS = {
   },
 };
 
-function normalizeBranchCode(value) {
+function normalizeBranchCode(value, options = {}) {
   const normalized = String(value || '').trim().toUpperCase();
   if (!normalized) return null;
   if (normalized === 'BT' || normalized === 'BLANTYRE') return 'BLANTYRE';
   if (normalized === 'ZA' || normalized === 'ZOMBA' || normalized === 'SH' || normalized === 'BAR' || normalized === 'ST999') return 'ZOMBA';
+
+  const syncSourceCode = String(options.syncSourceCode || '').trim().toUpperCase();
+  if (syncSourceCode.includes('BLANTYRE')) return 'BLANTYRE';
+  if (syncSourceCode.includes('ZOMBA')) return 'ZOMBA';
+
+  const locationCode = String(options.locationCode || '').trim().toUpperCase();
+  if (locationCode === 'BT' || locationCode === 'BLANTYRE') return 'BLANTYRE';
+  if (locationCode === 'ZA' || locationCode === 'ZOMBA' || locationCode === 'SH' || locationCode === 'BAR' || locationCode === 'ST999') return 'ZOMBA';
+
   return null;
 }
 
@@ -76,7 +85,13 @@ async function resolveSupplierForPosRecord(tx, branchCode, supplierName) {
 }
 
 async function ingestSuppliersFromPos(payload) {
-  const branchCode = normalizeBranchCode(payload && payload.branchCode);
+  const rawBranchCode = payload && payload.branchCode;
+  const rawSyncSourceCode = payload && payload.syncSourceCode;
+  const rawLocationCode = payload && payload.locationCode;
+  const branchCode = normalizeBranchCode(rawBranchCode, {
+    syncSourceCode: rawSyncSourceCode,
+    locationCode: rawLocationCode,
+  });
   if (!branchCode) {
     const error = new Error('branchCode is required and must resolve to BLANTYRE or ZOMBA');
     error.statusCode = 400;
@@ -208,6 +223,9 @@ async function ingestSuppliersFromPos(payload) {
     .sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0));
 
   console.log('[BO][SUPPLIER_SYNC][PULL][SUMMARY]', {
+    inputBranchCode: rawBranchCode || null,
+    inputSyncSourceCode: rawSyncSourceCode || null,
+    inputLocationCode: rawLocationCode || null,
     branchCode,
     received: result.received,
     linked: result.linked,
