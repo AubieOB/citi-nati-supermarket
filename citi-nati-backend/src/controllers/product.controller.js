@@ -2356,6 +2356,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
     const affectedSourceCodes = new Set();
     let stockChangedCount = 0;
     let priceChangedCount = 0;
+    let upsertKeySamplesLogged = 0;
     let zombaIngestSamplesLogged = 0;
     let zombaResolvedSamplesLogged = 0;
     const zombaPersistedByLocation = {
@@ -2409,6 +2410,22 @@ const syncProductsFromPOSAgent = async (req, res) => {
           continue;
         }
 
+        if (branchCode === 'BLANTYRE' && CORE_ZOMBA_LOCATION_CODES.includes(productLocationCode)) {
+          skipped++;
+          const rejection = `[POS PRODUCT INGEST][REJECTED] product=${sourceCode} branch=${branchCode} location=${productLocationCode} reason=BRANCH_LOCATION_MISMATCH`;
+          errors.push(rejection);
+          console.warn(rejection);
+          continue;
+        }
+
+        if (branchCode === 'ZOMBA' && productLocationCode === 'BT') {
+          skipped++;
+          const rejection = `[POS PRODUCT INGEST][REJECTED] product=${sourceCode} branch=${branchCode} location=${productLocationCode} reason=BRANCH_LOCATION_MISMATCH`;
+          errors.push(rejection);
+          console.warn(rejection);
+          continue;
+        }
+
         // Guard against legacy calculated/fallback payloads for Zomba operational stock.
         if (branchCode === 'ZOMBA' && stockSourceRaw) {
           const normalizedSource = stockSourceRaw.toLowerCase();
@@ -2454,6 +2471,17 @@ const syncProductsFromPOSAgent = async (req, res) => {
             overrideStock: true,
           },
         });
+
+        if (upsertKeySamplesLogged < 40) {
+          console.log('[POS PRODUCT INGEST][UPSERT_KEY]', {
+            branchCode,
+            locationCode: productLocationCode,
+            productCode: sourceCode,
+            existingProductId: existingProduct ? existingProduct.id : null,
+            operation: existingProduct ? 'update' : 'create',
+          });
+          upsertKeySamplesLogged += 1;
+        }
 
         const normalizedBatches = Array.isArray(product.expiryBatches)
           ? product.expiryBatches

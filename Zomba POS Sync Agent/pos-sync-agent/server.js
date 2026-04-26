@@ -61,6 +61,7 @@ const EXPIRY_BATCH_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const ZOMBA_OPERATIONAL_LOCATION_CODES = ['SH', 'BAR', 'ST999'];
 const PRODUCT_ACTIVITY_FRESHNESS_WINDOW_MINUTES = Number.parseInt(process.env.PRODUCT_ACTIVITY_FRESHNESS_WINDOW_MINUTES || '5', 10);
 const PRODUCT_ACTIVITY_FALLBACK_MAX_ABS_STOCK = Number.parseInt(process.env.PRODUCT_ACTIVITY_FALLBACK_MAX_ABS_STOCK || '2000', 10);
+const DAILY_STOCK_MAX_STALENESS_DAYS = Number.parseInt(process.env.DAILY_STOCK_MAX_STALENESS_DAYS || '1', 10);
 let liveStockSourceConfig = null;
 const ENABLE_DELTA_PRODUCT_SYNC = String(process.env.ENABLE_DELTA_PRODUCT_SYNC || 'true').trim().toLowerCase() !== 'false';
 const DELTA_FULL_SYNC_EVERY_CYCLES = Number.parseInt(process.env.DELTA_FULL_SYNC_EVERY_CYCLES || '40', 10);
@@ -208,9 +209,11 @@ async function resolveLiveStockSourceConfig() {
     return liveStockSourceConfig;
   }
 
-  const [dailyStockBalanceColumns, productActivityColumns] = await Promise.all([
+  const [dailyStockBalanceColumns, productActivityColumns, stocksColumns, stockDetailsColumns] = await Promise.all([
     getTableColumns('DailyStockBalance'),
     getTableColumns('ProductActivity'),
+    getTableColumns('stocks'),
+    getTableColumns('stockdetails'),
   ]);
 
   const hasDailyStockBalance = dailyStockBalanceColumns.has('ProductCode')
@@ -225,35 +228,140 @@ async function resolveLiveStockSourceConfig() {
 
   const productActivityTimestampColumn = hasProductActivity
     ? pickFirst(productActivityColumns, [
+      'ActivityDateTime',
       'ActivityDate',
       'TransactionDate',
       'TransDate',
+      'TransTime',
+      'DocTime',
       'DocDate',
       'VoucherDate',
       'EntryDate',
+      'EntryTime',
+      'CreatedDate',
       'CreatedAt',
       'CreatedOn',
+      'LastUpdated',
       'ModifiedAt',
       'UpdatedAt',
     ])
     : null;
 
+  const stockDetailsStockInColumn = pickFirst(stockDetailsColumns, ['StockQty', 'QtyIn']);
+  const stockDetailsStockOutColumn = pickFirst(stockDetailsColumns, ['StockOut', 'QtyOut']);
+  const stocksTimestampColumn = pickFirst(stocksColumns, [
+    'StockDate',
+    'TransactionDate',
+    'TransDate',
+    'DocDate',
+    'EntryDate',
+    'CreatedDate',
+    'CreatedAt',
+    'UpdatedAt',
+  ]);
+
+  const hasStockDetailsLive = Boolean(
+    stocksColumns.has('GRNNo')
+    && stocksColumns.has('LocationCode')
+    && stockDetailsColumns.has('GRNNo')
+    && stockDetailsColumns.has('ProductCode')
+    && stockDetailsStockInColumn
+  );
+
   liveStockSourceConfig = {
     hasDailyStockBalance,
     hasProductActivity,
     productActivityTimestampColumn,
+    hasStockDetailsLive,
+    stockDetailsStockInColumn,
+    stockDetailsStockOutColumn,
+    stocksTimestampColumn,
   };
 
   console.log(`${SYNC_LOG_PREFIX} stock source configuration resolved`, {
     hasDailyStockBalance,
     hasProductActivity,
     productActivityTimestampColumn,
+    hasStockDetailsLive,
+    stockDetailsStockInColumn,
+    stockDetailsStockOutColumn,
+    stocksTimestampColumn,
     preferredSource: hasDailyStockBalance
       ? 'DailyStockBalance'
-      : (hasProductActivity ? 'ProductActivity' : 'Unavailable'),
+      : (hasProductActivity ? 'ProductActivity' : (hasStockDetailsLive ? 'StockDetailsLive' : 'Unavailable')),
   });
 
   return liveStockSourceConfig;
+}
+
+async function fetchStockDetailsLiveStockMap(locationCode, stockConfig) {
+  const liveMap = new Map();
+
+  if (!stockConfig || !stockConfig.hasStockDetailsLive) {
+    return liveMap;
+  }
+
+  const inCol = String(stockConfig.stockDetailsStockInColumn || '').replace(/[^A-Za-z0-9_]/g, '');
+  const outCol = stockConfig.stockDetailsStockOutColumn
+    ? String(stockConfig.stockDetailsStockOutColumn).replace(/[^A-Za-z0-9_]/g, '')
+    : null;
+  const tsCol = stockConfig.stocksTimestampColumn
+    ? String(stockConfig.stocksTimestampColumn).replace(/[^A-Za-z0-9_]/g, '')
+    : null;
+
+  if (!inCol) {
+    return liveMap;
+  }
+
+  const outExpr = outCol ? `ISNULL(sd.[${outCol}], 0)` : '0';
+  const tsExpr = tsCol
+    ? `MAX(TRY_CONVERT(datetime2, s.[${tsCol}])) AS LiveLatestAt`
+    : 'NULL AS LiveLatestAt';
+
+  const request = pool.request();
+  request.input('LocationCode', sql.VarChar(10), locationCode);
+
+  const query = `
+    SELECT
+      sd.ProductCode,
+      SUM(ISNULL(sd.[${inCol}], 0) - ${outExpr}) AS LiveStockBalance,
+      ${tsExpr}
+    FROM POS.dbo.stocks s
+    INNER JOIN POS.dbo.stockdetails sd
+      ON s.GRNNo = sd.GRNNo
+    WHERE s.LocationCode = @LocationCode
+    GROUP BY sd.ProductCode
+  `;
+
+  try {
+    const result = await request.query(query);
+    const rows = Array.isArray(result && result.recordset) ? result.recordset : [];
+
+    rows.forEach((row) => {
+      const productCode = String(row && row.ProductCode ? row.ProductCode : '').trim();
+      if (!productCode) return;
+      const liveBalance = Number(row.LiveStockBalance || 0);
+      if (!Number.isFinite(liveBalance)) return;
+
+      liveMap.set(productCode, {
+        liveStockBalance: liveBalance,
+        liveLatestAt: row.LiveLatestAt || null,
+      });
+    });
+
+    console.log(`${SYNC_LOG_PREFIX} [STOCKDETAILS LIVE] resolved live stock map`, {
+      locationCode,
+      rows: rows.length,
+      resolvedProducts: liveMap.size,
+      stockInColumn: inCol,
+      stockOutColumn: outCol,
+      timestampColumn: tsCol,
+    });
+  } catch (error) {
+    console.error(`${SYNC_LOG_PREFIX} [STOCKDETAILS LIVE] fallback query failed:`, error.message);
+  }
+
+  return liveMap;
 }
 
 async function getCachedExpiryBatches() {
@@ -796,6 +904,8 @@ async function fetchProductsFromPOS(locationCode) {
       productActivityTimestampColumnConfigured: Boolean(safeActivityTimestampColumn),
       productActivityTimestampColumn: safeActivityTimestampColumn,
       productActivityFreshnessWindowMinutes: PRODUCT_ACTIVITY_FRESHNESS_WINDOW_MINUTES,
+      stockDetailsLiveAvailable: Boolean(stockConfig.hasStockDetailsLive),
+      dailyStockMaxStalenessDays: DAILY_STOCK_MAX_STALENESS_DAYS,
     });
     let result = await request.query(query);
 
@@ -807,6 +917,16 @@ async function fetchProductsFromPOS(locationCode) {
       ? new Date(locationStockDateRow.LatestBalanceDate).toISOString().slice(0, 10)
       : effectiveStockDate;
 
+    const effectiveStockDateObj = effectiveStockDate ? new Date(`${effectiveStockDate}T00:00:00.000Z`) : null;
+    const dailyStockStalenessDays = effectiveStockDateObj && !Number.isNaN(effectiveStockDateObj.getTime())
+      ? Math.floor((Date.now() - effectiveStockDateObj.getTime()) / (24 * 60 * 60 * 1000))
+      : null;
+    const dailyStockIsStale = Number.isFinite(dailyStockStalenessDays) && dailyStockStalenessDays > DAILY_STOCK_MAX_STALENESS_DAYS;
+
+    const stockDetailsLiveMap = isGuardedZombaLocation
+      ? await fetchStockDetailsLiveStockMap(LOCATION_CODE, stockConfig)
+      : new Map();
+
     if (isGuardedZombaLocation && stockConfig.hasDailyStockBalance && stockConfig.hasProductActivity) {
       const nowMs = Date.now();
       let fallbackAccepted = 0;
@@ -814,6 +934,8 @@ async function fetchProductsFromPOS(locationCode) {
       let fallbackRejectedMissingTimestamp = 0;
       let fallbackRejectedStale = 0;
       let fallbackRejectedUnsafe = 0;
+      let fallbackToStockDetailsNoDaily = 0;
+      let fallbackToStockDetailsDailyStale = 0;
       const comparisonSamples = [];
 
       const normalizedRows = result.recordset.map((row) => {
@@ -823,6 +945,11 @@ async function fetchProductsFromPOS(locationCode) {
         const activityValue = activityRaw == null ? null : Number(activityRaw);
         const hasDaily = dailyValue != null && Number.isFinite(dailyValue);
         const hasActivity = activityValue != null && Number.isFinite(activityValue);
+        const stockDetailsLive = stockDetailsLiveMap.get(String(row.ProductCode || '').trim()) || null;
+        const liveStockValue = stockDetailsLive && Number.isFinite(Number(stockDetailsLive.liveStockBalance))
+          ? Number(stockDetailsLive.liveStockBalance)
+          : null;
+        const hasLiveStockDetails = liveStockValue != null;
         const activityDate = row.ActivityLatestAt ? new Date(row.ActivityLatestAt) : null;
         const activityAgeMinutes = activityDate && !Number.isNaN(activityDate.getTime())
           ? (nowMs - activityDate.getTime()) / 60000
@@ -834,6 +961,12 @@ async function fetchProductsFromPOS(locationCode) {
 
         let finalStock = hasDaily ? dailyValue : 0;
         let finalSource = hasDaily ? 'DailyStockBalance' : 'NoStockRow';
+
+        if (hasDaily && hasLiveStockDetails && dailyStockIsStale) {
+          finalStock = liveStockValue;
+          finalSource = 'StockDetailsLiveFallbackDailyStale';
+          fallbackToStockDetailsDailyStale++;
+        }
 
         if (!hasDaily && hasActivity) {
           if (!activityIsSafe) {
@@ -852,6 +985,12 @@ async function fetchProductsFromPOS(locationCode) {
           }
         }
 
+        if (!hasDaily && hasLiveStockDetails && finalSource === 'NoStockRow') {
+          finalStock = liveStockValue;
+          finalSource = 'StockDetailsLiveFallbackNoDaily';
+          fallbackToStockDetailsNoDaily++;
+        }
+
         if (!hasDaily && hasActivity && finalSource === 'NoStockRow') {
           if (!canUseFreshProductActivityFallback) {
             fallbackRejectedMissingTimestamp++;
@@ -861,9 +1000,10 @@ async function fetchProductsFromPOS(locationCode) {
             productCode: row.ProductCode,
             activityStock: activityValue,
             activityLatestAt: row.ActivityLatestAt || null,
+            stockDetailsLive: liveStockValue,
             reason: !canUseFreshProductActivityFallback
               ? 'MISSING_TIMESTAMP_COLUMN'
-              : (!activityIsFresh ? 'STALE_ACTIVITY' : 'UNSAFE_ACTIVITY_VALUE'),
+              : (!activityIsSafe ? 'UNSAFE_ACTIVITY_VALUE' : (!activityIsFresh ? 'STALE_ACTIVITY' : 'NO_USABLE_FALLBACK')),
           });
         }
 
@@ -882,6 +1022,7 @@ async function fetchProductsFromPOS(locationCode) {
             productCode: row.ProductCode,
             dailyStockBalance: hasDaily ? dailyValue : null,
             productActivityStock: hasActivity ? activityValue : null,
+            stockDetailsLive: hasLiveStockDetails ? liveStockValue : null,
             productActivityAgeMinutes: activityAgeMinutes == null ? null : Math.round(activityAgeMinutes),
             productActivityFresh: activityIsFresh,
             finalStock,
@@ -901,11 +1042,15 @@ async function fetchProductsFromPOS(locationCode) {
         locationCode: LOCATION_CODE,
         dailyStockBalancePrimary: true,
         canUseFreshProductActivityFallback,
+        dailyStockStalenessDays,
+        dailyStockIsStale,
         fallbackAccepted,
         fallbackAcceptedNoTimestamp,
         fallbackRejectedMissingTimestamp,
         fallbackRejectedStale,
         fallbackRejectedUnsafe,
+        fallbackToStockDetailsNoDaily,
+        fallbackToStockDetailsDailyStale,
         sampleComparison: comparisonSamples,
       });
 
@@ -917,7 +1062,7 @@ async function fetchProductsFromPOS(locationCode) {
 
     const stockDateSample = result.recordset.find((row) => String(row.StockSource || '').includes('DailyStockBalance'))
       || result.recordset.find((row) => Number.isFinite(Number(row.QuantityAvailable)));
-    console.log(`${SYNC_LOG_PREFIX} [STOCK DATE RESOLUTION] location=${LOCATION_CODE} serverDate=${new Date().toISOString()} effectiveStockDate=${effectiveStockDate || 'NULL'} latestBalanceDate=${latestBalanceDate || 'NULL'}`);
+    console.log(`${SYNC_LOG_PREFIX} [STOCK DATE RESOLUTION] location=${LOCATION_CODE} serverDate=${new Date().toISOString()} effectiveStockDate=${effectiveStockDate || 'NULL'} latestBalanceDate=${latestBalanceDate || 'NULL'} dailyStockStalenessDays=${Number.isFinite(dailyStockStalenessDays) ? dailyStockStalenessDays : 'NULL'} dailyStockIsStale=${dailyStockIsStale}`);
     if (stockDateSample) {
       const sampleStockDate = stockDateSample.StockDate ? new Date(stockDateSample.StockDate).toISOString().slice(0, 10) : 'NULL';
       console.log(`${SYNC_LOG_PREFIX} [STOCK DATE SAMPLE] location=${LOCATION_CODE} productCode=${stockDateSample.ProductCode} stockDate=${sampleStockDate} stock=${Number(stockDateSample.QuantityAvailable || 0)} source=${stockDateSample.StockSource || 'Unknown'}`);
@@ -2434,6 +2579,16 @@ let isSupplierSyncRunning = false;
 
 async function syncSuppliersToBackend() {
   if (!appConfig.backend.baseUrl || !appConfig.backend.apiToken) {
+    console.warn(`${BRANCH_TAG} [SUPPLIER SYNC] Skipped tick - backend config missing`, {
+      hasBackendUrl: Boolean(appConfig.backend.baseUrl),
+      hasApiToken: Boolean(appConfig.backend.apiToken),
+      branchCode: appConfig.branch.branchCode,
+    });
+    return;
+  }
+
+  if (!pool) {
+    console.warn(`${BRANCH_TAG} [SUPPLIER SYNC] Skipped tick - SQL pool is not initialized yet`);
     return;
   }
 
@@ -2445,6 +2600,12 @@ async function syncSuppliersToBackend() {
   isSupplierSyncRunning = true;
 
   try {
+    console.log(`${BRANCH_TAG} [SUPPLIER SYNC] Tick started`, {
+      branchCode: appConfig.branch.branchCode,
+      syncSourceCode: appConfig.branch.syncSourceCode,
+      intervalMs: SUPPLIER_SYNC_INTERVAL_MS,
+    });
+
     const queryResult = await pool.request().query([
       'SELECT SupplierCode, SupplierName, Address, Telephone, Fax, Email, ContactName, UploadStatus',
       'FROM [POS].[dbo].[suppliers]',
@@ -2462,7 +2623,11 @@ async function syncSuppliersToBackend() {
       uploadStatus: Number(row.UploadStatus || 0),
     }));
 
-    console.log(`${BRANCH_TAG} [SUPPLIER SYNC] Pulling ${suppliers.length} supplier rows from POS`);
+    console.log(`${BRANCH_TAG} [SUPPLIER SYNC] Pulling ${suppliers.length} supplier rows from POS`, {
+      branchCode: appConfig.branch.branchCode,
+      firstSupplierCode: suppliers.length > 0 ? suppliers[0].supplierCode : null,
+      lastSupplierCode: suppliers.length > 0 ? suppliers[suppliers.length - 1].supplierCode : null,
+    });
 
     const response = await axios.post(
       `${appConfig.backend.baseUrl}/api/pos-sync/suppliers/pull`,
@@ -2484,9 +2649,23 @@ async function syncSuppliersToBackend() {
       }
     );
 
-    console.log(`${BRANCH_TAG} [SUPPLIER SYNC] Backend ingest complete`, response.data && response.data.data ? response.data.data : {});
+    const ingest = response && response.data && response.data.data ? response.data.data : {};
+    console.log(`${BRANCH_TAG} [SUPPLIER SYNC] Backend ingest complete`, {
+      branchCode: appConfig.branch.branchCode,
+      received: Number(ingest.received || 0),
+      linked: Number(ingest.linked || 0),
+      createdSuppliers: Number(ingest.createdSuppliers || 0),
+      updatedSuppliers: Number(ingest.updatedSuppliers || 0),
+      skipped: Number(ingest.skipped || 0),
+    });
   } catch (error) {
-    console.error(`${BRANCH_TAG} [SUPPLIER SYNC] Failed:`, error.message);
+    const httpStatus = error && error.response ? error.response.status : null;
+    const responseData = error && error.response ? error.response.data : null;
+    console.error(`${BRANCH_TAG} [SUPPLIER SYNC] Failed:`, error.message, {
+      branchCode: appConfig.branch.branchCode,
+      httpStatus,
+      responseData,
+    });
   } finally {
     isSupplierSyncRunning = false;
   }

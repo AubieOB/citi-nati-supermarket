@@ -118,6 +118,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
     setListError('');
 
     try {
+      const supplierLocationId = selectedBranchCode ? undefined : (selectedLocationId || undefined);
       const response = await api.get('/business-operations/suppliers', {
         params: {
           page,
@@ -126,7 +127,8 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
           sortOrder: 'desc',
           search: search || undefined,
           status: statusFilter || undefined,
-          locationId: selectedLocationId || undefined,
+          locationId: supplierLocationId,
+          branchCode: selectedBranchCode || undefined,
         },
       });
 
@@ -139,7 +141,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
     } finally {
       setListLoading(false);
     }
-  }, [page, search, selectedLocationId, statusFilter]);
+  }, [page, search, selectedBranchCode, selectedLocationId, statusFilter]);
 
   const fetchSupplierDetail = useCallback(async (supplierId, nextTransactionPage = 1) => {
     if (!supplierId) {
@@ -155,6 +157,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
     setTransactionsError('');
 
     try {
+      const transactionLocationId = selectedBranchCode ? undefined : (selectedLocationId || undefined);
       const [supplierResponse, balanceResponse, transactionsResponse] = await Promise.all([
         api.get(`/business-operations/suppliers/${supplierId}`),
         api.get(`/business-operations/suppliers/${supplierId}/balance`),
@@ -165,7 +168,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
             pageSize: 12,
             sortBy: 'transactionDate',
             sortOrder: 'desc',
-            locationId: selectedLocationId || undefined,
+            locationId: transactionLocationId,
           },
         }),
       ]);
@@ -185,7 +188,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
       setDetailLoading(false);
       setTransactionsLoading(false);
     }
-  }, [selectedLocationId]);
+  }, [selectedBranchCode, selectedLocationId]);
 
   const refreshData = useCallback(async ({ selectedId = selectedSupplierId, nextTransactionPage = transactionPage } = {}) => {
     await fetchSuppliers();

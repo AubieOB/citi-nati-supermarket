@@ -675,13 +675,14 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
     setSupplierLoading(true);
     try {
       const branchCode = branchCodeForLocationCode(activeLookupLocationCode || normalizeLocationCode(selectedLocation));
+      const supplierLocationId = branchCode ? undefined : (selectedLocationId || undefined);
       const response = await api.get('/business-operations/suppliers', {
         params: {
           page: 1,
           pageSize: 200,
           sortBy: 'name',
           sortOrder: 'asc',
-          locationId: selectedLocationId || undefined,
+          locationId: supplierLocationId,
           branchCode: branchCode || undefined,
           requirePosLinked: branchCode ? true : undefined,
           status: 'active',
