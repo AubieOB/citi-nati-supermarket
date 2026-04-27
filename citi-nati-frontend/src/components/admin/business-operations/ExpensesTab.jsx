@@ -47,6 +47,8 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
   const [isCategoriesWorkspaceModalOpen, setIsCategoriesWorkspaceModalOpen] = useState(false);
   const [isExpensesWorkspaceMaximized, setIsExpensesWorkspaceMaximized] = useState(false);
   const [isCategoriesWorkspaceMaximized, setIsCategoriesWorkspaceMaximized] = useState(false);
+  const [isExpenseDetailModalOpen, setIsExpenseDetailModalOpen] = useState(false);
+  const [isExpenseDetailModalMaximized, setIsExpenseDetailModalMaximized] = useState(false);
 
   // Expense list state
   const [filters, setFilters] = useState({
@@ -223,6 +225,11 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
     }
   };
 
+  const openExpenseDetailModal = () => {
+  if (!selectedExpense) return;
+  setIsExpenseDetailModalMaximized(false);
+  setIsExpenseDetailModalOpen(true);
+};
   const openAddExpense = () => { setExpenseError(''); setExpenseModal({ open: true, expense: null }); };
   const openEditExpense = (expense) => { setExpenseError(''); setExpenseModal({ open: true, expense }); };
   const openAddCategory = () => { setCategoryError(''); setCategoryModal({ open: true, category: null }); };
@@ -289,7 +296,7 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
   }, [activeTab, categories, expenses, filters, selectedLocationId, summary]);
 
   useEffect(() => {
-    const anySubModal = expenseModal.open || categoryModal.open;
+    const anySubModal = expenseModal.open || categoryModal.open || isExpenseDetailModalOpen;
     if (anySubModal) return;
     if (!isExpensesWorkspaceModalOpen && !isCategoriesWorkspaceModalOpen) return;
     const handler = (event) => {
@@ -304,7 +311,7 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isExpensesWorkspaceModalOpen, isCategoriesWorkspaceModalOpen, expenseModal.open, categoryModal.open]);
+  }, [isExpensesWorkspaceModalOpen, isCategoriesWorkspaceModalOpen, expenseModal.open, categoryModal.open, isExpenseDetailModalOpen]);
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
@@ -516,78 +523,133 @@ const ExpensesTab = ({ refreshKey = 0, drilldownRequest = null, selectedLocation
               </div>
             </div>
 
-            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'minmax(360px, 420px) 1fr', minHeight: 0 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, borderRight: '1px solid #e2e8f0' }}>
-                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-                  <div style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '0.52rem 0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
-                    <span>Visible: {expenses.length} {expenses.length === 1 ? 'expense' : 'expenses'}</span>
-                    <span style={{ color: '#334155', maxWidth: '170px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      Selected: {selectedExpense?.referenceNo || selectedExpense?.description || 'None'}
-                    </span>
-                  </div>
-                  <div style={{ padding: '0.85rem' }}>
-                    <div style={{ ...cardStyle, overflow: 'hidden' }}>
-                      <div style={{ padding: '1rem 1.05rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                        <div>
-                          <strong style={{ color: '#0f172a' }}>Expense Register</strong>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={openAddExpense}
-                          style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.6rem 0.95rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.88rem' }}
-                        >
-                          <i className="fas fa-plus" style={{ marginRight: '0.4rem' }} />
-                          Add Expense
-                        </button>
-                      </div>
-                      {listError ? (
-                        <div style={{ padding: '1rem', color: '#b91c1c', fontSize: '0.9rem' }}>{listError}</div>
-                      ) : (
-                        <ExpensesList
-                          expenses={expenses}
-                          loading={listLoading}
-                          error={listError}
-                          pagination={expensePagination}
-                          page={expensePage}
-                          onPageChange={setExpensePage}
-                          selectedExpenseId={selectedExpense?.id ?? null}
-                          onSelectExpense={(expense) => setSelectedExpense(expense)}
-                          onEditExpense={openEditExpense}
-                          onDeleteExpense={handleDeleteExpense}
-                        />
-                      )}
-                    </div>
-                  </div>
+                      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.85rem' }}>
+            <div style={{ ...cardStyle, overflow: 'hidden' }}>
+              <div style={{ padding: '0.75rem 1.05rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'grid', gap: '0.2rem' }}>
+                  <strong style={{ color: '#0f172a' }}>Expense Register</strong>
+                  <span style={{ color: '#64748b', fontSize: '0.8rem' }}>
+                    Selected: {selectedExpense?.referenceNo || selectedExpense?.description || 'None'}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={openExpenseDetailModal}
+                    disabled={!selectedExpense}
+                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.5rem 0.8rem', fontWeight: 700, cursor: selectedExpense ? 'pointer' : 'not-allowed', opacity: selectedExpense ? 1 : 0.65 }}
+                  >
+                    Open Expense Details
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={openAddExpense}
+                    style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.5rem 0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    <i className="fas fa-plus" style={{ marginRight: '0.38rem' }} />
+                    Add Expense
+                  </button>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-                  <div style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '0.52rem 0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
-                    <span style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {selectedExpense?.description || selectedExpense?.referenceNo || 'No expense selected'}
-                    </span>
-                    <span style={{ color: '#334155', fontWeight: 700 }}>
-                      {selectedExpense ? `Amount: MWK ${Number(selectedExpense.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
-                    </span>
-                  </div>
-                  <div style={{ padding: '0.85rem' }}>
-                    <div style={{ ...cardStyle, overflow: 'hidden' }}>
-                      <ExpenseDetailPanel
-                        expense={selectedExpense}
-                        loading={listLoading}
-                        error={listError}
-                        onEdit={openEditExpense}
-                        onAddExpense={openAddExpense}
-                      />
-                    </div>
-                  </div>
-                </div>
+              <div style={{ borderBottom: '1px solid #e2e8f0', padding: '0.52rem 0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>
+                  Visible: {Number(expenses.length || 0).toLocaleString('en-US')} {expenses.length === 1 ? 'expense' : 'expenses'}
+                </span>
+                <span style={{ color: '#334155', fontSize: '0.78rem', fontWeight: 700 }}>
+                  Total: {Number(expensePagination?.total || expenses.length || 0).toLocaleString('en-US')}
+                </span>
               </div>
+
+              {listError ? (
+                <div style={{ padding: '1rem', color: '#b91c1c', fontSize: '0.9rem' }}>{listError}</div>
+              ) : (
+                <ExpensesList
+                  expenses={expenses}
+                  loading={listLoading}
+                  error={listError}
+                  pagination={expensePagination}
+                  page={expensePage}
+                  onPageChange={setExpensePage}
+                  selectedExpenseId={selectedExpense?.id ?? null}
+                  onSelectExpense={(expense) => setSelectedExpense(expense)}
+                  onEditExpense={openEditExpense}
+                  onDeleteExpense={handleDeleteExpense}
+                />
+              )}
             </div>
+          </div>
           </div>
         </div>
       )}
+
+      {isExpenseDetailModalOpen && (
+  <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.5)', zIndex: 180, display: 'grid', placeItems: 'center', padding: isExpenseDetailModalMaximized ? '0.35rem' : '1rem' }}>
+    <div style={{ ...cardStyle, width: isExpenseDetailModalMaximized ? 'calc(100vw - 0.7rem)' : 'min(1000px, 96vw)', height: isExpenseDetailModalMaximized ? 'calc(100vh - 0.7rem)' : '88vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isExpenseDetailModalMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flexShrink: 0, padding: '0.8rem 1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div>
+          <h3 style={{ margin: 0, color: '#0f172a' }}>Expense Details</h3>
+          <div style={{ color: '#64748b', fontSize: '0.84rem' }}>
+            {selectedExpense?.referenceNo || selectedExpense?.description || 'No expense selected'}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => selectedExpense && openEditExpense(selectedExpense)}
+            disabled={!selectedExpense}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.82rem', fontWeight: 700, cursor: selectedExpense ? 'pointer' : 'not-allowed', opacity: selectedExpense ? 1 : 0.65 }}
+          >
+            Edit Expense
+          </button>
+
+          <button
+            type="button"
+            onClick={openAddExpense}
+            style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.55rem 0.82rem', fontWeight: 700, cursor: 'pointer' }}
+          >
+            Add Expense
+          </button>
+
+          <button
+            type="button"
+            title={isExpenseDetailModalMaximized ? 'Restore' : 'Maximize'}
+            aria-label={isExpenseDetailModalMaximized ? 'Restore expense detail modal' : 'Maximize expense detail modal'}
+            onClick={() => setIsExpenseDetailModalMaximized((prev) => !prev)}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
+          >
+            <i className={`fas ${isExpenseDetailModalMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
+          </button>
+
+          <button
+            type="button"
+            title="Close"
+            aria-label="Close expense detail modal"
+            onClick={() => { setIsExpenseDetailModalOpen(false); setIsExpenseDetailModalMaximized(false); }}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
+          >
+            <i className="fas fa-times" />
+          </button>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.9rem' }}>
+        <div style={{ ...cardStyle, overflow: 'hidden' }}>
+          <ExpenseDetailPanel
+            expense={selectedExpense}
+            loading={listLoading}
+            error={listError}
+            onEdit={openEditExpense}
+            onAddExpense={openAddExpense}
+          />
+        </div>
+      </div>
+    </div>
+  </div>
+)}
 
       {isCategoriesWorkspaceModalOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: isCategoriesWorkspaceMaximized ? '0.35rem' : '1rem' }}>
