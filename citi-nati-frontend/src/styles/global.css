@@ -2798,3 +2798,14 @@ button:disabled,
   font-weight: 700;
   border-bottom: none !important;
 }
+
+.header__link--active {
+  color: #5B4B8A !important;
+  font-weight: 700;
+  transform: none !important; /* 🔥 stops the lift */
+}
+
+/* Hover effect ONLY when not active */
+.header__link:not(.header__link--active):hover {
+  transform: translateY(-2px);
+}
