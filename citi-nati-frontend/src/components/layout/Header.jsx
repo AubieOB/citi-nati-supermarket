@@ -438,34 +438,37 @@ const Header = () => {
         >
           About Us
         </NavLink>
-        <NavLink to="/cart" 
-        onClick={closeMenu}>
-          className={({ isActive }) => 
-            `header__link ${isActive ? 'header__link--active' : ''}`
-          }
-          <i className="fas fa-shopping-cart" style={{ marginRight: '0.5rem' }}></i>
-          Cart
-          {cartCount > 0 && (
-            <span
-              style={{
-                marginLeft: '0.5rem',
-                backgroundColor: '#ff3860',
-                color: 'white',
-                borderRadius: '50%',
-                width: '20px',
-                height: '20px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '12px',
-                fontWeight: 'bold',
-                minWidth: '20px',
-              }}
-            >
-              {cartCount}
-            </span>
-          )}
-        </NavLink>
+        <NavLink 
+  to="/cart"
+  onClick={closeMenu}
+  className={({ isActive }) => 
+    `header__link ${isActive ? 'header__link--active' : ''}`
+  }
+>
+  <i className="fas fa-shopping-cart" style={{ marginRight: '0.5rem' }}></i>
+  Cart
+
+  {cartCount > 0 && (
+    <span
+      style={{
+        marginLeft: '0.5rem',
+        backgroundColor: '#ff3860',
+        color: 'white',
+        borderRadius: '50%',
+        width: '20px',
+        height: '20px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '12px',
+        fontWeight: 'bold',
+        minWidth: '20px',
+      }}
+    >
+      {cartCount}
+    </span>
+  )}
+</NavLink>
 
         {isAuthenticated ? (
           <>
