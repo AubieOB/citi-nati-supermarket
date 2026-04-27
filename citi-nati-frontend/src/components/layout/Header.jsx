@@ -170,12 +170,23 @@ const Header = () => {
 
       {/* Desktop Navigation */}
       <nav className="header__nav">
-        <Link to="/" className="header__link">
+       <NavLink 
+          to="/" 
+          end
+          className={({ isActive }) => 
+            `header__link ${isActive ? 'header__link--active' : ''}`
+          }
+        >
           Home
-        </Link>
-        <Link to="/products" className="header__link">
+        </NavLink>
+        <NavLink 
+          to="/products"
+          className={({ isActive }) => 
+            `header__link ${isActive ? 'header__link--active' : ''}`
+          }
+        >
           Products
-        </Link>
+        </NavLink>
         <NavLink 
           to="/about" 
           className={({ isActive }) => 
@@ -184,9 +195,14 @@ const Header = () => {
         >
           About Us
         </NavLink>
-        <Link to="/cart" className="header__link">
-          <i className="fas fa-shopping-cart" style={{ marginRight: '0.5rem' }}></i>
-          Cart
+        <NavLink 
+        to="/cart"
+        className={({ isActive }) => 
+          `header__link ${isActive ? 'header__link--active' : ''}`
+        }
+      >
+        <i className="fas fa-shopping-cart" style={{ marginRight: '0.5rem' }}></i>
+      Cart
           {cartCount > 0 && (
             <span
               style={{
@@ -207,7 +223,7 @@ const Header = () => {
               {cartCount}
             </span>
           )}
-        </Link>
+        </NavLink>
 
         {isAuthenticated ? (
           <>
@@ -359,12 +375,22 @@ const Header = () => {
           </>
         ) : (
           <>
-            <Link to="/login" className="header__link">
-              Login
-            </Link>
-            <Link to="/register" className="header__link">
+            <NavLink 
+            to="/login"
+            className={({ isActive }) => 
+              `header__link ${isActive ? 'header__link--active' : ''}`
+            }
+          >
+            Login
+          </NavLink>
+            <NavLink 
+              to="/register"
+              className={({ isActive }) => 
+                `header__link ${isActive ? 'header__link--active' : ''}`
+              }
+            >
               Register
-            </Link>
+            </NavLink>
           </>
         )}
       </nav>
@@ -394,13 +420,29 @@ const Header = () => {
         <Link to="/" className="header__link" onClick={closeMenu}>
           Home
         </Link>
-        <Link to="/products" className="header__link" onClick={closeMenu}>
+        <NavLink 
+          to="/products"
+          onClick={closeMenu}
+          className={({ isActive }) => 
+            `header__link ${isActive ? 'header__link--active' : ''}`
+          }
+        >
           Products
-        </Link>
-        <Link to="/about" className="header__link" onClick={closeMenu}>
+        </NavLink>
+        <NavLink 
+          to="/about" 
+          onClick={closeMenu}
+          className={({ isActive }) => 
+            `header__link ${isActive ? 'header__link--active' : ''}`
+          }
+        >
           About Us
-        </Link> 
-        <Link to="/cart" className="header__link" onClick={closeMenu}>
+        </NavLink>
+        <NavLink to="/cart" 
+        onClick={closeMenu}>
+          className={({ isActive }) => 
+            `header__link ${isActive ? 'header__link--active' : ''}`
+          }
           <i className="fas fa-shopping-cart" style={{ marginRight: '0.5rem' }}></i>
           Cart
           {cartCount > 0 && (
@@ -423,7 +465,7 @@ const Header = () => {
               {cartCount}
             </span>
           )}
-        </Link>
+        </NavLink>
 
         {isAuthenticated ? (
           <>
@@ -533,12 +575,18 @@ const Header = () => {
           </>
         ) : (
           <>
-            <Link to="/login" className="header__link" onClick={closeMenu}>
+            <NavLink to="/login" className={({ isActive }) => 
+            `header__link ${isActive ? 'header__link--active' : ''}`
+          }
+           onClick={closeMenu}>
               Login
-            </Link>
-            <Link to="/register" className="header__link" onClick={closeMenu}>
+            </NavLink>
+            <NavLink to="/register" className={({ isActive }) => 
+            `header__link ${isActive ? 'header__link--active' : ''}`
+          }
+           onClick={closeMenu}>
               Register
-            </Link>
+            </NavLink>
           </>
         )}
       </nav>

@@ -2785,7 +2785,16 @@ button:disabled,
   }
 }
 
+
+/* Hover ONLY */
+.header__link:hover {
+  color: #5B4B8A;
+  border-bottom: 2px solid #5B4B8A;
+}
+
+/* Active = COLOR ONLY */
 .header__link--active {
-  color: #5B4B8A !important; /* your brand purple */
+  color: #5B4B8A !important;
   font-weight: 700;
+  border-bottom: none !important;
 }
