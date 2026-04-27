@@ -236,7 +236,9 @@ const Header = () => {
 
             {/* Show My Orders link for users */}
             {user?.role === 'user' && (
-              <Link to="/my-orders" className="header__link">
+              <Link to="/my-orders" className={({ isActive }) => 
+                `header__link ${isActive ? 'header__link--active' : ''}`
+              }>
                 <i className="fas fa-box" style={{ marginRight: '0.5rem' }}></i>
                 My Orders
               </Link>
@@ -417,9 +419,14 @@ const Header = () => {
 
       {/* Mobile Menu */}
       <nav ref={menuRef} className={`header__mobile-menu ${menuOpen ? 'header__mobile-menu--open' : ''}`}>
-        <Link to="/" className="header__link" onClick={closeMenu}>
+        <NavLink to="/" 
+         onClick={closeMenu}
+         className={({ isActive }) => 
+            `header__link ${isActive ? 'header__link--active' : ''}`
+          }
+        >
           Home
-        </Link>
+        </NavLink>
         <NavLink 
           to="/products"
           onClick={closeMenu}
@@ -481,10 +488,12 @@ const Header = () => {
 
             {/* Show My Orders link for users */}
             {user?.role === 'user' && (
-              <Link to="/my-orders" className="header__link" onClick={closeMenu}>
+              <NavLink to="/my-orders" className={({ isActive }) => 
+                `header__link ${isActive ? 'header__link--active' : ''}`
+              } onClick={closeMenu}>
                 <i className="fas fa-box" style={{ marginRight: '0.5rem' }}></i>
                 My Orders
-              </Link>
+              </NavLink>
             )}
 
             {/* Avatar + Email Popup for mobile */}
