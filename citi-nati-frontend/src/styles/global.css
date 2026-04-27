@@ -192,9 +192,11 @@ input, textarea, select {
 }
 
 .header__link--active {
-  color: #5B4B8A;
-  border-bottom: 2px solid #2D8659;
-  padding-bottom: 0.25rem;
+  color: #5B4B8A !important;
+  font-weight: 700;
+  border-bottom: none !important;
+  padding-bottom: 0 !important;
+  transform: none !important;
 }
 
 .header__hamburger {
