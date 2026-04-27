@@ -36,6 +36,49 @@ function productGroupKey(productCode, productName) {
   return `${productCode || ''}__${productName || ''}`;
 }
 
+/**
+ * Build a Prisma WHERE clause for expenses based on the same period/filters as sales.
+ * Extracts date range and branch/location filters from the sales itemWhere.
+ */
+function buildExpenseWhere(itemWhere, filters = {}) {
+  if (!itemWhere?.salesInvoice) return null;
+
+  const invoiceWhere = itemWhere.salesInvoice;
+  const expenseWhere = {};
+
+  // Extract date range from invoice where clause
+  if (invoiceWhere.invoiceDate) {
+    if (invoiceWhere.invoiceDate.gte) {
+      expenseWhere.date = { gte: invoiceWhere.invoiceDate.gte };
+    }
+    if (invoiceWhere.invoiceDate.lte) {
+      if (!expenseWhere.date) expenseWhere.date = {};
+      expenseWhere.date.lte = invoiceWhere.invoiceDate.lte;
+    }
+  }
+
+  // Extract branch/location filters
+  if (invoiceWhere.branchCode) {
+    expenseWhere.branchCode = invoiceWhere.branchCode;
+  }
+  if (invoiceWhere.locationCode) {
+    expenseWhere.locationCode = invoiceWhere.locationCode;
+  }
+  if (invoiceWhere.locationId) {
+    expenseWhere.locationId = invoiceWhere.locationId;
+  }
+
+  // Apply additional filters from the filters object
+  if (filters.branchCode) {
+    expenseWhere.branchCode = filters.branchCode;
+  }
+  if (filters.locationCode) {
+    expenseWhere.locationCode = filters.locationCode;
+  }
+
+  return Object.keys(expenseWhere).length > 0 ? expenseWhere : null;
+}
+
 // ---------------------------------------------------------------------------
 // 1. Sales Summary
 // ---------------------------------------------------------------------------
@@ -702,6 +745,30 @@ async function queryLatestCostProfitAnalytics(itemWhere, filters = {}) {
     ? roundMoney((summary.completeRevenue / summary.totalRevenue) * 100)
     : 0;
   summary.costBasisLabel = 'Latest unit cost from the most recent POS SQL GRN per product and sync source';
+
+  // Fetch expense data for the same period and scope
+  let totalExpenses = 0;
+  try {
+    const expenseWhere = buildExpenseWhere(itemWhere, filters);
+    if (expenseWhere) {
+      const expenseAgg = await prisma.expense.aggregate({
+        where: expenseWhere,
+        _sum: { amount: true },
+      });
+      totalExpenses = roundMoney(toNum(expenseAgg._sum.amount));
+    }
+  } catch (expenseErr) {
+    console.warn('[REPORTING] Failed to fetch expense data for profit analytics:', expenseErr.message);
+  }
+
+  summary.totalExpenses = totalExpenses;
+  summary.expenseRatio = summary.totalRevenue > 0
+    ? roundMoney((totalExpenses / summary.totalRevenue) * 100)
+    : 0;
+  summary.netProfit = roundMoney(summary.totalGrossProfit - totalExpenses);
+  summary.netProfitMargin = summary.totalRevenue > 0
+    ? roundMoney(((summary.totalGrossProfit - totalExpenses) / summary.totalRevenue) * 100)
+    : null;
 
   const categoryMap = new Map();
   for (const row of branchScopedProducts) {
