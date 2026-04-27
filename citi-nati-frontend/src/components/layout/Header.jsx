@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useCart } from '../../context/CartContext.jsx';
 import Modal from '../common/Modal.jsx';
@@ -176,9 +176,14 @@ const Header = () => {
         <Link to="/products" className="header__link">
           Products
         </Link>
-        <Link to="/about" className="header__link">
-        About Us
-        </Link> 
+        <NavLink 
+          to="/about" 
+          className={({ isActive }) => 
+            `header__link ${isActive ? 'header__link--active' : ''}`
+          }
+        >
+          About Us
+        </NavLink>
         <Link to="/cart" className="header__link">
           <i className="fas fa-shopping-cart" style={{ marginRight: '0.5rem' }}></i>
           Cart

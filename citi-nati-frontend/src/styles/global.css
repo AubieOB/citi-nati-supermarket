@@ -2785,3 +2785,7 @@ button:disabled,
   }
 }
 
+.header__link--active {
+  color: #5B4B8A !important; /* your brand purple */
+  font-weight: 700;
+}
