@@ -37,6 +37,8 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
   const [showFilters, setShowFilters] = useState(false);
   const [isEmployeesWorkspaceModalOpen, setIsEmployeesWorkspaceModalOpen] = useState(false);
   const [isEmployeesWorkspaceMaximized, setIsEmployeesWorkspaceMaximized] = useState(false);
+  const [isEmployeeProfileModalOpen, setIsEmployeeProfileModalOpen] = useState(false);
+  const [isEmployeeProfileModalMaximized, setIsEmployeeProfileModalMaximized] = useState(false);
 
   // ── List state ──
   const [employees, setEmployees] = useState([]);
@@ -173,6 +175,12 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
     setEmployeeModal({ open: true, employee: null });
   };
 
+  const openEmployeeProfileModal = () => {
+  if (!selectedEmployeeId) return;
+  setIsEmployeeProfileModalMaximized(false);
+  setIsEmployeeProfileModalOpen(true);
+};
+
   const handleEditEmployee = () => {
     if (!detail) return;
     setEmpSaveError('');
@@ -291,11 +299,11 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
   };
 
   useEffect(() => {
-    if (!isEmployeesWorkspaceModalOpen || employeeModal.open || salaryModal.open) return;
+    if (!isEmployeesWorkspaceModalOpen || employeeModal.open || salaryModal.open || isEmployeeProfileModalOpen) return;
     const handler = (event) => { if (event.key === 'Escape') { setIsEmployeesWorkspaceModalOpen(false); setIsEmployeesWorkspaceMaximized(false); } };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isEmployeesWorkspaceModalOpen, employeeModal.open, salaryModal.open]);
+  }, [isEmployeesWorkspaceModalOpen, employeeModal.open, salaryModal.open, isEmployeeProfileModalOpen]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
@@ -449,64 +457,133 @@ const EmployeesTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(460px, 1fr))', gap: '1rem', alignItems: 'stretch', minHeight: 0, flex: 1, overflow: 'hidden' }}>
-              <div style={{ ...themedCardStyle, overflow: 'hidden', borderRadius: '16px', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                <div style={{ padding: '0.88rem 1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-                  <strong style={{ color: '#0f172a' }}>Employee Register</strong>
-                </div>
-                <div style={{ minHeight: 0, overflowY: 'auto' }}>
-                  <div style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '0.52rem 0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-                    <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>Visible: {Number(employees.length || 0).toLocaleString('en-US')} employees</span>
-                    <span style={{ color: '#334155', fontSize: '0.78rem', fontWeight: 700 }}>
-                      Selected: {selectedEmployee ? buildFullName(selectedEmployee) : 'None'}
-                    </span>
-                  </div>
-                  <EmployeesList
-                    employees={employees}
-                    loading={listLoading}
-                    error={listError}
-                    pagination={pagination}
-                    page={page}
-                    onPageChange={(pg) => setPage(pg)}
-                    selectedEmployeeId={selectedEmployeeId}
-                    onSelectEmployee={handleSelectEmployee}
-                    onEditEmployee={() => handleEditEmployee()}
-                    onDeleteEmployee={handleDeleteEmployee}
-                  />
-                </div>
-              </div>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.85rem' }}>
+  <div style={{ ...themedCardStyle, overflow: 'hidden', borderRadius: '16px' }}>
+    <div style={{ padding: '0.75rem 1.05rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+      <div style={{ display: 'grid', gap: '0.2rem' }}>
+        <strong style={{ color: '#0f172a' }}>Employee Register</strong>
+        <span style={{ color: '#64748b', fontSize: '0.8rem' }}>
+          Selected: {selectedEmployee ? buildFullName(selectedEmployee) : 'None'}
+        </span>
+      </div>
 
-              <div style={{ ...themedCardStyle, overflow: 'hidden', borderRadius: '16px', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                <div style={{ padding: '0.88rem 1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-                  <strong style={{ color: '#0f172a' }}>Employee Insight Panel</strong>
-                </div>
-                <div style={{ minHeight: 0, overflowY: 'auto' }}>
-                  <div style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '0.52rem 0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-                    <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>
-                      {selectedEmployee?.employeeNo ? `Employee #${selectedEmployee.employeeNo}` : 'No employee selected'}
-                    </span>
-                    <span style={{ color: '#334155', fontSize: '0.78rem', fontWeight: 700, textTransform: 'capitalize' }}>
-                      Status: {selectedEmployee?.status || 'N/A'}
-                    </span>
-                  </div>
-                  <EmployeeDetailPanel
-                    employee={selectedEmployee}
-                    salaryHistory={salaryHistory}
-                    salaryLoading={salaryLoading}
-                    salaryError={salaryError}
-                    detailLoading={detailLoading}
-                    detailError={detailError}
-                    onEditEmployee={handleEditEmployee}
-                    onAddSalary={handleAddSalary}
-                    onEditSalary={handleEditSalary}
-                    onAddEmployee={handleAddEmployee}
-                  />
-                </div>
-              </div>
-            </div>
+      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={openEmployeeProfileModal}
+          disabled={!selectedEmployeeId}
+          style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.5rem 0.8rem', fontWeight: 700, cursor: selectedEmployeeId ? 'pointer' : 'not-allowed', opacity: selectedEmployeeId ? 1 : 0.65 }}
+        >
+          Open Employee Profile
+        </button>
+
+        <button
+          type="button"
+          onClick={handleAddSalary}
+          disabled={!selectedEmployeeId}
+          style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.5rem 0.8rem', fontWeight: 700, cursor: selectedEmployeeId ? 'pointer' : 'not-allowed', opacity: selectedEmployeeId ? 1 : 0.65 }}
+        >
+          Add Salary Structure
+        </button>
+      </div>
+    </div>
+
+    <div style={{ borderBottom: '1px solid #e2e8f0', padding: '0.52rem 0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+      <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700 }}>
+        Visible: {Number(employees.length || 0).toLocaleString('en-US')} employees
+      </span>
+      <span style={{ color: '#334155', fontSize: '0.78rem', fontWeight: 700 }}>
+        Total: {Number(pagination.total || employees.length || 0).toLocaleString('en-US')}
+      </span>
+    </div>
+
+    <EmployeesList
+      employees={employees}
+      loading={listLoading}
+      error={listError}
+      pagination={pagination}
+      page={page}
+      onPageChange={(pg) => setPage(pg)}
+      selectedEmployeeId={selectedEmployeeId}
+      onSelectEmployee={handleSelectEmployee}
+      onEditEmployee={() => handleEditEmployee()}
+      onDeleteEmployee={handleDeleteEmployee}
+    />
+  </div>
+</div>
           </div>
         </div>
       )}
+
+      {isEmployeeProfileModalOpen && (
+  <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.5)', zIndex: 180, display: 'grid', placeItems: 'center', padding: isEmployeeProfileModalMaximized ? '0.35rem' : '1rem' }}>
+    <div style={{ ...themedCardStyle, width: isEmployeeProfileModalMaximized ? 'calc(100vw - 0.7rem)' : 'min(1100px, 96vw)', height: isEmployeeProfileModalMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isEmployeeProfileModalMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flexShrink: 0, padding: '0.8rem 1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: isAdminDarkTheme ? '#181818' : '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div>
+          <h3 style={{ margin: 0, color: isAdminDarkTheme ? '#f8fafc' : '#0f172a' }}>Employee Profile</h3>
+          <div style={{ color: '#64748b', fontSize: '0.84rem' }}>
+            {selectedEmployee ? `${buildFullName(selectedEmployee)}${selectedEmployee.employeeNo ? ` · ${selectedEmployee.employeeNo}` : ''}` : 'No employee selected'}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={handleEditEmployee}
+            disabled={!selectedEmployee}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.82rem', fontWeight: 700, cursor: selectedEmployee ? 'pointer' : 'not-allowed', opacity: selectedEmployee ? 1 : 0.65 }}
+          >
+            Edit Employee
+          </button>
+
+          <button
+            type="button"
+            onClick={handleAddSalary}
+            disabled={!selectedEmployeeId}
+            style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.55rem 0.82rem', fontWeight: 700, cursor: selectedEmployeeId ? 'pointer' : 'not-allowed', opacity: selectedEmployeeId ? 1 : 0.65 }}
+          >
+            Add Salary Structure
+          </button>
+
+          <button
+            type="button"
+            title={isEmployeeProfileModalMaximized ? 'Restore' : 'Maximize'}
+            aria-label={isEmployeeProfileModalMaximized ? 'Restore employee profile modal' : 'Maximize employee profile modal'}
+            onClick={() => setIsEmployeeProfileModalMaximized((prev) => !prev)}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
+          >
+            <i className={`fas ${isEmployeeProfileModalMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
+          </button>
+
+          <button
+            type="button"
+            title="Close"
+            aria-label="Close employee profile modal"
+            onClick={() => { setIsEmployeeProfileModalOpen(false); setIsEmployeeProfileModalMaximized(false); }}
+            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
+          >
+            <i className="fas fa-times" />
+          </button>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.9rem' }}>
+        <EmployeeDetailPanel
+          employee={selectedEmployee}
+          salaryHistory={salaryHistory}
+          salaryLoading={salaryLoading}
+          salaryError={salaryError}
+          detailLoading={detailLoading}
+          detailError={detailError}
+          onEditEmployee={handleEditEmployee}
+          onAddSalary={handleAddSalary}
+          onEditSalary={handleEditSalary}
+          onAddEmployee={handleAddEmployee}
+        />
+      </div>
+    </div>
+  </div>
+)}
 
       {/* ── Modals ── */}
       <EmployeeFormModal
