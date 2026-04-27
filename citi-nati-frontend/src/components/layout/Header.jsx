@@ -236,12 +236,12 @@ const Header = () => {
 
             {/* Show My Orders link for users */}
             {user?.role === 'user' && (
-              <Link to="/my-orders" className={({ isActive }) => 
+              <NavLink to="/my-orders" className={({ isActive }) => 
                 `header__link ${isActive ? 'header__link--active' : ''}`
               }>
                 <i className="fas fa-box" style={{ marginRight: '0.5rem' }}></i>
                 My Orders
-              </Link>
+              </NavLink>
             )}
 
             {/* Avatar Circle with Email and Logout Popup */}
