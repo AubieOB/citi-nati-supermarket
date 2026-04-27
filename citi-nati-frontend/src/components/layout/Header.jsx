@@ -176,6 +176,9 @@ const Header = () => {
         <Link to="/products" className="header__link">
           Products
         </Link>
+        <Link to="/about" className="header__link">
+        About Us
+        </Link> 
         <Link to="/cart" className="header__link">
           <i className="fas fa-shopping-cart" style={{ marginRight: '0.5rem' }}></i>
           Cart
@@ -389,6 +392,9 @@ const Header = () => {
         <Link to="/products" className="header__link" onClick={closeMenu}>
           Products
         </Link>
+        <Link to="/about" className="header__link" onClick={closeMenu}>
+          About Us
+        </Link> 
         <Link to="/cart" className="header__link" onClick={closeMenu}>
           <i className="fas fa-shopping-cart" style={{ marginRight: '0.5rem' }}></i>
           Cart

@@ -56,7 +56,7 @@ const Home = () => {
             Browse Products
           </Link>
           <Link to="/about" className="hero__button hero__button--secondary">
-            Learn More
+            About Us
           </Link>
         </div>
       </section>
