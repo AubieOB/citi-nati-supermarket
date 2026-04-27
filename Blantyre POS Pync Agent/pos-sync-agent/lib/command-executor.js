@@ -3,6 +3,21 @@ const priceUpdates = require('./price-updates');
 const productNameUpdates = require('./product-name-updates');
 const stockUpdates = require('./stock-updates');
 const invoiceWriteback = require('./invoice-writeback');
+const { buildConfig } = require('./config');
+
+// Branch code hard guard - Blantyre agent only accepts BLANTYRE commands
+const AGENT_BRANCH_CODE = 'BLANTYRE';
+
+function validateBranchCode(payload, agentBranchCode) {
+  const payloadBranchCode = String(payload?.branchCode || '').trim().toUpperCase();
+  if (!payloadBranchCode) {
+    throw new Error('NON_RETRYABLE: Command payload missing branchCode');
+  }
+  if (payloadBranchCode !== agentBranchCode) {
+    throw new Error(`NON_RETRYABLE: Command branchCode "${payloadBranchCode}" does not match agent branch "${agentBranchCode}". This command is for a different branch.`);
+  }
+  return true;
+}
 
 function formatGrnDatePart(value) {
   const date = value instanceof Date ? value : new Date(value);
@@ -723,6 +738,9 @@ async function executeCreatePendingStockIntake(pool, payload, commandId) {
 }
 
 async function executeCreateOrLinkSupplier(pool, payload, commandId) {
+  // Branch validation - hard guard to ensure this agent only processes its own branch commands
+  validateBranchCode(payload, AGENT_BRANCH_CODE);
+
   const supplierName = String(payload.supplierName || '').trim();
   const address = String(payload.address || '').trim();
   const telephone = String(payload.telephone || '').trim();
@@ -809,6 +827,9 @@ async function executeCreateOrLinkSupplier(pool, payload, commandId) {
 }
 
 async function executeDeleteSupplier(pool, payload, commandId) {
+  // Branch validation - hard guard to ensure this agent only processes its own branch commands
+  validateBranchCode(payload, AGENT_BRANCH_CODE);
+
   const posSupplierCode = Number(payload.posSupplierCode);
   if (!Number.isFinite(posSupplierCode) || posSupplierCode <= 0 || Math.floor(posSupplierCode) !== posSupplierCode) {
     throw new Error('NON_RETRYABLE: DELETE_SUPPLIER payload missing valid posSupplierCode');

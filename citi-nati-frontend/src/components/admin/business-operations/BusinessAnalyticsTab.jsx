@@ -622,6 +622,8 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, effectiveScope, locat
               { label: 'Revenue With Cost Basis', value: money(summary.completeRevenue), note: `Coverage ${Number(summary.coveragePct || 0).toFixed(1)}%` },
               { label: 'COGS From Latest Cost', value: money(summary.totalCostOfGoodsSold), note: 'Latest unit cost multiplied by sold quantity.' },
               { label: 'Gross Profit', value: money(summary.totalGrossProfit), note: summary.grossMarginPct == null ? 'Margin unavailable' : `Margin ${Number(summary.grossMarginPct).toFixed(1)}%` },
+              { label: 'Total Expenses', value: summary.totalExpenses != null ? money(summary.totalExpenses) : 'N/A', note: summary.totalExpenses != null ? `${Number(summary.expenseRatio || 0).toFixed(1)}% of revenue` : 'Expense data not available' },
+              { label: 'Net Profit', value: summary.netProfit != null ? money(summary.netProfit) : 'N/A', note: summary.netProfit != null ? `Margin ${Number(summary.netProfitMargin || 0).toFixed(1)}%` : 'Gross Profit - Expenses' },
               { label: 'Excluded Revenue', value: money(summary.excludedRevenue), note: `${intFmt(summary.incompleteProducts)} incomplete product(s)` },
               { label: 'Daily / Period Ready', value: intFmt(summary.completeProducts), note: `${intFmt(summary.uniqueProducts || 0)} unique products • ${intFmt(summary.totalProducts)} branch rows` },
             ].map((kpi) => (

@@ -5,6 +5,20 @@ const stockUpdates = require('./stock-updates');
 const invoiceWriteback = require('./invoice-writeback');
 const { buildConfig } = require('./config');
 
+// Branch code hard guard - Zomba agent only accepts ZOMBA commands
+const AGENT_BRANCH_CODE = 'ZOMBA';
+
+function validateBranchCode(payload, agentBranchCode) {
+  var payloadBranchCode = String(payload && payload.branchCode || '').trim().toUpperCase();
+  if (!payloadBranchCode) {
+    throw new Error('NON_RETRYABLE: Command payload missing branchCode');
+  }
+  if (payloadBranchCode !== agentBranchCode) {
+    throw new Error('NON_RETRYABLE: Command branchCode "' + payloadBranchCode + '" does not match agent branch "' + agentBranchCode + '". This command is for a different branch.');
+  }
+  return true;
+}
+
 function formatGrnDatePart(value) {
   var date = value instanceof Date ? value : new Date(value);
   if (isNaN(date.getTime())) {
@@ -253,6 +267,9 @@ async function executeCreatePendingStockIntake(pool, payload, commandId) {
 }
 
 async function executeCreateOrLinkSupplier(pool, payload, commandId) {
+  // Branch validation - hard guard to ensure this agent only processes its own branch commands
+  validateBranchCode(payload, AGENT_BRANCH_CODE);
+
   var supplierName = String(payload.supplierName || '').trim();
   var address = String(payload.address || '').trim();
   var telephone = String(payload.telephone || '').trim();
@@ -340,6 +357,9 @@ async function executeCreateOrLinkSupplier(pool, payload, commandId) {
 }
 
 async function executeDeleteSupplier(pool, payload, commandId) {
+  // Branch validation - hard guard to ensure this agent only processes its own branch commands
+  validateBranchCode(payload, AGENT_BRANCH_CODE);
+
   var posSupplierCode = Number(payload.posSupplierCode);
   if (!isFinite(posSupplierCode) || posSupplierCode <= 0 || Math.floor(posSupplierCode) !== posSupplierCode) {
     throw new Error('NON_RETRYABLE: DELETE_SUPPLIER payload missing valid posSupplierCode');

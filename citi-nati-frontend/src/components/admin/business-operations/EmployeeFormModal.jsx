@@ -4,6 +4,47 @@ const EMPLOYMENT_TYPES = ['permanent', 'contract', 'casual', 'temporary', 'part_
 const GENDERS = ['male', 'female', 'other'];
 const STATUSES = ['active', 'inactive', 'terminated'];
 
+// Predefined departments suitable for supermarket/business context
+const DEPARTMENTS = [
+  { value: '', label: 'Select department' },
+  { value: 'Shop/Retail', label: 'Shop/Retail' },
+  { value: 'Bar', label: 'Bar' },
+  { value: 'Restaurant', label: 'Restaurant' },
+  { value: 'Kitchen', label: 'Kitchen' },
+  { value: 'Security', label: 'Security' },
+  { value: 'Delivery', label: 'Delivery' },
+  { value: 'Stores/Warehouse', label: 'Stores/Warehouse' },
+  { value: 'Administration', label: 'Administration' },
+  { value: 'Management', label: 'Management' },
+  { value: 'Accounts/Finance', label: 'Accounts/Finance' },
+  { value: 'Maintenance', label: 'Maintenance' },
+  { value: 'Home/Grounds', label: 'Home/Grounds' },
+];
+
+// Predefined positions suitable for supermarket/business context
+const POSITIONS = [
+  { value: '', label: 'Select position' },
+  { value: 'Cashier', label: 'Cashier' },
+  { value: 'Supervisor', label: 'Supervisor' },
+  { value: 'Shop Attendant', label: 'Shop Attendant' },
+  { value: 'Stock Controller', label: 'Stock Controller' },
+  { value: 'Storekeeper', label: 'Storekeeper' },
+  { value: 'Driver', label: 'Driver' },
+  { value: 'Delivery Rider', label: 'Delivery Rider' },
+  { value: 'Bar Attendant', label: 'Bar Attendant' },
+  { value: 'Waiter/Waitress', label: 'Waiter/Waitress' },
+  { value: 'Chef/Cook', label: 'Chef/Cook' },
+  { value: 'Kitchen Assistant', label: 'Kitchen Assistant' },
+  { value: 'Cleaner', label: 'Cleaner' },
+  { value: 'Security Guard', label: 'Security Guard' },
+  { value: 'Garden Boy/Groundskeeper', label: 'Garden Boy/Groundskeeper' },
+  { value: 'Manager', label: 'Manager' },
+  { value: 'Assistant Manager', label: 'Assistant Manager' },
+  { value: 'Accountant/Accounts Clerk', label: 'Accountant/Accounts Clerk' },
+  { value: 'Procurement/Purchasing Assistant', label: 'Procurement/Purchasing Assistant' },
+  { value: 'General Worker', label: 'General Worker' },
+];
+
 const defaultForm = {
   locationId: '',
   employeeNo: '',
@@ -205,11 +246,19 @@ const EmployeeFormModal = ({ isOpen, employee, selectedLocationId = null, locati
           </div>
           <div>
             <label style={labelStyle}>Position</label>
-            <input type="text" value={form.position} onChange={set('position')} placeholder="e.g. Cashier" style={fieldStyle} />
+            <select value={form.position} onChange={set('position')} style={fieldStyle}>
+              {POSITIONS.map((p) => (
+                <option key={p.value} value={p.value}>{p.label}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label style={labelStyle}>Department</label>
-            <input type="text" value={form.department} onChange={set('department')} placeholder="e.g. Operations" style={fieldStyle} />
+            <select value={form.department} onChange={set('department')} style={fieldStyle}>
+              {DEPARTMENTS.map((d) => (
+                <option key={d.value} value={d.value}>{d.label}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label style={labelStyle}>Employment Type</label>
