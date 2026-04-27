@@ -2807,7 +2807,11 @@ button:disabled,
   transform: none !important; /* 🔥 stops the lift */
 }
 
-/* Hover effect ONLY when not active */
-.header__link:not(.header__link--active):hover {
-  transform: translateY(-2px);
+.header__link:hover {
+  color: #5B4B8A;
+  border-bottom: 2px solid #5B4B8A;
+}
+
+.header__link--active:hover {
+  transform: translateY(-1px);
 }
