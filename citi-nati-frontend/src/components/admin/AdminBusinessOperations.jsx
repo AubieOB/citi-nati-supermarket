@@ -11,6 +11,7 @@ import GoodsIntakeTab from './business-operations/GoodsIntakeTab.jsx';
 import ReportHistoryTab from './business-operations/ReportHistoryTab.jsx';
 import BusinessOperationsActionsTab from './business-operations/BusinessOperationsActionsTab.jsx';
 import BusinessAnalyticsTab from './business-operations/BusinessAnalyticsTab.jsx';
+import InventoryActivityLedger from './business-operations/InventoryActivityLedger.jsx';
 import SalesBalancingTab from './business-operations/SalesBalancingTab.jsx';
 import BusinessOperationsImportButton from './business-operations/BusinessOperationsImportButton.jsx';
 import BusinessOperationsImportModal from './business-operations/BusinessOperationsImportModal.jsx';
@@ -43,6 +44,7 @@ const TABS = [
   { id: 'report-history', label: 'Report History', icon: 'fa-clock-rotate-left', permission: PERMISSION_KEYS.BO_REPORT_HISTORY_VIEW },
   { id: 'sales-balancing', label: 'Sales Balancing', icon: 'fa-scale-balanced', permission: PERMISSION_KEYS.BO_SALES_BALANCING_VIEW },
   { id: 'analytics-performance', label: 'Analytics', icon: 'fa-chart-line', permission: PERMISSION_KEYS.BO_ANALYTICS_VIEW },
+  { id: 'inventory-activity', label: 'Inventory Activity', icon: 'fa-box', permission: PERMISSION_KEYS.BO_INVENTORY_ACTIVITY_VIEW },
   { id: 'actions', label: 'Actions', icon: 'fa-triangle-exclamation', permission: PERMISSION_KEYS.BO_ACTIONS_VIEW },
 ];
 
@@ -234,6 +236,12 @@ const AdminBusinessOperations = () => {
     'report-history': <ReportHistoryTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} onNavigateTab={handleNavigateTab} />,
     'sales-balancing': <SalesBalancingTab selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} selectedLocationName={selectedLocationName} />,
     'analytics-performance': <BusinessAnalyticsTab selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} locations={locations} />,
+    'inventory-activity': (
+  <InventoryActivityLedger
+    selectedLocationId={selectedLocationIdNumber}
+    selectedLocationCode={selectedLocationCode}
+  />
+),
     actions: <BusinessOperationsActionsTab permissions={actionsPermissions} />,
   };
 
