@@ -15,7 +15,7 @@ async function generateUniqueEmployeeNumber() {
   let employeeNo;
 
   while (!unique) {
-    employeeNo = `EMP-${Math.floor(100000 + Math.random() * 900000)}`; // Generate a random 6-digit number prefixed with EMP
+    employeeNo = `CITI-${Math.floor(100000 + Math.random() * 900000)}`; // Generate a random 6-digit number prefixed with CITI
     const existingEmployee = await prisma.employee.findUnique({ where: { employeeNo } });
     if (!existingEmployee) {
       unique = true;
