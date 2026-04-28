@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import api from '../../../services/api';
+import api from '../../../utils/api.js';
 
 const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) => {
   const [loading, setLoading] = useState(false);
