@@ -173,7 +173,11 @@ async function getSaleMovements(period, filters = {}) {
         },
       },
     },
-    orderBy: { createdAt: 'asc' },
+            orderBy: {
+        salesInvoice: {
+            invoiceTime: 'asc',
+        },
+    },
     take: 1000,
   });
 
@@ -228,7 +232,11 @@ async function getIntakeMovements(period, filters = {}) {
         },
       },
     },
-    orderBy: { createdAt: 'asc' },
+        orderBy: {
+    goodsIntake: {
+        finalizedAt: 'asc',
+    },
+},
     take: 1000,
   });
 
@@ -346,8 +354,12 @@ async function getInventoryActivityLedgerData({ period, filters = {} }) {
   };
 }
 
-  const currentProduct = await findCurrentProduct(filters);
-  const currentProductStock = toNum(currentProduct?.stock || 0);
+  const isAllLocations = !filters.locationId;
+
+const currentProduct = await findCurrentProduct(filters);
+const currentProductStock = isAllLocations
+  ? 0
+  : toNum(currentProduct?.stock || 0);
 
   const [saleMovements, intakeMovements] = await Promise.all([
     getSaleMovements(period, filters),
