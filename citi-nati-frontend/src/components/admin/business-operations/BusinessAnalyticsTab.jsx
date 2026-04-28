@@ -907,7 +907,7 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, effectiveScope, locat
                     <div>
                       <strong style={{ color: '#0f172a', fontSize: '0.84rem' }}>{row.productName}</strong>
                       <div style={{ marginTop: '0.16rem', color: '#64748b', fontSize: '0.76rem' }}>{row.productCode || 'No product code'}{row.category ? ` • ${row.category}` : ''}</div>
-                      <div style={{ marginTop: '0.12rem', color: '#94a3b8', fontSize: '0.73rem' }}>Branches: {joinLabels(row.branchCodes)} | Sources: {joinLabels(row.syncSourceCodes)}</div>
+                      <div style={{ marginTop: '0.12rem', color: '#94a3b8', fontSize: '0.73rem' }}>Branches: {joinLabels(row.branchCodes)} | Sources: {joinLabels(row.syncSourceCodes || [])}</div>
                     </div>
                     <div style={{ color: '#1d4ed8', fontWeight: 900, fontSize: '0.86rem' }}>{money(row.grossProfit)}</div>
                   </div>
@@ -1688,7 +1688,7 @@ const BusinessAnalyticsTab = ({
                 <div style={{ ...cardStyle, padding: '0.85rem 0.95rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <div style={sectionHead}>Top Products</div>
-                    <div style={{ display: 'inline-flex', border: '1px solid #dbe3ef', borderRadius: '999px', padding: '0.18rem', backgroundColor: '#f8fafc' }}>
+                    <div style={{ display: 'inline-flex', border: '1px solid #dbeafe', borderRadius: '999px', padding: '0.18rem', backgroundColor: '#f8fafc' }}>
                       <button
                         type="button"
                         onClick={() => setProductRankingMode('sales')}
@@ -2370,7 +2370,7 @@ const BusinessAnalyticsTab = ({
                                   <input
                                     type="number"
                                     step={fieldDef.step}
-                                    value={analysisInputs[fieldKey]}
+                                    value={analysis.inputs[fieldKey]}
                                     onChange={(event) => updateAnalysisInput(fieldKey, event.target.value)}
                                     style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', border: '1px solid #93c5fd', borderRadius: '10px', padding: '0.58rem 0.62rem', color: '#0f172a', backgroundColor: '#fff', fontFamily: 'Consolas, Menlo, Monaco, monospace', fontWeight: 800, fontSize: '0.95rem', boxShadow: 'inset 0 1px 3px rgba(15, 23, 42, 0.08)' }}
                                   />
@@ -2387,11 +2387,11 @@ const BusinessAnalyticsTab = ({
                             <button
                               type="button"
                               onClick={() => {
-                                const resetValues = { ...analysisInputs };
+                                const resetValues = { ...analysis.inputs };
                                 Object.keys(resetValues).forEach((key) => {
                                   resetValues[key] = key === 'projectedGrowthPct' ? 10 : 0;
                                 });
-                                setAnalysisInputs(resetValues);
+                                setAnalysis.inputs(resetValues);
                                 setAnalysisResult(null);
                               }}
                               style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.5rem 0.8rem', fontWeight: 800, cursor: 'pointer' }}
@@ -2604,7 +2604,7 @@ const BusinessAnalyticsTab = ({
                                   return (
                                     <label key={fieldKey} style={{ display: 'grid', gap: '0.28rem', border: '1px solid #dbeafe', borderRadius: '12px', padding: '0.45rem 0.5rem', backgroundColor: '#f8fbff', minWidth: 0, overflow: 'hidden' }}>
                                       <span style={{ color: '#475569', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.03em' }}>{fieldDef.label}</span>
-                                      <input type="number" step={fieldDef.step} value={analysisInputs[fieldKey]} onChange={(event) => updateAnalysisInput(fieldKey, event.target.value)} style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', border: '1px solid #93c5fd', borderRadius: '10px', padding: '0.58rem 0.62rem', color: '#0f172a', backgroundColor: '#fff', fontFamily: 'Consolas, Menlo, Monaco, monospace', fontWeight: 800, fontSize: '0.95rem', boxShadow: 'inset 0 1px 3px rgba(15, 23, 42, 0.08)' }} />
+                                      <input type="number" step={fieldDef.step} value={analysis.inputs[fieldKey]} onChange={(event) => updateAnalysisInput(fieldKey, event.target.value)} style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', border: '1px solid #93c5fd', borderRadius: '10px', padding: '0.58rem 0.62rem', color: '#0f172a', backgroundColor: '#fff', fontFamily: 'Consolas, Menlo, Monaco, monospace', fontWeight: 800, fontSize: '0.95rem', boxShadow: 'inset 0 1px 3px rgba(15, 23, 42, 0.08)' }} />
                                     </label>
                                   );
                                 })}
@@ -2613,7 +2613,7 @@ const BusinessAnalyticsTab = ({
                                 <button type="button" onClick={runAnalysis} style={{ border: '1px solid #1d4ed8', background: 'linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%)', color: '#fff', borderRadius: '10px', padding: '0.54rem 0.86rem', fontWeight: 900, letterSpacing: '0.02em', cursor: 'pointer', boxShadow: '0 10px 20px rgba(37, 99, 235, 0.28)' }}>
                                   <i className="fas fa-play" style={{ marginRight: '0.34rem', fontSize: '0.72rem' }}></i>Run Calculation
                                 </button>
-                                <button type="button" onClick={() => { const r = { ...analysisInputs }; Object.keys(r).forEach((k) => { r[k] = k === 'projectedGrowthPct' ? 10 : 0; }); setAnalysisInputs(r); setAnalysisResult(null); }} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.5rem 0.8rem', fontWeight: 800, cursor: 'pointer' }}>
+                                <button type="button" onClick={() => { const r = { ...analysis.inputs }; Object.keys(r).forEach((k) => { r[k] = k === 'projectedGrowthPct' ? 10 : 0; }); setAnalysis.inputs(r); setAnalysisResult(null); }} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.5rem 0.8rem', fontWeight: 800, cursor: 'pointer' }}>
                                   <i className="fas fa-rotate-left" style={{ marginRight: '0.34rem', fontSize: '0.72rem' }}></i>Reset Inputs
                                 </button>
                               </div>

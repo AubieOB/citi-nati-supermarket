@@ -239,12 +239,6 @@ const EmployeeFormModal = ({ isOpen, employee, selectedLocationId = null, locati
             <input type="text" value={form.employeeNo} onChange={set('employeeNo')} placeholder="e.g. EMP001" style={fieldStyle} />
           </div>
           <div>
-            <label style={labelStyle}>Status</label>
-            <select value={form.status} onChange={set('status')} style={fieldStyle}>
-              {STATUSES.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
-            </select>
-          </div>
-          <div>
             <label style={labelStyle}>Position</label>
             <select value={form.position} onChange={set('position')} style={fieldStyle}>
               {POSITIONS.map((p) => (

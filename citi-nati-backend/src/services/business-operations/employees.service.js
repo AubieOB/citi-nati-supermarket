@@ -10,10 +10,26 @@ function parseDate(value) {
   return isNaN(d.getTime()) ? null : d;
 }
 
+async function generateUniqueEmployeeNumber() {
+  let unique = false;
+  let employeeNo;
+
+  while (!unique) {
+    employeeNo = `EMP-${Math.floor(100000 + Math.random() * 900000)}`; // Generate a random 6-digit number prefixed with EMP
+    const existingEmployee = await prisma.employee.findUnique({ where: { employeeNo } });
+    if (!existingEmployee) {
+      unique = true;
+    }
+  }
+
+  return employeeNo;
+}
+
 async function createEmployee(payload) {
+  const employeeNo = payload.employeeNo || await generateUniqueEmployeeNumber();
   return prisma.employee.create({
     data: {
-      employeeNo: payload.employeeNo || null,
+      employeeNo,
       firstName: payload.firstName,
       surname: payload.surname,
       middleName: payload.middleName || null,
