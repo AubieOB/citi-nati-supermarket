@@ -47,7 +47,7 @@ const POSITIONS = [
 
 const defaultForm = {
   locationId: '',
-  employeeNo: '',
+  employeeNo: 'Auto-generated', // Default value indicating auto-generation
   firstName: '',
   surname: '',
   middleName: '',
@@ -145,6 +145,26 @@ const EmployeeFormModal = ({ isOpen, employee, selectedLocationId = null, locati
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (isCreateMode) {
+      async function fetchGeneratedEmployeeNo() {
+        try {
+          const response = await fetch('/api/employees/generate-employee-no');
+          const data = await response.json();
+          if (data.success) {
+            setForm((prevForm) => ({ ...prevForm, employeeNo: data.employeeNo }));
+          } else {
+            console.error('Failed to generate employee number:', data.error);
+          }
+        } catch (error) {
+          console.error('Error generating employee number:', error);
+        }
+      }
+
+      fetchGeneratedEmployeeNo();
+    }
+  }, [isCreateMode]);
 
   if (!isOpen) return null;
 
