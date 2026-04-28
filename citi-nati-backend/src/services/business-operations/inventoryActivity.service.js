@@ -334,22 +334,17 @@ async function getInventoryActivityLedgerData({ period, filters = {} }) {
   const hasProductFilter = Boolean(normalize(filters.productCode) || normalize(filters.productName));
 
   if (!hasProductFilter) {
-    const groupedProducts = await getGroupedSummary(period, filters);
-
-    return {
-      mode: 'summary',
-      summary: {
-        movementCount: groupedProducts.reduce((sum, row) => sum + Number(row.movementCount || 0), 0),
-        productCount: groupedProducts.length,
-      },
-      products: groupedProducts,
-      movements: [],
-      dataQuality: {
-        openingBalanceMethod: 'not_applicable_for_grouped_summary',
-        warning: 'Select one product to view opening balance, running balance, and full stock movement ledger.',
-      },
-    };
-  }
+  return {
+    mode: 'summary',
+    summary: {},
+    products: [],
+    movements: [],
+    dataQuality: {
+      openingBalanceMethod: 'disabled_temporarily',
+      warning: 'Enter a product code or name to view inventory activity.',
+    },
+  };
+}
 
   const currentProduct = await findCurrentProduct(filters);
   const currentProductStock = toNum(currentProduct?.stock || 0);
