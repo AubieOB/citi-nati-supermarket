@@ -80,7 +80,7 @@ function buildGoodsIntakeWhere(period, filters = {}, fromStartUntilNow = false) 
       status: {
         not: 'draft',
       },
-      purchaseDate: {
+      finalizedAt: {
         gte: period.startDate,
         lte: fromStartUntilNow ? new Date() : period.endDate,
       },
@@ -88,14 +88,23 @@ function buildGoodsIntakeWhere(period, filters = {}, fromStartUntilNow = false) 
   };
 
   if (filters.productCode) {
-    where.product = {
-      sourceCode: {
-        equals: normalize(filters.productCode),
-        mode: 'insensitive',
+    where.OR = [
+      {
+        product: {
+          sourceCode: {
+            equals: normalize(filters.productCode),
+            mode: 'insensitive',
+          },
+        },
       },
-    };
+      {
+        productName: {
+          contains: normalize(filters.productCode),
+          mode: 'insensitive',
+        },
+      },
+    ];
   }
-
   if (filters.productName) {
     where.productName = {
       contains: normalize(filters.productName),
@@ -138,12 +147,25 @@ async function findCurrentProduct(filters = {}) {
   });
 }
 
+/**
+ * Get movement date from sale - prioritize invoiceTime, then invoiceDate, then createdAt
+ */
 function getMovementDateFromSale(row) {
-  return row.salesInvoice?.invoiceTime || row.salesInvoice?.invoiceDate || row.createdAt;
+  const invoice = row.salesInvoice;
+  if (invoice?.invoiceTime) return invoice.invoiceTime;
+  if (invoice?.invoiceDate) return invoice.invoiceDate;
+  return row.createdAt;
 }
 
+/**
+ * Get movement date from intake - prioritize finalizedAt, then purchaseDate, then createdAt
+ */
 function getMovementDateFromIntake(row) {
-  return row.goodsIntake?.finalizedAt || row.goodsIntake?.purchaseDate || row.goodsIntake?.createdAt || row.createdAt;
+  const intake = row.goodsIntake;
+  if (intake?.finalizedAt) return intake.finalizedAt;
+  if (intake?.purchaseDate) return intake.purchaseDate;
+  if (intake?.createdAt) return intake.createdAt;
+  return row.createdAt;
 }
 
 async function getSaleMovements(period, filters = {}) {
@@ -173,10 +195,10 @@ async function getSaleMovements(period, filters = {}) {
         },
       },
     },
-            orderBy: {
-        salesInvoice: {
-            invoiceTime: 'asc',
-        },
+    orderBy: {
+      salesInvoice: {
+        invoiceTime: 'asc',
+      },
     },
     take: 1000,
   });
@@ -232,11 +254,11 @@ async function getIntakeMovements(period, filters = {}) {
         },
       },
     },
-        orderBy: {
-    goodsIntake: {
+    orderBy: {
+      goodsIntake: {
         finalizedAt: 'asc',
+      },
     },
-},
     take: 1000,
   });
 
@@ -262,51 +284,69 @@ async function getIntakeMovements(period, filters = {}) {
   }));
 }
 
+/**
+ * Get product movement summary using findMany + JS aggregation to avoid Prisma groupBy issues
+ */
 async function getGroupedSummary(period, filters = {}) {
-  const [salesGroups, intakeGroups] = await Promise.all([
-    prisma.salesInvoiceItem.groupBy({
-      by: ['productCode', 'productName'],
+  const [salesItems, intakeItems] = await Promise.all([
+    prisma.salesInvoiceItem.findMany({
       where: buildSalesItemWhere(period, filters, false),
-      _sum: { qty: true, amount: true },
-      _count: { id: true },
-      take: 200,
+      select: {
+        productCode: true,
+        productName: true,
+        qty: true,
+        amount: true,
+      },
+      take: 2000,
     }),
-    prisma.goodsIntakeItem.groupBy({
-      by: ['productName'],
+    prisma.goodsIntakeItem.findMany({
       where: buildGoodsIntakeWhere(period, filters, false),
-      _sum: { quantity: true, totalCost: true },
-      _count: { id: true },
-      take: 200,
+      select: {
+        productName: true,
+        quantity: true,
+        totalCost: true,
+        product: {
+          select: {
+            sourceCode: true,
+          },
+        },
+      },
+      take: 2000,
     }),
   ]);
 
   const map = new Map();
 
-  for (const row of salesGroups) {
+  // Aggregate sales
+  for (const row of salesItems) {
     const key = normalizeUpper(row.productCode || row.productName);
-    map.set(key, {
-      productCode: row.productCode,
-      productName: row.productName,
-      totalQtyIn: 0,
-      totalQtyOut: toNum(row._sum.qty),
-      totalSalesAmount: roundMoney(row._sum.amount),
-      movementCount: row._count.id || 0,
-    });
-  }
-
-  for (const row of intakeGroups) {
-    const key = normalizeUpper(row.productName);
     const existing = map.get(key) || {
-      productCode: null,
+      productCode: row.productCode,
       productName: row.productName,
       totalQtyIn: 0,
       totalQtyOut: 0,
       totalSalesAmount: 0,
       movementCount: 0,
     };
+    existing.totalQtyOut += toNum(row.qty);
+    existing.totalSalesAmount += roundMoney(row.amount);
+    existing.movementCount += 1;
+    map.set(key, existing);
+  }
 
-    existing.totalQtyIn += toNum(row._sum.quantity);
-    existing.movementCount += row._count.id || 0;
+  // Aggregate intakes
+  for (const row of intakeItems) {
+    const key = normalizeUpper(row.product?.sourceCode || row.productName);
+    const existing = map.get(key) || {
+      productCode: row.product?.sourceCode || null,
+      productName: row.productName,
+      totalQtyIn: 0,
+      totalQtyOut: 0,
+      totalSalesAmount: 0,
+      movementCount: 0,
+    };
+    existing.totalQtyIn += toNum(row.quantity);
+    existing.movementCount += 1;
     map.set(key, existing);
   }
 
@@ -317,9 +357,14 @@ async function getGroupedSummary(period, filters = {}) {
       totalQtyOut: toNum(row.totalQtyOut),
       netMovement: toNum(row.totalQtyIn - row.totalQtyOut),
     }))
-    .sort((a, b) => b.movementCount - a.movementCount);
+    .sort((a, b) => b.movementCount - a.movementCount)
+    .slice(0, 200);
 }
 
+/**
+ * Calculate opening balance using reconstructed method
+ * opening = currentStock - qtyInAfterStart + qtyOutAfterStart
+ */
 async function calculateOpeningBalance(period, filters = {}, currentProductStock = 0) {
   const [salesAfterStart, intakesAfterStart] = await Promise.all([
     prisma.salesInvoiceItem.aggregate({
@@ -335,50 +380,92 @@ async function calculateOpeningBalance(period, filters = {}, currentProductStock
   const totalOutAfterStart = toNum(salesAfterStart._sum.qty);
   const totalInAfterStart = toNum(intakesAfterStart._sum.quantity);
 
-  return toNum(Number(currentProductStock || 0) - totalInAfterStart + totalOutAfterStart);
+  const opening = Number(currentProductStock || 0) - totalInAfterStart + totalOutAfterStart;
+
+  return Number.isFinite(opening) ? toNum(opening) : 0;
 }
 
+/**
+ * Main function to get inventory activity ledger data
+ */
 async function getInventoryActivityLedgerData({ period, filters = {} }) {
   const hasProductFilter = Boolean(normalize(filters.productCode) || normalize(filters.productName));
+  const isAllLocations = !filters.locationId && !filters.locationCode;
 
+  // Summary mode - no product selected
   if (!hasProductFilter) {
-  return {
-    mode: 'summary',
-    summary: {},
-    products: [],
-    movements: [],
-    dataQuality: {
-      openingBalanceMethod: 'disabled_temporarily',
-      warning: 'Enter a product code or name to view inventory activity.',
-    },
-  };
-}
+    // For All Locations, warn about data quality
+    let dataQualityLevel = 'ok';
+    let dataQualityWarning = null;
 
-  const isAllLocations = !filters.locationId;
+    if (isAllLocations) {
+      dataQualityLevel = 'warning';
+      dataQualityWarning = 'Summary mode shows aggregated data across all locations. Select a specific location for accurate running balance.';
+    }
 
-const currentProduct = await findCurrentProduct(filters);
-const currentProductStock = isAllLocations
-  ? 0
-  : toNum(currentProduct?.stock || 0);
+    const products = await getGroupedSummary(period, filters);
 
+    return {
+      mode: 'summary',
+      summary: {},
+      products,
+      movements: [],
+      dataQuality: {
+        level: dataQualityLevel,
+        openingBalanceMethod: 'disabled',
+        warning: dataQualityWarning || 'Enter a product code or name to view inventory activity ledger.',
+      },
+    };
+  }
+
+  // Ledger mode - product selected
+  // Check location scope
+  if (isAllLocations) {
+    return {
+      mode: 'ledger',
+      summary: {},
+      products: [],
+      movements: [],
+      dataQuality: {
+        level: 'warning',
+        openingBalanceMethod: 'disabled',
+        warning: 'Select a specific location for accurate running balance. Stock is location-specific and cannot be combined.',
+      },
+    };
+  }
+
+  // Find current product for the specific location
+  const currentProduct = await findCurrentProduct(filters);
+  const currentProductStock = currentProduct ? toNum(currentProduct.stock || 0) : null;
+
+  // Get movements
   const [saleMovements, intakeMovements] = await Promise.all([
     getSaleMovements(period, filters),
     getIntakeMovements(period, filters),
   ]);
 
+  // Combine and filter movements
   let movements = [...saleMovements, ...intakeMovements]
     .filter((row) => {
       if (!filters.movementType) return true;
       return row.movementType === normalizeUpper(filters.movementType);
     })
-    .sort((a, b) => new Date(a.movementDate).getTime() - new Date(b.movementDate).getTime());
+    .sort((a, b) => {
+      const dateA = new Date(a.movementDate).getTime();
+      const dateB = new Date(b.movementDate).getTime();
+      return dateA - dateB;
+    });
 
-  const openingBalance = await calculateOpeningBalance(period, filters, currentProductStock);
+  // Calculate opening balance
+  const openingBalance = currentProductStock !== null
+    ? await calculateOpeningBalance(period, filters, currentProductStock)
+    : 0;
 
   let runningBalance = openingBalance;
   let totalQtyIn = 0;
   let totalQtyOut = 0;
 
+  // Calculate running balance for each movement
   movements = movements.map((movement) => {
     totalQtyIn += Number(movement.qtyIn || 0);
     totalQtyOut += Number(movement.qtyOut || 0);
@@ -392,29 +479,47 @@ const currentProductStock = isAllLocations
   });
 
   const calculatedClosingBalance = toNum(openingBalance + totalQtyIn - totalQtyOut);
-  const variance = toNum(currentProductStock - calculatedClosingBalance);
+  const variance = currentProductStock !== null
+    ? toNum(currentProductStock - calculatedClosingBalance)
+    : null;
+
+  // Build summary
+  const summary = {
+    productCode: normalize(filters.productCode) || currentProduct?.sourceCode || movements[0]?.productCode || null,
+    productName: normalize(filters.productName) || currentProduct?.name || movements[0]?.productName || null,
+    locationId: filters.locationId || currentProduct?.locationId || null,
+    locationCode: filters.locationCode || currentProduct?.locationCode || null,
+    branchCode: filters.branchCode || currentProduct?.branchCode || null,
+    openingBalance: toNum(openingBalance),
+    totalQtyIn: toNum(totalQtyIn),
+    totalQtyOut: toNum(totalQtyOut),
+    netMovement: toNum(totalQtyIn - totalQtyOut),
+    calculatedClosingBalance: toNum(calculatedClosingBalance),
+    currentProductStock,
+    variance,
+    movementCount: movements.length,
+  };
+
+  // Determine data quality
+  let dataQualityLevel = 'ok';
+  let dataQualityWarning = null;
+
+  if (currentProductStock === null) {
+    dataQualityLevel = 'warning';
+    dataQualityWarning = 'Current product stock not found for this location. Opening/closing balances may be inaccurate.';
+  } else {
+    dataQualityWarning = 'Opening balance is reconstructed from current product stock and synced movement data. Accuracy depends on latest POS stock sync.';
+  }
 
   return {
     mode: 'ledger',
-    summary: {
-      productCode: normalize(filters.productCode) || currentProduct?.sourceCode || movements[0]?.productCode || null,
-      productName: normalize(filters.productName) || currentProduct?.name || movements[0]?.productName || null,
-      locationId: filters.locationId || currentProduct?.locationId || null,
-      locationCode: filters.locationCode || currentProduct?.locationCode || null,
-      branchCode: filters.branchCode || currentProduct?.branchCode || null,
-      openingBalance,
-      totalQtyIn: toNum(totalQtyIn),
-      totalQtyOut: toNum(totalQtyOut),
-      netMovement: toNum(totalQtyIn - totalQtyOut),
-      calculatedClosingBalance,
-      currentProductStock,
-      variance,
-      movementCount: movements.length,
-    },
+    summary,
+    products: [],
     movements,
     dataQuality: {
+      level: dataQualityLevel,
       openingBalanceMethod: 'reconstructed_from_current_stock',
-      warning: 'Opening balance is reconstructed from current product stock and synced movement data. Accuracy depends on latest POS stock sync.',
+      warning: dataQualityWarning,
     },
   };
 }

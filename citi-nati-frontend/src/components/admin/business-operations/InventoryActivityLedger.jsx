@@ -37,6 +37,8 @@ const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) =
   const [productName, setProductName] = useState('');
   const [movementType, setMovementType] = useState('');
 
+  const isAllLocations = !selectedLocationId && !selectedLocationCode;
+
   const params = useMemo(() => {
     const next = {
       periodType,
@@ -81,13 +83,76 @@ const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) =
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLocationId, selectedLocationCode]);
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      fetchData();
+    }
+  };
+
+  const clearFilters = () => {
+    setProductCode('');
+    setProductName('');
+    setMovementType('');
+    setPeriodType('day');
+    setDate(today.toISOString().slice(0, 10));
+    setMonth(currentMonth);
+    setYear(currentYear);
+    setStartDate(today.toISOString().slice(0, 10));
+    setEndDate(today.toISOString().slice(0, 10));
+  };
+
+  const viewLedger = (row) => {
+    if (row.productCode) {
+      setProductCode(row.productCode);
+    } else {
+      setProductName(row.productName);
+    }
+    fetchData();
+  };
+
+  const exportCSV = () => {
+    if (!data) return;
+
+    const isLedgerMode = data?.mode === 'ledger';
+    const rows = isLedgerMode ? data?.movements || [] : data?.products || [];
+    
+    if (rows.length === 0) return;
+
+    let csvContent = '';
+    
+    if (isLedgerMode) {
+      csvContent = 'Time,Type,Reference,Cashier/Entered By,Product,Qty In,Qty Out,Running Balance,Amount,Location\n';
+      rows.forEach(m => {
+        csvContent += `"${formatDateTime(m.movementDate)}","${m.movementType}","${m.referenceNo || ''}","${m.cashierName || ''}","${m.productName || m.productCode || ''}",${m.qtyIn},${m.qtyOut},${m.runningBalance},${m.lineAmount},"${m.locationCode || ''}"\n`;
+      });
+    } else {
+      csvContent = 'Product Code,Product Name,Qty In,Qty Out,Net Movement,Sales Amount,Movements\n';
+      rows.forEach(row => {
+        csvContent += `"${row.productCode || ''}","${row.productName || ''}",${row.totalQtyIn},${row.totalQtyOut},${row.netMovement},${row.totalSalesAmount || 0},${row.movementCount}\n`;
+      });
+    }
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const fileName = `inventory-activity-${isLedgerMode ? 'ledger' : 'summary'}-${periodType}-${productCode || 'all-products'}-${selectedLocationCode || 'all-locations'}.csv`;
+    link.href = URL.createObjectURL(blob);
+    link.download = fileName;
+    link.click();
+  };
+
   const summary = data?.summary || {};
   const movements = data?.movements || [];
   const groupedProducts = data?.products || [];
   const isLedgerMode = data?.mode === 'ledger';
+  const dataQuality = data?.dataQuality || {};
+  const hasProductFilter = productCode.trim() || productName.trim();
+
+  // Show warning for All Locations in ledger mode
+  const showLocationWarning = isAllLocations && hasProductFilter && isLedgerMode;
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
+      {/* Header Card */}
       <div style={{ ...cardStyle, padding: '1.1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
           <div>
@@ -100,27 +165,46 @@ const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) =
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={fetchData}
-            disabled={loading}
-            style={{
-              border: 'none',
-              backgroundColor: '#5B4B8A',
-              color: '#fff',
-              borderRadius: '10px',
-              padding: '0.75rem 1rem',
-              fontWeight: 800,
-              cursor: loading ? 'not-allowed' : 'pointer',
-              alignSelf: 'start',
-            }}
-          >
-            <i className={`fas ${loading ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`} style={{ marginRight: '0.45rem' }} />
-            {loading ? 'Loading...' : 'Refresh'}
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem', alignSelf: 'start' }}>
+            <button
+              type="button"
+              onClick={exportCSV}
+              disabled={loading || (isLedgerMode ? movements.length === 0 : groupedProducts.length === 0)}
+              style={{
+                border: '1px solid #cbd5e1',
+                backgroundColor: '#fff',
+                color: '#475569',
+                borderRadius: '10px',
+                padding: '0.75rem 1rem',
+                fontWeight: 800,
+                cursor: (loading || (isLedgerMode ? movements.length === 0 : groupedProducts.length === 0)) ? 'not-allowed' : 'pointer',
+              }}
+            >
+              <i className="fas fa-download" style={{ marginRight: '0.45rem' }} />
+              Export CSV
+            </button>
+            <button
+              type="button"
+              onClick={fetchData}
+              disabled={loading}
+              style={{
+                border: 'none',
+                backgroundColor: '#5B4B8A',
+                color: '#fff',
+                borderRadius: '10px',
+                padding: '0.75rem 1rem',
+                fontWeight: 800,
+                cursor: loading ? 'not-allowed' : 'pointer',
+              }}
+            >
+              <i className={`fas ${loading ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`} style={{ marginRight: '0.45rem' }} />
+              {loading ? 'Loading...' : 'Refresh'}
+            </button>
+          </div>
         </div>
       </div>
 
+      {/* Filters Card */}
       <div style={{ ...cardStyle, padding: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem' }}>
         <div>
           <label style={labelStyle}>Period</label>
@@ -174,12 +258,24 @@ const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) =
 
         <div>
           <label style={labelStyle}>Product Code</label>
-          <input value={productCode} onChange={(e) => setProductCode(e.target.value)} placeholder="e.g. 705632476345" style={inputStyle} />
+          <input 
+            value={productCode} 
+            onChange={(e) => setProductCode(e.target.value)} 
+            onKeyDown={handleKeyDown}
+            placeholder="e.g. 705632476345" 
+            style={inputStyle} 
+          />
         </div>
 
         <div>
           <label style={labelStyle}>Product Name</label>
-          <input value={productName} onChange={(e) => setProductName(e.target.value)} placeholder="Search product name" style={inputStyle} />
+          <input 
+            value={productName} 
+            onChange={(e) => setProductName(e.target.value)} 
+            onKeyDown={handleKeyDown}
+            placeholder="Search product name" 
+            style={inputStyle} 
+          />
         </div>
 
         <div>
@@ -190,96 +286,196 @@ const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) =
             <option value="STOCK_INTAKE">Stock Intake Only</option>
           </select>
         </div>
+
+        <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+          <button
+            type="button"
+            onClick={clearFilters}
+            style={{
+              border: '1px solid #cbd5e1',
+              backgroundColor: '#fff',
+              color: '#475569',
+              borderRadius: '10px',
+              padding: '0.72rem 0.85rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              width: '100%',
+            }}
+          >
+            <i className="fas fa-times" style={{ marginRight: '0.45rem' }} />
+            Clear Filters
+          </button>
+        </div>
       </div>
 
+      {/* Error Banner */}
       {error && (
         <div style={{ ...cardStyle, padding: '0.9rem 1rem', color: '#b91c1c', backgroundColor: '#fff1f2', borderColor: '#fecaca' }}>
           {error}
         </div>
       )}
 
-      {summary && (
+      {/* Data Quality Warning */}
+      {dataQuality.warning && (
+        <div style={{ 
+          ...cardStyle, 
+          padding: '0.9rem 1rem', 
+          color: dataQuality.level === 'danger' ? '#b91c1c' : '#92400e', 
+          backgroundColor: dataQuality.level === 'danger' ? '#fef2f2' : '#fffbeb', 
+          borderColor: dataQuality.level === 'danger' ? '#fecaca' : '#fde68a' 
+        }}>
+          <i className="fas fa-exclamation-triangle" style={{ marginRight: '0.45rem' }} />
+          {dataQuality.warning}
+        </div>
+      )}
+
+      {/* Location Warning */}
+      {showLocationWarning && (
+        <div style={{ ...cardStyle, padding: '0.9rem 1rem', color: '#92400e', backgroundColor: '#fffbeb', borderColor: '#fde68a' }}>
+          <i className="fas fa-exclamation-triangle" style={{ marginRight: '0.45rem' }} />
+          Select a specific location for accurate running balance. Stock is location-specific and cannot be combined.
+        </div>
+      )}
+
+      {/* KPI Cards - Only show in ledger mode */}
+      {isLedgerMode && hasProductFilter && !showLocationWarning && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem' }}>
           <Kpi label="Opening Stock" value={summary.openingBalance ?? '-'} />
           <Kpi label="Qty In" value={summary.totalQtyIn ?? 0} />
           <Kpi label="Qty Out" value={summary.totalQtyOut ?? 0} />
           <Kpi label="Closing Stock" value={summary.calculatedClosingBalance ?? '-'} />
           <Kpi label="Current POS Stock" value={summary.currentProductStock ?? '-'} />
-          <Kpi label="Variance" value={summary.variance ?? '-'} danger={Number(summary.variance || 0) !== 0} />
+          <Kpi label="Variance" value={summary.variance ?? '-'} danger={summary.variance !== null && Number(summary.variance) !== 0} />
         </div>
       )}
 
+      {/* Table Card */}
       <div style={{ ...cardStyle, overflow: 'hidden' }}>
-        <div style={{ padding: '0.9rem 1rem', borderBottom: '1px solid #e2e8f0' }}>
-          <strong style={{ color: '#0f172a' }}>
-            {isLedgerMode ? 'Stock Movement Ledger' : 'Product Movement Summary'}
-          </strong>
-          <p style={{ margin: '0.25rem 0 0', color: '#64748b', fontSize: '0.82rem' }}>
-            {isLedgerMode ? 'Invoice-by-invoice and intake-by-intake stock activity.' : 'Select a product code or name to view full running balance ledger.'}
-          </p>
+        <div style={{ padding: '0.9rem 1rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <strong style={{ color: '#0f172a' }}>
+              {isLedgerMode ? 'Stock Movement Ledger' : 'Product Movement Summary'}
+            </strong>
+            <p style={{ margin: '0.25rem 0 0', color: '#64748b', fontSize: '0.82rem' }}>
+              {isLedgerMode 
+                ? 'Invoice-by-invoice and intake-by-intake stock activity.' 
+                : 'Select a product code or name to view full running balance ledger.'}
+            </p>
+          </div>
+          {isAllLocations && !hasProductFilter && (
+            <span style={{ fontSize: '0.75rem', color: '#92400e', backgroundColor: '#fffbeb', padding: '0.25rem 0.5rem', borderRadius: '4px' }}>
+              All Locations Mode
+            </span>
+          )}
         </div>
 
         <div style={{ overflowX: 'auto' }}>
-          {isLedgerMode ? (
-            <table style={tableStyle}>
-              <thead>
-                <tr>
-                  <Th>Time</Th>
-                  <Th>Type</Th>
-                  <Th>Reference</Th>
-                  <Th>Cashier / Entered By</Th>
-                  <Th>Product</Th>
-                  <Th align="right">Qty In</Th>
-                  <Th align="right">Qty Out</Th>
-                  <Th align="right">Balance</Th>
-                  <Th align="right">Amount</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {movements.length === 0 ? (
-                  <tr><Td colSpan={9}>No stock movement found for this selection.</Td></tr>
-                ) : movements.map((m, index) => (
-                  <tr key={`${m.referenceNo || 'movement'}-${index}`}>
-                    <Td>{formatDateTime(m.movementDate)}</Td>
-                    <Td><MovementBadge type={m.movementType} /></Td>
-                    <Td>{m.referenceNo || '-'}</Td>
-                    <Td>{m.cashierName || '-'}</Td>
-                    <Td>{m.productName || m.productCode || '-'}</Td>
-                    <Td align="right">{m.qtyIn}</Td>
-                    <Td align="right">{m.qtyOut}</Td>
-                    <Td align="right"><strong>{m.runningBalance}</strong></Td>
-                    <Td align="right">{money(m.lineAmount)}</Td>
+          {loading ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>
+              <i className="fas fa-spinner fa-spin" style={{ marginRight: '0.5rem' }} />
+              Loading inventory activity...
+            </div>
+          ) : isLedgerMode ? (
+            movements.length === 0 ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>
+                <i className="fas fa-box-open" style={{ fontSize: '2rem', marginBottom: '0.5rem', display: 'block' }} />
+                No stock movement found for this selection.
+                {isAllLocations && (
+                  <p style={{ marginTop: '0.5rem', fontSize: '0.82rem' }}>
+                    Select a specific location to view accurate running balance.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <table style={tableStyle}>
+                <thead>
+                  <tr>
+                    <Th>Time</Th>
+                    <Th>Type</Th>
+                    <Th>Reference</Th>
+                    <Th>Cashier / Entered By</Th>
+                    <Th>Product</Th>
+                    <Th align="right">Qty In</Th>
+                    <Th align="right">Qty Out</Th>
+                    <Th align="right">Balance</Th>
+                    <Th align="right">Amount</Th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {movements.map((m, index) => (
+                    <tr key={`${m.referenceNo || 'movement'}-${index}`}>
+                      <Td>{formatDateTime(m.movementDate)}</Td>
+                      <Td><MovementBadge type={m.movementType} /></Td>
+                      <Td>{m.referenceNo || '-'}</Td>
+                      <Td>{m.cashierName || '-'}</Td>
+                      <Td>{m.productName || m.productCode || '-'}</Td>
+                      <Td align="right">{m.qtyIn}</Td>
+                      <Td align="right">{m.qtyOut}</Td>
+                      <Td align="right"><strong>{m.runningBalance}</strong></Td>
+                      <Td align="right">{money(m.lineAmount)}</Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
           ) : (
-            <table style={tableStyle}>
-              <thead>
-                <tr>
-                  <Th>Product Code</Th>
-                  <Th>Product Name</Th>
-                  <Th align="right">Qty In</Th>
-                  <Th align="right">Qty Out</Th>
-                  <Th align="right">Net Movement</Th>
-                  <Th align="right">Movements</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {groupedProducts.length === 0 ? (
-                  <tr><Td colSpan={6}>No inventory activity found for this period.</Td></tr>
-                ) : groupedProducts.map((row, index) => (
-                  <tr key={`${row.productCode || row.productName}-${index}`}>
-                    <Td>{row.productCode || '-'}</Td>
-                    <Td>{row.productName || '-'}</Td>
-                    <Td align="right">{row.totalQtyIn}</Td>
-                    <Td align="right">{row.totalQtyOut}</Td>
-                    <Td align="right">{row.netMovement}</Td>
-                    <Td align="right">{row.movementCount}</Td>
+            groupedProducts.length === 0 ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>
+                <i className="fas fa-box-open" style={{ fontSize: '2rem', marginBottom: '0.5rem', display: 'block' }} />
+                No inventory activity found for this period.
+                <p style={{ marginTop: '0.5rem', fontSize: '0.82rem' }}>
+                  Try adjusting your date range or filters.
+                </p>
+              </div>
+            ) : (
+              <table style={tableStyle}>
+                <thead>
+                  <tr>
+                    <Th>Product Code</Th>
+                    <Th>Product Name</Th>
+                    <Th align="right">Qty In</Th>
+                    <Th align="right">Qty Out</Th>
+                    <Th align="right">Net Movement</Th>
+                    <Th align="right">Sales Amount</Th>
+                    <Th align="right">Movements</Th>
+                    <Th>Action</Th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {groupedProducts.map((row, index) => (
+                    <tr key={`${row.productCode || row.productName}-${index}`}>
+                      <Td>{row.productCode || '-'}</Td>
+                      <Td>{row.productName || '-'}</Td>
+                      <Td align="right">{row.totalQtyIn}</Td>
+                      <Td align="right">{row.totalQtyOut}</Td>
+                      <Td align="right" style={{ color: row.netMovement > 0 ? '#166534' : row.netMovement < 0 ? '#b91c1c' : '#0f172a' }}>
+                        {row.netMovement > 0 ? '+' : ''}{row.netMovement}
+                      </Td>
+                      <Td align="right">{money(row.totalSalesAmount)}</Td>
+                      <Td align="right">{row.movementCount}</Td>
+                      <Td>
+                        <button
+                          type="button"
+                          onClick={() => viewLedger(row)}
+                          style={{
+                            border: 'none',
+                            backgroundColor: '#5B4B8A',
+                            color: '#fff',
+                            borderRadius: '6px',
+                            padding: '0.35rem 0.65rem',
+                            fontSize: '0.75rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          View Ledger
+                        </button>
+                      </Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
           )}
         </div>
       </div>
