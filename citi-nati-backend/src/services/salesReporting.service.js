@@ -733,27 +733,55 @@ async function queryLatestCostProfitAnalytics(itemWhere, filters = {}) {
 
   // Fetch expense data for the same period and scope
   let totalExpenses = 0;
-  try {
-    const expenseWhere = buildExpenseWhere(itemWhere, filters);
-    if (expenseWhere) {
-      const expenseAgg = await prisma.expense.aggregate({
-        where: expenseWhere,
-        _sum: { amount: true },
-      });
-      totalExpenses = roundMoney(toNum(expenseAgg._sum.amount));
-    }
-  } catch (expenseErr) {
-    console.warn('[REPORTING] Failed to fetch expense data for profit analytics:', expenseErr.message);
+let payrollExpenses = 0;
+
+try {
+  // 1. Operating Expenses
+  const expenseWhere = buildExpenseWhere(itemWhere, filters);
+  if (expenseWhere) {
+    const expenseAgg = await prisma.expense.aggregate({
+      where: expenseWhere,
+      _sum: { amount: true },
+    });
+    totalExpenses = roundMoney(toNum(expenseAgg._sum.amount));
   }
 
-  summary.totalExpenses = totalExpenses;
+  // 2. Payroll Expenses (Net Pay)
+  const dateRange =
+    itemWhere?.salesInvoice?.invoiceDate ||
+    itemWhere?.salesInvoice?.AND?.find(c => c.invoiceDate)?.invoiceDate;
+
+  if (dateRange) {
+    const payrollAgg = await prisma.payrollEntry.aggregate({
+      where: {
+        createdAt: {
+          gte: dateRange.gte,
+          lte: dateRange.lte,
+        },
+      },
+      _sum: { netPay: true },
+    });
+
+    payrollExpenses = roundMoney(toNum(payrollAgg._sum.netPay));
+  }
+
+} catch (err) {
+  console.warn('[REPORTING] Failed to fetch expense/payroll data:', err.message);
+}
+
+// FINAL TOTAL EXPENSES
+const combinedExpenses = totalExpenses + payrollExpenses;
+
+  summary.totalExpenses = combinedExpenses;
+  summary.payrollExpenses = payrollExpenses;
+  summary.operatingExpenses = totalExpenses;
   summary.expenseRatio = summary.totalRevenue > 0
     ? roundMoney((totalExpenses / summary.totalRevenue) * 100)
     : 0;
-  summary.netProfit = roundMoney(summary.totalGrossProfit - totalExpenses);
+  summary.netProfit = roundMoney(summary.totalGrossProfit - combinedExpenses);
   summary.netProfitMargin = summary.totalRevenue > 0
-    ? roundMoney(((summary.totalGrossProfit - totalExpenses) / summary.totalRevenue) * 100)
-    : null;
+  ? roundMoney(((summary.totalGrossProfit - combinedExpenses) / summary.totalRevenue) * 100)
+  : null;
 
   const categoryMap = new Map();
   for (const row of branchScopedProducts) {
