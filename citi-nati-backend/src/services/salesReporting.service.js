@@ -46,39 +46,24 @@ function buildExpenseWhere(itemWhere, filters = {}) {
   const invoiceWhere = itemWhere.salesInvoice;
   const expenseWhere = {};
 
-  // Extract date range from invoice where clause
-  if (invoiceWhere.invoiceDate) {
-    if (invoiceWhere.invoiceDate.gte) {
-      expenseWhere.date = { gte: invoiceWhere.invoiceDate.gte };
-    }
-    if (invoiceWhere.invoiceDate.lte) {
-      if (!expenseWhere.date) expenseWhere.date = {};
-      expenseWhere.date.lte = invoiceWhere.invoiceDate.lte;
-    }
+  // Extract correct date range (handle AND conditions too)
+  const dateRange =
+    invoiceWhere.invoiceDate ||
+    invoiceWhere.AND?.find((condition) => condition.invoiceDate)?.invoiceDate;
+
+  if (dateRange) {
+    expenseWhere.expenseDate = {};
+    if (dateRange.gte) expenseWhere.expenseDate.gte = dateRange.gte;
+    if (dateRange.lte) expenseWhere.expenseDate.lte = dateRange.lte;
   }
 
-  // Extract branch/location filters
-  if (invoiceWhere.branchCode) {
-    expenseWhere.branchCode = invoiceWhere.branchCode;
-  }
-  if (invoiceWhere.locationCode) {
-    expenseWhere.locationCode = invoiceWhere.locationCode;
-  }
-  if (invoiceWhere.locationId) {
-    expenseWhere.locationId = invoiceWhere.locationId;
-  }
-
-  // Apply additional filters from the filters object
-  if (filters.branchCode) {
-    expenseWhere.branchCode = filters.branchCode;
-  }
-  if (filters.locationCode) {
-    expenseWhere.locationCode = filters.locationCode;
+  // STRICT location-based filtering (matches your system design)
+  if (filters.locationId) {
+    expenseWhere.locationId = Number(filters.locationId);
   }
 
   return Object.keys(expenseWhere).length > 0 ? expenseWhere : null;
 }
-
 // ---------------------------------------------------------------------------
 // 1. Sales Summary
 // ---------------------------------------------------------------------------
