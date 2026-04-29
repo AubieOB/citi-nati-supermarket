@@ -137,7 +137,24 @@ const Register = () => {
     <div className="auth-page">
       <Container>
         <div className="auth-page__container">
-          <h1 className="auth-page__title">Create Account</h1>
+  <Link
+    to="/"
+    style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '0.35rem',
+      marginBottom: '1rem',
+      color: '#5B4B8A',
+      textDecoration: 'none',
+      fontWeight: 700,
+      fontSize: '0.9rem',
+    }}
+  >
+    <i className="fas fa-arrow-left"></i>
+    Back to Home
+  </Link>
+
+  <h1 className="auth-page__title">Create Account</h1>
           <p className="auth-page__subtitle">Join Citi-Nati today and start shopping</p>
 
           {error && (
