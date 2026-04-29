@@ -137,24 +137,7 @@ const Register = () => {
     <div className="auth-page">
       <Container>
         <div className="auth-page__container">
-  <Link
-    to="/"
-    style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: '0.35rem',
-      marginBottom: '1rem',
-      color: '#5B4B8A',
-      textDecoration: 'none',
-      fontWeight: 700,
-      fontSize: '0.9rem',
-    }}
-  >
-    <i className="fas fa-arrow-left"></i>
-    Back to Home
-  </Link>
-
-  <h1 className="auth-page__title">Create Account</h1>
+        <h1 className="auth-page__title">Create Account</h1>
           <p className="auth-page__subtitle">Join Citi-Nati today and start shopping</p>
 
           {error && (
@@ -398,6 +381,22 @@ const Register = () => {
           </div>
         </div>
       </Container>
+            <div style={{
+        textAlign: 'center',
+        marginTop: '1.5rem',
+      }}>
+        <Link
+          to="/"
+          style={{
+            color: '#64748b',
+            textDecoration: 'none',
+            fontSize: '0.85rem',
+            fontWeight: '600',
+          }}
+        >
+          ← Back to Home
+        </Link>
+      </div>
     </div>
   );
 };

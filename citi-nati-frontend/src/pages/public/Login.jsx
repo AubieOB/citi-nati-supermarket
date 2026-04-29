@@ -114,8 +114,8 @@ const Login = () => {
   return (
     <div className="auth-page">
       <Container>
-        <div className="auth-page__container">
-          <h1 className="auth-page__title">Login</h1>
+       <div className="auth-page__container">
+  <h1 className="auth-page__title">Login</h1>
           <p className="auth-page__subtitle">Welcome back! Sign in to your account</p>
 
           {error && (
