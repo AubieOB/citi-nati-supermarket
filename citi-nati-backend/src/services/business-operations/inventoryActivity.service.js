@@ -83,7 +83,7 @@ function buildLocationFilter(filters = {}) {
  * Get sales movements for a period and location
  */
 async function getSaleMovements(period, filters = {}) {
-  const locationFilter = buildLocationFilter(filters);
+
   const productFilter = filters.productCode || filters.productName ? {
     OR: [
       { productCode: { contains: filters.productCode || '', mode: 'insensitive' } },
@@ -91,13 +91,21 @@ async function getSaleMovements(period, filters = {}) {
     ]
   } : {};
 
+  // Build salesInvoice filter with location scoping
+  const salesInvoiceFilter = {
+    invoiceDate: { gte: period.startDate, lte: period.endDate },
+    status: { not: 'draft' },
+  };
+  if (filters.locationId) {
+    salesInvoiceFilter.locationId = Number(filters.locationId);
+  }
+  if (filters.locationCode) {
+    salesInvoiceFilter.locationCode = normalizeUpper(filters.locationCode);
+  }
+
   const where = {
-    ...locationFilter,
     ...productFilter,
-    salesInvoice: {
-      invoiceDate: { gte: period.startDate, lte: period.endDate },
-      status: { not: 'draft' },
-    },
+    salesInvoice: salesInvoiceFilter,
   };
 
   const rows = await prisma.salesInvoiceItem.findMany({
