@@ -93,9 +93,8 @@ async function getSaleMovements(period, filters = {}) {
 
   // Build salesInvoice filter with location scoping
   const salesInvoiceFilter = {
-    invoiceDate: { gte: period.startDate, lte: period.endDate },
-    status: { not: 'draft' },
-  };
+  invoiceDate: { gte: period.startDate, lte: period.endDate },
+};
   if (filters.locationId) {
     salesInvoiceFilter.locationId = Number(filters.locationId);
   }
@@ -224,9 +223,8 @@ async function getProductSummary(period, filters = {}) {
       where: {
         ...locationFilter,
         salesInvoice: {
-          invoiceDate: { gte: period.startDate, lte: period.endDate },
-          status: { not: 'draft' },
-        },
+  invoiceDate: { gte: period.startDate, lte: period.endDate },
+},
       },
       select: {
         productCode: true,
