@@ -269,11 +269,11 @@ const Login = () => {
             Don't have an account?{' '}
             <Link to="/register">Register here</Link>
           </div>
+          <div className="auth-page__footer-link">
+            <Link to="/" className="auth-page__back-link">← Back to Home</Link>
+          </div>
         </div>
       </Container>
-      <div className="auth-page__footer-link">
-        <Link to="/" className="auth-page__back-link">← Back to Home</Link>
-      </div>
     </div>
   );
 };
