@@ -10,17 +10,20 @@ const Layout = ({ children }) => {
   
   // Hide header only on products page and admin/driver dashboards
   const hideHeader = location.pathname.startsWith('/admin') || 
-                     location.pathname.startsWith('/driver') ||
-                     location.pathname.startsWith('/cashier') ||
-                     location.pathname === '/products' ||
-                     location.pathname === '/maintenance' ||
-                     location.pathname === '/admin-login';
+                   location.pathname.startsWith('/driver') ||
+                   location.pathname.startsWith('/cashier') ||
+                   location.pathname === '/products' ||
+                   location.pathname === '/maintenance' ||
+                   location.pathname === '/admin-login' ||
+                   location.pathname === '/login' ||
+                   location.pathname === '/register';
   const hideFooter = location.pathname.startsWith('/admin') ||
-                     location.pathname.startsWith('/driver') ||
-                     location.pathname.startsWith('/cashier') ||
-                     location.pathname === '/maintenance' ||
-                     location.pathname === '/admin-login';
-
+                   location.pathname.startsWith('/driver') ||
+                   location.pathname.startsWith('/cashier') ||
+                   location.pathname === '/maintenance' ||
+                   location.pathname === '/admin-login' ||
+                   location.pathname === '/login' ||
+                   location.pathname === '/register';
   return (
     <div className={`layout${hideHeader ? ' layout--no-header' : ''}`}>
       {!hideHeader && (

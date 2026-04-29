@@ -44,7 +44,13 @@ const TABS = [
   { id: 'report-history', label: 'Report History', icon: 'fa-clock-rotate-left', permission: PERMISSION_KEYS.BO_REPORT_HISTORY_VIEW },
   { id: 'sales-balancing', label: 'Sales Balancing', icon: 'fa-scale-balanced', permission: PERMISSION_KEYS.BO_SALES_BALANCING_VIEW },
   { id: 'analytics-performance', label: 'Analytics', icon: 'fa-chart-line', permission: PERMISSION_KEYS.BO_ANALYTICS_VIEW },
-  { id: 'inventory-activity', label: 'Inventory Activity', icon: 'fa-box', permission: PERMISSION_KEYS.BO_INVENTORY_ACTIVITY_VIEW },
+  {
+    id: 'inventory-activity',
+    label: 'Inventory Activity',
+    icon: 'fa-box',
+    permission: PERMISSION_KEYS.BO_ANALYTICS_VIEW,
+    disabled: true,
+},
   { id: 'actions', label: 'Actions', icon: 'fa-triangle-exclamation', permission: PERMISSION_KEYS.BO_ACTIONS_VIEW },
 ];
 
@@ -236,11 +242,7 @@ const AdminBusinessOperations = () => {
     'report-history': <ReportHistoryTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} onNavigateTab={handleNavigateTab} />,
     'sales-balancing': <SalesBalancingTab selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} selectedLocationName={selectedLocationName} />,
     'analytics-performance': <BusinessAnalyticsTab selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode} locations={locations} />,
-    'inventory-activity': (
-  <InventoryActivityLedger
-    selectedLocationId={selectedLocationIdNumber}
-    selectedLocationCode={selectedLocationCode}
-  />
+    'inventory-activity': (<InventoryActivityLedger selectedLocationId={selectedLocationIdNumber} selectedLocationCode={selectedLocationCode}/>
 ),
     actions: <BusinessOperationsActionsTab permissions={actionsPermissions} />,
   };
