@@ -137,7 +137,7 @@ const Register = () => {
     <div className="auth-page">
       <Container>
         <div className="auth-page__container">
-          <h1 className="auth-page__title">Create Account</h1>
+      <h1 className="auth-page__title">Create Account</h1>
           <p className="auth-page__subtitle">Join Citi-Nati today and start shopping</p>
 
           {error && (
@@ -381,6 +381,9 @@ const Register = () => {
           </div>
         </div>
       </Container>
+      <div className="auth-page__footer-link">
+        <Link to="/" className="auth-page__back-link">← Back to Home</Link>
+      </div>
     </div>
   );
 };

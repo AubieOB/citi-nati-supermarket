@@ -1098,6 +1098,21 @@ body.menu-open {
   font-weight: 600;
 }
 
+.auth-page__footer-link {
+  margin-top: 1.5rem;
+  text-align: center;
+}
+
+.auth-page__back-link {
+  color: #2D8659;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.auth-page__back-link:hover {
+  text-decoration: underline;
+}
+
 @media (max-width: 600px) {
   .form {
     padding: 1.5rem;
