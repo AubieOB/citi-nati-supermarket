@@ -63,7 +63,7 @@ const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) =
   const debouncedProductCode = useDebounce(modalProductCode, 400);
   const debouncedProductName = useDebounce(modalProductName, 400);
 
-  const isAllLocations = !selectedLocationId && !selectedLocationCode;
+  const isAllLocations = (String(selectedLocationId || '') === 'all' || !selectedLocationId) && !selectedLocationCode;
 
   const modalFilters = useMemo(() => ({
     periodType: modalPeriodType,
@@ -72,12 +72,12 @@ const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) =
     year: modalYear,
     startDate: modalStartDate,
     endDate: modalEndDate,
-    locationId: selectedLocationId || undefined,
-    locationCode: selectedLocationCode || undefined,
+    locationId: isAllLocations ? undefined : (selectedLocationId ? Number(selectedLocationId) : undefined),
+    locationCode: isAllLocations ? undefined : (selectedLocationCode || undefined),
     productCode: debouncedProductCode.trim() || undefined,
     productName: debouncedProductName.trim() || undefined,
     movementType: modalMovementType || undefined,
-  }), [modalPeriodType, modalDate, modalMonth, modalYear, modalStartDate, modalEndDate, selectedLocationId, selectedLocationCode, debouncedProductCode, debouncedProductName, modalMovementType]);
+  }), [modalPeriodType, modalDate, modalMonth, modalYear, modalStartDate, modalEndDate, selectedLocationId, selectedLocationCode, debouncedProductCode, debouncedProductName, modalMovementType, isAllLocations]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -104,7 +104,7 @@ const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) =
     if (activeModal) {
       fetchData();
     }
-  }, [activeModal, debouncedProductCode, debouncedProductName]);
+  }, [activeModal, fetchData, modalPeriodType, modalDate, modalMonth, modalYear, modalStartDate, modalEndDate]);
 
   const closeModal = () => {
     setActiveModal(null);

@@ -49,8 +49,7 @@ const TABS = [
     label: 'Inventory Activity',
     icon: 'fa-box',
     permission: PERMISSION_KEYS.BO_ANALYTICS_VIEW,
-    disabled: true,
-},
+  },
   { id: 'actions', label: 'Actions', icon: 'fa-triangle-exclamation', permission: PERMISSION_KEYS.BO_ACTIONS_VIEW },
 ];
 
