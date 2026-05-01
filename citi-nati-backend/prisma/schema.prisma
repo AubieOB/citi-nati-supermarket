@@ -652,7 +652,7 @@ model SalesInvoice {
   updatedAt           DateTime           @updatedAt @map("updated_at")
   items               SalesInvoiceItem[]
 
-  @@unique([syncSourceCode, sourceInvoiceNo])
+  @@unique([syncSourceCode, sourceInvoiceNo, locationCode])
   @@index([syncSourceCode])
   @@index([sourceInvoiceNo])
   @@index([invoiceDate])

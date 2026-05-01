@@ -9,6 +9,7 @@ const { receiveSuppliersFromPos } = require('../controllers/supplierPosSync.cont
 const { requireTrustedAgent } = require('../middleware/agentAuth.middleware');
 
 const router = express.Router();
+const { backfillSales } = require('../controllers/posAgentBackfill.controller');
 
 router.use(requireTrustedAgent);
 

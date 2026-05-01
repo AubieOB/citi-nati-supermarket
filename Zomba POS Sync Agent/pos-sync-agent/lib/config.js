@@ -152,6 +152,15 @@ function buildConfig() {
     deltaStateDir: normalizeString(process.env.DELTA_STATE_DIR, './.sync-state'),
   };
 
+  // Historical sales backfill configuration
+  config.backfill = {
+    enabled: parseBoolean(process.env.BACKFILL_SALES_ENABLED, false),
+    fromDate: normalizeString(process.env.BACKFILL_SALES_FROM, null),
+    toDate: normalizeString(process.env.BACKFILL_SALES_TO, null),
+    batchSize: parseInteger(process.env.BACKFILL_BATCH_SIZE, 100),
+    backendEndpoint: normalizeString(process.env.BACKFILL_SALES_ENDPOINT, '/api/pos-agent/sales/backfill'),
+  };
+
   return config;
 }
 

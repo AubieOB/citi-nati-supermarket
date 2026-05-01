@@ -138,7 +138,14 @@ function buildConfig() {
     latestCostSyncIntervalMs: parseInteger(process.env.REPORTING_LATEST_COST_INTERVAL_MS, 300000),
     limitToRecentDays: parseNonNegativeInteger(process.env.REPORTING_LIMIT_TO_RECENT_DAYS, 0),
   };
-
+  // Historical sales backfill configuration
+  config.backfill = {
+    enabled: parseBoolean(process.env.BACKFILL_SALES_ENABLED, false),
+    fromDate: normalizeString(process.env.BACKFILL_SALES_FROM, null),
+    toDate: normalizeString(process.env.BACKFILL_SALES_TO, null),
+    batchSize: parseInteger(process.env.BACKFILL_BATCH_SIZE, 100),
+    backendEndpoint: normalizeString(process.env.BACKFILL_SALES_ENDPOINT, '/api/pos-agent/sales/backfill'),
+  };
   return config;
 }
 
