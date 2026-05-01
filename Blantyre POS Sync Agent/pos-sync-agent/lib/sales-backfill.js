@@ -78,6 +78,7 @@ class SalesBackfillService {
 
       const query = `
         SELECT TOP (@batchSize)
+            InvoiceCode,
             InvoiceNo,
             InvoiceSerialNo,
             RefNo,
@@ -205,6 +206,7 @@ class SalesBackfillService {
     const invoiceSubLocation = getSubLocationByCode(row.LocationCode);
 
     return {
+      invoiceCode: Number(row.InvoiceCode),
       invoiceNo: Number(row.InvoiceNo),
       invoiceSerialNo: Number(row.InvoiceSerialNo),
       refNo: row.RefNo || null,
@@ -297,7 +299,7 @@ class SalesBackfillService {
     const payload = {
       invoices: invoices.map((inv) => ({
         ...inv,
-        details: detailsMap[inv.invoiceNo] || [],
+        details: detailsMap[inv.invoiceCode] || [],
       })),
       metadata: getSyncMetadata(this.config, {
         backfillMode: true,

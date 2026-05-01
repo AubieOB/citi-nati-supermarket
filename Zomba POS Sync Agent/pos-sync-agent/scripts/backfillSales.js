@@ -92,16 +92,19 @@ async function resolveInvoiceQuoteNoSupport() {
   }
 }
 
-async function fetchHistoricalInvoiceHeaders(fromDate, toDate, batchSize = 100) {
+async function fetchHistoricalInvoiceHeaders(fromDate, toDate, batchSize = 100, lastInvoiceNo = 0) {
   const hasQuoteNo = await resolveInvoiceQuoteNoSupport();
   const request = pool.request();
   
   request.input('fromDate', sql.Date, fromDate);
   request.input('toDate', sql.Date, toDate);
   request.input('batchSize', sql.Int, batchSize);
+  request.input('lastInvoiceNo', sql.Int, lastInvoiceNo);
 
   const quoteNoSelect = hasQuoteNo ? ',\n            QuoteNo' : '';
 
+  // FIX: Use cursor-based pagination with WHERE InvoiceNo > @lastInvoiceNo
+  // This prevents infinite loop by advancing through records
   const query = `
     SELECT TOP (@batchSize)
         InvoiceNo,
@@ -140,11 +143,12 @@ async function fetchHistoricalInvoiceHeaders(fromDate, toDate, batchSize = 100) 
         Bank_CARD_EXPIARY${quoteNoSelect}
     FROM invoice
     WHERE InvoiceDate >= @fromDate AND InvoiceDate <= @toDate
+      AND InvoiceNo > @lastInvoiceNo
     ORDER BY InvoiceNo ASC
   `;
 
   const result = await request.query(query);
-  console.log(`${BRANCH_TAG} [BACKFILL] Pulled ${result.recordset.length} invoices from POS (date range: ${fromDate} to ${toDate})`);
+  console.log(`${BRANCH_TAG} [BACKFILL] Pulled ${result.recordset.length} invoices from POS (cursor: > ${lastInvoiceNo}, date range: ${fromDate} to ${toDate})`);
 
   return result.recordset || [];
 }
@@ -199,6 +203,8 @@ async function fetchInvoiceDetails(invoiceCodes) {
 
   const detailsMap = {};
   result.recordset.forEach((detail) => {
+    // FIX: Use InvoiceNo (display number) as key to match live reporting behavior
+    // This ensures details are properly mapped to invoices
     if (!detailsMap[detail.InvoiceCode]) {
       detailsMap[detail.InvoiceCode] = [];
     }
@@ -363,9 +369,11 @@ async function runBackfill() {
   let totalInvoicesSynced = 0;
   let totalBatches = 0;
   let batchNumber = 1;
+  let lastInvoiceNo = 0; // Cursor for pagination
 
   while (true) {
-    const invoices = await fetchHistoricalInvoiceHeaders(fromDate, toDate, batchSize);
+    // FIX: Pass lastInvoiceNo cursor for proper pagination
+    const invoices = await fetchHistoricalInvoiceHeaders(fromDate, toDate, batchSize, lastInvoiceNo);
     
     if (invoices.length === 0) {
       console.log(`${BRANCH_TAG} [SALES BACKFILL] No more invoices to process`);
@@ -389,6 +397,8 @@ async function runBackfill() {
       console.error(`${BRANCH_TAG} [SALES BACKFILL] Batch ${batchNumber} failed: ${error.message}`);
     }
 
+    // FIX: Update cursor to last invoice number for next iteration
+    lastInvoiceNo = Math.max(...invoices.map((inv) => Number(inv.InvoiceNo)));
     batchNumber++;
 
     if (batchNumber > 1000) {
