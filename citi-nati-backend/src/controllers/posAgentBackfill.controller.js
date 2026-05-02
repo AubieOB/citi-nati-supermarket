@@ -38,7 +38,7 @@ exports.backfillSales = async (req, res) => {
 
         // Find sync source
         const syncSource = await prisma.salesSyncSource.findFirst({
-          where: { code: syncSourceCode },
+          where: { syncSourceCode },
         });
         if (!syncSource) {
           errors.push(`Invoice ${invoice.invoiceNo || 'unknown'}: sync source '${syncSourceCode}' not found`);
