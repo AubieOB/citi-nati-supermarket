@@ -327,11 +327,12 @@ async function pushBatchToBackend(invoices, detailsMap) {
       }
     );
 
+    const responseData = response && response.data ? response.data : {};
     return {
-      success: response.data?.success ?? true,
-      synced: response.data?.synced ?? invoices.length,
-      skipped: response.data?.skipped ?? 0,
-      errors: response.data?.errors ?? [],
+      success: typeof responseData.success !== 'undefined' && responseData.success !== null ? responseData.success : true,
+      synced: typeof responseData.synced !== 'undefined' && responseData.synced !== null ? responseData.synced : invoices.length,
+      skipped: typeof responseData.skipped !== 'undefined' && responseData.skipped !== null ? responseData.skipped : 0,
+      errors: Array.isArray(responseData.errors) ? responseData.errors : [],
     };
   } catch (error) {
     console.error(`${BRANCH_TAG} [BACKFILL] Error pushing batch to backend:`, error.message);
