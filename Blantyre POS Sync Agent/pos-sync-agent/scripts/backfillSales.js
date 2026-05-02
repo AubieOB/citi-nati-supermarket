@@ -371,6 +371,7 @@ async function runBackfill() {
   let totalBatches = 0;
   let batchNumber = 1;
   let lastInvoiceNo = 0; // Cursor for pagination
+  const maxBatches = 2; // Limit to 2 batches for testing
 
   while (true) {
     // FIX: Pass lastInvoiceNo cursor for proper pagination
@@ -383,6 +384,11 @@ async function runBackfill() {
 
     totalInvoicesPulled += invoices.length;
     totalBatches++;
+
+    if (totalBatches >= maxBatches) {
+      console.log(`${BRANCH_TAG} [SALES BACKFILL] Stopping after ${maxBatches} batches for testing`);
+      break;
+    }
 
     const normalizedInvoices = invoices.map((inv) => normalizeInvoiceRow(inv));
     const invoiceCodes = invoices.map((inv) => Number(inv.InvoiceCode));
