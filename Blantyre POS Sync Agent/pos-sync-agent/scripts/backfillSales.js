@@ -108,6 +108,7 @@ async function fetchHistoricalInvoiceHeaders(fromDate, toDate, batchSize = 100, 
   const query = `
     SELECT TOP (@batchSize)
         InvoiceNo,
+        InvoiceCode,
         InvoiceSerialNo,
         RefNo,
         InvoiceDate,
