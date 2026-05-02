@@ -277,18 +277,19 @@ async function transferGoodsIntakeToBlantyrePosPending(intakeId, options = {}) {
   const posLocationCode = mapToPostLocationCode(locationCode); // BT → SH
 
   const queued = await posCommandQueueService.enqueueCommand(
-    'CREATE_PENDING_STOCK_INTAKE',
-    {
-      intakeId,
-      intakeRef:    intake.intakeRef,
-      grnDate:      grnDate.toISOString(),
-      requestedGrn: requestedGrnValidation.requestedGrn || null,
-      manualGrnOverride,
-      supplierCode,
-      locationCode: posLocationCode,
-      items:        detailItems,
-      usedFallbackSupplier: supplierResolution.usedFallback,
-    },
+  'CREATE_PENDING_STOCK_INTAKE',
+  {
+    intakeId,
+    intakeRef: intake.intakeRef,
+    grnDate: grnDate.toISOString(),
+    requestedGrn: requestedGrnValidation.requestedGrn || null,
+    manualGrnOverride,
+    supplierCode,
+    locationCode: posLocationCode,
+    branchCode: 'BLANTYRE', // ✅ ADD THIS LINE
+    items: detailItems,
+    usedFallbackSupplier: supplierResolution.usedFallback,
+  },
     {
       source:            'goods-intake-transfer',
       relatedEntityType: 'GoodsIntake',
