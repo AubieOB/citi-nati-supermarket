@@ -221,6 +221,7 @@ function normalizeInvoiceRow(row) {
 
   return {
     invoiceNo: Number(row.InvoiceNo),
+    invoiceCode: Number(row.InvoiceCode),
     invoiceSerialNo: Number(row.InvoiceSerialNo),
     refNo: row.RefNo || null,
     invoiceDate: row.InvoiceDate instanceof Date ? row.InvoiceDate.toISOString() : row.InvoiceDate,
@@ -304,7 +305,7 @@ async function pushBatchToBackend(invoices, detailsMap) {
   const payload = {
     invoices: invoices.map((inv) => ({
       ...inv,
-      details: (detailsMap[inv.invoiceNo] || []).map(d => normalizeDetailRow(d)),
+      details: (detailsMap[inv.invoiceCode] || []).map(d => normalizeDetailRow(d)),
     })),
     metadata: getSyncMetadata(appConfig, {
       backfillMode: true,
