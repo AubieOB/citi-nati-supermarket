@@ -19,5 +19,6 @@ router.post('/ack-emergency-sale-failed', ackEmergencySaleSyncFailed);
 router.post('/reporting/invoices', receiveReportingInvoices);
 router.post('/reporting/latest-product-costs', receiveLatestProductCosts);
 router.post('/suppliers/pull', receiveSuppliersFromPos);
+router.post('/sales/backfill', backfillSales);
 
 module.exports = router;
