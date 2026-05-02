@@ -158,7 +158,7 @@ function buildConfig() {
     fromDate: normalizeString(process.env.BACKFILL_SALES_FROM, null),
     toDate: normalizeString(process.env.BACKFILL_SALES_TO, null),
     batchSize: parseInteger(process.env.BACKFILL_BATCH_SIZE, 100),
-    backendEndpoint: normalizeString(process.env.BACKFILL_SALES_ENDPOINT, '/api/pos-sync/backfill-sales'),
+    backendEndpoint: normalizeString(process.env.BACKFILL_SALES_ENDPOINT, '/api/pos-sync/sales/backfill'),
   };
 
   return config;
