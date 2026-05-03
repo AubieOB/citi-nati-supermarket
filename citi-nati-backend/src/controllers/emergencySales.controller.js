@@ -34,7 +34,11 @@ function normalizeLocationCode(value) {
 
 function normalizeBranchCode(value) {
   const normalized = String(value || '').trim().toUpperCase();
-  return normalized || null;
+  if (!normalized) return null;
+  if (isZombaLocationCode(normalized)) return 'ZOMBA';
+
+  const derived = deriveBranchFromOperationalLocation(normalized);
+  return derived || normalized;
 }
 
 function isZombaLocationCode(locationCode) {
@@ -64,7 +68,11 @@ function getBranchNameFromLocationCode(locationCode) {
 }
 
 function getBranchCodeFromLocationCode(locationCode) {
-  return deriveBranchFromOperationalLocation(locationCode) || locationCode || null;
+  const normalized = normalizeLocationCode(locationCode);
+  if (!normalized) return null;
+
+  const derived = deriveBranchFromOperationalLocation(normalized);
+  return derived || (isZombaLocationCode(normalized) ? 'ZOMBA' : null);
 }
 
 function resolveSaleScopeFromSnapshot(sale) {
