@@ -48,6 +48,7 @@ class FastReportingCatchup {
     const detailColumns = await this.getTableColumns('invoicedetails');
 
     return {
+      hasInvoiceCode: invoiceColumns.has('InvoiceCode'),
       hasQuoteNo: invoiceColumns.has('QuoteNo'),
       hasCostPrice: detailColumns.has('CostPrice'),
       hasGrnDate: detailColumns.has('GrnDate'),
@@ -56,7 +57,9 @@ class FastReportingCatchup {
 
   buildDateRange() {
     const to = new Date();
-    const from = new Date(to.getTime() - (this.appConfig.reporting.fastCatchupLookbackHours * 60 * 60 * 1000));
+    const from = new Date(
+      to.getTime() - this.appConfig.reporting.fastCatchupLookbackHours * 60 * 60 * 1000
+    );
 
     return { from, to };
   }
@@ -71,12 +74,18 @@ class FastReportingCatchup {
     request.input('batchSize', sql.Int, this.appConfig.reporting.fastCatchupBatchSize);
     request.input('lastInvoiceNo', sql.Int, this.lastInvoiceNo);
 
-    const quoteNoSelect = support.hasQuoteNo ? ', QuoteNo' : '';
+    const invoiceCodeSelect = support.hasInvoiceCode
+      ? 'InvoiceCode'
+      : support.hasQuoteNo
+        ? 'QuoteNo AS InvoiceCode'
+        : 'InvoiceNo AS InvoiceCode';
+
+    const quoteNoSelect = support.hasQuoteNo ? ', QuoteNo' : ', NULL AS QuoteNo';
 
     const result = await request.query(`
       SELECT TOP (@batchSize)
         InvoiceNo,
-        InvoiceCode,
+        ${invoiceCodeSelect},
         InvoiceSerialNo,
         RefNo,
         InvoiceDate,
@@ -132,8 +141,8 @@ class FastReportingCatchup {
       request.input(`invoiceCode${idx}`, sql.Int, code);
     });
 
-    const costPriceSelect = support.hasCostPrice ? ', CostPrice' : '';
-    const grnDateSelect = support.hasGrnDate ? ', GrnDate' : '';
+    const costPriceSelect = support.hasCostPrice ? ', CostPrice' : ', NULL AS CostPrice';
+    const grnDateSelect = support.hasGrnDate ? ', GrnDate' : ', NULL AS GrnDate';
 
     const result = await request.query(`
       SELECT
@@ -264,19 +273,15 @@ class FastReportingCatchup {
       }),
     };
 
-    const response = await axios.post(
-      `${backendUrl}${endpoint}`,
-      payload,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-pos-secret': this.appConfig.backend.apiToken,
-          'x-branch-code': this.appConfig.branch.branchCode,
-          'x-sync-source-code': this.appConfig.branch.syncSourceCode,
-        },
-        timeout: 120000,
-      }
-    );
+    const response = await axios.post(`${backendUrl}${endpoint}`, payload, {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-pos-secret': this.appConfig.backend.apiToken,
+        'x-branch-code': this.appConfig.branch.branchCode,
+        'x-sync-source-code': this.appConfig.branch.syncSourceCode,
+      },
+      timeout: 120000,
+    });
 
     return response.data;
   }

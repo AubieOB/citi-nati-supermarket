@@ -1860,6 +1860,10 @@ async function gracefulShutdown() {
     clearInterval(reportingSyncInterval);
     console.log('Reporting sync interval cleared');
   }
+  if (fastReportingCatchup) {
+    fastReportingCatchup.stop();
+    console.log('Fast reporting catchup stopped');
+  }
   if (supplierSyncInterval) {
     clearInterval(supplierSyncInterval);
     console.log('Supplier sync interval cleared');
@@ -2255,13 +2259,31 @@ async function startServer() {
         console.log('[EMERGENCY SALES] ⚠️ Sync polling disabled (requires emergency sales feature flags, BACKEND_URL, BACKEND_API_TOKEN/POS_SECRET)');
       }
 
-      if (ENABLE_REPORTING_SYNC && reportingSyncService) {
-        reportingSyncInterval = setInterval(pollAndProcessReportingSync, REPORTING_SYNC_INTERVAL_MS);
-        console.log(`${BRANCH_TAG} [REPORTING SYNC] ✅ Polling enabled (${REPORTING_SYNC_INTERVAL_MS}ms, batch: ${appConfig.reporting.batchSize})`);
-        pollAndProcessReportingSync();
-      } else if (!ENABLE_REPORTING_SYNC) {
-        console.log(`${BRANCH_TAG} [REPORTING SYNC] ⏸ Polling disabled by ENABLE_REPORTING_SYNC=false`);
-      }
+     if (ENABLE_REPORTING_SYNC && reportingSyncService) {
+  reportingSyncInterval = setInterval(pollAndProcessReportingSync, REPORTING_SYNC_INTERVAL_MS);
+  console.log(`${BRANCH_TAG} [REPORTING SYNC] ✅ Polling enabled (${REPORTING_SYNC_INTERVAL_MS}ms, batch: ${appConfig.reporting.batchSize})`);
+
+  pollAndProcessReportingSync();
+
+  console.log(`${BRANCH_TAG} [FAST REPORTING CATCHUP] config check`, {
+    fastCatchupEnabled: appConfig.reporting.fastCatchupEnabled,
+    pollMs: appConfig.reporting.fastCatchupPollMs,
+    idlePollMs: appConfig.reporting.fastCatchupIdlePollMs,
+    lookbackHours: appConfig.reporting.fastCatchupLookbackHours,
+    batchSize: appConfig.reporting.fastCatchupBatchSize,
+  });
+
+  if (appConfig.reporting.fastCatchupEnabled) {
+    fastReportingCatchup = new FastReportingCatchup(pool, appConfig);
+    fastReportingCatchup.start();
+  } else {
+    console.log(`${BRANCH_TAG} [FAST REPORTING CATCHUP] disabled`);
+  }
+} else if (!ENABLE_REPORTING_SYNC) {
+  console.log(`${BRANCH_TAG} [REPORTING SYNC] ⏸ Polling disabled by ENABLE_REPORTING_SYNC=false`);
+} else {
+  console.log(`${BRANCH_TAG} [REPORTING SYNC] ⏸ Polling disabled because service was not initialized`);
+}
 
       supplierSyncInterval = setInterval(syncSuppliersToBackend, SUPPLIER_SYNC_INTERVAL_MS);
       console.log(`[SUPPLIER SYNC] ✅ Polling enabled (${SUPPLIER_SYNC_INTERVAL_MS}ms)`);
