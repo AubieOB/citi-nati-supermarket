@@ -2830,3 +2830,10 @@ button:disabled,
 .header__link--active:hover {
   transform: translateY(-1px);
 }
+.seo-snippet {
+  max-width: 720px;
+  margin: 0.75rem auto 0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.9);
+}
