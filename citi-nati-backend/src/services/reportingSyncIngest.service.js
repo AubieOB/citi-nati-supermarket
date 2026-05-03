@@ -162,15 +162,13 @@ async function processInvoice(tx, invoice, batchMeta) {
   }
 
   try {
-    const existingInvoice = await tx.salesInvoice.findUnique({
-      where: {
-        syncSourceCode_sourceInvoiceNo: {
-          syncSourceCode: batchMeta.syncSourceCode,
-          sourceInvoiceNo: invoiceData.sourceInvoiceNo,
-        },
-      },
-      select: { id: true },
-    });
+    const existingInvoice = await tx.salesInvoice.findFirst({
+  where: {
+    syncSourceCode: batchMeta.syncSourceCode,
+    sourceInvoiceNo: invoiceData.sourceInvoiceNo,
+  },
+  select: { id: true },
+});
 
     let salesInvoice;
     let inserted = 0;
@@ -238,12 +236,10 @@ async function processInvoice(tx, invoice, batchMeta) {
       const detailData = normalizeInvoiceItem(item, batchMeta.syncSourceCode, salesInvoice.id);
 
       try {
-        const existingItem = await tx.salesInvoiceItem.findUnique({
+      const existingItem = await tx.salesInvoiceItem.findFirst({
           where: {
-            syncSourceCode_sourceInvDetailId: {
-              syncSourceCode: batchMeta.syncSourceCode,
-              sourceInvDetailId,
-            },
+            syncSourceCode: batchMeta.syncSourceCode,
+            sourceInvDetailId,
           },
           select: { id: true },
         });
