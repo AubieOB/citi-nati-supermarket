@@ -94,9 +94,9 @@ function safeParseJson(value, fallback) {
   }
 }
 
-const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocationCode = 'BT' }) => {
+const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocationCode = 'BT', selectedBranchCode = null }) => {
   const { user } = useAuth();
-  const previousLocationCodeRef = useRef(selectedLocationCode);
+  const previousScopeRef = useRef({ selectedLocationCode, selectedBranchCode });
 
   const rootRef = useRef(null);
   const hiddenBarcodeInputRef = useRef(null);
@@ -145,16 +145,18 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
 
   const draftStorageKey = useMemo(() => {
     const userId = user?.id || user?.email || 'anonymous';
-    return `emergency-sales-draft:${apiBase}:${userId}:${selectedLocationCode || 'BT'}`;
-  }, [apiBase, user, selectedLocationCode]);
+    return `emergency-sales-draft:${apiBase}:${userId}:${selectedBranchCode || 'NONE'}:${selectedLocationCode || 'BT'}`;
+  }, [apiBase, user, selectedBranchCode, selectedLocationCode]);
 
   useEffect(() => {
-    if (previousLocationCodeRef.current === selectedLocationCode) {
+    const previousScope = previousScopeRef.current;
+    if (previousScope.selectedLocationCode === selectedLocationCode && previousScope.selectedBranchCode === selectedBranchCode) {
       return;
     }
 
-    const previousLocationCode = previousLocationCodeRef.current;
-    previousLocationCodeRef.current = selectedLocationCode;
+    const previousLocationCode = previousScope.selectedLocationCode;
+    const previousBranchCode = previousScope.selectedBranchCode;
+    previousScopeRef.current = { selectedLocationCode, selectedBranchCode };
 
     // Reset volatile state so previous location data never bleeds into current scope.
     setSearchModalOpen(false);
@@ -168,11 +170,13 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
     setLastReceipt(null);
     lookupCacheRef.current.clear();
 
-    console.log('[EMERGENCY SALES UI] location switched', {
+    console.log('[EMERGENCY SALES UI] location/branch switched', {
       from: previousLocationCode,
       to: selectedLocationCode,
+      branchFrom: previousBranchCode,
+      branchTo: selectedBranchCode,
     });
-  }, [selectedLocationCode]);
+  }, [selectedBranchCode, selectedLocationCode]);
 
   const subtotal = useMemo(
     () => toMoney(cart.reduce((sum, line) => sum + toMoney(line.qty * line.unitPrice), 0)),
@@ -217,7 +221,8 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
           page: 1,
           pageSize: isAdminScope ? 200 : 20,
           status: 'all',
-          ...(selectedLocationCode && { locationCode: selectedLocationCode }),
+          ...(selectedBranchCode ? { branchCode: selectedBranchCode } : {}),
+          ...(selectedLocationCode ? { locationCode: selectedLocationCode } : {}),
         },
       });
 
@@ -232,7 +237,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
     } catch (error) {
       notifyError(`Failed to load emergency sales: ${error.response?.data?.error || error.message}`, 3000);
     }
-  }, [apiBase, selectedLocationCode]);
+  }, [apiBase, selectedBranchCode, selectedLocationCode]);
 
   useEffect(() => {
     fetchEmergencySales();
@@ -367,16 +372,23 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
     if (!trimmed) return [];
 
     const bypassCache = options?.bypassCache === true;
-    const cacheKey = `${String(selectedLocationCode || '').toUpperCase()}|${trimmed.toLowerCase()}`;
+    const cacheKey = `${String(selectedBranchCode || '').toUpperCase()}|${String(selectedLocationCode || '').toUpperCase()}|${trimmed.toLowerCase()}`;
     const cached = bypassCache ? null : lookupCacheRef.current.get(cacheKey);
     if (cached && (Date.now() - cached.cachedAt) < EMERGENCY_LOOKUP_CLIENT_CACHE_TTL_MS) {
       return cached.products;
     }
 
+    console.log('[EMERGENCY SALES][LOOKUP] requesting products', {
+      query: trimmed,
+      locationCode: selectedLocationCode,
+      branchCode: selectedBranchCode,
+    });
+
     const response = await api.get(`/${apiBase}/lookup`, {
       params: {
         q: trimmed,
-        locationCode: selectedLocationCode,
+        ...(selectedBranchCode ? { branchCode: selectedBranchCode } : {}),
+        ...(selectedLocationCode ? { locationCode: selectedLocationCode } : {}),
         ...(bypassCache ? { forceRefresh: '1' } : {}),
       },
     });
@@ -388,7 +400,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
     });
 
     return products;
-  }, [apiBase, selectedLocationCode]);
+  }, [apiBase, selectedBranchCode, selectedLocationCode]);
 
   const refreshSearchModalResults = useCallback(async ({ bypassCache = false, showLoading = false, resetActiveIndex = false } = {}) => {
     const query = searchModalQuery.trim();
@@ -526,7 +538,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
       window.removeEventListener('focus', silentRefresh);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [refreshSearchModalResults, searchModalOpen, searchModalQuery, selectedLocationCode]);
+  }, [refreshSearchModalResults, searchModalOpen, searchModalQuery, selectedBranchCode, selectedLocationCode]);
 
   const clearInvoice = useCallback(() => {
     setCart([]);
@@ -761,6 +773,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
         tendered_amount: tendered,
         payment_method: paymentMethod,
         locationCode: selectedLocationCode,
+        ...(selectedBranchCode ? { branchCode: selectedBranchCode } : {}),
       });
 
       const savedSale = response.data?.sale;
@@ -785,7 +798,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
     } finally {
       setIsSubmittingSale(false);
     }
-  }, [apiBase, cart, clearInvoice, discountValue, fetchEmergencySales, paymentMethod, printReceipt, tendered, selectedLocationCode]);
+  }, [apiBase, cart, clearInvoice, discountValue, fetchEmergencySales, paymentMethod, printReceipt, selectedBranchCode, tendered, selectedLocationCode]);
 
   const updateLineQty = useCallback((lineId, nextQtyRaw) => {
     const nextQty = Math.max(0, parseInt(nextQtyRaw, 10) || 0);

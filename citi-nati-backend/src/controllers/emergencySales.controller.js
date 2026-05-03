@@ -23,6 +23,14 @@ const SYNC_STATUS = {
 
 const ZOMBA_LOCATION_CODES = ['ZA'].concat(CORE_ZOMBA_LOCATION_CODES);
 const SUPPORTED_LOCATION_CODES = ['BT', 'ZA', 'SH', 'BAR', 'ST999', 'WH'];
+const BRANCH_CODE_ALIASES = {
+  ZOMBA: 'ZOMBA',
+  ZA: 'ZOMBA',
+  ZOMBA_SH: 'ZOMBA',
+  BLANTYRE: 'BLANTYRE',
+  BT: 'BLANTYRE',
+  BLANTYRE_SH: 'BLANTYRE',
+};
 const SCOPED_PRODUCT_CODES_CACHE_TTL_MS = Number.parseInt(process.env.EMERGENCY_SCOPE_CODES_CACHE_TTL_MS || '30000', 10);
 const EMERGENCY_LOOKUP_CACHE_TTL_MS = Number.parseInt(process.env.EMERGENCY_LOOKUP_CACHE_TTL_MS || '8000', 10);
 const scopedProductCodesCache = new Map();
@@ -35,10 +43,10 @@ function normalizeLocationCode(value) {
 function normalizeBranchCode(value) {
   const normalized = String(value || '').trim().toUpperCase();
   if (!normalized) return null;
-  if (isZombaLocationCode(normalized)) return 'ZOMBA';
-
-  const derived = deriveBranchFromOperationalLocation(normalized);
-  return derived || normalized;
+  if (Object.prototype.hasOwnProperty.call(BRANCH_CODE_ALIASES, normalized)) {
+    return BRANCH_CODE_ALIASES[normalized];
+  }
+  return normalized;
 }
 
 function isZombaLocationCode(locationCode) {
@@ -71,14 +79,13 @@ function getBranchCodeFromLocationCode(locationCode) {
   const normalized = normalizeLocationCode(locationCode);
   if (!normalized) return null;
 
-  const derived = deriveBranchFromOperationalLocation(normalized);
-  return derived || (isZombaLocationCode(normalized) ? 'ZOMBA' : null);
+  return deriveBranchFromOperationalLocation(normalized);
 }
 
 function resolveSaleScopeFromSnapshot(sale) {
   const snapshot = sale?.cartSnapshot && typeof sale.cartSnapshot === 'object' ? sale.cartSnapshot : {};
   const locationCode = normalizeLocationCode(snapshot.posLocationCode || snapshot.locationCode || null);
-  const branchCode = normalizeBranchCode(snapshot.branchCode || getBranchCodeFromLocationCode(locationCode));
+  const branchCode = normalizeBranchCode(snapshot.branchCode || null) || getBranchCodeFromLocationCode(locationCode);
   const branchName = String(snapshot.branchName || getBranchNameFromLocationCode(locationCode) || '').trim() || null;
   return { locationCode, branchCode, branchName };
 }
@@ -115,12 +122,12 @@ function getScopeCacheKey(locationCode) {
   return scopeCodes.join('|') || String(locationCode || 'NONE');
 }
 
-function getLookupCacheKey(locationCode, query) {
-  return `${String(locationCode || '').toUpperCase()}|${String(query || '').trim().toLowerCase()}`;
+function getLookupCacheKey(locationCode, branchCode, query) {
+  return `${String(branchCode || '').toUpperCase()}|${String(locationCode || '').toUpperCase()}|${String(query || '').trim().toLowerCase()}`;
 }
 
-function invalidateLookupCacheForLocation(locationCode, reason = 'unspecified') {
-  const prefix = `${String(locationCode || '').trim().toUpperCase()}|`;
+function invalidateLookupCacheForLocation(locationCode, branchCode = null, reason = 'unspecified') {
+  const prefix = `${String(branchCode || '').toUpperCase()}|${String(locationCode || '').trim().toUpperCase()}|`;
   if (!prefix || prefix === '|') return;
 
   let deleted = 0;
@@ -168,8 +175,8 @@ async function hasLocationLookupStockChangedSince(locationCode, sinceTimestampMs
   return changedCount > 0;
 }
 
-async function readLookupCache(locationCode, query) {
-  const key = getLookupCacheKey(locationCode, query);
+async function readLookupCache(locationCode, branchCode, query) {
+  const key = getLookupCacheKey(locationCode, branchCode, query);
   const entry = emergencyLookupCache.get(key);
   if (!entry) return null;
   if ((Date.now() - entry.cachedAt) > EMERGENCY_LOOKUP_CACHE_TTL_MS) {

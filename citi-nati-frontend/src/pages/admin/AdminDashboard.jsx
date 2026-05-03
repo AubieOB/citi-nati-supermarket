@@ -546,10 +546,13 @@ const AdminDashboard = () => {
       }
     };
 
+    const intervalId = window.setInterval(refreshIfStale, ADMIN_PRODUCTS_SILENT_REFRESH_STALE_MS);
+    refreshIfStale();
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       disposed = true;
+      window.clearInterval(intervalId);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [

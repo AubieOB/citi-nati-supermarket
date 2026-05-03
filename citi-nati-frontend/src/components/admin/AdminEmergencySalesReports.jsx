@@ -82,7 +82,7 @@ function statusColor(status) {
   return '#b06c00';
 }
 
-const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
+const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT', selectedBranchCode = null }) => {
   const isMobileViewport = useMobileViewport();
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
@@ -123,6 +123,7 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
           endDate: nextFilters.endDate || undefined,
           product: nextFilters.product || undefined,
           cashier: nextFilters.cashier || undefined,
+          ...(selectedBranchCode ? { branchCode: selectedBranchCode } : {}),
           ...(selectedLocationCode && { locationCode: selectedLocationCode }),
         },
       });
@@ -140,7 +141,7 @@ const AdminEmergencySalesReports = ({ selectedLocationCode = 'BT' }) => {
     } finally {
       setLoading(false);
     }
-  }, [selectedLocationCode]);
+  }, [selectedBranchCode, selectedLocationCode]);
 
   useEffect(() => {
     fetchReportSales(filters);

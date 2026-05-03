@@ -30,6 +30,7 @@ import '../../css/admin-responsive-filters.css';
 
 const AdminProducts = ({
   selectedLocationCode = 'BT',
+  selectedBranchCode = null,
   cachedProducts = [],
   cachedProductsMeta = {},
   onRefreshProductsCache,
@@ -447,9 +448,9 @@ const AdminProducts = ({
     setOnSaleOnly(false);
     setCurrentPage(1);
     setExpandedBatchRows({});
-    // Reset stale-while-revalidate guard so the new location’s data always renders immediately.
+    // Reset stale-while-revalidate guard so the new location/branch data always renders immediately.
     displayedProductsRef.current = [];
-  }, [selectedLocationCode]);
+  }, [selectedBranchCode, selectedLocationCode]);
 
   // Sync product list from shared cache whenever it changes — never touches search/filter state.
   // Stale-while-revalidate: during background pagination the currently displayed list stays
@@ -496,7 +497,7 @@ const AdminProducts = ({
     }
 
     fetchProducts();
-  }, [selectedLocationCode, cachedProducts, cachedProductsMeta]);
+  }, [selectedBranchCode, selectedLocationCode, cachedProducts, cachedProductsMeta]);
 
   useEffect(() => {
     if (activeSubTab === 'expiry-alerts') {
@@ -613,13 +614,24 @@ const AdminProducts = ({
 
       const handleProductUpdate = (updatedProduct) => {
         const updatedLocationCode = String(updatedProduct?.locationCode || '').trim().toUpperCase();
+        const updatedBranchCode = String(updatedProduct?.branchCode || '').trim().toUpperCase();
         const selectedScope = resolveOperationalScope(selectedLocationCode);
         const currentLocationCode = String(selectedScope?.locationCode || selectedLocationCode || '').trim().toUpperCase();
+        const currentBranchCode = String(selectedBranchCode || selectedScope?.branchCode || '').trim().toUpperCase();
+
+        if (updatedBranchCode && currentBranchCode && updatedBranchCode !== currentBranchCode) {
+          return;
+        }
         if (updatedLocationCode && currentLocationCode && updatedLocationCode !== currentLocationCode) {
           return;
         }
 
-        console.log('[AdminProducts] 🔄 Product update received:', updatedProduct.name);
+        console.log('[AdminProducts] 🔄 Product update received:', updatedProduct.name, {
+          updatedLocationCode,
+          updatedBranchCode,
+          currentLocationCode,
+          currentBranchCode,
+        });
         
         // Update the products list with complete product details
         setProducts(prevProducts =>
@@ -685,6 +697,9 @@ const AdminProducts = ({
         if (selectedLocationCode) {
           params.append('locationCode', selectedLocationCode);
         }
+        if (selectedBranchCode) {
+          params.append('branchCode', selectedBranchCode);
+        }
         return api.get(`/products?${params.toString()}`);
       };
 
@@ -721,6 +736,9 @@ const AdminProducts = ({
           const params = new URLSearchParams({ page: '1', limit: '5000' });
           if (selectedLocationCode) {
             params.append('locationCode', selectedLocationCode);
+          }
+          if (selectedBranchCode) {
+            params.append('branchCode', selectedBranchCode);
           }
           const adminResp = await api.get(`/admin/pos-products?${params.toString()}`);
           const adminItems = Array.isArray(adminResp?.data?.products)
