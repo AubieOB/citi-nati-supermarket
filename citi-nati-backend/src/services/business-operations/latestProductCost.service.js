@@ -16,6 +16,7 @@ function roundMoney(value, decimals = 2) {
 }
 
 const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH'];
+const AMBIGUOUS_LOCATION_CODES = new Set(['SH']);
 const BRANCH_SCOPE_LOCATION_CODES = ['BT', 'ZA'];
 
 const BRANCH_SYNC_SOURCE_PREFIXES = {
@@ -28,6 +29,7 @@ const BRANCH_SYNC_SOURCE_PREFIXES = {
 function deriveBranchCodeFromLocationCode(locationCode) {
   const code = String(locationCode || '').trim().toUpperCase();
   if (!code) return null;
+  if (AMBIGUOUS_LOCATION_CODES.has(code)) return null;
   if (code === 'BT') return 'BLANTYRE';
   if (ZOMBA_LOCATION_CODES.includes(code)) return 'ZOMBA';
   return null;

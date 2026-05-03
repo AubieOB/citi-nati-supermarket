@@ -16,6 +16,7 @@ const LOCATION_ALIASES = {
   WH: 'WH',
 };
 
+const AMBIGUOUS_LOCATION_CODES = new Set(['SH']);
 const ZOMBA_LOCATION_CODES = ['SH', 'BAR', 'ST999', 'WH'];
 const ZOMBA_OPERATIONAL_LOCATION_CODES = ['SH', 'BAR', 'ST999'];
 
@@ -33,6 +34,7 @@ function isZombaLocationCode(value) {
 function deriveBranchCodeFromLocationCode(value) {
   const normalized = normalizeScopeCode(value);
   if (!normalized) return null;
+  if (AMBIGUOUS_LOCATION_CODES.has(normalized)) return null;
   if (normalized === 'BT') return 'BLANTYRE';
   if (normalized === 'ZA' || ZOMBA_LOCATION_CODES.includes(normalized)) return 'ZOMBA';
   return null;
