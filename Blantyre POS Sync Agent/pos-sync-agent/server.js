@@ -12,6 +12,7 @@ const priceUpdates = require('./lib/price-updates');
 const commandQueueClient = require('./lib/command-queue-client');
 const commandExecutor = require('./lib/command-executor');
 const { buildConfig, getBranchTag, getSyncMetadata, validateStartupConfig, buildStartupSummary } = require('./lib/config');
+const FastReportingCatchup = require('./lib/fast-reporting-catchup');
 const ReportingSyncService = require('./lib/reporting-sync');
 const ReportingSyncState = require('./lib/reporting-sync-state');
 
@@ -56,6 +57,7 @@ const sqlConfig = {
 let pool;
 
 /** Reporting sync service and state */
+let fastReportingCatchup;
 let reportingSyncState;
 let reportingSyncService;
 let instanceLockServer = null;

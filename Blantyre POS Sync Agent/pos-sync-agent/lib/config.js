@@ -130,14 +130,21 @@ function buildConfig() {
   };
 
   config.reporting = {
-    backendReportingEndpoint: normalizeString(process.env.REPORTING_BACKEND_ENDPOINT, '/api/pos-sync/reporting/invoices'),
-    backendLatestProductCostEndpoint: normalizeString(process.env.REPORTING_LATEST_COST_ENDPOINT, '/api/pos-sync/reporting/latest-product-costs'),
-    batchSize: parseInteger(process.env.REPORTING_BATCH_SIZE, 100),
-    latestCostBatchSize: parseInteger(process.env.REPORTING_LATEST_COST_BATCH_SIZE, 500),
-    pollingIntervalMs: parseInteger(process.env.REPORTING_POLLING_INTERVAL_MS, parseInteger(process.env.POLLING_INTERVAL_MS || process.env.SYNC_INTERVAL_MS, 60000)),
-    latestCostSyncIntervalMs: parseInteger(process.env.REPORTING_LATEST_COST_INTERVAL_MS, 300000),
-    limitToRecentDays: parseNonNegativeInteger(process.env.REPORTING_LIMIT_TO_RECENT_DAYS, 0),
-  };
+  backendReportingEndpoint: normalizeString(process.env.REPORTING_BACKEND_ENDPOINT, '/api/pos-sync/reporting/invoices'),
+  backendLatestProductCostEndpoint: normalizeString(process.env.REPORTING_LATEST_COST_ENDPOINT, '/api/pos-sync/reporting/latest-product-costs'),
+  batchSize: parseInteger(process.env.REPORTING_BATCH_SIZE, 100),
+  latestCostBatchSize: parseInteger(process.env.REPORTING_LATEST_COST_BATCH_SIZE, 500),
+  pollingIntervalMs: parseInteger(process.env.REPORTING_POLLING_INTERVAL_MS, parseInteger(process.env.POLLING_INTERVAL_MS || process.env.SYNC_INTERVAL_MS, 60000)),
+  latestCostSyncIntervalMs: parseInteger(process.env.REPORTING_LATEST_COST_INTERVAL_MS, 300000),
+  limitToRecentDays: parseNonNegativeInteger(process.env.REPORTING_LIMIT_TO_RECENT_DAYS, 0),
+
+  // Fast rolling sales catch-up sync
+  fastCatchupEnabled: parseBoolean(process.env.REPORTING_FAST_CATCHUP_ENABLED, true),
+  fastCatchupPollMs: parseInteger(process.env.REPORTING_FAST_CATCHUP_POLL_MS, 3000),
+  fastCatchupIdlePollMs: parseInteger(process.env.REPORTING_FAST_CATCHUP_IDLE_POLL_MS, 5000),
+  fastCatchupLookbackHours: parseInteger(process.env.REPORTING_FAST_CATCHUP_LOOKBACK_HOURS, 24),
+  fastCatchupBatchSize: parseInteger(process.env.REPORTING_FAST_CATCHUP_BATCH_SIZE, 200),
+};
   // Historical sales backfill configuration
   config.backfill = {
     enabled: parseBoolean(process.env.BACKFILL_SALES_ENABLED, false),
