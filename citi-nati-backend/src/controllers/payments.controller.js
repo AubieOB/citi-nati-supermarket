@@ -25,6 +25,8 @@ function formatInvoiceTime(date = new Date()) {
 async function buildWriteInvoicePayload(order, paymentReference) {
   const locationCode = process.env.POS_LOCATION_CODE || 'SH';
   const priceTypeCode = process.env.POS_PRICE_TYPE_CODE || 'RT';
+  const branchCode = process.env.POS_BRANCH_CODE || 'BLANTYRE';
+  const syncSourceCode = process.env.POS_SYNC_SOURCE_CODE || 'BLANTYRE_POS_01';
   const persistedVatRate = normalizeVatRatePercent(order?.vatRatePercent, NaN);
   const fallbackVatRate = await getVatRatePercent();
   const appliedVatRate = Number.isFinite(persistedVatRate) ? persistedVatRate : fallbackVatRate;
@@ -88,6 +90,8 @@ async function buildWriteInvoicePayload(order, paymentReference) {
     orderId: String(order.id),
     reference: paymentReference || order.paymentReference || `ORDER-${order.id}`,
     locationCode,
+    branchCode,
+    syncSourceCode,
     customerCode: 'CASH',
     invoiceDate: formatInvoiceDate(new Date()),
     invoiceTime: formatInvoiceTime(new Date()),

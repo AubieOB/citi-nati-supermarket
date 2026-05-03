@@ -5,6 +5,7 @@
  */
 
 const sql = require('mssql');
+const { reduceStockOnSale } = require('./stock-updates');
 
 function createScopedRequest(request) {
   if (request && request.transaction) {
@@ -595,6 +596,14 @@ async function writeBackInvoice(request, invoiceData) {
       writebackLocationCode
     );
     const itemCount = detailResult.insertedCount;
+
+    // Reduce stock for each sold item
+    for (const item of items) {
+      const qty = Number(item.qty);
+      if (Number.isFinite(qty) && qty > 0) {
+        await reduceStockOnSale(request, item.productCode, writebackLocationCode, qty);
+      }
+    }
 
     await updateLastCashSaleNo(request, nextLastCashSaleNo);
     console.log(`[INVOICE] LastCashSaleNo update success: ${nextLastCashSaleNo}`);

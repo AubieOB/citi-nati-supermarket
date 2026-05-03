@@ -3190,14 +3190,37 @@ async function startServer() {
       }
 
       // reporting sync module
-      if (appConfig.features.enableReportingSync && reportingSyncService) {
-        reportingSyncInterval = setInterval(pollAndProcessReportingSync, REPORTING_SYNC_INTERVAL_MS);
-        console.log(`${BRANCH_TAG} [REPORTING SYNC] ✅ Polling enabled (${REPORTING_SYNC_INTERVAL_MS}ms, batch: ${appConfig.reporting.batchSize})`);
-        // Run one initial sync immediately
-        pollAndProcessReportingSync();
-      } else if (!appConfig.features.enableReportingSync) {
-        console.log(`${BRANCH_TAG} [REPORTING SYNC] ⏸ Polling disabled by ENABLE_REPORTING_SYNC=false`);
-      }
+     // reporting sync module
+      // reporting sync module
+if (appConfig.features.enableReportingSync && reportingSyncService) {
+  reportingSyncInterval = setInterval(pollAndProcessReportingSync, REPORTING_SYNC_INTERVAL_MS);
+  console.log(`${BRANCH_TAG} [REPORTING SYNC] ✅ Polling enabled (${REPORTING_SYNC_INTERVAL_MS}ms, batch: ${appConfig.reporting.batchSize})`);
+
+  // Run one initial sync immediately
+  pollAndProcessReportingSync();
+
+  // 🔥 DEBUG CONFIG (IMPORTANT)
+  console.log(`${BRANCH_TAG} [FAST REPORTING CATCHUP] config check`, {
+    fastCatchupEnabled: appConfig.reporting.fastCatchupEnabled,
+    pollMs: appConfig.reporting.fastCatchupPollMs,
+    idlePollMs: appConfig.reporting.fastCatchupIdlePollMs,
+    lookbackHours: appConfig.reporting.fastCatchupLookbackHours,
+    batchSize: appConfig.reporting.fastCatchupBatchSize,
+  });
+
+  // 🔥 START FAST CATCHUP
+  if (appConfig.reporting.fastCatchupEnabled) {
+    fastReportingCatchup = new FastReportingCatchup(pool, appConfig);
+    fastReportingCatchup.start();
+  } else {
+    console.log(`${BRANCH_TAG} [FAST REPORTING CATCHUP] disabled`);
+  }
+
+} else if (!appConfig.features.enableReportingSync) {
+  console.log(`${BRANCH_TAG} [REPORTING SYNC] ⏸ Polling disabled by ENABLE_REPORTING_SYNC=false`);
+} else {
+  console.log(`${BRANCH_TAG} [REPORTING SYNC] ⏸ Polling disabled because service not initialized`);
+}
 
       supplierSyncInterval = setInterval(syncSuppliersToBackend, appConfig.stock.supplierSyncIntervalMs);
       console.log(`${BRANCH_TAG} [SUPPLIER SYNC] ✅ Polling enabled (interval: ${appConfig.stock.supplierSyncIntervalMs}ms)`);
