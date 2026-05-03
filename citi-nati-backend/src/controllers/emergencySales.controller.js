@@ -528,7 +528,11 @@ function getSaleVatContext(sale) {
 
 function buildPosWriteInvoicePayload(emergencySale) {
   const saleScope = resolveSaleScopeFromSnapshot(emergencySale);
-  const locationCode = normalizeLocationCode(saleScope.locationCode || process.env.POS_LOCATION_CODE || null);
+  let locationCode = normalizeLocationCode(saleScope.locationCode || process.env.POS_LOCATION_CODE || null);
+  // For Blantyre emergency sales, use the same location as online orders to ensure stock consistency
+  if (saleScope.branchCode === 'BLANTYRE') {
+    locationCode = process.env.POS_LOCATION_CODE || 'SH';
+  }
   if (!locationCode) {
     throw new Error(`Emergency sale ${emergencySale?.id || '(unknown)'} is missing location scope for POS write-back`);
   }
