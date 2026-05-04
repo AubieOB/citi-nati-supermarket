@@ -143,9 +143,10 @@ async function validateBackendConnection() {
 }
 
 function buildProductDeltaKey(product) {
-  const productCode = String(product && product.ProductCode ? product.ProductCode : '').trim().toUpperCase();
-  const locationCode = String(product && product.LocationCode ? product.LocationCode : '').trim().toUpperCase();
-  return `${locationCode}::${productCode}`;
+  const branchCode = String(product && (product.BranchCode || product.branchCode) ? (product.BranchCode || product.branchCode) : appConfig.branch.branchCode).trim().toUpperCase();
+  const locationCode = String(product && (product.LocationCode || product.locationCode) ? (product.LocationCode || product.locationCode) : '').trim().toUpperCase();
+  const productCode = String(product && (product.ProductCode || product.productCode) ? (product.ProductCode || product.productCode) : '').trim().toUpperCase();
+  return `${branchCode}|${locationCode}|${productCode}`;
 }
 
 function normalizeDateValue(value) {
@@ -482,14 +483,44 @@ async function sendProductsToLiveServer(products, syncContext = {}) {
 
     console.log(`${SYNC_LOG_PREFIX} Sending ${products.length} products to backend (batching)`);
 
+    const normalizedProducts = products.map((product) => {
+      const locationCode = String(product.LocationCode || product.locationCode || '').trim().toUpperCase();
+      const branchCode = String(product.BranchCode || product.branchCode || appConfig.branch.branchCode).trim().toUpperCase();
+      return {
+        ...product,
+        LocationCode: locationCode,
+        BranchCode: branchCode,
+      };
+    });
+
     const syncedLocations = Array.isArray(syncContext.syncLocations) && syncContext.syncLocations.length > 0
-      ? syncContext.syncLocations
-      : Array.from(new Set(products.map((product) => String(product.LocationCode || '').trim()).filter(Boolean)));
-    const overallLocationBreakdown = products.reduce((acc, product) => {
-      const key = String(product.LocationCode || 'UNKNOWN').trim() || 'UNKNOWN';
+      ? syncContext.syncLocations.map((code) => String(code || '').trim().toUpperCase())
+      : Array.from(new Set(normalizedProducts.map((product) => product.LocationCode).filter(Boolean)));
+
+    const overallLocationBreakdown = normalizedProducts.reduce((acc, product) => {
+      const key = product.LocationCode || 'UNKNOWN';
       acc[key] = (acc[key] || 0) + 1;
       return acc;
     }, {});
+
+    const missingLocationProducts = normalizedProducts.filter((product) => !product.LocationCode);
+    if (missingLocationProducts.length > 0) {
+      const sampleCodes = missingLocationProducts.slice(0, 5).map((p) => String(p.ProductCode || p.sourceCode || 'UNKNOWN'));
+      console.error(`${SYNC_LOG_PREFIX} CRITICAL: ${missingLocationProducts.length} products are missing LocationCode and cannot be batched. Sample products: ${sampleCodes.join(', ')}`);
+      return { success: false, error: 'Products missing LocationCode detected' };
+    }
+
+    const orderedLocations = [ ...new Set([ ...syncedLocations, ...Object.keys(overallLocationBreakdown).filter(Boolean) ]) ];
+    const orderedProducts = normalizedProducts.slice().sort((left, right) => {
+      const leftLoc = left.LocationCode || 'UNKNOWN';
+      const rightLoc = right.LocationCode || 'UNKNOWN';
+      const leftIdx = orderedLocations.indexOf(leftLoc);
+      const rightIdx = orderedLocations.indexOf(rightLoc);
+      if (leftIdx !== rightIdx) {
+        return leftIdx - rightIdx;
+      }
+      return String(left.ProductCode || left.sourceCode || '').localeCompare(String(right.ProductCode || right.sourceCode || ''));
+    });
 
     console.log(`${SYNC_LOG_PREFIX} stock resolution mode`, {
       mode: 'LOCATION_SPECIFIC',
@@ -502,8 +533,8 @@ async function sendProductsToLiveServer(products, syncContext = {}) {
     const BATCH_SIZE = 100;
     const batches = [];
 
-    for (let i = 0; i < products.length; i += BATCH_SIZE) {
-      batches.push(products.slice(i, i + BATCH_SIZE));
+    for (let i = 0; i < orderedProducts.length; i += BATCH_SIZE) {
+      batches.push(orderedProducts.slice(i, i + BATCH_SIZE));
     }
 
     console.log(`${SYNC_LOG_PREFIX} Split into ${batches.length} batches of up to ${BATCH_SIZE} products`);
@@ -581,7 +612,7 @@ async function sendProductsToLiveServer(products, syncContext = {}) {
                   daysToExpiry: Number.isFinite(Number(p.DaysToExpiry)) ? Number(p.DaysToExpiry) : null,
                   expiryStatus: p.ExpiryStatus || null,
                   expiryBatches: Array.isArray(p.ExpiryBatches) ? p.ExpiryBatches : [],
-                  branchCode: appConfig.branch.branchCode,
+                  branchCode: p.BranchCode || appConfig.branch.branchCode,
                   branchName: appConfig.branch.branchName,
                   locationCode: locCode,
                 };
