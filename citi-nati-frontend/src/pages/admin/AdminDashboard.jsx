@@ -36,6 +36,7 @@ import '../../styles/admin-dashboard.css';
 
 const ADMIN_THEME_KEY = 'adminDashboardTheme';
 const ADMIN_PRODUCTS_SILENT_REFRESH_STALE_MS = 120000;
+const ADMIN_PRODUCTS_SYNC_DEBOUNCE_MS = 2500;
 
 const ADMIN_DARK_BG = '#1e1e1e';
 const ADMIN_DARK_BORDER = '#333333';
@@ -318,6 +319,7 @@ const AdminDashboard = () => {
   const [adminProductsCacheByLocation, setAdminProductsCacheByLocation] = useState({});
   const [adminProductsCacheMetaByLocation, setAdminProductsCacheMetaByLocation] = useState({});
   const adminProductsFetchRequestRef = useRef({});
+  const posSyncDebounceTimersRef = useRef({});
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') return 'light';
     return window.localStorage.getItem(ADMIN_THEME_KEY) === 'dark' ? 'dark' : 'light';
@@ -651,10 +653,21 @@ const AdminDashboard = () => {
           targetUiScopes: Array.from(targetUiScopes.values()),
         });
 
+        // Debounce cache updates: multiple events within ADMIN_PRODUCTS_SYNC_DEBOUNCE_MS
+        // will coalesce into a single metadata update
         targetUiScopes.forEach((uiScopeCode) => {
-          updateProductsCacheMeta(uiScopeCode, {
-            lastRealtimeUpdateAt: Date.now(),
-          });
+          // Clear existing timer for this scope if present
+          if (posSyncDebounceTimersRef.current[uiScopeCode]) {
+            clearTimeout(posSyncDebounceTimersRef.current[uiScopeCode]);
+          }
+
+          // Set new debounced timer
+          posSyncDebounceTimersRef.current[uiScopeCode] = setTimeout(() => {
+            updateProductsCacheMeta(uiScopeCode, {
+              lastRealtimeUpdateAt: Date.now(),
+            });
+            delete posSyncDebounceTimersRef.current[uiScopeCode];
+          }, ADMIN_PRODUCTS_SYNC_DEBOUNCE_MS);
         });
       };
 
@@ -666,6 +679,12 @@ const AdminDashboard = () => {
         socket.off('pos-product-updated', handlePosProductUpdated);
         socket.off('product_updated', handleProductUpdated);
         socket.off('pos-products-synced', handlePosProductsSynced);
+
+        // Clean up any pending debounce timers
+        Object.values(posSyncDebounceTimersRef.current).forEach((timerId) => {
+          clearTimeout(timerId);
+        });
+        posSyncDebounceTimersRef.current = {};
       };
     } catch (socketErr) {
       console.warn('[ADMIN PRODUCTS CACHE] socket listener setup failed:', socketErr.message);
