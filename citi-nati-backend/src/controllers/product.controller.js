@@ -1234,6 +1234,7 @@ const getProducts = async (req, res) => {
     const where = {
       isActive: true,
       enabled: true, // Only show enabled products
+      price: { gt: 0 }, // Only show products with price > 0
     };
 
     if (!isAdminRequest(req)) {

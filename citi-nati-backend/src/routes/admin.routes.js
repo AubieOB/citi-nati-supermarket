@@ -1329,6 +1329,7 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
     // Build where clause
     const where = {
       sourceCode: { not: null }, // Only POS products
+      price: { gt: 0 }, // Only show products with price > 0
     };
 
     if (normalizedLocationCode) {
