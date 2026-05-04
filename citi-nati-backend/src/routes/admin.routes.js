@@ -1370,11 +1370,11 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
             selectedLocation: locationCode || '(none)',
             normalizedLocation: normalizedLocationCode,
             scopeCodes,
-            reason: 'Ambiguous Zomba locationCode (SH) requires explicit branchCode parameter',
+            reason: 'branchCode is required for SH because SH exists in multiple branches.',
           });
           return res.status(400).json({
             success: false,
-            error: 'Ambiguous location code SH requires explicit branchCode parameter',
+            error: 'branchCode is required for SH because SH exists in multiple branches.',
           });
         }
 
@@ -1391,6 +1391,7 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
             error: 'Concrete locationCode is required for Zomba stock reads (use SH, BAR, or ST999)',
           });
         }
+
         where.branchCode = normalizedBranchCode || 'ZOMBA';
         where.locationCode = {
           equals: resolvedLocationCode,
@@ -1526,7 +1527,7 @@ router.put('/pos-products/:id/visibility', verifyTokenMiddleware, verifyAdmin, a
       if (normalizedLocationCode === 'SH' && !normalizedBranchCode) {
         return res.status(400).json({
           success: false,
-          error: 'Ambiguous location code SH requires explicit branchCode parameter',
+          error: 'branchCode is required for SH because SH exists in multiple branches.',
         });
       }
 
@@ -1667,7 +1668,7 @@ router.delete('/pos-products/delete-selected', verifyTokenMiddleware, verifyAdmi
       if (normalizedLocationCode === 'SH' && !normalizedBranchCode) {
         return res.status(400).json({
           success: false,
-          error: 'Ambiguous location code SH requires explicit branchCode parameter',
+          error: 'branchCode is required for SH because SH exists in multiple branches.',
         });
       }
 
@@ -1734,7 +1735,7 @@ router.delete('/pos-products/delete-all', verifyTokenMiddleware, verifyAdmin, as
       if (normalizedLocationCode === 'SH' && !normalizedBranchCode) {
         return res.status(400).json({
           success: false,
-          error: 'Ambiguous location code SH requires explicit branchCode parameter',
+          error: 'branchCode is required for SH because SH exists in multiple branches.',
         });
       }
 

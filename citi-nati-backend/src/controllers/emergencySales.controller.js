@@ -680,6 +680,13 @@ async function lookupEmergencyProducts(req, res) {
       });
     }
 
+    if (locationCode === 'SH' && !requestedBranchCode) {
+      return res.status(400).json({
+        success: false,
+        error: 'branchCode is required for SH because SH exists in multiple branches.',
+      });
+    }
+
     const normalizedQuery = query.toLowerCase();
     const isLikelyCodeLookup = /^[0-9a-z-]+$/i.test(query) && query.length >= 3;
     if (!isLikelyCodeLookup && normalizedQuery.length < 2) {
@@ -829,12 +836,21 @@ async function lookupEmergencyProducts(req, res) {
         return aExact ? -1 : 1;
       });
 
-    writeLookupCache(locationCode, derivedBranchCode, query, mapped);
+    const safeProducts = mapped.filter((product) => {
+      const productBranchCode = String(product.branchCode || '').trim().toUpperCase();
+      const productLocationCode = String(product.locationCode || '').trim().toUpperCase();
+      const productPrice = Number(product.price || 0);
+      if (requestedBranchCode && productBranchCode !== requestedBranchCode) return false;
+      if (locationCode && productLocationCode !== locationCode) return false;
+      return productPrice > 0;
+    });
 
-    if (isZombaLocationCode(locationCode) && mapped.length > 0) {
-      const sample = mapped[0];
+    writeLookupCache(locationCode, derivedBranchCode, query, safeProducts);
+
+    if (isZombaLocationCode(locationCode) && safeProducts.length > 0) {
+      const sample = safeProducts[0];
       console.log(`[ZOMBA STOCK][EMERGENCY_LOOKUP] selectedLocation=${req.query.locationCode || req.query.branchCode || '(none)'} resolvedStockLocation=${locationCode} querySource=${sample.stockSource || 'LocationSpecificPersistedProductStock'} product=${sample.sourceCode || sample.productCode || 'UNKNOWN'} stock=${Number(sample.stock || 0)} cache=miss`);
-      const verifyProduct = mapped.find((row) => String(row.sourceCode || row.productCode || '').trim() === '9501100002174');
+      const verifyProduct = safeProducts.find((row) => String(row.sourceCode || row.productCode || '').trim() === '9501100002174');
       if (verifyProduct) {
         console.log(`[ZOMBA STOCK][VERIFY][EMERGENCY_LOOKUP] selectedLocation=${req.query.locationCode || req.query.branchCode || '(none)'} resolvedStockLocation=${locationCode} querySource=${verifyProduct.stockSource || 'LocationSpecificPersistedProductStock'} product=9501100002174 stock=${Number(verifyProduct.stock || 0)} cache=miss`);
       }
@@ -844,11 +860,11 @@ async function lookupEmergencyProducts(req, res) {
       locationCode,
       mode: isZombaScope ? 'ZOMBA_FAST_PATH' : 'SCOPED_CODES_PATH',
       query,
-      resultCount: mapped.length,
+      resultCount: safeProducts.length,
       durationMs: Date.now() - startedAt,
     });
 
-    return res.status(200).json({ success: true, products: mapped });
+    return res.status(200).json({ success: true, products: safeProducts });
   } catch (error) {
     console.error('[EMERGENCY SALES] lookup failed:', error.message);
     return res.status(500).json({ success: false, error: 'Failed to search products' });
@@ -867,7 +883,7 @@ async function createEmergencySale(req, res) {
     if (locationCode === 'SH' && !requestedBranchCode) {
       return res.status(400).json({
         success: false,
-        error: 'Ambiguous location code SH requires explicit branchCode parameter',
+        error: 'branchCode is required for SH because SH exists in multiple branches.',
       });
     }
 
@@ -1223,7 +1239,7 @@ async function listEmergencySales(req, res) {
     if (locationCode === 'SH' && !requestedBranchCode) {
       return res.status(400).json({
         success: false,
-        error: 'Ambiguous location code SH requires explicit branchCode parameter',
+        error: 'branchCode is required for SH because SH exists in multiple branches.',
       });
     }
 

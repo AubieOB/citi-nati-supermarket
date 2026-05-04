@@ -1197,7 +1197,8 @@ const getProducts = async (req, res) => {
 
     // Extract query parameters for filtering and pagination
     // Support both offset-based (offset, limit) and page-based (page, pageSize) for backwards compatibility
-    const { search, category, onSale, page, pageSize, offset, limit, includePosExpiry, locationCode } = req.query;
+    const { search, category, onSale, page, pageSize, offset, limit, includePosExpiry, locationCode, branchCode } = req.query;
+    const requestedBranchCode = normalizeBranchCode(branchCode);
     const requestedPosExpiry = String(includePosExpiry || '').trim().toLowerCase() === 'true';
     const forceAdminPosExpiry = shouldForceAdminExpiryEnrichment(req);
     const shouldIncludePosExpiry = requestedPosExpiry || forceAdminPosExpiry;
@@ -1264,6 +1265,12 @@ const getProducts = async (req, res) => {
       const derivedBranchCode = deriveBranchCodeFromScopeCodes(scopeCodes);
       const rawLocationParam = String(locationCode || '').trim().toUpperCase();
       const resWasMapped = (rawLocationParam === 'RES' || rawLocationParam === 'ZOMBA_RES') && normalizedLocationCode === 'ST999';
+
+      if (normalizedLocationCode === 'SH' && !requestedBranchCode) {
+        return res.status(400).json({
+          error: 'branchCode is required for SH because SH exists in multiple branches.',
+        });
+      }
 
       // Keep legacy behavior for Blantyre, but enforce strict branch+location reads for Zomba.
       if (derivedBranchCode === 'ZOMBA') {
