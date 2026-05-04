@@ -68,7 +68,9 @@ const MAINTENANCE_MESSAGE_KEY = 'maintenance_mode_message';
 const DEFAULT_MAINTENANCE_MESSAGE = 'We are currently carrying out maintenance to improve your experience. We apologize for the inconvenience.';
 
 function normalizeLocationCode(value) {
-  return normalizeScopeCode(value);
+  // Handle cases like "SH:1" by extracting the location code before the colon
+  const cleanValue = String(value || '').trim().split(':')[0];
+  return normalizeScopeCode(cleanValue);
 }
 
 const BRANCH_CODE_ALIASES = {

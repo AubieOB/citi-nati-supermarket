@@ -160,7 +160,9 @@ async function resolveLocationScopedProductCodes(locationCode) {
 }
 
 function normalizeLocationCode(value) {
-  return normalizeScopeCode(value);
+  // Handle cases like "SH:1" by extracting the location code before the colon
+  const cleanValue = String(value || '').trim().split(':')[0];
+  return normalizeScopeCode(cleanValue);
 }
 
 function deriveBranchCodeFromLocationCode(locationCode) {
