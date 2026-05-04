@@ -286,7 +286,7 @@ async function resolveLocationScopedProductCodesFromLatestCosts(scopeCodes = [])
     .filter(Boolean);
 }
 
-function buildEmergencySalesLocationScopeFilters(locationCode) {
+  function buildEmergencySalesLocationScopeFilters(locationCode, requestedBranchCode = null) {
   const scopeCodes = expandLocationScopeCodes(locationCode);
   if (scopeCodes.length === 0) {
     return [];
@@ -861,7 +861,7 @@ async function createEmergencySale(req, res) {
       return res.status(400).json({ success: false, error: 'locationCode is required and must be one of BT, SH, BAR, ST999, WH, or ZA' });
     }
 
-    const branchCode = getBranchCodeFromLocationCode(locationCode);
+    const branchCode = requestedBranchCode || getBranchCodeFromLocationCode(locationCode);
     const branchName = getBranchNameFromLocationCode(locationCode);
     const posLocationCode = getDefaultAgentLocationCode(branchCode, locationCode);
     if (branchCode === 'ZOMBA' && !isConcreteZombaOperationalLocationCode(posLocationCode)) {
@@ -1273,7 +1273,7 @@ async function listEmergencySales(req, res) {
     }
 
     if (locationCode) {
-      const locationScopeFilters = buildEmergencySalesLocationScopeFilters(locationCode);
+      const locationScopeFilters = buildEmergencySalesLocationScopeFilters(locationCode, branchCode);
       if (locationScopeFilters.length > 0) {
         andClauses.push({ OR: locationScopeFilters });
       }
