@@ -861,6 +861,14 @@ async function createEmergencySale(req, res) {
       return res.status(400).json({ success: false, error: 'locationCode is required and must be one of BT, SH, BAR, ST999, WH, or ZA' });
     }
 
+    // For ambiguous Zomba locations, require explicit branchCode
+    if (locationCode === 'SH' && !requestedBranchCode) {
+      return res.status(400).json({
+        success: false,
+        error: 'Ambiguous location code SH requires explicit branchCode parameter',
+      });
+    }
+
     const branchCode = requestedBranchCode || getBranchCodeFromLocationCode(locationCode);
     const branchName = getBranchNameFromLocationCode(locationCode);
     const posLocationCode = getDefaultAgentLocationCode(branchCode, locationCode);
@@ -1201,12 +1209,21 @@ async function listEmergencySales(req, res) {
     const search = String(req.query.search || '').trim();
     const cashier = String(req.query.cashier || '').trim();
     const product = String(req.query.product || '').trim();
-    const locationCode = normalizeLocationCode(req.query.locationCode || req.query.branchCode);
-    const branchCode = normalizeBranchCode(req.query.branchCode || getBranchCodeFromLocationCode(locationCode));
+    const locationCode = normalizeLocationCode(req.query.locationCode);
+    const requestedBranchCode = normalizeBranchCode(req.query.branchCode);
+    const branchCode = requestedBranchCode || getBranchCodeFromLocationCode(locationCode);
     const startDate = String(req.query.startDate || '').trim();
     const endDate = String(req.query.endDate || '').trim();
     const requesterRole = String(req.user?.role || '').trim().toLowerCase();
     const requesterUserId = String(req.user?.userId || '').trim();
+
+    // For ambiguous Zomba locations, require explicit branchCode
+    if (locationCode === 'SH' && !requestedBranchCode) {
+      return res.status(400).json({
+        success: false,
+        error: 'Ambiguous location code SH requires explicit branchCode parameter',
+      });
+    }
 
     const andClauses = [];
 
@@ -1273,7 +1290,7 @@ async function listEmergencySales(req, res) {
     }
 
     if (locationCode) {
-      const locationScopeFilters = buildEmergencySalesLocationScopeFilters(locationCode, branchCode);
+      const locationScopeFilters = buildEmergencySalesLocationScopeFilters(locationCode, requestedBranchCode || branchCode);
       if (locationScopeFilters.length > 0) {
         andClauses.push({ OR: locationScopeFilters });
       }

@@ -30,6 +30,7 @@ import '../../css/admin-responsive-filters.css';
 
 const AdminStocks = ({
   selectedLocationCode = 'BT',
+  selectedBranchCode = null,
   cachedProducts = [],
   cachedProductsMeta = {},
   onRefreshProductsCache,
@@ -79,7 +80,7 @@ const AdminStocks = ({
     displayedProductsRef.current = [];
     const cleanup = setupSocketListeners();
     return cleanup;
-  }, [selectedLocationCode]);
+  }, [selectedLocationCode, selectedBranchCode]);
 
   // Sync product list from shared cache whenever it changes — never touches search/filter state.
   // Stale-while-revalidate: during background pagination the currently displayed list stays
@@ -163,9 +164,15 @@ const AdminStocks = ({
 
       const handleProductUpdate = (updatedProduct) => {
         const updatedLocationCode = String(updatedProduct?.locationCode || '').trim().toUpperCase();
+        const updatedBranchCode = String(updatedProduct?.branchCode || '').trim().toUpperCase();
         const selectedScope = resolveOperationalScope(selectedLocationCode);
         const currentLocationCode = String(selectedScope?.locationCode || selectedLocationCode || '').trim().toUpperCase();
+        const currentBranchCode = String(selectedBranchCode || selectedScope?.branchCode || '').trim().toUpperCase();
+
         if (updatedLocationCode && currentLocationCode && updatedLocationCode !== currentLocationCode) {
+          return;
+        }
+        if (updatedBranchCode && currentBranchCode && updatedBranchCode !== currentBranchCode) {
           return;
         }
 
@@ -208,6 +215,9 @@ const AdminStocks = ({
       if (selectedLocationCode) {
         firstParams.append('locationCode', selectedLocationCode);
       }
+      if (selectedBranchCode) {
+        firstParams.append('branchCode', selectedBranchCode);
+      }
       const res1 = await api.get(`/products?${firstParams.toString()}`);
       const firstBatch = filterProductsForOperationalLocation(res1.data.products || [], selectedLocationCode)
         .map((product) => enrichProductStock(product));
@@ -236,6 +246,9 @@ const AdminStocks = ({
             const params = new URLSearchParams({ page: String(page), pageSize: String(perPage) });
             if (selectedLocationCode) {
               params.append('locationCode', selectedLocationCode);
+            }
+            if (selectedBranchCode) {
+              params.append('branchCode', selectedBranchCode);
             }
             const res = await api.get(`/products?${params.toString()}`);
             const items = res.data.products || [];
@@ -286,6 +299,7 @@ const AdminStocks = ({
       const response = await api.put(`/products/${selectedProduct.id}`, {
         stock: newStock,
         locationCode: selectedLocationCode,
+        ...(selectedBranchCode ? { branchCode: selectedBranchCode } : {}),
       });
 
       // Update local state (allProducts list used for filtering/pagination)

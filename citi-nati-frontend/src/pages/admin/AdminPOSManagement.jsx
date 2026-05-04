@@ -26,6 +26,7 @@ import '../../styles/global.css';
 
 const AdminPOSManagement = ({
   selectedLocationCode = 'BT',
+  selectedBranchCode = null,
   cachedProducts = [],
   cachedProductsMeta = {},
   onRefreshProductsCache,
@@ -87,6 +88,9 @@ const AdminPOSManagement = ({
         params.append('limit', String(perPage));
         if (selectedLocationCode) {
           params.append('locationCode', selectedLocationCode);
+        }
+        if (selectedBranchCode) {
+          params.append('branchCode', selectedBranchCode);
         }
         return api.get(`/admin/pos-products?${params.toString()}`);
       };
@@ -327,7 +331,7 @@ const AdminPOSManagement = ({
   useEffect(() => {
     displayedProductsRef.current = [];
     fetchProducts('', 1, 'all');
-  }, [selectedLocationCode]);
+  }, [selectedLocationCode, selectedBranchCode]);
 
   // When the shared cache updates, re-filter WITHOUT resetting page or search.
   // Stale-while-revalidate: if background pagination is running and we already have
@@ -428,8 +432,12 @@ const AdminPOSManagement = ({
               await api.put(`/admin/pos-products/${productId}/visibility`, {
                 hideFromProductsPage: hideFromProducts,
                 locationCode: selectedLocationCode,
+                ...(selectedBranchCode ? { branchCode: selectedBranchCode } : {}),
               }, {
-                params: { locationCode: selectedLocationCode },
+                params: {
+                  locationCode: selectedLocationCode,
+                  ...(selectedBranchCode ? { branchCode: selectedBranchCode } : {}),
+                },
               });
             }
           }
@@ -461,8 +469,12 @@ const AdminPOSManagement = ({
       const response = await api.put(`/admin/pos-products/${productId}/visibility`, {
         hideFromProductsPage: !hideFromProductsPage,
         locationCode: selectedLocationCode,
+        ...(selectedBranchCode ? { branchCode: selectedBranchCode } : {}),
       }, {
-        params: { locationCode: selectedLocationCode },
+        params: {
+          locationCode: selectedLocationCode,
+          ...(selectedBranchCode ? { branchCode: selectedBranchCode } : {}),
+        },
       });
 
       if (response.data.success) {
@@ -498,8 +510,14 @@ const AdminPOSManagement = ({
       try {
         setLoading(true);
         const response = await api.delete('/admin/pos-products/delete-selected', {
-          params: { locationCode: selectedLocationCode },
-          data: { productIds: Array.from(selectedProducts) },
+          params: {
+            locationCode: selectedLocationCode,
+            ...(selectedBranchCode ? { branchCode: selectedBranchCode } : {}),
+          },
+          data: {
+            productIds: Array.from(selectedProducts),
+            ...(selectedBranchCode ? { branchCode: selectedBranchCode } : {}),
+          },
         });
 
         if (response.data.success) {
@@ -530,8 +548,14 @@ const AdminPOSManagement = ({
       try {
         setLoading(true);
         const response = await api.delete('/admin/pos-products/delete-all', {
-          params: { locationCode: selectedLocationCode },
-          data: { locationCode: selectedLocationCode },
+          params: {
+            locationCode: selectedLocationCode,
+            ...(selectedBranchCode ? { branchCode: selectedBranchCode } : {}),
+          },
+          data: {
+            locationCode: selectedLocationCode,
+            ...(selectedBranchCode ? { branchCode: selectedBranchCode } : {}),
+          },
         });
 
         if (response.data.success) {

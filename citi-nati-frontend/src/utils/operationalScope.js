@@ -69,17 +69,26 @@ function filterProductsForOperationalLocation(products, value) {
   if (!Array.isArray(products) || products.length === 0) return [];
 
   const scope = resolveOperationalScope(value);
-  if (!scope || scope.branchCode !== 'ZOMBA') {
+  if (!scope) {
     return products;
   }
 
-  const expectedBranchCode = scope.branchCode;
-  const expectedLocationCode = scope.locationCode;
+  const expectedBranchCode = String(scope.branchCode || '').trim().toUpperCase();
+  const expectedLocationCode = String(scope.locationCode || '').trim().toUpperCase();
 
   return products.filter((product) => {
     const productBranchCode = String(product?.branchCode || '').trim().toUpperCase();
     const productLocationCode = String(product?.locationCode || '').trim().toUpperCase();
-    return productBranchCode === expectedBranchCode && productLocationCode === expectedLocationCode;
+
+    if (expectedBranchCode && productBranchCode && productBranchCode !== expectedBranchCode) {
+      return false;
+    }
+
+    if (expectedLocationCode && productLocationCode && productLocationCode !== expectedLocationCode) {
+      return false;
+    }
+
+    return true;
   });
 }
 

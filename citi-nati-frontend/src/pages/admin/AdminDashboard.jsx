@@ -573,16 +573,24 @@ const AdminDashboard = () => {
         return;
       }
 
-      const resolveUiScopeCodesFromPosLocation = (locationCode) => {
-        const normalized = normalizeOperationalScopeCode(locationCode);
-        if (!normalized) return [];
+      const resolveUiScopeCodesFromPosLocation = (locationCode, branchCode) => {
+        const normalizedLocationCode = normalizeOperationalScopeCode(locationCode);
+        if (!normalizedLocationCode) return [];
+
         return OPERATIONAL_SCOPES
-          .filter((scope) => normalizeOperationalScopeCode(scope.locationCode) === normalized)
+          .filter((scope) => {
+            const scopeLocationCode = normalizeOperationalScopeCode(scope.locationCode);
+            if (scopeLocationCode !== normalizedLocationCode) return false;
+            if (branchCode) {
+              return String(scope.branchCode || '').trim().toUpperCase() === String(branchCode || '').trim().toUpperCase();
+            }
+            return true;
+          })
           .map((scope) => scope.uiCode);
       };
 
       const applyRealtimeProductPatch = (product, sourceEvent) => {
-        const targetUiScopeCodes = resolveUiScopeCodesFromPosLocation(product?.locationCode);
+        const targetUiScopeCodes = resolveUiScopeCodesFromPosLocation(product?.locationCode, product?.branchCode);
         if (targetUiScopeCodes.length === 0) {
           return;
         }
