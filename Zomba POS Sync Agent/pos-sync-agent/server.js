@@ -535,29 +535,56 @@ async function sendProductsToLiveServer(products, syncContext = {}) {
       let batchCompleted = false;
       for (let attempt = 1; attempt <= MAX_BATCH_ATTEMPTS; attempt++) {
         try {
-          const response = await axios.post(
+          // CRITICAL: Validate every product has LocationCode before sending.
+          // For Zomba, LocationCode must be one of: SH, BAR, ST999
+          // Products without LocationCode indicate a critical fetch/enrichment bug.
+          const productsWithMissingLocation = batch.filter((p) => {
+            const locCode = String(p.LocationCode || '').trim();
+            return !locCode || locCode.length === 0;
+          });
+
+          if (productsWithMissingLocation.length > 0) {
+            const missingCount = productsWithMissingLocation.length;
+            const sampleCodes = productsWithMissingLocation.slice(0, 3).map((p) => String(p.ProductCode || 'UNKNOWN'));
+            console.error(`${SYNC_LOG_PREFIX} CRITICAL: products batch ${batchIndex + 1} has ${missingCount} products with missing LocationCode. Sample: ${sampleCodes.join(', ')}. This indicates a product fetch/enrichment bug. Batch will be rejected.`);
+            totalErrors++;
+            batchCompleted = true;
+            break;
+          }
+
+          // Log batch location breakdown before sending
+          const batchLocationBreakdownDebug = batch.reduce((acc, p) => {
+            const locCode = String(p.LocationCode || 'UNKNOWN').trim().toUpperCase();
+            acc[locCode] = (acc[locCode] || 0) + 1;
+            return acc;
+          }, {});
+          
+          console.log(`${SYNC_LOG_PREFIX} Sending products batch ${batchIndex + 1}/${batches.length} (${batch.length} rows, attempt ${attempt}/${MAX_BATCH_ATTEMPTS})`, batchLocationBreakdownDebug);
             `${appConfig.backend.baseUrl}/api/products/pos-sync/push`,
             {
-              products: batch.map(p => ({
-                sourceCode: p.ProductCode,
-                name: p.ProductName,
-                price: p.SellingPrice,
-                stock: p.QuantityAvailable,
-                stockSource: p.StockSource || null,
-                stockDate: p.StockDate ? (p.StockDate instanceof Date ? p.StockDate.toISOString() : p.StockDate) : null,
-                barcode: p.Barcode || '',
-                category: p.CategoryName || 'Uncategorized',
-                expiryDate: p.ExpiryDate ? (p.ExpiryDate instanceof Date ? p.ExpiryDate.toISOString() : p.ExpiryDate) : null,
-                expirySource: p.ExpirySource || null,
-                nearestExpiryDate: p.ExpiryDate ? (p.ExpiryDate instanceof Date ? p.ExpiryDate.toISOString() : p.ExpiryDate) : null,
-                expiryBatchCount: Number.isFinite(Number(p.ExpiryBatchCount)) ? Number(p.ExpiryBatchCount) : 0,
-                daysToExpiry: Number.isFinite(Number(p.DaysToExpiry)) ? Number(p.DaysToExpiry) : null,
-                expiryStatus: p.ExpiryStatus || null,
-                expiryBatches: Array.isArray(p.ExpiryBatches) ? p.ExpiryBatches : [],
-                branchCode: appConfig.branch.branchCode,
-                branchName: appConfig.branch.branchName,
-                locationCode: p.LocationCode || appConfig.posDb.locationCode,
-              })),
+              products: batch.map((p) => {
+                const locCode = String(p.LocationCode || '').trim().toUpperCase();
+                return {
+                  sourceCode: p.ProductCode,
+                  name: p.ProductName,
+                  price: p.SellingPrice,
+                  stock: p.QuantityAvailable,
+                  stockSource: p.StockSource || null,
+                  stockDate: p.StockDate ? (p.StockDate instanceof Date ? p.StockDate.toISOString() : p.StockDate) : null,
+                  barcode: p.Barcode || '',
+                  category: p.CategoryName || 'Uncategorized',
+                  expiryDate: p.ExpiryDate ? (p.ExpiryDate instanceof Date ? p.ExpiryDate.toISOString() : p.ExpiryDate) : null,
+                  expirySource: p.ExpirySource || null,
+                  nearestExpiryDate: p.ExpiryDate ? (p.ExpiryDate instanceof Date ? p.ExpiryDate.toISOString() : p.ExpiryDate) : null,
+                  expiryBatchCount: Number.isFinite(Number(p.ExpiryBatchCount)) ? Number(p.ExpiryBatchCount) : 0,
+                  daysToExpiry: Number.isFinite(Number(p.DaysToExpiry)) ? Number(p.DaysToExpiry) : null,
+                  expiryStatus: p.ExpiryStatus || null,
+                  expiryBatches: Array.isArray(p.ExpiryBatches) ? p.ExpiryBatches : [],
+                  branchCode: appConfig.branch.branchCode,
+                  branchName: appConfig.branch.branchName,
+                  locationCode: locCode,
+                };
+              }),
               metadata: syncMetadata,
             },
             {
@@ -575,24 +602,35 @@ async function sendProductsToLiveServer(products, syncContext = {}) {
             totalSynced += response.data.synced || batch.length;
             batchCompleted = true;
             console.log(`${SYNC_LOG_PREFIX} products synced (batch ${batchIndex + 1}/${batches.length}, attempt ${attempt}/${MAX_BATCH_ATTEMPTS})`, {
-              batchLocationBreakdown,
+              synced: response.data.synced || 0,
+              batchSize: batch.length,
+              batchLocationBreakdown: batchLocationBreakdownDebug,
             });
             break;
+          } else {
+            // Backend returned success=false
+            const errorMsg = response.data.error || 'Unknown error';
+            console.error(`${SYNC_LOG_PREFIX} backend rejected batch ${batchIndex + 1} (attempt ${attempt}/${MAX_BATCH_ATTEMPTS}): ${errorMsg}`);
+            if (attempt === MAX_BATCH_ATTEMPTS) {
+              totalErrors++;
+            }
           }
         } catch (batchError) {
           const httpStatus = batchError && batchError.response ? batchError.response.status : null;
           const responseBody = batchError && batchError.response ? batchError.response.data : null;
           console.error(`${SYNC_LOG_PREFIX} error (products batch ${batchIndex + 1}/${batches.length}, attempt ${attempt}/${MAX_BATCH_ATTEMPTS}):`, batchError.message);
-          console.error(`${SYNC_LOG_PREFIX} batch ${batchIndex + 1} location breakdown:`, batchLocationBreakdown);
+          console.error(`${SYNC_LOG_PREFIX} batch ${batchIndex + 1} location breakdown:`, batchLocationBreakdownDebug);
           if (httpStatus) {
             console.error(`${SYNC_LOG_PREFIX} batch ${batchIndex + 1} HTTP status: ${httpStatus}`);
           }
           if (responseBody) {
-            console.error(`${SYNC_LOG_PREFIX} batch ${batchIndex + 1} response body:`, JSON.stringify(responseBody).slice(0, 1000));
+            const bodySlice = typeof responseBody === 'string' ? responseBody : JSON.stringify(responseBody);
+            console.error(`${SYNC_LOG_PREFIX} batch ${batchIndex + 1} response body:`, bodySlice.slice(0, 1000));
           }
 
           if (attempt === MAX_BATCH_ATTEMPTS) {
             totalErrors++;
+            console.error(`${SYNC_LOG_PREFIX} batch ${batchIndex + 1} failed after ${MAX_BATCH_ATTEMPTS} attempts - giving up`);
           }
         }
       }
@@ -2540,6 +2578,52 @@ app.get('/health', (req, res) => {
   });
 });
 
+/**
+ * POST /pos-sync/force-full-sync
+ * Force a full product sync for Zomba (all locations) without waiting for AUTO SYNC cycle.
+ * Admin/operations only - returns immediately with a background sync queued.
+ */
+app.post('/pos-sync/force-full-sync', validateApiKey, async (req, res) => {
+  try {
+    console.log(`${BRANCH_TAG} [MANUAL SYNC] force-full-sync endpoint called - queueing full product refresh`);
+
+    if (!appConfig.features.enableReportingSync) {
+      return res.status(403).json({
+        success: false,
+        error: 'Product sync is disabled (ENABLE_REPORTING_SYNC=false)',
+      });
+    }
+
+    if (isAutoSyncRunning) {
+      return res.status(409).json({
+        success: false,
+        error: 'Auto-sync is already running. Try again in a few seconds.',
+      });
+    }
+
+    // Queue immediate sync in background (do not block response)
+    setImmediate(() => {
+      autoSync().catch((err) => {
+        console.error(`${BRANCH_TAG} [MANUAL SYNC] Background sync failed:`, err.message);
+      });
+    });
+
+    return res.json({
+      success: true,
+      message: 'Full product sync queued for all operational locations (SH, BAR, ST999)',
+      locations: getOperationalSyncLocations(),
+      branchCode: appConfig.branch.branchCode,
+      queuedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error(`${BRANCH_TAG} [MANUAL SYNC] Error:`, err.message);
+    return res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
+
 /** 404 handler */
 app.use((req, res) => res.status(404).json({ success: false, error: 'Not found' }));
 
@@ -3093,7 +3177,26 @@ function logStartupConfiguration() {
   console.log(`${BRANCH_TAG} [BOOT] Agent: ${appConfig.server.agentName} v${PACKAGE_VERSION}`);
   console.log(`${BRANCH_TAG} [BOOT] Branch: ${appConfig.branch.branchName} (${appConfig.branch.branchCode})`);
   console.log(`${BRANCH_TAG} [BOOT] Source: ${appConfig.branch.syncSourceCode} | LocationId: ${appConfig.branch.locationId}`);
-  console.log(`${BRANCH_TAG} [BOOT] Feature flags:`, appConfig.features);
+  
+  // ZOMBA-SPECIFIC STARTUP LOGGING
+  if (appConfig.branch.branchCode === 'ZOMBA') {
+    const zombaOpsLocs = getOperationalSyncLocations();
+    console.log(`${BRANCH_TAG} [BOOT][ZOMBA] Operational locations configured: ${zombaOpsLocs.join(', ')}`);
+  }
+
+  console.log(`${BRANCH_TAG} [BOOT] Backend URL: ${appConfig.backend.baseUrl || '(NOT CONFIGURED - SYNC DISABLED)'}`);
+  console.log(`${BRANCH_TAG} [BOOT] POS Database: ${appConfig.posDb.server}/${appConfig.posDb.database}`);
+  console.log(`${BRANCH_TAG} [BOOT] Polling interval: ${appConfig.polling.reportingSyncIntervalMs}ms`);
+  
+  console.log(`${BRANCH_TAG} [BOOT] Feature flags:`, {
+    enableReportingSync: appConfig.features.enableReportingSync,
+    enableOnlineOrderWriteback: appConfig.features.enableOnlineOrderWriteback,
+    enableStockWriteback: appConfig.features.enableStockWriteback,
+    enablePriceSync: appConfig.features.enablePriceSync,
+    enableProductNameSync: appConfig.features.enableProductNameSync,
+    enableInvoiceWriteback: appConfig.features.enableInvoiceWriteback,
+  });
+  
   console.log(`${BRANCH_TAG} [BOOT] Startup summary:`, startupSummary);
 
   if (validation.warnings.length > 0) {
