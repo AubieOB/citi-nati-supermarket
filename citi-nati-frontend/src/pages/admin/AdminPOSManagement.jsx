@@ -335,8 +335,41 @@ const AdminPOSManagement = ({
   useEffect(() => {
     if (!hasSharedProductsCache) return;
     if (cachedProductsMeta?.isBackgroundLoading && displayedProductsRef.current.length > 0) return;
+
+    if (Array.isArray(cachedProducts) && cachedProducts.length > 0) {
+      const normalizedSearch = String(searchTerm || '').trim().toLowerCase();
+      const posScopedCachedProducts = cachedProducts.filter((product) => {
+        const sourceCode = String(product?.sourceCode || product?.productCode || '').trim();
+        return Boolean(sourceCode);
+      });
+
+      const allItems = normalizedSearch
+        ? posScopedCachedProducts.filter((product) => {
+            const name = String(product?.name || '').toLowerCase();
+            const code = String(product?.sourceCode || product?.productCode || '').toLowerCase();
+            const category = String(product?.category || '').toLowerCase();
+            return name.includes(normalizedSearch) || code.includes(normalizedSearch) || category.includes(normalizedSearch);
+          })
+        : posScopedCachedProducts;
+
+      const scopedItems = filterProductsForOperationalLocation(allItems, selectedLocationCode);
+      const uniqueCategories = [...new Set(scopedItems.map((p) => p.category).filter(Boolean))];
+      const filteredItems = applyCategoryFilter(scopedItems, selectedCategory);
+      const nextTotalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
+
+      setCategories(uniqueCategories.sort());
+      setProducts(filteredItems);
+      setTotal(filteredItems.length);
+      setTotalPages(nextTotalPages);
+      setPage((prevPage) => Math.min(prevPage, nextTotalPages));
+      setError(cachedProductsMeta?.error || null);
+      setLoading(Boolean(cachedProductsMeta?.isLoading && filteredItems.length === 0));
+      displayedProductsRef.current = allItems;
+      return;
+    }
+
     fetchProducts(searchTerm, page, selectedCategory);
-  }, [cachedProducts, cachedProductsMeta, hasSharedProductsCache]);
+  }, [cachedProducts, cachedProductsMeta?.isBackgroundLoading, cachedProductsMeta?.isLoading, hasSharedProductsCache, searchTerm, page, selectedCategory]);
 
   // Handle pagination
   const handlePageChange = (newPage) => {
