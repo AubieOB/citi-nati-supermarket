@@ -96,7 +96,18 @@ function safeParseJson(value, fallback) {
 
 const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocationCode = 'BT', selectedBranchCode = null }) => {
   const { user } = useAuth();
-  const previousScopeRef = useRef({ selectedLocationCode, selectedBranchCode });
+
+  // Derive branchCode from locationCode if not provided
+  const deriveBranchCodeFromLocationCode = (locationCode) => {
+    const normalized = String(locationCode || '').trim().toUpperCase();
+    if (['SH', 'BAR', 'ST999', 'WH', 'ZA'].includes(normalized)) return 'ZOMBA';
+    if (normalized === 'BT') return 'BLANTYRE';
+    return null;
+  };
+
+  const effectiveBranchCode = selectedBranchCode || deriveBranchCodeFromLocationCode(selectedLocationCode);
+
+  const previousScopeRef = useRef({ selectedLocationCode, selectedBranchCode: effectiveBranchCode });
 
   const rootRef = useRef(null);
   const hiddenBarcodeInputRef = useRef(null);
@@ -145,18 +156,18 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
 
   const draftStorageKey = useMemo(() => {
     const userId = user?.id || user?.email || 'anonymous';
-    return `emergency-sales-draft:${apiBase}:${userId}:${selectedBranchCode || 'NONE'}:${selectedLocationCode || 'BT'}`;
-  }, [apiBase, user, selectedBranchCode, selectedLocationCode]);
+    return `emergency-sales-draft:${apiBase}:${userId}:${effectiveBranchCode || 'NONE'}:${selectedLocationCode || 'BT'}`;
+  }, [apiBase, user, effectiveBranchCode, selectedLocationCode]);
 
   useEffect(() => {
     const previousScope = previousScopeRef.current;
-    if (previousScope.selectedLocationCode === selectedLocationCode && previousScope.selectedBranchCode === selectedBranchCode) {
+    if (previousScope.selectedLocationCode === selectedLocationCode && previousScope.selectedBranchCode === effectiveBranchCode) {
       return;
     }
 
     const previousLocationCode = previousScope.selectedLocationCode;
     const previousBranchCode = previousScope.selectedBranchCode;
-    previousScopeRef.current = { selectedLocationCode, selectedBranchCode };
+    previousScopeRef.current = { selectedLocationCode, selectedBranchCode: effectiveBranchCode };
 
     // Reset volatile state so previous location data never bleeds into current scope.
     setSearchModalOpen(false);
@@ -174,9 +185,9 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
       from: previousLocationCode,
       to: selectedLocationCode,
       branchFrom: previousBranchCode,
-      branchTo: selectedBranchCode,
+      branchTo: effectiveBranchCode,
     });
-  }, [selectedBranchCode, selectedLocationCode]);
+  }, [effectiveBranchCode, selectedLocationCode]);
 
   const subtotal = useMemo(
     () => toMoney(cart.reduce((sum, line) => sum + toMoney(line.qty * line.unitPrice), 0)),
@@ -221,7 +232,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
           page: 1,
           pageSize: isAdminScope ? 200 : 20,
           status: 'all',
-          ...(selectedBranchCode ? { branchCode: selectedBranchCode } : {}),
+          ...(effectiveBranchCode ? { branchCode: effectiveBranchCode } : {}),
           ...(selectedLocationCode ? { locationCode: selectedLocationCode } : {}),
         },
       });
@@ -237,7 +248,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
     } catch (error) {
       notifyError(`Failed to load emergency sales: ${error.response?.data?.error || error.message}`, 3000);
     }
-  }, [apiBase, selectedBranchCode, selectedLocationCode]);
+  }, [apiBase, effectiveBranchCode, selectedLocationCode]);
 
   useEffect(() => {
     fetchEmergencySales();
@@ -372,7 +383,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
     if (!trimmed) return [];
 
     const bypassCache = options?.bypassCache === true;
-    const cacheKey = `${String(selectedBranchCode || '').toUpperCase()}|${String(selectedLocationCode || '').toUpperCase()}|${trimmed.toLowerCase()}`;
+    const cacheKey = `${String(effectiveBranchCode || '').toUpperCase()}|${String(selectedLocationCode || '').toUpperCase()}|${trimmed.toLowerCase()}`;
     const cached = bypassCache ? null : lookupCacheRef.current.get(cacheKey);
     if (cached && (Date.now() - cached.cachedAt) < EMERGENCY_LOOKUP_CLIENT_CACHE_TTL_MS) {
       return cached.products;
@@ -381,19 +392,19 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
     console.log('[EMERGENCY SALES][LOOKUP] requesting products', {
       query: trimmed,
       locationCode: selectedLocationCode,
-      branchCode: selectedBranchCode,
+      branchCode: effectiveBranchCode,
     });
 
     const response = await api.get(`/${apiBase}/lookup`, {
       params: {
         q: trimmed,
-        ...(selectedBranchCode ? { branchCode: selectedBranchCode } : {}),
+        ...(effectiveBranchCode ? { branchCode: effectiveBranchCode } : {}),
         ...(selectedLocationCode ? { locationCode: selectedLocationCode } : {}),
         ...(bypassCache ? { forceRefresh: '1' } : {}),
       },
     });
 
-    const requestedBranchCode = String(selectedBranchCode || '').trim().toUpperCase();
+    const requestedBranchCode = String(effectiveBranchCode || '').trim().toUpperCase();
   const requestedLocationCode = String(selectedLocationCode || '').trim().toUpperCase();
 
   const products = (response.data?.products || []).filter((product) => {
@@ -417,7 +428,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
   });
 
   return products;
-  }, [apiBase, selectedBranchCode, selectedLocationCode]);
+  }, [apiBase, effectiveBranchCode, selectedLocationCode]);
 
   const refreshSearchModalResults = useCallback(async ({ bypassCache = false, showLoading = false, resetActiveIndex = false } = {}) => {
     const query = searchModalQuery.trim();
@@ -555,7 +566,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
       window.removeEventListener('focus', silentRefresh);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [refreshSearchModalResults, searchModalOpen, searchModalQuery, selectedBranchCode, selectedLocationCode]);
+  }, [refreshSearchModalResults, searchModalOpen, searchModalQuery, effectiveBranchCode, selectedLocationCode]);
 
   const clearInvoice = useCallback(() => {
     setCart([]);
