@@ -560,6 +560,7 @@ async function sendProductsToLiveServer(products, syncContext = {}) {
           }, {});
           
           console.log(`${SYNC_LOG_PREFIX} Sending products batch ${batchIndex + 1}/${batches.length} (${batch.length} rows, attempt ${attempt}/${MAX_BATCH_ATTEMPTS})`, batchLocationBreakdownDebug);
+          const response = await axios.post(
             `${appConfig.backend.baseUrl}/api/products/pos-sync/push`,
             {
               products: batch.map((p) => {
