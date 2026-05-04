@@ -1403,10 +1403,6 @@ async function retryEmergencySaleSync(req, res) {
 
 async function getPendingEmergencySalesForPosSync(req, res) {
   try {
-    if (!validateAgentSecret(req)) {
-      return res.status(403).json({ success: false, error: 'Unauthorized' });
-    }
-
     const branchCode = normalizeBranchCode(req.headers['x-branch-code'] || req.query.branchCode || req.query.locationCode || req.body?.branchCode || req.body?.locationCode);
     
     // For Zomba branch, support multiple sub-locations (SH, BAR, WH)
@@ -1508,10 +1504,6 @@ async function getPendingEmergencySalesForPosSync(req, res) {
 
 async function ackEmergencySaleSynced(req, res) {
   try {
-    if (!validateAgentSecret(req)) {
-      return res.status(403).json({ success: false, error: 'Unauthorized' });
-    }
-
     const agentBranchCode = normalizeBranchCode(req.headers['x-branch-code'] || req.body?.branchCode || req.body?.locationCode);
     const explicitAgentLocationCode = normalizeLocationCode(req.body?.locationCode);
 
@@ -1586,10 +1578,6 @@ async function ackEmergencySaleSynced(req, res) {
 
 async function ackEmergencySaleSyncFailed(req, res) {
   try {
-    if (!validateAgentSecret(req)) {
-      return res.status(403).json({ success: false, error: 'Unauthorized' });
-    }
-
     const agentBranchCode = normalizeBranchCode(req.headers['x-branch-code'] || req.body?.branchCode || req.body?.locationCode);
     const explicitAgentLocationCode = normalizeLocationCode(req.body?.locationCode);
 
