@@ -196,8 +196,8 @@ async function readLookupCache(locationCode, branchCode, query) {
   return entry.products;
 }
 
-function writeLookupCache(locationCode, query, products) {
-  const key = getLookupCacheKey(locationCode, query);
+function writeLookupCache(locationCode, branchCode, query, products) {
+  const key = getLookupCacheKey(locationCode, branchCode, query);
   emergencyLookupCache.set(key, {
     cachedAt: Date.now(),
     products,
@@ -292,7 +292,7 @@ function buildEmergencySalesLocationScopeFilters(locationCode) {
     return [];
   }
 
-  const branchCode = getBranchCodeFromLocationCode(locationCode);
+  const branchCode = requestedBranchCode || getBranchCodeFromLocationCode(locationCode);
   const includeBranchFallback = scopeCodes.includes('BT');
   const base = scopeCodes.flatMap((code) => ([
     { cartSnapshot: { path: ['locationCode'], equals: code } },
@@ -659,7 +659,9 @@ async function lookupEmergencyProducts(req, res) {
   try {
     const startedAt = Date.now();
     const query = String(req.query.q || req.query.search || '').trim();
-    const locationCode = normalizeLocationCode(req.query.locationCode || req.query.branchCode);
+    const locationCode = normalizeLocationCode(req.query.locationCode);
+    const requestedBranchCode = normalizeBranchCode(req.query.branchCode);
+    const derivedBranchCode = requestedBranchCode || getBranchCodeFromLocationCode(locationCode);
     const bypassCache = ['1', 'true', 'yes'].includes(String(req.query.forceRefresh || '').trim().toLowerCase());
     if (!query) {
       return res.status(200).json({ success: true, products: [] });
@@ -682,7 +684,7 @@ async function lookupEmergencyProducts(req, res) {
       return res.status(200).json({ success: true, products: [] });
     }
 
-    const cachedProducts = bypassCache ? null : await readLookupCache(locationCode, query);
+    const cachedProducts = bypassCache ? null : await readLookupCache(locationCode, derivedBranchCode, query);
     if (cachedProducts) {
       console.log('[EMERGENCY SALES][LOOKUP] cache-hit', {
         selectedLocation: req.query.locationCode || req.query.branchCode || '(none)',
@@ -698,8 +700,8 @@ async function lookupEmergencyProducts(req, res) {
       return res.status(200).json({ success: true, products: cachedProducts });
     }
 
-    const derivedBranchCode = deriveBranchCodeFromScopeCodes(expandLocationScopeCodes(locationCode));
-    const isZombaScope = isZombaLocationCode(locationCode);
+    // const derivedBranchCode = deriveBranchCodeFromScopeCodes(expandLocationScopeCodes(locationCode));// Commented for a purpose
+    const isZombaScope = derivedBranchCode === 'ZOMBA';
     let scopedProductCodes = null;
 
     if (isZombaScope) {
@@ -762,6 +764,8 @@ async function lookupEmergencyProducts(req, res) {
         discountPrice: true,
         isOnSale: true,
         stock: true,
+        branchCode: true,
+        locationCode: true,
         overrideActive: true,
         overrideStock: true,
         lowStockThreshold: true,
@@ -823,7 +827,7 @@ async function lookupEmergencyProducts(req, res) {
         return aExact ? -1 : 1;
       });
 
-    writeLookupCache(locationCode, query, mapped);
+    writeLookupCache(locationCode, derivedBranchCode, query, mapped);
 
     if (isZombaLocationCode(locationCode) && mapped.length > 0) {
       const sample = mapped[0];
@@ -851,7 +855,8 @@ async function lookupEmergencyProducts(req, res) {
 
 async function createEmergencySale(req, res) {
   try {
-    const locationCode = normalizeLocationCode(req.body?.locationCode || req.body?.branchCode || req.query?.locationCode);
+    const locationCode = normalizeLocationCode(req.body?.locationCode || req.query?.locationCode);
+    const requestedBranchCode = normalizeBranchCode(req.body?.branchCode || req.query?.branchCode);
     if (!locationCode || !SUPPORTED_LOCATION_CODES.includes(locationCode)) {
       return res.status(400).json({ success: false, error: 'locationCode is required and must be one of BT, SH, BAR, ST999, WH, or ZA' });
     }
@@ -1141,7 +1146,7 @@ async function createEmergencySale(req, res) {
     const formattedSale = formatEmergencySale(created.sale);
     const posWritePayload = buildPosWriteInvoicePayload(created.sale);
 
-    invalidateLookupCacheForLocation(locationCode, 'emergency_sale_stock_update');
+    invalidateLookupCacheForLocation(locationCode, branchCode, 'emergency_sale_stock_update');
 
     console.log('[EMERGENCY SALES][CREATE] created sale', {
       saleRef: formattedSale.sale_ref,

@@ -393,13 +393,30 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
       },
     });
 
-    const products = response.data?.products || [];
-    lookupCacheRef.current.set(cacheKey, {
-      cachedAt: Date.now(),
-      products,
-    });
+    const requestedBranchCode = String(selectedBranchCode || '').trim().toUpperCase();
+  const requestedLocationCode = String(selectedLocationCode || '').trim().toUpperCase();
 
-    return products;
+  const products = (response.data?.products || []).filter((product) => {
+    const productBranchCode = String(product.branchCode || product.branch_code || '').trim().toUpperCase();
+    const productLocationCode = String(product.locationCode || product.location_code || '').trim().toUpperCase();
+
+    if (requestedBranchCode && productBranchCode && productBranchCode !== requestedBranchCode) {
+      return false;
+    }
+
+    if (requestedLocationCode && productLocationCode && productLocationCode !== requestedLocationCode) {
+      return false;
+    }
+
+    return true;
+  });
+
+  lookupCacheRef.current.set(cacheKey, {
+    cachedAt: Date.now(),
+    products,
+  });
+
+  return products;
   }, [apiBase, selectedBranchCode, selectedLocationCode]);
 
   const refreshSearchModalResults = useCallback(async ({ bypassCache = false, showLoading = false, resetActiveIndex = false } = {}) => {
@@ -1425,7 +1442,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
                   >
                     <div style={{ fontWeight: 700 }}>{product.name}</div>
                     <div style={{ fontSize: '0.82rem', color: '#666' }}>
-                      Code: {product.sourceCode || '-'} | Barcode: {product.barcode || '-'} | Stock: {product.effective_stock ?? product.effectiveStock ?? product.stock ?? 0} | Price: {formatMoney(product.unitPrice ?? product.unit_price ?? product.price)}
+                      Code: {product.sourceCode || '-'} | Branch: {product.branchCode || product.branch_code || '-'} | Loc: {product.locationCode || product.location_code || '-'} | Barcode: {product.barcode || '-'} | Stock: {product.effective_stock ?? product.effectiveStock ?? product.stock ?? 0} | Price: {formatMoney(product.unitPrice ?? product.unit_price ?? product.price)}
                     </div>
                   </button>
                 ))}
