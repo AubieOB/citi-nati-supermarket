@@ -73,6 +73,8 @@ async function failCommand(id, errorMessage, retryable = true) {
 
 async function pollPendingEmergencySales(limit = 10) {
   const client = createClient();
+  // branchCode is automatically sent via x-branch-code header from createClient()
+  // The endpoint will use this to determine scope (Zomba = all locations SH/BAR/ST999)
   const response = await client.get('/api/pos-sync/pending-emergency-sales', {
     params: { limit },
   });
