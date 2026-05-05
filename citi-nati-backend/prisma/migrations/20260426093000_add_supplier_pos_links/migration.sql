@@ -15,16 +15,16 @@ CREATE TABLE "supplier_pos_links" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "supplier_pos_links_supplier_id_branch_code_key" ON "supplier_pos_links"("supplier_id", "branch_code");
+CREATE UNIQUE INDEX IF NOT EXISTS "supplier_pos_links_supplier_id_branch_code_key" ON "supplier_pos_links"("supplier_id", "branch_code");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "supplier_pos_links_branch_code_pos_supplier_code_key" ON "supplier_pos_links"("branch_code", "pos_supplier_code");
+CREATE UNIQUE INDEX IF NOT EXISTS "supplier_pos_links_branch_code_pos_supplier_code_key" ON "supplier_pos_links"("branch_code", "pos_supplier_code");
 
 -- CreateIndex
-CREATE INDEX "supplier_pos_links_branch_code_idx" ON "supplier_pos_links"("branch_code");
+CREATE INDEX IF NOT EXISTS "supplier_pos_links_branch_code_idx" ON "supplier_pos_links"("branch_code");
 
 -- CreateIndex
-CREATE INDEX "supplier_pos_links_sync_status_idx" ON "supplier_pos_links"("sync_status");
+CREATE INDEX IF NOT EXISTS "supplier_pos_links_sync_status_idx" ON "supplier_pos_links"("sync_status");
 
 -- AddForeignKey
 ALTER TABLE "supplier_pos_links" ADD CONSTRAINT "supplier_pos_links_supplier_id_fkey" FOREIGN KEY ("supplier_id") REFERENCES "suppliers"("id") ON DELETE CASCADE ON UPDATE CASCADE;

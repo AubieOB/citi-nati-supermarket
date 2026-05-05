@@ -1,5 +1,5 @@
 -- AlterTable
-ALTER TABLE "Order" ADD COLUMN     "driverId" TEXT;
+ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS     "driverId" TEXT;
 
 -- CreateTable
 CREATE TABLE "Driver" (
@@ -13,10 +13,10 @@ CREATE TABLE "Driver" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Driver_phone_key" ON "Driver"("phone");
+CREATE UNIQUE INDEX IF NOT EXISTS "Driver_phone_key" ON "Driver"("phone");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Driver_email_key" ON "Driver"("email");
+CREATE UNIQUE INDEX IF NOT EXISTS "Driver_email_key" ON "Driver"("email");
 
 -- AddForeignKey
 ALTER TABLE "Order" ADD CONSTRAINT "Order_driverId_fkey" FOREIGN KEY ("driverId") REFERENCES "Driver"("id") ON DELETE SET NULL ON UPDATE CASCADE;

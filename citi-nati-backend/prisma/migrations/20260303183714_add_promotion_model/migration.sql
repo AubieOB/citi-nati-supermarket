@@ -13,4 +13,4 @@ CREATE TABLE "Promotion" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Promotion_type_key" ON "Promotion"("type");
+CREATE UNIQUE INDEX IF NOT EXISTS "Promotion_type_key" ON "Promotion"("type");

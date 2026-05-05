@@ -32,13 +32,13 @@ CREATE TABLE "security_audit_logs" (
     CONSTRAINT "security_audit_logs_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "refresh_tokens_token_hash_key" ON "refresh_tokens"("token_hash");
-CREATE INDEX "refresh_tokens_user_id_expires_at_idx" ON "refresh_tokens"("user_id", "expires_at");
-CREATE INDEX "refresh_tokens_revoked_at_idx" ON "refresh_tokens"("revoked_at");
+CREATE UNIQUE INDEX IF NOT EXISTS "refresh_tokens_token_hash_key" ON "refresh_tokens"("token_hash");
+CREATE INDEX IF NOT EXISTS "refresh_tokens_user_id_expires_at_idx" ON "refresh_tokens"("user_id", "expires_at");
+CREATE INDEX IF NOT EXISTS "refresh_tokens_revoked_at_idx" ON "refresh_tokens"("revoked_at");
 
-CREATE INDEX "security_audit_logs_actor_user_id_created_at_idx" ON "security_audit_logs"("actor_user_id", "created_at");
-CREATE INDEX "security_audit_logs_action_created_at_idx" ON "security_audit_logs"("action", "created_at");
-CREATE INDEX "security_audit_logs_resource_type_resource_id_idx" ON "security_audit_logs"("resource_type", "resource_id");
+CREATE INDEX IF NOT EXISTS "security_audit_logs_actor_user_id_created_at_idx" ON "security_audit_logs"("actor_user_id", "created_at");
+CREATE INDEX IF NOT EXISTS "security_audit_logs_action_created_at_idx" ON "security_audit_logs"("action", "created_at");
+CREATE INDEX IF NOT EXISTS "security_audit_logs_resource_type_resource_id_idx" ON "security_audit_logs"("resource_type", "resource_id");
 
 ALTER TABLE "refresh_tokens" ADD CONSTRAINT "refresh_tokens_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "security_audit_logs" ADD CONSTRAINT "security_audit_logs_actor_user_id_fkey" FOREIGN KEY ("actor_user_id") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;

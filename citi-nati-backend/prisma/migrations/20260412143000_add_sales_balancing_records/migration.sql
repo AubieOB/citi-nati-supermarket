@@ -29,9 +29,9 @@ CREATE TABLE "sales_balancing_records" (
 );
 
 -- Indexes
-CREATE INDEX "sales_balancing_records_location_id_balancing_date_idx" ON "sales_balancing_records"("location_id", "balancing_date");
-CREATE INDEX "sales_balancing_records_status_balancing_date_idx" ON "sales_balancing_records"("status", "balancing_date");
-CREATE INDEX "sales_balancing_records_location_code_balancing_date_idx" ON "sales_balancing_records"("location_code", "balancing_date");
+CREATE INDEX IF NOT EXISTS "sales_balancing_records_location_id_balancing_date_idx" ON "sales_balancing_records"("location_id", "balancing_date");
+CREATE INDEX IF NOT EXISTS "sales_balancing_records_status_balancing_date_idx" ON "sales_balancing_records"("status", "balancing_date");
+CREATE INDEX IF NOT EXISTS "sales_balancing_records_location_code_balancing_date_idx" ON "sales_balancing_records"("location_code", "balancing_date");
 
 -- Optional guardrails for amounts/status
 ALTER TABLE "sales_balancing_records"

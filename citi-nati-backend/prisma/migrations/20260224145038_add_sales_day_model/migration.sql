@@ -1,5 +1,5 @@
 -- AlterTable
-ALTER TABLE "Order" ADD COLUMN     "salesDayId" INTEGER;
+ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS     "salesDayId" INTEGER;
 
 -- CreateTable
 CREATE TABLE "SalesDay" (

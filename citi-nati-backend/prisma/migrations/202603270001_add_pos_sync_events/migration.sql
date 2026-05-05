@@ -18,8 +18,8 @@ CREATE TABLE "PosSyncEvent" (
   CONSTRAINT "PosSyncEvent_pkey" PRIMARY KEY ("id")
 );
 
-CREATE INDEX "PosSyncEvent_createdAt_idx" ON "PosSyncEvent"("createdAt");
-CREATE INDEX "PosSyncEvent_status_createdAt_idx" ON "PosSyncEvent"("status", "createdAt");
-CREATE INDEX "PosSyncEvent_level_createdAt_idx" ON "PosSyncEvent"("level", "createdAt");
-CREATE INDEX "PosSyncEvent_source_createdAt_idx" ON "PosSyncEvent"("source", "createdAt");
-CREATE INDEX "PosSyncEvent_eventType_createdAt_idx" ON "PosSyncEvent"("eventType", "createdAt");
+CREATE INDEX IF NOT EXISTS "PosSyncEvent_createdAt_idx" ON "PosSyncEvent"("createdAt");
+CREATE INDEX IF NOT EXISTS "PosSyncEvent_status_createdAt_idx" ON "PosSyncEvent"("status", "createdAt");
+CREATE INDEX IF NOT EXISTS "PosSyncEvent_level_createdAt_idx" ON "PosSyncEvent"("level", "createdAt");
+CREATE INDEX IF NOT EXISTS "PosSyncEvent_source_createdAt_idx" ON "PosSyncEvent"("source", "createdAt");
+CREATE INDEX IF NOT EXISTS "PosSyncEvent_eventType_createdAt_idx" ON "PosSyncEvent"("eventType", "createdAt");

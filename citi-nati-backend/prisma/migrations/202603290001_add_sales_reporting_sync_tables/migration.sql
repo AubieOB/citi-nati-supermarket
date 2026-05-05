@@ -11,7 +11,7 @@ CREATE TABLE "sales_sync_sources" (
   CONSTRAINT "sales_sync_sources_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "sales_sync_sources_sync_source_code_key" ON "sales_sync_sources"("sync_source_code");
+CREATE UNIQUE INDEX IF NOT EXISTS "sales_sync_sources_sync_source_code_key" ON "sales_sync_sources"("sync_source_code");
 
 CREATE TABLE "sales_invoices" (
   "id" BIGSERIAL NOT NULL,
@@ -69,15 +69,15 @@ ALTER TABLE "sales_invoices"
   FOREIGN KEY ("sync_source_id") REFERENCES "sales_sync_sources"("id")
   ON DELETE RESTRICT ON UPDATE CASCADE;
 
-CREATE UNIQUE INDEX "sales_invoices_sync_source_code_source_invoice_no_key"
+CREATE UNIQUE INDEX IF NOT EXISTS "sales_invoices_sync_source_code_source_invoice_no_key"
   ON "sales_invoices"("sync_source_code", "source_invoice_no");
 
-CREATE INDEX "sales_invoices_sync_source_code_idx" ON "sales_invoices"("sync_source_code");
-CREATE INDEX "sales_invoices_source_invoice_no_idx" ON "sales_invoices"("source_invoice_no");
-CREATE INDEX "sales_invoices_invoice_date_idx" ON "sales_invoices"("invoice_date");
-CREATE INDEX "sales_invoices_user_name_idx" ON "sales_invoices"("user_name");
-CREATE INDEX "sales_invoices_location_code_idx" ON "sales_invoices"("location_code");
-CREATE INDEX "sales_invoices_branch_code_invoice_date_idx" ON "sales_invoices"("branch_code", "invoice_date");
+CREATE INDEX IF NOT EXISTS "sales_invoices_sync_source_code_idx" ON "sales_invoices"("sync_source_code");
+CREATE INDEX IF NOT EXISTS "sales_invoices_source_invoice_no_idx" ON "sales_invoices"("source_invoice_no");
+CREATE INDEX IF NOT EXISTS "sales_invoices_invoice_date_idx" ON "sales_invoices"("invoice_date");
+CREATE INDEX IF NOT EXISTS "sales_invoices_user_name_idx" ON "sales_invoices"("user_name");
+CREATE INDEX IF NOT EXISTS "sales_invoices_location_code_idx" ON "sales_invoices"("location_code");
+CREATE INDEX IF NOT EXISTS "sales_invoices_branch_code_invoice_date_idx" ON "sales_invoices"("branch_code", "invoice_date");
 
 CREATE TABLE "sales_invoice_items" (
   "id" BIGSERIAL NOT NULL,
@@ -120,11 +120,11 @@ ALTER TABLE "sales_invoice_items"
   FOREIGN KEY ("sales_invoice_id") REFERENCES "sales_invoices"("id")
   ON DELETE CASCADE ON UPDATE CASCADE;
 
-CREATE UNIQUE INDEX "sales_invoice_items_sync_source_code_source_inv_detail_id_key"
+CREATE UNIQUE INDEX IF NOT EXISTS "sales_invoice_items_sync_source_code_source_inv_detail_id_key"
   ON "sales_invoice_items"("sync_source_code", "source_inv_detail_id");
 
-CREATE INDEX "sales_invoice_items_sync_source_code_idx" ON "sales_invoice_items"("sync_source_code");
-CREATE INDEX "sales_invoice_items_source_inv_detail_id_idx" ON "sales_invoice_items"("source_inv_detail_id");
-CREATE INDEX "sales_invoice_items_product_code_idx" ON "sales_invoice_items"("product_code");
-CREATE INDEX "sales_invoice_items_location_code_idx" ON "sales_invoice_items"("location_code");
-CREATE INDEX "sales_invoice_items_sales_invoice_id_idx" ON "sales_invoice_items"("sales_invoice_id");
+CREATE INDEX IF NOT EXISTS "sales_invoice_items_sync_source_code_idx" ON "sales_invoice_items"("sync_source_code");
+CREATE INDEX IF NOT EXISTS "sales_invoice_items_source_inv_detail_id_idx" ON "sales_invoice_items"("source_inv_detail_id");
+CREATE INDEX IF NOT EXISTS "sales_invoice_items_product_code_idx" ON "sales_invoice_items"("product_code");
+CREATE INDEX IF NOT EXISTS "sales_invoice_items_location_code_idx" ON "sales_invoice_items"("location_code");
+CREATE INDEX IF NOT EXISTS "sales_invoice_items_sales_invoice_id_idx" ON "sales_invoice_items"("sales_invoice_id");

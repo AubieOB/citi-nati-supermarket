@@ -15,10 +15,10 @@ CREATE TABLE "WebsiteProductsCache" (
 );
 
 -- Create index on Enabled for faster filtering
-CREATE INDEX "idx_website_products_cache_enabled" ON "WebsiteProductsCache"("Enabled");
+CREATE INDEX IF NOT EXISTS "idx_website_products_cache_enabled" ON "WebsiteProductsCache"("Enabled");
 
 -- Create index on Category for faster category filtering
-CREATE INDEX "idx_website_products_cache_category" ON "WebsiteProductsCache"("Category");
+CREATE INDEX IF NOT EXISTS "idx_website_products_cache_category" ON "WebsiteProductsCache"("Category");
 
 -- Create index on ProductName for faster search/ordering
-CREATE INDEX "idx_website_products_cache_product_name" ON "WebsiteProductsCache"("ProductName");
+CREATE INDEX IF NOT EXISTS "idx_website_products_cache_product_name" ON "WebsiteProductsCache"("ProductName");

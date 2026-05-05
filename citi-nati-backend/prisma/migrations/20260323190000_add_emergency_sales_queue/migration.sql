@@ -40,19 +40,19 @@ CREATE TABLE "emergency_sale_items" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "emergency_sales_sale_ref_key" ON "emergency_sales"("sale_ref");
+CREATE UNIQUE INDEX IF NOT EXISTS "emergency_sales_sale_ref_key" ON "emergency_sales"("sale_ref");
 
 -- CreateIndex
-CREATE INDEX "emergency_sales_sync_status_created_at_idx" ON "emergency_sales"("sync_status", "created_at");
+CREATE INDEX IF NOT EXISTS "emergency_sales_sync_status_created_at_idx" ON "emergency_sales"("sync_status", "created_at");
 
 -- CreateIndex
-CREATE INDEX "emergency_sales_retry_count_sync_status_idx" ON "emergency_sales"("retry_count", "sync_status");
+CREATE INDEX IF NOT EXISTS "emergency_sales_retry_count_sync_status_idx" ON "emergency_sales"("retry_count", "sync_status");
 
 -- CreateIndex
-CREATE INDEX "emergency_sale_items_emergency_sale_id_idx" ON "emergency_sale_items"("emergency_sale_id");
+CREATE INDEX IF NOT EXISTS "emergency_sale_items_emergency_sale_id_idx" ON "emergency_sale_items"("emergency_sale_id");
 
 -- CreateIndex
-CREATE INDEX "emergency_sale_items_product_id_idx" ON "emergency_sale_items"("product_id");
+CREATE INDEX IF NOT EXISTS "emergency_sale_items_product_id_idx" ON "emergency_sale_items"("product_id");
 
 -- AddForeignKey
 ALTER TABLE "emergency_sale_items" ADD CONSTRAINT "emergency_sale_items_emergency_sale_id_fkey" FOREIGN KEY ("emergency_sale_id") REFERENCES "emergency_sales"("id") ON DELETE CASCADE ON UPDATE CASCADE;

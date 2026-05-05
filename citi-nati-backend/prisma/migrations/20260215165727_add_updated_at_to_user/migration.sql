@@ -5,4 +5,4 @@
 
 */
 -- AlterTable
-ALTER TABLE "User" ADD COLUMN     "updatedAt" TIMESTAMP(3) NOT NULL;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS     "updatedAt" TIMESTAMP(3) NOT NULL;

@@ -13,32 +13,32 @@ DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'payroll_periods' AND column_name = 'location_id') THEN
-    ALTER TABLE "payroll_periods" ADD COLUMN "location_id" INTEGER;
+    ALTER TABLE "payroll_periods" ADD COLUMN IF NOT EXISTS "location_id" INTEGER;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'payroll_periods' AND column_name = 'payroll_month') THEN
-    ALTER TABLE "payroll_periods" ADD COLUMN "payroll_month" INTEGER;
+    ALTER TABLE "payroll_periods" ADD COLUMN IF NOT EXISTS "payroll_month" INTEGER;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'payroll_periods' AND column_name = 'payroll_year') THEN
-    ALTER TABLE "payroll_periods" ADD COLUMN "payroll_year" INTEGER;
+    ALTER TABLE "payroll_periods" ADD COLUMN IF NOT EXISTS "payroll_year" INTEGER;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'payroll_periods' AND column_name = 'payroll_position_in_month') THEN
-    ALTER TABLE "payroll_periods" ADD COLUMN "payroll_position_in_month" INTEGER;
+    ALTER TABLE "payroll_periods" ADD COLUMN IF NOT EXISTS "payroll_position_in_month" INTEGER;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'payroll_periods' AND column_name = 'run_started_at') THEN
-    ALTER TABLE "payroll_periods" ADD COLUMN "run_started_at" TIMESTAMP(3);
+    ALTER TABLE "payroll_periods" ADD COLUMN IF NOT EXISTS "run_started_at" TIMESTAMP(3);
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'payroll_periods' AND column_name = 'finalized_at') THEN
-    ALTER TABLE "payroll_periods" ADD COLUMN "finalized_at" TIMESTAMP(3);
+    ALTER TABLE "payroll_periods" ADD COLUMN IF NOT EXISTS "finalized_at" TIMESTAMP(3);
   END IF;
 END $$;
 
@@ -56,47 +56,47 @@ DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'payroll_entries' AND column_name = 'overtime_normal_hours') THEN
-    ALTER TABLE "payroll_entries" ADD COLUMN "overtime_normal_hours" DOUBLE PRECISION;
+    ALTER TABLE "payroll_entries" ADD COLUMN IF NOT EXISTS "overtime_normal_hours" DOUBLE PRECISION;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'payroll_entries' AND column_name = 'overtime_double_hours') THEN
-    ALTER TABLE "payroll_entries" ADD COLUMN "overtime_double_hours" DOUBLE PRECISION;
+    ALTER TABLE "payroll_entries" ADD COLUMN IF NOT EXISTS "overtime_double_hours" DOUBLE PRECISION;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'payroll_entries' AND column_name = 'overtime_normal_amount') THEN
-    ALTER TABLE "payroll_entries" ADD COLUMN "overtime_normal_amount" DOUBLE PRECISION DEFAULT 0;
+    ALTER TABLE "payroll_entries" ADD COLUMN IF NOT EXISTS "overtime_normal_amount" DOUBLE PRECISION DEFAULT 0;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'payroll_entries' AND column_name = 'overtime_double_amount') THEN
-    ALTER TABLE "payroll_entries" ADD COLUMN "overtime_double_amount" DOUBLE PRECISION DEFAULT 0;
+    ALTER TABLE "payroll_entries" ADD COLUMN IF NOT EXISTS "overtime_double_amount" DOUBLE PRECISION DEFAULT 0;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'payroll_entries' AND column_name = 'absence_deduction_amount') THEN
-    ALTER TABLE "payroll_entries" ADD COLUMN "absence_deduction_amount" DOUBLE PRECISION DEFAULT 0;
+    ALTER TABLE "payroll_entries" ADD COLUMN IF NOT EXISTS "absence_deduction_amount" DOUBLE PRECISION DEFAULT 0;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'payroll_entries' AND column_name = 'loan_balance_at_payroll') THEN
-    ALTER TABLE "payroll_entries" ADD COLUMN "loan_balance_at_payroll" DOUBLE PRECISION DEFAULT 0;
+    ALTER TABLE "payroll_entries" ADD COLUMN IF NOT EXISTS "loan_balance_at_payroll" DOUBLE PRECISION DEFAULT 0;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'payroll_entries' AND column_name = 'accrued_interest_at_payroll') THEN
-    ALTER TABLE "payroll_entries" ADD COLUMN "accrued_interest_at_payroll" DOUBLE PRECISION DEFAULT 0;
+    ALTER TABLE "payroll_entries" ADD COLUMN IF NOT EXISTS "accrued_interest_at_payroll" DOUBLE PRECISION DEFAULT 0;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'payroll_entries' AND column_name = 'net_pay_mid_portion') THEN
-    ALTER TABLE "payroll_entries" ADD COLUMN "net_pay_mid_portion" DOUBLE PRECISION DEFAULT 0;
+    ALTER TABLE "payroll_entries" ADD COLUMN IF NOT EXISTS "net_pay_mid_portion" DOUBLE PRECISION DEFAULT 0;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'payroll_entries' AND column_name = 'net_pay_end_portion') THEN
-    ALTER TABLE "payroll_entries" ADD COLUMN "net_pay_end_portion" DOUBLE PRECISION DEFAULT 0;
+    ALTER TABLE "payroll_entries" ADD COLUMN IF NOT EXISTS "net_pay_end_portion" DOUBLE PRECISION DEFAULT 0;
   END IF;
 END $$;
 
@@ -107,42 +107,42 @@ DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'employee_terminations' AND column_name = 'termination_type') THEN
-    ALTER TABLE "employee_terminations" ADD COLUMN "termination_type" TEXT;
+    ALTER TABLE "employee_terminations" ADD COLUMN IF NOT EXISTS "termination_type" TEXT;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'employee_terminations' AND column_name = 'half_pay_due_in_termination_month') THEN
-    ALTER TABLE "employee_terminations" ADD COLUMN "half_pay_due_in_termination_month" DOUBLE PRECISION;
+    ALTER TABLE "employee_terminations" ADD COLUMN IF NOT EXISTS "half_pay_due_in_termination_month" DOUBLE PRECISION;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'employee_terminations' AND column_name = 'amount_paid_in_termination_month') THEN
-    ALTER TABLE "employee_terminations" ADD COLUMN "amount_paid_in_termination_month" DOUBLE PRECISION;
+    ALTER TABLE "employee_terminations" ADD COLUMN IF NOT EXISTS "amount_paid_in_termination_month" DOUBLE PRECISION;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'employee_terminations' AND column_name = 'leave_pay_accrued_days') THEN
-    ALTER TABLE "employee_terminations" ADD COLUMN "leave_pay_accrued_days" DOUBLE PRECISION;
+    ALTER TABLE "employee_terminations" ADD COLUMN IF NOT EXISTS "leave_pay_accrued_days" DOUBLE PRECISION;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'employee_terminations' AND column_name = 'leave_pay_amount') THEN
-    ALTER TABLE "employee_terminations" ADD COLUMN "leave_pay_amount" DOUBLE PRECISION;
+    ALTER TABLE "employee_terminations" ADD COLUMN IF NOT EXISTS "leave_pay_amount" DOUBLE PRECISION;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'employee_terminations' AND column_name = 'outstanding_loan_obligations') THEN
-    ALTER TABLE "employee_terminations" ADD COLUMN "outstanding_loan_obligations" DOUBLE PRECISION;
+    ALTER TABLE "employee_terminations" ADD COLUMN IF NOT EXISTS "outstanding_loan_obligations" DOUBLE PRECISION;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'employee_terminations' AND column_name = 'gross_settlement_amount') THEN
-    ALTER TABLE "employee_terminations" ADD COLUMN "gross_settlement_amount" DOUBLE PRECISION;
+    ALTER TABLE "employee_terminations" ADD COLUMN IF NOT EXISTS "gross_settlement_amount" DOUBLE PRECISION;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'employee_terminations' AND column_name = 'net_settlement_amount') THEN
-    ALTER TABLE "employee_terminations" ADD COLUMN "net_settlement_amount" DOUBLE PRECISION;
+    ALTER TABLE "employee_terminations" ADD COLUMN IF NOT EXISTS "net_settlement_amount" DOUBLE PRECISION;
   END IF;
 END $$;
 
@@ -153,12 +153,12 @@ DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'employee_reengagements' AND column_name = 'wage_at_retrenchment') THEN
-    ALTER TABLE "employee_reengagements" ADD COLUMN "wage_at_retrenchment" DOUBLE PRECISION;
+    ALTER TABLE "employee_reengagements" ADD COLUMN IF NOT EXISTS "wage_at_retrenchment" DOUBLE PRECISION;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'employee_reengagements' AND column_name = 'linked_termination_id') THEN
-    ALTER TABLE "employee_reengagements" ADD COLUMN "linked_termination_id" INTEGER;
+    ALTER TABLE "employee_reengagements" ADD COLUMN IF NOT EXISTS "linked_termination_id" INTEGER;
   END IF;
 END $$;
 
@@ -193,37 +193,37 @@ DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'employee_loans' AND column_name = 'interest_rate') THEN
-    ALTER TABLE "employee_loans" ADD COLUMN "interest_rate" DOUBLE PRECISION;
+    ALTER TABLE "employee_loans" ADD COLUMN IF NOT EXISTS "interest_rate" DOUBLE PRECISION;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'employee_loans' AND column_name = 'accrued_interest') THEN
-    ALTER TABLE "employee_loans" ADD COLUMN "accrued_interest" DOUBLE PRECISION DEFAULT 0;
+    ALTER TABLE "employee_loans" ADD COLUMN IF NOT EXISTS "accrued_interest" DOUBLE PRECISION DEFAULT 0;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'employee_loans' AND column_name = 'loan_granted_month') THEN
-    ALTER TABLE "employee_loans" ADD COLUMN "loan_granted_month" INTEGER;
+    ALTER TABLE "employee_loans" ADD COLUMN IF NOT EXISTS "loan_granted_month" INTEGER;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'employee_loans' AND column_name = 'loan_granted_year') THEN
-    ALTER TABLE "employee_loans" ADD COLUMN "loan_granted_year" INTEGER;
+    ALTER TABLE "employee_loans" ADD COLUMN IF NOT EXISTS "loan_granted_year" INTEGER;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'employee_loans' AND column_name = 'repayment_end_month') THEN
-    ALTER TABLE "employee_loans" ADD COLUMN "repayment_end_month" INTEGER;
+    ALTER TABLE "employee_loans" ADD COLUMN IF NOT EXISTS "repayment_end_month" INTEGER;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'employee_loans' AND column_name = 'repayment_end_year') THEN
-    ALTER TABLE "employee_loans" ADD COLUMN "repayment_end_year" INTEGER;
+    ALTER TABLE "employee_loans" ADD COLUMN IF NOT EXISTS "repayment_end_year" INTEGER;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'employee_loans' AND column_name = 'reason') THEN
-    ALTER TABLE "employee_loans" ADD COLUMN "reason" TEXT;
+    ALTER TABLE "employee_loans" ADD COLUMN IF NOT EXISTS "reason" TEXT;
   END IF;
 END $$;
 
@@ -237,12 +237,12 @@ DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'employee_loan_transactions' AND column_name = 'principal_component') THEN
-    ALTER TABLE "employee_loan_transactions" ADD COLUMN "principal_component" DOUBLE PRECISION;
+    ALTER TABLE "employee_loan_transactions" ADD COLUMN IF NOT EXISTS "principal_component" DOUBLE PRECISION;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'employee_loan_transactions' AND column_name = 'interest_component') THEN
-    ALTER TABLE "employee_loan_transactions" ADD COLUMN "interest_component" DOUBLE PRECISION;
+    ALTER TABLE "employee_loan_transactions" ADD COLUMN IF NOT EXISTS "interest_component" DOUBLE PRECISION;
   END IF;
 END $$;
 

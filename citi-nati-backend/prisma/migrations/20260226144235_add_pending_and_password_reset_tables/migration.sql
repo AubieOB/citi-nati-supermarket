@@ -23,7 +23,7 @@ CREATE TABLE "PasswordReset" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "PendingUser_email_key" ON "PendingUser"("email");
+CREATE UNIQUE INDEX IF NOT EXISTS "PendingUser_email_key" ON "PendingUser"("email");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "PasswordReset_email_key" ON "PasswordReset"("email");
+CREATE UNIQUE INDEX IF NOT EXISTS "PasswordReset_email_key" ON "PasswordReset"("email");

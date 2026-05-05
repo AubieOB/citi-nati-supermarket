@@ -9,4 +9,4 @@ CREATE TABLE "TicketReadStatus" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "TicketReadStatus_ticketId_userId_key" ON "TicketReadStatus"("ticketId", "userId");
+CREATE UNIQUE INDEX IF NOT EXISTS "TicketReadStatus_ticketId_userId_key" ON "TicketReadStatus"("ticketId", "userId");

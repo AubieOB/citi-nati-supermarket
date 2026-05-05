@@ -44,16 +44,16 @@ CREATE TABLE "goods_intake_items" (
   CONSTRAINT "goods_intake_items_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "goods_intakes_intake_ref_key" ON "goods_intakes"("intake_ref");
-CREATE INDEX "goods_intakes_status_purchase_date_idx" ON "goods_intakes"("status", "purchase_date");
-CREATE INDEX "goods_intakes_supplier_id_purchase_date_idx" ON "goods_intakes"("supplier_id", "purchase_date");
-CREATE INDEX "goods_intakes_location_id_purchase_date_idx" ON "goods_intakes"("location_id", "purchase_date");
-CREATE INDEX "goods_intakes_purchase_date_idx" ON "goods_intakes"("purchase_date");
+CREATE UNIQUE INDEX IF NOT EXISTS "goods_intakes_intake_ref_key" ON "goods_intakes"("intake_ref");
+CREATE INDEX IF NOT EXISTS "goods_intakes_status_purchase_date_idx" ON "goods_intakes"("status", "purchase_date");
+CREATE INDEX IF NOT EXISTS "goods_intakes_supplier_id_purchase_date_idx" ON "goods_intakes"("supplier_id", "purchase_date");
+CREATE INDEX IF NOT EXISTS "goods_intakes_location_id_purchase_date_idx" ON "goods_intakes"("location_id", "purchase_date");
+CREATE INDEX IF NOT EXISTS "goods_intakes_purchase_date_idx" ON "goods_intakes"("purchase_date");
 
-CREATE INDEX "goods_intake_items_goods_intake_id_line_no_idx" ON "goods_intake_items"("goods_intake_id", "line_no");
-CREATE INDEX "goods_intake_items_barcode_idx" ON "goods_intake_items"("barcode");
-CREATE INDEX "goods_intake_items_product_id_idx" ON "goods_intake_items"("product_id");
-CREATE INDEX "goods_intake_items_expiry_date_idx" ON "goods_intake_items"("expiry_date");
+CREATE INDEX IF NOT EXISTS "goods_intake_items_goods_intake_id_line_no_idx" ON "goods_intake_items"("goods_intake_id", "line_no");
+CREATE INDEX IF NOT EXISTS "goods_intake_items_barcode_idx" ON "goods_intake_items"("barcode");
+CREATE INDEX IF NOT EXISTS "goods_intake_items_product_id_idx" ON "goods_intake_items"("product_id");
+CREATE INDEX IF NOT EXISTS "goods_intake_items_expiry_date_idx" ON "goods_intake_items"("expiry_date");
 
 ALTER TABLE "goods_intakes"
 ADD CONSTRAINT "goods_intakes_supplier_id_fkey"

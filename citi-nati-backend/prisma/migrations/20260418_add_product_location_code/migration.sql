@@ -8,7 +8,7 @@ DROP INDEX IF EXISTS "Product_branchCode_sourceCode_key";
 
 -- Create new unique constraint that includes locationCode
 -- This allows same sourceCode to exist in different locations
-CREATE UNIQUE INDEX "Product_branchCode_sourceCode_locationCode_key"
+CREATE UNIQUE INDEX IF NOT EXISTS "Product_branchCode_sourceCode_locationCode_key"
 ON "Product"("branch_code", "sourceCode", "location_code");
 
 -- Create additional index on location_code for filtering queries

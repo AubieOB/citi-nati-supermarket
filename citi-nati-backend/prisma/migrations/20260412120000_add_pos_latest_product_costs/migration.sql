@@ -25,19 +25,19 @@ CREATE TABLE "pos_latest_product_costs" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "pos_latest_product_costs_sync_source_code_product_code_key" ON "pos_latest_product_costs"("sync_source_code", "product_code");
+CREATE UNIQUE INDEX IF NOT EXISTS "pos_latest_product_costs_sync_source_code_product_code_key" ON "pos_latest_product_costs"("sync_source_code", "product_code");
 
 -- CreateIndex
-CREATE INDEX "pos_latest_product_costs_sync_source_code_idx" ON "pos_latest_product_costs"("sync_source_code");
+CREATE INDEX IF NOT EXISTS "pos_latest_product_costs_sync_source_code_idx" ON "pos_latest_product_costs"("sync_source_code");
 
 -- CreateIndex
-CREATE INDEX "pos_latest_product_costs_product_code_idx" ON "pos_latest_product_costs"("product_code");
+CREATE INDEX IF NOT EXISTS "pos_latest_product_costs_product_code_idx" ON "pos_latest_product_costs"("product_code");
 
 -- CreateIndex
-CREATE INDEX "pos_latest_product_costs_branch_code_product_code_idx" ON "pos_latest_product_costs"("branch_code", "product_code");
+CREATE INDEX IF NOT EXISTS "pos_latest_product_costs_branch_code_product_code_idx" ON "pos_latest_product_costs"("branch_code", "product_code");
 
 -- CreateIndex
-CREATE INDEX "pos_latest_product_costs_location_code_product_code_idx" ON "pos_latest_product_costs"("location_code", "product_code");
+CREATE INDEX IF NOT EXISTS "pos_latest_product_costs_location_code_product_code_idx" ON "pos_latest_product_costs"("location_code", "product_code");
 
 -- AddForeignKey
 ALTER TABLE "pos_latest_product_costs"

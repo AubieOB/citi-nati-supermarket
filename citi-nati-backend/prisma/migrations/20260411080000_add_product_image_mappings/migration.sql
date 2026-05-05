@@ -20,7 +20,7 @@ CREATE TABLE "product_image_mappings" (
 );
 
 -- CreateIndex: unique lookup by product_code
-CREATE UNIQUE INDEX "product_image_mappings_product_code_key" ON "product_image_mappings"("product_code");
+CREATE UNIQUE INDEX IF NOT EXISTS "product_image_mappings_product_code_key" ON "product_image_mappings"("product_code");
 
 -- CreateIndex: non-unique index for fast lookups
-CREATE INDEX "product_image_mappings_product_code_idx" ON "product_image_mappings"("product_code");
+CREATE INDEX IF NOT EXISTS "product_image_mappings_product_code_idx" ON "product_image_mappings"("product_code");

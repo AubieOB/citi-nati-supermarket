@@ -15,9 +15,9 @@ CREATE TABLE "suppliers" (
   CONSTRAINT "suppliers_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "suppliers_supplier_code_key" ON "suppliers"("supplier_code");
-CREATE INDEX "suppliers_name_idx" ON "suppliers"("name");
-CREATE INDEX "suppliers_status_idx" ON "suppliers"("status");
+CREATE UNIQUE INDEX IF NOT EXISTS "suppliers_supplier_code_key" ON "suppliers"("supplier_code");
+CREATE INDEX IF NOT EXISTS "suppliers_name_idx" ON "suppliers"("name");
+CREATE INDEX IF NOT EXISTS "suppliers_status_idx" ON "suppliers"("status");
 
 CREATE TABLE "supplier_transactions" (
   "id" SERIAL NOT NULL,
@@ -41,11 +41,11 @@ ALTER TABLE "supplier_transactions"
   FOREIGN KEY ("supplier_id") REFERENCES "suppliers"("id")
   ON DELETE CASCADE ON UPDATE CASCADE;
 
-CREATE INDEX "supplier_transactions_supplier_id_transaction_date_idx"
+CREATE INDEX IF NOT EXISTS "supplier_transactions_supplier_id_transaction_date_idx"
   ON "supplier_transactions"("supplier_id", "transaction_date");
-CREATE INDEX "supplier_transactions_reporting_period_id_idx"
+CREATE INDEX IF NOT EXISTS "supplier_transactions_reporting_period_id_idx"
   ON "supplier_transactions"("reporting_period_id");
-CREATE INDEX "supplier_transactions_transaction_type_idx"
+CREATE INDEX IF NOT EXISTS "supplier_transactions_transaction_type_idx"
   ON "supplier_transactions"("transaction_type");
 
 CREATE TABLE "supplier_balances" (
@@ -65,9 +65,9 @@ ALTER TABLE "supplier_balances"
   FOREIGN KEY ("supplier_id") REFERENCES "suppliers"("id")
   ON DELETE CASCADE ON UPDATE CASCADE;
 
-CREATE UNIQUE INDEX "supplier_balances_supplier_id_reporting_period_id_key"
+CREATE UNIQUE INDEX IF NOT EXISTS "supplier_balances_supplier_id_reporting_period_id_key"
   ON "supplier_balances"("supplier_id", "reporting_period_id");
-CREATE INDEX "supplier_balances_reporting_period_id_idx"
+CREATE INDEX IF NOT EXISTS "supplier_balances_reporting_period_id_idx"
   ON "supplier_balances"("reporting_period_id");
 
 CREATE TABLE "expense_categories" (
@@ -82,9 +82,9 @@ CREATE TABLE "expense_categories" (
   CONSTRAINT "expense_categories_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "expense_categories_code_key" ON "expense_categories"("code");
-CREATE INDEX "expense_categories_name_idx" ON "expense_categories"("name");
-CREATE INDEX "expense_categories_is_active_idx" ON "expense_categories"("is_active");
+CREATE UNIQUE INDEX IF NOT EXISTS "expense_categories_code_key" ON "expense_categories"("code");
+CREATE INDEX IF NOT EXISTS "expense_categories_name_idx" ON "expense_categories"("name");
+CREATE INDEX IF NOT EXISTS "expense_categories_is_active_idx" ON "expense_categories"("is_active");
 
 CREATE TABLE "expenses" (
   "id" SERIAL NOT NULL,
@@ -108,10 +108,10 @@ ALTER TABLE "expenses"
   FOREIGN KEY ("expense_category_id") REFERENCES "expense_categories"("id")
   ON DELETE RESTRICT ON UPDATE CASCADE;
 
-CREATE INDEX "expenses_expense_date_idx" ON "expenses"("expense_date");
-CREATE INDEX "expenses_expense_category_id_idx" ON "expenses"("expense_category_id");
-CREATE INDEX "expenses_location_id_idx" ON "expenses"("location_id");
-CREATE INDEX "expenses_reporting_period_id_idx" ON "expenses"("reporting_period_id");
+CREATE INDEX IF NOT EXISTS "expenses_expense_date_idx" ON "expenses"("expense_date");
+CREATE INDEX IF NOT EXISTS "expenses_expense_category_id_idx" ON "expenses"("expense_category_id");
+CREATE INDEX IF NOT EXISTS "expenses_location_id_idx" ON "expenses"("location_id");
+CREATE INDEX IF NOT EXISTS "expenses_reporting_period_id_idx" ON "expenses"("reporting_period_id");
 
 CREATE TABLE "employees" (
   "id" SERIAL NOT NULL,
@@ -140,11 +140,11 @@ CREATE TABLE "employees" (
   CONSTRAINT "employees_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "employees_employee_no_key" ON "employees"("employee_no");
-CREATE INDEX "employees_surname_first_name_idx" ON "employees"("surname", "first_name");
-CREATE INDEX "employees_status_idx" ON "employees"("status");
-CREATE INDEX "employees_department_idx" ON "employees"("department");
-CREATE INDEX "employees_location_id_idx" ON "employees"("location_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "employees_employee_no_key" ON "employees"("employee_no");
+CREATE INDEX IF NOT EXISTS "employees_surname_first_name_idx" ON "employees"("surname", "first_name");
+CREATE INDEX IF NOT EXISTS "employees_status_idx" ON "employees"("status");
+CREATE INDEX IF NOT EXISTS "employees_department_idx" ON "employees"("department");
+CREATE INDEX IF NOT EXISTS "employees_location_id_idx" ON "employees"("location_id");
 
 CREATE TABLE "employee_salary_structures" (
   "id" SERIAL NOT NULL,
@@ -167,9 +167,9 @@ ALTER TABLE "employee_salary_structures"
   FOREIGN KEY ("employee_id") REFERENCES "employees"("id")
   ON DELETE CASCADE ON UPDATE CASCADE;
 
-CREATE INDEX "employee_salary_structures_employee_id_is_current_idx"
+CREATE INDEX IF NOT EXISTS "employee_salary_structures_employee_id_is_current_idx"
   ON "employee_salary_structures"("employee_id", "is_current");
-CREATE INDEX "employee_salary_structures_effective_from_effective_to_idx"
+CREATE INDEX IF NOT EXISTS "employee_salary_structures_effective_from_effective_to_idx"
   ON "employee_salary_structures"("effective_from", "effective_to");
 
 CREATE TABLE "payroll_periods" (
@@ -185,9 +185,9 @@ CREATE TABLE "payroll_periods" (
   CONSTRAINT "payroll_periods_pkey" PRIMARY KEY ("id")
 );
 
-CREATE INDEX "payroll_periods_status_idx" ON "payroll_periods"("status");
-CREATE INDEX "payroll_periods_payroll_mode_idx" ON "payroll_periods"("payroll_mode");
-CREATE INDEX "payroll_periods_reporting_period_id_idx" ON "payroll_periods"("reporting_period_id");
+CREATE INDEX IF NOT EXISTS "payroll_periods_status_idx" ON "payroll_periods"("status");
+CREATE INDEX IF NOT EXISTS "payroll_periods_payroll_mode_idx" ON "payroll_periods"("payroll_mode");
+CREATE INDEX IF NOT EXISTS "payroll_periods_reporting_period_id_idx" ON "payroll_periods"("reporting_period_id");
 
 CREATE TABLE "payroll_entries" (
   "id" SERIAL NOT NULL,
@@ -225,10 +225,10 @@ ALTER TABLE "payroll_entries"
   FOREIGN KEY ("employee_id") REFERENCES "employees"("id")
   ON DELETE RESTRICT ON UPDATE CASCADE;
 
-CREATE UNIQUE INDEX "payroll_entries_payroll_period_id_employee_id_key"
+CREATE UNIQUE INDEX IF NOT EXISTS "payroll_entries_payroll_period_id_employee_id_key"
   ON "payroll_entries"("payroll_period_id", "employee_id");
-CREATE INDEX "payroll_entries_employee_id_idx" ON "payroll_entries"("employee_id");
-CREATE INDEX "payroll_entries_payroll_period_id_idx" ON "payroll_entries"("payroll_period_id");
+CREATE INDEX IF NOT EXISTS "payroll_entries_employee_id_idx" ON "payroll_entries"("employee_id");
+CREATE INDEX IF NOT EXISTS "payroll_entries_payroll_period_id_idx" ON "payroll_entries"("payroll_period_id");
 
 CREATE TABLE "employee_loans" (
   "id" SERIAL NOT NULL,
@@ -252,9 +252,9 @@ ALTER TABLE "employee_loans"
   FOREIGN KEY ("employee_id") REFERENCES "employees"("id")
   ON DELETE CASCADE ON UPDATE CASCADE;
 
-CREATE UNIQUE INDEX "employee_loans_loan_reference_key" ON "employee_loans"("loan_reference");
-CREATE INDEX "employee_loans_employee_id_idx" ON "employee_loans"("employee_id");
-CREATE INDEX "employee_loans_status_idx" ON "employee_loans"("status");
+CREATE UNIQUE INDEX IF NOT EXISTS "employee_loans_loan_reference_key" ON "employee_loans"("loan_reference");
+CREATE INDEX IF NOT EXISTS "employee_loans_employee_id_idx" ON "employee_loans"("employee_id");
+CREATE INDEX IF NOT EXISTS "employee_loans_status_idx" ON "employee_loans"("status");
 
 CREATE TABLE "employee_loan_transactions" (
   "id" SERIAL NOT NULL,
@@ -278,9 +278,9 @@ ALTER TABLE "employee_loan_transactions"
   FOREIGN KEY ("payroll_period_id") REFERENCES "payroll_periods"("id")
   ON DELETE SET NULL ON UPDATE CASCADE;
 
-CREATE INDEX "employee_loan_transactions_employee_loan_id_idx" ON "employee_loan_transactions"("employee_loan_id");
-CREATE INDEX "employee_loan_transactions_payroll_period_id_idx" ON "employee_loan_transactions"("payroll_period_id");
-CREATE INDEX "employee_loan_transactions_transaction_type_idx" ON "employee_loan_transactions"("transaction_type");
+CREATE INDEX IF NOT EXISTS "employee_loan_transactions_employee_loan_id_idx" ON "employee_loan_transactions"("employee_loan_id");
+CREATE INDEX IF NOT EXISTS "employee_loan_transactions_payroll_period_id_idx" ON "employee_loan_transactions"("payroll_period_id");
+CREATE INDEX IF NOT EXISTS "employee_loan_transactions_transaction_type_idx" ON "employee_loan_transactions"("transaction_type");
 
 CREATE TABLE "employee_terminations" (
   "id" SERIAL NOT NULL,
@@ -302,8 +302,8 @@ ALTER TABLE "employee_terminations"
   FOREIGN KEY ("employee_id") REFERENCES "employees"("id")
   ON DELETE CASCADE ON UPDATE CASCADE;
 
-CREATE INDEX "employee_terminations_employee_id_idx" ON "employee_terminations"("employee_id");
-CREATE INDEX "employee_terminations_termination_date_idx" ON "employee_terminations"("termination_date");
+CREATE INDEX IF NOT EXISTS "employee_terminations_employee_id_idx" ON "employee_terminations"("employee_id");
+CREATE INDEX IF NOT EXISTS "employee_terminations_termination_date_idx" ON "employee_terminations"("termination_date");
 
 CREATE TABLE "employee_reengagements" (
   "id" SERIAL NOT NULL,
@@ -325,5 +325,5 @@ ALTER TABLE "employee_reengagements"
   FOREIGN KEY ("employee_id") REFERENCES "employees"("id")
   ON DELETE CASCADE ON UPDATE CASCADE;
 
-CREATE INDEX "employee_reengagements_employee_id_idx" ON "employee_reengagements"("employee_id");
-CREATE INDEX "employee_reengagements_effective_date_idx" ON "employee_reengagements"("effective_date");
+CREATE INDEX IF NOT EXISTS "employee_reengagements_employee_id_idx" ON "employee_reengagements"("employee_id");
+CREATE INDEX IF NOT EXISTS "employee_reengagements_effective_date_idx" ON "employee_reengagements"("effective_date");

@@ -17,5 +17,5 @@ CREATE TABLE "DeliveryZone" (
   CONSTRAINT "DeliveryZone_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "DeliveryZone_district_area_key" ON "DeliveryZone"("district", "area");
-CREATE INDEX "DeliveryZone_district_isActive_idx" ON "DeliveryZone"("district", "isActive");
+CREATE UNIQUE INDEX IF NOT EXISTS "DeliveryZone_district_area_key" ON "DeliveryZone"("district", "area");
+CREATE INDEX IF NOT EXISTS "DeliveryZone_district_isActive_idx" ON "DeliveryZone"("district", "isActive");

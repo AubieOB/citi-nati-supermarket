@@ -38,8 +38,8 @@ CREATE TABLE "PosWriteCommand" (
   CONSTRAINT "PosWriteCommand_pkey" PRIMARY KEY ("id")
 );
 
-CREATE INDEX "PosWriteCommand_status_createdAt_idx"
+CREATE INDEX IF NOT EXISTS "PosWriteCommand_status_createdAt_idx"
   ON "PosWriteCommand"("status", "createdAt");
 
-CREATE INDEX "PosWriteCommand_agentId_status_idx"
+CREATE INDEX IF NOT EXISTS "PosWriteCommand_agentId_status_idx"
   ON "PosWriteCommand"("agentId", "status");

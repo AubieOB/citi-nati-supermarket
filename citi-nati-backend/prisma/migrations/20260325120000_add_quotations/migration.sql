@@ -34,16 +34,16 @@ CREATE TABLE "quotation_items" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "quotations_quotation_ref_key" ON "quotations"("quotation_ref");
+CREATE UNIQUE INDEX IF NOT EXISTS "quotations_quotation_ref_key" ON "quotations"("quotation_ref");
 
 -- CreateIndex
-CREATE INDEX "quotations_client_name_idx" ON "quotations"("client_name");
+CREATE INDEX IF NOT EXISTS "quotations_client_name_idx" ON "quotations"("client_name");
 
 -- CreateIndex
-CREATE INDEX "quotations_created_at_idx" ON "quotations"("created_at");
+CREATE INDEX IF NOT EXISTS "quotations_created_at_idx" ON "quotations"("created_at");
 
 -- CreateIndex
-CREATE INDEX "quotation_items_quotation_id_idx" ON "quotation_items"("quotation_id");
+CREATE INDEX IF NOT EXISTS "quotation_items_quotation_id_idx" ON "quotation_items"("quotation_id");
 
 -- AddForeignKey
 ALTER TABLE "quotation_items" ADD CONSTRAINT "quotation_items_quotation_id_fkey"
