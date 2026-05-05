@@ -115,10 +115,11 @@ function buildLocationCodeScopeWhere(locationCodes) {
   };
 }
 
-function deriveBranchCodeFromScopeCodes(scopeCodes = []) {
+function deriveBranchCodeFromScopeCodes(scopeCodes = [], branchCode = null) {
+  const normalizedBranchCode = normalizeBranchCode(branchCode);
   for (const code of scopeCodes) {
-    const branchCode = deriveBranchCodeFromLocationCode(code);
-    if (branchCode) return branchCode;
+    const derived = deriveBranchCodeFromLocationCode(code, normalizedBranchCode || code);
+    if (derived) return derived;
   }
   return null;
 }
@@ -1354,7 +1355,7 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
 
     if (normalizedLocationCode) {
       const scopeCodes = expandLocationScopeCodes(normalizedLocationCode);
-      const derivedBranchCode = deriveBranchCodeFromScopeCodes(scopeCodes);
+      const derivedBranchCode = deriveBranchCodeFromScopeCodes(scopeCodes, normalizedBranchCode);
       const rawParam = String(locationCode || '').trim().toUpperCase();
       const resWasMapped = (rawParam === 'RES' || rawParam === 'ZOMBA_RES') && normalizedLocationCode === 'ST999';
 
@@ -1673,7 +1674,7 @@ router.delete('/pos-products/delete-selected', verifyTokenMiddleware, verifyAdmi
       }
 
       const scopeCodes = expandLocationScopeCodes(normalizedLocationCode);
-      const derivedBranchCode = deriveBranchCodeFromScopeCodes(scopeCodes);
+      const derivedBranchCode = deriveBranchCodeFromScopeCodes(scopeCodes, normalizedBranchCode);
 
       if (derivedBranchCode === 'ZOMBA') {
         const resolvedLocationCode = normalizedLocationCode;
@@ -1740,7 +1741,7 @@ router.delete('/pos-products/delete-all', verifyTokenMiddleware, verifyAdmin, as
       }
 
       const scopeCodes = expandLocationScopeCodes(normalizedLocationCode);
-      const derivedBranchCode = deriveBranchCodeFromScopeCodes(scopeCodes);
+      const derivedBranchCode = deriveBranchCodeFromScopeCodes(scopeCodes, normalizedBranchCode);
 
       if (derivedBranchCode === 'ZOMBA') {
         const resolvedLocationCode = normalizedLocationCode;
