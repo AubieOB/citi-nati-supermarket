@@ -114,7 +114,7 @@ function buildInvoiceWhere(dateRange, filters = {}) {
   // branchCode is the authoritative branch discriminator — it is stored from the
   // POS agent's BRANCH_CODE env and is not affected by POS sub-location code
   // ambiguities (e.g. both branches may use 'SH' as a sub-location code).
-  const effectiveBranchCode = filters.branchCode || deriveBranchCodeFromLocationCode(filters.locationCode);
+  const effectiveBranchCode = filters.branchCode || deriveBranchCodeFromLocationCode(filters.locationCode, filters.branchCode);
   const branchScopePredicate = buildBranchScopePredicate(effectiveBranchCode);
   if (branchScopePredicate) {
     andConditions.push(branchScopePredicate);

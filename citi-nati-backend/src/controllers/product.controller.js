@@ -115,9 +115,9 @@ function resolveProductWritebackScope(req, product = null) {
     || req.query?.branchCode
     || req.headers['x-branch-code']
     || product?.branchCode
-    || deriveBranchCodeFromLocationCode(requestedLocationCode)
+    || deriveBranchCodeFromLocationCode(requestedLocationCode, req.body?.branchCode || req.query?.branchCode || req.headers['x-branch-code'])
     || process.env.BRANCH_CODE
-  ) || deriveBranchCodeFromLocationCode(requestedLocationCode) || 'BLANTYRE';
+  ) || deriveBranchCodeFromLocationCode(requestedLocationCode, process.env.BRANCH_CODE) || 'BLANTYRE';
 
   return {
     locationCode: requestedLocationCode,

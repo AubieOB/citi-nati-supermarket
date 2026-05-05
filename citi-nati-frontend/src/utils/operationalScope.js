@@ -51,16 +51,32 @@ function normalizeOperationalScopeCode(value) {
 
 function resolveOperationalScope(value, branchCode = '') {
   const normalized = normalizeOperationalScopeCode(value);
-  if (normalized) {
-    return OPERATIONAL_SCOPE_MAP[normalized];
-  }
-
   const normalizedLocationCode = String(value || '').trim().toUpperCase();
   const normalizedBranchCode = String(branchCode || '').trim().toUpperCase();
 
+  if (normalized) {
+    if (normalizedLocationCode === 'SH' || normalizedBranchCode) {
+      console.info('[OperationalScope] resolveOperationalScope', {
+        value,
+        branchCode,
+        normalized,
+        scope: OPERATIONAL_SCOPE_MAP[normalized],
+      });
+    }
+    return OPERATIONAL_SCOPE_MAP[normalized];
+  }
+
   if (normalizedLocationCode === 'SH') {
-    if (normalizedBranchCode === 'BLANTYRE') return OPERATIONAL_SCOPE_MAP.BLANTYRE_SH;
-    if (normalizedBranchCode === 'ZOMBA') return OPERATIONAL_SCOPE_MAP.ZOMBA_SH;
+    if (normalizedBranchCode === 'BLANTYRE') {
+      console.info('[OperationalScope] resolveOperationalScope ambiguous SH -> BLANTYRE_SH', { value, branchCode });
+      return OPERATIONAL_SCOPE_MAP.BLANTYRE_SH;
+    }
+    if (normalizedBranchCode === 'ZOMBA') {
+      console.info('[OperationalScope] resolveOperationalScope ambiguous SH -> ZOMBA_SH', { value, branchCode });
+      return OPERATIONAL_SCOPE_MAP.ZOMBA_SH;
+    }
+
+    console.warn('[OperationalScope] resolveOperationalScope ambiguous SH with no explicit branchCode', { value, branchCode });
   }
 
   return null;
@@ -85,13 +101,18 @@ function filterProductsForOperationalLocation(products, value, branchCode = '') 
 
   const scope = resolveOperationalScope(value, branchCode);
   if (!scope) {
+    console.warn('[OperationalScope] filterProductsForOperationalLocation no scope resolved', {
+      value,
+      branchCode,
+      productsLength: products.length,
+    });
     return [];
   }
 
   const expectedBranchCode = String(scope.branchCode || '').trim().toUpperCase();
   const expectedLocationCode = String(scope.locationCode || '').trim().toUpperCase();
 
-  return products.filter((product) => {
+  const filtered = products.filter((product) => {
     const productBranchCode = String(product?.branchCode || '').trim().toUpperCase();
     const productLocationCode = String(product?.locationCode || '').trim().toUpperCase();
 
@@ -104,6 +125,18 @@ function filterProductsForOperationalLocation(products, value, branchCode = '') 
 
     return branchMatches && locationMatches;
   });
+
+  if (filtered.length === 0) {
+    console.info('[OperationalScope] filterProductsForOperationalLocation filtered zero products', {
+      value,
+      branchCode,
+      expectedBranchCode,
+      expectedLocationCode,
+      productsLength: products.length,
+    });
+  }
+
+  return filtered;
 }
 
 export {

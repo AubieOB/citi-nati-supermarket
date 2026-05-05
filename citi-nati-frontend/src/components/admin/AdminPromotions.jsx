@@ -94,6 +94,14 @@ const AdminPromotions = ({
   }, [selectedLocationCode, selectedBranchCode]);
 
   useEffect(() => {
+    console.info('[AdminPromotions] scope change', {
+      selectedLocationCode,
+      selectedBranchCode,
+      effectiveLocationCode,
+      effectiveBranchCode,
+      selectedScope,
+    });
+
     setSearchTerm('');
     setShowPreview(false);
     setPreviewProducts([]);

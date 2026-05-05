@@ -46,7 +46,7 @@ async function resolveLocationScopedProductCodesFromSales(scopeCodes = []) {
   }
 
   const derivedBranchCode = scopeCodes.includes('BT')
-    ? deriveBranchCodeFromLocationCode('BT')
+    ? deriveBranchCodeFromLocationCode('BT', 'BLANTYRE')
     : null;
   const locationCodePredicates = scopeCodes.map((code) => ({
     locationCode: {
@@ -82,7 +82,7 @@ async function resolveLocationScopedProductCodesFromLatestCosts(scopeCodes = [])
   }
 
   const derivedBranchCode = scopeCodes.includes('BT')
-    ? deriveBranchCodeFromLocationCode('BT')
+    ? deriveBranchCodeFromLocationCode('BT', 'BLANTYRE')
     : null;
   const locationCodePredicates = scopeCodes.map((code) => ({
     locationCode: {
@@ -170,8 +170,8 @@ function normalizeBranchCode(value) {
   return normalized || null;
 }
 
-function deriveBranchCodeFromLocationCode(locationCode) {
-  return deriveBranchFromOperationalLocation(locationCode);
+function deriveBranchCodeFromLocationCode(locationCode, branchCode = '') {
+  return deriveBranchFromOperationalLocation(locationCode, branchCode);
 }
 
 function isConcreteZombaOperationalLocationCode(locationCode) {
@@ -212,7 +212,7 @@ function resolvePromotionScope(req) {
     };
   }
 
-  const derivedBranchCode = deriveBranchCodeFromLocationCode(locationCode);
+  const derivedBranchCode = deriveBranchCodeFromLocationCode(locationCode, requestedBranchCode);
   const branchCode = requestedBranchCode || derivedBranchCode;
 
   if (!branchCode) {

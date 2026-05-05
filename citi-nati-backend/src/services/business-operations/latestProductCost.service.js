@@ -26,10 +26,18 @@ const BRANCH_SYNC_SOURCE_PREFIXES = {
 
 // Mirrors the same function in reportingFilters.js — kept local to avoid
 // coupling unrelated modules. Must stay in sync with that version.
-function deriveBranchCodeFromLocationCode(locationCode) {
+function deriveBranchCodeFromLocationCode(locationCode, branchCode = '') {
   const code = String(locationCode || '').trim().toUpperCase();
   if (!code) return null;
-  if (AMBIGUOUS_LOCATION_CODES.has(code)) return null;
+  
+  // Handle ambiguous location codes (like SH) with explicit branch
+  if (AMBIGUOUS_LOCATION_CODES.has(code)) {
+    const normalizedBranch = String(branchCode || '').trim().toUpperCase();
+    if (normalizedBranch === 'BLANTYRE') return 'BLANTYRE';
+    if (normalizedBranch === 'ZOMBA') return 'ZOMBA';
+    return null;
+  }
+  
   if (code === 'BT') return 'BLANTYRE';
   if (ZOMBA_LOCATION_CODES.includes(code)) return 'ZOMBA';
   return null;
@@ -59,7 +67,7 @@ function buildLatestCostScope(filters = {}) {
   // Derive an authoritative branchCode from the location selection.
   // This is the same logic used in buildInvoiceWhere: branchCode is the
   // reliable discriminator because it comes from the agent BRANCH_CODE env.
-  const effectiveBranchCode = filters.branchCode || deriveBranchCodeFromLocationCode(filters.locationCode);
+  const effectiveBranchCode = filters.branchCode || deriveBranchCodeFromLocationCode(filters.locationCode, filters.branchCode);
   const branchScopePredicate = buildBranchScopePredicate(effectiveBranchCode);
   if (branchScopePredicate) {
     andConditions.push(branchScopePredicate);

@@ -458,6 +458,13 @@ const AdminProducts = ({
   useEffect(() => {
     if (Array.isArray(cachedProducts) && cachedProducts.length > 0) {
       const scopedCachedProducts = filterProductsForOperationalLocation(cachedProducts, selectedLocationCode, selectedBranchCode);
+      console.info('[AdminProducts] cachedProducts scoped', {
+        selectedLocationCode,
+        selectedBranchCode,
+        scope: resolveOperationalScope(selectedLocationCode, selectedBranchCode),
+        cachedProductsLength: cachedProducts.length,
+        scopedCachedLength: scopedCachedProducts.length,
+      });
       const sortedCached = [...scopedCachedProducts].sort((a, b) => getExpirySeverity(a) - getExpirySeverity(b));
 
       // Background pagination in progress AND we already have data on screen:

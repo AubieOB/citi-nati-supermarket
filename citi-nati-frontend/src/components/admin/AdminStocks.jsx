@@ -88,6 +88,13 @@ const AdminStocks = ({
   useEffect(() => {
     if (Array.isArray(cachedProducts) && cachedProducts.length > 0) {
       const scopedCachedProducts = filterProductsForOperationalLocation(cachedProducts, selectedLocationCode, selectedBranchCode);
+      console.info('[AdminStocks] cachedProducts scoped', {
+        selectedLocationCode,
+        selectedBranchCode,
+        scope: resolveOperationalScope(selectedLocationCode, selectedBranchCode),
+        cachedProductsLength: cachedProducts.length,
+        scopedCachedLength: scopedCachedProducts.length,
+      });
       const nextProducts = scopedCachedProducts.map((product) => enrichProductStock(product));
       const nextCategories = [...new Set(nextProducts.map((product) => product.category).filter(Boolean))];
 

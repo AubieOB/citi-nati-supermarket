@@ -31,16 +31,24 @@ function isZombaLocationCode(value) {
   return !!normalized && (normalized === 'ZA' || ZOMBA_LOCATION_CODES.includes(normalized));
 }
 
-function deriveBranchCodeFromLocationCode(value) {
+function deriveBranchCodeFromLocationCode(value, branchCode = '') {
   const normalized = normalizeScopeCode(value);
   if (!normalized) return null;
-  if (AMBIGUOUS_LOCATION_CODES.has(normalized)) return null;
+  
+  // Handle ambiguous location codes (like SH) with explicit branch
+  if (AMBIGUOUS_LOCATION_CODES.has(normalized)) {
+    const normalizedBranch = String(branchCode || '').trim().toUpperCase();
+    if (normalizedBranch === 'BLANTYRE') return 'BLANTYRE';
+    if (normalizedBranch === 'ZOMBA') return 'ZOMBA';
+    return null;
+  }
+  
   if (normalized === 'BT') return 'BLANTYRE';
   if (normalized === 'ZA' || ZOMBA_LOCATION_CODES.includes(normalized)) return 'ZOMBA';
   return null;
 }
 
-function expandLocationScopeCodes(value) {
+function expandLocationScopeCodes(value, branchCode = '') {
   const normalized = normalizeScopeCode(value);
   if (!normalized) return [];
   if (normalized === 'BT') return ['BT'];
