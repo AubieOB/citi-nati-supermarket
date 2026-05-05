@@ -1564,6 +1564,7 @@ React.useEffect(() => {
                 {activeTab === 'security' && <AdminSecurity />}
                 {activeTab === 'promotions' && (
                   <AdminPromotions
+                    selectedScopeCode={selectedOperationalLocationCode}
                     selectedLocationCode={selectedOperationalPosLocationCode}
                     selectedBranchCode={selectedOperationalBranchCode}
                     cachedProducts={activeLocationCachedProducts}

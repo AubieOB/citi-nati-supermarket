@@ -25,6 +25,7 @@ function createDefaultPromotionsState() {
 }
 
 const AdminPromotions = ({
+  selectedScopeCode = '',
   selectedLocationCode = 'BT',
   selectedBranchCode = '',
   cachedProducts = [],
@@ -47,9 +48,11 @@ const AdminPromotions = ({
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
   const textPrimary = isAdminDarkTheme ? '#f8fafc' : '#333';
   const textSecondary = isAdminDarkTheme ? '#cbd5e1' : '#666';
-  const selectedScope = resolveOperationalScope(selectedLocationCode, selectedBranchCode);
+  const selectedScope = selectedScopeCode
+    ? resolveOperationalScope(selectedScopeCode)
+    : resolveOperationalScope(selectedLocationCode, selectedBranchCode);
   const effectiveLocationCode = selectedScope?.locationCode || String(selectedLocationCode || '').trim().toUpperCase();
-  const effectiveBranchCode = selectedBranchCode || selectedScope?.branchCode || '';
+  const effectiveBranchCode = selectedScope?.branchCode || String(selectedBranchCode || '').trim().toUpperCase();
   const selectedLocationLabel = selectedScope?.label || `${effectiveBranchCode || 'Unknown'} ${effectiveLocationCode}`;
   const scopeKey = `${effectiveBranchCode}|${effectiveLocationCode}`;
   const isCatalogUpdating = Boolean(cachedProductsMeta?.isLoading || cachedProductsMeta?.isBackgroundLoading);
