@@ -1,7 +1,7 @@
 const OPERATIONAL_SCOPE_MAP = {
   BLANTYRE_SH: {
     uiCode: 'BLANTYRE_SH',
-    label: 'Blantyre SH',
+    label: 'Blantyre BT',
     branchCode: 'BLANTYRE',
     locationCode: 'BT',
     salesMode: 'live',
