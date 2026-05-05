@@ -165,6 +165,11 @@ function normalizeLocationCode(value) {
   return normalizeScopeCode(cleanValue);
 }
 
+function normalizeBranchCode(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  return normalized || null;
+}
+
 function deriveBranchCodeFromLocationCode(locationCode) {
   return deriveBranchFromOperationalLocation(locationCode);
 }
@@ -195,6 +200,7 @@ function getDefaultPosLocationCodeForBranch(branchCode, requestedLocationCode) {
 
 function resolvePromotionScope(req) {
   const rawLocationCode = req.body?.locationCode || req.query?.locationCode || req.headers['x-location-code'] || null;
+  const requestedBranchCode = normalizeBranchCode(req.body?.branchCode || req.query?.branchCode || req.headers['x-branch-code'] || null);
   const locationCode = normalizeLocationCode(rawLocationCode);
 
   if (!locationCode) {
@@ -206,10 +212,21 @@ function resolvePromotionScope(req) {
     };
   }
 
-  const branchCode = deriveBranchCodeFromLocationCode(locationCode);
+  const derivedBranchCode = deriveBranchCodeFromLocationCode(locationCode);
+  const branchCode = requestedBranchCode || derivedBranchCode;
+
   if (!branchCode) {
     return {
       error: `Unsupported locationCode: ${locationCode}`,
+      locationCode,
+      branchCode: null,
+      posLocationCode: null,
+    };
+  }
+
+  if (requestedBranchCode && derivedBranchCode && requestedBranchCode !== derivedBranchCode && locationCode !== 'SH') {
+    return {
+      error: `branchCode ${requestedBranchCode} does not match locationCode ${locationCode}`,
       locationCode,
       branchCode: null,
       posLocationCode: null,
