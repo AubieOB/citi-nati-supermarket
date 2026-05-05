@@ -2616,29 +2616,8 @@ const syncProductsFromPOSAgent = async (req, res) => {
         }
         
         // Emit real-time update for this specific product (for instant frontend updates)
-        if (global.io && completeProduct) {
-          try {
-            const { emitProductUpdate } = require('../utils/socket');
 
-            // Keep the canonical product_updated event in sync with POS-pushed products.
-            emitProductUpdate(completeProduct);
 
-            console.log(`[POS AGENT PUSH] 📡 Emitting real-time update for: ${completeProduct.name}`);
-            global.io.emit('pos-product-updated', {
-              id: completeProduct.id,
-              sourceCode: completeProduct.sourceCode,
-              name: completeProduct.name,
-              price: completeProduct.price,
-              stock: completeProduct.stock,
-              category: completeProduct.category,
-              branchCode: completeProduct.branchCode || null,
-              locationCode: completeProduct.locationCode || null,
-              updatedAt: completeProduct.updatedAt || new Date().toISOString(),
-            });
-          } catch (ioErr) {
-            console.warn('[POS AGENT PUSH] Socket emit failed:', ioErr.message);
-          }
-        }
         
         console.log(`${syncLogPrefix} products synced: ${product.name} (${product.sourceCode})`);
       } catch (error) {
@@ -2671,8 +2650,11 @@ const syncProductsFromPOSAgent = async (req, res) => {
           priceChangedCount,
           branchCode,
           locationCode: payloadLocationCode || null,
-          affectedLocations: affectedLocationsList,
           affectedProductCodeSample,
+affectedScopes: affectedLocationsList.map(loc => ({
+  branchCode,
+  locationCode: loc
+})),
           timestamp: new Date().toISOString(),
         });
         console.log(`${syncLogPrefix} emitted realtime update for ${synced} synced products`, {

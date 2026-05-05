@@ -801,7 +801,7 @@ const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocati
         tendered_amount: tendered,
         payment_method: paymentMethod,
         locationCode: selectedLocationCode,
-        ...(selectedBranchCode ? { branchCode: selectedBranchCode } : {}),
+...(effectiveBranchCode ? { branchCode: effectiveBranchCode } : {}),
       });
 
       const savedSale = response.data?.sale;

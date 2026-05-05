@@ -505,12 +505,10 @@ const AdminDashboard = () => {
     }
   }, [adminProductsCacheMetaByLocation, updateProductsCacheMeta]);
 
-  React.useEffect(() => {
-    OPERATIONAL_SCOPES.forEach((scope) => {
-      preloadAdminProductsForLocation(scope.uiCode);
-    });
-  }, [preloadAdminProductsForLocation]);
-
+React.useEffect(() => {
+  if (!selectedOperationalLocationCode) return;
+  preloadAdminProductsForLocation(selectedOperationalLocationCode);
+}, [selectedOperationalLocationCode, preloadAdminProductsForLocation]);
   const activeLocationCachedProductsMeta = adminProductsCacheMetaByLocation[selectedOperationalLocationCode] || {};
   const shouldAutoRefreshAdminProducts = ADMIN_PRODUCTS_AUTO_REFRESH_TAB_IDS.has(activeTab);
 
@@ -623,10 +621,6 @@ const AdminDashboard = () => {
               [uiScopeCode]: updated,
             };
           });
-
-          updateProductsCacheMeta(uiScopeCode, {
-            lastRealtimeUpdateAt: Date.now(),
-          });
         }
       };
 
@@ -638,47 +632,54 @@ const AdminDashboard = () => {
         applyRealtimeProductPatch(payload, 'product_updated');
       };
 
-      const handlePosProductsSynced = (payload = {}) => {
-        const locations = Array.isArray(payload.affectedLocations)
-          ? payload.affectedLocations
-          : [];
+const handlePosProductsSynced = (payload = {}) => {
+  const scopes = Array.isArray(payload.affectedScopes)
+    ? payload.affectedScopes
+    : [];
 
-        const targetUiScopes = new Set();
-        locations.forEach((locationCode) => {
-          resolveUiScopeCodesFromPosLocation(locationCode).forEach((scopeCode) => targetUiScopes.add(scopeCode));
-        });
+  if (scopes.length === 0) {
+    console.log('[ADMIN PRODUCTS CACHE][POS_SYNC_EVENT] ignored: missing affectedScopes', {
+      synced: payload.synced,
+      stockChangedCount: payload.stockChangedCount,
+      priceChangedCount: payload.priceChangedCount,
+      affectedLocations: payload.affectedLocations,
+    });
+    return;
+  }
 
-        // Fallback to selected scope when payload misses per-location metadata.
-        if (targetUiScopes.size === 0) {
-          targetUiScopes.add(selectedOperationalLocationCode);
-        }
+  const targetUiScopes = new Set();
 
-        console.log('[ADMIN PRODUCTS CACHE][POS_SYNC_EVENT]', {
-          synced: payload.synced,
-          stockChangedCount: payload.stockChangedCount,
-          priceChangedCount: payload.priceChangedCount,
-          affectedLocations: locations,
-          targetUiScopes: Array.from(targetUiScopes.values()),
-        });
+  scopes.forEach(({ branchCode, locationCode }) => {
+    resolveUiScopeCodesFromPosLocation(locationCode, branchCode)
+      .forEach((scopeCode) => targetUiScopes.add(scopeCode));
+  });
 
-        // Debounce cache updates: multiple events within ADMIN_PRODUCTS_SYNC_DEBOUNCE_MS
-        // will coalesce into a single metadata update
-        targetUiScopes.forEach((uiScopeCode) => {
-          // Clear existing timer for this scope if present
-          if (posSyncDebounceTimersRef.current[uiScopeCode]) {
-            clearTimeout(posSyncDebounceTimersRef.current[uiScopeCode]);
-          }
+  console.log('[ADMIN PRODUCTS CACHE][POS_SYNC_EVENT]', {
+    synced: payload.synced,
+    stockChangedCount: payload.stockChangedCount,
+    priceChangedCount: payload.priceChangedCount,
+    affectedScopes: scopes,
+    targetUiScopes: Array.from(targetUiScopes.values()),
+  });
 
-          // Set new debounced timer
-          posSyncDebounceTimersRef.current[uiScopeCode] = setTimeout(() => {
-            updateProductsCacheMeta(uiScopeCode, {
-              lastRealtimeUpdateAt: Date.now(),
-            });
-            delete posSyncDebounceTimersRef.current[uiScopeCode];
-          }, ADMIN_PRODUCTS_SYNC_DEBOUNCE_MS);
-        });
-      };
+// TEMP: ignore POS sync refresh storms. Products already load from cache/manual refresh.
+console.log('[ADMIN PRODUCTS CACHE][POS_SYNC_EVENT] ignored to prevent refresh storm', {
+  synced: payload.synced,
+  affectedScopes: scopes,
+});
+return;
 
+  targetUiScopes.forEach((uiScopeCode) => {
+    if (posSyncDebounceTimersRef.current[uiScopeCode]) {
+      clearTimeout(posSyncDebounceTimersRef.current[uiScopeCode]);
+    }
+
+    posSyncDebounceTimersRef.current[uiScopeCode] = setTimeout(() => {
+      preloadAdminProductsForLocation(uiScopeCode, { force: true, silent: true });
+      delete posSyncDebounceTimersRef.current[uiScopeCode];
+    }, ADMIN_PRODUCTS_SYNC_DEBOUNCE_MS);
+  });
+};
       socket.on('pos-product-updated', handlePosProductUpdated);
       socket.on('product_updated', handleProductUpdated);
       socket.on('pos-products-synced', handlePosProductsSynced);
@@ -697,8 +698,7 @@ const AdminDashboard = () => {
     } catch (socketErr) {
       console.warn('[ADMIN PRODUCTS CACHE] socket listener setup failed:', socketErr.message);
     }
-  }, [selectedOperationalLocationCode, updateProductsCacheMeta]);
-
+}, [preloadAdminProductsForLocation]);
   /**
    * Handle real-time order updates (for refreshing orders list)
    */

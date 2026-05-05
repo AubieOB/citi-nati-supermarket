@@ -666,12 +666,12 @@ const AdminProducts = ({
       };
 
       // Listen for comprehensive product updates
-      socket.on('product_updated', handleProductUpdate);
-      console.log('[AdminProducts] 🔌 Socket listener attached for product_updated events');
+    // socket.on('product_updated', handleProductUpdate);
+    // console.log('[AdminProducts] 🔌 Socket listener attached for product_updated events');
 
       // Cleanup: remove listener on component unmount
       return () => {
-        socket.off('product_updated', handleProductUpdate);
+      //  socket.off('product_updated', handleProductUpdate);
         console.log('[AdminProducts] 🔌 Socket listener removed');
       };
     } catch (err) {
