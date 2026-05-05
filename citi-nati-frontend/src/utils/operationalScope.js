@@ -32,9 +32,6 @@ locationCode: 'SH',
 const LEGACY_SCOPE_ALIAS = {
   BT: 'BLANTYRE_SH',
   BLANTYRE: 'BLANTYRE_SH',
-  SH: 'ZOMBA_SH',
-  ZA: 'ZOMBA_SH',
-  ZOMBA: 'ZOMBA_SH',
   BAR: 'ZOMBA_BAR',
   RES: 'ZOMBA_RES',
   ST999: 'ZOMBA_RES',
@@ -44,12 +41,17 @@ function normalizeOperationalScopeCode(value) {
   const normalized = String(value || '').trim().toUpperCase();
   if (!normalized) return 'BLANTYRE_SH';
   if (OPERATIONAL_SCOPE_MAP[normalized]) return normalized;
-  return LEGACY_SCOPE_ALIAS[normalized] || 'BLANTYRE_SH';
+
+  if (normalized === 'BT' || normalized === 'BLANTYRE') return 'BLANTYRE_SH';
+  if (normalized === 'BAR') return 'ZOMBA_BAR';
+  if (normalized === 'RES' || normalized === 'ST999') return 'ZOMBA_RES';
+
+  return null;
 }
 
 function resolveOperationalScope(value) {
   const normalized = normalizeOperationalScopeCode(value);
-  return OPERATIONAL_SCOPE_MAP[normalized];
+  return normalized ? OPERATIONAL_SCOPE_MAP[normalized] : null;
 }
 
 function getOperationalScopeOptions() {
@@ -70,7 +72,7 @@ function filterProductsForOperationalLocation(products, value) {
 
   const scope = resolveOperationalScope(value);
   if (!scope) {
-    return products;
+    return [];
   }
 
   const expectedBranchCode = String(scope.branchCode || '').trim().toUpperCase();
@@ -80,15 +82,14 @@ function filterProductsForOperationalLocation(products, value) {
     const productBranchCode = String(product?.branchCode || '').trim().toUpperCase();
     const productLocationCode = String(product?.locationCode || '').trim().toUpperCase();
 
-    if (expectedBranchCode && productBranchCode && productBranchCode !== expectedBranchCode) {
-      return false;
-    }
+    const branchMatches = expectedBranchCode
+      ? productBranchCode === expectedBranchCode
+      : true;
+    const locationMatches = expectedLocationCode
+      ? productLocationCode === expectedLocationCode
+      : true;
 
-    if (expectedLocationCode && productLocationCode && productLocationCode !== expectedLocationCode) {
-      return false;
-    }
-
-    return true;
+    return branchMatches && locationMatches;
   });
 }
 

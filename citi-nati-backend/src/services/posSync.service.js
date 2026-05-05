@@ -289,9 +289,8 @@ async function syncProductsFromPOS() {
             await notifyLowStock(updatedProduct);
           }
 
-          if (global.io) {
-            emitProductUpdate(updatedProduct);
-          }
+          // Batch POS sync should not emit per-product real-time events.
+          // Frontend listens for a single pos-products-synced event instead.
 
           // Ensure mapping reattachment also runs on updates (covers legacy null-image rows).
           const reattached = await productImageMappingService.reattachImageByProductCode(posProduct.ProductCode);
@@ -311,9 +310,8 @@ async function syncProductsFromPOS() {
             await notifyLowStock(createdProduct);
           }
 
-          if (global.io) {
-            emitProductUpdate(createdProduct);
-          }
+          // Batch POS sync should not emit per-product real-time events.
+          // Frontend will use the aggregated pos-products-synced event.
 
           console.log(`[POS Sync] Created: ${productData.name} (${posProduct.ProductCode})`);
 

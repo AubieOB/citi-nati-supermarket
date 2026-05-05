@@ -687,6 +687,17 @@ const AdminProducts = ({
       setError(null);
       setLoading(true);
 
+      // Add diagnostics for selected scope and fetch mode.
+      console.log('[AdminProducts] fetchProducts start', {
+        uiScope: selectedLocationCode,
+        branchCode: selectedBranchCode,
+        locationCode: selectedLocationCode,
+        page: 1,
+        pageSize: 100,
+        silent: false,
+        source: 'cache-aware-admin',
+      });
+
       // Load first page immediately (limit 100 per page)
       let page = 1;
       const perPage = 100;
@@ -729,6 +740,14 @@ const AdminProducts = ({
       // Fetch first page to show something immediately
       const firstResp = await fetchProductsPage(page);
       const firstItems = firstResp.data.products || [];
+      console.log('[AdminProducts] fetchProducts first page', {
+        uiScope: selectedLocationCode,
+        branchCode: selectedBranchCode,
+        locationCode: selectedLocationCode,
+        page,
+        pageSize: perPage,
+        resultCount: firstItems.length,
+      });
 
       if (firstItems.length === 0) {
         try {
@@ -802,7 +821,15 @@ const AdminProducts = ({
               }
               
               setProducts(sorted);
-              console.log('[AdminProducts] Background load: +', items.length, 'products (total:', sorted.length, ')');
+              console.log('[AdminProducts] Background load page', {
+                uiScope: selectedLocationCode,
+                branchCode: selectedBranchCode,
+                locationCode: selectedLocationCode,
+                page,
+                pageSize: perPage,
+                pageResultCount: items.length,
+                totalProducts: sorted.length,
+              });
 
               if (items.length < perPage) break;
               page += 1;

@@ -1263,6 +1263,7 @@ const getProducts = async (req, res) => {
     if (normalizedLocationCode) {
       const scopeCodes = expandLocationScopeCodes(normalizedLocationCode);
       const derivedBranchCode = deriveBranchCodeFromScopeCodes(scopeCodes);
+      const explicitBranchCode = requestedBranchCode || derivedBranchCode;
       const rawLocationParam = String(locationCode || '').trim().toUpperCase();
       const resWasMapped = (rawLocationParam === 'RES' || rawLocationParam === 'ZOMBA_RES') && normalizedLocationCode === 'ST999';
 
@@ -1287,7 +1288,7 @@ const getProducts = async (req, res) => {
             error: 'Concrete locationCode is required for Zomba stock reads (use SH, BAR, or ST999)',
           });
         }
-        where.branchCode = 'ZOMBA';
+        where.branchCode = explicitBranchCode || 'ZOMBA';
         where.locationCode = {
           equals: resolvedLocationCode,
           mode: 'insensitive',
@@ -1299,7 +1300,7 @@ const getProducts = async (req, res) => {
           uiLocation: locationCode || '(none)',
           selectedLocation: normalizedLocationCode,
           resolvedStockLocation: resolvedLocationCode,
-          branchCode: 'ZOMBA',
+          branchCode: explicitBranchCode || 'ZOMBA',
           locationCode: resolvedLocationCode,
           querySource: 'PersistedProduct.stock',
           resAlias: resWasMapped ? 'RES->ST999' : null,
@@ -1308,7 +1309,7 @@ const getProducts = async (req, res) => {
         const scopedProductCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
         console.log('[PRODUCT QUERY]', {
           uiLocation: locationCode || '(none)',
-          branchCode: derivedBranchCode || '(any)',
+          branchCode: explicitBranchCode || '(any)',
           locationCode: normalizedLocationCode,
           scopedCodeCount: scopedProductCodes ? scopedProductCodes.length : 0,
         });
@@ -1329,8 +1330,8 @@ const getProducts = async (req, res) => {
         }
 
         where.sourceCode = { in: scopedProductCodes };
-        if (derivedBranchCode) {
-          where.branchCode = derivedBranchCode;
+        if (explicitBranchCode) {
+          where.branchCode = explicitBranchCode;
         }
       }
     }
