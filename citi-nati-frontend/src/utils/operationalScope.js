@@ -49,9 +49,21 @@ function normalizeOperationalScopeCode(value) {
   return null;
 }
 
-function resolveOperationalScope(value) {
+function resolveOperationalScope(value, branchCode = '') {
   const normalized = normalizeOperationalScopeCode(value);
-  return normalized ? OPERATIONAL_SCOPE_MAP[normalized] : null;
+  if (normalized) {
+    return OPERATIONAL_SCOPE_MAP[normalized];
+  }
+
+  const normalizedLocationCode = String(value || '').trim().toUpperCase();
+  const normalizedBranchCode = String(branchCode || '').trim().toUpperCase();
+
+  if (normalizedLocationCode === 'SH') {
+    if (normalizedBranchCode === 'BLANTYRE') return OPERATIONAL_SCOPE_MAP.BLANTYRE_SH;
+    if (normalizedBranchCode === 'ZOMBA') return OPERATIONAL_SCOPE_MAP.ZOMBA_SH;
+  }
+
+  return null;
 }
 
 function getOperationalScopeOptions() {
@@ -64,13 +76,14 @@ function getOperationalScopeOptions() {
 }
 
 function toLegacyLocationCode(value) {
-  return resolveOperationalScope(value).locationCode;
+  const scope = resolveOperationalScope(value);
+  return scope ? scope.locationCode : null;
 }
 
-function filterProductsForOperationalLocation(products, value) {
+function filterProductsForOperationalLocation(products, value, branchCode = '') {
   if (!Array.isArray(products) || products.length === 0) return [];
 
-  const scope = resolveOperationalScope(value);
+  const scope = resolveOperationalScope(value, branchCode);
   if (!scope) {
     return [];
   }

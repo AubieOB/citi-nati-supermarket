@@ -87,7 +87,7 @@ const AdminStocks = ({
   // frozen on screen; we only swap in fresh data once the full refresh is complete.
   useEffect(() => {
     if (Array.isArray(cachedProducts) && cachedProducts.length > 0) {
-      const scopedCachedProducts = filterProductsForOperationalLocation(cachedProducts, selectedLocationCode);
+      const scopedCachedProducts = filterProductsForOperationalLocation(cachedProducts, selectedLocationCode, selectedBranchCode);
       const nextProducts = scopedCachedProducts.map((product) => enrichProductStock(product));
       const nextCategories = [...new Set(nextProducts.map((product) => product.category).filter(Boolean))];
 
@@ -165,7 +165,7 @@ const AdminStocks = ({
       const handleProductUpdate = (updatedProduct) => {
         const updatedLocationCode = String(updatedProduct?.locationCode || '').trim().toUpperCase();
         const updatedBranchCode = String(updatedProduct?.branchCode || '').trim().toUpperCase();
-        const selectedScope = resolveOperationalScope(selectedLocationCode);
+        const selectedScope = resolveOperationalScope(selectedLocationCode, selectedBranchCode);
         const currentLocationCode = String(selectedScope?.locationCode || selectedLocationCode || '').trim().toUpperCase();
         const currentBranchCode = String(selectedBranchCode || selectedScope?.branchCode || '').trim().toUpperCase();
 
@@ -219,7 +219,7 @@ const AdminStocks = ({
         firstParams.append('branchCode', selectedBranchCode);
       }
       const res1 = await api.get(`/products?${firstParams.toString()}`);
-      const firstBatch = filterProductsForOperationalLocation(res1.data.products || [], selectedLocationCode)
+      const firstBatch = filterProductsForOperationalLocation(res1.data.products || [], selectedLocationCode, selectedBranchCode)
         .map((product) => enrichProductStock(product));
 
       if (fetchRequestIdRef.current !== requestId) {

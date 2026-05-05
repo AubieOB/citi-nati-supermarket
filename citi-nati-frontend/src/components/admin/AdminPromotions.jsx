@@ -47,10 +47,10 @@ const AdminPromotions = ({
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
   const textPrimary = isAdminDarkTheme ? '#f8fafc' : '#333';
   const textSecondary = isAdminDarkTheme ? '#cbd5e1' : '#666';
-  const selectedScope = resolveOperationalScope(selectedLocationCode);
-  const effectiveLocationCode = selectedScope.locationCode;
-  const effectiveBranchCode = selectedBranchCode || selectedScope.branchCode;
-  const selectedLocationLabel = selectedScope.label;
+  const selectedScope = resolveOperationalScope(selectedLocationCode, selectedBranchCode);
+  const effectiveLocationCode = selectedScope?.locationCode || String(selectedLocationCode || '').trim().toUpperCase();
+  const effectiveBranchCode = selectedBranchCode || selectedScope?.branchCode || '';
+  const selectedLocationLabel = selectedScope?.label || `${effectiveBranchCode || 'Unknown'} ${effectiveLocationCode}`;
   const scopeKey = `${effectiveBranchCode}|${effectiveLocationCode}`;
   const isCatalogUpdating = Boolean(cachedProductsMeta?.isLoading || cachedProductsMeta?.isBackgroundLoading);
   const hasSharedProductsCache = Array.isArray(cachedProducts) && (
@@ -100,7 +100,7 @@ const AdminPromotions = ({
     setPromotions(createDefaultPromotionsState());
 
     if (Array.isArray(cachedProducts) && cachedProducts.length > 0) {
-      const scopedCachedProducts = filterProductsForOperationalLocation(cachedProducts, effectiveLocationCode);
+      const scopedCachedProducts = filterProductsForOperationalLocation(cachedProducts, effectiveLocationCode, effectiveBranchCode);
       const uniqueCategories = [...new Set(scopedCachedProducts.map((p) => p.category).filter(Boolean))].sort();
       setAllProducts(scopedCachedProducts);
       setCategories(uniqueCategories);
@@ -116,11 +116,11 @@ const AdminPromotions = ({
 
   useEffect(() => {
     if (!hasSharedProductsCache) return;
-    const scopedCachedProducts = filterProductsForOperationalLocation(cachedProducts, effectiveLocationCode);
+    const scopedCachedProducts = filterProductsForOperationalLocation(cachedProducts, effectiveLocationCode, effectiveBranchCode);
     const uniqueCategories = [...new Set(scopedCachedProducts.map((p) => p.category).filter(Boolean))].sort();
     setAllProducts(scopedCachedProducts);
     setCategories(uniqueCategories);
-  }, [cachedProducts, hasSharedProductsCache, effectiveLocationCode]);
+  }, [cachedProducts, hasSharedProductsCache, effectiveLocationCode, effectiveBranchCode]);
 
   useEffect(() => {
     let resizeObserver;
@@ -215,7 +215,7 @@ const AdminPromotions = ({
       };
 
       const syncCatalogState = (items) => {
-        const scopedItems = filterProductsForOperationalLocation(items, effectiveLocationCode);
+        const scopedItems = filterProductsForOperationalLocation(items, effectiveLocationCode, effectiveBranchCode);
         const uniqueCategories = [...new Set(scopedItems.map((p) => p.category).filter(Boolean))].sort();
         setAllProducts(scopedItems);
         setCategories(uniqueCategories);
@@ -224,7 +224,8 @@ const AdminPromotions = ({
       const firstResponse = await fetchProductsPage(1);
       let all = filterProductsForOperationalLocation(
         Array.isArray(firstResponse?.data?.products) ? firstResponse.data.products : [],
-        effectiveLocationCode
+        effectiveLocationCode,
+        effectiveBranchCode
       );
 
       if (catalogRequestIdRef.current !== requestId) {
@@ -244,7 +245,7 @@ const AdminPromotions = ({
                 break;
               }
 
-              all = filterProductsForOperationalLocation(all.concat(items), effectiveLocationCode);
+              all = filterProductsForOperationalLocation(all.concat(items), effectiveLocationCode, effectiveBranchCode);
               if (catalogRequestIdRef.current !== requestId) {
                 return;
               }

@@ -167,8 +167,9 @@ function expandScopeLocationCodes(locationCode) {
   return [normalized];
 }
 
-function eventMatchesSelectedScope(event, selectedLocationCode) {
-  const scopeBranchCode = deriveBranchCodeFromLocationCode(selectedLocationCode);
+function eventMatchesSelectedScope(event, selectedLocationCode, selectedBranchCode = '') {
+  const normalizedSelectedBranch = String(selectedBranchCode || '').trim().toUpperCase();
+  const scopeBranchCode = normalizedSelectedBranch || deriveBranchCodeFromLocationCode(selectedLocationCode);
   const scopeLocationCodes = expandScopeLocationCodes(selectedLocationCode);
   if (!scopeBranchCode && scopeLocationCodes.length === 0) return true;
 
@@ -281,7 +282,7 @@ function FailureBar({ items = [] }) {
   );
 }
 
-export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
+export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT', selectedBranchCode = '' }) {
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
   const [activeTab, setActiveTab] = useState('overview');
   const isMobileViewport = useMobileViewport();
@@ -392,7 +393,7 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT' }) {
     if (!socket) return undefined;
 
     const handlePosSyncEvent = (event) => {
-      if (!eventMatchesSelectedScope(event, selectedLocationCode)) {
+      if (!eventMatchesSelectedScope(event, selectedLocationCode, selectedBranchCode)) {
         return;
       }
 

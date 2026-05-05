@@ -457,7 +457,7 @@ const AdminProducts = ({
   // frozen on screen; we only swap in fresh data once the full refresh is complete.
   useEffect(() => {
     if (Array.isArray(cachedProducts) && cachedProducts.length > 0) {
-      const scopedCachedProducts = filterProductsForOperationalLocation(cachedProducts, selectedLocationCode);
+      const scopedCachedProducts = filterProductsForOperationalLocation(cachedProducts, selectedLocationCode, selectedBranchCode);
       const sortedCached = [...scopedCachedProducts].sort((a, b) => getExpirySeverity(a) - getExpirySeverity(b));
 
       // Background pagination in progress AND we already have data on screen:
@@ -615,7 +615,7 @@ const AdminProducts = ({
       const handleProductUpdate = (updatedProduct) => {
         const updatedLocationCode = String(updatedProduct?.locationCode || '').trim().toUpperCase();
         const updatedBranchCode = String(updatedProduct?.branchCode || '').trim().toUpperCase();
-        const selectedScope = resolveOperationalScope(selectedLocationCode);
+        const selectedScope = resolveOperationalScope(selectedLocationCode, selectedBranchCode);
         const currentLocationCode = String(selectedScope?.locationCode || selectedLocationCode || '').trim().toUpperCase();
         const currentBranchCode = String(selectedBranchCode || selectedScope?.branchCode || '').trim().toUpperCase();
 
@@ -677,7 +677,7 @@ const AdminProducts = ({
     } catch (err) {
       console.warn('[AdminProducts] Error setting up product update listener:', err.message);
     }
-  }, [selectedLocationCode]);
+  }, [selectedLocationCode, selectedBranchCode]);
 
   const fetchProducts = async () => {
     const requestId = Date.now();
@@ -765,13 +765,13 @@ const AdminProducts = ({
             : [];
 
           console.log('[ADMIN PRODUCTS UI] /admin/pos-products fallback count', adminItems.length);
-          all = filterProductsForOperationalLocation(adminItems, selectedLocationCode);
+          all = filterProductsForOperationalLocation(adminItems, selectedLocationCode, selectedBranchCode);
         } catch (adminFallbackErr) {
           console.warn('[ADMIN PRODUCTS UI] /admin/pos-products fallback failed', adminFallbackErr?.response?.data || adminFallbackErr.message);
           all = firstItems;
         }
       } else {
-        all = filterProductsForOperationalLocation(all.concat(firstItems), selectedLocationCode);
+        all = filterProductsForOperationalLocation(all.concat(firstItems), selectedLocationCode, selectedBranchCode);
       }
 
       console.log('[ADMIN PRODUCTS UI] first product row', firstItems[0] || null);
@@ -809,7 +809,7 @@ const AdminProducts = ({
               const items = resp.data.products || [];
               if (items.length === 0) break;
               
-              all = filterProductsForOperationalLocation(all.concat(items), selectedLocationCode);
+              all = filterProductsForOperationalLocation(all.concat(items), selectedLocationCode, selectedBranchCode);
               
               // Re-sort and update state
               sorted = all.sort((a, b) => {
