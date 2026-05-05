@@ -81,6 +81,10 @@ const AdminProducts = ({
   const expiryAlertsPageSize = 12;
   const POS_ALERTS_CLIENT_CACHE_TTL_MS = 5 * 60 * 1000;
   const searchTimeoutRef = useRef(null);
+  const selectedScope = resolveOperationalScope(selectedLocationCode, selectedBranchCode);
+  const productScopeKey = selectedScope
+    ? `${String(selectedScope.branchCode).trim().toUpperCase()}_${String(selectedScope.locationCode).trim().toUpperCase()}`
+    : `${String(selectedBranchCode || 'UNKNOWN').trim().toUpperCase()}_${String(selectedLocationCode || 'UNKNOWN').trim().toUpperCase()}`;
   const fetchRequestIdRef = useRef(0);
   const recognitionRef = useRef(null);
   const voiceEnabledRef = useRef(false);
@@ -457,15 +461,15 @@ const AdminProducts = ({
   // frozen on screen; we only swap in fresh data once the full refresh is complete.
   useEffect(() => {
     if (Array.isArray(cachedProducts) && cachedProducts.length > 0) {
-      const scopedCachedProducts = filterProductsForOperationalLocation(cachedProducts, selectedLocationCode, selectedBranchCode);
-      console.info('[AdminProducts] cachedProducts scoped', {
+      const selectedScope = resolveOperationalScope(selectedLocationCode, selectedBranchCode);
+      console.info('[AdminProducts] cachedProducts loaded', {
+        productScopeKey,
         selectedLocationCode,
         selectedBranchCode,
-        scope: resolveOperationalScope(selectedLocationCode, selectedBranchCode),
+        selectedScope,
         cachedProductsLength: cachedProducts.length,
-        scopedCachedLength: scopedCachedProducts.length,
       });
-      const sortedCached = [...scopedCachedProducts].sort((a, b) => getExpirySeverity(a) - getExpirySeverity(b));
+      const sortedCached = [...cachedProducts].sort((a, b) => getExpirySeverity(a) - getExpirySeverity(b));
 
       // Background pagination in progress AND we already have data on screen:
       // keep the existing display stable; do not replace with a partial page.
@@ -695,7 +699,10 @@ const AdminProducts = ({
       setLoading(true);
 
       // Add diagnostics for selected scope and fetch mode.
+      const selectedScope = resolveOperationalScope(selectedLocationCode, selectedBranchCode);
       console.log('[AdminProducts] fetchProducts start', {
+        productScopeKey,
+        selectedScope,
         uiScope: selectedLocationCode,
         branchCode: selectedBranchCode,
         locationCode: selectedLocationCode,
@@ -709,6 +716,7 @@ const AdminProducts = ({
       let page = 1;
       const perPage = 100;
       let all = [];
+      const needsFallbackFiltering = !selectedBranchCode;
 
       const fetchProductsPage = async (pageNumber) => {
         const params = new URLSearchParams({ page: String(pageNumber), pageSize: String(perPage) });
@@ -772,13 +780,15 @@ const AdminProducts = ({
             : [];
 
           console.log('[ADMIN PRODUCTS UI] /admin/pos-products fallback count', adminItems.length);
-          all = filterProductsForOperationalLocation(adminItems, selectedLocationCode, selectedBranchCode);
+          all = needsFallbackFiltering
+            ? filterProductsForOperationalLocation(adminItems, selectedLocationCode, selectedBranchCode)
+            : adminItems;
         } catch (adminFallbackErr) {
           console.warn('[ADMIN PRODUCTS UI] /admin/pos-products fallback failed', adminFallbackErr?.response?.data || adminFallbackErr.message);
           all = firstItems;
         }
       } else {
-        all = filterProductsForOperationalLocation(all.concat(firstItems), selectedLocationCode, selectedBranchCode);
+        all = firstItems;
       }
 
       console.log('[ADMIN PRODUCTS UI] first product row', firstItems[0] || null);
@@ -816,7 +826,9 @@ const AdminProducts = ({
               const items = resp.data.products || [];
               if (items.length === 0) break;
               
-              all = filterProductsForOperationalLocation(all.concat(items), selectedLocationCode, selectedBranchCode);
+              all = needsFallbackFiltering
+                ? filterProductsForOperationalLocation(all.concat(items), selectedLocationCode, selectedBranchCode)
+                : all.concat(items);
               
               // Re-sort and update state
               sorted = all.sort((a, b) => {

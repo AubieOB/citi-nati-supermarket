@@ -28,7 +28,7 @@ import { useOrderUpdates } from '../../hooks/useOrderUpdates.js';
 import { getSpeechAlertsEnabled, setSpeechAlertsEnabled } from '../../utils/notifications.js';
 import api from '../../utils/api.js';
 import { getSocket } from '../../utils/socket.js';
-import { filterProductsForOperationalLocation, getOperationalScopeOptions, normalizeOperationalScopeCode, resolveOperationalScope } from '../../utils/operationalScope.js';
+import { getOperationalScopeOptions, normalizeOperationalScopeCode, resolveOperationalScope } from '../../utils/operationalScope.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { PERMISSION_KEYS, hasPermission } from '../../utils/permissions.js';
 import '../../styles/global.css';
@@ -349,9 +349,15 @@ const AdminDashboard = () => {
   const preloadAdminProductsForLocation = useCallback(async (locationCode, options = {}) => {
     const safeLocationCode = normalizeOperationalScopeCode(locationCode);
     const scope = resolveOperationalScope(safeLocationCode);
+    if (!scope) {
+      console.warn('[AdminDashboard] preloadAdminProductsForLocation could not resolve scope', { locationCode });
+      return;
+    }
+
+    const uiScopeKey = safeLocationCode || `${scope.branchCode}_${scope.locationCode}`;
     const forceRefresh = options?.force === true;
     const preferSilentRefresh = options?.silent === true;
-    const cacheMeta = adminProductsCacheMetaByLocation[safeLocationCode] || {};
+    const cacheMeta = adminProductsCacheMetaByLocation[uiScopeKey] || {};
     const hasCachedItems = Boolean(cacheMeta.lastLoadedAt);
 
     if (!forceRefresh) {
@@ -364,7 +370,7 @@ const AdminDashboard = () => {
     }
 
     const requestId = Date.now();
-    adminProductsFetchRequestRef.current[safeLocationCode] = requestId;
+    adminProductsFetchRequestRef.current[uiScopeKey] = requestId;
 
     const perPage = 100;
     let page = 1;
@@ -391,7 +397,7 @@ const AdminDashboard = () => {
 
     try {
       const useBackgroundLoading = preferSilentRefresh || (forceRefresh && hasCachedItems);
-      updateProductsCacheMeta(safeLocationCode, {
+      updateProductsCacheMeta(uiScopeKey, {
         isLoading: !useBackgroundLoading,
         isBackgroundLoading: useBackgroundLoading,
         error: null,
@@ -409,32 +415,32 @@ const AdminDashboard = () => {
           const adminItems = Array.isArray(adminResp?.data?.products)
             ? adminResp.data.products.map(normalizeAdminPosProduct)
             : [];
-          allItems = filterProductsForOperationalLocation(adminItems, safeLocationCode);
+          allItems = adminItems;
         } catch (fallbackErr) {
           console.warn('[AdminDashboard] /admin/pos-products fallback failed:', fallbackErr?.response?.data || fallbackErr.message);
           allItems = [];
         }
       } else {
-        allItems = filterProductsForOperationalLocation(firstItems, safeLocationCode);
+        allItems = firstItems;
       }
 
-      if (adminProductsFetchRequestRef.current[safeLocationCode] !== requestId) {
+      if (adminProductsFetchRequestRef.current[uiScopeKey] !== requestId) {
         return;
       }
 
       setAdminProductsCacheByLocation((prev) => ({
         ...prev,
-        [safeLocationCode]: allItems,
+        [uiScopeKey]: allItems,
       }));
 
       console.log('[ADMIN DASHBOARD][PRODUCT SCOPE]', {
-        uiScope: safeLocationCode,
+        scopeKey: uiScopeKey,
         branchCode: scope.branchCode,
         locationCode: scope.locationCode,
         cachedCount: allItems.length,
       });
 
-      updateProductsCacheMeta(safeLocationCode, {
+      updateProductsCacheMeta(uiScopeKey, {
         isLoading: false,
         isBackgroundLoading: firstItems.length === perPage,
         error: null,
@@ -452,16 +458,16 @@ const AdminDashboard = () => {
                 break;
               }
 
-              allItems = filterProductsForOperationalLocation(allItems.concat(items), safeLocationCode);
-              if (adminProductsFetchRequestRef.current[safeLocationCode] !== requestId) {
+              allItems = allItems.concat(items);
+              if (adminProductsFetchRequestRef.current[uiScopeKey] !== requestId) {
                 return;
               }
 
               setAdminProductsCacheByLocation((prev) => ({
                 ...prev,
-                [safeLocationCode]: allItems,
+                [uiScopeKey]: allItems,
               }));
-              updateProductsCacheMeta(safeLocationCode, {
+              updateProductsCacheMeta(uiScopeKey, {
                 isBackgroundLoading: true,
                 lastLoadedAt: Date.now(),
               });
@@ -473,20 +479,20 @@ const AdminDashboard = () => {
               page += 1;
             }
 
-            if (adminProductsFetchRequestRef.current[safeLocationCode] !== requestId) {
+            if (adminProductsFetchRequestRef.current[uiScopeKey] !== requestId) {
               return;
             }
 
-            updateProductsCacheMeta(safeLocationCode, {
+            updateProductsCacheMeta(uiScopeKey, {
               isBackgroundLoading: false,
               lastLoadedAt: Date.now(),
             });
           } catch (bgErr) {
             console.warn('[AdminDashboard] Background products loading error:', bgErr.message);
-            if (adminProductsFetchRequestRef.current[safeLocationCode] !== requestId) {
+            if (adminProductsFetchRequestRef.current[uiScopeKey] !== requestId) {
               return;
             }
-            updateProductsCacheMeta(safeLocationCode, {
+            updateProductsCacheMeta(uiScopeKey, {
               isBackgroundLoading: false,
             });
           }
@@ -494,10 +500,10 @@ const AdminDashboard = () => {
       }
     } catch (error) {
       console.error('[AdminDashboard] Failed to preload admin products cache:', error);
-      if (adminProductsFetchRequestRef.current[safeLocationCode] !== requestId) {
+      if (adminProductsFetchRequestRef.current[uiScopeKey] !== requestId) {
         return;
       }
-      updateProductsCacheMeta(safeLocationCode, {
+      updateProductsCacheMeta(uiScopeKey, {
         isLoading: false,
         isBackgroundLoading: false,
         error: error?.response?.data?.error || error.message || 'Failed to load products',
