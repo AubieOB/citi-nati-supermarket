@@ -11,7 +11,6 @@ const posCommandQueueService = require('../services/posCommandQueue.service');
 const {
   normalizeScopeCode,
   expandLocationScopeCodes: expandOperationalLocationScopeCodes,
-  deriveBranchCodeFromLocationCode: deriveBranchFromOperationalLocation,
   ZOMBA_LOCATION_CODES: CORE_ZOMBA_LOCATION_CODES,
 } = require('../utils/operationalScope');
 const prisma = new PrismaClient();
@@ -45,9 +44,6 @@ async function resolveLocationScopedProductCodesFromSales(scopeCodes = []) {
     return [];
   }
 
-  const derivedBranchCode = scopeCodes.includes('BT')
-    ? deriveBranchCodeFromLocationCode('BT', 'BLANTYRE')
-    : null;
   const locationCodePredicates = scopeCodes.map((code) => ({
     locationCode: {
       equals: code,
@@ -59,10 +55,7 @@ async function resolveLocationScopedProductCodesFromSales(scopeCodes = []) {
     where: {
       productCode: { not: null },
       salesInvoice: {
-        OR: [
-          ...locationCodePredicates,
-          ...(derivedBranchCode ? [{ branchCode: derivedBranchCode }] : []),
-        ],
+        OR: locationCodePredicates,
       },
     },
     select: {
@@ -81,9 +74,6 @@ async function resolveLocationScopedProductCodesFromLatestCosts(scopeCodes = [])
     return [];
   }
 
-  const derivedBranchCode = scopeCodes.includes('BT')
-    ? deriveBranchCodeFromLocationCode('BT', 'BLANTYRE')
-    : null;
   const locationCodePredicates = scopeCodes.map((code) => ({
     locationCode: {
       equals: code,
@@ -93,10 +83,7 @@ async function resolveLocationScopedProductCodesFromLatestCosts(scopeCodes = [])
 
   const rows = await prisma.posLatestProductCost.findMany({
     where: {
-      OR: [
-        ...locationCodePredicates,
-        ...(derivedBranchCode ? [{ branchCode: derivedBranchCode }] : []),
-      ],
+      OR: locationCodePredicates,
     },
     select: {
       productCode: true,
@@ -170,10 +157,6 @@ function normalizeBranchCode(value) {
   return normalized || null;
 }
 
-function deriveBranchCodeFromLocationCode(locationCode, branchCode = '') {
-  return deriveBranchFromOperationalLocation(locationCode, branchCode);
-}
-
 function isConcreteZombaOperationalLocationCode(locationCode) {
   return CORE_ZOMBA_LOCATION_CODES.includes(normalizeLocationCode(locationCode));
 }
@@ -212,23 +195,22 @@ function resolvePromotionScope(req) {
     };
   }
 
-  const derivedBranchCode = deriveBranchCodeFromLocationCode(locationCode, requestedBranchCode);
-  const branchCode = requestedBranchCode || derivedBranchCode;
-
-  if (!branchCode) {
+  if (!requestedBranchCode) {
     return {
-      error: `Unsupported locationCode: ${locationCode}`,
+      error: 'branchCode is required for promotions',
       locationCode,
       branchCode: null,
       posLocationCode: null,
     };
   }
 
-  if (requestedBranchCode && derivedBranchCode && requestedBranchCode !== derivedBranchCode && locationCode !== 'SH') {
+  const branchCode = requestedBranchCode;
+
+  if (branchCode === 'ZOMBA' && !isConcreteZombaOperationalLocationCode(locationCode)) {
     return {
-      error: `branchCode ${requestedBranchCode} does not match locationCode ${locationCode}`,
+      error: 'Concrete locationCode is required for Zomba promotions (use SH, BAR, or ST999)',
       locationCode,
-      branchCode: null,
+      branchCode,
       posLocationCode: null,
     };
   }

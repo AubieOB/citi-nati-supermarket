@@ -1,7 +1,6 @@
 'use strict';
 
 const { PrismaClient } = require('@prisma/client');
-const { deriveBranchCodeFromLocationCode } = require('../../utils/operationalScope');
 const posCommandQueueService = require('../posCommandQueue.service');
 
 const prisma = new PrismaClient();
@@ -190,10 +189,9 @@ async function transferGoodsIntakeToBlantyrePosPending(intakeId, options = {}) {
   // --- Blantyre-only guard ---
   const locationCode = String(intake.locationCode || '').trim().toUpperCase();
   if (locationCode !== BLANTYRE_LOCATION_CODE) {
-    const branch = deriveBranchCodeFromLocationCode(intake.locationCode);
     return {
       success: false,
-      error: `Transfer to POS pending stock is available for Blantyre (SH) location only. This intake is for ${intake.locationName || branch || locationCode || '(unknown location)'}.`,
+      error: `Transfer to POS pending stock is available for Blantyre (SH) location only. This intake is for ${intake.locationName || locationCode || '(unknown location)'}.`,
     };
   }
 

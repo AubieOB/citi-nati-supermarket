@@ -26,23 +26,6 @@ const BRANCH_SYNC_SOURCE_PREFIXES = {
 
 // Mirrors the same function in reportingFilters.js — kept local to avoid
 // coupling unrelated modules. Must stay in sync with that version.
-function deriveBranchCodeFromLocationCode(locationCode, branchCode = '') {
-  const code = String(locationCode || '').trim().toUpperCase();
-  if (!code) return null;
-  
-  // Handle ambiguous location codes (like SH) with explicit branch
-  if (AMBIGUOUS_LOCATION_CODES.has(code)) {
-    const normalizedBranch = String(branchCode || '').trim().toUpperCase();
-    if (normalizedBranch === 'BLANTYRE') return 'BLANTYRE';
-    if (normalizedBranch === 'ZOMBA') return 'ZOMBA';
-    return null;
-  }
-  
-  if (code === 'BT') return 'BLANTYRE';
-  if (ZOMBA_LOCATION_CODES.includes(code)) return 'ZOMBA';
-  return null;
-}
-
 function buildBranchScopePredicate(branchCode) {
   const normalized = String(branchCode || '').trim().toUpperCase();
   if (!normalized) return null;
@@ -60,38 +43,29 @@ function buildBranchScopePredicate(branchCode) {
 }
 
 function buildLatestCostScope(filters = {}) {
-  const where = {};
+  if (!filters.branchCode) {
+    throw new Error('branchCode is required for latest product cost scope');
+  }
+  if (!filters.locationCode) {
+    throw new Error('locationCode is required for latest product cost scope');
+  }
 
+  const where = {};
   const andConditions = [];
 
-  // Derive an authoritative branchCode from the location selection.
-  // This is the same logic used in buildInvoiceWhere: branchCode is the
-  // reliable discriminator because it comes from the agent BRANCH_CODE env.
-  const effectiveBranchCode = filters.branchCode || deriveBranchCodeFromLocationCode(filters.locationCode, filters.branchCode);
-  const branchScopePredicate = buildBranchScopePredicate(effectiveBranchCode);
+  const branchScopePredicate = buildBranchScopePredicate(filters.branchCode);
   if (branchScopePredicate) {
     andConditions.push(branchScopePredicate);
   }
 
-  const normalizedRequestedLocationCode = String(filters.locationCode || '').trim().toUpperCase();
-  const isBranchScopeSelection = Boolean(effectiveBranchCode)
-    && Boolean(normalizedRequestedLocationCode)
-    && BRANCH_SCOPE_LOCATION_CODES.includes(normalizedRequestedLocationCode);
+  const locationCode = normalizeProductCode(filters.locationCode);
+  if (locationCode) {
+    where.locationCode = locationCode;
+  }
 
-  const locationCode = normalizeProductCode(filters.locationCode || filters.branchCode);
   const locationId = Number.isInteger(filters.locationId) ? filters.locationId : Number(filters.locationId);
   const hasLocationId = Number.isInteger(locationId) && locationId > 0;
-
-  if (!isBranchScopeSelection && locationCode && hasLocationId) {
-    andConditions.push({
-      OR: [
-        { locationCode },
-        { locationId },
-      ],
-    });
-  } else if (!isBranchScopeSelection && locationCode) {
-    where.locationCode = locationCode;
-  } else if (!isBranchScopeSelection && hasLocationId) {
+  if (hasLocationId) {
     where.locationId = locationId;
   }
 

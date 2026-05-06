@@ -587,11 +587,6 @@ function getStorefrontLocationCode() {
   return normalizeScopeCode(process.env.STOREFRONT_LOCATION_CODE || process.env.PUBLIC_STOREFRONT_LOCATION_CODE || 'BT');
 }
 
-function deriveBranchCodeFromScopeCodes(scopeCodes = []) {
-  // Removed inference logic - require explicit branchCode and locationCode
-  throw new Error('deriveBranchCodeFromScopeCodes is deprecated. Use resolveOperationalScope for strict scoping.');
-}
-
 async function resolveLocationScopedProductCodesFromSales(branchCode, locationCode) {
   if (!branchCode || !locationCode) {
     throw new Error('Both branchCode and locationCode are required for product code resolution');

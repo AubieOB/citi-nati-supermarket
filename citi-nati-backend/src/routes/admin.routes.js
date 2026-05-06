@@ -42,7 +42,6 @@ const {
 const {
   normalizeScopeCode,
   expandLocationScopeCodes: expandOperationalLocationScopeCodes,
-  deriveBranchCodeFromLocationCode,
   ZOMBA_LOCATION_CODES: CORE_ZOMBA_LOCATION_CODES,
 } = require('../utils/operationalScope');
 const { PERMISSION_GROUPS, ALL_PERMISSION_KEYS, ROLE_DEFAULT_PERMISSIONS, isValidPermissionKey } = require('../security/permissions');
@@ -116,12 +115,7 @@ function buildLocationCodeScopeWhere(locationCodes) {
 }
 
 function deriveBranchCodeFromScopeCodes(scopeCodes = [], branchCode = null) {
-  const normalizedBranchCode = normalizeBranchCode(branchCode);
-  for (const code of scopeCodes) {
-    const derived = deriveBranchCodeFromLocationCode(code, normalizedBranchCode || code);
-    if (derived) return derived;
-  }
-  return null;
+  return normalizeBranchCode(branchCode);
 }
 
 async function resolveLocationScopedProductCodesFromSales(scopeCodes = []) {
@@ -129,10 +123,6 @@ async function resolveLocationScopedProductCodesFromSales(scopeCodes = []) {
     return [];
   }
 
-  // Preserve branch-level fallback only for legacy Blantyre rows.
-  const derivedBranchCode = scopeCodes.includes('BT')
-    ? deriveBranchCodeFromScopeCodes(scopeCodes)
-    : null;
   const locationPredicates = scopeCodes.map((code) => ({
     locationCode: {
       equals: code,
@@ -144,10 +134,7 @@ async function resolveLocationScopedProductCodesFromSales(scopeCodes = []) {
     where: {
       productCode: { not: null },
       salesInvoice: {
-        OR: [
-          ...locationPredicates,
-          ...(derivedBranchCode ? [{ branchCode: derivedBranchCode }] : []),
-        ],
+        OR: locationPredicates,
       },
     },
     select: { productCode: true },
@@ -164,10 +151,6 @@ async function resolveLocationScopedProductCodesFromLatestCosts(scopeCodes = [])
     return [];
   }
 
-  // Preserve branch-level fallback only for legacy Blantyre rows.
-  const derivedBranchCode = scopeCodes.includes('BT')
-    ? deriveBranchCodeFromScopeCodes(scopeCodes)
-    : null;
   const locationPredicates = scopeCodes.map((code) => ({
     locationCode: {
       equals: code,
@@ -177,10 +160,7 @@ async function resolveLocationScopedProductCodesFromLatestCosts(scopeCodes = [])
 
   const rows = await prisma.posLatestProductCost.findMany({
     where: {
-      OR: [
-        ...locationPredicates,
-        ...(derivedBranchCode ? [{ branchCode: derivedBranchCode }] : []),
-      ],
+      OR: locationPredicates,
     },
     select: { productCode: true },
     distinct: ['productCode'],
@@ -1355,7 +1335,7 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
 
     if (normalizedLocationCode) {
       const scopeCodes = expandLocationScopeCodes(normalizedLocationCode);
-      const derivedBranchCode = deriveBranchCodeFromScopeCodes(scopeCodes, normalizedBranchCode);
+      const derivedBranchCode = normalizedBranchCode;
       const rawParam = String(locationCode || '').trim().toUpperCase();
       const resWasMapped = (rawParam === 'RES' || rawParam === 'ZOMBA_RES') && normalizedLocationCode === 'ST999';
 
@@ -1674,7 +1654,7 @@ router.delete('/pos-products/delete-selected', verifyTokenMiddleware, verifyAdmi
       }
 
       const scopeCodes = expandLocationScopeCodes(normalizedLocationCode);
-      const derivedBranchCode = deriveBranchCodeFromScopeCodes(scopeCodes, normalizedBranchCode);
+      const derivedBranchCode = normalizedBranchCode;
 
       if (derivedBranchCode === 'ZOMBA') {
         const resolvedLocationCode = normalizedLocationCode;
@@ -1741,7 +1721,7 @@ router.delete('/pos-products/delete-all', verifyTokenMiddleware, verifyAdmin, as
       }
 
       const scopeCodes = expandLocationScopeCodes(normalizedLocationCode);
-      const derivedBranchCode = deriveBranchCodeFromScopeCodes(scopeCodes, normalizedBranchCode);
+      const derivedBranchCode = normalizedBranchCode;
 
       if (derivedBranchCode === 'ZOMBA') {
         const resolvedLocationCode = normalizedLocationCode;

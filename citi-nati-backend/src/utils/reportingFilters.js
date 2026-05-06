@@ -273,7 +273,6 @@ module.exports = {
   parsePagination,
   parseSort,
   buildResponseFilters,
-  deriveBranchCodeFromLocationCode,
   ALLOWED_INVOICE_SORT_FIELDS,
   ALLOWED_PRODUCT_SORT_FIELDS,
   ALLOWED_USER_SORT_FIELDS,

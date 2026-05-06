@@ -77,11 +77,6 @@ function getBranchNameFromLocationCode(locationCode) {
   return locationCode || 'Unknown';
 }
 
-function getBranchCodeFromLocationCode(locationCode) {
-  // Removed inference logic - require explicit branchCode
-  throw new Error('getBranchCodeFromLocationCode is deprecated. Use resolveOperationalScope for strict scoping.');
-}
-
 function resolveSaleScopeFromSnapshot(sale) {
   const snapshot = sale?.cartSnapshot && typeof sale.cartSnapshot === 'object' ? sale.cartSnapshot : {};
   const locationCode = normalizeLocationCode(snapshot.posLocationCode || snapshot.locationCode || null);
@@ -115,14 +110,6 @@ function buildLocationCodeScopeWhere(locationCodes) {
       },
     })),
   };
-}
-
-function deriveBranchCodeFromScopeCodes(scopeCodes = []) {
-  for (const code of scopeCodes) {
-    const branchCode = deriveBranchFromOperationalLocation(code);
-    if (branchCode) return branchCode;
-  }
-  return null;
 }
 
 function getScopeCacheKey(locationCode) {

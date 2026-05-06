@@ -6,7 +6,6 @@ const { updateProductPrice: updateCachedProductPrice } = require('../cache.servi
 const {
   normalizeScopeCode,
   expandLocationScopeCodes,
-  deriveBranchCodeFromLocationCode,
 } = require('../../utils/operationalScope');
 const { enrichProductStock } = require('../../utils/stockResolver');
 
@@ -162,23 +161,11 @@ function includeShape() {
 
 function buildProductScopeWhere(normalizedLocationCode) {
   const scopeCodes = expandLocationScopeCodes(normalizedLocationCode);
-  const branchCode = deriveBranchCodeFromLocationCode(normalizedLocationCode);
-  const isConcreteZombaScope = branchCode === 'ZOMBA' && normalizedLocationCode !== 'ZA';
-
-  if (isConcreteZombaScope) {
-    return {
-      branchCode: 'ZOMBA',
-      locationCode: { equals: normalizedLocationCode, mode: 'insensitive' },
-    };
-  }
 
   return {
-    OR: [
-      ...scopeCodes.map((code) => ({
-        locationCode: { equals: code, mode: 'insensitive' },
-      })),
-      ...(scopeCodes.includes('BT') ? [{ branchCode: 'BLANTYRE' }] : []),
-    ],
+    OR: scopeCodes.map((code) => ({
+      locationCode: { equals: code, mode: 'insensitive' },
+    })),
   };
 }
 
@@ -198,7 +185,10 @@ function getDefaultPosLocationCodeForBranch(branchCode, requestedLocationCode) {
 
 function buildGoodsIntakePriceWritebackScope(product, payloadLocationCode) {
   const requestedLocationCode = normalizeScopeCode(payloadLocationCode || product?.locationCode || POS_DEFAULT_LOCATION_CODE) || POS_DEFAULT_LOCATION_CODE;
-  const branchCode = String(product?.branchCode || deriveBranchCodeFromLocationCode(requestedLocationCode) || 'BLANTYRE').trim().toUpperCase();
+  const branchCode = String(product?.branchCode || '').trim().toUpperCase();
+  if (!branchCode) {
+    throw new Error('branchCode is required for goods intake price writeback scope');
+  }
 
   return {
     requestedLocationCode,

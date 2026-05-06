@@ -64,6 +64,15 @@ function logReportScope(endpoint, req, whereClause, extra = {}) {
   }
 }
 
+function handleReportingValidationError(err, res) {
+  const message = String(err?.message || '').trim();
+  if (message.includes('branchCode is required') || message.includes('locationCode is required')) {
+    res.status(400).json({ success: false, error: message });
+    return true;
+  }
+  return false;
+}
+
 const _diagPrisma = new PrismaClient();
 
 /**
@@ -167,6 +176,7 @@ async function getSalesSummary(req, res) {
       data,
     });
   } catch (err) {
+    if (handleReportingValidationError(err, res)) return;
     console.error('[REPORTING] getSalesSummary error:', err);
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
@@ -216,6 +226,7 @@ async function getSalesInvoices(req, res) {
       },
     });
   } catch (err) {
+    if (handleReportingValidationError(err, res)) return;
     console.error('[REPORTING] getSalesInvoices error:', err);
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
@@ -265,6 +276,7 @@ async function getSalesProducts(req, res) {
       },
     });
   } catch (err) {
+    if (handleReportingValidationError(err, res)) return;
     console.error('[REPORTING] getSalesProducts error:', err);
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
@@ -312,6 +324,7 @@ async function getSalesUsers(req, res) {
       },
     });
   } catch (err) {
+    if (handleReportingValidationError(err, res)) return;
     console.error('[REPORTING] getSalesUsers error:', err);
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
@@ -361,6 +374,7 @@ async function getSalesPayments(req, res) {
       },
     });
   } catch (err) {
+    if (handleReportingValidationError(err, res)) return;
     console.error('[REPORTING] getSalesPayments error:', err);
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
