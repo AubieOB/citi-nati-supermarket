@@ -2305,16 +2305,16 @@ const syncProductsFromPOSAgent = async (req, res) => {
 
     const { products, metadata = {} } = req.body;
 
-    const rawPayloadLocationCode = metadata.locationCode
-      || req.body.locationCode
-      || process.env.POS_LOCATION_CODE
-      || 'SH';
-    const normalizedPayloadLocationCode = normalizeScopeCode(rawPayloadLocationCode);
-    const branchCode = normalizeBranchCodeForIngest(
-      req.headers['x-branch-code'] || metadata.branchCode || req.body.branchCode || 'BLANTYRE',
-      normalizedPayloadLocationCode
-    ) || 'BLANTYRE';
+    const rawBranchCode = req.headers['x-branch-code'] || metadata.branchCode || req.body.branchCode || 'BLANTYRE';
+    const branchCode = normalizeBranchCodeForIngest(rawBranchCode) || 'BLANTYRE';
     const branchName = String(metadata.branchName || req.body.branchName || branchCode).trim() || branchCode;
+    let rawPayloadLocationCode = metadata.locationCode
+      || req.body.locationCode
+      || process.env.POS_LOCATION_CODE;
+    if (!rawPayloadLocationCode && branchCode !== 'ZOMBA') {
+      rawPayloadLocationCode = 'BT';
+    }
+    const normalizedPayloadLocationCode = normalizeScopeCode(rawPayloadLocationCode);
     // Do not silently default Zomba payloads to SH when locationCode is missing.
     const payloadLocationCode = branchCode === 'ZOMBA'
       ? normalizeScopeCode(metadata.locationCode || req.body.locationCode || null)

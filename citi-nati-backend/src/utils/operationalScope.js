@@ -1,7 +1,7 @@
 'use strict';
 
 const LOCATION_ALIASES = {
-  BLANTYRE_SH: 'BT',
+  BLANTYRE_SH: 'SH',
   BT: 'BT',
   BLANTYRE: 'BT',
   ZOMBA_SH: 'SH',
