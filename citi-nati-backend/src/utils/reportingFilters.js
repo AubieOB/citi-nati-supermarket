@@ -1,10 +1,5 @@
 'use strict';
 
-const {
-  deriveBranchCodeFromLocationCode,
-  expandLocationScopeCodes,
-} = require('./operationalScope');
-
 // ---------------------------------------------------------------------------
 // Allowed filter field sets — controls what can be sorted or filtered.
 // ---------------------------------------------------------------------------
@@ -43,9 +38,6 @@ const ALLOWED_PAYMENT_SORT_FIELDS = new Set(['payMethod', 'totalAmount', 'invoic
 
 const ALLOWED_SORT_ORDERS = new Set(['asc', 'desc']);
 
-const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'ST999', 'WH'];
-const BRANCH_SCOPE_LOCATION_CODES = ['BT', 'ZA'];
-
 const BRANCH_SYNC_SOURCE_PREFIXES = {
   BLANTYRE: ['BLANTYRE', 'BT'],
   ZOMBA: ['ZOMBA', 'ZA'],
@@ -66,6 +58,10 @@ function buildBranchScopePredicate(branchCode) {
     ],
   };
 }
+
+// ---------------------------------------------------------------------------
+// Filter extraction from raw query params
+// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // Filter extraction from raw query params
@@ -110,44 +106,25 @@ function buildInvoiceWhere(dateRange, filters = {}) {
     };
   }
 
-  // Use explicit branchCode if provided; otherwise derive from locationCode.
-  // branchCode is the authoritative branch discriminator — it is stored from the
-  // POS agent's BRANCH_CODE env and is not affected by POS sub-location code
-  // ambiguities (e.g. both branches may use 'SH' as a sub-location code).
-  const effectiveBranchCode = filters.branchCode || deriveBranchCodeFromLocationCode(filters.locationCode, filters.branchCode);
-  const branchScopePredicate = buildBranchScopePredicate(effectiveBranchCode);
+  // Require BOTH branchCode and locationCode for strict scoping
+  if (!filters.branchCode) {
+    throw new Error('branchCode is required for reporting queries');
+  }
+  if (!filters.locationCode) {
+    throw new Error('locationCode is required for reporting queries');
+  }
+
+  console.log('[REPORTING SCOPE]', { branchCode: filters.branchCode, locationCode: filters.locationCode });
+
+  const branchScopePredicate = buildBranchScopePredicate(filters.branchCode);
   if (branchScopePredicate) {
     andConditions.push(branchScopePredicate);
   }
   if (filters.syncSourceCode) where.syncSourceCode = filters.syncSourceCode;
 
-  const normalizedRequestedLocationCode = sanitizeStr(filters.locationCode)?.toUpperCase();
-  // BO top-level scope uses BT/ZA as branch selectors, not POS sub-location filters.
-  // When we already have an effective branchCode, enforcing locationId/locationCode
-  // can over-filter to zero if stored POS rows use different locationId/locationCode
-  // conventions (while still belonging to the same branch).
-  const isBranchScopeSelection = Boolean(effectiveBranchCode)
-    && Boolean(normalizedRequestedLocationCode)
-    && BRANCH_SCOPE_LOCATION_CODES.includes(normalizedRequestedLocationCode);
-
-  const expandedLocationCodes = expandLocationScopeCodes(filters.locationCode);
-  const hasLocationCode = expandedLocationCodes.length > 0;
-  const hasLocationId = filters.locationId !== null && filters.locationId !== undefined;
-
-  if (!isBranchScopeSelection && hasLocationCode && hasLocationId) {
-    // Synced datasets may carry one location identifier but not the other.
-    // Match either to avoid unintentionally excluding valid branch rows.
-    andConditions.push({
-      OR: [
-        ...expandedLocationCodes.map((code) => ({ locationCode: code })),
-        { locationId: filters.locationId },
-      ],
-    });
-  } else if (!isBranchScopeSelection && hasLocationCode) {
-    where.locationCode = expandedLocationCodes.length === 1
-      ? expandedLocationCodes[0]
-      : { in: expandedLocationCodes };
-  } else if (!isBranchScopeSelection && hasLocationId) {
+  // Always filter by both branchCode and locationCode
+  where.locationCode = filters.locationCode;
+  if (filters.locationId !== null && filters.locationId !== undefined) {
     where.locationId = filters.locationId;
   }
 

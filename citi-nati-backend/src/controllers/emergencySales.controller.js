@@ -8,7 +8,7 @@ const { formatBusinessDateKey, formatBusinessTimeKey } = require('../utils/busin
 const {
   normalizeScopeCode,
   expandLocationScopeCodes: expandOperationalLocationScopeCodes,
-  deriveBranchCodeFromLocationCode: deriveBranchFromOperationalLocation,
+  resolveOperationalScope,
   ZOMBA_LOCATION_CODES: CORE_ZOMBA_LOCATION_CODES,
 } = require('../utils/operationalScope');
 
@@ -78,17 +78,23 @@ function getBranchNameFromLocationCode(locationCode) {
 }
 
 function getBranchCodeFromLocationCode(locationCode) {
-  const normalized = normalizeLocationCode(locationCode);
-  if (!normalized) return null;
-
-  return deriveBranchFromOperationalLocation(normalized);
+  // Removed inference logic - require explicit branchCode
+  throw new Error('getBranchCodeFromLocationCode is deprecated. Use resolveOperationalScope for strict scoping.');
 }
 
 function resolveSaleScopeFromSnapshot(sale) {
   const snapshot = sale?.cartSnapshot && typeof sale.cartSnapshot === 'object' ? sale.cartSnapshot : {};
   const locationCode = normalizeLocationCode(snapshot.posLocationCode || snapshot.locationCode || null);
-  const branchCode = normalizeBranchCode(snapshot.branchCode || null) || getBranchCodeFromLocationCode(locationCode);
+  const branchCode = normalizeBranchCode(snapshot.branchCode || null);
   const branchName = String(snapshot.branchName || getBranchNameFromLocationCode(locationCode) || '').trim() || null;
+
+  if (!branchCode) {
+    throw new Error('Emergency sale snapshot is missing explicit branchCode');
+  }
+  if (!locationCode) {
+    throw new Error('Emergency sale snapshot is missing explicit locationCode');
+  }
+
   return { locationCode, branchCode, branchName };
 }
 
@@ -154,19 +160,15 @@ async function hasLocationLookupStockChangedSince(locationCode, sinceTimestampMs
     return false;
   }
 
-  const scopeCodes = expandLocationScopeCodes(locationCode);
-  const branchCode = deriveBranchCodeFromScopeCodes(scopeCodes);
   const sinceDate = new Date(sinceTimestampMs);
-
   const where = {
     enabled: true,
     updatedAt: {
       gt: sinceDate,
     },
-    ...(branchCode ? { branchCode } : {}),
   };
 
-  if (branchCode === 'ZOMBA' && isConcreteZombaOperationalLocationCode(locationCode)) {
+  if (locationCode) {
     where.locationCode = {
       equals: locationCode,
       mode: 'insensitive',
@@ -226,10 +228,6 @@ async function resolveLocationScopedProductCodesFromSales(scopeCodes = []) {
     return [];
   }
 
-  // Preserve branch-level fallback only for legacy Blantyre rows.
-  const derivedBranchCode = scopeCodes.includes('BT')
-    ? deriveBranchCodeFromScopeCodes(scopeCodes)
-    : null;
   const locationPredicates = scopeCodes.map((code) => ({
     locationCode: {
       equals: code,
@@ -243,7 +241,6 @@ async function resolveLocationScopedProductCodesFromSales(scopeCodes = []) {
       salesInvoice: {
         OR: [
           ...locationPredicates,
-          ...(derivedBranchCode ? [{ branchCode: derivedBranchCode }] : []),
         ],
       },
     },
@@ -261,10 +258,6 @@ async function resolveLocationScopedProductCodesFromLatestCosts(scopeCodes = [])
     return [];
   }
 
-  // Preserve branch-level fallback only for legacy Blantyre rows.
-  const derivedBranchCode = scopeCodes.includes('BT')
-    ? deriveBranchCodeFromScopeCodes(scopeCodes)
-    : null;
   const locationPredicates = scopeCodes.map((code) => ({
     locationCode: {
       equals: code,
@@ -276,7 +269,6 @@ async function resolveLocationScopedProductCodesFromLatestCosts(scopeCodes = [])
     where: {
       OR: [
         ...locationPredicates,
-        ...(derivedBranchCode ? [{ branchCode: derivedBranchCode }] : []),
       ],
     },
     select: { productCode: true },
@@ -294,7 +286,7 @@ async function resolveLocationScopedProductCodesFromLatestCosts(scopeCodes = [])
     return [];
   }
 
-  const branchCode = requestedBranchCode || getBranchCodeFromLocationCode(locationCode);
+  const branchCode = requestedBranchCode;
   const includeBranchFallback = scopeCodes.includes('BT');
   const base = scopeCodes.flatMap((code) => ([
     { cartSnapshot: { path: ['locationCode'], equals: code } },
@@ -661,29 +653,21 @@ async function lookupEmergencyProducts(req, res) {
   try {
     const startedAt = Date.now();
     const query = String(req.query.q || req.query.search || '').trim();
-    const locationCode = normalizeLocationCode(req.query.locationCode);
-    const requestedBranchCode = normalizeBranchCode(req.query.branchCode);
-    const derivedBranchCode = requestedBranchCode || getBranchCodeFromLocationCode(locationCode);
+    const { branchCode, locationCode } = resolveOperationalScope(req);
     const bypassCache = ['1', 'true', 'yes'].includes(String(req.query.forceRefresh || '').trim().toLowerCase());
+
     if (!query) {
       return res.status(200).json({ success: true, products: [] });
     }
 
-    if (!locationCode || !SUPPORTED_LOCATION_CODES.includes(locationCode)) {
-      return res.status(400).json({ success: false, error: 'locationCode is required and must be one of BT, SH, BAR, ST999, or WH' });
+    if (!SUPPORTED_LOCATION_CODES.includes(locationCode)) {
+      return res.status(400).json({ success: false, error: 'locationCode is required and must be one of BT, SH, BAR, ST999, WH, or ZA' });
     }
 
-    if (locationCode === 'ZA') {
+    if (branchCode === 'ZOMBA' && !isConcreteZombaOperationalLocationCode(locationCode)) {
       return res.status(400).json({
         success: false,
         error: 'Concrete locationCode is required for Zomba emergency lookup (use SH, BAR, or ST999)',
-      });
-    }
-
-    if (locationCode === 'SH' && !requestedBranchCode) {
-      return res.status(400).json({
-        success: false,
-        error: 'branchCode is required for SH because SH exists in multiple branches.',
       });
     }
 
@@ -693,7 +677,7 @@ async function lookupEmergencyProducts(req, res) {
       return res.status(200).json({ success: true, products: [] });
     }
 
-    const cachedProducts = bypassCache ? null : await readLookupCache(locationCode, derivedBranchCode, query);
+    const cachedProducts = bypassCache ? null : await readLookupCache(locationCode, branchCode, query);
     if (cachedProducts) {
       console.log('[EMERGENCY SALES][LOOKUP] cache-hit', {
         selectedLocation: req.query.locationCode || req.query.branchCode || '(none)',
@@ -709,8 +693,7 @@ async function lookupEmergencyProducts(req, res) {
       return res.status(200).json({ success: true, products: cachedProducts });
     }
 
-    // const derivedBranchCode = deriveBranchCodeFromScopeCodes(expandLocationScopeCodes(locationCode));// Commented for a purpose
-    const isZombaScope = derivedBranchCode === 'ZOMBA';
+    const isZombaScope = branchCode === 'ZOMBA';
     let scopedProductCodes = null;
 
     if (isZombaScope) {
@@ -719,7 +702,7 @@ async function lookupEmergencyProducts(req, res) {
         uiLocation: req.query.locationCode || req.query.branchCode || '(none)',
         selectedLocation: locationCode,
         resolvedStockLocation: locationCode,
-        branchCode: 'ZOMBA',
+        branchCode,
         locationCode,
         querySource: 'LocationSpecificPersistedProductStock',
       });
@@ -730,14 +713,14 @@ async function lookupEmergencyProducts(req, res) {
       }
       console.log('[PRODUCT QUERY]', {
         uiLocation: req.query.locationCode || req.query.branchCode || '(none)',
-        branchCode: derivedBranchCode || '(any)',
+        branchCode,
         locationCode,
       });
     }
 
     const baseWhere = {
       enabled: true,
-      ...(derivedBranchCode ? { branchCode: derivedBranchCode } : {}),
+      branchCode: branchCode,
       ...(isZombaScope
         ? {
             locationCode: { equals: locationCode, mode: 'insensitive' },
@@ -840,12 +823,12 @@ async function lookupEmergencyProducts(req, res) {
       const productBranchCode = String(product.branchCode || '').trim().toUpperCase();
       const productLocationCode = String(product.locationCode || '').trim().toUpperCase();
       const productPrice = Number(product.price || 0);
-      if (requestedBranchCode && productBranchCode !== requestedBranchCode) return false;
+      if (productBranchCode !== branchCode) return false;
       if (locationCode && productLocationCode !== locationCode) return false;
       return productPrice > 0;
     });
 
-    writeLookupCache(locationCode, derivedBranchCode, query, safeProducts);
+    writeLookupCache(locationCode, branchCode, query, safeProducts);
 
     if (isZombaLocationCode(locationCode) && safeProducts.length > 0) {
       const sample = safeProducts[0];
@@ -873,29 +856,27 @@ async function lookupEmergencyProducts(req, res) {
 
 async function createEmergencySale(req, res) {
   try {
-    const locationCode = normalizeLocationCode(req.body?.locationCode || req.query?.locationCode);
-    const requestedBranchCode = normalizeBranchCode(req.body?.branchCode || req.query?.branchCode);
-    if (!locationCode || !SUPPORTED_LOCATION_CODES.includes(locationCode)) {
+    const { branchCode, locationCode } = resolveOperationalScope(req);
+    if (!SUPPORTED_LOCATION_CODES.includes(locationCode)) {
       return res.status(400).json({ success: false, error: 'locationCode is required and must be one of BT, SH, BAR, ST999, WH, or ZA' });
     }
 
-    // For ambiguous Zomba locations, require explicit branchCode
-    if (locationCode === 'SH' && !requestedBranchCode) {
-      return res.status(400).json({
-        success: false,
-        error: 'branchCode is required for SH because SH exists in multiple branches.',
-      });
-    }
-
-    const branchCode = requestedBranchCode || getBranchCodeFromLocationCode(locationCode);
-    const branchName = getBranchNameFromLocationCode(locationCode);
-    const posLocationCode = getDefaultAgentLocationCode(branchCode, locationCode);
-    if (branchCode === 'ZOMBA' && !isConcreteZombaOperationalLocationCode(posLocationCode)) {
+    if (branchCode === 'ZOMBA' && !CORE_ZOMBA_LOCATION_CODES.includes(locationCode)) {
       return res.status(400).json({
         success: false,
         error: 'Concrete locationCode is required for Zomba emergency sale (use SH, BAR, or ST999)',
       });
     }
+
+    if (branchCode === 'BLANTYRE' && !['BT', 'SH', 'WH'].includes(locationCode)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid locationCode for BLANTYRE branch',
+      });
+    }
+
+    const branchName = getBranchNameFromLocationCode(locationCode);
+    const posLocationCode = getDefaultAgentLocationCode(branchCode, locationCode);
     // For Zomba: availability is determined directly by location+price row, not the indirect
     // scopedProductCodes set (which requires prior sales/expiry/cost history that BAR/ST999 may lack).
     const isZombaCreateScope = branchCode === 'ZOMBA' && isConcreteZombaOperationalLocationCode(posLocationCode);
@@ -1229,17 +1210,23 @@ async function listEmergencySales(req, res) {
     const product = String(req.query.product || '').trim();
     const locationCode = normalizeLocationCode(req.query.locationCode);
     const requestedBranchCode = normalizeBranchCode(req.query.branchCode);
-    const branchCode = requestedBranchCode || getBranchCodeFromLocationCode(locationCode);
+    const branchCode = requestedBranchCode;
     const startDate = String(req.query.startDate || '').trim();
     const endDate = String(req.query.endDate || '').trim();
     const requesterRole = String(req.user?.role || '').trim().toLowerCase();
     const requesterUserId = String(req.user?.userId || '').trim();
 
-    // For ambiguous Zomba locations, require explicit branchCode
-    if (locationCode === 'SH' && !requestedBranchCode) {
+    if (locationCode && !branchCode) {
       return res.status(400).json({
         success: false,
-        error: 'branchCode is required for SH because SH exists in multiple branches.',
+        error: 'branchCode is required when locationCode is specified.',
+      });
+    }
+
+    if (branchCode && !locationCode) {
+      return res.status(400).json({
+        success: false,
+        error: 'locationCode is required when branchCode is specified.',
       });
     }
 
@@ -1307,13 +1294,11 @@ async function listEmergencySales(req, res) {
       });
     }
 
-    if (locationCode) {
-      const locationScopeFilters = buildEmergencySalesLocationScopeFilters(locationCode, requestedBranchCode || branchCode);
+    if (locationCode && branchCode) {
+      const locationScopeFilters = buildEmergencySalesLocationScopeFilters(locationCode, branchCode);
       if (locationScopeFilters.length > 0) {
         andClauses.push({ OR: locationScopeFilters });
       }
-    } else if (branchCode) {
-      andClauses.push({ cartSnapshot: { path: ['branchCode'], equals: branchCode } });
     }
 
     const where = andClauses.length > 0 ? { AND: andClauses } : {};
@@ -1522,8 +1507,12 @@ async function getPendingEmergencySalesForPosSync(req, res) {
 
 async function ackEmergencySaleSynced(req, res) {
   try {
-    const agentBranchCode = normalizeBranchCode(req.headers['x-branch-code'] || req.body?.branchCode || req.body?.locationCode);
-    const explicitAgentLocationCode = normalizeLocationCode(req.body?.locationCode);
+const agentBranchCode = normalizeBranchCode(req.headers['x-branch-code'] || req.body?.branchCode || null);
+  const explicitAgentLocationCode = normalizeLocationCode(req.body?.locationCode);
+
+  if (!agentBranchCode || !explicitAgentLocationCode) {
+    return res.status(400).json({ success: false, error: 'branchCode and locationCode are required for acknowledgement' });
+  }
 
     const saleRef = String(req.body?.sale_ref || req.body?.saleRef || '').trim();
     const emergencySaleId = toSafeInt(req.body?.emergency_sale_id ?? req.body?.emergencySaleId);
@@ -1596,8 +1585,12 @@ async function ackEmergencySaleSynced(req, res) {
 
 async function ackEmergencySaleSyncFailed(req, res) {
   try {
-    const agentBranchCode = normalizeBranchCode(req.headers['x-branch-code'] || req.body?.branchCode || req.body?.locationCode);
-    const explicitAgentLocationCode = normalizeLocationCode(req.body?.locationCode);
+const agentBranchCode = normalizeBranchCode(req.headers['x-branch-code'] || req.body?.branchCode || null);
+  const explicitAgentLocationCode = normalizeLocationCode(req.body?.locationCode);
+
+  if (!agentBranchCode || !explicitAgentLocationCode) {
+    return res.status(400).json({ success: false, error: 'branchCode and locationCode are required for acknowledgement' });
+  }
 
     const saleRef = String(req.body?.sale_ref || req.body?.saleRef || '').trim();
     const emergencySaleId = toSafeInt(req.body?.emergency_sale_id ?? req.body?.emergencySaleId);

@@ -12,8 +12,7 @@ const {
 const {
   normalizeScopeCode: normalizeOperationalScopeCode,
   expandLocationScopeCodes: expandOperationalLocationScopeCodes,
-  deriveBranchCodeFromLocationCode,
-  ZOMBA_LOCATION_CODES: CORE_ZOMBA_LOCATION_CODES,
+  resolveOperationalScope,
 } = require('../utils/operationalScope');
 
 const prisma = new PrismaClient();
@@ -102,28 +101,14 @@ function getDefaultPosLocationCodeForBranch(branchCode, requestedLocationCode) {
 }
 
 function resolveProductWritebackScope(req, product = null) {
-  const requestedLocationCode = normalizeOperationalScopeCode(
-    req.body?.locationCode
-    || req.query?.locationCode
-    || req.headers['x-location-code']
-    || product?.locationCode
-    || POS_DEFAULT_LOCATION_CODE
-  ) || POS_DEFAULT_LOCATION_CODE;
-
-  const branchCode = normalizeBranchCode(
-    req.body?.branchCode
-    || req.query?.branchCode
-    || req.headers['x-branch-code']
-    || product?.branchCode
-    || deriveBranchCodeFromLocationCode(requestedLocationCode, req.body?.branchCode || req.query?.branchCode || req.headers['x-branch-code'])
-    || process.env.BRANCH_CODE
-  ) || deriveBranchCodeFromLocationCode(requestedLocationCode, process.env.BRANCH_CODE) || 'BLANTYRE';
+  // Require both branchCode and locationCode for strict scoping
+  const { branchCode, locationCode } = resolveOperationalScope(req);
 
   return {
-    locationCode: requestedLocationCode,
-    requestedLocationCode,
+    locationCode,
+    requestedLocationCode: locationCode,
     branchCode,
-    posLocationCode: getDefaultPosLocationCodeForBranch(branchCode, requestedLocationCode),
+    posLocationCode: getDefaultPosLocationCodeForBranch(branchCode, locationCode),
     priceTypeCode: POS_DEFAULT_PRICE_TYPE_CODE,
   };
 }
@@ -560,16 +545,8 @@ function normalizeBranchCodeForIngest(value, fallbackLocationCode = null) {
   if (normalized === 'BLANTYRE' || normalized === 'BT') return 'BLANTYRE';
   if (normalized === 'ZOMBA' || normalized === 'ZA') return 'ZOMBA';
 
-  const normalizedScope = normalizeScopeCode(normalized);
-  const derivedFromScope = deriveBranchCodeFromLocationCode(normalizedScope || normalized);
-  if (derivedFromScope) return derivedFromScope;
-
-  if (fallbackLocationCode) {
-    const derivedFromFallback = deriveBranchCodeFromLocationCode(fallbackLocationCode);
-    if (derivedFromFallback) return derivedFromFallback;
-  }
-
-  return normalized || null;
+  // For ingest operations, require explicit branchCode - no inference from locationCode
+  throw new Error(`Invalid branchCode for ingest: ${value}. Must be BLANTYRE/BT or ZOMBA/ZA`);
 }
 
 const ZOMBA_LOCATION_CODES = ['ZA'].concat(CORE_ZOMBA_LOCATION_CODES);
@@ -610,37 +587,23 @@ function getStorefrontLocationCode() {
 }
 
 function deriveBranchCodeFromScopeCodes(scopeCodes = []) {
-  for (const code of scopeCodes) {
-    const branchCode = deriveBranchCodeFromLocationCode(code);
-    if (branchCode) return branchCode;
-  }
-  return null;
+  // Removed inference logic - require explicit branchCode and locationCode
+  throw new Error('deriveBranchCodeFromScopeCodes is deprecated. Use resolveOperationalScope for strict scoping.');
 }
 
-async function resolveLocationScopedProductCodesFromSales(scopeCodes = []) {
-  if (!Array.isArray(scopeCodes) || scopeCodes.length === 0) {
-    return [];
+async function resolveLocationScopedProductCodesFromSales(branchCode, locationCode) {
+  if (!branchCode || !locationCode) {
+    throw new Error('Both branchCode and locationCode are required for product code resolution');
   }
 
-  // Preserve branch-level fallback only for legacy Blantyre rows.
-  const derivedBranchCode = scopeCodes.includes('BT')
-    ? deriveBranchCodeFromScopeCodes(scopeCodes)
-    : null;
-  const locationCodePredicates = scopeCodes.map((code) => ({
-    locationCode: {
-      equals: code,
-      mode: 'insensitive',
-    },
-  }));
+  console.log('[PRODUCT SCOPE]', { branchCode, locationCode });
 
   const salesRows = await prisma.salesInvoiceItem.findMany({
     where: {
       productCode: { not: null },
       salesInvoice: {
-        OR: [
-          ...locationCodePredicates,
-          ...(derivedBranchCode ? [{ branchCode: derivedBranchCode }] : []),
-        ],
+        branchCode: branchCode,
+        locationCode: locationCode,
       },
     },
     select: {
@@ -654,28 +617,17 @@ async function resolveLocationScopedProductCodesFromSales(scopeCodes = []) {
     .filter(Boolean);
 }
 
-async function resolveLocationScopedProductCodesFromLatestCosts(scopeCodes = []) {
-  if (!Array.isArray(scopeCodes) || scopeCodes.length === 0) {
-    return [];
+async function resolveLocationScopedProductCodesFromLatestCosts(branchCode, locationCode) {
+  if (!branchCode || !locationCode) {
+    throw new Error('Both branchCode and locationCode are required for product code resolution');
   }
 
-  // Preserve branch-level fallback only for legacy Blantyre rows.
-  const derivedBranchCode = scopeCodes.includes('BT')
-    ? deriveBranchCodeFromScopeCodes(scopeCodes)
-    : null;
-  const locationCodePredicates = scopeCodes.map((code) => ({
-    locationCode: {
-      equals: code,
-      mode: 'insensitive',
-    },
-  }));
+  console.log('[PRODUCT SCOPE]', { branchCode, locationCode });
 
   const rows = await prisma.posLatestProductCost.findMany({
     where: {
-      OR: [
-        ...locationCodePredicates,
-        ...(derivedBranchCode ? [{ branchCode: derivedBranchCode }] : []),
-      ],
+      branchCode: branchCode,
+      locationCode: locationCode,
     },
     select: {
       productCode: true,
@@ -688,14 +640,20 @@ async function resolveLocationScopedProductCodesFromLatestCosts(scopeCodes = [])
     .filter(Boolean);
 }
 
-async function resolveLocationScopedProductCodes(locationCode) {
-  const scopeCodes = expandLocationScopeCodes(locationCode);
-  if (scopeCodes.length === 0) return null;
+async function resolveLocationScopedProductCodes(branchCode, locationCode) {
+  if (!branchCode || !locationCode) {
+    throw new Error('Both branchCode and locationCode are required for product code resolution');
+  }
 
-  const scopedWhere = buildLocationCodeScopeWhere(scopeCodes);
+  console.log('[PRODUCT SCOPE]', { branchCode, locationCode });
+
+  const scopedWhere = {
+    branchCode: branchCode,
+    locationCode: locationCode,
+  };
 
   const expiryRows = await prisma.productExpiryBatch.findMany({
-    where: scopedWhere || undefined,
+    where: scopedWhere,
     select: { productCode: true },
     distinct: ['productCode'],
   });
@@ -706,16 +664,17 @@ async function resolveLocationScopedProductCodes(locationCode) {
       .filter(Boolean)
   );
 
-  const costCodes = await resolveLocationScopedProductCodesFromLatestCosts(scopeCodes);
+  const costCodes = await resolveLocationScopedProductCodesFromLatestCosts(branchCode, locationCode);
   costCodes.forEach((code) => scopedCodes.add(code));
 
-  const salesCodes = await resolveLocationScopedProductCodesFromSales(scopeCodes);
+  const salesCodes = await resolveLocationScopedProductCodesFromSales(branchCode, locationCode);
   salesCodes.forEach((code) => scopedCodes.add(code));
 
-  const isZombaScope = scopeCodes.some((code) => CORE_ZOMBA_LOCATION_CODES.includes(code));
+  const isZombaScope = CORE_ZOMBA_LOCATION_CODES.includes(locationCode);
   if (isZombaScope) {
     console.log('[PRODUCTS][SCOPE][ZOMBA] code-source diagnostics', {
-      scopeCodes,
+      branchCode,
+      locationCode,
       expiryDistinctCount: expiryRows.length,
       latestCostDistinctCount: costCodes.length,
       salesDistinctCount: salesCodes.length,
@@ -724,7 +683,7 @@ async function resolveLocationScopedProductCodes(locationCode) {
   }
 
   // Keep legacy Blantyre operations usable when historical rows predate location tagging.
-  if (scopedCodes.size === 0 && scopeCodes.includes('BT')) {
+  if (scopedCodes.size === 0 && branchCode === 'BLANTYRE') {
     const legacyRows = await prisma.product.findMany({
       where: { sourceCode: { not: null } },
       select: { sourceCode: true },
@@ -1262,8 +1221,9 @@ const getProducts = async (req, res) => {
 
     if (normalizedLocationCode) {
       const scopeCodes = expandLocationScopeCodes(normalizedLocationCode);
-      const derivedBranchCode = deriveBranchCodeFromScopeCodes(scopeCodes);
-      const explicitBranchCode = requestedBranchCode || derivedBranchCode;
+      // For legacy compatibility, assume BLANTYRE for non-Zomba cases
+      const derivedBranchCode = requestedBranchCode || 'BLANTYRE';
+      const explicitBranchCode = derivedBranchCode;
       const rawLocationParam = String(locationCode || '').trim().toUpperCase();
       const resWasMapped = (rawLocationParam === 'RES' || rawLocationParam === 'ZOMBA_RES') && normalizedLocationCode === 'ST999';
 
@@ -1306,17 +1266,18 @@ const getProducts = async (req, res) => {
           resAlias: resWasMapped ? 'RES->ST999' : null,
         });
       } else {
-        const scopedProductCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
+        // For Blantyre, use BLANTYRE as branchCode since that's the legacy behavior
+        const scopedProductCodes = await resolveLocationScopedProductCodes('BLANTYRE', normalizedLocationCode);
         console.log('[PRODUCT QUERY]', {
           uiLocation: locationCode || '(none)',
-          branchCode: explicitBranchCode || '(any)',
+          branchCode: 'BLANTYRE',
           locationCode: normalizedLocationCode,
           scopedCodeCount: scopedProductCodes ? scopedProductCodes.length : 0,
         });
         if (!scopedProductCodes || scopedProductCodes.length === 0) {
           console.warn('[PRODUCT QUERY] no scoped product codes found - returning empty result', {
             normalizedLocationCode,
-            derivedBranchCode,
+            branchCode: 'BLANTYRE',
           });
           return res.status(200).json({
             products: [],
@@ -2783,16 +2744,14 @@ const getCategories = async (req, res) => {
     };
 
     if (effectiveLocationCode) {
-      const scopedProductCodes = await resolveLocationScopedProductCodes(effectiveLocationCode);
-      const derivedBranchCode = deriveBranchCodeFromScopeCodes(expandLocationScopeCodes(effectiveLocationCode));
+      // For legacy Blantyre behavior, assume BLANTYRE branch
+      const scopedProductCodes = await resolveLocationScopedProductCodes('BLANTYRE', effectiveLocationCode);
       if (!scopedProductCodes || scopedProductCodes.length === 0) {
         return res.status(200).json({ categories: [] });
       }
 
       where.sourceCode = { in: scopedProductCodes };
-      if (derivedBranchCode) {
-        where.branchCode = derivedBranchCode;
-      }
+      where.branchCode = 'BLANTYRE';
     }
 
     const categories = await prisma.product.findMany({
@@ -2953,12 +2912,13 @@ const getExpiryBatchAlerts = async (req, res) => {
     }
 
     const productCodes = Array.from(new Set(rawRows.map((row) => row.productCode).filter(Boolean)));
-    const derivedBranchCode = deriveBranchCodeFromScopeCodes(expandLocationScopeCodes(locationCode));
+    // For legacy compatibility, assume BLANTYRE branch for expiry data
+    const derivedBranchCode = 'BLANTYRE';
     const products = productCodes.length > 0
       ? await prisma.product.findMany({
           where: {
             sourceCode: { in: productCodes },
-            ...(derivedBranchCode ? { branchCode: derivedBranchCode } : {}),
+            branchCode: derivedBranchCode,
           },
           select: { sourceCode: true, name: true, category: true },
         })

@@ -16,54 +16,56 @@ const LOCATION_ALIASES = {
   WH: 'WH',
 };
 
-const AMBIGUOUS_LOCATION_CODES = new Set(['SH']);
-const ZOMBA_LOCATION_CODES = ['SH', 'BAR', 'ST999', 'WH'];
-const ZOMBA_OPERATIONAL_LOCATION_CODES = ['SH', 'BAR', 'ST999'];
-
 function normalizeScopeCode(value) {
   const normalized = String(value || '').trim().toUpperCase();
   if (!normalized) return null;
   return LOCATION_ALIASES[normalized] || normalized;
 }
 
-function isZombaLocationCode(value) {
-  const normalized = normalizeScopeCode(value);
-  return !!normalized && (normalized === 'ZA' || ZOMBA_LOCATION_CODES.includes(normalized));
-}
+/**
+ * Resolves operational scope from request parameters.
+ * Requires BOTH branchCode and locationCode to be provided.
+ * Throws an error if either is missing.
+ */
+function resolveOperationalScope(req) {
+  const branchCode = String(
+    req.query.branchCode
+    || req.body?.branchCode
+    || req.headers?.['x-branch-code']
+    || ''
+  ).trim();
 
-function deriveBranchCodeFromLocationCode(value, branchCode = '') {
-  const normalized = normalizeScopeCode(value);
-  if (!normalized) return null;
-  
-  // Handle ambiguous location codes (like SH) with explicit branch
-  if (AMBIGUOUS_LOCATION_CODES.has(normalized)) {
-    const normalizedBranch = String(branchCode || '').trim().toUpperCase();
-    if (normalizedBranch === 'BLANTYRE') return 'BLANTYRE';
-    if (normalizedBranch === 'ZOMBA') return 'ZOMBA';
-    return null;
-  }
-  
-  if (normalized === 'BT') return 'BLANTYRE';
-  if (normalized === 'ZA' || ZOMBA_LOCATION_CODES.includes(normalized)) return 'ZOMBA';
-  return null;
-}
+  const locationCode = String(
+    req.query.locationCode
+    || req.body?.locationCode
+    || req.headers?.['x-location-code']
+    || ''
+  ).trim();
 
-function expandLocationScopeCodes(value, branchCode = '') {
-  const normalized = normalizeScopeCode(value);
-  if (!normalized) return [];
-  if (normalized === 'BT') return ['BT'];
-  if (normalized === 'ZA') return ZOMBA_OPERATIONAL_LOCATION_CODES.slice();
-  if (normalized === 'SH' || normalized === 'BAR' || normalized === 'ST999' || normalized === 'WH') {
-    return [normalized];
+  if (!branchCode) {
+    throw new Error('branchCode is required for scoped queries');
   }
-  return [normalized];
+
+  if (!locationCode) {
+    throw new Error('locationCode is required for scoped queries');
+  }
+
+  const normalizedBranchCode = branchCode.toUpperCase();
+  const normalizedLocationCode = normalizeScopeCode(locationCode);
+
+  if (!normalizedLocationCode) {
+    throw new Error('Invalid locationCode provided');
+  }
+
+  console.log('[SCOPE]', { branchCode: normalizedBranchCode, locationCode: normalizedLocationCode });
+
+  return {
+    branchCode: normalizedBranchCode,
+    locationCode: normalizedLocationCode
+  };
 }
 
 module.exports = {
   normalizeScopeCode,
-  deriveBranchCodeFromLocationCode,
-  expandLocationScopeCodes,
-  isZombaLocationCode,
-  ZOMBA_LOCATION_CODES,
-  ZOMBA_OPERATIONAL_LOCATION_CODES,
+  resolveOperationalScope,
 };
