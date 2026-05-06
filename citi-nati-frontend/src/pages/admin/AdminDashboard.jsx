@@ -330,11 +330,16 @@ const AdminDashboard = () => {
   });
   const isDarkTheme = theme === 'dark';
   const [freshnessClockMs, setFreshnessClockMs] = useState(() => Date.now());
-  const selectedOperationalScope = resolveOperationalScope(selectedOperationalLocationCode);
-  const selectedOperationalLocationLabel = selectedOperationalScope.label;
-  const selectedOperationalBranchCode = selectedOperationalScope.branchCode;
-  const selectedOperationalPosLocationCode = selectedOperationalScope.locationCode;
-  const navigate = useNavigate();
+ const selectedOperationalScope = resolveOperationalScope(selectedOperationalLocationCode);
+const selectedOperationalScopeKey =
+  selectedOperationalScope?.uiCode ||
+  normalizeOperationalScopeCode(selectedOperationalLocationCode) ||
+  `${selectedOperationalScope?.branchCode || ''}_${selectedOperationalScope?.locationCode || ''}`;
+
+const selectedOperationalLocationLabel = selectedOperationalScope.label;
+const selectedOperationalBranchCode = selectedOperationalScope.branchCode;
+const selectedOperationalPosLocationCode = selectedOperationalScope.locationCode;
+const navigate = useNavigate();
 
   const updateProductsCacheMeta = useCallback((locationCode, patch) => {
     setAdminProductsCacheMetaByLocation((prev) => ({
@@ -512,10 +517,10 @@ const AdminDashboard = () => {
   }, [adminProductsCacheMetaByLocation, updateProductsCacheMeta]);
 
 React.useEffect(() => {
-  if (!selectedOperationalLocationCode) return;
-  preloadAdminProductsForLocation(selectedOperationalLocationCode);
-}, [selectedOperationalLocationCode, preloadAdminProductsForLocation]);
-  const activeLocationCachedProductsMeta = adminProductsCacheMetaByLocation[selectedOperationalLocationCode] || {};
+  if (!selectedOperationalScopeKey) return;
+  preloadAdminProductsForLocation(selectedOperationalScopeKey);
+}, [selectedOperationalScopeKey, preloadAdminProductsForLocation]);
+  const activeLocationCachedProductsMeta = adminProductsCacheMetaByLocation[selectedOperationalScopeKey] || {};
   const shouldAutoRefreshAdminProducts = ADMIN_PRODUCTS_AUTO_REFRESH_TAB_IDS.has(activeTab);
 
   React.useEffect(() => {
@@ -543,7 +548,7 @@ React.useEffect(() => {
         return;
       }
 
-      void preloadAdminProductsForLocation(selectedOperationalLocationCode, { force: true, silent: true });
+      void preloadAdminProductsForLocation(selectedOperationalScopeKey, { force: true, silent: true });
     };
 
     const handleVisibilityChange = () => {
@@ -676,7 +681,7 @@ React.useEffect(() => {
           stockChangedCount: payload.stockChangedCount,
           priceChangedCount: payload.priceChangedCount,
           affectedScopes: scopes,
-          refreshedScopes: targetScopeArray,
+          targetUiScopes: targetScopeArray,
         });
 
         if (targetScopeArray.length === 0) {
@@ -934,13 +939,12 @@ React.useEffect(() => {
   const activeTabBlockedReason = activeTabMeta
     ? (MOBILE_BLOCKED_MESSAGE_BY_TAB[activeTabMeta.id] || 'This admin module is desktop-only on mobile.')
     : 'This admin module is desktop-only on mobile.';
-  const activeLocationCachedProducts = adminProductsCacheByLocation[selectedOperationalLocationCode] || [];
   const handleRefreshAdminProductsCache = useCallback(async (options = {}) => {
-    await preloadAdminProductsForLocation(selectedOperationalLocationCode, {
-      force: true,
-      silent: options?.silent === true,
-    });
-  }, [preloadAdminProductsForLocation, selectedOperationalLocationCode]);
+  await preloadAdminProductsForLocation(selectedOperationalScopeKey, {
+    force: true,
+    silent: options?.silent === true,
+  });
+}, [preloadAdminProductsForLocation, selectedOperationalScopeKey]);
 
   const activeLocationLastLoadedAt = Number(activeLocationCachedProductsMeta.lastLoadedAt || 0);
   const activeLocationLastRealtimeUpdateAt = Number(activeLocationCachedProductsMeta.lastRealtimeUpdateAt || 0);

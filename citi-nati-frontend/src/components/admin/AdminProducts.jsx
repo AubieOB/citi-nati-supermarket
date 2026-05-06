@@ -624,26 +624,25 @@ const AdminProducts = ({
       }
 
       const handleProductUpdate = (updatedProduct) => {
-        const updatedLocationCode = String(updatedProduct?.locationCode || '').trim().toUpperCase();
-        const updatedBranchCode = String(updatedProduct?.branchCode || '').trim().toUpperCase();
-        const selectedScope = resolveOperationalScope(selectedLocationCode, selectedBranchCode);
-        const currentLocationCode = String(selectedScope?.locationCode || selectedLocationCode || '').trim().toUpperCase();
-        const currentBranchCode = String(selectedBranchCode || selectedScope?.branchCode || '').trim().toUpperCase();
+       const updatedScope = resolveOperationalScope(
+        updatedProduct?.locationCode,
+        updatedProduct?.branchCode
+      );
 
-        if (updatedBranchCode && currentBranchCode && updatedBranchCode !== currentBranchCode) {
-          return;
-        }
-        if (updatedLocationCode && currentLocationCode && updatedLocationCode !== currentLocationCode) {
-          return;
-        }
+      const updatedScopeKey = updatedScope
+        ? `${String(updatedScope.branchCode).trim().toUpperCase()}_${String(updatedScope.locationCode).trim().toUpperCase()}`
+        : `${String(updatedProduct?.branchCode || 'UNKNOWN').trim().toUpperCase()}_${String(updatedProduct?.locationCode || 'UNKNOWN').trim().toUpperCase()}`;
+
+      if (updatedScopeKey !== productScopeKey) {
+        return;
+      }
 
         console.log('[AdminProducts] 🔄 Product update received:', updatedProduct.name, {
-          updatedLocationCode,
-          updatedBranchCode,
-          currentLocationCode,
-          currentBranchCode,
-        });
-        
+        updatedScopeKey,
+        productScopeKey,
+        updatedLocationCode: updatedProduct?.locationCode,
+        updatedBranchCode: updatedProduct?.branchCode,
+      });
         // Update the products list with complete product details
         setProducts(prevProducts =>
           prevProducts.map(product =>
@@ -716,7 +715,7 @@ const AdminProducts = ({
       let page = 1;
       const perPage = 100;
       let all = [];
-      const needsFallbackFiltering = !selectedBranchCode;
+      
 
       const fetchProductsPage = async (pageNumber) => {
         const params = new URLSearchParams({ page: String(pageNumber), pageSize: String(perPage) });
@@ -764,33 +763,42 @@ const AdminProducts = ({
         resultCount: firstItems.length,
       });
 
-      if (firstItems.length === 0) {
-        try {
-          console.warn('[ADMIN PRODUCTS UI] /products returned 0; trying /admin/pos-products fallback');
-          const params = new URLSearchParams({ page: '1', limit: '5000' });
-          if (selectedLocationCode) {
-            params.append('locationCode', selectedLocationCode);
-          }
-          if (selectedBranchCode) {
-            params.append('branchCode', selectedBranchCode);
-          }
-          const adminResp = await api.get(`/admin/pos-products?${params.toString()}`);
-          const adminItems = Array.isArray(adminResp?.data?.products)
-            ? adminResp.data.products.map(normalizeAdminPosProduct)
-            : [];
+     if (firstItems.length === 0) {
+  try {
+    console.warn('[ADMIN PRODUCTS UI] /products returned 0; trying /admin/pos-products fallback');
+    const params = new URLSearchParams({ page: '1', limit: '5000' });
+    if (selectedLocationCode) {
+      params.append('locationCode', selectedLocationCode);
+    }
+    if (selectedBranchCode) {
+      params.append('branchCode', selectedBranchCode);
+    }
+    const adminResp = await api.get(`/admin/pos-products?${params.toString()}`);
+    const adminItems = Array.isArray(adminResp?.data?.products)
+      ? adminResp.data.products.map(normalizeAdminPosProduct)
+      : [];
 
-          console.log('[ADMIN PRODUCTS UI] /admin/pos-products fallback count', adminItems.length);
-          all = needsFallbackFiltering
-            ? filterProductsForOperationalLocation(adminItems, selectedLocationCode, selectedBranchCode)
-            : adminItems;
-        } catch (adminFallbackErr) {
-          console.warn('[ADMIN PRODUCTS UI] /admin/pos-products fallback failed', adminFallbackErr?.response?.data || adminFallbackErr.message);
-          all = firstItems;
-        }
-      } else {
-        all = firstItems;
-      }
-
+    console.log('[ADMIN PRODUCTS UI] /admin/pos-products fallback count', adminItems.length);
+    all = filterProductsForOperationalLocation(
+      adminItems,
+      selectedLocationCode,
+      selectedBranchCode
+    );
+  } catch (adminFallbackErr) {
+    console.warn('[ADMIN PRODUCTS UI] /admin/pos-products fallback failed', adminFallbackErr?.response?.data || adminFallbackErr.message);
+    all = filterProductsForOperationalLocation(
+      firstItems,
+      selectedLocationCode,
+      selectedBranchCode
+    );
+  }
+} else {
+  all = filterProductsForOperationalLocation(
+    firstItems,
+    selectedLocationCode,
+    selectedBranchCode
+  );
+}
       console.log('[ADMIN PRODUCTS UI] first product row', firstItems[0] || null);
       console.log('[ADMIN PRODUCTS UI] expiry fields received', firstItems.slice(0, 5).map((product) => ({
         id: product.id,
@@ -803,7 +811,7 @@ const AdminProducts = ({
       })));
 
       // Sort by expiry status
-      let sorted = all.sort((a, b) => {
+      let sorted = [...all].sort((a, b) => {
         return getExpirySeverity(a) - getExpirySeverity(b);
       });
 
@@ -826,12 +834,14 @@ const AdminProducts = ({
               const items = resp.data.products || [];
               if (items.length === 0) break;
               
-              all = needsFallbackFiltering
-                ? filterProductsForOperationalLocation(all.concat(items), selectedLocationCode, selectedBranchCode)
-                : all.concat(items);
+              all = filterProductsForOperationalLocation(
+              all.concat(items),
+              selectedLocationCode,
+              selectedBranchCode
+            );
               
               // Re-sort and update state
-              sorted = all.sort((a, b) => {
+              sorted = [...all].sort((a, b) => {
                 return getExpirySeverity(a) - getExpirySeverity(b);
               });
 
