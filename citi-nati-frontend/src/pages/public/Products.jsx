@@ -339,7 +339,10 @@ const Products = () => {
     const fetchCategories = async () => {
       try {
         const response = await api.get('/products/categories', {
-          params: { locationCode: STOREFRONT_LOCATION_CODE },
+          params: {
+            branchCode: 'BLANTYRE',
+            locationCode: STOREFRONT_LOCATION_CODE,
+          },
         });
         if (response.data.categories) {
           setCategories(response.data.categories);
