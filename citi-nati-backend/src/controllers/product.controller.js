@@ -82,7 +82,10 @@ function normalizeProductNameInput(value) {
 
 function normalizeBranchCode(value) {
   const normalized = String(value || '').trim().toUpperCase();
-  return normalized || null;
+  if (!normalized) return null;
+  if (normalized === 'BT' || normalized === 'BLANTYRE') return 'BLANTYRE';
+  if (normalized === 'ZA' || normalized === 'ZOMBA') return 'ZOMBA';
+  return normalized;
 }
 
 function getDefaultPosLocationCodeForBranch(branchCode, requestedLocationCode) {
@@ -679,24 +682,6 @@ async function resolveLocationScopedProductCodes(branchCode, locationCode) {
   const isAmbiguousLocationCode = normalizedLocationCode === 'SH';
   const isZombaScope = normalizedBranchCode === 'ZOMBA';
   const isBlantyreScope = normalizedBranchCode === 'BLANTYRE';
-
-  if (!isAmbiguousLocationCode) {
-    const expiryRows = await prisma.productExpiryBatch.findMany({
-      where: {
-        locationCode: {
-          equals: normalizedLocationCode,
-          mode: 'insensitive',
-        },
-      },
-      select: { productCode: true },
-      distinct: ['productCode'],
-    });
-
-    expiryRows
-      .map((row) => normalizeProductCode(row.productCode))
-      .filter(Boolean)
-      .forEach((code) => scopedCodes.add(code));
-  }
 
   if (isZombaScope) {
     console.log('[PRODUCTS][SCOPE][ZOMBA] code-source diagnostics', {
@@ -2757,48 +2742,56 @@ const deletePOSProducts = async (req, res) => {
  */
 const getCategories = async (req, res) => {
   try {
+    const requestedBranchCode = normalizeBranchCode(req.query.branchCode);
     const requestedLocationCode = normalizeScopeCode(req.query.locationCode);
+    const effectiveBranchCode = requestedBranchCode || (!isAdminRequest(req) ? 'BLANTYRE' : null);
     const effectiveLocationCode = requestedLocationCode || (!isAdminRequest(req) ? getStorefrontLocationCode() : null);
+
+    if (!isAdminRequest(req) && !requestedBranchCode && requestedLocationCode === 'SH') {
+      return res.status(400).json({
+        error: 'branchCode is required for SH because SH exists in multiple branches.',
+      });
+    }
 
     // Get all distinct categories from Product table (single source of truth)
     const where = {
       category: {
-        not: null
+        not: null,
       },
       enabled: true,
-      isActive: true
+      isActive: true,
     };
 
-    if (effectiveLocationCode) {
-      // For legacy Blantyre behavior, assume BLANTYRE branch
-      const scopedProductCodes = await resolveLocationScopedProductCodes('BLANTYRE', effectiveLocationCode);
-      if (!scopedProductCodes || scopedProductCodes.length === 0) {
-        return res.status(200).json({ categories: [] });
-      }
+    if (effectiveBranchCode) {
+      where.branchCode = effectiveBranchCode;
+    }
 
-      where.sourceCode = { in: scopedProductCodes };
-      where.branchCode = 'BLANTYRE';
+    if (effectiveLocationCode) {
+      where.locationCode = {
+        equals: effectiveLocationCode,
+        mode: 'insensitive',
+      };
     }
 
     const categories = await prisma.product.findMany({
       where,
       distinct: ['category'],
       select: {
-        category: true
+        category: true,
       },
       orderBy: {
-        category: 'asc'
-      }
+        category: 'asc',
+      },
     });
 
     const categoryList = categories
-      .map(c => c.category)
-      .filter(c => c && c.trim() !== '');
+      .map((c) => c.category)
+      .filter((c) => c && c.trim() !== '');
 
     console.log(`[CATEGORIES] Retrieved ${categoryList.length} unique categories from Product table`);
 
     return res.status(200).json({
-      categories: categoryList
+      categories: categoryList,
     });
   } catch (err) {
     console.error('[CATEGORIES ERROR]:', err);
