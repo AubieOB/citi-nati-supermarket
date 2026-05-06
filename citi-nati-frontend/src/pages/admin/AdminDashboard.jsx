@@ -521,6 +521,10 @@ React.useEffect(() => {
   preloadAdminProductsForLocation(selectedOperationalScopeKey);
 }, [selectedOperationalScopeKey, preloadAdminProductsForLocation]);
   const activeLocationCachedProductsMeta = adminProductsCacheMetaByLocation[selectedOperationalScopeKey] || {};
+  const activeLocationCachedProducts =
+  Array.isArray(adminProductsCacheByLocation[selectedOperationalScopeKey])
+    ? adminProductsCacheByLocation[selectedOperationalScopeKey]
+    : [];
   const shouldAutoRefreshAdminProducts = ADMIN_PRODUCTS_AUTO_REFRESH_TAB_IDS.has(activeTab);
 
   React.useEffect(() => {
