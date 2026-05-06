@@ -11,7 +11,7 @@ const {
 } = require('../utils/stockResolver');
 const {
   normalizeScopeCode: normalizeOperationalScopeCode,
-  expandLocationScopeCodes: expandOperationalLocationScopeCodes,
+  expandOperationalLocationScopeCodes,
   resolveOperationalScope,
   CORE_ZOMBA_LOCATION_CODES,
 } = require('../utils/operationalScope');
