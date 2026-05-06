@@ -194,15 +194,13 @@ function deriveBranchCodeFromLocationCode(locationCode) {
   return '';
 }
 
-function resolveLocationScopeLabel(filters = {}, selectedLocationId = null, selectedLocationCode = '') {
+function resolveLocationScopeLabel(filters = {}, selectedBranchCode = '', selectedLocationCode = '') {
   const locationCode = String(filters.locationCode || selectedLocationCode || '').trim().toUpperCase();
-  if (locationCode) return locationCode;
+  const branchCode = String(filters.branchCode || selectedBranchCode || '').trim().toUpperCase();
 
-  const locationId = String(filters.locationId || selectedLocationId || '').trim();
-  if (locationId) return `Location #${locationId}`;
-
-  const branchCode = String(filters.branchCode || '').trim().toUpperCase();
+  if (locationCode && branchCode) return `${branchCode} ${locationCode}`;
   if (branchCode) return `Branch ${branchCode} (all locations)`;
+  if (locationCode) return locationCode;
 
   return 'All Locations (Combined)';
 }
@@ -225,7 +223,7 @@ const ErrorState = ({ message }) => (
   </div>
 );
 
-const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, selectedLocationCode = '', permissions = {} }) => {
+const SalesReportsTab = ({ drilldownRequest = null, selectedBranchCode = '', selectedLocationCode = '', permissions = {} }) => {
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
   const canViewSummary = permissions.canViewSummary !== false;
   const canViewSalesBy = permissions.canViewSalesBy !== false;
@@ -318,19 +316,17 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
 
   useEffect(() => {
     setFilters((prev) => {
-      const nextLocationId = selectedLocationId ? String(selectedLocationId) : '';
-      const nextLocationCode = selectedLocationId ? String(selectedLocationCode || '').trim().toUpperCase() : '';
-      const nextBranchCode = deriveBranchCodeFromLocationCode(nextLocationCode);
-      if (prev.locationId === nextLocationId && prev.locationCode === nextLocationCode && prev.branchCode === nextBranchCode) return prev;
+      const nextLocationCode = String(selectedLocationCode || '').trim().toUpperCase();
+      const nextBranchCode = String(selectedBranchCode || '').trim().toUpperCase();
+      if (prev.locationCode === nextLocationCode && prev.branchCode === nextBranchCode) return prev;
       return {
         ...prev,
-        locationId: nextLocationId,
         locationCode: nextLocationCode,
         branchCode: nextBranchCode,
       };
     });
     setViewState(DEFAULT_VIEW_STATE);
-  }, [selectedLocationCode, selectedLocationId]);
+  }, [selectedLocationCode, selectedBranchCode]);
 
   const updateFilter = useCallback((key, value) => {
     setFilters((prev) => {
@@ -347,15 +343,15 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
   }, []);
 
   const resetFilters = useCallback(() => {
-    const nextLocationCode = selectedLocationId ? String(selectedLocationCode || '').trim().toUpperCase() : '';
+    const nextLocationCode = String(selectedLocationCode || '').trim().toUpperCase();
+    const nextBranchCode = String(selectedBranchCode || '').trim().toUpperCase();
     setFilters({
       ...DEFAULT_FILTERS,
-      locationId: selectedLocationId ? String(selectedLocationId) : '',
       locationCode: nextLocationCode,
-      branchCode: deriveBranchCodeFromLocationCode(nextLocationCode),
+      branchCode: nextBranchCode,
     });
     setViewState(DEFAULT_VIEW_STATE);
-  }, [selectedLocationCode, selectedLocationId]);
+  }, [selectedLocationCode, selectedBranchCode]);
 
   const updateViewSort = useCallback((view, sortBy) => {
     setViewState((prev) => {
@@ -621,12 +617,12 @@ const SalesReportsTab = ({ drilldownRequest = null, selectedLocationId = null, s
     if (summaryMeta?.dateRange?.startDate && summaryMeta?.dateRange?.endDate) {
       chips.push(`${summaryMeta.dateRange.startDate} to ${summaryMeta.dateRange.endDate}`);
     }
-    chips.push(`Location Scope: ${resolveLocationScopeLabel(filters, selectedLocationId, selectedLocationCode)}`);
+    chips.push(`Location Scope: ${resolveLocationScopeLabel(filters, selectedBranchCode, selectedLocationCode)}`);
     if (summaryMeta?.filters?.branchCode) chips.push(`Branch: ${summaryMeta.filters.branchCode}`);
     if (summaryMeta?.filters?.locationCode) chips.push(`Location: ${summaryMeta.filters.locationCode}`);
     if (summaryMeta?.filters?.syncSourceCode) chips.push(`Source: ${summaryMeta.filters.syncSourceCode}`);
     return chips;
-  }, [filters, selectedLocationCode, selectedLocationId, summaryMeta]);
+  }, [filters, selectedBranchCode, selectedLocationCode, summaryMeta]);
 
   const fetchAllRowsForView = useCallback(async (viewId) => {
     if (viewId === 'summary' || viewId === 'payments') {

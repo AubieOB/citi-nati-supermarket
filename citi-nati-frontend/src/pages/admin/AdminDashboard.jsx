@@ -1591,7 +1591,7 @@ React.useEffect(() => {
                 )}
                 {activeTab === 'users' && <AdminUsers />}
                 {activeTab === 'sales' && <AdminSales selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
-                {activeTab === 'business-operations' && <AdminBusinessOperations />}
+                {activeTab === 'business-operations' && <AdminBusinessOperations selectedLocationCode={selectedOperationalPosLocationCode} selectedBranchCode={selectedOperationalBranchCode} />}
                 {activeTab === 'delivery-coverage' && <AdminDeliveryCoverage />}
                 {activeTab === 'refunds' && <AdminRefunds />}
                 {activeTab === 'support' && <SupportDashboard openTicketRequest={supportTicketOpenRequest} />}

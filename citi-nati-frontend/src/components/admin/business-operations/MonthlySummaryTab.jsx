@@ -81,7 +81,7 @@ const defaultSectionState = { loading: true, error: '' };
 const MonthlySummaryTab = ({
   refreshKey = 0,
   onNavigateTab,
-  selectedLocationId = null,
+  selectedBranchCode = '',
   selectedLocationCode = '',
   selectedLocationName = '',
   permissions = {},
@@ -180,14 +180,11 @@ const MonthlySummaryTab = ({
       ? { periodType: 'month', month: String(filters.month), year: String(filters.year) }
       : { periodType: 'custom', startDate: activeRange.startDate, endDate: activeRange.endDate };
 
-    if (selectedLocationId) {
-      params.locationId = selectedLocationId;
-    }
     if (selectedLocationCode.trim()) {
-      const normalizedCode = selectedLocationCode.trim().toUpperCase();
-      params.locationCode = normalizedCode;
-      const branchCode = deriveBranchCodeFromLocationCode(normalizedCode);
-      if (branchCode) params.branchCode = branchCode;
+      params.locationCode = selectedLocationCode.trim().toUpperCase();
+    }
+    if (selectedBranchCode.trim()) {
+      params.branchCode = selectedBranchCode.trim().toUpperCase();
     }
 
     try {
@@ -211,7 +208,7 @@ const MonthlySummaryTab = ({
         return { loading: false, error: nextError, summary: null, payments: [] };
       });
     }
-  }, [activeRange.endDate, activeRange.startDate, filters.month, filters.periodType, filters.year, selectedLocationCode, selectedLocationId]);
+  }, [activeRange.endDate, activeRange.startDate, filters.month, filters.periodType, filters.year, selectedLocationCode, selectedBranchCode]);
 
   const fetchExpenses = useCallback(async ({ background = false } = {}) => {
     setExpensesState((prev) => ({
@@ -225,12 +222,11 @@ const MonthlySummaryTab = ({
       endDate: activeRange.endDate,
     };
 
-    if (selectedLocationId) params.locationId = selectedLocationId;
     if (selectedLocationCode.trim()) {
-      const normalizedCode = selectedLocationCode.trim().toUpperCase();
-      params.locationCode = normalizedCode;
-      const branchCode = deriveBranchCodeFromLocationCode(normalizedCode);
-      if (branchCode) params.branchCode = branchCode;
+      params.locationCode = selectedLocationCode.trim().toUpperCase();
+    }
+    if (selectedBranchCode.trim()) {
+      params.branchCode = selectedBranchCode.trim().toUpperCase();
     }
 
     try {
@@ -245,7 +241,7 @@ const MonthlySummaryTab = ({
         return { loading: false, error: nextError, summary: null };
       });
     }
-  }, [activeRange.endDate, activeRange.startDate, selectedLocationCode, selectedLocationId]);
+  }, [activeRange.endDate, activeRange.startDate, selectedLocationCode, selectedBranchCode]);
 
   const fetchPayroll = useCallback(async ({ background = false } = {}) => {
     setPayrollState((prev) => ({
@@ -259,7 +255,8 @@ const MonthlySummaryTab = ({
         sortBy: 'createdAt',
         sortOrder: 'desc',
         pageSize: 100,
-        locationId: selectedLocationId || undefined,
+        branchCode: selectedBranchCode || undefined,
+        locationCode: selectedLocationCode || undefined,
       });
 
       const relevantPeriods = periods.filter((period) => inDateRange(period.createdAt, activeRange.startDate, activeRange.endDate));
@@ -286,7 +283,8 @@ const MonthlySummaryTab = ({
           sortBy: 'createdAt',
           sortOrder: 'desc',
           pageSize: 150,
-          locationId: selectedLocationId || undefined,
+          branchCode: selectedBranchCode || undefined,
+          locationCode: selectedLocationCode || undefined,
         })),
       );
 
@@ -318,7 +316,7 @@ const MonthlySummaryTab = ({
         return { loading: false, error: nextError, data: null };
       });
     }
-  }, [activeRange.endDate, activeRange.startDate, selectedLocationId]);
+  }, [activeRange.endDate, activeRange.startDate, selectedBranchCode, selectedLocationCode]);
 
   const fetchSuppliers = useCallback(async ({ background = false } = {}) => {
     setSupplierState((prev) => ({
@@ -333,7 +331,8 @@ const MonthlySummaryTab = ({
           sortBy: 'createdAt',
           sortOrder: 'desc',
           pageSize: 100,
-          locationId: selectedLocationId || undefined,
+          branchCode: selectedBranchCode || undefined,
+          locationCode: selectedLocationCode || undefined,
         }),
         fetchAllPages('/business-operations/suppliers/transactions/list', {
           sortBy: 'transactionDate',
@@ -342,7 +341,8 @@ const MonthlySummaryTab = ({
           startDate: activeRange.startDate,
           endDate: activeRange.endDate,
           pageSize: 100,
-          locationId: selectedLocationId || undefined,
+          branchCode: selectedBranchCode || undefined,
+          locationCode: selectedLocationCode || undefined,
         }),
       ]);
 
@@ -384,7 +384,7 @@ const MonthlySummaryTab = ({
         return { loading: false, error: nextError, data: null };
       });
     }
-  }, [activeRange.endDate, activeRange.startDate, selectedLocationId]);
+  }, [activeRange.endDate, activeRange.startDate, selectedBranchCode, selectedLocationCode]);
 
   useEffect(() => {
     if (validationError) return;
@@ -485,8 +485,7 @@ const MonthlySummaryTab = ({
     startDate: activeRange.startDate,
     endDate: activeRange.endDate,
     locationCode: selectedLocationCode?.trim() || '',
-    locationId: selectedLocationId || '',
-  }), [activeRange.endDate, activeRange.startDate, filters.month, filters.periodType, filters.year, selectedLocationCode, selectedLocationId]);
+  }), [activeRange.endDate, activeRange.startDate, filters.month, filters.periodType, filters.year, selectedLocationCode]);
 
   const handleExport = async (format) => {
     if (format === 'excel') setExportingExcel(true);
@@ -497,7 +496,6 @@ const MonthlySummaryTab = ({
         exportMonthlySummaryPdf({
           filters,
           activeRange,
-          selectedLocationId,
           selectedLocationCode,
           salesState,
           expensesState,
@@ -517,7 +515,6 @@ const MonthlySummaryTab = ({
           year: filters.year,
           startDate: activeRange.startDate,
           endDate: activeRange.endDate,
-          locationId: selectedLocationId,
           locationCode: selectedLocationCode,
         },
       });
