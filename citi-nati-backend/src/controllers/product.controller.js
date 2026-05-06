@@ -13,6 +13,7 @@ const {
   normalizeScopeCode: normalizeOperationalScopeCode,
   expandOperationalLocationScopeCodes,
   resolveOperationalScope,
+  isAmbiguousLocationCode,
   CORE_ZOMBA_LOCATION_CODES,
 } = require('../utils/operationalScope');
 
@@ -107,6 +108,11 @@ function getDefaultPosLocationCodeForBranch(branchCode, requestedLocationCode) {
 function resolveProductWritebackScope(req, product = null) {
   // Require both branchCode and locationCode for strict scoping
   const { branchCode, locationCode } = resolveOperationalScope(req);
+
+  // For ambiguous location codes like SH, branchCode must be explicitly provided
+  if (locationCode && isAmbiguousLocationCode(locationCode) && !branchCode) {
+    throw new Error(`branchCode is required when using location code ${locationCode} (ambiguous location code)`);
+  }
 
   return {
     locationCode,

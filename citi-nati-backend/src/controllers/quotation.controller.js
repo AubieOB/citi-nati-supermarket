@@ -29,7 +29,6 @@ function getScopeFromRequest(req) {
     branchCode,
     locationCode,
     isValid: Boolean(branchCode && locationCode),
-    isScoped: Boolean(branchCode || locationCode),
   };
 }
 
@@ -160,13 +159,13 @@ const listQuotations = async (req, res) => {
   try {
     const { search, limit, offset = 0 } = req.query;
     const scope = getScopeFromRequest(req);
-    if (!scope.isScoped) {
-      return res.status(400).json({ error: 'branchCode or locationCode is required' });
+    if (!scope.isValid) {
+      return res.status(400).json({ error: 'branchCode and locationCode are required' });
     }
 
     const where = {
-      ...(scope.branchCode ? { branchCode: scope.branchCode } : {}),
-      ...(scope.locationCode ? { locationCode: scope.locationCode } : {}),
+      branchCode: scope.branchCode,
+      locationCode: scope.locationCode,
     };
     if (search) {
       where.OR = [
@@ -205,15 +204,15 @@ const getQuotation = async (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id' });
     const scope = getScopeFromRequest(req);
-    if (!scope.isScoped) {
-      return res.status(400).json({ error: 'branchCode or locationCode is required' });
+    if (!scope.isValid) {
+      return res.status(400).json({ error: 'branchCode and locationCode are required' });
     }
 
     const quotation = await prisma.quotation.findFirst({
       where: {
         id,
-        ...(scope.branchCode ? { branchCode: scope.branchCode } : {}),
-        ...(scope.locationCode ? { locationCode: scope.locationCode } : {}),
+        branchCode: scope.branchCode,
+        locationCode: scope.locationCode,
       },
       include: { items: true },
     });
@@ -237,15 +236,15 @@ const updateQuotation = async (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id' });
     const scope = getScopeFromRequest(req);
-    if (!scope.isScoped) {
-      return res.status(400).json({ error: 'branchCode or locationCode is required' });
+    if (!scope.isValid) {
+      return res.status(400).json({ error: 'branchCode and locationCode are required' });
     }
 
     const existing = await prisma.quotation.findFirst({
       where: {
         id,
-        ...(scope.branchCode ? { branchCode: scope.branchCode } : {}),
-        ...(scope.locationCode ? { locationCode: scope.locationCode } : {}),
+        branchCode: scope.branchCode,
+        locationCode: scope.locationCode,
       },
     });
     if (!existing) return res.status(404).json({ error: 'Quotation not found' });
@@ -300,8 +299,8 @@ const updateQuotation = async (req, res) => {
         subtotal,
         discount: discountValue,
         total,
-        ...(scope.branchCode ? { branchCode: scope.branchCode } : {}),
-        ...(scope.locationCode ? { locationCode: scope.locationCode } : {}),
+        branchCode: scope.branchCode,
+        locationCode: scope.locationCode,
         validUntil: validUntil !== undefined ? (validUntil ? new Date(validUntil) : null) : undefined,
         ...(sanitizedItems && {
           items: { create: sanitizedItems },
@@ -330,18 +329,18 @@ const deleteQuotation = async (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id' });
     const scope = getScopeFromRequest(req);
-    if (!scope.isScoped) {
-      return res.status(400).json({ error: 'branchCode or locationCode is required' });
+    if (!scope.isValid) {
+      return res.status(400).json({ error: 'branchCode and locationCode are required' });
     }
 
-    const existing = await prisma.quotation.findFirst({
+    const quotation = await prisma.quotation.findFirst({
       where: {
         id,
-        ...(scope.branchCode ? { branchCode: scope.branchCode } : {}),
-        ...(scope.locationCode ? { locationCode: scope.locationCode } : {}),
+        branchCode: scope.branchCode,
+        locationCode: scope.locationCode,
       },
     });
-    if (!existing) return res.status(404).json({ error: 'Quotation not found' });
+    if (!quotation) return res.status(404).json({ error: 'Quotation not found' });
 
     await prisma.quotation.delete({ where: { id } });
     return res.json({ success: true });

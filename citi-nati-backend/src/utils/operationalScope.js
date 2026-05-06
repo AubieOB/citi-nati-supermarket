@@ -29,6 +29,14 @@ const BRANCH_ALIASES = {
 
 const CORE_ZOMBA_LOCATION_CODES = ['SH', 'BAR', 'ST999'];
 
+// Location codes that exist in multiple branches and require explicit branchCode
+const AMBIGUOUS_LOCATION_CODES = new Set(['SH']);
+
+function isAmbiguousLocationCode(locationCode) {
+  return !!locationCode && AMBIGUOUS_LOCATION_CODES.has(String(locationCode || '').toUpperCase());
+}
+
+
 function normalizeScopeCode(value) {
   const normalized = String(value || '').trim().toUpperCase();
   if (!normalized) return null;
@@ -104,5 +112,6 @@ module.exports = {
   normalizeScopeCode,
   expandOperationalLocationScopeCodes,
   resolveOperationalScope,
+  isAmbiguousLocationCode,
   CORE_ZOMBA_LOCATION_CODES,
 };

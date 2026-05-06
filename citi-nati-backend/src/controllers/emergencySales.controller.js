@@ -9,6 +9,7 @@ const {
   normalizeScopeCode,
   expandLocationScopeCodes: expandOperationalLocationScopeCodes,
   resolveOperationalScope,
+  isAmbiguousLocationCode,
   CORE_ZOMBA_LOCATION_CODES,
 } = require('../utils/operationalScope');
 
@@ -641,6 +642,15 @@ async function lookupEmergencyProducts(req, res) {
     const startedAt = Date.now();
     const query = String(req.query.q || req.query.search || '').trim();
     const { branchCode, locationCode } = resolveOperationalScope(req);
+
+    // For ambiguous location codes like SH, branchCode must be explicitly provided
+    if (locationCode && isAmbiguousLocationCode(locationCode) && !branchCode) {
+      return res.status(400).json({
+        success: false,
+        error: `branchCode is required when using location code ${locationCode} (ambiguous location code)`,
+      });
+    }
+
     const bypassCache = ['1', 'true', 'yes'].includes(String(req.query.forceRefresh || '').trim().toLowerCase());
 
     if (!query) {
@@ -844,6 +854,15 @@ async function lookupEmergencyProducts(req, res) {
 async function createEmergencySale(req, res) {
   try {
     const { branchCode, locationCode } = resolveOperationalScope(req);
+
+    // For ambiguous location codes like SH, branchCode must be explicitly provided
+    if (locationCode && isAmbiguousLocationCode(locationCode) && !branchCode) {
+      return res.status(400).json({
+        success: false,
+        error: `branchCode is required when using location code ${locationCode} (ambiguous location code)`,
+      });
+    }
+
     if (!SUPPORTED_LOCATION_CODES.includes(locationCode)) {
       return res.status(400).json({ success: false, error: 'locationCode is required and must be one of BT, SH, BAR, ST999, WH, or ZA' });
     }
