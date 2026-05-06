@@ -256,7 +256,7 @@ const ensureProductPerformanceIndexes = async () => {
     // Index for isOnSale filtering
     await ensureIndex('idx_product_on_sale', () => prisma.$executeRaw`
       CREATE INDEX IF NOT EXISTS idx_product_on_sale
-      ON "Product"(isOnSale);
+      ON "Product"("isOnSale");
     `);
     
     console.log('[DB INIT] ensured all performance indexes on Product table');
