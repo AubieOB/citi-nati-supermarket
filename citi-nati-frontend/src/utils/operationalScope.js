@@ -47,13 +47,32 @@ function normalizeOperationalScopeCode(value) {
 }
 
 function resolveOperationalScope(value, branchCode = '') {
+  const locationCode = String(value || '').trim().toUpperCase();
+  const branch = String(branchCode || '').trim().toUpperCase();
+
+  // Exact branch + location must win first, especially because SH exists in both branches.
+  if (locationCode && branch) {
+    const exactScope = Object.values(OPERATIONAL_SCOPE_MAP).find((scope) =>
+      String(scope.branchCode || '').trim().toUpperCase() === branch &&
+      String(scope.locationCode || '').trim().toUpperCase() === locationCode
+    );
+
+    if (exactScope) return exactScope;
+
+    return {
+      uiCode: `${branch}_${locationCode}`,
+      label: `${branch} ${locationCode}`,
+      branchCode: branch,
+      locationCode,
+      salesMode: 'live',
+    };
+  }
+
   const normalized = normalizeOperationalScopeCode(value);
   if (normalized) {
     return OPERATIONAL_SCOPE_MAP[normalized];
   }
 
-  const locationCode = String(value || '').trim().toUpperCase();
-  const branch = String(branchCode || '').trim().toUpperCase();
   if (!locationCode || !branch) return null;
 
   return {
@@ -64,7 +83,6 @@ function resolveOperationalScope(value, branchCode = '') {
     salesMode: 'live',
   };
 }
-
 function getOperationalScopeOptions() {
   return [
     OPERATIONAL_SCOPE_MAP.BLANTYRE_SH,
