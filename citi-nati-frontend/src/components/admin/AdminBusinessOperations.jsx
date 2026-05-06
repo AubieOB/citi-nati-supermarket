@@ -240,21 +240,20 @@ const isAllLocationsSelected = !selectedLocationCode || !selectedBranchCode;
     return unregister;
   }, [handleBoDialog]);
 
-  const contentByTab = {
-    'sales-reports': <SalesReportsTab drilldownRequest={drilldownRequests['sales-reports']} selectedBranchCode={selectedBranchCode} selectedLocationCode={selectedLocationCodeValue} permissions={salesReportsPermissions} />,
-    suppliers: <SuppliersTab refreshKey={locationRefreshKey} selectedBranchCode={selectedBranchCode} selectedLocationCode={selectedLocationCodeValue} />,
-    'goods-intake': <GoodsIntakeTab selectedBranchCode={selectedBranchCode} selectedLocationCode={selectedLocationCodeValue} permissions={goodsIntakePermissions} />,
-    expenses: <ExpensesTab refreshKey={locationRefreshKey} drilldownRequest={drilldownRequests.expenses} selectedBranchCode={selectedBranchCode} selectedLocationCode={selectedLocationCodeValue} />,
-    'monthly-summary': <MonthlySummaryTab refreshKey={locationRefreshKey} onNavigateTab={handleNavigateTab} selectedBranchCode={selectedBranchCode} selectedLocationCode={selectedLocationCodeValue} selectedLocationName={selectedLocationName} permissions={monthlySummaryPermissions} />,
-    employees: <EmployeesTab refreshKey={locationRefreshKey} selectedBranchCode={selectedBranchCode} selectedLocationCode={selectedLocationCodeValue} />,
-    payroll: <PayrollTab refreshKey={locationRefreshKey} selectedBranchCode={selectedBranchCode} selectedLocationCode={selectedLocationCodeValue} />,
-    'report-history': <ReportHistoryTab refreshKey={locationRefreshKey} selectedBranchCode={selectedBranchCode} selectedLocationCode={selectedLocationCodeValue} onNavigateTab={handleNavigateTab} />,
-    'sales-balancing': <SalesBalancingTab selectedBranchCode={selectedBranchCode} selectedLocationCode={selectedLocationCodeValue} selectedLocationName={selectedLocationName} />,
-    'analytics-performance': <BusinessAnalyticsTab selectedBranchCode={selectedBranchCode} selectedLocationCode={selectedLocationCodeValue} />,
-    'inventory-activity': (<InventoryActivityLedger selectedBranchCode={selectedBranchCode} selectedLocationCode={selectedLocationCodeValue}/>
-),
-    actions: <BusinessOperationsActionsTab permissions={actionsPermissions} />,
-  };
+ const contentByTab = {
+  'sales-reports': <SalesReportsTab drilldownRequest={drilldownRequests['sales-reports']} selectedLocationId={selectedLocationId} selectedBranchCode={selectedBranchCode} selectedLocationCode={selectedLocationCodeValue} permissions={salesReportsPermissions} />,
+  suppliers: <SuppliersTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationId} selectedBranchCode={selectedBranchCode} selectedLocationCode={selectedLocationCodeValue} />,
+  'goods-intake': <GoodsIntakeTab selectedLocationId={selectedLocationId} selectedBranchCode={selectedBranchCode} selectedLocationCode={selectedLocationCodeValue} permissions={goodsIntakePermissions} />,
+  expenses: <ExpensesTab refreshKey={locationRefreshKey} drilldownRequest={drilldownRequests.expenses} selectedLocationId={selectedLocationId} selectedBranchCode={selectedBranchCode} selectedLocationCode={selectedLocationCodeValue} />,
+  'monthly-summary': <MonthlySummaryTab refreshKey={locationRefreshKey} onNavigateTab={handleNavigateTab} selectedLocationId={selectedLocationId} selectedBranchCode={selectedBranchCode} selectedLocationCode={selectedLocationCodeValue} selectedLocationName={selectedLocationName} permissions={monthlySummaryPermissions} />,
+  employees: <EmployeesTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationId} selectedBranchCode={selectedBranchCode} selectedLocationCode={selectedLocationCodeValue} />,
+  payroll: <PayrollTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationId} selectedBranchCode={selectedBranchCode} selectedLocationCode={selectedLocationCodeValue} />,
+  'report-history': <ReportHistoryTab refreshKey={locationRefreshKey} selectedLocationId={selectedLocationId} selectedBranchCode={selectedBranchCode} selectedLocationCode={selectedLocationCodeValue} onNavigateTab={handleNavigateTab} />,
+  'sales-balancing': <SalesBalancingTab selectedLocationId={selectedLocationId} selectedBranchCode={selectedBranchCode} selectedLocationCode={selectedLocationCodeValue} selectedLocationName={selectedLocationName} />,
+  'analytics-performance': <BusinessAnalyticsTab selectedLocationId={selectedLocationId} selectedBranchCode={selectedBranchCode} selectedLocationCode={selectedLocationCodeValue} />,
+  'inventory-activity': <InventoryActivityLedger selectedLocationId={selectedLocationId} selectedBranchCode={selectedBranchCode} selectedLocationCode={selectedLocationCodeValue} />,
+  actions: <BusinessOperationsActionsTab permissions={actionsPermissions} />,
+};
 
   if (!canAccessBusinessOperationsPanel) {
     return (
