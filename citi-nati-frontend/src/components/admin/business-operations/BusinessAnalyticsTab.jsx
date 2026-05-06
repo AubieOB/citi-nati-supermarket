@@ -1008,25 +1008,49 @@ const BusinessAnalyticsTab = ({
   const refreshInFlightRef = useRef(false);
   const hasLoadedOnceRef = useRef(false);
 
-  const effectiveScope = useMemo(() => {
-    if (scope === 'inherit') {
-      return selectedLocationId ? String(selectedLocationId) : 'all';
-    }
-    return scope;
-  }, [scope, selectedLocationId]);
+  const inheritedScope = useMemo(() => {
+  const resolved = resolveOperationalScope(selectedLocationCode);
 
-  const scopeLabel = useMemo(() => {
-    if (scope === 'inherit') {
-      if (!selectedLocationId) return 'All Locations (inherits BO scope)';
-      const inherited = locations.find((row) => Number(row.id) === Number(selectedLocationId));
-      if (inherited) return `${inherited.name} (inherits BO scope)`;
-      return selectedLocationCode ? `${selectedLocationCode} (inherits BO scope)` : 'Selected BO scope';
+  if (!resolved) {
+    return 'all';
+  }
+
+  return `code:${resolved.uiCode}`;
+}, [selectedLocationCode]);
+
+const effectiveScope = useMemo(() => {
+  if (scope === 'inherit') {
+    return inheritedScope;
+  }
+
+  return scope;
+}, [scope, inheritedScope]);
+
+const scopeLabel = useMemo(() => {
+  if (scope === 'inherit') {
+    const resolved = resolveOperationalScope(selectedLocationCode);
+
+    if (!resolved) {
+      return 'All Locations (inherits BO scope)';
     }
 
-    if (scope === 'all') return 'All Locations';
-    const selected = locations.find((row) => String(row.id) === String(scope));
-    return selected ? selected.name : 'Selected location';
-  }, [locations, scope, selectedLocationId]);
+    return `${resolved.label} (inherits BO scope)`;
+  }
+
+  if (scope === 'all') {
+    return 'All Locations';
+  }
+
+  if (String(scope).startsWith('code:')) {
+    const resolved = resolveOperationalScope(String(scope).slice(5));
+
+    if (resolved) {
+      return resolved.label;
+    }
+  }
+
+  return 'Selected location';
+}, [scope, selectedLocationCode]);
 
   const selectedPeriod = useMemo(() => {
     const period = {
