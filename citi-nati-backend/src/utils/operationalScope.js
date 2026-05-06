@@ -16,6 +16,8 @@ const LOCATION_ALIASES = {
   WH: 'WH',
 };
 
+const CORE_ZOMBA_LOCATION_CODES = ['SH', 'BAR', 'ST999'];
+
 function normalizeScopeCode(value) {
   const normalized = String(value || '').trim().toUpperCase();
   if (!normalized) return null;
@@ -68,4 +70,5 @@ function resolveOperationalScope(req) {
 module.exports = {
   normalizeScopeCode,
   resolveOperationalScope,
+  CORE_ZOMBA_LOCATION_CODES,
 };

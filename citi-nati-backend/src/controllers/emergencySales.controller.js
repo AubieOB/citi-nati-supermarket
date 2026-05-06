@@ -9,7 +9,7 @@ const {
   normalizeScopeCode,
   expandLocationScopeCodes: expandOperationalLocationScopeCodes,
   resolveOperationalScope,
-  ZOMBA_LOCATION_CODES: CORE_ZOMBA_LOCATION_CODES,
+  CORE_ZOMBA_LOCATION_CODES,
 } = require('../utils/operationalScope');
 
 const prisma = new PrismaClient();
