@@ -1380,10 +1380,6 @@ async function listEmergencySales(req, res) {
       details: error.message,
     });
   }
-  } catch (error) {
-    console.error('[EMERGENCY SALES] list failed:', error.message);
-    return res.status(500).json({ success: false, error: 'Failed to fetch emergency sales' });
-  }
 }
 
 async function getEmergencySaleById(req, res) {
