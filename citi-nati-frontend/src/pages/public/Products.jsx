@@ -344,10 +344,11 @@ const Products = () => {
             locationCode: STOREFRONT_LOCATION_CODE,
           },
         });
-        if (response.data.categories) {
-          setCategories(response.data.categories);
-          console.log('[PRODUCTS] Categories loaded:', response.data.categories);
-        }
+        console.log('[CATEGORY API RESPONSE]', response.data);
+        const categoriesArray = response.data.categories || [];
+        console.log('[PARSED CATEGORIES]', categoriesArray);
+        setCategories(categoriesArray);
+        console.log('[PRODUCTS] Categories loaded:', categoriesArray);
       } catch (err) {
         console.warn('[PRODUCTS] Error fetching categories:', err.message);
         // Continue without categories - not critical
