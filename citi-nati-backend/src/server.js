@@ -35,6 +35,7 @@ const { adminRateLimiter, posAgentRateLimiter } = require('./middleware/rateLimi
 const mailConfig = require('./config/mailConfig');
 const { startDataRetentionScheduler } = require('./services/dataRetention.service');
 const { ensureProductPerformanceIndexes } = require('./controllers/product.controller');
+const { getPublicPromotions } = require('./controllers/promotion.controller');
 
 const prisma = new PrismaClient();
 
@@ -493,6 +494,7 @@ async function start() {
 
     // Products routes
     app.use('/api/products', productsRoutes);
+    app.get('/api/promotions', getPublicPromotions);
 
     // Cart routes
     app.use('/api/cart', cartRoutes);

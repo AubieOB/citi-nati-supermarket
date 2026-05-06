@@ -641,45 +641,75 @@ async function resolveLocationScopedProductCodes(branchCode, locationCode) {
     throw new Error('Both branchCode and locationCode are required for product code resolution');
   }
 
-  console.log('[PRODUCT SCOPE]', { branchCode, locationCode });
+  const normalizedBranchCode = normalizeBranchCode(branchCode);
+  const normalizedLocationCode = normalizeScopeCode(locationCode);
 
-  const scopedWhere = {
-    branchCode: branchCode,
-    locationCode: locationCode,
-  };
+  if (!normalizedBranchCode || !normalizedLocationCode) {
+    throw new Error('Invalid branchCode or locationCode for product code resolution');
+  }
 
-  const expiryRows = await prisma.productExpiryBatch.findMany({
-    where: scopedWhere,
-    select: { productCode: true },
-    distinct: ['productCode'],
+  console.log('[PRODUCT SCOPE]', { branchCode: normalizedBranchCode, locationCode: normalizedLocationCode });
+
+  const scopedCodes = new Set();
+
+  const costCodes = await resolveLocationScopedProductCodesFromLatestCosts(normalizedBranchCode, normalizedLocationCode);
+  costCodes.forEach((code) => scopedCodes.add(code));
+
+  const salesCodes = await resolveLocationScopedProductCodesFromSales(normalizedBranchCode, normalizedLocationCode);
+  salesCodes.forEach((code) => scopedCodes.add(code));
+
+  const productRows = await prisma.product.findMany({
+    where: {
+      branchCode: normalizedBranchCode,
+      locationCode: {
+        equals: normalizedLocationCode,
+        mode: 'insensitive',
+      },
+      sourceCode: { not: null },
+    },
+    select: { sourceCode: true },
+    distinct: ['sourceCode'],
   });
 
-  const scopedCodes = new Set(
+  productRows
+    .map((row) => normalizeProductCode(row.sourceCode))
+    .filter(Boolean)
+    .forEach((code) => scopedCodes.add(code));
+
+  const isAmbiguousLocationCode = normalizedLocationCode === 'SH';
+  const isZombaScope = normalizedBranchCode === 'ZOMBA';
+  const isBlantyreScope = normalizedBranchCode === 'BLANTYRE';
+
+  if (!isAmbiguousLocationCode) {
+    const expiryRows = await prisma.productExpiryBatch.findMany({
+      where: {
+        locationCode: {
+          equals: normalizedLocationCode,
+          mode: 'insensitive',
+        },
+      },
+      select: { productCode: true },
+      distinct: ['productCode'],
+    });
+
     expiryRows
       .map((row) => normalizeProductCode(row.productCode))
       .filter(Boolean)
-  );
+      .forEach((code) => scopedCodes.add(code));
+  }
 
-  const costCodes = await resolveLocationScopedProductCodesFromLatestCosts(branchCode, locationCode);
-  costCodes.forEach((code) => scopedCodes.add(code));
-
-  const salesCodes = await resolveLocationScopedProductCodesFromSales(branchCode, locationCode);
-  salesCodes.forEach((code) => scopedCodes.add(code));
-
-  const isZombaScope = CORE_ZOMBA_LOCATION_CODES.includes(locationCode);
   if (isZombaScope) {
     console.log('[PRODUCTS][SCOPE][ZOMBA] code-source diagnostics', {
-      branchCode,
-      locationCode,
-      expiryDistinctCount: expiryRows.length,
-      latestCostDistinctCount: costCodes.length,
+      branchCode: normalizedBranchCode,
+      locationCode: normalizedLocationCode,
+      costDistinctCount: costCodes.length,
       salesDistinctCount: salesCodes.length,
+      productDistinctCount: productRows.length,
       combinedDistinctCount: scopedCodes.size,
     });
   }
 
-  // Keep legacy Blantyre operations usable when historical rows predate location tagging.
-  if (scopedCodes.size === 0 && branchCode === 'BLANTYRE') {
+  if (scopedCodes.size === 0 && isBlantyreScope) {
     const legacyRows = await prisma.product.findMany({
       where: { sourceCode: { not: null } },
       select: { sourceCode: true },
@@ -692,27 +722,27 @@ async function resolveLocationScopedProductCodes(branchCode, locationCode) {
       .forEach((code) => scopedCodes.add(code));
   }
 
-  // Zomba fallback: if no activity-table records exist yet for the requested
-  // Zomba location, fall back to products stored with branchCode='ZOMBA' AND
-  // the specific locationCode (SH/BAR/ST999). The Product table is the primary
-  // source for POS-synced products.
   if (scopedCodes.size === 0 && isZombaScope) {
-    const locationWhere = buildLocationCodeScopeWhere(scopeCodes);
     const zombaRows = await prisma.product.findMany({
-      where: { 
-        branchCode: 'ZOMBA', 
+      where: {
+        branchCode: 'ZOMBA',
+        locationCode: {
+          equals: normalizedLocationCode,
+          mode: 'insensitive',
+        },
         sourceCode: { not: null },
-        ...(locationWhere || {})
       },
       select: { sourceCode: true },
       distinct: ['sourceCode'],
     });
+
     zombaRows
       .map((row) => normalizeProductCode(row.sourceCode))
       .filter(Boolean)
       .forEach((code) => scopedCodes.add(code));
-    console.log('[PRODUCTS][ZOMBA_SCOPE][FALLBACK] fell back to Product table branchCode=ZOMBA + locationCodes', {
-      scopeCodes,
+
+    console.log('[PRODUCTS][ZOMBA_SCOPE][FALLBACK] fell back to Product table branchCode=ZOMBA + locationCode', {
+      locationCode: normalizedLocationCode,
       fallbackCodeCount: scopedCodes.size,
     });
   }

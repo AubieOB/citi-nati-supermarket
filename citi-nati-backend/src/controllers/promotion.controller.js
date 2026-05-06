@@ -19,12 +19,12 @@ const ZOMBA_LOCATION_CODES = ['ZA'].concat(CORE_ZOMBA_LOCATION_CODES);
 const POS_DEFAULT_LOCATION_CODE = process.env.POS_LOCATION_CODE || 'BT';
 const POS_DEFAULT_PRICE_TYPE_CODE = process.env.POS_PRICE_TYPE_CODE || 'RT';
 const POS_PROMO_REASON_CODE = 'WEBSITE_PROMOTION';
-const POS_BLANTYRE_SELLING_LOCATION_CODE = normalizeLocationCode(
+const POS_BLANTYRE_SELLING_LOCATION_CODE = normalizeScopeCode(
   process.env.POS_BLANTYRE_SELLING_LOCATION_CODE
   || process.env.POS_BLANTYRE_PROMOTION_LOCATION_CODE
   || 'SH'
 ) || 'SH';
-const POS_ZOMBA_SELLING_LOCATION_CODE = normalizeLocationCode(
+const POS_ZOMBA_SELLING_LOCATION_CODE = normalizeScopeCode(
   process.env.POS_ZOMBA_SELLING_LOCATION_CODE
   || process.env.POS_ZOMBA_PROMOTION_LOCATION_CODE
   || 'SH'
@@ -34,6 +34,22 @@ const ACTIVE_PRODUCT_FILTER = {
   isActive: true,
   enabled: true,
 };
+
+function normalizeBranchCode(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (!normalized) return null;
+  if (normalized === 'BT' || normalized === 'BLANTYRE') return 'BLANTYRE';
+  if (normalized === 'ZA' || normalized === 'ZOMBA') return 'ZOMBA';
+  return normalized;
+}
+
+function normalizeLocationCode(value) {
+  return normalizeScopeCode(value);
+}
+
+function getStorefrontLocationCode() {
+  return normalizeScopeCode(process.env.STOREFRONT_LOCATION_CODE || process.env.PUBLIC_STOREFRONT_LOCATION_CODE || 'BT');
+}
 
 function expandLocationScopeCodes(locationCode) {
   return expandOperationalLocationScopeCodes(locationCode);
@@ -794,6 +810,84 @@ const getCurrentPromotions = async (req, res) => {
   }
 };
 
+const getPublicPromotions = async (req, res) => {
+  try {
+    const branchCode = normalizeBranchCode(req.query.branchCode || req.body?.branchCode || process.env.PUBLIC_PROMOTIONS_BRANCH_CODE || 'BLANTYRE');
+    const locationCode = normalizeLocationCode(req.query.locationCode || req.body?.locationCode || getStorefrontLocationCode());
+
+    if (!branchCode) {
+      return res.status(400).json({
+        success: false,
+        error: 'branchCode is required for promotions',
+      });
+    }
+
+    if (!locationCode) {
+      return res.status(400).json({
+        success: false,
+        error: 'locationCode is required for promotions',
+      });
+    }
+
+    if (branchCode === 'ZOMBA' && !isConcreteZombaOperationalLocationCode(locationCode)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Concrete locationCode is required for Zomba promotions (use SH, BAR, or ST999)',
+      });
+    }
+
+    const promotions = await prisma.promotion.findMany({
+      where: { branchCode },
+    });
+
+    const formatPromotion = (promo) => {
+      if (!promo) return null;
+      return {
+        type: promo.type,
+        enabled: promo.enabled,
+        percentage: promo.percentage,
+        categoryId: promo.categoryId || null,
+        selectedProducts: promo.selectedProductIds || [],
+      };
+    };
+
+    const formattedPromotions = {
+      global: formatPromotion(promotions.find(p => p.type === 'global')) || {
+        type: 'global',
+        enabled: false,
+        percentage: 10,
+        categoryId: null,
+        selectedProducts: []
+      },
+      category: formatPromotion(promotions.find(p => p.type === 'category')) || {
+        type: 'category',
+        enabled: false,
+        percentage: 10,
+        categoryId: null,
+        selectedProducts: []
+      },
+      selective: formatPromotion(promotions.find(p => p.type === 'selective')) || {
+        type: 'selective',
+        enabled: false,
+        percentage: 10,
+        categoryId: null,
+        selectedProducts: []
+      },
+    };
+
+    return res.json({
+      success: true,
+      promotions: formattedPromotions,
+    });
+  } catch (err) {
+    console.error('Error getting public promotions:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get promotions',
+    });
+  }
+};
+
 /**
  * Activate or deactivate a promotion and apply it
  */
@@ -1245,6 +1339,7 @@ const removePromotion = async (req, res) => {
 
 module.exports = {
   getCurrentPromotions,
+  getPublicPromotions,
   updatePromotion,
   previewPromotion,
   applyPromotion,

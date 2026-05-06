@@ -24,6 +24,17 @@ function normalizeScopeCode(value) {
   return LOCATION_ALIASES[normalized] || normalized;
 }
 
+function expandOperationalLocationScopeCodes(locationCode) {
+  const normalized = normalizeScopeCode(locationCode);
+  if (!normalized) return [];
+
+  if (normalized === 'ZA') {
+    return [...CORE_ZOMBA_LOCATION_CODES];
+  }
+
+  return [normalized];
+}
+
 /**
  * Resolves operational scope from request parameters.
  * Requires BOTH branchCode and locationCode to be provided.
@@ -69,6 +80,7 @@ function resolveOperationalScope(req) {
 
 module.exports = {
   normalizeScopeCode,
+  expandOperationalLocationScopeCodes,
   resolveOperationalScope,
   CORE_ZOMBA_LOCATION_CODES,
 };
