@@ -153,7 +153,6 @@ function normalizeScopeCode(value) {
 function deriveBranchCodeFromLocationCode(locationCode) {
   const normalized = normalizeScopeCode(locationCode);
   if (normalized === 'BT') return 'BLANTYRE';
-  if (['ZA', 'SH', 'BAR', 'ST999', 'RES', 'WH'].includes(normalized)) return 'ZOMBA';
   return null;
 }
 
@@ -174,12 +173,10 @@ function eventMatchesSelectedScope(event, selectedLocationCode, selectedBranchCo
   if (!scopeBranchCode && scopeLocationCodes.length === 0) return true;
 
   const metadata = event?.metadata && typeof event.metadata === 'object' ? event.metadata : {};
-  const eventBranchCode = deriveBranchCodeFromLocationCode(metadata.branchCode)
-    || deriveBranchCodeFromLocationCode(metadata.locationCode)
-    || normalizeScopeCode(metadata.branchCode || null);
+  const eventBranchCode = normalizeScopeCode(metadata.branchCode || null);
   const eventLocationCode = normalizeScopeCode(metadata.locationCode || null);
 
-  if (scopeBranchCode && eventBranchCode === scopeBranchCode) return true;
+  if (scopeBranchCode && eventBranchCode && eventBranchCode === scopeBranchCode) return true;
   if (eventLocationCode && scopeLocationCodes.includes(eventLocationCode)) return true;
   return false;
 }

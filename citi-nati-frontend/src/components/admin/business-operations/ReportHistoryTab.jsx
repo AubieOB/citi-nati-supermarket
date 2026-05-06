@@ -77,7 +77,7 @@ const activityTabStyle = (active) => ({
   cursor: 'pointer',
 });
 
-const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedLocationCode = '', onNavigateTab }) => {
+const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedBranchCode = '', selectedLocationCode = '', onNavigateTab }) => {
   const [state, setState] = useState({
     loading: true,
     error: '',
@@ -113,13 +113,13 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedL
       };
     });
     const normalizedLocationCode = String(selectedLocationCode || '').trim().toUpperCase();
-    const derivedBranchCode = deriveBranchCodeFromLocationCode(normalizedLocationCode);
+    const normalizedBranchCode = String(selectedBranchCode || '').trim().toUpperCase();
 
     const monthParams = {
       ...getCurrentMonthParams(),
       ...(selectedLocationId && { locationId: selectedLocationId }),
       ...(normalizedLocationCode && { locationCode: normalizedLocationCode }),
-      ...(derivedBranchCode && { branchCode: derivedBranchCode }),
+      ...(normalizedBranchCode && { branchCode: normalizedBranchCode }),
     };
 
     try {

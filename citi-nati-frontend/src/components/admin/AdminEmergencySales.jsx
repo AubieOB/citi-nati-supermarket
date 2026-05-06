@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../../utils/api.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { resolveOperationalScope } from '../../utils/operationalScope.js';
 import { notifyError, notifyInfo, notifySuccess } from '../../utils/notifications.js';
 
 const STATUS_LABELS = {
@@ -97,15 +98,9 @@ function safeParseJson(value, fallback) {
 const AdminEmergencySales = ({ apiBase = 'admin/emergency-sales', selectedLocationCode = 'BT', selectedBranchCode = null }) => {
   const { user } = useAuth();
 
-  // Derive branchCode from locationCode if not provided
-  const deriveBranchCodeFromLocationCode = (locationCode) => {
-    const normalized = String(locationCode || '').trim().toUpperCase();
-    if (['SH', 'BAR', 'ST999', 'WH', 'ZA'].includes(normalized)) return 'ZOMBA';
-    if (normalized === 'BT') return 'BLANTYRE';
-    return null;
-  };
-
-  const effectiveBranchCode = selectedBranchCode || deriveBranchCodeFromLocationCode(selectedLocationCode);
+  const selectedScope = resolveOperationalScope(selectedLocationCode, selectedBranchCode);
+  const effectiveBranchCode = selectedScope?.branchCode || String(selectedBranchCode || '').trim().toUpperCase();
+  const effectiveLocationCode = selectedScope?.locationCode || String(selectedLocationCode || '').trim().toUpperCase();
 
   const previousScopeRef = useRef({ selectedLocationCode, selectedBranchCode: effectiveBranchCode });
 

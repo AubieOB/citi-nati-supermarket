@@ -3,7 +3,7 @@ const OPERATIONAL_SCOPE_MAP = {
     uiCode: 'BLANTYRE_SH',
     label: 'Blantyre SH',
     branchCode: 'BLANTYRE',
-    locationCode: 'BT',
+    locationCode: 'SH',
     salesMode: 'live',
   },
   ZOMBA_SH: {
@@ -32,7 +32,6 @@ const OPERATIONAL_SCOPE_MAP = {
 const LEGACY_SCOPE_ALIAS = {
   BT: 'BLANTYRE_SH',
   BLANTYRE: 'BLANTYRE_SH',
-  SH: 'ZOMBA_SH',
   ZA: 'ZOMBA_SH',
   ZOMBA: 'ZOMBA_SH',
   BAR: 'ZOMBA_BAR',
@@ -44,12 +43,26 @@ function normalizeOperationalScopeCode(value) {
   const normalized = String(value || '').trim().toUpperCase();
   if (!normalized) return 'BLANTYRE_SH';
   if (OPERATIONAL_SCOPE_MAP[normalized]) return normalized;
-  return LEGACY_SCOPE_ALIAS[normalized] || 'BLANTYRE_SH';
+  return LEGACY_SCOPE_ALIAS[normalized] || null;
 }
 
-function resolveOperationalScope(value) {
+function resolveOperationalScope(value, branchCode = '') {
   const normalized = normalizeOperationalScopeCode(value);
-  return OPERATIONAL_SCOPE_MAP[normalized];
+  if (normalized) {
+    return OPERATIONAL_SCOPE_MAP[normalized];
+  }
+
+  const locationCode = String(value || '').trim().toUpperCase();
+  const branch = String(branchCode || '').trim().toUpperCase();
+  if (!locationCode || !branch) return null;
+
+  return {
+    uiCode: `${branch}_${locationCode}`,
+    label: `${branch} ${locationCode}`,
+    branchCode: branch,
+    locationCode,
+    salesMode: 'live',
+  };
 }
 
 function getOperationalScopeOptions() {
@@ -62,19 +75,20 @@ function getOperationalScopeOptions() {
 }
 
 function toLegacyLocationCode(value) {
-  return resolveOperationalScope(value).locationCode;
+  const scope = resolveOperationalScope(value);
+  return scope ? scope.locationCode : String(value || '').trim().toUpperCase();
 }
 
-function filterProductsForOperationalLocation(products, value) {
+function filterProductsForOperationalLocation(products, locationValue, branchValue) {
   if (!Array.isArray(products) || products.length === 0) return [];
 
-  const scope = resolveOperationalScope(value);
-  if (!scope || scope.branchCode !== 'ZOMBA') {
+  const scope = resolveOperationalScope(locationValue, branchValue);
+  if (!scope || !scope.branchCode || !scope.locationCode) {
     return products;
   }
 
-  const expectedBranchCode = scope.branchCode;
-  const expectedLocationCode = scope.locationCode;
+  const expectedBranchCode = String(scope.branchCode).trim().toUpperCase();
+  const expectedLocationCode = String(scope.locationCode).trim().toUpperCase();
 
   return products.filter((product) => {
     const productBranchCode = String(product?.branchCode || '').trim().toUpperCase();

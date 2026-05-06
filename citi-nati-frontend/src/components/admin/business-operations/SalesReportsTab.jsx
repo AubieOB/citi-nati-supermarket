@@ -185,15 +185,6 @@ function buildReportParams(filters, extras = {}) {
 
 // Maps known BO location codes to the branchCode stored in SalesInvoice.
 // Must match the deriveBranchCodeFromLocationCode logic in reportingFilters.js.
-const ZOMBA_LOCATION_CODES_FE = ['ZA', 'SH', 'BAR', 'WH'];
-function deriveBranchCodeFromLocationCode(locationCode) {
-  const code = String(locationCode || '').trim().toUpperCase();
-  if (!code) return '';
-  if (code === 'BT') return 'BLANTYRE';
-  if (ZOMBA_LOCATION_CODES_FE.includes(code)) return 'ZOMBA';
-  return '';
-}
-
 function resolveLocationScopeLabel(filters = {}, selectedBranchCode = '', selectedLocationCode = '') {
   const locationCode = String(filters.locationCode || selectedLocationCode || '').trim().toUpperCase();
   const branchCode = String(filters.branchCode || selectedBranchCode || '').trim().toUpperCase();
