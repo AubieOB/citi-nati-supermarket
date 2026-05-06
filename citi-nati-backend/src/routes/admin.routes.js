@@ -1323,9 +1323,18 @@ router.post('/pos-promotions/revert', verifyTokenMiddleware, verifyAdmin, revert
 router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
   try {
     const { search = '', page = 1, limit = 5000, locationCode, branchCode } = req.query;
-    const skip = (page - 1) * limit;
     const normalizedLocationCode = normalizeLocationCode(locationCode);
     const normalizedBranchCode = normalizeBranchCode(branchCode);
+
+    // Validate ambiguous location codes upfront
+    if (normalizedLocationCode === 'SH' && !normalizedBranchCode) {
+      return res.status(400).json({
+        success: false,
+        error: 'branchCode is required when locationCode=SH (ambiguous location exists in multiple branches)',
+      });
+    }
+
+    const skip = (page - 1) * limit;
 
     // Build where clause
     const where = {
