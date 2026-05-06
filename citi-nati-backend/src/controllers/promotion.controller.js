@@ -38,8 +38,8 @@ const ACTIVE_PRODUCT_FILTER = {
 function normalizeBranchCode(value) {
   const normalized = String(value || '').trim().toUpperCase();
   if (!normalized) return null;
-  if (normalized === 'BT' || normalized === 'BLANTYRE') return 'BLANTYRE';
-  if (normalized === 'ZA' || normalized === 'ZOMBA') return 'ZOMBA';
+  if (['BT', 'BLANTYRE', 'BLANTYRE_SH'].includes(normalized)) return 'BLANTYRE';
+  if (['ZA', 'ZOMBA', 'ZOMBA_SH', 'ZOMBA_BAR', 'ZOMBA_RES'].includes(normalized)) return 'ZOMBA';
   return normalized;
 }
 
@@ -170,7 +170,10 @@ function normalizeLocationCode(value) {
 
 function normalizeBranchCode(value) {
   const normalized = String(value || '').trim().toUpperCase();
-  return normalized || null;
+  if (!normalized) return null;
+  if (['BT', 'BLANTYRE', 'BLANTYRE_SH'].includes(normalized)) return 'BLANTYRE';
+  if (['ZA', 'ZOMBA', 'ZOMBA_SH', 'ZOMBA_BAR', 'ZOMBA_RES'].includes(normalized)) return 'ZOMBA';
+  return normalized;
 }
 
 function isConcreteZombaOperationalLocationCode(locationCode) {
@@ -179,7 +182,7 @@ function isConcreteZombaOperationalLocationCode(locationCode) {
 
 async function resolvePromotionScopedProductCodes(scope) {
   const normalizedLocationCode = normalizeLocationCode(scope?.locationCode);
-  if (scope?.branchCode === 'ZOMBA' && isConcreteZombaOperationalLocationCode(normalizedLocationCode)) {
+  if (scope?.branchCode === 'ZOMBA' && (normalizedLocationCode === 'ZA' || isConcreteZombaOperationalLocationCode(normalizedLocationCode))) {
     return null;
   }
   return resolveLocationScopedProductCodes(normalizedLocationCode);
@@ -222,18 +225,9 @@ function resolvePromotionScope(req) {
 
   const branchCode = requestedBranchCode;
 
-  if (branchCode === 'ZOMBA' && !isConcreteZombaOperationalLocationCode(locationCode)) {
+  if (branchCode === 'ZOMBA' && !ZOMBA_LOCATION_CODES.includes(locationCode)) {
     return {
-      error: 'Concrete locationCode is required for Zomba promotions (use SH, BAR, or ST999)',
-      locationCode,
-      branchCode,
-      posLocationCode: null,
-    };
-  }
-
-  if (branchCode === 'ZOMBA' && !isConcreteZombaOperationalLocationCode(locationCode)) {
-    return {
-      error: 'Concrete locationCode is required for Zomba promotions (use SH, BAR, or ST999)',
+      error: 'Concrete or branch-wide locationCode is required for Zomba promotions (use ZA, SH, BAR, or ST999)',
       locationCode,
       branchCode,
       posLocationCode: null,
@@ -255,17 +249,19 @@ function getScopedActiveProductFilter(branchCode, locationCode = null, scopedPro
   };
 
   const normalizedLocationCode = normalizeLocationCode(locationCode);
-  if (branchCode === 'ZOMBA' && normalizedLocationCode) {
-    where.locationCode = {
-      equals: normalizedLocationCode,
-      mode: 'insensitive',
-    };
-    // Only products with a valid location-specific price row (price > 0).
-    // Products synced without a price row for this location are not operationally available.
-    where.price = { gt: 0 };
-  }
-
-  if (branchCode === 'ZOMBA' && normalizedLocationCode) {
+  if (branchCode === 'ZOMBA') {
+    if (normalizedLocationCode === 'ZA') {
+      where.OR = CORE_ZOMBA_LOCATION_CODES.map((code) => ({
+        locationCode: { equals: code, mode: 'insensitive' },
+      }));
+      where.price = { gt: 0 };
+    } else if (normalizedLocationCode) {
+      where.locationCode = {
+        equals: normalizedLocationCode,
+        mode: 'insensitive',
+      };
+      where.price = { gt: 0 };
+    }
     where.sourceCode = { not: null };
   } else if (Array.isArray(scopedProductCodes) && scopedProductCodes.length > 0) {
     where.sourceCode = { in: scopedProductCodes };

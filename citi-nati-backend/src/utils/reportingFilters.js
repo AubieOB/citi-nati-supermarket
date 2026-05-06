@@ -43,8 +43,18 @@ const BRANCH_SYNC_SOURCE_PREFIXES = {
   ZOMBA: ['ZOMBA', 'ZA'],
 };
 
+const { normalizeScopeCode, expandOperationalLocationScopeCodes } = require('./operationalScope');
+
+function normalizeBranchCode(branchCode) {
+  const normalized = sanitizeStr(branchCode)?.toUpperCase();
+  if (!normalized) return null;
+  if (['BT', 'BLANTYRE', 'BLANTYRE_SH'].includes(normalized)) return 'BLANTYRE';
+  if (['ZA', 'ZOMBA', 'ZOMBA_SH', 'ZOMBA_BAR', 'ZOMBA_RES'].includes(normalized)) return 'ZOMBA';
+  return normalized;
+}
+
 function buildBranchScopePredicate(branchCode) {
-  const normalizedBranch = sanitizeStr(branchCode)?.toUpperCase();
+  const normalizedBranch = normalizeBranchCode(branchCode);
   if (!normalizedBranch) return null;
 
   const syncPrefixes = BRANCH_SYNC_SOURCE_PREFIXES[normalizedBranch] || [normalizedBranch];
@@ -95,6 +105,23 @@ function extractFilters(query) {
  *
  * All conditions are optional – only those with a non-null value are added.
  */
+function buildLocationScopePredicate(locationCode) {
+  const normalizedLocation = normalizeScopeCode(locationCode);
+  if (!normalizedLocation) return null;
+
+  const scopeCodes = expandOperationalLocationScopeCodes(normalizedLocation);
+  if (!Array.isArray(scopeCodes) || scopeCodes.length === 0) return null;
+  if (scopeCodes.length === 1) {
+    return { locationCode: { equals: scopeCodes[0], mode: 'insensitive' } };
+  }
+
+  return {
+    OR: scopeCodes.map((code) => ({
+      locationCode: { equals: code, mode: 'insensitive' },
+    })),
+  };
+}
+
 function buildInvoiceWhere(dateRange, filters = {}) {
   const where = {};
   const andConditions = [];
@@ -106,24 +133,20 @@ function buildInvoiceWhere(dateRange, filters = {}) {
     };
   }
 
-  // Require BOTH branchCode and locationCode for strict scoping
-  if (!filters.branchCode) {
-    throw new Error('branchCode is required for reporting queries');
-  }
-  if (!filters.locationCode) {
-    throw new Error('locationCode is required for reporting queries');
-  }
-
-  console.log('[REPORTING SCOPE]', { branchCode: filters.branchCode, locationCode: filters.locationCode });
-
   const branchScopePredicate = buildBranchScopePredicate(filters.branchCode);
   if (branchScopePredicate) {
     andConditions.push(branchScopePredicate);
   }
-  if (filters.syncSourceCode) where.syncSourceCode = filters.syncSourceCode;
 
-  // Always filter by both branchCode and locationCode
-  where.locationCode = filters.locationCode;
+  const locationScopePredicate = buildLocationScopePredicate(filters.locationCode);
+  if (locationScopePredicate) {
+    andConditions.push(locationScopePredicate);
+  }
+
+  if (filters.syncSourceCode) {
+    where.syncSourceCode = filters.syncSourceCode;
+  }
+
   if (filters.locationId !== null && filters.locationId !== undefined) {
     where.locationId = filters.locationId;
   }
@@ -147,6 +170,12 @@ function buildInvoiceWhere(dateRange, filters = {}) {
   if (andConditions.length > 0) {
     where.AND = andConditions;
   }
+
+  console.log('[REPORTING SCOPE]', {
+    branchCode: filters.branchCode || null,
+    locationCode: filters.locationCode || null,
+    locationId: filters.locationId || null,
+  });
 
   return where;
 }
@@ -253,7 +282,10 @@ function buildResponseFilters(rawQuery, dateRange) {
 function sanitizeStr(val) {
   if (!val || typeof val !== 'string') return null;
   const trimmed = val.trim();
-  return trimmed.length > 0 ? trimmed : null;
+  if (!trimmed) return null;
+  const normalized = trimmed.toLowerCase();
+  if (normalized === 'all') return null;
+  return trimmed;
 }
 
 function parseOptionalInt(val) {

@@ -16,6 +16,17 @@ const LOCATION_ALIASES = {
   WH: 'WH',
 };
 
+const BRANCH_ALIASES = {
+  BT: 'BLANTYRE',
+  BLANTYRE: 'BLANTYRE',
+  BLANTYRE_SH: 'BLANTYRE',
+  ZOMBA_SH: 'ZOMBA',
+  ZOMBA_BAR: 'ZOMBA',
+  ZOMBA_RES: 'ZOMBA',
+  ZA: 'ZOMBA',
+  ZOMBA: 'ZOMBA',
+};
+
 const CORE_ZOMBA_LOCATION_CODES = ['SH', 'BAR', 'ST999'];
 
 function normalizeScopeCode(value) {
@@ -37,44 +48,55 @@ function expandOperationalLocationScopeCodes(locationCode) {
 
 /**
  * Resolves operational scope from request parameters.
- * Requires BOTH branchCode and locationCode to be provided.
- * Throws an error if either is missing.
+ * Supports branch-only, location-only, and branch+location scopes.
+ * Infers branch from non-ambiguous location codes when branch is missing.
  */
+function inferBranchFromLocationCode(locationCode) {
+  const normalizedLocation = normalizeScopeCode(locationCode);
+  if (!normalizedLocation) return null;
+  if (normalizedLocation === 'BT' || normalizedLocation === 'WH') return 'BLANTYRE';
+  if (['ZA', 'BAR', 'ST999'].includes(normalizedLocation)) return 'ZOMBA';
+  return null;
+}
+
 function resolveOperationalScope(req) {
-  const branchCode = String(
+  const branchCodeRaw = String(
     req.query.branchCode
     || req.body?.branchCode
     || req.headers?.['x-branch-code']
     || ''
   ).trim();
 
-  const locationCode = String(
+  const locationCodeRaw = String(
     req.query.locationCode
     || req.body?.locationCode
     || req.headers?.['x-location-code']
     || ''
   ).trim();
 
-  if (!branchCode) {
-    throw new Error('branchCode is required for scoped queries');
+  let branchCode = branchCodeRaw.toUpperCase();
+  if (branchCode && BRANCH_ALIASES[branchCode]) {
+    branchCode = BRANCH_ALIASES[branchCode];
   }
 
-  if (!locationCode) {
-    throw new Error('locationCode is required for scoped queries');
+  const locationCode = normalizeScopeCode(locationCodeRaw);
+  if (!branchCode && locationCode) {
+    branchCode = inferBranchFromLocationCode(locationCode);
   }
 
-  const normalizedBranchCode = branchCode.toUpperCase();
-  const normalizedLocationCode = normalizeScopeCode(locationCode);
+  if (!branchCode && !locationCode) {
+    throw new Error('branchCode or locationCode is required for scoped queries');
+  }
 
-  if (!normalizedLocationCode) {
+  if (locationCodeRaw && !locationCode) {
     throw new Error('Invalid locationCode provided');
   }
 
-  console.log('[SCOPE]', { branchCode: normalizedBranchCode, locationCode: normalizedLocationCode });
+  console.log('[SCOPE]', { branchCode: branchCode || null, locationCode: locationCode || null });
 
   return {
-    branchCode: normalizedBranchCode,
-    locationCode: normalizedLocationCode
+    branchCode: branchCode || null,
+    locationCode: locationCode || null,
   };
 }
 
