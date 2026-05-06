@@ -14,7 +14,7 @@ import Modal from '../../components/common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
 import '../../styles/global.css';
 
-const STOREFRONT_LOCATION_CODE = String(import.meta.env.VITE_STOREFRONT_LOCATION_CODE || 'BT').trim().toUpperCase();
+const STOREFRONT_LOCATION_CODE = String(import.meta.env.VITE_STOREFRONT_LOCATION_CODE || 'SH').trim().toUpperCase();
 const PRODUCTS_CACHE_BACKGROUND_REFRESH_COOLDOWN_MS = 12000;
 
 /**

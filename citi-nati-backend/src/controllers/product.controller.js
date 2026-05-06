@@ -587,7 +587,7 @@ function isAdminRequest(req) {
 }
 
 function getStorefrontLocationCode() {
-  return normalizeScopeCode(process.env.STOREFRONT_LOCATION_CODE || process.env.PUBLIC_STOREFRONT_LOCATION_CODE || 'BT');
+  return normalizeScopeCode(process.env.STOREFRONT_LOCATION_CODE || process.env.PUBLIC_STOREFRONT_LOCATION_CODE || 'SH');
 }
 
 async function resolveLocationScopedProductCodesFromSales(branchCode, locationCode) {
@@ -1238,7 +1238,7 @@ const getProducts = async (req, res) => {
       const rawLocationParam = String(locationCode || '').trim().toUpperCase();
       const resWasMapped = (rawLocationParam === 'RES' || rawLocationParam === 'ZOMBA_RES') && normalizedLocationCode === 'ST999';
 
-      if (normalizedLocationCode === 'SH' && !requestedBranchCode) {
+      if (isAdminRequest(req) && normalizedLocationCode === 'SH' && !requestedBranchCode) {
         return res.status(400).json({
           error: 'branchCode is required for SH because SH exists in multiple branches.',
         });
@@ -2747,7 +2747,7 @@ const getCategories = async (req, res) => {
     const effectiveBranchCode = requestedBranchCode || (!isAdminRequest(req) ? 'BLANTYRE' : null);
     const effectiveLocationCode = requestedLocationCode || (!isAdminRequest(req) ? getStorefrontLocationCode() : null);
 
-    if (!isAdminRequest(req) && !requestedBranchCode && requestedLocationCode === 'SH') {
+    if (isAdminRequest(req) && !requestedBranchCode && requestedLocationCode === 'SH') {
       return res.status(400).json({
         error: 'branchCode is required for SH because SH exists in multiple branches.',
       });

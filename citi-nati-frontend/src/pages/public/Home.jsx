@@ -6,7 +6,7 @@ import PromotionBanner from '../../components/common/PromotionBanner.jsx';
 import api from '../../utils/api.js';
 import '../../styles/global.css';
 
-const STOREFRONT_LOCATION_CODE = String(import.meta.env.VITE_STOREFRONT_LOCATION_CODE || 'BT').trim().toUpperCase();
+const STOREFRONT_LOCATION_CODE = String(import.meta.env.VITE_STOREFRONT_LOCATION_CODE || 'SH').trim().toUpperCase();
 
 const Home = () => {
   useEffect(() => {
@@ -47,10 +47,15 @@ const Home = () => {
 
       {/* Hero Section */}
       <section className="hero">
-        <h1 className="hero__title">Welcome to Citi-Nati Supermarket</h1>
-        <p className="hero__subtitle">
-          The Brand of Choice That Offers Convenient Shopping Experience.
-        </p>
+      <h1 className="hero__title">Welcome to Citi-Nati Supermarket</h1>
+
+      <p className="hero__subtitle">
+        The Brand of Choice That Offers Convenient Shopping Experience.
+      </p>
+
+      <p className="seo-snippet">
+        Shop groceries, household essentials, drinks, snacks, and more from Citi-Nati Supermarket. Order online for fast, reliable delivery in supported areas.
+      </p>
         <div className="hero__buttons">
           <Link to="/products" className="hero__button hero__button--primary">
             Browse Products

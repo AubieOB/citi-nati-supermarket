@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getSocket } from '../../utils/socket.js';
 import api from '../../utils/api.js';
 
-const STOREFRONT_LOCATION_CODE = String(import.meta.env.VITE_STOREFRONT_LOCATION_CODE || 'BT').trim().toUpperCase();
+const STOREFRONT_LOCATION_CODE = String(import.meta.env.VITE_STOREFRONT_LOCATION_CODE || 'SH').trim().toUpperCase();
 
 /**
  * 🎉 PROMOTION BANNER
