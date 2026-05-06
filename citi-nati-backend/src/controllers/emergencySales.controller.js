@@ -1206,6 +1206,14 @@ async function createEmergencySale(req, res) {
 
 async function listEmergencySales(req, res) {
   try {
+    console.log('[EMERGENCY SALES][LIST] Request params:', {
+      branchCode: req.query.branchCode,
+      locationCode: req.query.locationCode,
+      status: req.query.status,
+      page: req.query.page,
+      pageSize: req.query.pageSize,
+    });
+
     const reportMode = String(req.query.reportMode || '').trim().toLowerCase() === 'all';
     const page = reportMode ? 1 : Math.max(1, toSafeInt(req.query.page, 1));
     const pageSize = reportMode ? 5000 : Math.min(100, Math.max(1, toSafeInt(req.query.pageSize, 20)));
@@ -1221,6 +1229,14 @@ async function listEmergencySales(req, res) {
     const endDate = String(req.query.endDate || '').trim();
     const requesterRole = String(req.user?.role || '').trim().toLowerCase();
     const requesterUserId = String(req.user?.userId || '').trim();
+
+    console.log('[EMERGENCY SALES][LIST] Normalized params:', {
+      locationCode,
+      branchCode,
+      status,
+      page,
+      pageSize,
+    });
 
     if (locationCode && !branchCode) {
       return res.status(400).json({
@@ -1305,9 +1321,12 @@ async function listEmergencySales(req, res) {
       if (locationScopeFilters.length > 0) {
         andClauses.push({ OR: locationScopeFilters });
       }
+      console.log('[EMERGENCY SALES][LIST] Location scope filters:', locationScopeFilters);
     }
 
     const where = andClauses.length > 0 ? { AND: andClauses } : {};
+
+    console.log('[EMERGENCY SALES][LIST] Final where clause:', JSON.stringify(where, null, 2));
 
     const [total, sales] = await Promise.all([
       prisma.emergencySale.count({ where }),
@@ -1348,6 +1367,19 @@ async function listEmergencySales(req, res) {
       totalPages: Math.ceil(total / pageSize),
       summary,
     });
+  } catch (error) {
+    console.error('[EMERGENCY SALES][LIST] Error:', {
+      message: error.message,
+      stack: error.stack,
+      branchCode: req.query?.branchCode,
+      locationCode: req.query?.locationCode,
+    });
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      details: error.message,
+    });
+  }
   } catch (error) {
     console.error('[EMERGENCY SALES] list failed:', error.message);
     return res.status(500).json({ success: false, error: 'Failed to fetch emergency sales' });

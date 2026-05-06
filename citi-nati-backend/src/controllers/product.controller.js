@@ -657,7 +657,7 @@ async function resolveLocationScopedProductCodes(branchCode, locationCode) {
     throw new Error('Invalid branchCode or locationCode for product code resolution');
   }
 
-  console.log('[PRODUCT SCOPE]', { branchCode: normalizedBranchCode, locationCode: normalizedLocationCode });
+  console.log('[PRODUCT SCOPE][RESOLVE]', { branchCode: normalizedBranchCode, locationCode: normalizedLocationCode });
 
   const scopedCodes = new Set();
 
@@ -666,6 +666,12 @@ async function resolveLocationScopedProductCodes(branchCode, locationCode) {
 
   const salesCodes = await resolveLocationScopedProductCodesFromSales(normalizedBranchCode, normalizedLocationCode);
   salesCodes.forEach((code) => scopedCodes.add(code));
+
+  console.log('[PRODUCT SCOPE][RESOLVE] codes from costs/sales', {
+    costCount: costCodes.length,
+    salesCount: salesCodes.length,
+    combinedCount: scopedCodes.size,
+  });
 
   const productRows = await prisma.product.findMany({
     where: {
@@ -678,6 +684,12 @@ async function resolveLocationScopedProductCodes(branchCode, locationCode) {
     },
     select: { sourceCode: true },
     distinct: ['sourceCode'],
+  });
+
+  console.log('[PRODUCT SCOPE][RESOLVE] products from Product table', {
+    branchCode: normalizedBranchCode,
+    locationCode: normalizedLocationCode,
+    productCount: productRows.length,
   });
 
   productRows
@@ -711,6 +723,10 @@ async function resolveLocationScopedProductCodes(branchCode, locationCode) {
       .map((row) => normalizeProductCode(row.sourceCode))
       .filter(Boolean)
       .forEach((code) => scopedCodes.add(code));
+
+    console.log('[PRODUCT SCOPE][RESOLVE] BLANTYRE fallback used', {
+      fallbackCodeCount: scopedCodes.size,
+    });
   }
 
   if (scopedCodes.size === 0 && isZombaScope) {
@@ -737,6 +753,12 @@ async function resolveLocationScopedProductCodes(branchCode, locationCode) {
       fallbackCodeCount: scopedCodes.size,
     });
   }
+
+  console.log('[PRODUCT SCOPE][RESOLVE] final result', {
+    branchCode: normalizedBranchCode,
+    locationCode: normalizedLocationCode,
+    finalCodeCount: scopedCodes.size,
+  });
 
   return Array.from(scopedCodes.values());
 }

@@ -126,7 +126,6 @@ async function getSaleMovements(period, filters = {}) {
           refNo: true,
           userName: true,
           locationCode: true,
-          locationId: true,
         },
       },
     },
