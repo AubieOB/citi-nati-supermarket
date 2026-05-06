@@ -123,9 +123,10 @@ const AdminBusinessOperations = ({ selectedLocationCode, selectedBranchCode }) =
     ) || null;
   }, [selectedLocationCode, selectedBranchCode]);
 
-  const selectedLocationCodeValue = selectedLocation?.code || selectedLocationCode || '';
-  const selectedLocationName = selectedLocation?.name || `${selectedBranchCode || 'Unknown'} ${selectedLocationCode || 'Unknown'}`;
-  const isAllLocationsSelected = !selectedLocationCode || !selectedBranchCode;
+const selectedLocationId = selectedLocation?.id || null;
+const selectedLocationCodeValue = selectedLocation?.code || selectedLocationCode || '';
+const selectedLocationName = selectedLocation?.name || `${selectedBranchCode || 'Unknown'} ${selectedLocationCode || 'Unknown'}`;
+const isAllLocationsSelected = !selectedLocationCode || !selectedBranchCode;
 
   // Debug logging for scope resolution
   console.log('[BUSINESS OPS SCOPE]', {
