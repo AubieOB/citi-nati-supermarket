@@ -11,9 +11,6 @@ import PayrollSummarySection from './monthly-summary/PayrollSummarySection.jsx';
 import SupplierSummarySection from './monthly-summary/SupplierSummarySection.jsx';
 import NetSummaryCard from './monthly-summary/NetSummaryCard.jsx';
 
-const AUTO_REFRESH_MS = 30000;
-const AUTO_REFRESH_DEBOUNCE_MS = 350;
-
 const cardStyle = {
   backgroundColor: '#fff',
   border: '1px solid #e2e8f0',
@@ -116,9 +113,6 @@ const MonthlySummaryTab = ({
   const [supplierState, setSupplierState] = useState({ ...defaultSectionState, data: null });
   const [exportingExcel, setExportingExcel] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
-  const [autoRefreshing, setAutoRefreshing] = useState(false);
-  const autoRefreshIntervalRef = useRef(null);
-  const autoRefreshTimeoutRef = useRef(null);
 
   const activeRange = useMemo(() => {
     if (filters.periodType === 'month') return monthRange(filters.year, filters.month);
@@ -386,71 +380,6 @@ const MonthlySummaryTab = ({
     fetchSuppliers();
   }, [fetchExpenses, fetchPayroll, fetchSales, fetchSuppliers, refreshKey, refreshTick, validationError]);
 
-  const runAutoRefresh = useCallback(async () => {
-    if (validationError) return;
-    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
-
-    setAutoRefreshing(true);
-    try {
-      await Promise.all([
-        fetchSales({ background: true }),
-        fetchExpenses({ background: true }),
-        fetchPayroll({ background: true }),
-        fetchSuppliers({ background: true }),
-      ]);
-    } finally {
-      setAutoRefreshing(false);
-    }
-  }, [fetchExpenses, fetchPayroll, fetchSales, fetchSuppliers, validationError]);
-
-  useEffect(() => {
-    autoRefreshIntervalRef.current = setInterval(() => {
-      runAutoRefresh();
-    }, AUTO_REFRESH_MS);
-
-    return () => {
-      if (autoRefreshIntervalRef.current) {
-        clearInterval(autoRefreshIntervalRef.current);
-      }
-    };
-  }, [runAutoRefresh]);
-
-  useEffect(() => {
-    const scheduleRefresh = () => {
-      if (autoRefreshTimeoutRef.current) {
-        clearTimeout(autoRefreshTimeoutRef.current);
-      }
-      autoRefreshTimeoutRef.current = setTimeout(() => {
-        runAutoRefresh();
-      }, AUTO_REFRESH_DEBOUNCE_MS);
-    };
-
-    const onVisibilityChange = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        scheduleRefresh();
-      }
-    };
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener('focus', scheduleRefresh);
-    }
-    if (typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', onVisibilityChange);
-    }
-
-    return () => {
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('focus', scheduleRefresh);
-      }
-      if (typeof document !== 'undefined') {
-        document.removeEventListener('visibilitychange', onVisibilityChange);
-      }
-      if (autoRefreshTimeoutRef.current) {
-        clearTimeout(autoRefreshTimeoutRef.current);
-      }
-    };
-  }, [runAutoRefresh]);
-
   const salesTotal = Number(salesState.summary?.netSales || 0);
   const expensesTotal = Number(expensesState.summary?.totals?.totalAmount || 0);
   const payrollTotal = Number(payrollState.data?.totalNetPay || 0);
@@ -578,12 +507,6 @@ const MonthlySummaryTab = ({
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <strong style={{ color: '#0f172a' }}>Monthly Insights Workspace</strong>
                 <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
-                  {autoRefreshing && (
-                    <span style={{ color: '#2563eb', fontSize: '0.82rem', fontWeight: 700, alignSelf: 'center' }}>
-                      <i className="fas fa-rotate-right fa-spin" style={{ marginRight: '0.35rem' }}></i>
-                      Auto-refreshing...
-                    </span>
-                  )}
                   {canExport && <button
                     type="button"
                     onClick={() => handleExport('pdf')}
