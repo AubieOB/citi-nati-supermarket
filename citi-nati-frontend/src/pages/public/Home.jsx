@@ -52,10 +52,6 @@ const Home = () => {
       <p className="hero__subtitle">
         The Brand of Choice That Offers Convenient Shopping Experience.
       </p>
-
-      <p className="seo-snippet">
-        Shop groceries, household essentials, drinks, snacks, and more from Citi-Nati Supermarket. Order online for fast, reliable delivery in supported areas.
-      </p>
         <div className="hero__buttons">
           <Link to="/products" className="hero__button hero__button--primary">
             Browse Products

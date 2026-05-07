@@ -242,14 +242,14 @@ const isAllLocationsSelected = !selectedLocationCode || !selectedBranchCode;
 
  const contentByTab = {
   'sales-reports': (
-    <SalesReportsTab
-      drilldownRequest={drilldownRequests['sales-reports']}
-      selectedBranchCode={selectedBranchCode}
-      selectedLocationCode={selectedLocationCodeValue}
-      permissions={salesReportsPermissions}
-    />
-  ),
-
+  <SalesReportsTab
+    drilldownRequest={drilldownRequests['sales-reports']}
+    selectedLocationId={selectedLocationId}
+    selectedBranchCode={selectedBranchCode}
+    selectedLocationCode={selectedLocationCodeValue}
+    permissions={salesReportsPermissions}
+  />
+),
   suppliers: (
     <SuppliersTab
       refreshKey={locationRefreshKey}
