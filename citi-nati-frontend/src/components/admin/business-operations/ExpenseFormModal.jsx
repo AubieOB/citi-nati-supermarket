@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 const PAYMENT_METHODS = [
   { value: 'cash', label: 'Cash' },
@@ -38,27 +38,55 @@ const labelStyle = {
   fontSize: '0.88rem',
 };
 
+const normalizeCode = (value) => String(value || '').trim().toUpperCase();
+
 const toDateInputValue = (value) => {
   if (!value) return '';
   const s = String(value);
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '';
-  const local = new Date(d.getTime() - (d.getTimezoneOffset() * 60000));
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
   return local.toISOString().slice(0, 10);
 };
 
-const ExpenseFormModal = ({ isOpen, expense, categories, selectedLocationId = null, locations = [], saving, error, onClose, onSubmit }) => {
+const ExpenseFormModal = ({
+  isOpen,
+  expense,
+  categories,
+  selectedLocationId = null,
+  selectedBranchCode = '',
+  selectedLocationCode = '',
+  selectedLocationName = '',
+  locations = [],
+  saving,
+  error,
+  onClose,
+  onSubmit,
+}) => {
   const [form, setForm] = useState(defaultForm);
   const [validationError, setValidationError] = useState('');
-  const isCreateMode = !expense;
-  const isLocationLocked = isCreateMode && Boolean(selectedLocationId);
+
+  const effectiveBranchCode = normalizeCode(selectedBranchCode || expense?.branchCode);
+  const effectiveLocationCode = normalizeCode(selectedLocationCode || expense?.locationCode);
+
+  const scopeLabel = useMemo(() => {
+    if (selectedLocationName) return selectedLocationName;
+    if (effectiveBranchCode && effectiveLocationCode) return `${effectiveBranchCode} / ${effectiveLocationCode}`;
+    if (effectiveLocationCode) return effectiveLocationCode;
+    return selectedLocationId ? `Location ID ${selectedLocationId}` : 'No branch/location selected';
+  }, [effectiveBranchCode, effectiveLocationCode, selectedLocationId, selectedLocationName]);
+
+  const hasCanonicalScope = Boolean(effectiveBranchCode && effectiveLocationCode);
 
   useEffect(() => {
     if (!isOpen) return;
+
     setValidationError('');
+
     const scopedLocationId = selectedLocationId ? String(selectedLocationId) : '';
     const existingLocationId = expense?.locationId ? String(expense.locationId) : '';
+
     setForm({
       expenseCategoryId: expense?.expenseCategoryId || '',
       locationId: existingLocationId || scopedLocationId,
@@ -73,38 +101,54 @@ const ExpenseFormModal = ({ isOpen, expense, categories, selectedLocationId = nu
 
   useEffect(() => {
     if (!isOpen) return;
-    const handler = (event) => { if (event.key === 'Escape') onClose(); };
+
+    const handler = (event) => {
+      if (event.key === 'Escape') onClose();
+    };
+
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
-  const set = (key) => (event) => setForm((prev) => ({ ...prev, [key]: event.target.value }));
+  const set = (key) => (event) => {
+    setForm((prev) => ({ ...prev, [key]: event.target.value }));
+  };
 
   const handleSubmit = (event) => {
     event.preventDefault();
+
     if (!form.expenseCategoryId) {
       setValidationError('Expense category is required.');
       return;
     }
+
     if (!form.expenseDate) {
       setValidationError('Expense date is required.');
       return;
     }
-    if (!form.locationId) {
-      setValidationError('Location is required.');
+
+    if (!hasCanonicalScope && !form.locationId) {
+      setValidationError('Branch/location scope is required.');
       return;
     }
+
     const amount = Number(form.amount);
+
     if (!form.amount || !Number.isFinite(amount) || amount <= 0) {
       setValidationError('Amount must be a positive number.');
       return;
     }
+
     setValidationError('');
+
     onSubmit({
       expenseCategoryId: form.expenseCategoryId,
-      locationId: Number(form.locationId),
+      locationId: form.locationId ? Number(form.locationId) : selectedLocationId || null,
+      branchCode: effectiveBranchCode || null,
+      locationCode: effectiveLocationCode || null,
+      locationName: selectedLocationName || scopeLabel || null,
       expenseDate: form.expenseDate,
       amount,
       description: form.description.trim() || null,
@@ -126,7 +170,11 @@ const ExpenseFormModal = ({ isOpen, expense, categories, selectedLocationId = nu
               Business Operations
             </div>
             <h3 style={{ margin: '0.3rem 0 0', color: '#0f172a' }}>{title}</h3>
+            <p style={{ margin: '0.25rem 0 0', color: '#64748b', fontSize: '0.84rem' }}>
+              Scope: {scopeLabel}
+            </p>
           </div>
+
           <button
             type="button"
             onClick={onClose}
@@ -146,16 +194,31 @@ const ExpenseFormModal = ({ isOpen, expense, categories, selectedLocationId = nu
         <form onSubmit={handleSubmit} style={{ padding: '1.3rem', display: 'grid', gap: '1rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.9rem' }}>
             <div>
-              <label style={labelStyle}>
-                Location <span style={{ color: '#ef4444' }}>*</span>
-              </label>
-              <select value={form.locationId} onChange={set('locationId')} disabled={isLocationLocked} style={{ ...fieldStyle, backgroundColor: isLocationLocked ? '#f8fafc' : '#fff' }}>
-                {!isLocationLocked && <option value="">Select a location</option>}
-                {locations.map((location) => (
-                  <option key={location.id} value={location.id}>{location.name}{location.code ? ` (${location.code})` : ''}</option>
-                ))}
-              </select>
+              <label style={labelStyle}>Branch / Location</label>
+              <input
+                value={scopeLabel}
+                disabled
+                readOnly
+                style={{ ...fieldStyle, backgroundColor: '#f8fafc', color: '#64748b' }}
+              />
             </div>
+
+            {!hasCanonicalScope && locations.length > 0 && (
+              <div>
+                <label style={labelStyle}>
+                  Legacy Location <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <select value={form.locationId} onChange={set('locationId')} style={fieldStyle}>
+                  <option value="">Select a location</option>
+                  {locations.map((location) => (
+                    <option key={location.id} value={location.id}>
+                      {location.name}{location.code ? ` (${location.code})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div>
               <label style={labelStyle}>
                 Category <span style={{ color: '#ef4444' }}>*</span>
@@ -167,16 +230,12 @@ const ExpenseFormModal = ({ isOpen, expense, categories, selectedLocationId = nu
                 ))}
               </select>
             </div>
+
             <div>
               <label style={labelStyle}>
                 Expense Date <span style={{ color: '#ef4444' }}>*</span>
               </label>
-              <input
-                type="date"
-                value={form.expenseDate}
-                onChange={set('expenseDate')}
-                style={fieldStyle}
-              />
+              <input type="date" value={form.expenseDate} onChange={set('expenseDate')} style={fieldStyle} />
             </div>
           </div>
 
@@ -195,6 +254,7 @@ const ExpenseFormModal = ({ isOpen, expense, categories, selectedLocationId = nu
                 style={fieldStyle}
               />
             </div>
+
             <div>
               <label style={labelStyle}>Payment Method</label>
               <select value={form.paymentMethod} onChange={set('paymentMethod')} style={fieldStyle}>
@@ -227,6 +287,7 @@ const ExpenseFormModal = ({ isOpen, expense, categories, selectedLocationId = nu
                 style={fieldStyle}
               />
             </div>
+
             <div>
               <label style={labelStyle}>Entered By</label>
               <input
@@ -248,6 +309,7 @@ const ExpenseFormModal = ({ isOpen, expense, categories, selectedLocationId = nu
             >
               Cancel
             </button>
+
             <button
               type="submit"
               disabled={saving}

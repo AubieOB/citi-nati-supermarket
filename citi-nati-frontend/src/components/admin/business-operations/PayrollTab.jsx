@@ -22,6 +22,8 @@ const cardStyle = {
   boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)',
 };
 
+const normalizeCode = (value) => String(value || '').trim().toUpperCase();
+
 const getApiError = (err, fallback) =>
   err?.response?.data?.error || err?.response?.data?.message || err?.message || fallback;
 
@@ -42,7 +44,28 @@ const reduceSummary = (entries = []) => entries.reduce((acc, entry) => {
   totalLoanDeductionAmount: 0,
 });
 
-const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] }) => {
+const PayrollTab = ({
+  refreshKey = 0,
+  selectedLocationId = null,
+  selectedBranchCode = '',
+  selectedLocationCode = '',
+  selectedLocationName = '',
+  locations = [],
+}) => {
+  const effectiveBranchCode = normalizeCode(selectedBranchCode);
+  const effectiveLocationCode = normalizeCode(selectedLocationCode);
+  const scopeLabel = selectedLocationName || (
+    effectiveBranchCode && effectiveLocationCode
+      ? `${effectiveBranchCode} / ${effectiveLocationCode}`
+      : 'All Locations'
+  );
+
+  const scopeParams = useMemo(() => ({
+    branchCode: effectiveBranchCode || undefined,
+    locationCode: effectiveLocationCode || undefined,
+    locationId: selectedLocationId || undefined,
+  }), [effectiveBranchCode, effectiveLocationCode, selectedLocationId]);
+
   const [showPeriodFilters, setShowPeriodFilters] = useState(false);
   const [showPolicyPanel, setShowPolicyPanel] = useState(false);
   const [isPayrollWorkspaceModalOpen, setIsPayrollWorkspaceModalOpen] = useState(false);
@@ -95,6 +118,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
   const [reengagementModal, setReengagementModal] = useState({ open: false, reengagement: null });
   const [taxBracketModal, setTaxBracketModal] = useState({ open: false, taxBracket: null });
   const [incrementPolicyModal, setIncrementPolicyModal] = useState({ open: false, incrementPolicy: null });
+
   const [taxBrackets, setTaxBrackets] = useState([]);
   const [incrementPolicies, setIncrementPolicies] = useState([]);
   const [policyLoading, setPolicyLoading] = useState(false);
@@ -112,33 +136,41 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingFullWorkbook, setExportingFullWorkbook] = useState(false);
   const [importingFullWorkbook, setImportingFullWorkbook] = useState(false);
+
   const fullWorkbookInputRef = useRef(null);
 
   const fetchEmployees = useCallback(async () => {
     try {
       const res = await api.get('/business-operations/employees', {
-        params: { page: 1, pageSize: 200, sortBy: 'createdAt', sortOrder: 'desc', locationId: selectedLocationId || undefined },
+        params: {
+          page: 1,
+          pageSize: 200,
+          sortBy: 'createdAt',
+          sortOrder: 'desc',
+          ...scopeParams,
+        },
       });
       setEmployees(Array.isArray(res?.data?.data) ? res.data.data : []);
-    } catch (_err) {
+    } catch {
       setEmployees([]);
     }
-  }, [selectedLocationId]);
+  }, [scopeParams]);
 
   const fetchPayrollPeriods = useCallback(async (pg = periodPage) => {
     setPeriodsLoading(true);
     setPeriodsError('');
+
     try {
       const params = {
         page: pg,
         pageSize: 10,
         sortBy: 'createdAt',
         sortOrder: 'desc',
+        search: periodFilters.search.trim() || undefined,
+        status: periodFilters.status || undefined,
+        payrollMode: periodFilters.payrollMode || undefined,
+        ...scopeParams,
       };
-      if (periodFilters.search.trim()) params.search = periodFilters.search.trim();
-      if (periodFilters.status) params.status = periodFilters.status;
-      if (periodFilters.payrollMode) params.payrollMode = periodFilters.payrollMode;
-      if (selectedLocationId) params.locationId = selectedLocationId;
 
       const res = await api.get('/business-operations/payroll/periods', { params });
       const data = Array.isArray(res?.data?.data) ? res.data.data : [];
@@ -151,18 +183,19 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
     } finally {
       setPeriodsLoading(false);
     }
-  }, [periodFilters.payrollMode, periodFilters.search, periodFilters.status, periodPage, selectedLocationId]);
+  }, [periodFilters.payrollMode, periodFilters.search, periodFilters.status, periodPage, scopeParams]);
 
   const fetchPolicies = useCallback(async () => {
     setPolicyLoading(true);
     setPolicyError('');
+
     try {
       const params = {
         page: 1,
         pageSize: 50,
         sortBy: 'effectiveFrom',
         sortOrder: 'desc',
-        locationId: selectedLocationId || undefined,
+        ...scopeParams,
       };
 
       const [taxRes, incrementRes] = await Promise.all([
@@ -179,19 +212,20 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
     } finally {
       setPolicyLoading(false);
     }
-  }, [selectedLocationId]);
+  }, [scopeParams]);
 
   const fetchPeriodDetail = useCallback(async (periodId) => {
     if (!periodId) {
       setSelectedPeriod(null);
       return;
     }
+
     try {
       const res = await api.get(`/business-operations/payroll/periods/${periodId}`);
       const detail = res?.data?.data || null;
       const fromList = periods.find((p) => p.id === periodId);
       setSelectedPeriod(fromList ? { ...detail, ...fromList } : detail);
-    } catch (_err) {
+    } catch {
       const fromList = periods.find((p) => p.id === periodId);
       setSelectedPeriod(fromList || null);
     }
@@ -206,6 +240,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
 
     setEntriesLoading(true);
     setEntriesError('');
+
     try {
       const res = await api.get('/business-operations/payroll/entries', {
         params: {
@@ -214,13 +249,14 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
           pageSize: 12,
           sortBy: 'createdAt',
           sortOrder: 'desc',
-          locationId: selectedLocationId || undefined,
+          ...scopeParams,
         },
       });
 
       const data = Array.isArray(res?.data?.data) ? res.data.data : [];
       setEntries(data);
       setEntriesPagination(res?.data?.pagination || null);
+
       if (selectedEntryId && !data.some((entry) => entry.id === selectedEntryId)) {
         setSelectedEntryId(null);
         setSupportData(null);
@@ -232,14 +268,16 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
     } finally {
       setEntriesLoading(false);
     }
-  }, [entriesPage, selectedEntryId, selectedLocationId]);
+  }, [entriesPage, scopeParams, selectedEntryId]);
 
   const fetchSupportData = useCallback(async (employeeId) => {
     if (!employeeId) {
       setSupportData(null);
       return;
     }
+
     setSupportLoading(true);
+
     try {
       const [loansRes, terminationsRes, reengagementsRes] = await Promise.all([
         api.get('/business-operations/payroll/loans', { params: { employeeId, page: 1, pageSize: 1 } }),
@@ -252,7 +290,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
         terminationsTotal: terminationsRes?.data?.pagination?.total || 0,
         reengagementsTotal: reengagementsRes?.data?.pagination?.total || 0,
       });
-    } catch (_err) {
+    } catch {
       setSupportData({ loansTotal: 0, terminationsTotal: 0, reengagementsTotal: 0 });
     } finally {
       setSupportLoading(false);
@@ -315,6 +353,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
   const refreshAll = useCallback(async () => {
     await fetchPayrollPeriods(periodPage);
     await fetchPolicies();
+
     if (selectedPeriodId) {
       await fetchPeriodDetail(selectedPeriodId);
       await fetchPayrollEntries(selectedPeriodId, entriesPage);
@@ -335,10 +374,16 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
 
   useEffect(() => {
     setPeriodPage(1);
-  }, [periodFilters.payrollMode, periodFilters.search, periodFilters.status, selectedLocationId]);
+    setSelectedPeriodId(null);
+    setSelectedPeriod(null);
+    setEntries([]);
+    setSelectedEntryId(null);
+    setSupportData(null);
+  }, [periodFilters.payrollMode, periodFilters.search, periodFilters.status, effectiveBranchCode, effectiveLocationCode, selectedLocationId]);
 
   useEffect(() => {
     if (periodsLoading) return;
+
     if (pendingSelectPeriodId) {
       const target = periods.find((period) => period.id === pendingSelectPeriodId);
       if (target) {
@@ -380,16 +425,30 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
   }, [entries, entriesPagination?.total, selectedPeriod]);
 
   const entryEmployees = useMemo(() => {
-    const periodLocationId = selectedPeriod?.locationId ? Number(selectedPeriod.locationId) : null;
-    const targetLocationId = periodLocationId || selectedLocationId || null;
-    if (!targetLocationId) return employees;
-    return employees.filter((employee) => Number(employee.locationId) === Number(targetLocationId));
-  }, [employees, selectedLocationId, selectedPeriod?.locationId]);
+    if (effectiveBranchCode && effectiveLocationCode) {
+      return employees.filter((employee) => {
+        const employeeBranch = normalizeCode(employee.branchCode);
+        const employeeLocation = normalizeCode(employee.locationCode);
+        if (employeeBranch || employeeLocation) {
+          return employeeBranch === effectiveBranchCode && employeeLocation === effectiveLocationCode;
+        }
+        return selectedLocationId ? Number(employee.locationId) === Number(selectedLocationId) : true;
+      });
+    }
+
+    if (selectedLocationId) {
+      return employees.filter((employee) => Number(employee.locationId) === Number(selectedLocationId));
+    }
+
+    return employees;
+  }, [effectiveBranchCode, effectiveLocationCode, employees, selectedLocationId]);
+
   const openPayrollPeriodDetailModal = () => {
     if (!selectedPeriodId) return;
     setIsPayrollPeriodDetailModalMaximized(false);
     setIsPayrollPeriodDetailModalOpen(true);
   };
+
   const handleCreatePeriod = () => {
     setPeriodSaveError('');
     setPeriodModal({ open: true, period: null });
@@ -413,22 +472,35 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
   const handlePeriodSubmit = async (payload) => {
     setPeriodSaving(true);
     setPeriodSaveError('');
+
     try {
+      const scopedPayload = {
+        ...payload,
+        branchCode: payload.branchCode || effectiveBranchCode || undefined,
+        locationCode: payload.locationCode || effectiveLocationCode || undefined,
+        locationName: payload.locationName || selectedLocationName || scopeLabel || undefined,
+        locationId: payload.locationId ?? selectedLocationId ?? undefined,
+      };
+
       let saved;
+
       if (periodModal.period) {
-        const res = await api.put(`/business-operations/payroll/periods/${periodModal.period.id}`, { ...payload, locationId: payload.locationId ?? selectedLocationId ?? undefined });
+        const res = await api.put(`/business-operations/payroll/periods/${periodModal.period.id}`, scopedPayload);
         saved = res?.data?.data;
       } else {
-        const res = await api.post('/business-operations/payroll/periods', { ...payload, locationId: payload.locationId ?? selectedLocationId ?? undefined });
+        const res = await api.post('/business-operations/payroll/periods', scopedPayload);
         saved = res?.data?.data;
       }
 
       setPeriodModal({ open: false, period: null });
+
       if (saved?.id) {
         setPendingSelectPeriodId(saved.id);
       }
+
       setPeriodPage(1);
       await fetchPayrollPeriods(1);
+
       if (saved?.id) {
         setSelectedPeriodId(saved.id);
       }
@@ -467,20 +539,29 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
     try {
       const res = await api.get(`/business-operations/employees/${employeeId}/salary/current`);
       setEntryEmployeeSalary(res?.data?.data || null);
-    } catch (_err) {
+    } catch {
       setEntryEmployeeSalary(null);
     }
   };
 
   const handleEntrySubmit = async (payload) => {
     if (!selectedPeriodId) return;
+
     setEntrySaving(true);
     setEntrySaveError('');
+
     try {
+      const scopedPayload = {
+        ...payload,
+        branchCode: payload.branchCode || effectiveBranchCode || undefined,
+        locationCode: payload.locationCode || effectiveLocationCode || undefined,
+        locationId: payload.locationId ?? selectedLocationId ?? undefined,
+      };
+
       if (entryModal.entry) {
-        await api.put(`/business-operations/payroll/entries/${entryModal.entry.id}`, payload);
+        await api.put(`/business-operations/payroll/entries/${entryModal.entry.id}`, scopedPayload);
       } else {
-        await api.post('/business-operations/payroll/entries', payload);
+        await api.post('/business-operations/payroll/entries', scopedPayload);
       }
 
       setEntryModal({ open: false, entry: null });
@@ -682,11 +763,22 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
     if (format === 'pdf') setExportingPdf(true);
 
     try {
+      const scopedFilters = {
+        payrollPeriodId: selectedPeriodId,
+        search: periodFilters.search || undefined,
+        status: periodFilters.status || undefined,
+        payrollMode: periodFilters.payrollMode || undefined,
+        ...scopeParams,
+      };
+
       if (format === 'pdf') {
         exportPayrollPdf({
           selectedPeriod,
-          periodFilters,
+          periodFilters: scopedFilters,
           selectedLocationId,
+          selectedBranchCode: effectiveBranchCode,
+          selectedLocationCode: effectiveLocationCode,
+          selectedLocationName: scopeLabel,
           periods,
           entries,
           summary,
@@ -698,13 +790,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
         format,
         module: 'payroll',
         type: 'period',
-        filters: {
-          payrollPeriodId: selectedPeriodId,
-          search: periodFilters.search,
-          status: periodFilters.status,
-          payrollMode: periodFilters.payrollMode,
-          locationId: selectedLocationId,
-        },
+        filters: scopedFilters,
       });
     } catch (error) {
       const message = error?.response?.data?.error || `Failed to export ${format.toUpperCase()} report.`;
@@ -719,9 +805,7 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
     setExportingFullWorkbook(true);
     try {
       await downloadFullBusinessWorkbook({
-        filters: {
-          locationId: selectedLocationId || undefined,
-        },
+        filters: scopeParams,
       });
     } catch (error) {
       const message = error?.response?.data?.error || error?.message || 'Failed to export full workbook.';
@@ -741,10 +825,9 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
     event.target.value = '';
     if (!file) return;
 
-    const confirmMessage = `Import workbook "${file.name}"? This will re-add/update payroll, sales, and business operations records.`;
     const confirmed = await boConfirm({
       title: 'Import Workbook',
-      message: confirmMessage,
+      message: `Import workbook "${file.name}"? This will re-add/update payroll, sales, and business operations records.`,
       confirmText: 'Import',
       cancelText: 'Cancel',
     });
@@ -756,6 +839,8 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
         file,
         upsert: true,
         clearExisting: false,
+        branchCode: effectiveBranchCode || null,
+        locationCode: effectiveLocationCode || null,
         locationId: selectedLocationId || null,
       });
 
@@ -785,7 +870,11 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
     setPolicySaveError('');
     setTaxBracketModal({
       open: true,
-      taxBracket: selectedLocationId ? { locationId: selectedLocationId } : null,
+      taxBracket: {
+        locationId: selectedLocationId || null,
+        branchCode: effectiveBranchCode || null,
+        locationCode: effectiveLocationCode || null,
+      },
     });
   };
 
@@ -810,6 +899,8 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
     try {
       const requestPayload = {
         ...payload,
+        branchCode: payload.branchCode || effectiveBranchCode || undefined,
+        locationCode: payload.locationCode || effectiveLocationCode || undefined,
         locationId: payload.locationId || selectedLocationId || undefined,
       };
       if (taxBracketModal.taxBracket?.id) {
@@ -830,7 +921,11 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
     setPolicySaveError('');
     setIncrementPolicyModal({
       open: true,
-      incrementPolicy: selectedLocationId ? { locationId: selectedLocationId } : null,
+      incrementPolicy: {
+        locationId: selectedLocationId || null,
+        branchCode: effectiveBranchCode || null,
+        locationCode: effectiveLocationCode || null,
+      },
     });
   };
 
@@ -855,6 +950,8 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
     try {
       const requestPayload = {
         ...payload,
+        branchCode: payload.branchCode || effectiveBranchCode || undefined,
+        locationCode: payload.locationCode || effectiveLocationCode || undefined,
         locationId: payload.locationId || selectedLocationId || undefined,
       };
       if (incrementPolicyModal.incrementPolicy?.id) {
@@ -873,7 +970,12 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
 
   useEffect(() => {
     if (!isPayrollWorkspaceModalOpen || periodModal.open || entryModal.open || supportDrawer.open || loanModal.open || loanTxModal.open || terminationModal.open || reengagementModal.open || taxBracketModal.open || incrementPolicyModal.open) return;
-    const handler = (event) => { if (event.key === 'Escape') { setIsPayrollWorkspaceModalOpen(false); setIsPayrollWorkspaceMaximized(false); } };
+    const handler = (event) => {
+      if (event.key === 'Escape') {
+        setIsPayrollWorkspaceModalOpen(false);
+        setIsPayrollWorkspaceMaximized(false);
+      }
+    };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [isPayrollWorkspaceModalOpen, periodModal.open, entryModal.open, supportDrawer.open, loanModal.open, loanTxModal.open, terminationModal.open, reengagementModal.open, taxBracketModal.open, incrementPolicyModal.open]);
@@ -887,7 +989,11 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
             <p style={{ margin: '0.3rem 0 0', color: '#64748b', fontSize: '0.88rem' }}>
               Launch payroll periods and entries management from the workspace card below.
             </p>
+            <p style={{ margin: '0.3rem 0 0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
+              Scope: {scopeLabel}
+            </p>
           </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '0.75rem' }}>
             <button
               type="button"
@@ -920,55 +1026,27 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
       {isPayrollWorkspaceModalOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: isPayrollWorkspaceMaximized ? '0.35rem' : '1rem' }}>
           <div style={{ ...cardStyle, width: isPayrollWorkspaceMaximized ? 'calc(100vw - 0.7rem)' : 'min(1400px, 97vw)', height: isPayrollWorkspaceMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isPayrollWorkspaceMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column' }}>
-
-            {/* Fixed modal header */}
             <div style={{ flexShrink: 0, padding: '1rem 1.1rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(15,23,42,0.04)' }}>
-              <input
-                ref={fullWorkbookInputRef}
-                type="file"
-                accept=".xlsx,.xls"
-                style={{ display: 'none' }}
-                onChange={handleImportWorkbookFileChange}
-              />
+              <input ref={fullWorkbookInputRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleImportWorkbookFileChange} />
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <div style={{ flex: '1 1 320px' }}>
                   <h2 style={{ margin: 0, color: '#0f172a', fontSize: '1.15rem', fontWeight: 800 }}>Payroll Workspace</h2>
                   <p style={{ margin: '0.28rem 0 0', color: '#64748b', fontSize: '0.86rem' }}>Manage payroll periods and process employee salary entries.</p>
+                  <p style={{ margin: '0.25rem 0 0', color: '#64748b', fontSize: '0.82rem', fontWeight: 700 }}>Scope: {scopeLabel}</p>
                 </div>
+
                 <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <button
-                    type="button"
-                    onClick={() => handleExport('pdf')}
-                    disabled={exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook}
-                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, cursor: exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
-                  >
+                  <button type="button" onClick={() => handleExport('pdf')} disabled={exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, cursor: exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}>
                     <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.38rem' }}></i>Export PDF
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleExport('excel')}
-                    disabled={exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook}
-                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, cursor: exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
-                  >
+                  <button type="button" onClick={() => handleExport('excel')} disabled={exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, cursor: exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}>
                     <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.38rem' }}></i>Export Excel
                   </button>
-                  <button
-                    type="button"
-                    title={isPayrollWorkspaceMaximized ? 'Restore' : 'Maximize'}
-                    aria-label={isPayrollWorkspaceMaximized ? 'Restore workspace' : 'Maximize workspace'}
-                    onClick={() => setIsPayrollWorkspaceMaximized((prev) => !prev)}
-                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
-                  >
+                  <button type="button" title={isPayrollWorkspaceMaximized ? 'Restore' : 'Maximize'} onClick={() => setIsPayrollWorkspaceMaximized((prev) => !prev)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}>
                     <i className={`fas ${isPayrollWorkspaceMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
                   </button>
-                  <button
-                    type="button"
-                    title="Close"
-                    aria-label="Close workspace"
-                    onClick={() => { setIsPayrollWorkspaceModalOpen(false); setIsPayrollWorkspaceMaximized(false); }}
-                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
-                  >
+                  <button type="button" title="Close" onClick={() => { setIsPayrollWorkspaceModalOpen(false); setIsPayrollWorkspaceMaximized(false); }} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}>
                     <i className="fas fa-times" />
                   </button>
                 </div>
@@ -976,71 +1054,31 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
 
               <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.8rem' }}>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <button
-                    type="button"
-                    onClick={handleCreatePeriod}
-                    style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.46rem 0.72rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
-                  >
-                    <i className="fas fa-plus" style={{ marginRight: '0.34rem' }}></i>
-                    Create Payroll Period
+                  <button type="button" onClick={handleCreatePeriod} style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.46rem 0.72rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>
+                    <i className="fas fa-plus" style={{ marginRight: '0.34rem' }}></i>Create Payroll Period
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowPeriodFilters((prev) => !prev)}
-                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.46rem 0.72rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
-                  >
-                    <i className="fas fa-sliders" style={{ marginRight: '0.34rem' }}></i>
-                    {showPeriodFilters ? 'Hide Filters' : 'Show Filters'}
+                  <button type="button" onClick={() => setShowPeriodFilters((prev) => !prev)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.46rem 0.72rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>
+                    <i className="fas fa-sliders" style={{ marginRight: '0.34rem' }}></i>{showPeriodFilters ? 'Hide Filters' : 'Show Filters'}
                   </button>
-                  <button
-                    type="button"
-                    onClick={refreshAll}
-                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.46rem 0.72rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
-                  >
-                    <i className="fas fa-rotate-right" style={{ marginRight: '0.34rem' }}></i>
-                    Refresh
+                  <button type="button" onClick={refreshAll} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.46rem 0.72rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>
+                    <i className="fas fa-rotate-right" style={{ marginRight: '0.34rem' }}></i>Refresh
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleCreateTaxBracket}
-                    style={{ border: '1px solid #d6d3d1', backgroundColor: '#fff', color: '#44403c', borderRadius: '10px', padding: '0.46rem 0.72rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
-                  >
-                    <i className="fas fa-percent" style={{ marginRight: '0.34rem' }}></i>
-                    New Tax Bracket
+                  <button type="button" onClick={handleCreateTaxBracket} style={{ border: '1px solid #d6d3d1', backgroundColor: '#fff', color: '#44403c', borderRadius: '10px', padding: '0.46rem 0.72rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>
+                    <i className="fas fa-percent" style={{ marginRight: '0.34rem' }}></i>New Tax Bracket
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleCreateIncrementPolicy}
-                    style={{ border: '1px solid #bbf7d0', backgroundColor: '#fff', color: '#166534', borderRadius: '10px', padding: '0.46rem 0.72rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
-                  >
-                    <i className="fas fa-chart-line" style={{ marginRight: '0.34rem' }}></i>
-                    New Increment Policy
+                  <button type="button" onClick={handleCreateIncrementPolicy} style={{ border: '1px solid #bbf7d0', backgroundColor: '#fff', color: '#166534', borderRadius: '10px', padding: '0.46rem 0.72rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>
+                    <i className="fas fa-chart-line" style={{ marginRight: '0.34rem' }}></i>New Increment Policy
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowPolicyPanel((prev) => !prev)}
-                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.46rem 0.72rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
-                  >
-                    <i className="fas fa-briefcase" style={{ marginRight: '0.34rem' }}></i>
-                    {showPolicyPanel ? 'Hide Policies' : 'Show Policies'}
+                  <button type="button" onClick={() => setShowPolicyPanel((prev) => !prev)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.46rem 0.72rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>
+                    <i className="fas fa-briefcase" style={{ marginRight: '0.34rem' }}></i>{showPolicyPanel ? 'Hide Policies' : 'Show Policies'}
                   </button>
                 </div>
 
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'nowrap' }}>
-                  <button
-                    type="button"
-                    onClick={handleExportFullWorkbook}
-                    disabled={exportingFullWorkbook || importingFullWorkbook || exportingExcel || exportingPdf}
-                    style={{ border: '1px solid #86efac', backgroundColor: '#f0fdf4', color: '#166534', borderRadius: '10px', padding: '0.46rem 0.72rem', fontWeight: 800, cursor: exportingFullWorkbook || importingFullWorkbook || exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.8rem' }}
-                  >
+                  <button type="button" onClick={handleExportFullWorkbook} disabled={exportingFullWorkbook || importingFullWorkbook || exportingExcel || exportingPdf} style={{ border: '1px solid #86efac', backgroundColor: '#f0fdf4', color: '#166534', borderRadius: '10px', padding: '0.46rem 0.72rem', fontWeight: 800, cursor: exportingFullWorkbook || importingFullWorkbook || exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.8rem' }}>
                     <i className={`fas ${exportingFullWorkbook ? 'fa-spinner fa-spin' : 'fa-file-arrow-down'}`} style={{ marginRight: '0.32rem' }}></i>Export Full Workbook
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleChooseImportWorkbook}
-                    disabled={importingFullWorkbook || exportingFullWorkbook || exportingExcel || exportingPdf}
-                    style={{ border: '1px solid #bfdbfe', backgroundColor: '#eff6ff', color: '#1e3a8a', borderRadius: '10px', padding: '0.46rem 0.72rem', fontWeight: 800, cursor: importingFullWorkbook || exportingFullWorkbook || exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.8rem' }}
-                  >
+                  <button type="button" onClick={handleChooseImportWorkbook} disabled={importingFullWorkbook || exportingFullWorkbook || exportingExcel || exportingPdf} style={{ border: '1px solid #bfdbfe', backgroundColor: '#eff6ff', color: '#1e3a8a', borderRadius: '10px', padding: '0.46rem 0.72rem', fontWeight: 800, cursor: importingFullWorkbook || exportingFullWorkbook || exportingExcel || exportingPdf ? 'not-allowed' : 'pointer', fontSize: '0.8rem' }}>
                     <i className={`fas ${importingFullWorkbook ? 'fa-spinner fa-spin' : 'fa-file-arrow-up'}`} style={{ marginRight: '0.32rem' }}></i>Import Full Workbook
                   </button>
                 </div>
@@ -1050,39 +1088,21 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
                 <div style={{ marginTop: '0.85rem', display: 'flex', gap: '0.65rem', flexWrap: 'wrap', alignItems: 'center' }}>
                   <div style={{ position: 'relative', flex: '1 1 250px' }}>
                     <i className="fas fa-search" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none', fontSize: '0.85rem' }}></i>
-                    <input
-                      type="text"
-                      placeholder="Search periods by description, mode, status, or creator"
-                      value={periodFilters.search}
-                      onChange={(event) => setPeriodFilters((prev) => ({ ...prev, search: event.target.value }))}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '0.72rem 0.84rem 0.72rem 2.2rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc' }}
-                    />
+                    <input type="text" placeholder="Search periods by description, mode, status, or creator" value={periodFilters.search} onChange={(event) => setPeriodFilters((prev) => ({ ...prev, search: event.target.value }))} style={{ width: '100%', boxSizing: 'border-box', padding: '0.72rem 0.84rem 0.72rem 2.2rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc' }} />
                   </div>
-                  <select
-                    value={periodFilters.status}
-                    onChange={(event) => setPeriodFilters((prev) => ({ ...prev, status: event.target.value }))}
-                    style={{ padding: '0.72rem 0.84rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc', minWidth: '130px' }}
-                  >
+                  <select value={periodFilters.status} onChange={(event) => setPeriodFilters((prev) => ({ ...prev, status: event.target.value }))} style={{ padding: '0.72rem 0.84rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc', minWidth: '130px' }}>
                     <option value="">All Statuses</option>
                     <option value="draft">Draft</option>
                     <option value="review">Review</option>
                     <option value="approved">Approved</option>
                     <option value="finalized">Finalized</option>
                   </select>
-                  <select
-                    value={periodFilters.payrollMode}
-                    onChange={(event) => setPeriodFilters((prev) => ({ ...prev, payrollMode: event.target.value }))}
-                    style={{ padding: '0.72rem 0.84rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc', minWidth: '130px' }}
-                  >
+                  <select value={periodFilters.payrollMode} onChange={(event) => setPeriodFilters((prev) => ({ ...prev, payrollMode: event.target.value }))} style={{ padding: '0.72rem 0.84rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc', minWidth: '130px' }}>
                     <option value="">All Modes</option>
                     <option value="mid_month">Mid Month</option>
                     <option value="full_month">Full Month</option>
                   </select>
-                  <button
-                    type="button"
-                    onClick={() => setPeriodFilters({ search: '', status: '', payrollMode: '' })}
-                    style={{ border: '1px solid #e2e8f0', backgroundColor: '#fff', color: '#475569', borderRadius: '10px', padding: '0.68rem 0.88rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
-                  >
+                  <button type="button" onClick={() => setPeriodFilters({ search: '', status: '', payrollMode: '' })} style={{ border: '1px solid #e2e8f0', backgroundColor: '#fff', color: '#475569', borderRadius: '10px', padding: '0.68rem 0.88rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}>
                     Clear
                   </button>
                 </div>
@@ -1152,134 +1172,110 @@ const PayrollTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] 
               )}
             </div>
 
-                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.85rem' }}>
-          <div style={{ ...cardStyle, overflow: 'hidden' }}>
-            <div style={{ padding: '0.75rem 1.05rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <div style={{ display: 'grid', gap: '0.2rem' }}>
-                <strong style={{ color: '#0f172a' }}>Payroll Period Register</strong>
-                <span style={{ color: '#64748b', fontSize: '0.8rem' }}>
-                  Selected: {selectedPeriod ? (selectedPeriod.description || `Period #${selectedPeriod.id}`) : 'None'}
-                </span>
-              </div>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.85rem' }}>
+              <div style={{ ...cardStyle, overflow: 'hidden' }}>
+                <div style={{ padding: '0.75rem 1.05rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'grid', gap: '0.2rem' }}>
+                    <strong style={{ color: '#0f172a' }}>Payroll Period Register</strong>
+                    <span style={{ color: '#64748b', fontSize: '0.8rem' }}>
+                      Selected: {selectedPeriod ? (selectedPeriod.description || `Period #${selectedPeriod.id}`) : 'None'}
+                    </span>
+                  </div>
 
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  onClick={openPayrollPeriodDetailModal}
-                  disabled={!selectedPeriodId}
-                  style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.5rem 0.8rem', fontWeight: 700, cursor: selectedPeriodId ? 'pointer' : 'not-allowed', opacity: selectedPeriodId ? 1 : 0.65 }}
-                >
-                  Open Payroll Details
-                </button>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <button type="button" onClick={openPayrollPeriodDetailModal} disabled={!selectedPeriodId} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.5rem 0.8rem', fontWeight: 700, cursor: selectedPeriodId ? 'pointer' : 'not-allowed', opacity: selectedPeriodId ? 1 : 0.65 }}>
+                      Open Payroll Details
+                    </button>
 
-                <button
-                  type="button"
-                  onClick={handleAddEntry}
-                  disabled={!selectedPeriodId}
-                  style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.5rem 0.8rem', fontWeight: 700, cursor: selectedPeriodId ? 'pointer' : 'not-allowed', opacity: selectedPeriodId ? 1 : 0.65 }}
-                >
-                  Add Payroll Entry
-                </button>
+                    <button type="button" onClick={handleAddEntry} disabled={!selectedPeriodId} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.5rem 0.8rem', fontWeight: 700, cursor: selectedPeriodId ? 'pointer' : 'not-allowed', opacity: selectedPeriodId ? 1 : 0.65 }}>
+                      Add Payroll Entry
+                    </button>
+                  </div>
+                </div>
+
+                <PayrollPeriodsList
+                  periods={periods}
+                  loading={periodsLoading}
+                  error={periodsError}
+                  page={periodPage}
+                  pagination={periodsPagination}
+                  selectedPeriodId={selectedPeriodId}
+                  onPageChange={setPeriodPage}
+                  onSelectPeriod={(period) => {
+                    setSelectedPeriodId(period.id);
+                    setSelectedPeriod(period);
+                    setEntriesPage(1);
+                    setSelectedEntryId(null);
+                    setSupportData(null);
+                    setSupportDrawer((prev) => ({ ...prev, open: false, employeeId: null, error: '', loans: [], terminations: [], reengagements: [] }));
+                  }}
+                  onEditPeriod={handleEditPeriod}
+                  onDeletePeriod={handleDeletePeriod}
+                  onCreatePeriod={handleCreatePeriod}
+                />
               </div>
             </div>
-
-            <PayrollPeriodsList
-              periods={periods}
-              loading={periodsLoading}
-              error={periodsError}
-              page={periodPage}
-              pagination={periodsPagination}
-              selectedPeriodId={selectedPeriodId}
-              onPageChange={setPeriodPage}
-              onSelectPeriod={(period) => {
-                setSelectedPeriodId(period.id);
-                setSelectedPeriod(period);
-                setEntriesPage(1);
-                setSelectedEntryId(null);
-                setSupportData(null);
-                setSupportDrawer((prev) => ({ ...prev, open: false, employeeId: null, error: '', loans: [], terminations: [], reengagements: [] }));
-              }}
-              onEditPeriod={handleEditPeriod}
-              onDeletePeriod={handleDeletePeriod}
-              onCreatePeriod={handleCreatePeriod}
-            />
-          </div>
-        </div>
           </div>
         </div>
       )}
 
       {isPayrollPeriodDetailModalOpen && (
-  <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.5)', zIndex: 180, display: 'grid', placeItems: 'center', padding: isPayrollPeriodDetailModalMaximized ? '0.35rem' : '1rem' }}>
-    <div style={{ ...cardStyle, width: isPayrollPeriodDetailModalMaximized ? 'calc(100vw - 0.7rem)' : 'min(1200px, 96vw)', height: isPayrollPeriodDetailModalMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isPayrollPeriodDetailModalMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ flexShrink: 0, padding: '0.8rem 1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-        <div>
-          <h3 style={{ margin: 0, color: '#0f172a' }}>Payroll Period Details</h3>
-          <div style={{ color: '#64748b', fontSize: '0.84rem' }}>
-            {selectedPeriod ? (selectedPeriod.description || `Period #${selectedPeriod.id}`) : 'No period selected'}
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.5)', zIndex: 180, display: 'grid', placeItems: 'center', padding: isPayrollPeriodDetailModalMaximized ? '0.35rem' : '1rem' }}>
+          <div style={{ ...cardStyle, width: isPayrollPeriodDetailModalMaximized ? 'calc(100vw - 0.7rem)' : 'min(1200px, 96vw)', height: isPayrollPeriodDetailModalMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isPayrollPeriodDetailModalMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ flexShrink: 0, padding: '0.8rem 1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <div>
+                <h3 style={{ margin: 0, color: '#0f172a' }}>Payroll Period Details</h3>
+                <div style={{ color: '#64748b', fontSize: '0.84rem' }}>
+                  {selectedPeriod ? (selectedPeriod.description || `Period #${selectedPeriod.id}`) : 'No period selected'}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <button type="button" onClick={handleAddEntry} disabled={!selectedPeriodId} style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.55rem 0.82rem', fontWeight: 700, cursor: selectedPeriodId ? 'pointer' : 'not-allowed', opacity: selectedPeriodId ? 1 : 0.65 }}>
+                  Add Payroll Entry
+                </button>
+
+                <button type="button" title={isPayrollPeriodDetailModalMaximized ? 'Restore' : 'Maximize'} onClick={() => setIsPayrollPeriodDetailModalMaximized((prev) => !prev)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}>
+                  <i className={`fas ${isPayrollPeriodDetailModalMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
+                </button>
+
+                <button type="button" title="Close" onClick={() => { setIsPayrollPeriodDetailModalOpen(false); setIsPayrollPeriodDetailModalMaximized(false); }} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}>
+                  <i className="fas fa-times" />
+                </button>
+              </div>
+            </div>
+
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.9rem' }}>
+              <PayrollPeriodDetailPanel
+                period={selectedPeriod}
+                summary={summary}
+                entries={entries}
+                entriesLoading={entriesLoading}
+                entriesError={entriesError}
+                entriesPage={entriesPage}
+                entriesPagination={entriesPagination}
+                selectedEntryId={selectedEntryId}
+                supportData={supportData}
+                supportLoading={supportLoading}
+                onSelectEntry={handleSelectEntry}
+                onEditEntry={handleEditEntry}
+                onDeleteEntry={handleDeleteEntry}
+                onPageChange={setEntriesPage}
+                onAddEntry={handleAddEntry}
+                onOpenSupportDrawer={handleOpenSupportDrawer}
+              />
+            </div>
           </div>
         </div>
-
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <button
-            type="button"
-            onClick={handleAddEntry}
-            disabled={!selectedPeriodId}
-            style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.55rem 0.82rem', fontWeight: 700, cursor: selectedPeriodId ? 'pointer' : 'not-allowed', opacity: selectedPeriodId ? 1 : 0.65 }}
-          >
-            Add Payroll Entry
-          </button>
-
-          <button
-            type="button"
-            title={isPayrollPeriodDetailModalMaximized ? 'Restore' : 'Maximize'}
-            aria-label={isPayrollPeriodDetailModalMaximized ? 'Restore payroll detail modal' : 'Maximize payroll detail modal'}
-            onClick={() => setIsPayrollPeriodDetailModalMaximized((prev) => !prev)}
-            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
-          >
-            <i className={`fas ${isPayrollPeriodDetailModalMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
-          </button>
-
-          <button
-            type="button"
-            title="Close"
-            aria-label="Close payroll detail modal"
-            onClick={() => { setIsPayrollPeriodDetailModalOpen(false); setIsPayrollPeriodDetailModalMaximized(false); }}
-            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
-          >
-            <i className="fas fa-times" />
-          </button>
-        </div>
-      </div>
-
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.9rem' }}>
-        <PayrollPeriodDetailPanel
-          period={selectedPeriod}
-          summary={summary}
-          entries={entries}
-          entriesLoading={entriesLoading}
-          entriesError={entriesError}
-          entriesPage={entriesPage}
-          entriesPagination={entriesPagination}
-          selectedEntryId={selectedEntryId}
-          supportData={supportData}
-          supportLoading={supportLoading}
-          onSelectEntry={handleSelectEntry}
-          onEditEntry={handleEditEntry}
-          onDeleteEntry={handleDeleteEntry}
-          onPageChange={setEntriesPage}
-          onAddEntry={handleAddEntry}
-          onOpenSupportDrawer={handleOpenSupportDrawer}
-        />
-      </div>
-    </div>
-  </div>
-)}
+      )}
 
       <PayrollPeriodFormModal
         isOpen={periodModal.open}
         period={periodModal.period}
         selectedLocationId={selectedLocationId}
+        selectedBranchCode={effectiveBranchCode}
+        selectedLocationCode={effectiveLocationCode}
+        selectedLocationName={scopeLabel}
         locations={locations}
         saving={periodSaving}
         error={periodSaveError}

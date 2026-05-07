@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 const EMPLOYMENT_TYPES = ['permanent', 'contract', 'casual', 'temporary', 'part_time', 'other'];
 const GENDERS = ['male', 'female', 'other'];
 const STATUSES = ['active', 'inactive', 'terminated'];
 
-// Predefined departments suitable for supermarket/business context
 const DEPARTMENTS = [
   { value: '', label: 'Select department' },
   { value: 'Shop/Retail', label: 'Shop/Retail' },
@@ -21,7 +20,6 @@ const DEPARTMENTS = [
   { value: 'Home/Grounds', label: 'Home/Grounds' },
 ];
 
-// Predefined positions suitable for supermarket/business context
 const POSITIONS = [
   { value: '', label: 'Select position' },
   { value: 'Cashier', label: 'Cashier' },
@@ -47,7 +45,7 @@ const POSITIONS = [
 
 const defaultForm = {
   locationId: '',
-  employeeNo: 'Auto-generated', // Default value indicating auto-generation
+  employeeNo: 'Auto-generated',
   firstName: '',
   surname: '',
   middleName: '',
@@ -95,30 +93,58 @@ const sectionLabel = {
   paddingTop: '0.35rem',
 };
 
+const normalizeCode = (value) => String(value || '').trim().toUpperCase();
+
 const toDateValue = (value) => {
   if (!value) return '';
   const s = String(value);
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '';
-  const local = new Date(d.getTime() - (d.getTimezoneOffset() * 60000));
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
   return local.toISOString().slice(0, 10);
 };
 
-const EmployeeFormModal = ({ isOpen, employee, selectedLocationId = null, locations = [], saving, error, onClose, onSubmit }) => {
+const EmployeeFormModal = ({
+  isOpen,
+  employee,
+  selectedLocationId = null,
+  selectedBranchCode = '',
+  selectedLocationCode = '',
+  selectedLocationName = '',
+  locations = [],
+  saving,
+  error,
+  onClose,
+  onSubmit,
+}) => {
   const [form, setForm] = useState(defaultForm);
   const [validationError, setValidationError] = useState('');
+
   const isCreateMode = !employee;
-  const isLocationLocked = isCreateMode && Boolean(selectedLocationId);
+  const effectiveBranchCode = normalizeCode(selectedBranchCode || employee?.branchCode);
+  const effectiveLocationCode = normalizeCode(selectedLocationCode || employee?.locationCode);
+
+  const scopeLabel = useMemo(() => {
+    if (selectedLocationName) return selectedLocationName;
+    if (effectiveBranchCode && effectiveLocationCode) return `${effectiveBranchCode} / ${effectiveLocationCode}`;
+    if (effectiveLocationCode) return effectiveLocationCode;
+    return selectedLocationId ? `Location ID ${selectedLocationId}` : 'No branch/location selected';
+  }, [effectiveBranchCode, effectiveLocationCode, selectedLocationId, selectedLocationName]);
+
+  const hasCanonicalScope = Boolean(effectiveBranchCode && effectiveLocationCode);
 
   useEffect(() => {
     if (!isOpen) return;
+
     setValidationError('');
+
     const scopedLocationId = selectedLocationId ? String(selectedLocationId) : '';
     const existingLocationId = employee?.locationId ? String(employee.locationId) : '';
+
     setForm({
       locationId: existingLocationId || scopedLocationId,
-      employeeNo: employee?.employeeNo || '',
+      employeeNo: employee?.employeeNo || 'Auto-generated',
       firstName: employee?.firstName || '',
       surname: employee?.surname || '',
       middleName: employee?.middleName || '',
@@ -141,30 +167,14 @@ const EmployeeFormModal = ({ isOpen, employee, selectedLocationId = null, locati
 
   useEffect(() => {
     if (!isOpen) return;
-    const handler = (event) => { if (event.key === 'Escape') onClose(); };
+
+    const handler = (event) => {
+      if (event.key === 'Escape') onClose();
+    };
+
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [isOpen, onClose]);
-
-  useEffect(() => {
-    if (isCreateMode) {
-      async function fetchGeneratedEmployeeNo() {
-        try {
-          const response = await fetch('/api/employees/generate-employee-no');
-          const data = await response.json();
-          if (data.success) {
-            setForm((prevForm) => ({ ...prevForm, employeeNo: data.employeeNo }));
-          } else {
-            console.error('Failed to generate employee number:', data.error);
-          }
-        } catch (error) {
-          console.error('Error generating employee number:', error);
-        }
-      }
-
-      fetchGeneratedEmployeeNo();
-    }
-  }, [isCreateMode]);
 
   if (!isOpen) return null;
 
@@ -172,21 +182,29 @@ const EmployeeFormModal = ({ isOpen, employee, selectedLocationId = null, locati
 
   const handleSubmit = (e) => {
     e.preventDefault();
+
     if (!String(form.firstName || '').trim()) {
       setValidationError('First name is required.');
       return;
     }
+
     if (!String(form.surname || '').trim()) {
       setValidationError('Surname is required.');
       return;
     }
-    if (!form.locationId) {
-      setValidationError('Location is required.');
+
+    if (!hasCanonicalScope && !form.locationId) {
+      setValidationError('Branch/location scope is required.');
       return;
     }
+
     setValidationError('');
+
     onSubmit({
-      locationId: Number(form.locationId),
+      locationId: form.locationId ? Number(form.locationId) : selectedLocationId || null,
+      branchCode: effectiveBranchCode || null,
+      locationCode: effectiveLocationCode || null,
+      locationName: selectedLocationName || scopeLabel || null,
       ...(employee ? { employeeNo: form.employeeNo?.trim() || null } : {}),
       firstName: form.firstName.trim(),
       surname: form.surname.trim(),
@@ -214,15 +232,17 @@ const EmployeeFormModal = ({ isOpen, employee, selectedLocationId = null, locati
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 220, display: 'grid', placeItems: 'center', padding: '1rem' }}>
       <div style={{ width: 'min(860px, 100%)', maxHeight: '94vh', overflowY: 'auto', backgroundColor: '#fff', borderRadius: '22px', border: '1px solid #e2e8f0', boxShadow: '0 24px 60px rgba(15, 23, 42, 0.22)' }}>
-
-        {/* Modal header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', padding: '1.2rem 1.3rem', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, backgroundColor: '#fff', zIndex: 5, borderRadius: '22px 22px 0 0' }}>
           <div>
             <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#5B4B8A', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Business Operations
             </div>
             <h3 style={{ margin: '0.3rem 0 0', color: '#0f172a' }}>{title}</h3>
+            <p style={{ margin: '0.25rem 0 0', color: '#64748b', fontSize: '0.84rem' }}>
+              Scope: {scopeLabel}
+            </p>
           </div>
+
           <button
             type="button"
             onClick={onClose}
@@ -240,36 +260,32 @@ const EmployeeFormModal = ({ isOpen, employee, selectedLocationId = null, locati
         )}
 
         <form onSubmit={handleSubmit} style={{ padding: '1.3rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '1rem' }}>
-
-          {/* ── Employment info ── */}
           <div style={sectionLabel}>Employment Information</div>
 
           <div>
-            <label style={labelStyle}>Location <span style={{ color: '#ef4444' }}>*</span></label>
-            <select value={form.locationId} onChange={set('locationId')} disabled={isLocationLocked} style={{ ...fieldStyle, backgroundColor: isLocationLocked ? '#f8fafc' : '#fff' }}>
-              {!isLocationLocked && <option value="">Select location</option>}
-              {locations.map((location) => (
-                <option key={location.id} value={location.id}>{location.name}{location.code ? ` (${location.code})` : ''}</option>
-              ))}
-            </select>
+            <label style={labelStyle}>Branch / Location</label>
+            <input value={scopeLabel} disabled readOnly style={{ ...fieldStyle, backgroundColor: '#f8fafc', color: '#64748b' }} />
           </div>
+
+          {!hasCanonicalScope && locations.length > 0 && (
+            <div>
+              <label style={labelStyle}>Legacy Location</label>
+              <select value={form.locationId} onChange={set('locationId')} style={fieldStyle}>
+                <option value="">Select location</option>
+                {locations.map((location) => (
+                  <option key={location.id} value={location.id}>
+                    {location.name}{location.code ? ` (${location.code})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div>
             <label style={labelStyle}>Employee Number</label>
-            <input
-              type="text"
-              value={form.employeeNo || 'Auto-generated by system'}
-              disabled
-              readOnly
-              placeholder="Auto-generated by system"
-              style={{
-                ...fieldStyle,
-                backgroundColor: '#f8fafc',
-                color: '#64748b',
-                cursor: 'not-allowed',
-              }}
-            />
+            <input type="text" value={form.employeeNo || 'Auto-generated by system'} disabled readOnly placeholder="Auto-generated by system" style={{ ...fieldStyle, backgroundColor: '#f8fafc', color: '#64748b', cursor: 'not-allowed' }} />
           </div>
+
           <div>
             <label style={labelStyle}>Position</label>
             <select value={form.position} onChange={set('position')} style={fieldStyle}>
@@ -278,6 +294,7 @@ const EmployeeFormModal = ({ isOpen, employee, selectedLocationId = null, locati
               ))}
             </select>
           </div>
+
           <div>
             <label style={labelStyle}>Department</label>
             <select value={form.department} onChange={set('department')} style={fieldStyle}>
@@ -286,6 +303,7 @@ const EmployeeFormModal = ({ isOpen, employee, selectedLocationId = null, locati
               ))}
             </select>
           </div>
+
           <div>
             <label style={labelStyle}>Employment Type</label>
             <select value={form.employmentType} onChange={set('employmentType')} style={fieldStyle}>
@@ -295,97 +313,98 @@ const EmployeeFormModal = ({ isOpen, employee, selectedLocationId = null, locati
               ))}
             </select>
           </div>
+
+          <div>
+            <label style={labelStyle}>Status</label>
+            <select value={form.status} onChange={set('status')} style={fieldStyle}>
+              {STATUSES.map((status) => (
+                <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
+              ))}
+            </select>
+          </div>
+
           <div>
             <label style={labelStyle}>Date of Employment</label>
             <input type="date" value={form.dateOfEmployment} onChange={set('dateOfEmployment')} style={fieldStyle} />
           </div>
 
-          {/* ── Personal info ── */}
           <div style={sectionLabel}>Personal Information</div>
 
           <div>
             <label style={labelStyle}>First Name <span style={{ color: '#ef4444' }}>*</span></label>
             <input type="text" value={form.firstName} onChange={set('firstName')} placeholder="First name" style={fieldStyle} />
           </div>
+
           <div>
             <label style={labelStyle}>Surname <span style={{ color: '#ef4444' }}>*</span></label>
             <input type="text" value={form.surname} onChange={set('surname')} placeholder="Surname" style={fieldStyle} />
           </div>
+
           <div>
             <label style={labelStyle}>Middle Name</label>
             <input type="text" value={form.middleName} onChange={set('middleName')} placeholder="Middle name (optional)" style={fieldStyle} />
           </div>
+
           <div>
             <label style={labelStyle}>Gender</label>
             <select value={form.gender} onChange={set('gender')} style={fieldStyle}>
               <option value="">Select gender</option>
-              {GENDERS.map((g) => <option key={g} value={g}>{g.charAt(0).toUpperCase() + g.slice(1)}</option>)}
+              {GENDERS.map((g) => (
+                <option key={g} value={g}>{g.charAt(0).toUpperCase() + g.slice(1)}</option>
+              ))}
             </select>
           </div>
+
           <div>
             <label style={labelStyle}>Date of Birth</label>
             <input type="date" value={form.dateOfBirth} onChange={set('dateOfBirth')} style={fieldStyle} />
           </div>
+
           <div>
             <label style={labelStyle}>Contact Number</label>
             <input type="text" value={form.contactNumber} onChange={set('contactNumber')} placeholder="e.g. +265 999 000 000" style={fieldStyle} />
           </div>
 
-          {/* ── Origin ── */}
           <div style={sectionLabel}>Origin / Residence</div>
 
           <div>
             <label style={labelStyle}>District of Origin</label>
             <input type="text" value={form.districtOfOrigin} onChange={set('districtOfOrigin')} placeholder="District" style={fieldStyle} />
           </div>
+
           <div>
             <label style={labelStyle}>Village</label>
             <input type="text" value={form.village} onChange={set('village')} placeholder="Village" style={fieldStyle} />
           </div>
+
           <div style={{ gridColumn: '1 / -1' }}>
             <label style={labelStyle}>Traditional Authority</label>
             <input type="text" value={form.traditionalAuthority} onChange={set('traditionalAuthority')} placeholder="T/A" style={fieldStyle} />
           </div>
 
-          {/* ── Identification ── */}
           <div style={sectionLabel}>Identification</div>
 
           <div>
             <label style={labelStyle}>National ID</label>
             <input type="text" value={form.nationalId} onChange={set('nationalId')} placeholder="National ID number" style={fieldStyle} />
           </div>
+
           <div>
             <label style={labelStyle}>National ID Expiry Date</label>
             <input type="date" value={form.nationalIdExpiryDate} onChange={set('nationalIdExpiryDate')} style={fieldStyle} />
           </div>
 
-          {/* ── Notes ── */}
           <div style={{ gridColumn: '1 / -1' }}>
             <label style={labelStyle}>Notes</label>
-            <textarea
-              value={form.notes}
-              onChange={set('notes')}
-              rows={3}
-              placeholder="Any additional notes about this employee..."
-              style={{ ...fieldStyle, resize: 'vertical', lineHeight: 1.6, fontFamily: 'inherit' }}
-            />
+            <textarea value={form.notes} onChange={set('notes')} rows={3} placeholder="Any additional notes about this employee..." style={{ ...fieldStyle, resize: 'vertical', lineHeight: 1.6, fontFamily: 'inherit' }} />
           </div>
 
-          {/* ── Actions ── */}
           <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: '0.7rem', paddingTop: '0.5rem', borderTop: '1px solid #e2e8f0' }}>
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={saving}
-              style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#475569', borderRadius: '10px', padding: '0.75rem 1.1rem', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer' }}
-            >
+            <button type="button" onClick={onClose} disabled={saving} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#475569', borderRadius: '10px', padding: '0.75rem 1.1rem', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer' }}>
               Cancel
             </button>
-            <button
-              type="submit"
-              disabled={saving}
-              style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.75rem 1.3rem', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer' }}
-            >
+
+            <button type="submit" disabled={saving} style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.75rem 1.3rem', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer' }}>
               {saving ? (
                 <><i className="fas fa-spinner fa-spin" style={{ marginRight: '0.45rem' }} />Saving...</>
               ) : (

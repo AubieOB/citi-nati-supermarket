@@ -19,30 +19,15 @@ const cardStyle = {
 
 const money = (value) => `MWK ${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+const normalizeCode = (value) => String(value || '').trim().toUpperCase();
+
 const balanceMeta = (value, debtLabel, creditLabel) => {
   const amount = Number(value || 0);
 
-  if (amount > 0) {
-    return {
-      label: debtLabel,
-      amount: money(amount),
-      color: '#b91c1c',
-    };
-  }
+  if (amount > 0) return { label: debtLabel, amount: money(amount), color: '#b91c1c' };
+  if (amount < 0) return { label: creditLabel, amount: money(Math.abs(amount)), color: '#166534' };
 
-  if (amount < 0) {
-    return {
-      label: creditLabel,
-      amount: money(Math.abs(amount)),
-      color: '#166534',
-    };
-  }
-
-  return {
-    label: 'Balanced',
-    amount: money(0),
-    color: '#0f172a',
-  };
+  return { label: 'Balanced', amount: money(0), color: '#0f172a' };
 };
 
 const INITIAL_DETAIL_STATE = {
@@ -52,26 +37,28 @@ const INITIAL_DETAIL_STATE = {
   transactionPagination: null,
 };
 
-function deriveBranchCodeFromLocation(location) {
-  if (!location) return null;
+const SuppliersTab = ({
+  refreshKey = 0,
+  selectedLocationId = null,
+  selectedBranchCode = '',
+  selectedLocationCode = '',
+  selectedLocationName = '',
+  locations = [],
+}) => {
+  const effectiveBranchCode = normalizeCode(selectedBranchCode);
+  const effectiveLocationCode = normalizeCode(selectedLocationCode);
+  const scopeLabel = selectedLocationName || (
+    effectiveBranchCode && effectiveLocationCode
+      ? `${effectiveBranchCode} / ${effectiveLocationCode}`
+      : 'All Locations'
+  );
 
-  const explicitBranchCode = String(location.branchCode || '').trim().toUpperCase();
-  if (explicitBranchCode === 'BLANTYRE' || explicitBranchCode === 'ZOMBA') {
-    return explicitBranchCode;
-  }
+  const scopeParams = useMemo(() => ({
+    branchCode: effectiveBranchCode || undefined,
+    locationCode: effectiveLocationCode || undefined,
+    locationId: selectedLocationId || undefined,
+  }), [effectiveBranchCode, effectiveLocationCode, selectedLocationId]);
 
-  const locationCode = String(location.code || '').trim().toUpperCase();
-  if (locationCode === 'BT') return 'BLANTYRE';
-  if (locationCode === 'ZA' || locationCode === 'SH' || locationCode === 'BAR' || locationCode === 'ST999') return 'ZOMBA';
-
-  const locationName = String(location.name || '').trim().toUpperCase();
-  if (locationName.includes('BLANTYRE')) return 'BLANTYRE';
-  if (locationName.includes('ZOMBA')) return 'ZOMBA';
-
-  return null;
-}
-
-const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [] }) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -106,15 +93,16 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
   const [exportingExcel, setExportingExcel] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [syncingBranches, setSyncingBranches] = useState({});
-
   const [pendingSelectedSupplierId, setPendingSelectedSupplierId] = useState(null);
 
   const supplierOptions = useMemo(() => {
     const currentOptions = suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name }));
     const selectedSupplier = detailState.supplier;
+
     if (selectedSupplier && !currentOptions.some((item) => item.id === selectedSupplier.id)) {
       return [{ id: selectedSupplier.id, name: selectedSupplier.name }, ...currentOptions];
     }
+
     return currentOptions;
   }, [detailState.supplier, suppliers]);
 
@@ -129,17 +117,11 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
     };
   }, [pagination?.total, suppliers]);
 
-  const selectedBranchCode = useMemo(() => {
-    const selectedLocation = locations.find((location) => Number(location.id) === Number(selectedLocationId));
-    return deriveBranchCodeFromLocation(selectedLocation);
-  }, [locations, selectedLocationId]);
-
   const fetchSuppliers = useCallback(async () => {
     setListLoading(true);
     setListError('');
 
     try {
-      const supplierLocationId = selectedBranchCode ? undefined : (selectedLocationId || undefined);
       const response = await api.get('/business-operations/suppliers', {
         params: {
           page,
@@ -148,8 +130,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
           sortOrder: 'desc',
           search: search || undefined,
           status: statusFilter || undefined,
-          locationId: supplierLocationId,
-          branchCode: selectedBranchCode || undefined,
+          ...scopeParams,
         },
       });
 
@@ -162,7 +143,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
     } finally {
       setListLoading(false);
     }
-  }, [page, search, selectedBranchCode, selectedLocationId, statusFilter]);
+  }, [page, scopeParams, search, statusFilter]);
 
   const fetchSupplierDetail = useCallback(async (supplierId, nextTransactionPage = 1) => {
     if (!supplierId) {
@@ -178,10 +159,9 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
     setTransactionsError('');
 
     try {
-      const transactionLocationId = selectedBranchCode ? undefined : (selectedLocationId || undefined);
       const [supplierResponse, balanceResponse, transactionsResponse] = await Promise.all([
         api.get(`/business-operations/suppliers/${supplierId}`),
-        api.get(`/business-operations/suppliers/${supplierId}/balance`),
+        api.get(`/business-operations/suppliers/${supplierId}/balance`, { params: scopeParams }),
         api.get('/business-operations/suppliers/transactions/list', {
           params: {
             supplierId,
@@ -189,7 +169,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
             pageSize: 12,
             sortBy: 'transactionDate',
             sortOrder: 'desc',
-            locationId: transactionLocationId,
+            ...scopeParams,
           },
         }),
       ]);
@@ -209,7 +189,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
       setDetailLoading(false);
       setTransactionsLoading(false);
     }
-  }, [selectedBranchCode, selectedLocationId]);
+  }, [scopeParams]);
 
   const refreshData = useCallback(async ({ selectedId = selectedSupplierId, nextTransactionPage = transactionPage } = {}) => {
     await fetchSuppliers();
@@ -224,7 +204,10 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
 
   useEffect(() => {
     setPage(1);
-  }, [search, selectedLocationId, statusFilter]);
+    setTransactionPage(1);
+    setSelectedSupplierId(null);
+    setDetailState(INITIAL_DETAIL_STATE);
+  }, [search, statusFilter, effectiveBranchCode, effectiveLocationCode, selectedLocationId]);
 
   useEffect(() => {
     setTransactionPage(1);
@@ -262,9 +245,17 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
     setSupplierFormError('');
 
     try {
+      const scopedPayload = {
+        ...payload,
+        branchCode: payload.branchCode || effectiveBranchCode || undefined,
+        locationCode: payload.locationCode || effectiveLocationCode || undefined,
+        locationName: payload.locationName || selectedLocationName || scopeLabel || undefined,
+        locationId: payload.locationId ?? selectedLocationId ?? undefined,
+      };
+
       const response = supplierModalState.supplier
-        ? await api.put(`/business-operations/suppliers/${supplierModalState.supplier.id}`, { ...payload, locationId: payload.locationId ?? selectedLocationId ?? undefined })
-        : await api.post('/business-operations/suppliers', { ...payload, locationId: payload.locationId ?? selectedLocationId ?? undefined });
+        ? await api.put(`/business-operations/suppliers/${supplierModalState.supplier.id}`, scopedPayload)
+        : await api.post('/business-operations/suppliers', scopedPayload);
 
       const savedSupplier = response.data?.data || null;
       setSupplierModalState({ open: false, supplier: null });
@@ -287,9 +278,17 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
     setTransactionFormError('');
 
     try {
+      const scopedPayload = {
+        ...payload,
+        branchCode: payload.branchCode || effectiveBranchCode || undefined,
+        locationCode: payload.locationCode || effectiveLocationCode || undefined,
+        locationName: payload.locationName || selectedLocationName || scopeLabel || undefined,
+        locationId: payload.locationId ?? selectedLocationId ?? undefined,
+      };
+
       await (transactionModalState.transaction
-        ? api.put(`/business-operations/suppliers/transactions/${transactionModalState.transaction.id}`, { ...payload, locationId: payload.locationId ?? selectedLocationId ?? undefined })
-        : api.post('/business-operations/suppliers/transactions', { ...payload, locationId: payload.locationId ?? selectedLocationId ?? undefined }));
+        ? api.put(`/business-operations/suppliers/transactions/${transactionModalState.transaction.id}`, scopedPayload)
+        : api.post('/business-operations/suppliers/transactions', scopedPayload));
 
       setTransactionModalState({ open: false, transaction: null });
       setTransactionPage(1);
@@ -359,6 +358,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
 
   const handleSyncSupplierToBranch = async (supplier, branchCode) => {
     if (!supplier?.id || !branchCode) return;
+
     const key = `${supplier.id}:${branchCode}`;
     setSyncingBranches((current) => ({ ...current, [key]: true }));
 
@@ -394,6 +394,13 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
     if (format === 'pdf') setExportingPdf(true);
 
     try {
+      const scopedFilters = {
+        search,
+        status: statusFilter,
+        supplierId: selectedSupplierId,
+        ...scopeParams,
+      };
+
       if (format === 'pdf') {
         exportSuppliersPdf({
           suppliers,
@@ -403,6 +410,9 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
           search,
           statusFilter,
           selectedLocationId,
+          selectedBranchCode: effectiveBranchCode,
+          selectedLocationCode: effectiveLocationCode,
+          selectedLocationName: scopeLabel,
         });
         return;
       }
@@ -411,12 +421,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
         format,
         module: 'suppliers',
         type: 'all',
-        filters: {
-          search,
-          status: statusFilter,
-          supplierId: selectedSupplierId,
-          locationId: selectedLocationId,
-        },
+        filters: scopedFilters,
       });
     } catch (error) {
       const message = error?.response?.data?.error || `Failed to export ${format.toUpperCase()} report.`;
@@ -435,7 +440,14 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
       || isSupplierProfileModalOpen
       || isSupplierTransactionsModalOpen
     ) return;
-    const handler = (event) => { if (event.key === 'Escape') { setIsSuppliersWorkspaceModalOpen(false); setIsSuppliersWorkspaceMaximized(false); } };
+
+    const handler = (event) => {
+      if (event.key === 'Escape') {
+        setIsSuppliersWorkspaceModalOpen(false);
+        setIsSuppliersWorkspaceMaximized(false);
+      }
+    };
+
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [
@@ -448,24 +460,28 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
 
   useEffect(() => {
     if (!isSupplierProfileModalOpen || supplierModalState.open || transactionModalState.open) return;
+
     const handler = (event) => {
       if (event.key === 'Escape') {
         setIsSupplierProfileModalOpen(false);
         setIsSupplierProfileModalMaximized(false);
       }
     };
+
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [isSupplierProfileModalOpen, supplierModalState.open, transactionModalState.open]);
 
   useEffect(() => {
     if (!isSupplierTransactionsModalOpen || supplierModalState.open || transactionModalState.open) return;
+
     const handler = (event) => {
       if (event.key === 'Escape') {
         setIsSupplierTransactionsModalOpen(false);
         setIsSupplierTransactionsModalMaximized(false);
       }
     };
+
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [isSupplierTransactionsModalOpen, supplierModalState.open, transactionModalState.open]);
@@ -478,18 +494,25 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
             <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Total Suppliers</div>
             <div style={{ marginTop: '0.35rem', fontSize: '1.46rem', lineHeight: 1.1, fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap' }}>{totals.totalSuppliers.toLocaleString('en-US')}</div>
           </div>
+
           <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
             <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Active On Page</div>
             <div style={{ marginTop: '0.35rem', fontSize: '1.46rem', lineHeight: 1.1, fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap' }}>{totals.activeSuppliers.toLocaleString('en-US')}</div>
           </div>
+
           <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
             <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>{pageBalanceMeta.label}</div>
             <div style={{ marginTop: '0.35rem', fontSize: '1.32rem', lineHeight: 1.1, fontWeight: 800, color: pageBalanceMeta.color, whiteSpace: 'nowrap' }}>{pageBalanceMeta.amount}</div>
           </div>
+
           <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
             <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>{selectedBalanceMeta.label}</div>
             <div style={{ marginTop: '0.35rem', fontSize: '1.32rem', lineHeight: 1.1, fontWeight: 800, color: selectedBalanceMeta.color, whiteSpace: 'nowrap' }}>{selectedBalanceMeta.amount}</div>
           </div>
+        </div>
+
+        <div style={{ marginTop: '0.75rem', color: '#64748b', fontSize: '0.86rem', fontWeight: 700 }}>
+          Scope: {scopeLabel}
         </div>
       </div>
 
@@ -498,6 +521,7 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
           <div>
             <strong style={{ color: '#0f172a' }}>Supplier Workspaces</strong>
           </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '0.75rem' }}>
             <button
               type="button"
@@ -535,97 +559,61 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', flexWrap: 'wrap' }}>
                   <div>
                     <h2 style={{ margin: 0, color: '#0f172a', fontSize: '1.15rem', fontWeight: 800 }}>Suppliers Workspace</h2>
+                    <p style={{ margin: '0.25rem 0 0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>Scope: {scopeLabel}</p>
                   </div>
-                  <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <button
-                    type="button"
-                    onClick={openCreateSupplier}
-                    style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
-                  >
-                    <i className="fas fa-plus" style={{ marginRight: '0.42rem' }}></i>
-                    Add New Supplier
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowFilters((prev) => !prev)}
-                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
-                  >
-                    <i className="fas fa-sliders" style={{ marginRight: '0.42rem' }}></i>
-                    {showFilters ? 'Hide Filters' : 'Show Filters'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => refreshData({ selectedId: selectedSupplierId, nextTransactionPage: transactionPage })}
-                    disabled={listLoading || detailLoading || transactionsLoading}
-                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}
-                  >
-                    <i className={`fas ${(listLoading || detailLoading || transactionsLoading) ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`} style={{ marginRight: '0.42rem' }}></i>
-                    Refresh
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleExport('pdf')}
-                    disabled={exportingExcel || exportingPdf}
-                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}
-                  >
-                    <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.42rem' }}></i>
-                    Export PDF
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleExport('excel')}
-                    disabled={exportingExcel || exportingPdf}
-                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}
-                  >
-                    <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.42rem' }}></i>
-                    Export Excel
-                  </button>
-                  <button
-                    type="button"
-                    title={isSuppliersWorkspaceMaximized ? 'Restore' : 'Maximize'}
-                    aria-label={isSuppliersWorkspaceMaximized ? 'Restore workspace' : 'Maximize workspace'}
-                    onClick={() => setIsSuppliersWorkspaceMaximized((prev) => !prev)}
-                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
-                  >
-                    <i className={`fas ${isSuppliersWorkspaceMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
-                  </button>
-                  <button
-                    type="button"
-                    title="Close"
-                    aria-label="Close workspace"
-                    onClick={() => { setIsSuppliersWorkspaceModalOpen(false); setIsSuppliersWorkspaceMaximized(false); }}
-                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
-                  >
-                    <i className="fas fa-times" />
-                  </button>
-                </div>
-              </div>
 
-              {showFilters && (
-                <div style={{ marginTop: '0.2rem', display: 'flex', gap: '0.65rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                    <div style={{ flex: '1 1 280px', position: 'relative' }}>
-                      <i className="fas fa-search" style={{ position: 'absolute', top: '50%', left: '0.95rem', transform: 'translateY(-50%)', color: '#94a3b8' }}></i>
-                      <input
-                        type="text"
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                        placeholder="Search by supplier name, code, contact, phone, or email"
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '0.78rem 0.9rem 0.78rem 2.5rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc' }}
-                      />
-                    </div>
-                    <select
-                      value={statusFilter}
-                      onChange={(event) => setStatusFilter(event.target.value)}
-                      style={{ minWidth: '140px', padding: '0.78rem 0.9rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc' }}
-                    >
-                      <option value="">All statuses</option>
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
+                  <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <button type="button" onClick={openCreateSupplier} style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}>
+                      <i className="fas fa-plus" style={{ marginRight: '0.42rem' }}></i>
+                      Add New Supplier
+                    </button>
+
+                    <button type="button" onClick={() => setShowFilters((prev) => !prev)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}>
+                      <i className="fas fa-sliders" style={{ marginRight: '0.42rem' }}></i>
+                      {showFilters ? 'Hide Filters' : 'Show Filters'}
+                    </button>
+
+                    <button type="button" onClick={() => refreshData({ selectedId: selectedSupplierId, nextTransactionPage: transactionPage })} disabled={listLoading || detailLoading || transactionsLoading} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}>
+                      <i className={`fas ${(listLoading || detailLoading || transactionsLoading) ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`} style={{ marginRight: '0.42rem' }}></i>
+                      Refresh
+                    </button>
+
+                    <button type="button" onClick={() => handleExport('pdf')} disabled={exportingExcel || exportingPdf} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}>
+                      <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.42rem' }}></i>
+                      Export PDF
+                    </button>
+
+                    <button type="button" onClick={() => handleExport('excel')} disabled={exportingExcel || exportingPdf} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.58rem 0.86rem', fontWeight: 700, cursor: exportingExcel || exportingPdf ? 'not-allowed' : 'pointer' }}>
+                      <i className={`fas ${exportingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'}`} style={{ marginRight: '0.42rem' }}></i>
+                      Export Excel
+                    </button>
+
+                    <button type="button" title={isSuppliersWorkspaceMaximized ? 'Restore' : 'Maximize'} onClick={() => setIsSuppliersWorkspaceMaximized((prev) => !prev)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}>
+                      <i className={`fas ${isSuppliersWorkspaceMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
+                    </button>
+
+                    <button type="button" title="Close" onClick={() => { setIsSuppliersWorkspaceModalOpen(false); setIsSuppliersWorkspaceMaximized(false); }} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}>
+                      <i className="fas fa-times" />
+                    </button>
                   </div>
                 </div>
-              )}
+
+                {showFilters && (
+                  <div style={{ marginTop: '0.2rem', display: 'flex', gap: '0.65rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                      <div style={{ flex: '1 1 280px', position: 'relative' }}>
+                        <i className="fas fa-search" style={{ position: 'absolute', top: '50%', left: '0.95rem', transform: 'translateY(-50%)', color: '#94a3b8' }}></i>
+                        <input type="text" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by supplier name, code, contact, phone, or email" style={{ width: '100%', boxSizing: 'border-box', padding: '0.78rem 0.9rem 0.78rem 2.5rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc' }} />
+                      </div>
+
+                      <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} style={{ minWidth: '140px', padding: '0.78rem 0.9rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.9rem', backgroundColor: '#f8fafc' }}>
+                        <option value="">All statuses</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -638,25 +626,18 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
                       Selected: {selectedSupplier ? selectedSupplier.name : 'None'}
                     </span>
                   </div>
+
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <button
-                      type="button"
-                      onClick={openSupplierProfileModal}
-                      disabled={!selectedSupplierId}
-                      style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.5rem 0.8rem', fontWeight: 700, cursor: selectedSupplierId ? 'pointer' : 'not-allowed', opacity: selectedSupplierId ? 1 : 0.65 }}
-                    >
+                    <button type="button" onClick={openSupplierProfileModal} disabled={!selectedSupplierId} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.5rem 0.8rem', fontWeight: 700, cursor: selectedSupplierId ? 'pointer' : 'not-allowed', opacity: selectedSupplierId ? 1 : 0.65 }}>
                       Open Supplier Profile
                     </button>
-                    <button
-                      type="button"
-                      onClick={openSupplierTransactionsModal}
-                      disabled={!selectedSupplierId}
-                      style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.5rem 0.8rem', fontWeight: 700, cursor: selectedSupplierId ? 'pointer' : 'not-allowed', opacity: selectedSupplierId ? 1 : 0.65 }}
-                    >
+
+                    <button type="button" onClick={openSupplierTransactionsModal} disabled={!selectedSupplierId} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.5rem 0.8rem', fontWeight: 700, cursor: selectedSupplierId ? 'pointer' : 'not-allowed', opacity: selectedSupplierId ? 1 : 0.65 }}>
                       Supplier Transactions
                     </button>
                   </div>
                 </div>
+
                 <SuppliersList
                   suppliers={suppliers}
                   loading={listLoading}
@@ -685,27 +666,18 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
                   {selectedSupplier ? `${selectedSupplier.name}${selectedSupplier.supplierCode ? ` · ${selectedSupplier.supplierCode}` : ''}` : 'No supplier selected'}
                 </div>
               </div>
+
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <button
-                  type="button"
-                  title={isSupplierProfileModalMaximized ? 'Restore' : 'Maximize'}
-                  aria-label={isSupplierProfileModalMaximized ? 'Restore supplier profile modal' : 'Maximize supplier profile modal'}
-                  onClick={() => setIsSupplierProfileModalMaximized((prev) => !prev)}
-                  style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
-                >
+                <button type="button" title={isSupplierProfileModalMaximized ? 'Restore' : 'Maximize'} onClick={() => setIsSupplierProfileModalMaximized((prev) => !prev)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}>
                   <i className={`fas ${isSupplierProfileModalMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
                 </button>
-                <button
-                  type="button"
-                  title="Close"
-                  aria-label="Close supplier profile modal"
-                  onClick={() => { setIsSupplierProfileModalOpen(false); setIsSupplierProfileModalMaximized(false); }}
-                  style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
-                >
+
+                <button type="button" title="Close" onClick={() => { setIsSupplierProfileModalOpen(false); setIsSupplierProfileModalMaximized(false); }} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}>
                   <i className="fas fa-times" />
                 </button>
               </div>
             </div>
+
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.9rem' }}>
               <SupplierDetailPanel
                 supplier={selectedSupplier}
@@ -720,7 +692,8 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
                 onTransactionPageChange={setTransactionPage}
                 onEditSupplier={() => openEditSupplier(selectedSupplier)}
                 onAddTransaction={openCreateTransaction}
-                selectedBranchCode={selectedBranchCode}
+                selectedBranchCode={effectiveBranchCode}
+                selectedLocationCode={effectiveLocationCode}
                 syncingBranches={syncingBranches}
                 onSyncPosBranch={(branchCode) => handleSyncSupplierToBranch(selectedSupplier, branchCode)}
                 onEditTransaction={openEditTransaction}
@@ -743,40 +716,30 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
                   {selectedSupplier ? `${selectedSupplier.name}${selectedSupplier.supplierCode ? ` · ${selectedSupplier.supplierCode}` : ''}` : 'No supplier selected'}
                 </div>
               </div>
+
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <button
-                  type="button"
-                  onClick={openCreateTransaction}
-                  style={{ border: 'none', backgroundColor: '#0f766e', color: '#fff', borderRadius: '10px', padding: '0.55rem 0.82rem', fontWeight: 700, cursor: 'pointer' }}
-                >
+                <button type="button" onClick={openCreateTransaction} style={{ border: 'none', backgroundColor: '#0f766e', color: '#fff', borderRadius: '10px', padding: '0.55rem 0.82rem', fontWeight: 700, cursor: 'pointer' }}>
                   Add Transaction
                 </button>
-                <button
-                  type="button"
-                  title={isSupplierTransactionsModalMaximized ? 'Restore' : 'Maximize'}
-                  aria-label={isSupplierTransactionsModalMaximized ? 'Restore supplier transactions modal' : 'Maximize supplier transactions modal'}
-                  onClick={() => setIsSupplierTransactionsModalMaximized((prev) => !prev)}
-                  style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
-                >
+
+                <button type="button" title={isSupplierTransactionsModalMaximized ? 'Restore' : 'Maximize'} onClick={() => setIsSupplierTransactionsModalMaximized((prev) => !prev)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}>
                   <i className={`fas ${isSupplierTransactionsModalMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
                 </button>
-                <button
-                  type="button"
-                  title="Close"
-                  aria-label="Close supplier transactions modal"
-                  onClick={() => { setIsSupplierTransactionsModalOpen(false); setIsSupplierTransactionsModalMaximized(false); }}
-                  style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}
-                >
+
+                <button type="button" title="Close" onClick={() => { setIsSupplierTransactionsModalOpen(false); setIsSupplierTransactionsModalMaximized(false); }} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}>
                   <i className="fas fa-times" />
                 </button>
               </div>
             </div>
+
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.9rem', display: 'grid', gap: '1rem' }}>
               <SupplierBalanceCards summary={selectedSummary} />
+
               <div style={{ border: '1px solid #e2e8f0', borderRadius: '18px', overflow: 'hidden', backgroundColor: '#fff' }}>
                 <div style={{ padding: '1rem 1.05rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
                   <strong style={{ color: '#0f172a' }}>Transaction History</strong>
                 </div>
+
                 <SupplierTransactionTable
                   transactions={detailState.transactions}
                   loading={transactionsLoading}
@@ -784,26 +747,19 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
                   onEditTransaction={openEditTransaction}
                   onDeleteTransaction={handleDeleteTransaction}
                 />
+
                 {detailState.transactionPagination && (detailState.transactionPagination.totalPages || 0) > 1 ? (
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', padding: '0.95rem 1rem', borderTop: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
                     <span style={{ color: '#64748b', fontSize: '0.86rem' }}>
                       Page {detailState.transactionPagination.page || transactionPage} of {detailState.transactionPagination.totalPages || 1} with {(detailState.transactionPagination.total || 0).toLocaleString('en-US')} transactions.
                     </span>
+
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button
-                        type="button"
-                        onClick={() => setTransactionPage(Math.max(1, transactionPage - 1))}
-                        disabled={(detailState.transactionPagination.page || transactionPage) <= 1}
-                        style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.5rem 0.85rem', fontWeight: 700, cursor: 'pointer' }}
-                      >
+                      <button type="button" onClick={() => setTransactionPage(Math.max(1, transactionPage - 1))} disabled={(detailState.transactionPagination.page || transactionPage) <= 1} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.5rem 0.85rem', fontWeight: 700, cursor: 'pointer' }}>
                         Previous
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setTransactionPage(transactionPage + 1)}
-                        disabled={(detailState.transactionPagination.page || transactionPage) >= (detailState.transactionPagination.totalPages || 1)}
-                        style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.5rem 0.85rem', fontWeight: 700, cursor: 'pointer' }}
-                      >
+
+                      <button type="button" onClick={() => setTransactionPage(transactionPage + 1)} disabled={(detailState.transactionPagination.page || transactionPage) >= (detailState.transactionPagination.totalPages || 1)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.5rem 0.85rem', fontWeight: 700, cursor: 'pointer' }}>
                         Next
                       </button>
                     </div>
@@ -819,6 +775,9 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
         isOpen={supplierModalState.open}
         supplier={supplierModalState.supplier}
         selectedLocationId={selectedLocationId}
+        selectedBranchCode={effectiveBranchCode}
+        selectedLocationCode={effectiveLocationCode}
+        selectedLocationName={scopeLabel}
         locations={locations}
         saving={supplierFormSaving}
         error={supplierFormError}
@@ -832,6 +791,9 @@ const SuppliersTab = ({ refreshKey = 0, selectedLocationId = null, locations = [
         supplier={selectedSupplier}
         supplierOptions={supplierOptions}
         selectedLocationId={selectedLocationId}
+        selectedBranchCode={effectiveBranchCode}
+        selectedLocationCode={effectiveLocationCode}
+        selectedLocationName={scopeLabel}
         locations={locations}
         saving={transactionFormSaving}
         error={transactionFormError}

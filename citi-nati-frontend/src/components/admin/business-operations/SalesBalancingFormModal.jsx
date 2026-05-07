@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import api from '../../../utils/api.js';
 
 const fieldStyle = {
@@ -48,6 +48,8 @@ const PAYMENT_FIELDS = [
   { key: 'bankTransferAmount', label: 'M0626 / National Bank / Bank Transfer', icon: 'fa-bank' },
 ];
 
+const normalizeCode = (value) => String(value || '').trim().toUpperCase();
+
 function normalizeAmount(value) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0) return 0;
@@ -64,7 +66,11 @@ const toDateInputValue = (value) => {
   return local.toISOString().slice(0, 10);
 };
 
-const MONEY = (value) => `MWK ${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const MONEY = (value) =>
+  `MWK ${Number(value || 0).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 
 const statusBadgeStyle = (resultStatus) => {
   if (resultStatus === 'shortage') {
@@ -76,8 +82,30 @@ const statusBadgeStyle = (resultStatus) => {
   return { backgroundColor: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0' };
 };
 
-const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedLocationCode, selectedLocationName, saving, error, onClose, onSubmit }) => {
+const SalesBalancingFormModal = ({
+  isOpen,
+  record,
+  selectedLocationId,
+  selectedBranchCode = '',
+  selectedLocationCode = '',
+  selectedLocationName = '',
+  saving,
+  error,
+  onClose,
+  onSubmit,
+}) => {
   const amountInputRefs = useRef(new Map());
+
+  const effectiveBranchCode = useMemo(() => normalizeCode(selectedBranchCode), [selectedBranchCode]);
+  const effectiveLocationCode = useMemo(() => normalizeCode(selectedLocationCode), [selectedLocationCode]);
+
+  const scopeLabel = useMemo(() => {
+    if (selectedLocationName) return selectedLocationName;
+    if (effectiveBranchCode && effectiveLocationCode) return `${effectiveBranchCode} / ${effectiveLocationCode}`;
+    if (effectiveLocationCode) return effectiveLocationCode;
+    return selectedLocationId ? `ID ${selectedLocationId}` : 'Unknown Location';
+  }, [effectiveBranchCode, effectiveLocationCode, selectedLocationId, selectedLocationName]);
+
   const [form, setForm] = useState({
     balancingDate: new Date().toISOString().slice(0, 10),
     referenceTitle: '',
@@ -98,12 +126,16 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
   const [activeAmountKey, setActiveAmountKey] = useState('cashAmount');
   const [loadingExpected, setLoadingExpected] = useState(false);
   const [expectedError, setExpectedError] = useState('');
+
   const isCreateMode = !record;
 
   useEffect(() => {
     if (!isOpen) return;
+
     setValidationError('');
+    setExpectedError('');
     setActiveAmountKey('cashAmount');
+
     if (record) {
       setForm({
         balancingDate: toDateInputValue(record.balancingDate) || new Date().toISOString().slice(0, 10),
@@ -141,36 +173,43 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
 
   useEffect(() => {
     if (!isOpen) return;
-    const handler = (event) => { if (event.key === 'Escape') onClose(); };
+
+    const handler = (event) => {
+      if (event.key === 'Escape') onClose();
+    };
+
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [isOpen, onClose]);
 
   useEffect(() => {
-    if (!isOpen || !selectedLocationId || !form.balancingDate) return;
+    if (!isOpen || !form.balancingDate || !effectiveBranchCode || !effectiveLocationCode) return;
 
     let cancelled = false;
+
     const loadExpectedSales = async () => {
       setLoadingExpected(true);
       setExpectedError('');
+
       try {
         const response = await api.get('/business-operations/sales-balancing/expected', {
           params: {
-            locationId: selectedLocationId,
+            branchCode: effectiveBranchCode,
+            locationCode: effectiveLocationCode,
             balancingDate: form.balancingDate,
+            locationId: selectedLocationId || undefined,
           },
         });
 
         if (cancelled) return;
+
         const expectedSystemSales = Number(response?.data?.data?.expectedSystemSales || 0);
         setForm((prev) => ({ ...prev, expectedSystemSales: normalizeAmount(expectedSystemSales) }));
       } catch (err) {
         if (cancelled) return;
-        setExpectedError(err?.response?.data?.error || 'Could not refresh expected system sales for this date/location.');
+        setExpectedError(err?.response?.data?.error || 'Could not refresh expected system sales for this branch/location.');
       } finally {
-        if (!cancelled) {
-          setLoadingExpected(false);
-        }
+        if (!cancelled) setLoadingExpected(false);
       }
     };
 
@@ -179,11 +218,12 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
     return () => {
       cancelled = true;
     };
-  }, [form.balancingDate, isOpen, selectedLocationId]);
+  }, [effectiveBranchCode, effectiveLocationCode, form.balancingDate, isOpen, selectedLocationId]);
 
   if (!isOpen) return null;
 
   const set = (key) => (event) => setForm((prev) => ({ ...prev, [key]: event.target.value }));
+
   const setAmount = (key) => (event) => {
     const val = event.target.value;
     setForm((prev) => ({ ...prev, [key]: val === '' ? 0 : normalizeAmount(val) }));
@@ -192,12 +232,15 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
   const handleAmountKeyDown = (fieldKey) => (event) => {
     if (event.key !== 'Enter') return;
     event.preventDefault();
+
     const currentIndex = PAYMENT_FIELDS.findIndex((field) => field.key === fieldKey);
     const nextField = PAYMENT_FIELDS[currentIndex + 1];
+
     if (!nextField) {
       event.currentTarget.select();
       return;
     }
+
     const nextInput = amountInputRefs.current.get(nextField.key);
     if (nextInput) {
       nextInput.focus();
@@ -212,11 +255,14 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
 
   const handleSubmit = (event) => {
     event.preventDefault();
+
     if (!form.balancingDate) {
       setValidationError('Balancing date is required.');
       return;
     }
+
     setValidationError('');
+
     onSubmit({
       balancingDate: form.balancingDate,
       referenceTitle: form.referenceTitle.trim() || null,
@@ -240,7 +286,6 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 220, display: 'grid', placeItems: 'center', padding: '1rem', overflowY: 'auto' }}>
       <div style={{ width: 'min(900px, 100%)', maxHeight: '95vh', overflowY: 'auto', backgroundColor: '#fff', borderRadius: '22px', border: '1px solid #e2e8f0', boxShadow: '0 24px 60px rgba(15, 23, 42, 0.22)' }}>
-        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', padding: '1.2rem 1.3rem', borderBottom: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#5B4B8A', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -248,9 +293,10 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
             </div>
             <h3 style={{ margin: '0.3rem 0 0', color: '#0f172a' }}>{title}</h3>
             <p style={{ margin: '0.2rem 0 0', color: '#64748b', fontSize: '0.85rem' }}>
-              Branch: {selectedLocationName || selectedLocationCode || `ID ${selectedLocationId}`}
+              Branch / Location: {scopeLabel}
             </p>
           </div>
+
           <button
             type="button"
             onClick={onClose}
@@ -261,7 +307,6 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
           </button>
         </div>
 
-        {/* Error Alert */}
         {displayError && (
           <div style={{ margin: '1rem 1.3rem 0', padding: '0.9rem 1rem', backgroundColor: '#fef2f2', color: '#b91c1c', borderRadius: '12px', border: '1px solid #fecaca', fontSize: '0.9rem' }}>
             {displayError}
@@ -269,9 +314,11 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
         )}
 
         <form onSubmit={handleSubmit} style={{ padding: '1.3rem', display: 'grid', gap: '1.2rem' }}>
-          {/* Context Section */}
           <div>
-            <h4 style={{ margin: 0, color: '#334155', fontSize: '0.95rem', fontWeight: 800, marginBottom: '0.75rem' }}>Balancing Context</h4>
+            <h4 style={{ margin: 0, color: '#334155', fontSize: '0.95rem', fontWeight: 800, marginBottom: '0.75rem' }}>
+              Balancing Context
+            </h4>
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.9rem' }}>
               <div>
                 <label style={labelStyle}>
@@ -279,14 +326,17 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
                 </label>
                 <input type="date" value={form.balancingDate} onChange={set('balancingDate')} style={fieldStyle} />
               </div>
+
               <div>
                 <label style={labelStyle}>Reference / Title</label>
                 <input value={form.referenceTitle} onChange={set('referenceTitle')} placeholder="e.g., EOD Reconciliation" style={fieldStyle} />
               </div>
+
               <div>
                 <label style={labelStyle}>Prepared By</label>
                 <input value={form.preparedBy} onChange={set('preparedBy')} placeholder="Operator name" style={fieldStyle} />
               </div>
+
               <div>
                 <label style={labelStyle}>Cashier / Session Ref</label>
                 <input value={form.cashierReference} onChange={set('cashierReference')} placeholder="Cashier, shift, till" style={fieldStyle} />
@@ -294,12 +344,12 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
             </div>
           </div>
 
-          {/* Payment Methods Section */}
           <div>
             <h4 style={{ margin: 0, color: '#334155', fontSize: '0.95rem', fontWeight: 800, marginBottom: '0.75rem' }}>
               <i className="fas fa-money-bill-wave" style={{ marginRight: '0.35rem' }}></i>
               Payment Method Totals
             </h4>
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.9rem' }}>
               {PAYMENT_FIELDS.map((field) => (
                 <div
@@ -317,15 +367,13 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
                     <i className={`fas ${field.icon}`} style={{ marginRight: '0.35rem', color: '#5B4B8A' }}></i>
                     {field.label}
                   </label>
+
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
                     <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#5B4B8A', letterSpacing: '0.08em' }}>MWK</span>
                     <input
                       ref={(element) => {
-                        if (element) {
-                          amountInputRefs.current.set(field.key, element);
-                        } else {
-                          amountInputRefs.current.delete(field.key);
-                        }
+                        if (element) amountInputRefs.current.set(field.key, element);
+                        else amountInputRefs.current.delete(field.key);
                       }}
                       type="number"
                       min="0"
@@ -355,29 +403,37 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
             </div>
           </div>
 
-          {/* Emergency Expenses Section */}
           <div>
             <h4 style={{ margin: 0, color: '#334155', fontSize: '0.95rem', fontWeight: 800, marginBottom: '0.75rem' }}>
               <i className="fas fa-exclamation-circle" style={{ marginRight: '0.35rem' }}></i>
               Emergency Expenses
             </h4>
+
             <p style={{ margin: '0 0 0.75rem', color: '#64748b', fontSize: '0.85rem' }}>
-              Expenses from the day's operations that would have been part of sales if not spent (e.g., repairs, utilities paid from cash).
+              Expenses from the day's operations that would have been part of sales if not spent.
             </p>
-            <div style={{ ...amountCardStyle, borderColor: activeAmountKey === 'emergencyExpensesAmount' ? '#8f94c9' : '#dbe3f0', boxShadow: activeAmountKey === 'emergencyExpensesAmount' ? '0 0 0 3px rgba(143, 148, 201, 0.16), inset 0 1px 0 rgba(255,255,255,0.92)' : amountCardStyle.boxShadow, backgroundColor: activeAmountKey === 'emergencyExpensesAmount' ? '#eef2ff' : amountCardStyle.backgroundColor }}>
+
+            <div
+              style={{
+                ...amountCardStyle,
+                borderColor: activeAmountKey === 'emergencyExpensesAmount' ? '#8f94c9' : '#dbe3f0',
+                boxShadow: activeAmountKey === 'emergencyExpensesAmount'
+                  ? '0 0 0 3px rgba(143, 148, 201, 0.16), inset 0 1px 0 rgba(255,255,255,0.92)'
+                  : amountCardStyle.boxShadow,
+                backgroundColor: activeAmountKey === 'emergencyExpensesAmount' ? '#eef2ff' : amountCardStyle.backgroundColor,
+              }}
+            >
               <label style={labelStyle}>
                 <i className="fas fa-exclamation-triangle" style={{ marginRight: '0.35rem', color: '#c2410c' }}></i>
                 Emergency Expenses (contributed to total)
               </label>
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
                 <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#5B4B8A', letterSpacing: '0.08em' }}>MWK</span>
                 <input
                   ref={(element) => {
-                    if (element) {
-                      amountInputRefs.current.set('emergencyExpensesAmount', element);
-                    } else {
-                      amountInputRefs.current.delete('emergencyExpensesAmount');
-                    }
+                    if (element) amountInputRefs.current.set('emergencyExpensesAmount', element);
+                    else amountInputRefs.current.delete('emergencyExpensesAmount');
                   }}
                   type="number"
                   min="0"
@@ -394,41 +450,62 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
                   style={{
                     ...amountInputStyle,
                     borderColor: activeAmountKey === 'emergencyExpensesAmount' ? '#8f94c9' : '#cbd5e1',
-                    background: activeAmountKey === 'emergencyExpensesAmount' ? 'linear-gradient(180deg, #ffffff 0%, #eef2ff 100%)' : amountInputStyle.background,
+                    background: activeAmountKey === 'emergencyExpensesAmount'
+                      ? 'linear-gradient(180deg, #ffffff 0%, #eef2ff 100%)'
+                      : amountInputStyle.background,
                   }}
                 />
               </div>
             </div>
           </div>
 
-          {/* Summary Section */}
           <div style={{ backgroundColor: '#f8fafc', borderRadius: '14px', padding: '1rem', border: '1px solid #e2e8f0' }}>
-            <h4 style={{ margin: '0 0 0.75rem', color: '#334155', fontSize: '0.95rem', fontWeight: 800 }}>Calculation Summary</h4>
+            <h4 style={{ margin: '0 0 0.75rem', color: '#334155', fontSize: '0.95rem', fontWeight: 800 }}>
+              Calculation Summary
+            </h4>
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.8rem' }}>
               <div>
                 <div style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800, marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <span>Expected System Sales</span>
                   {loadingExpected && <i className="fas fa-spinner fa-spin" style={{ fontSize: '0.72rem' }}></i>}
                 </div>
+
                 <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>{MONEY(form.expectedSystemSales)}</div>
+
                 {!loadingExpected && expectedError && (
                   <div style={{ marginTop: '0.25rem', color: '#b45309', fontSize: '0.72rem', lineHeight: 1.35 }}>
                     {expectedError}
                   </div>
                 )}
               </div>
+
               <div>
-                <div style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800, marginBottom: '0.3rem' }}>Total Actual Entered</div>
-                <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginBottom: '0.2rem' }}>Payment Methods: {MONEY(paymentMethodsTotal)}</div>
-                <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginBottom: '0.3rem' }}>+ Emergency Expenses: {MONEY(form.emergencyExpensesAmount)}</div>
+                <div style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800, marginBottom: '0.3rem' }}>
+                  Total Actual Entered
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginBottom: '0.2rem' }}>
+                  Payment Methods: {MONEY(paymentMethodsTotal)}
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginBottom: '0.3rem' }}>
+                  + Emergency Expenses: {MONEY(form.emergencyExpensesAmount)}
+                </div>
                 <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>{MONEY(totalActual)}</div>
               </div>
+
               <div>
-                <div style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800, marginBottom: '0.3rem' }}>Difference</div>
-                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: resultStatus === 'balanced' ? '#166534' : resultStatus === 'shortage' ? '#b91c1c' : '#c2410c' }}>{MONEY(difference)}</div>
+                <div style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800, marginBottom: '0.3rem' }}>
+                  Difference
+                </div>
+                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: resultStatus === 'balanced' ? '#166534' : resultStatus === 'shortage' ? '#b91c1c' : '#c2410c' }}>
+                  {MONEY(difference)}
+                </div>
               </div>
+
               <div>
-                <div style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800, marginBottom: '0.3rem' }}>Result</div>
+                <div style={{ color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 800, marginBottom: '0.3rem' }}>
+                  Result
+                </div>
                 <span style={{ display: 'inline-flex', borderRadius: '999px', padding: '0.4rem 0.75rem', fontWeight: 800, fontSize: '0.82rem', ...statusBadgeStyle(resultStatus) }}>
                   {resultStatus === 'balanced' ? '✓ Balanced' : resultStatus === 'shortage' ? '⚠ Shortage' : '◆ Overage'}
                 </span>
@@ -436,9 +513,10 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
             </div>
           </div>
 
-          {/* Notes Section */}
           <div>
-            <h4 style={{ margin: 0, color: '#334155', fontSize: '0.95rem', fontWeight: 800, marginBottom: '0.5rem' }}>Notes & Comments</h4>
+            <h4 style={{ margin: 0, color: '#334155', fontSize: '0.95rem', fontWeight: 800, marginBottom: '0.5rem' }}>
+              Notes & Comments
+            </h4>
             <textarea
               value={form.notes}
               onChange={set('notes')}
@@ -448,7 +526,6 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
             />
           </div>
 
-          {/* Footer Actions */}
           <div style={{ display: 'flex', gap: '0.65rem', justifyContent: 'flex-end', paddingTop: '0.5rem', borderTop: '1px solid #e2e8f0' }}>
             <button
               type="button"
@@ -458,6 +535,7 @@ const SalesBalancingFormModal = ({ isOpen, record, selectedLocationId, selectedL
             >
               Cancel
             </button>
+
             <button
               type="submit"
               disabled={saving}
