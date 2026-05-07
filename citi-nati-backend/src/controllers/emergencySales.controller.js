@@ -688,42 +688,22 @@ async function lookupEmergencyProducts(req, res) {
       return res.status(200).json({ success: true, products: cachedProducts });
     }
 
-    const isZombaScope = branchCode === 'ZOMBA';
-    const isBlantyreScope = branchCode === 'BLANTYRE';
-    let scopedProductCodes = null;
+    console.log('[PRODUCT QUERY]', {
+      view: 'Emergency sale product search',
+      uiLocation: req.query.locationCode || req.query.branchCode || '(none)',
+      selectedLocation: locationCode,
+      resolvedStockLocation: locationCode,
+      branchCode,
+      locationCode,
+      querySource: 'LocationSpecificPersistedProductStock',
+    });
 
-    if (isZombaScope || isBlantyreScope) {
-      console.log('[PRODUCT QUERY]', {
-        view: 'Emergency sale product search',
-        uiLocation: req.query.locationCode || req.query.branchCode || '(none)',
-        selectedLocation: locationCode,
-        resolvedStockLocation: locationCode,
-        branchCode,
-        locationCode,
-        querySource: 'LocationSpecificPersistedProductStock',
-      });
-    } else {
-      scopedProductCodes = await resolveLocationScopedProductCodes(locationCode);
-      if (!scopedProductCodes || scopedProductCodes.length === 0) {
-        return res.status(200).json({ success: true, products: [] });
-      }
-      console.log('[PRODUCT QUERY]', {
-        uiLocation: req.query.locationCode || req.query.branchCode || '(none)',
-        branchCode,
-        locationCode,
-      });
-    }
-
-    const baseWhere = {
+   const baseWhere = {
       enabled: true,
-      branchCode: branchCode,
-      ...((isZombaScope || isBlantyreScope)
-  ? {
+      branchCode,
       locationCode: { equals: locationCode, mode: 'insensitive' },
       sourceCode: { not: null },
       price: { gt: 0 },
-    }
-  : { sourceCode: { in: scopedProductCodes } }),
     };
 
     // Single combined query: exact matches (barcode/sourceCode) + contains matches (name/barcode/sourceCode).
