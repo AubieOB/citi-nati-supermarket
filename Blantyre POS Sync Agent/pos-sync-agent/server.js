@@ -2093,10 +2093,12 @@ async function pollAndProcessEmergencySales() {
       try {
         const resultSummary = await writeEmergencySaleToPos(sale);
 
-        await commandQueueClient.ackEmergencySaleSynced({
+       await commandQueueClient.ackEmergencySaleSynced({
           sale_ref: sale.sale_ref,
           emergency_sale_id: sale.emergency_sale_id,
           pos_invoice_no: resultSummary?.invoiceCode || null,
+          branchCode: BRANCH_CODE,
+          locationCode: appConfig.posDb.locationCode,
         });
 
         console.log('[EMERGENCY SALES] sync success:', {
@@ -2116,6 +2118,8 @@ async function pollAndProcessEmergencySales() {
           sale_ref: sale.sale_ref,
           emergency_sale_id: sale.emergency_sale_id,
           sync_error: error.message,
+          branchCode: BRANCH_CODE,
+          locationCode: appConfig.posDb.locationCode,
         });
       }
     }
