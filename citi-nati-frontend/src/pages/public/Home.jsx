@@ -7,6 +7,7 @@ import api from '../../utils/api.js';
 import '../../styles/global.css';
 
 const STOREFRONT_LOCATION_CODE = String(import.meta.env.VITE_STOREFRONT_LOCATION_CODE || 'SH').trim().toUpperCase();
+const STOREFRONT_BRANCH_CODE = String(import.meta.env.VITE_STOREFRONT_BRANCH_CODE || 'BLANTYRE').trim().toUpperCase();
 
 const Home = () => {
   useEffect(() => {
@@ -27,6 +28,7 @@ const Home = () => {
           params: {
             page: 1,
             pageSize: 20,
+            branchCode: STOREFRONT_BRANCH_CODE,
             locationCode: STOREFRONT_LOCATION_CODE,
           },
         });

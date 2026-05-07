@@ -190,6 +190,7 @@ Each variable includes:
 | `VITE_ENABLE_DARK_MODE` | UI feature flag if used in presentation logic. | `false` | No |
 | `VITE_POS_AGENT_URL` | POS agent URL referenced by current frontend utility code. | `http://localhost:3001` | No |
 | `VITE_POS_SECRET` | POS secret referenced by current frontend utility code. Avoid exposing this in public production builds unless the feature is strictly internal and network-controlled. | `replace-with-agent-secret` | No |
+| `VITE_STOREFRONT_BRANCH_CODE` | Storefront default branch scope for ambiguous locations such as `SH`. | `BLANTYRE` | Recommended |
 | `VITE_STOREFRONT_LOCATION_CODE` | Storefront default location scope. | `BT` | Recommended |
 
 ## POS Agent Variables

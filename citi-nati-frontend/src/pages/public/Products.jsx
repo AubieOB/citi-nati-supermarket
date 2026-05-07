@@ -15,6 +15,7 @@ import { useModal } from '../../hooks/useModal.js';
 import '../../styles/global.css';
 
 const STOREFRONT_LOCATION_CODE = String(import.meta.env.VITE_STOREFRONT_LOCATION_CODE || 'SH').trim().toUpperCase();
+const STOREFRONT_BRANCH_CODE = String(import.meta.env.VITE_STOREFRONT_BRANCH_CODE || 'BLANTYRE').trim().toUpperCase();
 const PRODUCTS_CACHE_BACKGROUND_REFRESH_COOLDOWN_MS = 12000;
 
 /**
@@ -147,6 +148,7 @@ const Products = () => {
           params.append('page', '1');
           params.append('pageSize', pageSize);
           params.append('search', query);
+          params.append('branchCode', STOREFRONT_BRANCH_CODE);
           params.append('locationCode', STOREFRONT_LOCATION_CODE);
           if (selectedCategorySearchRef.current) params.append('category', selectedCategorySearchRef.current);
           if (onSaleOnlyRef.current) params.append('onSale', 'true');
@@ -248,13 +250,14 @@ const Products = () => {
       }
 
       const params = new URLSearchParams();
-    params.append('limit', requestLimit);
+      params.append('limit', requestLimit);
       params.append('offset', currentOffset);
+      params.append('branchCode', STOREFRONT_BRANCH_CODE);
       params.append('locationCode', STOREFRONT_LOCATION_CODE);
       if (effectiveCategory) params.append('category', effectiveCategory);
       if (effectiveOnSaleOnly) params.append('onSale', 'true');
 
-    console.log(`[PRODUCTS FETCH] ${isLoadMore ? 'Load More' : silent ? 'Background Refresh' : 'Initial'} | Offset: ${currentOffset} | Limit: ${requestLimit} | Category: ${effectiveCategory || 'all'} | OnSale: ${effectiveOnSaleOnly}`);
+      console.log(`[PRODUCTS FETCH] ${isLoadMore ? 'Load More' : silent ? 'Background Refresh' : 'Initial'} | Offset: ${currentOffset} | Limit: ${requestLimit} | Category: ${effectiveCategory || 'all'} | OnSale: ${effectiveOnSaleOnly}`);
       
       const response = await api.get(`/products?${params.toString()}`);
       const data = response.data;
@@ -340,7 +343,7 @@ const Products = () => {
       try {
         const response = await api.get('/products/categories', {
           params: {
-            branchCode: 'BLANTYRE',
+            branchCode: STOREFRONT_BRANCH_CODE,
             locationCode: STOREFRONT_LOCATION_CODE,
           },
         });
@@ -419,6 +422,7 @@ const Products = () => {
           params: {
             page: 1,
             pageSize: 1,
+            branchCode: STOREFRONT_BRANCH_CODE,
             locationCode: STOREFRONT_LOCATION_CODE,
           }
         });
@@ -628,7 +632,11 @@ const Products = () => {
 
       const handlePromotionUpdated = (promotion) => {
         const promotionLocationCode = String(promotion?.locationCode || '').trim().toUpperCase();
+        const promotionBranchCode = String(promotion?.branchCode || '').trim().toUpperCase();
         if (promotionLocationCode && promotionLocationCode !== STOREFRONT_LOCATION_CODE) {
+          return;
+        }
+        if (promotionBranchCode && promotionBranchCode !== STOREFRONT_BRANCH_CODE) {
           return;
         }
         console.log('[PRODUCTS] 🎯 Promotion updated:', promotion.type);

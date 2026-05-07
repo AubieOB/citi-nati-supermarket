@@ -123,6 +123,8 @@ const AdminBusinessOperations = ({ selectedLocationCode, selectedBranchCode }) =
     ) || null;
   }, [selectedLocationCode, selectedBranchCode]);
 
+  // NOTE: selectedLocationId is legacy compatibility for older BO APIs.
+  // Canonical business operations filtering uses selectedBranchCode + selectedLocationCode.
   const selectedLocationId = selectedLocation?.id || null;
   const selectedLocationCodeValue = selectedLocation?.code || selectedLocationCode || '';
   const selectedLocationName = selectedLocation?.name || `${selectedBranchCode || 'Unknown'} ${selectedLocationCode || 'Unknown'}`;

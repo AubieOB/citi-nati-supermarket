@@ -3,6 +3,7 @@ import { getSocket } from '../../utils/socket.js';
 import api from '../../utils/api.js';
 
 const STOREFRONT_LOCATION_CODE = String(import.meta.env.VITE_STOREFRONT_LOCATION_CODE || 'SH').trim().toUpperCase();
+const STOREFRONT_BRANCH_CODE = String(import.meta.env.VITE_STOREFRONT_BRANCH_CODE || 'BLANTYRE').trim().toUpperCase();
 
 /**
  * 🎉 PROMOTION BANNER
@@ -56,6 +57,14 @@ const PromotionBanner = ({ category = null }) => {
       }
 
       if (activePromotion) {
+        const promotionBranchCode = String(activePromotion?.branchCode || '').trim().toUpperCase();
+        if (promotionBranchCode && promotionBranchCode !== STOREFRONT_BRANCH_CODE) {
+          activePromotion = null;
+          activeType = null;
+        }
+      }
+
+      if (activePromotion) {
         setPromotion(activePromotion);
         setPromotionType(activeType);
         // Reset dismissed state when promotion changes
@@ -101,7 +110,11 @@ const PromotionBanner = ({ category = null }) => {
 
       const handlePromotionUpdated = (promotionData) => {
         const promotionLocationCode = String(promotionData?.locationCode || '').trim().toUpperCase();
+        const promotionBranchCode = String(promotionData?.branchCode || '').trim().toUpperCase();
         if (promotionLocationCode && promotionLocationCode !== STOREFRONT_LOCATION_CODE) {
+          return;
+        }
+        if (promotionBranchCode && promotionBranchCode !== STOREFRONT_BRANCH_CODE) {
           return;
         }
         console.log('[PromotionBanner] 🎯 Promotion updated:', promotionData.type, 'enabled:', promotionData.enabled);
