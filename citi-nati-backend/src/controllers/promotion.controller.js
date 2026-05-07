@@ -15,7 +15,13 @@ const {
 } = require('../utils/operationalScope');
 const prisma = new PrismaClient();
 
-const ZOMBA_LOCATION_CODES = ['ZA'].concat(CORE_ZOMBA_LOCATION_CODES);
+const ZOMBA_LOCATION_CODES = Array.from(new Set([
+  'ZA',
+  'SH',
+  'BAR',
+  'ST999',
+  ...CORE_ZOMBA_LOCATION_CODES,
+]));
 const POS_DEFAULT_LOCATION_CODE = process.env.POS_LOCATION_CODE || 'BT';
 const POS_DEFAULT_PRICE_TYPE_CODE = process.env.POS_PRICE_TYPE_CODE || 'RT';
 const POS_PROMO_REASON_CODE = 'WEBSITE_PROMOTION';
