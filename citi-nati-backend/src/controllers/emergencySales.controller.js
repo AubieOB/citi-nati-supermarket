@@ -73,7 +73,7 @@ function getDefaultAgentLocationCode(branchCode, requestedLocationCode) {
 }
 
 function getBranchNameFromLocationCode(locationCode) {
-  if (locationCode === 'BT') return 'Blantyre';
+  if (locationCode === 'BT' || locationCode === 'SH') return 'Blantyre';
   if (isZombaLocationCode(locationCode)) return 'Zomba';
   return locationCode || 'Unknown';
 }
@@ -269,30 +269,28 @@ async function resolveLocationScopedProductCodesFromLatestCosts(scopeCodes = [])
 }
 
   function buildEmergencySalesLocationScopeFilters(locationCode, requestedBranchCode = null) {
-  const scopeCodes = expandLocationScopeCodes(locationCode);
-  if (scopeCodes.length === 0) {
-    return [];
+  const normalizedLocationCode = normalizeLocationCode(locationCode);
+  const branchCode = normalizeBranchCode(requestedBranchCode);
+
+  if (!normalizedLocationCode || !branchCode) return [];
+
+  const codes = new Set();
+
+  // Canonical admin scope
+  codes.add(normalizedLocationCode);
+
+  // Backward compatibility for old Blantyre emergency rows
+  if (branchCode === 'BLANTYRE' && normalizedLocationCode === 'SH') {
+    codes.add('BT');
   }
 
-  const branchCode = requestedBranchCode;
-  const includeBranchFallback = scopeCodes.includes('BT');
-  const base = scopeCodes.flatMap((code) => ([
+  return Array.from(codes).flatMap((code) => ([
+    { cartSnapshot: { path: ['branchCode'], equals: branchCode } },
     { cartSnapshot: { path: ['locationCode'], equals: code } },
     { cartSnapshot: { path: ['posLocationCode'], equals: code } },
+    { cartSnapshot: { path: ['locationScopeCode'], equals: code } },
   ]));
-
-  if (branchCode && includeBranchFallback) {
-    base.push({ cartSnapshot: { path: ['branchCode'], equals: branchCode } });
-  }
-
-  // Preserve legacy Blantyre emergency-sale rows created before location tagging.
-  if (scopeCodes.includes('BT')) {
-    base.push({ cartSnapshot: { path: ['branchCode'], equals: null } });
-  }
-
-  return base;
 }
-
 async function resolveLocationScopedProductCodes(locationCode) {
   const cacheKey = getScopeCacheKey(locationCode);
   const cached = scopedProductCodesCache.get(cacheKey);
@@ -1456,8 +1454,9 @@ async function getPendingEmergencySalesForPosSync(req, res) {
         locationCodes = ['ZA', 'SH', 'BAR', 'ST999', 'WH'];
       }
     } else if (branchCode === 'BLANTYRE') {
-      locationCodes = ['BT'];
-    } else {
+      locationCodes = ['SH', 'BT'];
+    }
+      else {
       const locationCode = normalizeLocationCode(req.query.locationCode || req.body?.locationCode);
       if (!locationCode || !SUPPORTED_LOCATION_CODES.includes(locationCode)) {
         return res.status(400).json({ success: false, error: 'Agent branch/location scope is required for pending emergency sales polling' });
