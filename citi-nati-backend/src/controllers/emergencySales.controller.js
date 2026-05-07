@@ -689,9 +689,10 @@ async function lookupEmergencyProducts(req, res) {
     }
 
     const isZombaScope = branchCode === 'ZOMBA';
+    const isBlantyreScope = branchCode === 'BLANTYRE';
     let scopedProductCodes = null;
 
-    if (isZombaScope) {
+    if (isZombaScope || isBlantyreScope) {
       console.log('[PRODUCT QUERY]', {
         view: 'Emergency sale product search',
         uiLocation: req.query.locationCode || req.query.branchCode || '(none)',
@@ -716,15 +717,13 @@ async function lookupEmergencyProducts(req, res) {
     const baseWhere = {
       enabled: true,
       branchCode: branchCode,
-      ...(isZombaScope
-        ? {
-            locationCode: { equals: locationCode, mode: 'insensitive' },
-            sourceCode: { not: null },
-            // Only products with a valid location-specific price row (price > 0).
-            // Products synced from POS without a price row for this location get price=0.
-            price: { gt: 0 },
-          }
-        : { sourceCode: { in: scopedProductCodes } }),
+      ...((isZombaScope || isBlantyreScope)
+  ? {
+      locationCode: { equals: locationCode, mode: 'insensitive' },
+      sourceCode: { not: null },
+      price: { gt: 0 },
+    }
+  : { sourceCode: { in: scopedProductCodes } }),
     };
 
     // Single combined query: exact matches (barcode/sourceCode) + contains matches (name/barcode/sourceCode).
