@@ -41,7 +41,7 @@ function normalizeScopeCode(value) {
   return normalized || null;
 }
 
-const ZOMBA_LOCATION_CODES = ['ZA', 'SH', 'BAR', 'WH'];
+const ZOMBA_LOCATION_CODES = ['ZA', 'BAR', 'WH', 'ST999'];
 
 function expandLocationScopeCodes(locationCode) {
   const normalized = normalizeScopeCode(locationCode);
@@ -96,6 +96,33 @@ function commandMatchesScope(command, scopedBranchCode, scopedLocationCode) {
 
   const payload = command?.payload && typeof command.payload === 'object' ? command.payload : {};
   const scopedLocationCodes = expandLocationScopeCodes(scopedLocationCode);
+
+  const payloadBranchCode = normalizeBranchCode(payload.branchCode);
+  const payloadLocationCode = normalizeScopeCode(payload.locationCode);
+  const payloadRequestedLocationCode = normalizeScopeCode(payload.requestedLocationCode);
+  const commandAgentBranchCode = normalizeBranchCode(inferBranchCodeFromAgentId(command?.agentId));
+
+  const effectiveBranchCode = payloadBranchCode || commandAgentBranchCode;
+  const effectiveLocationCode = payloadRequestedLocationCode || payloadLocationCode;
+
+  if (scopedBranchCode && effectiveBranchCode !== scopedBranchCode) {
+    return false;
+  }
+
+  if (
+    scopedLocationCodes.length > 0 &&
+    effectiveLocationCode &&
+    !scopedLocationCodes.includes(effectiveLocationCode)
+  ) {
+    return false;
+  }
+
+  return true;
+}
+  if (!scopedBranchCode && !scopedLocationCode) return true;
+
+  const payload = command?.payload && typeof command.payload === 'object' ? command.payload : {};
+  const scopedLocationCodes = expandLocationScopeCodes(scopedLocationCode);
   const payloadBranchCode = normalizeBranchCode(payload.branchCode);
   const payloadLocationCode = normalizeScopeCode(payload.locationCode);
   const payloadRequestedLocationCode = normalizeScopeCode(payload.requestedLocationCode);
@@ -108,9 +135,8 @@ function commandMatchesScope(command, scopedBranchCode, scopedLocationCode) {
     if (payloadRequestedLocationCode && scopedLocationCodes.includes(payloadRequestedLocationCode)) return true;
     if (payloadLocationCode && scopedLocationCodes.includes(payloadLocationCode)) return true;
   }
-
+  
   return false;
-}
 
 function emergencySaleMatchesScope(sale, scopedBranchCode, scopedLocationCode) {
   if (!scopedBranchCode && !scopedLocationCode) return true;
@@ -162,13 +188,24 @@ function summarizeEmergencySales(sales = []) {
 
 function eventMatchesScope(event, scopedBranchCode, scopedLocationCode) {
   if (!scopedBranchCode && !scopedLocationCode) return true;
+
   const eventBranchCode = getEventBranchCode(event);
   const eventLocationCode = getEventLocationCode(event);
   const scopedLocationCodes = expandLocationScopeCodes(scopedLocationCode);
 
-  if (scopedBranchCode && eventBranchCode === scopedBranchCode) return true;
-  if (scopedLocationCodes.length > 0 && eventLocationCode && scopedLocationCodes.includes(eventLocationCode)) return true;
-  return false;
+  if (scopedBranchCode && eventBranchCode !== scopedBranchCode) {
+    return false;
+  }
+
+  if (
+    scopedLocationCodes.length > 0 &&
+    eventLocationCode &&
+    !scopedLocationCodes.includes(eventLocationCode)
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 function isAgentContactEvent(event) {
