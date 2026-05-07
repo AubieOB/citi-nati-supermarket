@@ -119,24 +119,6 @@ function commandMatchesScope(command, scopedBranchCode, scopedLocationCode) {
 
   return true;
 }
-  if (!scopedBranchCode && !scopedLocationCode) return true;
-
-  const payload = command?.payload && typeof command.payload === 'object' ? command.payload : {};
-  const scopedLocationCodes = expandLocationScopeCodes(scopedLocationCode);
-  const payloadBranchCode = normalizeBranchCode(payload.branchCode);
-  const payloadLocationCode = normalizeScopeCode(payload.locationCode);
-  const payloadRequestedLocationCode = normalizeScopeCode(payload.requestedLocationCode);
-  const commandAgentBranchCode = normalizeBranchCode(inferBranchCodeFromAgentId(command?.agentId));
-
-  if (scopedBranchCode && payloadBranchCode === scopedBranchCode) return true;
-  if (scopedBranchCode && commandAgentBranchCode === scopedBranchCode) return true;
-
-  if (scopedLocationCodes.length > 0) {
-    if (payloadRequestedLocationCode && scopedLocationCodes.includes(payloadRequestedLocationCode)) return true;
-    if (payloadLocationCode && scopedLocationCodes.includes(payloadLocationCode)) return true;
-  }
-  
-  return false;
 
 function emergencySaleMatchesScope(sale, scopedBranchCode, scopedLocationCode) {
   if (!scopedBranchCode && !scopedLocationCode) return true;
