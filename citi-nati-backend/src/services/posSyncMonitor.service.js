@@ -120,6 +120,7 @@ function commandMatchesScope(command, scopedBranchCode, scopedLocationCode) {
   return true;
 }
 
+
 function emergencySaleMatchesScope(sale, scopedBranchCode, scopedLocationCode) {
   if (!scopedBranchCode && !scopedLocationCode) return true;
 
@@ -357,7 +358,7 @@ async function getPosSyncMonitorSnapshot({ hours = 24, limit = 40, locationCode,
   const safeHours = Math.max(1, Math.min(168, Number.parseInt(hours, 10) || 24));
   const safeLimit = Math.max(10, Math.min(100, Number.parseInt(limit, 10) || 40));
   const scopedLocationCode = normalizeScopeCode(locationCode);
-  const scopedBranchCode = normalizeBranchCode(branchCode);
+  const scopedBranchCode = normalizeBranchCode(branchCode) || toScopeFromLocationCode(scopedLocationCode);
   const backendConfiguredBranchCode = normalizeBranchCode(process.env.POS_BRANCH_CODE || process.env.BRANCH_CODE || null);
   const since = new Date(Date.now() - safeHours * 60 * 60 * 1000);
 
@@ -536,7 +537,7 @@ async function listPosSyncEvents({ limit = 50, locationCode, branchCode } = {}) 
 
 async function clearFailedPosSyncEvents({ locationCode, branchCode } = {}) {
   const scopedLocationCode = normalizeScopeCode(locationCode);
-  const scopedBranchCode = normalizeBranchCode(branchCode);
+  const scopedBranchCode = normalizeBranchCode(branchCode) || toScopeFromLocationCode(scopedLocationCode);
 
   const failedEvents = await prisma.posSyncEvent.findMany({
     where: { status: 'failed' },
