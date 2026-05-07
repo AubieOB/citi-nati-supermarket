@@ -750,20 +750,6 @@ async function lookupEmergencyProducts(req, res) {
       locationCode
     );
 
-    // Log location-availability decision for each result (diagnostics).
-    if (isZombaScope) {
-      products.forEach((product) => {
-        const masterExists = true; // already filtered to existing rows
-        const locationPriceExists = Number(product.price || 0) > 0;
-        console.log(
-          `[LOCATION AVAILABILITY] product=${product.sourceCode || product.id} location=${locationCode}` +
-          ` masterExists=${masterExists} locationPriceExists=${locationPriceExists}` +
-          ` availability=${locationPriceExists}` +
-          `${locationPriceExists ? '' : ' reason=NO_LOCATION_PRICE_ROW'}`
-        );
-      });
-    }
-
     const mapped = products
       .map((product) => {
         const sourceCode = String(product.sourceCode || '').trim();
@@ -815,7 +801,7 @@ async function lookupEmergencyProducts(req, res) {
 
     console.log('[EMERGENCY SALES][LOOKUP] performance', {
       locationCode,
-      mode: isZombaScope ? 'ZOMBA_FAST_PATH' : 'SCOPED_CODES_PATH',
+      mode: 'DIRECT_BRANCH_LOCATION_PATH',
       query,
       resultCount: safeProducts.length,
       durationMs: Date.now() - startedAt,
