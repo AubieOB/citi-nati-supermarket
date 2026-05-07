@@ -1406,7 +1406,11 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
           resAlias: resWasMapped ? 'RES->ST999' : null,
         });
       } else {
-        const scopedProductCodes = await resolveLocationScopedProductCodes(normalizedLocationCode);
+        const scopedProductCodes = await resolveLocationScopedProductCodes(
+            normalizedBranchCode === 'BLANTYRE' && normalizedLocationCode === 'SH'
+              ? 'BT'
+              : normalizedLocationCode
+          );
         const explicitBranchCode = normalizedBranchCode || derivedBranchCode;
         console.log('[PRODUCT QUERY][POS_MANAGEMENT]', {
           uiLocation: locationCode || '(none)',
