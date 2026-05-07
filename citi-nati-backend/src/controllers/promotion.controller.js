@@ -186,9 +186,9 @@ function getDefaultPosLocationCodeForBranch(branchCode, requestedLocationCode) {
   if (branchCode === 'BLANTYRE') return POS_BLANTYRE_SELLING_LOCATION_CODE;
   if (branchCode === 'ZOMBA') {
     const normalizedRequested = normalizeLocationCode(requestedLocationCode);
-    if (normalizedRequested && CORE_ZOMBA_LOCATION_CODES.includes(normalizedRequested)) {
-      return normalizedRequested;
-    }
+   if (normalizedRequested && ZOMBA_LOCATION_CODES.includes(normalizedRequested)) {
+  return normalizedRequested;
+}
     return POS_ZOMBA_SELLING_LOCATION_CODE;
   }
   return normalizeLocationCode(requestedLocationCode) || POS_DEFAULT_LOCATION_CODE;
