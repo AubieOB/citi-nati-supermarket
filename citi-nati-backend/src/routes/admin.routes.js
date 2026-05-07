@@ -41,7 +41,7 @@ const {
 } = require('../utils/businessTime');
 const {
   normalizeScopeCode,
-  expandLocationScopeCodes: expandOperationalLocationScopeCodes,
+  expandOperationalLocationScopeCodes,
   ZOMBA_LOCATION_CODES: CORE_ZOMBA_LOCATION_CODES,
 } = require('../utils/operationalScope');
 const { PERMISSION_GROUPS, ALL_PERMISSION_KEYS, ROLE_DEFAULT_PERMISSIONS, isValidPermissionKey } = require('../security/permissions');
@@ -89,10 +89,16 @@ function normalizeBranchCode(value) {
   return BRANCH_CODE_ALIASES[normalized] || normalized;
 }
 
-const ZOMBA_LOCATION_CODES = ['ZA'].concat(CORE_ZOMBA_LOCATION_CODES);
+const ZOMBA_LOCATION_CODES = Array.from(new Set([
+  'ZA',
+  'SH',
+  'BAR',
+  'ST999',
+  ...(Array.isArray(CORE_ZOMBA_LOCATION_CODES) ? CORE_ZOMBA_LOCATION_CODES : []),
+]));
 
 function isConcreteZombaOperationalLocationCode(locationCode) {
-  return CORE_ZOMBA_LOCATION_CODES.includes(String(locationCode || '').trim().toUpperCase());
+  return ZOMBA_LOCATION_CODES.includes(String(locationCode || '').trim().toUpperCase());
 }
 
 function expandLocationScopeCodes(locationCode) {
