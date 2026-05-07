@@ -274,22 +274,27 @@ async function resolveLocationScopedProductCodesFromLatestCosts(scopeCodes = [])
 
   if (!normalizedLocationCode || !branchCode) return [];
 
-  const codes = new Set();
+  const codes = new Set([normalizedLocationCode]);
 
-  // Canonical admin scope
-  codes.add(normalizedLocationCode);
-
-  // Backward compatibility for old Blantyre emergency rows
+  // Backward compatibility for old Blantyre rows
   if (branchCode === 'BLANTYRE' && normalizedLocationCode === 'SH') {
     codes.add('BT');
   }
 
-  return Array.from(codes).flatMap((code) => ([
-    { cartSnapshot: { path: ['branchCode'], equals: branchCode } },
-    { cartSnapshot: { path: ['locationCode'], equals: code } },
-    { cartSnapshot: { path: ['posLocationCode'], equals: code } },
-    { cartSnapshot: { path: ['locationScopeCode'], equals: code } },
-  ]));
+  return [
+    {
+      AND: [
+        { cartSnapshot: { path: ['branchCode'], equals: branchCode } },
+        {
+          OR: Array.from(codes).flatMap((code) => ([
+            { cartSnapshot: { path: ['locationCode'], equals: code } },
+            { cartSnapshot: { path: ['posLocationCode'], equals: code } },
+            { cartSnapshot: { path: ['locationScopeCode'], equals: code } },
+          ])),
+        },
+      ],
+    },
+  ];
 }
 async function resolveLocationScopedProductCodes(locationCode) {
   const cacheKey = getScopeCacheKey(locationCode);
@@ -1520,7 +1525,17 @@ const agentBranchCode = normalizeBranchCode(req.headers['x-branch-code'] || req.
       return res.status(403).json({ success: false, error: 'Emergency sale does not belong to this branch scope' });
     }
 
-    if (explicitAgentLocationCode && saleScope.locationCode && saleScope.locationCode !== explicitAgentLocationCode) {
+    const saleSnapshot = sale?.cartSnapshot && typeof sale.cartSnapshot === 'object' ? sale.cartSnapshot : {};
+    const saleScopeCode = normalizeLocationCode(saleSnapshot.locationScopeCode || saleScope.locationCode);
+    const salePosCode = normalizeLocationCode(saleSnapshot.posLocationCode || saleScope.locationCode);
+
+    if (
+      explicitAgentLocationCode &&
+      saleScopeCode &&
+      salePosCode &&
+      explicitAgentLocationCode !== saleScopeCode &&
+      explicitAgentLocationCode !== salePosCode
+    ) {
       return res.status(403).json({ success: false, error: 'Emergency sale does not belong to this location scope' });
     }
 
