@@ -30,26 +30,76 @@ const labelStyle = {
   textTransform: 'uppercase',
 };
 
-// Debounce hook
+const thStyle = {
+  padding: '0.75rem 0.85rem',
+  borderBottom: '1px solid #e2e8f0',
+  color: '#334155',
+  background: '#f8fafc',
+  fontWeight: 800,
+  fontSize: '0.82rem',
+  textAlign: 'left',
+};
+
+const tdStyle = {
+  padding: '0.72rem 0.85rem',
+  borderBottom: '1px solid #f1f5f9',
+  color: '#0f172a',
+};
+
+const normalizeCode = (value) => String(value || '').trim().toUpperCase();
+
+const compactParams = (params = {}) =>
+  Object.entries(params).reduce((acc, [key, value]) => {
+    if (value !== '' && value !== null && value !== undefined) {
+      acc[key] = value;
+    }
+    return acc;
+  }, {});
+
+function money(value) {
+  return `MWK ${Number(value || 0).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
 function useDebounce(value, delay) {
   const [debouncedValue, setDebouncedValue] = useState(value);
+
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedValue(value), delay);
     return () => clearTimeout(handler);
   }, [value, delay]);
+
   return debouncedValue;
 }
 
-const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) => {
+const InventoryActivityLedger = ({
+  selectedLocationId = null,
+  selectedBranchCode = '',
+  selectedLocationCode = '',
+  selectedLocationName = '',
+}) => {
+  const effectiveBranchCode = normalizeCode(selectedBranchCode);
+  const effectiveLocationCode = normalizeCode(selectedLocationCode);
+
+  const isAllLocations =
+    (!effectiveBranchCode && !effectiveLocationCode && !selectedLocationId) ||
+    String(selectedLocationId || '').toLowerCase() === 'all';
+
+  const scopeLabel =
+    selectedLocationName ||
+    (effectiveBranchCode && effectiveLocationCode
+      ? `${effectiveBranchCode} / ${effectiveLocationCode}`
+      : effectiveLocationCode || 'All Locations');
+
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
 
-  // Modal states
   const [activeModal, setActiveModal] = useState(null);
   const [modalMaximized, setModalMaximized] = useState(false);
 
-  // Modal-specific filters
   const [modalPeriodType, setModalPeriodType] = useState('day');
   const [modalDate, setModalDate] = useState(today.toISOString().slice(0, 10));
   const [modalMonth, setModalMonth] = useState(currentMonth);
@@ -63,29 +113,53 @@ const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) =
   const debouncedProductCode = useDebounce(modalProductCode, 400);
   const debouncedProductName = useDebounce(modalProductName, 400);
 
-  const isAllLocations = (String(selectedLocationId || '') === 'all' || !selectedLocationId) && !selectedLocationCode;
+  const modalFilters = useMemo(
+    () =>
+      compactParams({
+        periodType: modalPeriodType,
+        date: modalDate,
+        month: modalMonth,
+        year: modalYear,
+        startDate: modalStartDate,
+        endDate: modalEndDate,
 
-  const modalFilters = useMemo(() => ({
-    periodType: modalPeriodType,
-    date: modalDate,
-    month: modalMonth,
-    year: modalYear,
-    startDate: modalStartDate,
-    endDate: modalEndDate,
-    locationId: isAllLocations ? undefined : (selectedLocationId ? Number(selectedLocationId) : undefined),
-    locationCode: isAllLocations ? undefined : (selectedLocationCode || undefined),
-    productCode: debouncedProductCode.trim() || undefined,
-    productName: debouncedProductName.trim() || undefined,
-    movementType: modalMovementType || undefined,
-  }), [modalPeriodType, modalDate, modalMonth, modalYear, modalStartDate, modalEndDate, selectedLocationId, selectedLocationCode, debouncedProductCode, debouncedProductName, modalMovementType, isAllLocations]);
+        // Canonical production scope
+        branchCode: isAllLocations ? undefined : effectiveBranchCode || undefined,
+        locationCode: isAllLocations ? undefined : effectiveLocationCode || undefined,
+
+        // Legacy fallback only
+        locationId: isAllLocations ? undefined : selectedLocationId || undefined,
+
+        productCode: debouncedProductCode.trim() || undefined,
+        productName: debouncedProductName.trim() || undefined,
+        movementType: modalMovementType || undefined,
+      }),
+    [
+      debouncedProductCode,
+      debouncedProductName,
+      effectiveBranchCode,
+      effectiveLocationCode,
+      isAllLocations,
+      modalDate,
+      modalEndDate,
+      modalMonth,
+      modalMovementType,
+      modalPeriodType,
+      modalStartDate,
+      modalYear,
+      selectedLocationId,
+    ]
+  );
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
 
-      const res = await api.get('/business-operations/inventory-activity/ledger', { params: modalFilters });
-      
+      const res = await api.get('/business-operations/inventory-activity/ledger', {
+        params: modalFilters,
+      });
+
       if (res.data.success) {
         setData(res.data.data);
       } else {
@@ -99,17 +173,17 @@ const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) =
     }
   }, [modalFilters]);
 
-  // Fetch when modal opens or filters change
   useEffect(() => {
     if (activeModal) {
       fetchData();
     }
-  }, [activeModal, fetchData, modalPeriodType, modalDate, modalMonth, modalYear, modalStartDate, modalEndDate]);
+  }, [activeModal, fetchData]);
 
   const closeModal = () => {
     setActiveModal(null);
     setModalMaximized(false);
     setData(null);
+    setError('');
   };
 
   const clearModalFilters = () => {
@@ -126,33 +200,41 @@ const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) =
 
   const exportCSV = () => {
     if (!data) return;
+
     const rows = data.mode === 'ledger' ? data.movements || [] : data.products || [];
     if (rows.length === 0) return;
 
     let csvContent = '';
+
     if (data.mode === 'ledger') {
       csvContent = 'Time,Type,Reference,Cashier,Product,Qty In,Qty Out,Balance,Amount\n';
-      rows.forEach(m => {
+
+      rows.forEach((m) => {
         csvContent += `"${formatDateTime(m.movementDate)}","${m.movementType}","${m.referenceNo || ''}","${m.cashierName || ''}","${m.productName || m.productCode || ''}",${m.qtyIn},${m.qtyOut},${m.runningBalance},${m.lineAmount}\n`;
       });
     } else {
       csvContent = 'Product Code,Product Name,Qty In,Qty Out,Net Movement,Sales Amount,Movements\n';
-      rows.forEach(row => {
+
+      rows.forEach((row) => {
         csvContent += `"${row.productCode || ''}","${row.productName || ''}",${row.totalQtyIn},${row.totalQtyOut},${row.netMovement},${row.totalSalesAmount || 0},${row.movementCount}\n`;
       });
     }
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
+
     link.href = URL.createObjectURL(blob);
     link.download = `inventory-activity-${data.mode}-${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
   };
 
-  // Keyboard handler
   useEffect(() => {
     if (!activeModal) return;
-    const handler = (e) => { if (e.key === 'Escape') closeModal(); };
+
+    const handler = (e) => {
+      if (e.key === 'Escape') closeModal();
+    };
+
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [activeModal]);
@@ -162,9 +244,13 @@ const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) =
   const products = data?.products || [];
   const dataQuality = data?.dataQuality || {};
 
-  // Render modal filters
   const renderModalFilters = () => (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '12px', marginBottom: '1rem' }}>
+      <div>
+        <label style={labelStyle}>Scope</label>
+        <input value={scopeLabel} disabled readOnly style={{ ...inputStyle, backgroundColor: '#fff', color: '#64748b', fontWeight: 700 }} />
+      </div>
+
       <div>
         <label style={labelStyle}>Period</label>
         <select value={modalPeriodType} onChange={(e) => setModalPeriodType(e.target.value)} style={inputStyle}>
@@ -188,6 +274,7 @@ const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) =
             <label style={labelStyle}>Month</label>
             <input type="number" min="1" max="12" value={modalMonth} onChange={(e) => setModalMonth(e.target.value)} style={inputStyle} />
           </div>
+
           <div>
             <label style={labelStyle}>Year</label>
             <input type="number" value={modalYear} onChange={(e) => setModalYear(e.target.value)} style={inputStyle} />
@@ -208,6 +295,7 @@ const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) =
             <label style={labelStyle}>Start Date</label>
             <input type="date" value={modalStartDate} onChange={(e) => setModalStartDate(e.target.value)} style={inputStyle} />
           </div>
+
           <div>
             <label style={labelStyle}>End Date</label>
             <input type="date" value={modalEndDate} onChange={(e) => setModalEndDate(e.target.value)} style={inputStyle} />
@@ -239,6 +327,7 @@ const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) =
           <i className={`fas ${loading ? 'fa-spinner fa-spin' : 'fa-search'}`} style={{ marginRight: '0.42rem' }} />
           Search
         </button>
+
         <button type="button" onClick={clearModalFilters} style={{ ...inputStyle, cursor: 'pointer', backgroundColor: '#fff', color: '#475569', fontWeight: 700 }}>
           <i className="fas fa-times" style={{ marginRight: '0.42rem' }} />
           Clear
@@ -247,11 +336,10 @@ const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) =
     </div>
   );
 
-  // Summary Modal Content
   const renderSummaryContent = () => (
     <div style={{ display: 'grid', gap: '1rem' }}>
       {renderModalFilters()}
-      
+
       {error && (
         <div style={{ padding: '1rem', color: '#b91c1c', backgroundColor: '#fff1f2', borderRadius: '10px', border: '1px solid #fecaca' }}>
           {error}
@@ -291,9 +379,10 @@ const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) =
                   <th style={{ ...thStyle, textAlign: 'right' }}>Movements</th>
                 </tr>
               </thead>
+
               <tbody>
                 {products.map((row, idx) => (
-                  <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  <tr key={`${row.productCode || idx}-summary`} style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ ...tdStyle }}>{row.productCode || '-'}</td>
                     <td style={{ ...tdStyle }}>{row.productName || '-'}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', color: '#166534', fontWeight: 700 }}>{row.totalQtyIn}</td>
@@ -322,11 +411,10 @@ const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) =
     </div>
   );
 
-  // Ledger Modal Content
   const renderLedgerContent = () => (
     <div style={{ display: 'grid', gap: '1rem' }}>
       {renderModalFilters()}
-      
+
       {error && (
         <div style={{ padding: '1rem', color: '#b91c1c', backgroundColor: '#fff1f2', borderRadius: '10px', border: '1px solid #fecaca' }}>
           {error}
@@ -340,21 +428,23 @@ const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) =
         </div>
       )}
 
-      {/* KPI Cards */}
       {data?.mode === 'ledger' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
           <div style={{ ...cardStyle, padding: '0.9rem 1rem' }}>
             <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800 }}>Total Qty In</div>
             <div style={{ marginTop: '0.35rem', fontSize: '1.25rem', fontWeight: 800, color: '#166534' }}>{summary.totalQtyIn ?? 0}</div>
           </div>
+
           <div style={{ ...cardStyle, padding: '0.9rem 1rem' }}>
             <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800 }}>Total Qty Out</div>
             <div style={{ marginTop: '0.35rem', fontSize: '1.25rem', fontWeight: 800, color: '#b91c1c' }}>{summary.totalQtyOut ?? 0}</div>
           </div>
+
           <div style={{ ...cardStyle, padding: '0.9rem 1rem' }}>
             <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800 }}>Sales Amount</div>
             <div style={{ marginTop: '0.35rem', fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>{money(summary.totalSalesAmount)}</div>
           </div>
+
           <div style={{ ...cardStyle, padding: '0.9rem 1rem' }}>
             <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800 }}>Movements</div>
             <div style={{ marginTop: '0.35rem', fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>{summary.movementCount ?? 0}</div>
@@ -390,9 +480,10 @@ const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) =
                   <th style={{ ...thStyle, textAlign: 'right' }}>Amount</th>
                 </tr>
               </thead>
+
               <tbody>
                 {movements.map((m, idx) => (
-                  <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  <tr key={`${m.referenceNo || idx}-movement`} style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ ...tdStyle }}>{formatDateTime(m.movementDate)}</td>
                     <td style={{ ...tdStyle }}><MovementBadge type={m.movementType} /></td>
                     <td style={{ ...tdStyle }}>{m.referenceNo || '-'}</td>
@@ -421,12 +512,8 @@ const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) =
     </div>
   );
 
-  const thStyle = { padding: '0.75rem 0.85rem', borderBottom: '1px solid #e2e8f0', color: '#334155', background: '#f8fafc', fontWeight: 800, fontSize: '0.82rem', textAlign: 'left' };
-  const tdStyle = { padding: '0.72rem 0.85rem', borderBottom: '1px solid #f1f5f9', color: '#0f172a' };
-
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
-      {/* Header */}
       <div style={{ ...cardStyle, padding: '1.1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
           <div>
@@ -434,7 +521,11 @@ const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) =
             <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.85rem' }}>
               Track stock movements, sales deductions, and stock intakes from POS.
             </p>
+            <p style={{ margin: '0.25rem 0 0', color: '#64748b', fontSize: '0.82rem', fontWeight: 700 }}>
+              Scope: {scopeLabel}
+            </p>
           </div>
+
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             {isAllLocations && (
               <span style={{ fontSize: '0.75rem', color: '#92400e', backgroundColor: '#fffbeb', padding: '0.35rem 0.65rem', borderRadius: '8px', fontWeight: 700 }}>
@@ -446,36 +537,37 @@ const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) =
         </div>
       </div>
 
-      {/* Dashboard Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
-        {/* Product Summary Card */}
         <button type="button" onClick={() => setActiveModal('summary')} style={{ ...cardStyle, padding: '1.1rem', cursor: 'pointer', border: '1px solid #e2e8f0', backgroundColor: '#fff', borderRadius: '14px', textAlign: 'left', transition: 'all 0.2s' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', borderRadius: '10px', backgroundColor: '#e0e7ff', color: '#4338ca' }}>
               <i className="fas fa-boxes-stacked" style={{ fontSize: '1.1rem' }} />
             </span>
+
             <div>
               <div style={{ color: '#0f172a', fontWeight: 800, fontSize: '0.95rem' }}>Product Movement Summary</div>
               <div style={{ color: '#64748b', fontSize: '0.82rem' }}>View aggregated stock by product</div>
             </div>
           </div>
+
           <div style={{ color: '#5B4B8A', fontSize: '0.85rem', fontWeight: 700 }}>
             <i className="fas fa-arrow-right" style={{ marginRight: '0.42rem' }} />
             Open Summary
           </div>
         </button>
 
-        {/* Stock Movement Ledger Card */}
         <button type="button" onClick={() => setActiveModal('ledger')} style={{ ...cardStyle, padding: '1.1rem', cursor: 'pointer', border: '1px solid #e2e8f0', backgroundColor: '#fff', borderRadius: '14px', textAlign: 'left', transition: 'all 0.2s' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', borderRadius: '10px', backgroundColor: '#dcfce7', color: '#166534' }}>
               <i className="fas fa-list-ol" style={{ fontSize: '1.1rem' }} />
             </span>
+
             <div>
               <div style={{ color: '#0f172a', fontWeight: 800, fontSize: '0.95rem' }}>Stock Movement Ledger</div>
               <div style={{ color: '#64748b', fontSize: '0.82rem' }}>Detailed movement with running balance</div>
             </div>
           </div>
+
           <div style={{ color: '#5B4B8A', fontSize: '0.85rem', fontWeight: 700 }}>
             <i className="fas fa-arrow-right" style={{ marginRight: '0.42rem' }} />
             Open Ledger
@@ -483,11 +575,9 @@ const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) =
         </button>
       </div>
 
-      {/* Modal */}
       {activeModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: modalMaximized ? '0.35rem' : '1rem' }}>
           <div style={{ ...cardStyle, width: modalMaximized ? 'calc(100vw - 0.7rem)' : 'min(1400px, 97vw)', height: modalMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', overflow: 'hidden', borderRadius: modalMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column' }}>
-            {/* Modal Header */}
             <div style={{ flexShrink: 0, padding: '1rem 1.1rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(15,23,42,0.04)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <div>
@@ -497,19 +587,23 @@ const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) =
                   <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.85rem' }}>
                     {activeModal === 'summary' ? 'Aggregated stock movement by product' : 'Detailed invoice-by-invoice stock activity'}
                   </p>
+                  <p style={{ margin: '0.25rem 0 0', color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>
+                    Scope: {scopeLabel}
+                  </p>
                 </div>
+
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                   <button type="button" title={modalMaximized ? 'Restore' : 'Maximize'} onClick={() => setModalMaximized(!modalMaximized)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}>
                     <i className={`fas ${modalMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
                   </button>
+
                   <button type="button" onClick={closeModal} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}>
                     <i className="fas fa-times" />
                   </button>
                 </div>
               </div>
             </div>
-            
-            {/* Modal Content */}
+
             <div style={{ flex: 1, overflow: 'auto', padding: '1rem' }}>
               {activeModal === 'summary' ? renderSummaryContent() : renderLedgerContent()}
             </div>
@@ -522,6 +616,7 @@ const InventoryActivityLedger = ({ selectedLocationId, selectedLocationCode }) =
 
 const MovementBadge = ({ type }) => {
   const isSale = type === 'SALE';
+
   return (
     <span style={{
       display: 'inline-flex',
@@ -539,8 +634,10 @@ const MovementBadge = ({ type }) => {
 
 function formatDateTime(value) {
   if (!value) return '-';
+
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '-';
+
   return d.toLocaleString('en-GB', {
     year: 'numeric',
     month: 'short',
@@ -548,13 +645,6 @@ function formatDateTime(value) {
     hour: '2-digit',
     minute: '2-digit',
   });
-}
-
-function money(value) {
-  return `MWK ${Number(value || 0).toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
 }
 
 export default InventoryActivityLedger;
