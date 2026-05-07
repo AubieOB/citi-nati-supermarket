@@ -20,7 +20,7 @@ const ZOMBA_LOCATION_CODES = Array.from(new Set([
   'SH',
   'BAR',
   'ST999',
-  ...CORE_ZOMBA_LOCATION_CODES,
+  ...(Array.isArray(CORE_ZOMBA_LOCATION_CODES) ? CORE_ZOMBA_LOCATION_CODES : []),
 ]));
 const POS_DEFAULT_LOCATION_CODE = process.env.POS_LOCATION_CODE || 'BT';
 const POS_DEFAULT_PRICE_TYPE_CODE = process.env.POS_PRICE_TYPE_CODE || 'RT';
