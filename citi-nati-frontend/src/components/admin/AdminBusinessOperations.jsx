@@ -284,6 +284,7 @@ const AdminBusinessOperations = ({ selectedLocationCode, selectedBranchCode }) =
     <MonthlySummaryTab
       refreshKey={locationRefreshKey}
       onNavigateTab={handleNavigateTab}
+      selectedLocationId={selectedLocationId}
       selectedBranchCode={selectedBranchCode}
       selectedLocationCode={selectedLocationCodeValue}
       selectedLocationName={selectedLocationName}

@@ -72,6 +72,7 @@ const defaultSectionState = { loading: true, error: '' };
 const MonthlySummaryTab = ({
   refreshKey = 0,
   onNavigateTab,
+  selectedLocationId = null,
   selectedBranchCode = '',
   selectedLocationCode = '',
   selectedLocationName = '',
