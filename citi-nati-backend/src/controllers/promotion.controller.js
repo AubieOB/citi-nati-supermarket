@@ -183,7 +183,7 @@ function normalizeBranchCode(value) {
 }
 
 function isConcreteZombaOperationalLocationCode(locationCode) {
-  return CORE_ZOMBA_LOCATION_CODES.includes(normalizeLocationCode(locationCode));
+  return ZOMBA_LOCATION_CODES.includes(normalizeLocationCode(locationCode));
 }
 
 async function resolvePromotionScopedProductCodes(scope) {
