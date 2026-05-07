@@ -10,7 +10,7 @@ const { PrismaClient } = require('@prisma/client');
 const posCommandQueueService = require('../services/posCommandQueue.service');
 const {
   normalizeScopeCode,
-  expandLocationScopeCodes: expandOperationalLocationScopeCodes,
+  expandOperationalLocationScopeCodes,
   ZOMBA_LOCATION_CODES: CORE_ZOMBA_LOCATION_CODES,
 } = require('../utils/operationalScope');
 const prisma = new PrismaClient();
