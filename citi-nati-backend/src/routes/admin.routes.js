@@ -201,7 +201,7 @@ async function resolveLocationScopedProductCodes(locationCode) {
   const salesCodes = await resolveLocationScopedProductCodesFromSales(scopeCodes);
   salesCodes.forEach((code) => scopedCodes.add(code));
 
-  const isZombaScope = scopeCodes.some((code) => CORE_ZOMBA_LOCATION_CODES.includes(code));
+  const isZombaScope = scopeCodes.some((code) => ZOMBA_LOCATION_CODES.includes(code));
   if (isZombaScope) {
     console.log('[ADMIN POS][SCOPE][ZOMBA] code-source diagnostics', {
       scopeCodes,
