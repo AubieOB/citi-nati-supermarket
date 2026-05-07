@@ -123,10 +123,10 @@ const AdminBusinessOperations = ({ selectedLocationCode, selectedBranchCode }) =
     ) || null;
   }, [selectedLocationCode, selectedBranchCode]);
 
-const selectedLocationId = selectedLocation?.id || null;
-const selectedLocationCodeValue = selectedLocation?.code || selectedLocationCode || '';
-const selectedLocationName = selectedLocation?.name || `${selectedBranchCode || 'Unknown'} ${selectedLocationCode || 'Unknown'}`;
-const isAllLocationsSelected = !selectedLocationCode || !selectedBranchCode;
+  const selectedLocationId = selectedLocation?.id || null;
+  const selectedLocationCodeValue = selectedLocation?.code || selectedLocationCode || '';
+  const selectedLocationName = selectedLocation?.name || `${selectedBranchCode || 'Unknown'} ${selectedLocationCode || 'Unknown'}`;
+  const isAllLocationsSelected = !selectedLocationCode || !selectedBranchCode;
 
   // Debug logging for scope resolution
   console.log('[BUSINESS OPS SCOPE]', {
@@ -253,6 +253,7 @@ const isAllLocationsSelected = !selectedLocationCode || !selectedBranchCode;
   suppliers: (
     <SuppliersTab
       refreshKey={locationRefreshKey}
+      selectedLocationId={selectedLocationId}
       selectedBranchCode={selectedBranchCode}
       selectedLocationCode={selectedLocationCodeValue}
     />
@@ -260,6 +261,7 @@ const isAllLocationsSelected = !selectedLocationCode || !selectedBranchCode;
 
   'goods-intake': (
     <GoodsIntakeTab
+      selectedLocationId={selectedLocationId}
       selectedBranchCode={selectedBranchCode}
       selectedLocationCode={selectedLocationCodeValue}
       permissions={goodsIntakePermissions}
@@ -270,6 +272,7 @@ const isAllLocationsSelected = !selectedLocationCode || !selectedBranchCode;
     <ExpensesTab
       refreshKey={locationRefreshKey}
       drilldownRequest={drilldownRequests.expenses}
+      selectedLocationId={selectedLocationId}
       selectedBranchCode={selectedBranchCode}
       selectedLocationCode={selectedLocationCodeValue}
     />
@@ -289,6 +292,7 @@ const isAllLocationsSelected = !selectedLocationCode || !selectedBranchCode;
   employees: (
     <EmployeesTab
       refreshKey={locationRefreshKey}
+      selectedLocationId={selectedLocationId}
       selectedBranchCode={selectedBranchCode}
       selectedLocationCode={selectedLocationCodeValue}
     />
@@ -297,6 +301,7 @@ const isAllLocationsSelected = !selectedLocationCode || !selectedBranchCode;
   payroll: (
     <PayrollTab
       refreshKey={locationRefreshKey}
+      selectedLocationId={selectedLocationId}
       selectedBranchCode={selectedBranchCode}
       selectedLocationCode={selectedLocationCodeValue}
     />
@@ -305,6 +310,7 @@ const isAllLocationsSelected = !selectedLocationCode || !selectedBranchCode;
   'report-history': (
     <ReportHistoryTab
       refreshKey={locationRefreshKey}
+      selectedLocationId={selectedLocationId}
       selectedBranchCode={selectedBranchCode}
       selectedLocationCode={selectedLocationCodeValue}
       onNavigateTab={handleNavigateTab}
@@ -313,6 +319,7 @@ const isAllLocationsSelected = !selectedLocationCode || !selectedBranchCode;
 
   'sales-balancing': (
     <SalesBalancingTab
+      selectedLocationId={selectedLocationId}
       selectedBranchCode={selectedBranchCode}
       selectedLocationCode={selectedLocationCodeValue}
       selectedLocationName={selectedLocationName}
@@ -321,6 +328,7 @@ const isAllLocationsSelected = !selectedLocationCode || !selectedBranchCode;
 
   'analytics-performance': (
     <BusinessAnalyticsTab
+      selectedLocationId={selectedLocationId}
       selectedBranchCode={selectedBranchCode}
       selectedLocationCode={selectedLocationCodeValue}
     />
@@ -328,6 +336,7 @@ const isAllLocationsSelected = !selectedLocationCode || !selectedBranchCode;
 
   'inventory-activity': (
     <InventoryActivityLedger
+      selectedLocationId={selectedLocationId}
       selectedBranchCode={selectedBranchCode}
       selectedLocationCode={selectedLocationCodeValue}
     />
