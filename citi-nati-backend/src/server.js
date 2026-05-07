@@ -532,8 +532,8 @@ async function start() {
     // Cashier role routes (PIN + emergency sales for cashier)
     app.use('/api/cashier', cashierRoutes);
 
-    // Business Operations reporting endpoints (admin-protected)
-    app.use('/api/business-operations', adminRateLimiter, businessOperationsRoutes);
+    // Business Operations reporting endpoints (admin-protected, no rate limiting to ensure stability)
+    app.use('/api/business-operations', businessOperationsRoutes);
 
     // Delivery coverage zones (public options for checkout)
     app.use('/api/delivery-zones', deliveryZonesRoutes);

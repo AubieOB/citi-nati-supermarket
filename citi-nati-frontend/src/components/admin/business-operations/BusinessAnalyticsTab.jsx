@@ -2,9 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import api from '../../../utils/api.js';
 import { getOperationalScopeOptions, resolveOperationalScope } from '../../../utils/operationalScope.js';
 
-const AUTO_REFRESH_MS = 300000; // 5 minutes
-const AUTO_REFRESH_DEBOUNCE_MS = 350;
-
 
 const cardStyle = {
   backgroundColor: '#fff',
@@ -1046,8 +1043,6 @@ const BusinessAnalyticsTab = ({
     basketImprovementPct: 0,
   });
 
-  const refreshIntervalRef = useRef(null);
-  const refreshTimeoutRef = useRef(null);
   const refreshInFlightRef = useRef(false);
   const hasLoadedOnceRef = useRef(false);
 
@@ -1357,51 +1352,6 @@ const scopeLabel = useMemo(() => {
 
   useEffect(() => {
     computeAnalytics();
-  }, [computeAnalytics]);
-
-  useEffect(() => {
-    refreshIntervalRef.current = setInterval(() => {
-      computeAnalytics(true);
-      setProfitRefreshTick((prev) => prev + 1);
-    }, AUTO_REFRESH_MS);
-
-    const scheduleRefresh = () => {
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current);
-      }
-      refreshTimeoutRef.current = setTimeout(() => {
-        computeAnalytics(true);
-        setProfitRefreshTick((prev) => prev + 1);
-      }, AUTO_REFRESH_DEBOUNCE_MS);
-    };
-
-    const onVisibilityChange = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        scheduleRefresh();
-      }
-    };
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener('focus', scheduleRefresh);
-    }
-    if (typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', onVisibilityChange);
-    }
-
-    return () => {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
-      }
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current);
-      }
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('focus', scheduleRefresh);
-      }
-      if (typeof document !== 'undefined') {
-        document.removeEventListener('visibilitychange', onVisibilityChange);
-      }
-    };
   }, [computeAnalytics]);
 
   const locationOptions = useMemo(() => {
