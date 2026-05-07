@@ -41,18 +41,6 @@ const ACTIVE_PRODUCT_FILTER = {
   enabled: true,
 };
 
-function normalizeBranchCode(value) {
-  const normalized = String(value || '').trim().toUpperCase();
-  if (!normalized) return null;
-  if (['BT', 'BLANTYRE', 'BLANTYRE_SH'].includes(normalized)) return 'BLANTYRE';
-  if (['ZA', 'ZOMBA', 'ZOMBA_SH', 'ZOMBA_BAR', 'ZOMBA_RES'].includes(normalized)) return 'ZOMBA';
-  return normalized;
-}
-
-function normalizeLocationCode(value) {
-  return normalizeScopeCode(value);
-}
-
 function getStorefrontLocationCode() {
   return normalizeScopeCode(process.env.STOREFRONT_LOCATION_CODE || process.env.PUBLIC_STOREFRONT_LOCATION_CODE || 'BT');
 }
