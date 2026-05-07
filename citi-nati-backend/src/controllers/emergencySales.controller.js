@@ -849,13 +849,6 @@ async function createEmergencySale(req, res) {
     // For Zomba: availability is determined directly by location+price row, not the indirect
     // scopedProductCodes set (which requires prior sales/expiry/cost history that BAR/ST999 may lack).
     const isZombaCreateScope = branchCode === 'ZOMBA' && isConcreteZombaOperationalLocationCode(posLocationCode);
-    let scopedProductCodes = null;
-    if (!isZombaCreateScope) {
-      scopedProductCodes = await resolveLocationScopedProductCodes(locationCode);
-      if (!scopedProductCodes || scopedProductCodes.length === 0) {
-        return res.status(400).json({ success: false, error: `No products are available for location ${locationCode}` });
-      }
-    }
 
     const rawItems = Array.isArray(req.body?.items) ? req.body.items : [];
     if (rawItems.length === 0) {
@@ -889,18 +882,12 @@ async function createEmergencySale(req, res) {
       // Build location-aware product query.
       // Zomba: validate by branchCode=ZOMBA + exact locationCode + price>0 (= location price row exists).
       // Non-Zomba: validate by scopedProductCodes derived from activity history.
-      const productQueryWhere = isZombaCreateScope
-        ? {
-            id: { in: productIds },
-            branchCode: 'ZOMBA',
-            locationCode: { equals: posLocationCode, mode: 'insensitive' },
-            sourceCode: { not: null },
-          }
-        : {
-            id: { in: productIds },
-            sourceCode: { in: scopedProductCodes },
-            ...(branchCode ? { branchCode } : {}),
-          };
+      const productQueryWhere = {
+          id: { in: productIds },
+          branchCode,
+          locationCode: { equals: locationCode, mode: 'insensitive' },
+          sourceCode: { not: null },
+        };
 
       const products = await tx.product.findMany({
         where: productQueryWhere,
