@@ -404,8 +404,7 @@ function buildParamsForPeriod(period) {
 
 function withScope(params, scope, locations, selectedBranchCode, selectedLocationCodeCanonical, selectedLocationId) {
   const scoped = { ...params };
-  if (scope === 'all') return scoped;
-
+  
   if (String(scope).startsWith('branch:') && scope.includes(':location:')) {
     const parts = scope.split(':');
     scoped.branchCode = parts[1];
@@ -427,6 +426,11 @@ function withScope(params, scope, locations, selectedBranchCode, selectedLocatio
   const resolved = resolveOperationalScope(location?.code || location?.uiCode || '');
   if (resolved?.locationCode) scoped.locationCode = resolved.locationCode;
   if (resolved?.branchCode) scoped.branchCode = resolved.branchCode;
+  
+  // For 'all' scope, always include selected branch/location as fallback
+  if (scope === 'all' && selectedBranchCode) scoped.branchCode = selectedBranchCode;
+  if (scope === 'all' && selectedLocationCodeCanonical) scoped.locationCode = selectedLocationCodeCanonical;
+  
   return scoped;
 }
 
