@@ -156,6 +156,23 @@ function deriveBranchCodeFromLocationCode(locationCode) {
   return null;
 }
 
+function getScopeDisplayLabel(locationCode, branchCode = '') {
+  const normalizedLocation = normalizeScopeCode(locationCode);
+  const normalizedBranch = normalizeScopeCode(branchCode) || deriveBranchCodeFromLocationCode(normalizedLocation);
+
+  const branchLabel = normalizedBranch === 'ZOMBA'
+    ? 'Zomba'
+    : normalizedBranch === 'BLANTYRE'
+      ? 'Blantyre'
+      : 'Unknown';
+
+  const locationLabel = normalizedLocation === 'ST999'
+    ? 'Restaurant'
+    : normalizedLocation || 'Unknown';
+
+  return `${branchLabel} (${locationLabel})`;
+}
+
 function expandScopeLocationCodes(locationCode) {
   const normalized = normalizeScopeCode(locationCode);
   if (!normalized) return [];
@@ -341,6 +358,7 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT', selec
         params: {
           hours: 24,
           limit: 40,
+          ...(selectedBranchCode && { branchCode: selectedBranchCode }),
           ...(selectedLocationCode && { locationCode: selectedLocationCode }),
         },
       });
@@ -550,7 +568,7 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT', selec
                     Agent: {summary.agentHealthy ? 'reachable' : 'unreachable'}
                   </span>
                   <span style={S.badge('#f1f5f9', '#475569')}>
-                    Scope: {selectedLocationCode === 'ZA' ? 'Zomba' : 'Blantyre'} ({selectedLocationCode})
+                    Scope: {getScopeDisplayLabel(selectedLocationCode, selectedBranchCode)}
                   </span>
                   <span style={S.badge('#f1f5f9', '#475569')}>
                     Last event: {rel(summary.lastEventAt)}
@@ -563,7 +581,7 @@ export default function AdminPOSSyncMonitor({ selectedLocationCode = 'BT', selec
                     Agent: {summary.agentHealthy ? 'reachable' : 'unreachable'}
                   </span>
                   <span style={S.badge('#f1f5f9', '#475569')}>
-                    Scope: {selectedLocationCode === 'ZA' ? 'Zomba' : 'Blantyre'} ({selectedLocationCode})
+                    Scope: {getScopeDisplayLabel(selectedLocationCode, selectedBranchCode)}
                   </span>
                   <span style={S.badge('#f1f5f9', '#475569')}>
                     Last event: {rel(summary.lastEventAt)}

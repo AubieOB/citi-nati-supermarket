@@ -3124,12 +3124,12 @@ async function pollAndProcessEmergencySales() {
         const resultSummary = await writeEmergencySaleToPos(sale);
 
         await commandQueueClient.ackEmergencySaleSynced({
-        sale_ref: sale.sale_ref,
-        emergency_sale_id: sale.emergency_sale_id,
-        pos_invoice_no: resultSummary && resultSummary.invoiceCode ? resultSummary.invoiceCode : null,
-        branchCode: BRANCH_CODE,
-        locationCode: appConfig.posDb.locationCode,
-      });
+          sale_ref: sale.sale_ref,
+          emergency_sale_id: sale.emergency_sale_id,
+          pos_invoice_no: resultSummary && resultSummary.invoiceCode ? resultSummary.invoiceCode : null,
+          branchCode: appConfig.branch.branchCode,
+          locationCode: sale && sale.payload && sale.payload.locationCode ? sale.payload.locationCode : appConfig.posDb.locationCode,
+        });
 
         console.log(`${BRANCH_TAG} [EMERGENCY SALES] sync success:`, {
           saleRef: sale.sale_ref,
@@ -3148,8 +3148,8 @@ async function pollAndProcessEmergencySales() {
           sale_ref: sale.sale_ref,
           emergency_sale_id: sale.emergency_sale_id,
           sync_error: error.message,
-          branchCode: BRANCH_CODE,
-          locationCode: appConfig.posDb.locationCode,
+          branchCode: appConfig.branch.branchCode,
+          locationCode: sale && sale.payload && sale.payload.locationCode ? sale.payload.locationCode : appConfig.posDb.locationCode,
         });
       }
     }
