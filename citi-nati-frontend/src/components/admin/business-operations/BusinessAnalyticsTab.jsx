@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../../../utils/api.js';
-import { getOperationalScopeOptions, resolveOperationalScope } from '../../../utils/operationalScope.js';
+import { resolveOperationalScope } from '../../../utils/operationalScope.js';
 
 
 const cardStyle = {
@@ -946,7 +946,6 @@ const BusinessAnalyticsTab = ({
   selectedLocationId = null,
   selectedBranchCode = '',
   selectedLocationCode = '',
-  locations = [],
 }) => {
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
   const now = new Date();
@@ -1290,16 +1289,6 @@ const BusinessAnalyticsTab = ({
   useEffect(() => {
     computeAnalytics();
   }, [computeAnalytics]);
-
-  const locationOptions = useMemo(() => {
-    const rows = (locations || []).map((row) => ({ id: String(row.id), label: row.name }));
-    getOperationalScopeOptions().forEach((scope) => {
-      if (!rows.find((row) => row.label.toLowerCase() === scope.label.toLowerCase())) {
-        rows.push({ id: `code:${scope.locationCode}`, label: scope.label });
-      }
-    });
-    return rows;
-  }, [locations]);
 
   const activeToolConfig = useMemo(
     () => ANALYSIS_TOOLS.find((tool) => tool.id === activeTool) || ANALYSIS_TOOLS[0],
@@ -1831,16 +1820,6 @@ const BusinessAnalyticsTab = ({
           </label>
         </>
       )}
-      <label style={{ display: 'grid', gap: '0.35rem' }}>
-        <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Branch Scope</span>
-        <select value={scope} onChange={(e) => setScope(e.target.value)} style={{ border: '1px solid #cbd5e1', borderRadius: '9px', padding: '0.5rem 0.6rem' }}>
-          <option value="inherit">Inherit BO Scope</option>
-          <option value="all">All Branches</option>
-          {locationOptions.map((row) => (
-            <option key={row.id} value={row.id}>{row.label}</option>
-          ))}
-        </select>
-      </label>
     </div>
   );
 
