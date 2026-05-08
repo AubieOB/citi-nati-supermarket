@@ -527,6 +527,17 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
   const [transferEndDate, setTransferEndDate] = useState('');
   const [priceSyncStatusFilter, setPriceSyncStatusFilter] = useState('all');
 
+  // Product search picker state
+  const [productPickerOpen, setProductPickerOpen] = useState(false);
+  const [productPickerRowIndex, setProductPickerRowIndex] = useState(-1);
+  const [productPickerQuery, setProductPickerQuery] = useState('');
+  const [productPickerResults, setProductPickerResults] = useState([]);
+  const [productPickerLoading, setProductPickerLoading] = useState(false);
+  const [productPickerError, setProductPickerError] = useState('');
+  const [productPickerHighlightedIndex, setProductPickerHighlightedIndex] = useState(0);
+  const productPickerInputRef = useRef(null);
+  const productPickerTimeoutRef = useRef(null);
+
   const activeLookupLocationCode = useMemo(() => {
     const formLocationCode = String(form.locationCode || '').trim().toUpperCase();
     if (formLocationCode) return formLocationCode;
@@ -755,13 +766,34 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     const handler = (event) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        // Route Escape through the same safe close flow as the modal close button.
-        handleCloseWorkspace();
+        if (productPickerOpen) {
+          closeProductPicker();
+        } else {
+          handleCloseWorkspace();
+        }
+      } else if (event.key === 'F1') {
+        event.preventDefault();
+        // F1 opens product picker for the focused row
+        const activeElement = document.activeElement;
+        if (activeElement && activeElement.dataset?.rowIndex !== undefined) {
+          const rowIndex = Number(activeElement.dataset.rowIndex);
+          if (!Number.isNaN(rowIndex) && rowIndex >= 0) {
+            const query = String(activeElement.value || '').trim();
+            openProductPicker(rowIndex, query);
+          }
+        }
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleCloseWorkspace, isIntakeWorkspaceOpen]);
+  }, [handleCloseWorkspace, isIntakeWorkspaceOpen, productPickerOpen, closeProductPicker, openProductPicker]);
+
+  useEffect(() => {
+    if (productPickerOpen) {
+      window.addEventListener('keydown', handleProductPickerKeyDown);
+      return () => window.removeEventListener('keydown', handleProductPickerKeyDown);
+    }
+  }, [productPickerOpen, handleProductPickerKeyDown]);
 
   const setLineValue = (index, key, value) => {
     setForm((prev) => ({
@@ -1231,6 +1263,148 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     }
   };
 
+  // Product picker helpers
+  const fetchProductPickerResults = useCallback(async (query) => {
+    if (!query || !activeLookupLocationCode) {
+      setProductPickerResults([]);
+      setProductPickerError('');
+      return;
+    }
+
+    setProductPickerLoading(true);
+    setProductPickerError('');
+    try {
+      const response = await api.get('/business-operations/goods-intake/lookup-products', {
+        params: buildScopedParams({
+          q: query,
+        }, effectiveBranchCode, activeLookupLocationCode, selectedLocationId),
+      });
+      const products = response.data?.products || [];
+      setProductPickerResults(products);
+      setProductPickerHighlightedIndex(0);
+      if (products.length === 0) {
+        setProductPickerError(`No products found for "${query}" in this branch/location.`);
+      }
+    } catch (error) {
+      setProductPickerResults([]);
+      setProductPickerError('Failed to search products. Please try again.');
+      console.error('Product picker search error:', error);
+    } finally {
+      setProductPickerLoading(false);
+    }
+  }, [effectiveBranchCode, activeLookupLocationCode, selectedLocationId]);
+
+  const openProductPicker = useCallback((rowIndex, initialQuery = '') => {
+    if (rowIndex < 0 || rowIndex >= (form.items || []).length) return;
+    setProductPickerOpen(true);
+    setProductPickerRowIndex(rowIndex);
+    setProductPickerQuery(initialQuery);
+    setProductPickerResults([]);
+    setProductPickerError('');
+    setProductPickerHighlightedIndex(0);
+    
+    setTimeout(() => {
+      productPickerInputRef.current?.focus();
+      productPickerInputRef.current?.select?.();
+    }, 100);
+  }, [form.items]);
+
+  const closeProductPicker = useCallback(() => {
+    setProductPickerOpen(false);
+    setProductPickerRowIndex(-1);
+    setProductPickerQuery('');
+    setProductPickerResults([]);
+    setProductPickerError('');
+    setProductPickerHighlightedIndex(0);
+    if (productPickerTimeoutRef.current) {
+      clearTimeout(productPickerTimeoutRef.current);
+    }
+  }, []);
+
+  const applyProductToLine = useCallback((product, rowIndex) => {
+    if (!product || rowIndex < 0) return;
+
+    const lookupPriceCandidates = [
+      product?.sellingPrice,
+      product?.selling_price,
+      product?.unitPrice,
+      product?.unit_price,
+      product?.price,
+    ];
+    const resolvedSellingPrice = lookupPriceCandidates.find((value) => Number.isFinite(Number(value)) && Number(value) >= 0);
+    const resolvedEffectiveStockRaw = product?.effectiveStock ?? product?.effective_stock ?? product?.posStock ?? product?.pos_stock ?? product?.stock;
+    const resolvedEffectiveStock = Number.isFinite(Number(resolvedEffectiveStockRaw)) ? Number(resolvedEffectiveStockRaw) : null;
+
+    setLiveLineStockByProductId((prev) => ({
+      ...prev,
+      [Number(product.id || 0)]: {
+        latestSyncedStock: resolvedEffectiveStock,
+        stockStatus: String(product?.stockStatus || product?.stock_status || ''),
+      },
+    }));
+
+    setForm((prev) => ({
+      ...prev,
+      items: (prev.items || []).map((item, itemIndex) => {
+        if (itemIndex !== rowIndex) return item;
+        return {
+          ...item,
+          productId: product.id || null,
+          barcode: product.barcode || product.productCode || '',
+          productName: product.name || item.productName,
+          sellingPrice: resolvedSellingPrice ?? item.sellingPrice ?? '',
+          latestSyncedStock: resolvedEffectiveStock,
+          stockStatus: String(product?.stockStatus || product?.stock_status || ''),
+        };
+      }),
+    }));
+
+    closeProductPicker();
+  }, [closeProductPicker]);
+
+  const handleProductPickerSearch = useCallback((query) => {
+    setProductPickerQuery(query);
+    if (productPickerTimeoutRef.current) {
+      clearTimeout(productPickerTimeoutRef.current);
+    }
+    productPickerTimeoutRef.current = setTimeout(() => {
+      fetchProductPickerResults(query);
+    }, 300);
+  }, [fetchProductPickerResults]);
+
+  const handleProductPickerKeyDown = useCallback((event) => {
+    if (!productPickerOpen) return;
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeProductPicker();
+      return;
+    }
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setProductPickerHighlightedIndex((prev) => 
+        Math.min(prev + 1, productPickerResults.length - 1)
+      );
+      return;
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setProductPickerHighlightedIndex((prev) => Math.max(prev - 1, 0));
+      return;
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      if (productPickerResults.length > 0 && productPickerHighlightedIndex >= 0) {
+        const product = productPickerResults[productPickerHighlightedIndex];
+        applyProductToLine(product, productPickerRowIndex);
+      }
+      return;
+    }
+  }, [productPickerOpen, productPickerResults, productPickerHighlightedIndex, productPickerRowIndex, closeProductPicker, applyProductToLine]);
+
   const refreshResolvedLineStock = useCallback(async () => {
     if (!isIntakeWorkspaceOpen || !activeLookupLocationCode || resolvedLineProductIds.length === 0) {
       return;
@@ -1642,19 +1816,33 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                   <tr key={`line-${index}`}>
                     <td style={{ fontWeight: 700, color: colors.subtleText, fontSize: '0.8rem', padding: '0.5rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>{index + 1}</td>
                     <td style={{ padding: '0.4rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
-                      <input
-                        value={line.barcode || ''}
-                        onFocus={selectInputText}
-                        onKeyDown={(event) => handleEntryFieldEnter(event, { lookupRowIndex: index })}
-                        onChange={(event) => setLineValue(index, 'barcode', event.target.value)}
-                        onBlur={() => handleLookup(index)}
-                        style={{ ...compactLineInputStyle, backgroundColor: line.productName && !line.barcode ? (isAdminDarkTheme ? '#26201a' : '#fff7ed') : compactLineInputStyle.backgroundColor }}
-                        placeholder="scan/manual"
-                      />
+                      <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'flex-start' }}>
+                        <input
+                          data-row-index={index}
+                          value={line.barcode || ''}
+                          onFocus={selectInputText}
+                          onKeyDown={(event) => handleEntryFieldEnter(event, { lookupRowIndex: index })}
+                          onChange={(event) => setLineValue(index, 'barcode', event.target.value)}
+                          onBlur={() => handleLookup(index)}
+                          style={{ ...compactLineInputStyle, backgroundColor: line.productName && !line.barcode ? (isAdminDarkTheme ? '#26201a' : '#fff7ed') : compactLineInputStyle.backgroundColor, flex: 1 }}
+                          placeholder="scan/manual"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => openProductPicker(index, line.barcode || '')}
+                          style={{ padding: '0.35rem 0.5rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, lineHeight: 1, transition: 'background 0.15s' }}
+                          onMouseEnter={(e) => e.target.style.background = '#1d4ed8'}
+                          onMouseLeave={(e) => e.target.style.background = '#2563eb'}
+                          title="Press F1 or click to search products"
+                        >
+                          🔍
+                        </button>
+                      </div>
                       <div style={{ marginTop: '0.18rem', fontSize: '0.7rem', color: colors.mutedText, lineHeight: 1.25, overflowWrap: 'anywhere' }}>{line.barcode || '-'}</div>
                     </td>
                     <td style={{ padding: '0.4rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
                       <input
+                        data-row-index={index}
                         value={line.productName || ''}
                         onFocus={selectInputText}
                         onKeyDown={(event) => handleEntryFieldEnter(event, { lookupRowIndex: index })}
@@ -2359,6 +2547,121 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                     })}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {productPickerOpen && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(12, 14, 18, 0.72)', zIndex: 180, display: 'grid', placeItems: 'center', padding: '1rem' }}>
+          <div style={{ ...themedCardStyle, width: 'min(900px, 95vw)', maxHeight: '90vh', overflow: 'hidden', borderRadius: '18px', display: 'flex', flexDirection: 'column', padding: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.85rem', flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontSize: '0.82rem', fontWeight: 800, color: colors.strongText }}>Product Search</div>
+                <div style={{ marginTop: '0.15rem', fontSize: '0.74rem', color: colors.mutedText }}>Search by product name, barcode, or code • Press F1 to open • Arrow keys to navigate • Enter to select</div>
+              </div>
+              <button
+                type="button"
+                onClick={closeProductPicker}
+                style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: isAdminDarkTheme ? '#2d1a1a' : '#fff5f5', color: '#b91c1c', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <i className="fas fa-times" />
+              </button>
+            </div>
+
+            <input
+              ref={productPickerInputRef}
+              type="text"
+              value={productPickerQuery}
+              onChange={(event) => handleProductPickerSearch(event.target.value)}
+              onKeyDown={handleProductPickerKeyDown}
+              placeholder="Search products by name, barcode, or code..."
+              style={{ ...themedInputStyle, marginBottom: '0.85rem', fontSize: '0.9rem', padding: '0.55rem 0.7rem' }}
+              autoFocus
+            />
+
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingRight: '0.2rem', border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '12px' }}>
+              {productPickerLoading && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '150px', color: colors.mutedText }}>
+                  <div>Searching...</div>
+                </div>
+              )}
+
+              {!productPickerLoading && productPickerError && (
+                <div style={{ padding: '1rem', color: '#b91c1c', fontSize: '0.85rem', textAlign: 'center' }}>
+                  {productPickerError}
+                </div>
+              )}
+
+              {!productPickerLoading && productPickerResults.length === 0 && !productPickerError && (
+                <div style={{ padding: '1rem', color: colors.mutedText, fontSize: '0.85rem', textAlign: 'center' }}>
+                  {productPickerQuery ? 'No results. Try a different search.' : 'Enter a search term to find products.'}
+                </div>
+              )}
+
+              {!productPickerLoading && productPickerResults.length > 0 && (
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: isAdminDarkTheme ? '#2a2a2a' : '#f8fafc', stickyTop: 0 }}>
+                      {['Product Name', 'Barcode', 'Code', 'Price', 'Stock', 'Status'].map((label) => (
+                        <th key={label} style={{ textAlign: 'left', padding: '0.6rem 0.65rem', fontSize: '0.76rem', fontWeight: 700, color: colors.mutedText, borderBottom: `2px solid ${colors.tableBorder}` }}>{label}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {productPickerResults.map((product, resultIndex) => {
+                      const isHighlighted = resultIndex === productPickerHighlightedIndex;
+                      const displayStock = product?.effectiveStock ?? product?.effective_stock ?? product?.posStock ?? product?.pos_stock ?? product?.stock ?? null;
+                      const stockStatus = String(product?.stockStatus || product?.stock_status || '');
+                      const stockTone = stockStatus === 'out_of_stock'
+                        ? { color: '#b91c1c', bg: isAdminDarkTheme ? '#2d1a1a' : '#fff1f2' }
+                        : stockStatus === 'low_stock'
+                          ? { color: '#b45309', bg: isAdminDarkTheme ? '#242418' : '#fffbeb' }
+                          : { color: '#166534', bg: isAdminDarkTheme ? '#1a2a1a' : '#f0fdf4' };
+
+                      return (
+                        <tr
+                          key={`product-${product.id || resultIndex}`}
+                          onClick={() => applyProductToLine(product, productPickerRowIndex)}
+                          onMouseEnter={() => setProductPickerHighlightedIndex(resultIndex)}
+                          style={{
+                            background: isHighlighted ? (isAdminDarkTheme ? '#2a5a3a' : '#eff6ff') : 'transparent',
+                            cursor: 'pointer',
+                            borderBottom: `1px solid ${colors.tableBorder}`,
+                            transition: 'background 0.1s',
+                          }}
+                        >
+                          <td style={{ padding: '0.65rem 0.65rem', color: colors.text, fontSize: '0.82rem', fontWeight: 600 }}>{product.name || '-'}</td>
+                          <td style={{ padding: '0.65rem 0.65rem', color: colors.mutedText, fontSize: '0.8rem' }}>{product.barcode || '-'}</td>
+                          <td style={{ padding: '0.65rem 0.65rem', color: colors.mutedText, fontSize: '0.8rem' }}>{product.sourceCode || product.productCode || '-'}</td>
+                          <td style={{ padding: '0.65rem 0.65rem', color: colors.strongText, fontSize: '0.82rem', fontWeight: 700 }}>{money(product.sellingPrice || product.selling_price || product.unitPrice || product.unit_price || product.price || 0)}</td>
+                          <td style={{ padding: '0.65rem 0.65rem', color: colors.text, fontSize: '0.82rem' }}>{displayStock == null ? 'Unknown' : Number(displayStock).toLocaleString('en-US')}</td>
+                          <td style={{ padding: '0.65rem 0.65rem' }}>
+                            <span style={{ border: `1px solid ${stockTone.color}`, background: stockTone.bg, color: stockTone.color, borderRadius: '999px', padding: '0.12rem 0.4rem', fontSize: '0.7rem', fontWeight: 700, display: 'inline-block' }}>
+                              {stockStatus || 'Unknown'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div style={{ marginTop: '0.85rem', fontSize: '0.75rem', color: colors.mutedText, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div>
+                {productPickerResults.length > 0 && (
+                  <span>
+                    Showing {productPickerHighlightedIndex + 1} of {productPickerResults.length}
+                  </span>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <span>ESC to close</span>
+                {productPickerResults.length > 0 && <span>↑↓ to navigate</span>}
+                {productPickerResults.length > 0 && <span>⏎ to select</span>}
               </div>
             </div>
           </div>
