@@ -1016,6 +1016,8 @@ const BusinessAnalyticsTab = ({
 
   const refreshInFlightRef = useRef(false);
   const hasLoadedOnceRef = useRef(false);
+
+  const selectedPeriod = useMemo(() => {
     const period = {
       periodType: filters.periodType,
       date: filters.date,
