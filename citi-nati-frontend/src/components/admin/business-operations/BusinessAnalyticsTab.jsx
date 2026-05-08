@@ -2540,7 +2540,7 @@ const BusinessAnalyticsTab = ({
                                 <button type="button" onClick={runAnalysis} style={{ border: '1px solid #1d4ed8', background: 'linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%)', color: '#fff', borderRadius: '10px', padding: '0.54rem 0.86rem', fontWeight: 900, letterSpacing: '0.02em', cursor: 'pointer', boxShadow: '0 10px 20px rgba(37, 99, 235, 0.28)' }}>
                                   <i className="fas fa-play" style={{ marginRight: '0.34rem', fontSize: '0.72rem' }}></i>Run Calculation
                                 </button>
-                                <button type="button" onClick={() => { const r = { ...analysis.inputs }; Object.keys(r).forEach((k) => { r[k] = k === 'projectedGrowthPct' ? 10 : 0; }); setAnalysis.inputs(r); setAnalysisResult(null); }} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.5rem 0.8rem', fontWeight: 800, cursor: 'pointer' }}>
+                                <button type="button" onClick={() => { const r = { ...analysisInputs }; Object.keys(r).forEach((k) => { r[k] = k === 'projectedGrowthPct' ? 10 : 0; }); setAnalysisInputs(r); setAnalysisResult(null); }} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.5rem 0.8rem', fontWeight: 800, cursor: 'pointer' }}>
                                   <i className="fas fa-rotate-left" style={{ marginRight: '0.34rem', fontSize: '0.72rem' }}></i>Reset Inputs
                                 </button>
                               </div>
