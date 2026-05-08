@@ -393,7 +393,19 @@ function toFormFromRecord(record) {
   };
 }
 
-const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions = {} }) => {
+function normalizeCode(code) {
+  return String(code || '').trim().toUpperCase();
+}
+
+function buildScopedParams(params, branchCode, locationCode, locationId) {
+  const scoped = { ...params };
+  if (branchCode) scoped.branchCode = branchCode;
+  if (locationCode) scoped.locationCode = locationCode;
+  if (locationId) scoped.locationId = locationId;
+  return scoped;
+}
+
+const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', selectedLocationCode = '', permissions = {} }) => {
   const workspaceRef = useRef(null);
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
   const canViewForm = permissions.canViewForm !== false;
@@ -451,12 +463,16 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
   const [endDate, setEndDate] = useState('');
   const [page, setPage] = useState(1);
 
-  const selectedLocation = useMemo(() => {
-    if (!selectedLocationId) return null;
-    return locations.find((location) => Number(location.id) === Number(selectedLocationId)) || null;
-  }, [locations, selectedLocationId]);
+  const effectiveBranchCode = normalizeCode(selectedBranchCode);
+  const effectiveLocationCode = normalizeCode(selectedLocationCode);
 
-  const [form, setForm] = useState(() => buildNewForm(selectedLocation));
+  const scopeParams = useMemo(() => ({
+    branchCode: effectiveBranchCode || undefined,
+    locationCode: effectiveLocationCode || undefined,
+    locationId: selectedLocationId || undefined,
+  }), [effectiveBranchCode, effectiveLocationCode, selectedLocationId]);
+
+  const [form, setForm] = useState(() => buildNewForm({ code: effectiveLocationCode, name: '' }));
   const [activeAutosaveId, setActiveAutosaveId] = useState(() => createGoodsIntakeAutosaveId());
   const [autosaveEntries, setAutosaveEntries] = useState(() => readGoodsIntakeAutosaves());
   const [liveLineStockByProductId, setLiveLineStockByProductId] = useState({});
@@ -489,18 +505,18 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
   const activeLookupLocationCode = useMemo(() => {
     const formLocationCode = String(form.locationCode || '').trim().toUpperCase();
     if (formLocationCode) return formLocationCode;
-    return normalizeLocationCode(selectedLocation);
-  }, [form.locationCode, selectedLocation]);
+    return effectiveLocationCode;
+  }, [form.locationCode, effectiveLocationCode]);
 
   useEffect(() => {
     if (form.id) return;
     setForm((prev) => ({
       ...prev,
-      locationId: selectedLocation ? String(selectedLocation.id) : '',
-      locationCode: selectedLocation?.code || normalizeLocationCode(selectedLocation),
-      locationName: selectedLocation?.name || '',
+      locationId: selectedLocationId ? String(selectedLocationId) : '',
+      locationCode: effectiveLocationCode,
+      locationName: '',
     }));
-  }, [form.id, selectedLocation]);
+  }, [form.id, effectiveLocationCode, selectedLocationId]);
 
   useEffect(() => {
     if (activeLookupLocationCode) {
@@ -570,6 +586,11 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
     if (String(form.manualSupplierName || '').trim()) return String(form.manualSupplierName).trim();
     return 'Supplier Name';
   }, [form.manualSupplierName, form.supplierId, suppliers]);
+
+  const selectedLocation = useMemo(() => ({
+    code: effectiveLocationCode,
+    name: '',
+  }), [effectiveLocationCode]);
 
   const finalizedRecordsCount = useMemo(
     () => records.filter((record) => String(record.status || '').toLowerCase() === 'finalized').length,
@@ -647,17 +668,16 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
 
     try {
       const response = await api.get('/business-operations/goods-intake', {
-        params: {
+        params: buildScopedParams({
           page,
           pageSize: 15,
           sortBy: 'purchaseDate',
           sortOrder: 'desc',
           search: search || undefined,
           status: statusFilter !== DEFAULT_STATUS_FILTER ? statusFilter : undefined,
-          locationId: selectedLocationId || undefined,
           startDate: startDate || undefined,
           endDate: endDate || undefined,
-        },
+        }, effectiveBranchCode, effectiveLocationCode, selectedLocationId),
       });
 
       setRecords(response.data?.data || []);
@@ -669,24 +689,19 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
     } finally {
       setListLoading(false);
     }
-  }, [endDate, page, search, selectedLocationId, startDate, statusFilter]);
+  }, [effectiveBranchCode, effectiveLocationCode, endDate, page, search, selectedLocationId, startDate, statusFilter]);
 
   const fetchSuppliers = useCallback(async () => {
     setSupplierLoading(true);
     try {
-      const branchCode = branchCodeForLocationCode(activeLookupLocationCode || normalizeLocationCode(selectedLocation));
-      const supplierLocationId = branchCode ? undefined : (selectedLocationId || undefined);
       const response = await api.get('/business-operations/suppliers', {
-        params: {
+        params: buildScopedParams({
           page: 1,
           pageSize: 200,
           sortBy: 'name',
           sortOrder: 'asc',
-          locationId: supplierLocationId,
-          branchCode: branchCode || undefined,
-          requirePosLinked: branchCode ? true : undefined,
           status: 'active',
-        },
+        }, effectiveBranchCode, effectiveLocationCode, selectedLocationId),
       });
       setSuppliers(response.data?.data || []);
     } catch (_error) {
@@ -694,7 +709,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
     } finally {
       setSupplierLoading(false);
     }
-  }, [activeLookupLocationCode, selectedLocation, selectedLocationId]);
+  }, [effectiveBranchCode, effectiveLocationCode, selectedLocationId]);
 
   useEffect(() => {
     fetchRecords();
@@ -706,7 +721,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, locations = [], permissions
 
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter, startDate, endDate, selectedLocationId]);
+  }, [search, statusFilter, startDate, endDate, effectiveBranchCode, effectiveLocationCode, selectedLocationId]);
 
   useEffect(() => {
     if (!isIntakeWorkspaceOpen) return;
