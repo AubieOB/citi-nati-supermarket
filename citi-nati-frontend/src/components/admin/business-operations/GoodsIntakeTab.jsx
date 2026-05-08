@@ -189,6 +189,10 @@ function normalizeLocationCode(location) {
   return location?.code ? String(location.code).trim().toUpperCase() : '';
 }
 
+function normalizeCode(value) {
+  return String(value || '').trim().toUpperCase() || null;
+}
+
 function selectInputText(event) {
   const target = event?.target;
   if (!target) return;
@@ -217,7 +221,7 @@ function focusNextWorkspaceField(container, currentField) {
   }
 }
 
-function buildNewForm(selectedLocation) {
+function buildNewForm(selectedLocation, branchCode) {
   return {
     id: null,
     intakeRef: '',
@@ -227,6 +231,7 @@ function buildNewForm(selectedLocation) {
     purchaseDate: localDateKey(new Date()),
     receiptReference: '',
     locationId: selectedLocation ? String(selectedLocation.id) : '',
+    branchCode: branchCode || '',
     locationCode: selectedLocation?.code || normalizeLocationCode(selectedLocation),
     locationName: selectedLocation?.name || '',
     overallNotes: '',
@@ -301,6 +306,7 @@ function sanitizeGoodsIntakeAutosaveForm(form) {
     purchaseDate: form?.purchaseDate || localDateKey(new Date()),
     receiptReference: form?.receiptReference || '',
     locationId: form?.locationId || '',
+    branchCode: form?.branchCode || '',
     locationCode: form?.locationCode || '',
     locationName: form?.locationName || '',
     overallNotes: form?.overallNotes || '',
@@ -336,6 +342,7 @@ function toPayload(form, items) {
     purchaseDate: form.purchaseDate,
     receiptReference: form.receiptReference || null,
     locationId: form.locationId ? Number(form.locationId) : null,
+    branchCode: form.branchCode || null,
     locationCode: form.locationCode || null,
     locationName: form.locationName || null,
     overallNotes: form.overallNotes || null,
@@ -366,6 +373,7 @@ function toFormFromRecord(record) {
     purchaseDate: dateInputValue(record.purchaseDate),
     receiptReference: record.receiptReference || '',
     locationId: record.locationId ? String(record.locationId) : '',
+    branchCode: record.branchCode || '',
     locationCode: record.locationCode || '',
     locationName: record.locationName || '',
     overallNotes: record.overallNotes || '',
@@ -472,7 +480,17 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     locationId: selectedLocationId || undefined,
   }), [effectiveBranchCode, effectiveLocationCode, selectedLocationId]);
 
-  const [form, setForm] = useState(() => buildNewForm({ code: effectiveLocationCode, name: '' }));
+  const scopeLabel = useMemo(() => {
+    if (effectiveBranchCode && effectiveLocationCode) {
+      return `${effectiveBranchCode} / ${effectiveLocationCode}`;
+    }
+    if (effectiveLocationCode) {
+      return effectiveLocationCode;
+    }
+    return 'All Locations';
+  }, [effectiveBranchCode, effectiveLocationCode]);
+
+  const [form, setForm] = useState(() => buildNewForm({ code: effectiveLocationCode, name: '' }, effectiveBranchCode));
   const [activeAutosaveId, setActiveAutosaveId] = useState(() => createGoodsIntakeAutosaveId());
   const [autosaveEntries, setAutosaveEntries] = useState(() => readGoodsIntakeAutosaves());
   const [liveLineStockByProductId, setLiveLineStockByProductId] = useState({});
@@ -513,10 +531,11 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     setForm((prev) => ({
       ...prev,
       locationId: selectedLocationId ? String(selectedLocationId) : '',
+      branchCode: effectiveBranchCode,
       locationCode: effectiveLocationCode,
       locationName: '',
     }));
-  }, [form.id, effectiveLocationCode, selectedLocationId]);
+  }, [form.id, effectiveBranchCode, effectiveLocationCode, selectedLocationId]);
 
   useEffect(() => {
     if (activeLookupLocationCode) {
@@ -549,6 +568,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
       savedAt: new Date().toISOString(),
       supplierName,
       lineCount,
+      branchCode: form.branchCode || effectiveBranchCode || '',
       locationCode: form.locationCode || normalizeLocationCode(selectedLocation) || '',
       locationName: form.locationName || selectedLocation?.name || '',
       purchaseDate: form.purchaseDate || '',
@@ -817,7 +837,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
       : [createEmptyLine()];
 
     setForm({
-      ...buildNewForm(selectedLocation),
+      ...buildNewForm(selectedLocation, effectiveBranchCode),
       ...entry.form,
       id: null,
       intakeRef: '',
@@ -838,7 +858,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     setLastFinalizePriceSync(null);
     setActivePriceSyncRecord(null);
     setActiveAutosaveId(createGoodsIntakeAutosaveId());
-    setForm(buildNewForm(selectedLocation));
+    setForm(buildNewForm(selectedLocation, effectiveBranchCode));
   };
 
   const openWorkspace = ({ reset = false } = {}) => {
@@ -848,7 +868,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
       setLastFinalizePriceSync(null);
       setActivePriceSyncRecord(null);
       setActiveAutosaveId(createGoodsIntakeAutosaveId());
-      setForm(buildNewForm(selectedLocation));
+      setForm(buildNewForm(selectedLocation, effectiveBranchCode));
     }
     setIsIntakeWorkspaceMaximized(false);
     setIsIntakeWorkspaceOpen(true);
@@ -1039,34 +1059,32 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     const manualGrn = normalizeTransferGrnInput(isCurrentFormRecord ? form.transferManualGrn : '');
     const manualGrnOverride = isCurrentFormRecord && form.transferGrnMode === 'manual';
     const agentLabel = posAgentLabel(recordLocationCode);
-    const recordBranchCode = branchCodeForLocationCode(recordLocationCode);
+    const recordBranchCode = String(
+      (isCurrentFormRecord ? form.branchCode : matchedRecord?.branchCode) || effectiveBranchCode || ''
+    ).trim().toUpperCase() || branchCodeForLocationCode(recordLocationCode);
     const transferSupplierId = isCurrentFormRecord
       ? Number(form.supplierId || 0)
       : Number(matchedRecord?.supplierId || 0);
 
     if (transferSupplierId > 0 && recordBranchCode) {
       const selectedSupplier = suppliers.find((entry) => Number(entry.id) === transferSupplierId);
-      if (transferSupplierId > 0 && recordBranchCode) {
-  const selectedSupplier = suppliers.find((entry) => Number(entry.id) === transferSupplierId);
+      const posLinks = Array.isArray(selectedSupplier?.posLinks) ? selectedSupplier.posLinks : [];
 
-  const posLinks = Array.isArray(selectedSupplier?.posLinks) ? selectedSupplier.posLinks : [];
+      const hasBranchLink = posLinks.some((link) =>
+        String(link.branchCode || '').trim().toUpperCase() === recordBranchCode
+        && Number(link.posSupplierCode || 0) > 0
+      );
 
-  const hasBranchLink = posLinks.some((link) =>
-    String(link.branchCode || '').trim().toUpperCase() === recordBranchCode
-    && Number(link.posSupplierCode || 0) > 0
-  );
-
-  // Only block when posLinks were actually loaded and clearly show no match.
-  // If posLinks were not included in the supplier list response, let backend validate.
-  if (posLinks.length > 0 && !hasBranchLink) {
-    await boAlert({
-      title: 'Supplier Not POS-Linked',
-      message: 'This supplier is not linked to a POS SupplierCode for this branch. Sync or link supplier first.',
-      type: 'warning',
-    });
-    return;
-  }
-}
+      // Only block when posLinks were actually loaded and clearly show no match.
+      // If posLinks were not included in the supplier list response, let backend validate.
+      if (posLinks.length > 0 && !hasBranchLink) {
+        await boAlert({
+          title: 'Supplier Not POS-Linked',
+          message: 'This supplier is not linked to a POS SupplierCode for this branch. Sync or link supplier first.',
+          type: 'warning',
+        });
+        return;
+      }
     }
 
     if (manualGrnOverride && !manualGrn) {
@@ -1090,6 +1108,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
       const response = await api.post(`/business-operations/goods-intake/${recordId}/transfer-to-pos`, {
         manualGrnOverride,
         requestedGrn: manualGrnOverride ? manualGrn : null,
+        branchCode: recordBranchCode || undefined,
         locationCode: recordLocationCode || undefined,
       });
       const result = response.data;
@@ -1886,7 +1905,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                         <div style={{ display: 'grid', gap: '0.2rem' }}>
                           <div style={{ fontSize: '0.88rem', fontWeight: 800, color: colors.strongText }}>{entry.supplierName || 'Unassigned Supplier'}</div>
                           <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                            {entry.locationName || entry.locationCode || 'No location'} • Purchase Date: {entry.purchaseDate || '-'} • Lines: {Number(entry.lineCount || 0)}
+                            {(entry.branchCode && entry.locationCode) ? `${entry.branchCode} / ${entry.locationCode}` : entry.locationName || entry.locationCode || 'No location'} • Purchase Date: {entry.purchaseDate || '-'} • Lines: {Number(entry.lineCount || 0)}
                           </div>
                           <div style={{ fontSize: '0.76rem', color: '#a0a0a0' }}>Last auto-save: {formatDateTime(entry.savedAt)}</div>
                         </div>
@@ -1984,7 +2003,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                         <td style={{ padding: '0.5rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, fontWeight: 700, color: colors.strongText, fontSize: '0.86rem' }}>{record.intakeRef}</td>
                         <td style={{ padding: '0.5rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.84rem' }}>{dateInputValue(record.purchaseDate)}</td>
                         <td style={{ padding: '0.5rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.84rem' }}>{record.supplier?.name || record.manualSupplierName || '-'}</td>
-                        <td style={{ padding: '0.5rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.84rem' }}>{record.locationName || record.locationCode || '-'}</td>
+                        <td style={{ padding: '0.5rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.84rem' }}>{record.branchCode && record.locationCode ? `${record.branchCode} / ${record.locationCode}` : record.locationName || record.locationCode || '-'}</td>
                         <td style={{ padding: '0.5rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}` }}>
                           <span style={{ padding: '0.2rem 0.5rem', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 700, color: record.status === 'finalized' ? '#166534' : '#1d4ed8', backgroundColor: record.status === 'finalized' ? '#ecfdf3' : '#eff6ff', border: `1px solid ${record.status === 'finalized' ? '#bbf7d0' : '#bfdbfe'}` }}>
                             {String(record.status || 'draft').toUpperCase()}
@@ -2117,7 +2136,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                             ) : null}
                           </td>
                           <td style={{ padding: '0.48rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.84rem' }}>{record.supplier?.name || record.manualSupplierName || '-'}</td>
-                          <td style={{ padding: '0.48rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.84rem' }}>{record.locationName || record.locationCode || '-'}</td>
+                          <td style={{ padding: '0.48rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.84rem' }}>{(record.branchCode && record.locationCode) ? `${record.branchCode} / ${record.locationCode}` : record.locationName || record.locationCode || '-'}</td>
                           <td style={{ padding: '0.48rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.84rem' }}>{dateInputValue(record.purchaseDate)}</td>
                           <td style={{ padding: '0.48rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, color: colors.text, fontSize: '0.84rem' }}>{record.totalItems || record._count?.items || 0}</td>
                           <td style={{ padding: '0.48rem 0.4rem', borderBottom: `1px solid ${colors.tableBorder}`, fontWeight: 700, color: colors.strongText, fontSize: '0.84rem' }}>{money(record.totalCost)}</td>
@@ -2283,7 +2302,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingRight: '0.2rem' }}>
               <div style={{ display: 'grid', gap: '0.65rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
                 <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text }}><strong>Supplier:</strong> {activePriceSyncRecord.supplier?.name || activePriceSyncRecord.manualSupplierName || '-'}</div>
-                <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text }}><strong>Location:</strong> {activePriceSyncRecord.locationName || activePriceSyncRecord.locationCode || '-'}</div>
+                <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text }}><strong>Location:</strong> {(activePriceSyncRecord.branchCode && activePriceSyncRecord.locationCode) ? `${activePriceSyncRecord.branchCode} / ${activePriceSyncRecord.locationCode}` : activePriceSyncRecord.locationName || activePriceSyncRecord.locationCode || '-'}</div>
                 <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text }}><strong>Intake Date:</strong> {dateInputValue(activePriceSyncRecord.purchaseDate)}</div>
                 <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text }}><strong>Commands:</strong> {Number(activePriceSyncRecord?.priceSyncSummary?.attempted || 0)}</div>
               </div>
@@ -2362,7 +2381,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingRight: '0.2rem' }}>
               <div style={{ display: 'grid', gap: '0.65rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
                 <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text }}><strong>Supplier:</strong> {transferDetailRecord.supplier?.name || transferDetailRecord.manualSupplierName || '-'}</div>
-                <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text }}><strong>Location:</strong> {transferDetailRecord.locationName || transferDetailRecord.locationCode || '-'}</div>
+                <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text }}><strong>Location:</strong> {(transferDetailRecord.branchCode && transferDetailRecord.locationCode) ? `${transferDetailRecord.branchCode} / ${transferDetailRecord.locationCode}` : transferDetailRecord.locationName || transferDetailRecord.locationCode || '-'}</div>
                 <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text }}><strong>Intake Date:</strong> {dateInputValue(transferDetailRecord.purchaseDate)}</div>
                 <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text }}><strong>Queued:</strong> {formatDateTime(transferDetailRecord.posTransferAt || transferDetailRecord.posTransferCommand?.createdAt)}</div>
                 <div style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text }}><strong>Completed:</strong> {formatDateTime(transferDetailRecord.posTransferCommand?.processedAt)}</div>

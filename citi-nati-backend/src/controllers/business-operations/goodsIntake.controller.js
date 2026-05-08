@@ -259,12 +259,21 @@ async function transferToPOS(req, res) {
     if (!id) return res.status(400).json({ success: false, error: 'Invalid goods intake id' });
 
     // Determine which agent should handle this transfer based on the branch code.
-    const hintBranchCode = String((req.body && req.body.branchCode) || '').trim().toUpperCase();
+    const rawBranchCode = String((req.body && req.body.branchCode) || '').trim().toUpperCase();
+    const hintBranchCode = rawBranchCode === 'BT' ? 'BLANTYRE'
+      : rawBranchCode === 'ZA' ? 'ZOMBA'
+      : rawBranchCode;
     const useZomba = hintBranchCode === 'ZOMBA';
 
     const result = useZomba
-      ? await goodsIntakePosTransferService.transferGoodsIntakeToZombaPosPending(id, req.body || {})
-      : await goodsIntakePosTransferService.transferGoodsIntakeToBlantyrePosPending(id, req.body || {});
+      ? await goodsIntakePosTransferService.transferGoodsIntakeToZombaPosPending(id, {
+          ...req.body,
+          branchCode: hintBranchCode,
+        })
+      : await goodsIntakePosTransferService.transferGoodsIntakeToBlantyrePosPending(id, {
+          ...req.body,
+          branchCode: hintBranchCode,
+        });
     if (!result.success) {
       const statusCode = result.alreadyTransferred ? 409 : 422;
       return res.status(statusCode).json({ success: false, error: result.error, grnNo: result.existingGrn });
