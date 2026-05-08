@@ -1202,7 +1202,9 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
 
     try {
       const response = await api.post('/business-operations/goods-intake/line-stock', {
+        branchCode: effectiveBranchCode,
         locationCode: activeLookupLocationCode,
+        locationId: selectedLocationId || undefined,
         productIds: resolvedLineProductIds,
       });
 

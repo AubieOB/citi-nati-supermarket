@@ -2296,7 +2296,7 @@ const BusinessAnalyticsTab = ({
                                   <input
                                     type="number"
                                     step={fieldDef.step}
-                                    value={analysis.inputs[fieldKey]}
+                                    value={analysisInputs[fieldKey]}
                                     onChange={(event) => updateAnalysisInput(fieldKey, event.target.value)}
                                     style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', border: '1px solid #93c5fd', borderRadius: '10px', padding: '0.58rem 0.62rem', color: '#0f172a', backgroundColor: '#fff', fontFamily: 'Consolas, Menlo, Monaco, monospace', fontWeight: 800, fontSize: '0.95rem', boxShadow: 'inset 0 1px 3px rgba(15, 23, 42, 0.08)' }}
                                   />
@@ -2313,11 +2313,11 @@ const BusinessAnalyticsTab = ({
                             <button
                               type="button"
                               onClick={() => {
-                                const resetValues = { ...analysis.inputs };
+                                const resetValues = { ...analysisInputs };
                                 Object.keys(resetValues).forEach((key) => {
                                   resetValues[key] = key === 'projectedGrowthPct' ? 10 : 0;
                                 });
-                                setAnalysis.inputs(resetValues);
+                                setAnalysisInputs(resetValues);
                                 setAnalysisResult(null);
                               }}
                               style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.5rem 0.8rem', fontWeight: 800, cursor: 'pointer' }}
@@ -2531,7 +2531,7 @@ const BusinessAnalyticsTab = ({
                                   return (
                                     <label key={fieldKey} style={{ display: 'grid', gap: '0.28rem', border: '1px solid #dbeafe', borderRadius: '12px', padding: '0.45rem 0.5rem', backgroundColor: '#f8fbff', minWidth: 0, overflow: 'hidden' }}>
                                       <span style={{ color: '#475569', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.03em' }}>{fieldDef.label}</span>
-                                      <input type="number" step={fieldDef.step} value={analysis.inputs[fieldKey]} onChange={(event) => updateAnalysisInput(fieldKey, event.target.value)} style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', border: '1px solid #93c5fd', borderRadius: '10px', padding: '0.58rem 0.62rem', color: '#0f172a', backgroundColor: '#fff', fontFamily: 'Consolas, Menlo, Monaco, monospace', fontWeight: 800, fontSize: '0.95rem', boxShadow: 'inset 0 1px 3px rgba(15, 23, 42, 0.08)' }} />
+                                      <input type="number" step={fieldDef.step} value={analysisInputs[fieldKey]} onChange={(event) => updateAnalysisInput(fieldKey, event.target.value)} style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', border: '1px solid #93c5fd', borderRadius: '10px', padding: '0.58rem 0.62rem', color: '#0f172a', backgroundColor: '#fff', fontFamily: 'Consolas, Menlo, Monaco, monospace', fontWeight: 800, fontSize: '0.95rem', boxShadow: 'inset 0 1px 3px rgba(15, 23, 42, 0.08)' }} />
                                     </label>
                                   );
                                 })}
