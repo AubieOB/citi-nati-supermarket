@@ -165,10 +165,21 @@ function isPosTransferSupported(code) {
 }
 
 // Human-readable POS agent name for the location
-function posAgentLabel(code) {
-  if (isBlantyreLocationCode(code)) return 'Blantyre POS Agent';
+function posAgentLabel(code, branchCode) {
+  const normalizedBranch = String(branchCode || '').trim().toUpperCase();
+  if (normalizedBranch === 'BLANTYRE') return 'Blantyre POS Agent';
+  if (normalizedBranch === 'ZOMBA') {
+    const c = String(code || '').trim().toUpperCase();
+    if (c === 'ZA' || c === 'SH') return 'Zomba POS Agent (SH)';
+    if (c === 'BAR') return 'Zomba POS Agent (BAR)';
+    if (c === 'ST999') return 'Zomba POS Agent (Restaurant/ST999)';
+    return 'Zomba POS Agent';
+  }
+
   var c = String(code || '').trim().toUpperCase();
-  if (c === 'ZA' || c === 'SH') return 'Zomba POS Agent (SH)';
+  if (isBlantyreLocationCode(code)) return 'Blantyre POS Agent';
+  if (c === 'ZA') return 'Zomba POS Agent (SH)';
+  if (c === 'SH') return 'POS Agent (SH)';
   if (c === 'BAR') return 'Zomba POS Agent (BAR)';
   if (c === 'ST999') return 'Zomba POS Agent (Restaurant/ST999)';
   return 'POS Agent';
@@ -178,7 +189,7 @@ function branchCodeForLocationCode(code) {
   var c = String(code || '').trim().toUpperCase();
   if (!c) return null;
   if (c === 'BT') return 'BLANTYRE';
-  if (c === 'ZA' || c === 'SH' || c === 'BAR' || c === 'ST999') return 'ZOMBA';
+  if (c === 'ZA' || c === 'BAR' || c === 'ST999') return 'ZOMBA';
   return null;
 }
 
@@ -1054,10 +1065,10 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     ).trim().toUpperCase();
     const manualGrn = normalizeTransferGrnInput(isCurrentFormRecord ? form.transferManualGrn : '');
     const manualGrnOverride = isCurrentFormRecord && form.transferGrnMode === 'manual';
-    const agentLabel = posAgentLabel(recordLocationCode);
     const recordBranchCode = String(
       (isCurrentFormRecord ? form.branchCode : matchedRecord?.branchCode) || effectiveBranchCode || ''
     ).trim().toUpperCase() || branchCodeForLocationCode(recordLocationCode);
+    const agentLabel = posAgentLabel(recordLocationCode, recordBranchCode);
     const transferSupplierId = isCurrentFormRecord
       ? Number(form.supplierId || 0)
       : Number(matchedRecord?.supplierId || 0);
