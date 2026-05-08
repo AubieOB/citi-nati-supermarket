@@ -402,38 +402,6 @@ function buildParamsForPeriod(period) {
   return base;
 }
 
-function withScope(params, scope, locations, selectedBranchCode, selectedLocationCodeCanonical, selectedLocationId) {
-  const scoped = { ...params };
-  
-  if (String(scope).startsWith('branch:') && scope.includes(':location:')) {
-    const parts = scope.split(':');
-    scoped.branchCode = parts[1];
-    scoped.locationCode = parts[3];
-    scoped.locationId = selectedLocationId || undefined;
-    return scoped;
-  }
-
-  if (String(scope).startsWith('code:')) {
-    const code = String(scope).slice(5).trim().toUpperCase();
-    const resolved = resolveOperationalScope(code);
-    scoped.locationCode = resolved.locationCode;
-    scoped.branchCode = resolved.branchCode;
-    return scoped;
-  }
-
-  const location = locations.find((row) => String(row.id) === String(scope));
-  if (location?.id) scoped.locationId = Number(location.id);
-  const resolved = resolveOperationalScope(location?.code || location?.uiCode || '');
-  if (resolved?.locationCode) scoped.locationCode = resolved.locationCode;
-  if (resolved?.branchCode) scoped.branchCode = resolved.branchCode;
-  
-  // For 'all' scope, always include selected branch/location as fallback
-  if (scope === 'all' && selectedBranchCode) scoped.branchCode = selectedBranchCode;
-  if (scope === 'all' && selectedLocationCodeCanonical) scoped.locationCode = selectedLocationCodeCanonical;
-  
-  return scoped;
-}
-
 function getCurrentMonthPeriod() {
   const now = new Date();
   return {
@@ -554,7 +522,7 @@ function joinLabels(values = []) {
   return rows.length > 0 ? rows.join(', ') : 'N/A';
 }
 
-const LatestCostProfitSubview = ({ active, selectedPeriod, effectiveScope, locations, scopeLabel, periodLabel, refreshTick, selectedBranchCode, selectedLocationCodeCanonical, selectedLocationId }) => {
+const LatestCostProfitSubview = ({ active, selectedPeriod, scopeLabel, periodLabel, refreshTick, selectedBranchCode, selectedLocationCode, selectedLocationId }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [profitData, setProfitData] = useState(null);
@@ -570,7 +538,7 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, effectiveScope, locat
     setLoading(true);
     setError('');
     try {
-      const params = withScope(buildParamsForPeriod(selectedPeriod), effectiveScope, locations, selectedBranchCode, selectedLocationCodeCanonical, selectedLocationId);
+      const params = buildScopedParams(buildParamsForPeriod(selectedPeriod), selectedBranchCode, selectedLocationCode, selectedLocationId);
       const response = await api.get('/business-operations/reports/sales/profit-latest-cost', { params });
       setProfitData(response?.data?.data || null);
     } catch (err) {
@@ -578,7 +546,7 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, effectiveScope, locat
     } finally {
       setLoading(false);
     }
-  }, [active, effectiveScope, locations, selectedPeriod, selectedBranchCode, selectedLocationCodeCanonical, selectedLocationId]);
+  }, [active, selectedPeriod, selectedBranchCode, selectedLocationCode, selectedLocationId]);
 
   useEffect(() => {
     fetchProfitAnalytics();
@@ -976,25 +944,24 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, effectiveScope, locat
 
 const BusinessAnalyticsTab = ({
   selectedLocationId = null,
+  selectedBranchCode = '',
   selectedLocationCode = '',
   locations = [],
 }) => {
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
   const now = new Date();
 
-  const selectedLocation = useMemo(() => {
-    if (selectedLocationId) {
-      return locations.find(loc => loc.id === selectedLocationId);
-    }
-    if (selectedLocationCode) {
-      return locations.find(loc => loc.code === selectedLocationCode || loc.uiCode === selectedLocationCode);
-    }
-    return null;
-  }, [selectedLocationId, selectedLocationCode, locations]);
+  const effectiveBranchCode = normalizeCode(selectedBranchCode);
+  const effectiveLocationCode = normalizeCode(selectedLocationCode);
+  const scopeLabel = effectiveBranchCode && effectiveLocationCode
+    ? `${effectiveBranchCode} / ${effectiveLocationCode}`
+    : 'All Locations';
+  const scopeParams = useMemo(() => ({
+    branchCode: effectiveBranchCode || undefined,
+    locationCode: effectiveLocationCode || undefined,
+    locationId: selectedLocationId || undefined,
+  }), [effectiveBranchCode, effectiveLocationCode, selectedLocationId]);
 
-  const selectedBranchCode = selectedLocation?.branchCode || '';
-  const selectedLocationCodeCanonical = selectedLocation?.locationCode || '';
-  const [scope, setScope] = useState('inherit');
   const [filters, setFilters] = useState({
     periodType: 'month',
     date: formatDateInput(now),
@@ -1049,45 +1016,6 @@ const BusinessAnalyticsTab = ({
 
   const refreshInFlightRef = useRef(false);
   const hasLoadedOnceRef = useRef(false);
-
-  const inheritedScope = useMemo(() => {
-    if (selectedBranchCode && selectedLocationCodeCanonical) {
-      return `branch:${selectedBranchCode}:location:${selectedLocationCodeCanonical}`;
-    }
-    return 'all';
-  }, [selectedBranchCode, selectedLocationCodeCanonical]);
-
-const effectiveScope = useMemo(() => {
-  if (scope === 'inherit') {
-    return inheritedScope;
-  }
-
-  return scope;
-}, [scope, inheritedScope]);
-
-const scopeLabel = useMemo(() => {
-    if (scope === 'inherit') {
-      if (selectedBranchCode && selectedLocationCodeCanonical) {
-        return `${selectedBranchCode} + ${selectedLocationCodeCanonical}`;
-      }
-      return 'All Locations (inherits BO scope)';
-    }
-
-    if (scope === 'all') {
-      return 'All Locations';
-    }
-
-    if (String(scope).startsWith('code:')) {
-      const resolved = resolveOperationalScope(String(scope).slice(5));
-
-      if (resolved) {
-        return resolved.label;
-      }
-    }
-
-    return 'Selected location';
-  }, [scope, selectedBranchCode, selectedLocationCodeCanonical]);
-  const selectedPeriod = useMemo(() => {
     const period = {
       periodType: filters.periodType,
       date: filters.date,
@@ -1116,12 +1044,12 @@ const scopeLabel = useMemo(() => {
       const now = new Date();
       const thisYear = now.getFullYear();
 
-      const periodParams = withScope(buildParamsForPeriod(selectedPeriod), effectiveScope, locations, selectedBranchCode, selectedLocationCodeCanonical, selectedLocationId);
-      const prevPeriodParams = withScope(buildParamsForPeriod(previousPeriod(selectedPeriod)), effectiveScope, locations, selectedBranchCode, selectedLocationCodeCanonical, selectedLocationId);
-      const monthParams = withScope(buildParamsForPeriod(getCurrentMonthPeriod()), effectiveScope, locations, selectedBranchCode, selectedLocationCodeCanonical, selectedLocationId);
-      const prevMonthParams = withScope(buildParamsForPeriod(previousPeriod(getCurrentMonthPeriod())), effectiveScope, locations, selectedBranchCode, selectedLocationCodeCanonical, selectedLocationId);
-      const yearParams = withScope(buildParamsForPeriod(getCurrentYearPeriod()), effectiveScope, locations, selectedBranchCode, selectedLocationCodeCanonical, selectedLocationId);
-      const prevYearParams = withScope(buildParamsForPeriod(previousPeriod(getCurrentYearPeriod())), effectiveScope, locations, selectedBranchCode, selectedLocationCodeCanonical, selectedLocationId);
+      const periodParams = buildScopedParams(buildParamsForPeriod(selectedPeriod), effectiveBranchCode, effectiveLocationCode, selectedLocationId);
+      const prevPeriodParams = buildScopedParams(buildParamsForPeriod(previousPeriod(selectedPeriod)), effectiveBranchCode, effectiveLocationCode, selectedLocationId);
+      const monthParams = buildScopedParams(buildParamsForPeriod(getCurrentMonthPeriod()), effectiveBranchCode, effectiveLocationCode, selectedLocationId);
+      const prevMonthParams = buildScopedParams(buildParamsForPeriod(previousPeriod(getCurrentMonthPeriod())), effectiveBranchCode, effectiveLocationCode, selectedLocationId);
+      const yearParams = buildScopedParams(buildParamsForPeriod(getCurrentYearPeriod()), effectiveBranchCode, effectiveLocationCode, selectedLocationId);
+      const prevYearParams = buildScopedParams(buildParamsForPeriod(previousPeriod(getCurrentYearPeriod())), effectiveBranchCode, effectiveLocationCode, selectedLocationId);
 
       const MAX_MONTH_POINTS = 6;
       const MAX_YEAR_POINTS = 3;
@@ -1177,13 +1105,16 @@ const scopeLabel = useMemo(() => {
         // 7: users
         api.get('/business-operations/reports/sales/users', { params: { ...periodParams, page: 1, pageSize: 10, sortBy: 'totalSales', sortOrder: 'desc' } }),
         // Trend summaries (capped to keep initial render fast)
-        ...recentMonths.map((p) => api.get('/business-operations/reports/sales/summary', { params: withScope(buildParamsForPeriod(p), effectiveScope, locations, selectedBranchCode, selectedLocationCodeCanonical, selectedLocationId) })),
-        ...recentYears.map((p) => api.get('/business-operations/reports/sales/summary', { params: withScope(buildParamsForPeriod(p), effectiveScope, locations, selectedBranchCode, selectedLocationCodeCanonical, selectedLocationId) })),
-        ...quarters.map((p) => api.get('/business-operations/reports/sales/summary', { params: withScope(buildParamsForPeriod(p), effectiveScope, locations, selectedBranchCode, selectedLocationCodeCanonical, selectedLocationId) })),
+        ...recentMonths.map((p) => api.get('/business-operations/reports/sales/summary', { params: buildScopedParams(buildParamsForPeriod(p), effectiveBranchCode, effectiveLocationCode, selectedLocationId) })),
+        ...recentYears.map((p) => api.get('/business-operations/reports/sales/summary', { params: buildScopedParams(buildParamsForPeriod(p), effectiveBranchCode, effectiveLocationCode, selectedLocationId) })),
+        ...quarters.map((p) => api.get('/business-operations/reports/sales/summary', { params: buildScopedParams(buildParamsForPeriod(p), effectiveBranchCode, effectiveLocationCode, selectedLocationId) })),
         // Daily trend (sampled points for short ranges)
-        ...dailyPeriods.map((p) => api.get('/business-operations/reports/sales/summary', { params: withScope(buildParamsForPeriod(p), effectiveScope, locations, selectedBranchCode, selectedLocationCodeCanonical, selectedLocationId) })),
+        ...dailyPeriods.map((p) => api.get('/business-operations/reports/sales/summary', { params: buildScopedParams(buildParamsForPeriod(p), effectiveBranchCode, effectiveLocationCode, selectedLocationId) })),
         // last 2: branch summaries (BT, ZA)
-        ...branchCodes.map((code) => api.get('/business-operations/reports/sales/summary', { params: withScope({ ...periodParams }, `code:${code}`, locations) })),
+        ...branchCodes.map((code) => {
+          const resolved = resolveOperationalScope(code);
+          return api.get('/business-operations/reports/sales/summary', { params: buildScopedParams({ ...periodParams }, resolved.branchCode, resolved.locationCode, selectedLocationId) });
+        }),
       ]);
 
       const currentSummary = allResponses[0]?.data?.data || {};
@@ -1352,7 +1283,7 @@ const scopeLabel = useMemo(() => {
       hasLoadedOnceRef.current = true;
       refreshInFlightRef.current = false;
     }
-  }, [effectiveScope, locations, scopeLabel, selectedDateRange.label, selectedPeriod, selectedBranchCode, selectedLocationCodeCanonical, selectedLocationId]);
+  }, [effectiveBranchCode, effectiveLocationCode, scopeLabel, selectedDateRange.label, selectedPeriod, selectedLocationId]);
 
   useEffect(() => {
     computeAnalytics();
@@ -2526,13 +2457,11 @@ const scopeLabel = useMemo(() => {
                   <LatestCostProfitSubview
                     active={isLatestProfitModalOpen}
                     selectedPeriod={selectedPeriod}
-                    effectiveScope={effectiveScope}
-                    locations={locations}
                     scopeLabel={scopeLabel}
                     periodLabel={selectedDateRange.label}
                     refreshTick={profitRefreshTick}
-                    selectedBranchCode={selectedBranchCode}
-                    selectedLocationCodeCanonical={selectedLocationCodeCanonical}
+                    selectedBranchCode={effectiveBranchCode}
+                    selectedLocationCode={effectiveLocationCode}
                     selectedLocationId={selectedLocationId}
                   />
                 </div>
