@@ -27,8 +27,14 @@ function expandLocationScopeCodes(locationCode) {
 
   if (!code) return [];
 
-  // Important: do not expand SH globally because SH exists in more than one branch.
-  // Branch filtering must handle BLANTYRE+SH vs ZOMBA+SH.
+  // Expand Zomba locations to include all Zomba sub-locations within the same branch.
+  // All Zomba locations (SH, BAR, ST999) use the same supplier pool and product catalog
+  // when working within the Zomba branch. Branch filtering handles BLANTYRE+SH vs ZOMBA+SH ambiguity.
+  const ZOMBA_LOCATIONS = ['SH', 'BAR', 'ST999'];
+  if (code === 'ZA' || ZOMBA_LOCATIONS.includes(code)) {
+    return ZOMBA_LOCATIONS;
+  }
+
   return [code];
 }
 

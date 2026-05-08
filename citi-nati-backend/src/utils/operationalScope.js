@@ -47,8 +47,10 @@ function expandOperationalLocationScopeCodes(locationCode) {
   const normalized = normalizeScopeCode(locationCode);
   if (!normalized) return [];
 
-  if (normalized === 'ZA') {
-    return [...CORE_ZOMBA_LOCATION_CODES];
+  // Expand Zomba locations to include all Zomba sub-locations (SH, BAR, ST999).
+  // All Zomba locations share the same supplier pool and product catalog within the ZOMBA branch.
+  if (normalized === 'ZA' || ['SH', 'BAR', 'ST999'].includes(normalized)) {
+    return ['SH', 'BAR', 'ST999'];
   }
 
   return [normalized];
