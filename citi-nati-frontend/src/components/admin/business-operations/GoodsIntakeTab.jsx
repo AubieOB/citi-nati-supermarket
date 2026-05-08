@@ -1143,10 +1143,9 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     setLookupWarning('');
     try {
       const response = await api.get('/business-operations/goods-intake/lookup-products', {
-        params: {
+        params: buildScopedParams({
           q: query,
-          locationCode: activeLookupLocationCode,
-        },
+        }, effectiveBranchCode, activeLookupLocationCode, selectedLocationId),
       });
       const products = response.data?.products || [];
       if (!products.length) return;
