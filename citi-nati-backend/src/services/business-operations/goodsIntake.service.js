@@ -465,10 +465,9 @@ async function lookupGoodsIntakeProducts({ query, branchCode, locationCode, loca
   const scopeWhere = buildProductScopeWhere(normalizedLocationCode);
   const scopeCodes = expandLocationScopeCodes(normalizedLocationCode);
   
-  // For ambiguous location codes (like SH that exists in both Blantyre and Zomba),
-  // use branchCode to further disambiguate
+  // Always add branchCode filter when provided to avoid ambiguity
   const whereClause = { AND: [scopeWhere] };
-  if (normalizedBranchCode && normalizedLocationCode === 'SH') {
+  if (normalizedBranchCode) {
     whereClause.AND.push({
       branchCode: { equals: normalizedBranchCode, mode: 'insensitive' },
     });
@@ -562,8 +561,8 @@ async function getGoodsIntakeLineStock({ branchCode, locationCode, locationId, p
   const scopeWhere = buildProductScopeWhere(normalizedLocationCode);
   const whereClause = { AND: [scopeWhere, { id: { in: ids } }] };
   
-  // For ambiguous location codes, use branchCode for disambiguation
-  if (normalizedBranchCode && normalizedLocationCode === 'SH') {
+  // Always add branchCode filter when provided to avoid ambiguity
+  if (normalizedBranchCode) {
     whereClause.AND.push({
       branchCode: { equals: normalizedBranchCode, mode: 'insensitive' },
     });

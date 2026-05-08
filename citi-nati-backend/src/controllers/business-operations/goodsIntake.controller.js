@@ -41,6 +41,7 @@ function normalizePayload(req) {
     purchaseDate: toDate(req.body.purchaseDate),
     receiptReference: req.body.receiptReference ? String(req.body.receiptReference).trim() : null,
     locationId: req.body.locationId ? toInt(req.body.locationId) : null,
+    branchCode: req.body.branchCode ? String(req.body.branchCode).trim() : null,
     locationCode: req.body.locationCode ? String(req.body.locationCode).trim() : null,
     locationName: req.body.locationName ? String(req.body.locationName).trim() : null,
     overallNotes: req.body.overallNotes ? String(req.body.overallNotes).trim() : null,
@@ -161,6 +162,8 @@ async function listGoodsIntakes(req, res) {
     const search = req.query.search ? String(req.query.search).trim() : null;
     const status = req.query.status ? String(req.query.status).trim().toLowerCase() : null;
     const supplierId = toInt(req.query.supplierId);
+    const branchCode = req.query.branchCode ? String(req.query.branchCode).trim() : null;
+    const locationCode = req.query.locationCode ? String(req.query.locationCode).trim() : null;
     const locationId = toInt(req.query.locationId);
     const startDate = req.query.startDate ? toDate(req.query.startDate) : null;
     const endDate = req.query.endDate ? toDate(req.query.endDate) : null;
@@ -170,6 +173,8 @@ async function listGoodsIntakes(req, res) {
         search,
         status,
         supplierId,
+        branchCode,
+        locationCode,
         locationId,
         startDate,
         endDate,
@@ -185,7 +190,7 @@ async function listGoodsIntakes(req, res) {
       total,
       page: pagination.page,
       pageSize: pagination.pageSize,
-      filters: { search, status, supplierId, locationId, startDate, endDate },
+      filters: { search, status, supplierId, branchCode, locationCode, locationId, startDate, endDate },
     }));
   } catch (error) {
     console.error('[BO][GOODS_INTAKE] list error:', error);
@@ -253,13 +258,9 @@ async function transferToPOS(req, res) {
     const id = toInt(req.params.id);
     if (!id) return res.status(400).json({ success: false, error: 'Invalid goods intake id' });
 
-    // Determine which agent should handle this transfer based on the intake's location code.
-    // We fetch the location code from the request body hint if provided, otherwise the service
-    // will validate the intake's own locationCode.
-    const hintLocationCode = String((req.body && req.body.locationCode) || '').trim().toUpperCase();
-    const useZomba = hintLocationCode
-      ? isZombaLocationCode(hintLocationCode)
-      : false; // service-level guard will handle unknown codes
+    // Determine which agent should handle this transfer based on the branch code.
+    const hintBranchCode = String((req.body && req.body.branchCode) || '').trim().toUpperCase();
+    const useZomba = hintBranchCode === 'ZOMBA';
 
     const result = useZomba
       ? await goodsIntakePosTransferService.transferGoodsIntakeToZombaPosPending(id, req.body || {})

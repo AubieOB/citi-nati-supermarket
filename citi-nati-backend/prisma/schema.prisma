@@ -1096,6 +1096,7 @@ model GoodsIntake {
   purchaseDate         DateTime          @map("purchase_date")
   receiptReference     String?           @map("receipt_reference")
   locationId           Int?              @map("location_id")
+  branchCode           String?           @map("branch_code")
   locationCode         String?           @map("location_code")
   locationName         String?           @map("location_name")
   status               String            @default("draft")
@@ -1118,6 +1119,8 @@ model GoodsIntake {
   @@index([status, purchaseDate])
   @@index([supplierId, purchaseDate])
   @@index([locationId, purchaseDate])
+  @@index([branchCode, locationCode, purchaseDate])
+  @@index([branchCode, locationCode, status, purchaseDate])
   @@index([purchaseDate])
   @@map("goods_intakes")
 }

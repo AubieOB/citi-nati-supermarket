@@ -284,7 +284,7 @@ async function transferGoodsIntakeToBlantyrePosPending(intakeId, options = {}) {
     manualGrnOverride,
     supplierCode,
     locationCode: posLocationCode,
-    branchCode: 'BLANTYRE', // ✅ ADD THIS LINE
+    branchCode: String(intake.branchCode || 'BLANTYRE').toUpperCase(),
     items: detailItems,
     usedFallbackSupplier: supplierResolution.usedFallback,
   },
@@ -488,7 +488,7 @@ async function transferGoodsIntakeToZombaPosPending(intakeId, options) {
       manualGrnOverride,
       supplierCode,
       locationCode: posLocationCode,
-      branchCode: 'ZOMBA',
+      branchCode: String(intake.branchCode || 'ZOMBA').toUpperCase(),
       items: detailItems,
       usedFallbackSupplier: supplierResolution.usedFallback,
     },
