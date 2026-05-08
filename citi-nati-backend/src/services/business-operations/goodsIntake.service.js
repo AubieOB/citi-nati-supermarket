@@ -110,8 +110,20 @@ function toWhereFilters(filters = {}) {
   const where = {};
 
   if (filters.status) where.status = normalizeStatus(filters.status);
-  if (filters.locationId) where.locationId = filters.locationId;
-  if (filters.supplierId) where.supplierId = filters.supplierId;
+  if (filters.branchCode) {
+  where.branchCode = { equals: String(filters.branchCode).trim().toUpperCase(), mode: 'insensitive' };
+}
+
+if (filters.locationCode) {
+  where.locationCode = { equals: String(filters.locationCode).trim().toUpperCase(), mode: 'insensitive' };
+}
+
+// Legacy fallback only
+if (!filters.branchCode && !filters.locationCode && filters.locationId) {
+  where.locationId = filters.locationId;
+}
+
+if (filters.supplierId) where.supplierId = filters.supplierId;
 
   if (filters.search) {
     where.OR = [
@@ -143,7 +155,8 @@ function shapeHeader(payload) {
     purchaseDate: payload.purchaseDate,
     receiptReference: payload.receiptReference || null,
     locationId: payload.locationId || null,
-    locationCode: payload.locationCode || null,
+    branchCode: payload.branchCode ? String(payload.branchCode).trim().toUpperCase() : null,
+    locationCode: payload.locationCode ? String(payload.locationCode).trim().toUpperCase() : null,
     locationName: payload.locationName || null,
     status,
     overallNotes: payload.overallNotes || null,
