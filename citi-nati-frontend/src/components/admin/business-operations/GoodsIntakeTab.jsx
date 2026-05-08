@@ -524,6 +524,11 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     }
   }, [activeLookupLocationCode]);
 
+  const selectedLocation = useMemo(() => ({
+    code: effectiveLocationCode,
+    name: '',
+  }), [effectiveLocationCode]);
+
   useEffect(() => {
     const existing = readGoodsIntakeAutosaves();
     const withoutCurrent = existing.filter((entry) => String(entry.id || '') !== String(activeAutosaveId || ''));
@@ -586,11 +591,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     if (String(form.manualSupplierName || '').trim()) return String(form.manualSupplierName).trim();
     return 'Supplier Name';
   }, [form.manualSupplierName, form.supplierId, suppliers]);
-
-  const selectedLocation = useMemo(() => ({
-    code: effectiveLocationCode,
-    name: '',
-  }), [effectiveLocationCode]);
 
   const finalizedRecordsCount = useMemo(
     () => records.filter((record) => String(record.status || '').toLowerCase() === 'finalized').length,
