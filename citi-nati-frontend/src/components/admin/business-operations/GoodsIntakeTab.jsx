@@ -401,10 +401,6 @@ function toFormFromRecord(record) {
   };
 }
 
-function normalizeCode(code) {
-  return String(code || '').trim().toUpperCase();
-}
-
 function buildScopedParams(params, branchCode, locationCode, locationId) {
   const scoped = { ...params };
   if (branchCode) scoped.branchCode = branchCode;
