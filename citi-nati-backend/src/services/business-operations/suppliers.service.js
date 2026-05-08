@@ -164,8 +164,13 @@ async function listSuppliers({ search, status, locationId, branchCode, requirePo
     ];
   }
 
-  if (locationId && supplierHasLocation) {
-    where.locationId = locationId;
+  // For Zomba locations (ZA, SH, BAR, ST999), all sub-locations share suppliers from the branch-level fallback location.
+  // Do not filter strictly by the specific locationId to avoid partitioning suppliers across sub-locations.
+  const isZombaBranch = branchCode && ['ZOMBA', 'ZA', 'SH', 'BAR', 'ST999'].includes(String(branchCode || '').toUpperCase());
+  const effectiveLocationId = isZombaBranch ? null : locationId;
+
+  if (effectiveLocationId && supplierHasLocation) {
+    where.locationId = effectiveLocationId;
   }
 
   if (supplierHasPosLinks) {
