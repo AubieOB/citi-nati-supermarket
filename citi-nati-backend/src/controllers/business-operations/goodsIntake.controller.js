@@ -196,7 +196,9 @@ async function listGoodsIntakes(req, res) {
 async function lookupGoodsIntakeProducts(req, res) {
   try {
     const query = String(req.query.q || req.query.search || '').trim();
+    const branchCode = req.query.branchCode ? String(req.query.branchCode).trim() : null;
     const locationCode = req.query.locationCode ? String(req.query.locationCode).trim() : null;
+    const locationId = req.query.locationId ? String(req.query.locationId).trim() : null;
 
     if (!query) {
       return res.json({ success: true, products: [] });
@@ -208,7 +210,9 @@ async function lookupGoodsIntakeProducts(req, res) {
 
     const products = await goodsIntakeService.lookupGoodsIntakeProducts({
       query,
+      branchCode,
       locationCode,
+      locationId,
       take: req.query.take,
     });
 
@@ -221,7 +225,9 @@ async function lookupGoodsIntakeProducts(req, res) {
 
 async function getGoodsIntakeLineStock(req, res) {
   try {
+    const branchCode = req.body?.branchCode ? String(req.body.branchCode).trim() : null;
     const locationCode = req.body?.locationCode ? String(req.body.locationCode).trim() : null;
+    const locationId = req.body?.locationId ? String(req.body.locationId).trim() : null;
     const productIds = Array.isArray(req.body?.productIds) ? req.body.productIds : [];
 
     if (!locationCode) {
@@ -229,7 +235,9 @@ async function getGoodsIntakeLineStock(req, res) {
     }
 
     const lines = await goodsIntakeService.getGoodsIntakeLineStock({
+      branchCode,
       locationCode,
+      locationId,
       productIds,
     });
 

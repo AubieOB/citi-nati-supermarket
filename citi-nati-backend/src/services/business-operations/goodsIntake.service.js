@@ -431,31 +431,38 @@ async function attachPriceSyncCommandMetadata(records) {
   });
 }
 
-async function lookupGoodsIntakeProducts({ query, locationCode, take = 20 }) {
+async function lookupGoodsIntakeProducts({ query, branchCode, locationCode, locationId, take = 20 }) {
   const normalizedQuery = String(query || '').trim();
   const normalizedLocationCode = normalizeScopeCode(locationCode);
+  const normalizedBranchCode = branchCode ? String(branchCode).trim().toUpperCase() : null;
+  
   if (!normalizedQuery || !normalizedLocationCode) {
     return [];
   }
 
   const scopeWhere = buildProductScopeWhere(normalizedLocationCode);
   const scopeCodes = expandLocationScopeCodes(normalizedLocationCode);
+  
+  // For ambiguous location codes (like SH that exists in both Blantyre and Zomba),
+  // use branchCode to further disambiguate
+  const whereClause = { AND: [scopeWhere] };
+  if (normalizedBranchCode && normalizedLocationCode === 'SH') {
+    whereClause.AND.push({
+      branchCode: { equals: normalizedBranchCode, mode: 'insensitive' },
+    });
+  }
+  whereClause.AND.push({
+    OR: [
+      { barcode: { equals: normalizedQuery, mode: 'insensitive' } },
+      { sourceCode: { equals: normalizedQuery, mode: 'insensitive' } },
+      { name: { contains: normalizedQuery, mode: 'insensitive' } },
+      { barcode: { contains: normalizedQuery, mode: 'insensitive' } },
+      { sourceCode: { contains: normalizedQuery, mode: 'insensitive' } },
+    ],
+  });
 
   const products = await prisma.product.findMany({
-    where: {
-      AND: [
-        scopeWhere,
-        {
-          OR: [
-            { barcode: { equals: normalizedQuery, mode: 'insensitive' } },
-            { sourceCode: { equals: normalizedQuery, mode: 'insensitive' } },
-            { name: { contains: normalizedQuery, mode: 'insensitive' } },
-            { barcode: { contains: normalizedQuery, mode: 'insensitive' } },
-            { sourceCode: { contains: normalizedQuery, mode: 'insensitive' } },
-          ],
-        },
-      ],
-    },
+    where: whereClause,
     select: {
       id: true,
       name: true,
@@ -519,8 +526,9 @@ async function lookupGoodsIntakeProducts({ query, locationCode, take = 20 }) {
     });
 }
 
-async function getGoodsIntakeLineStock({ locationCode, productIds = [] }) {
+async function getGoodsIntakeLineStock({ branchCode, locationCode, locationId, productIds = [] }) {
   const normalizedLocationCode = normalizeScopeCode(locationCode);
+  const normalizedBranchCode = branchCode ? String(branchCode).trim().toUpperCase() : null;
   const ids = Array.from(new Set((Array.isArray(productIds) ? productIds : [])
     .map((value) => Number(value))
     .filter((value) => Number.isFinite(value) && value > 0)));
@@ -529,13 +537,18 @@ async function getGoodsIntakeLineStock({ locationCode, productIds = [] }) {
     return [];
   }
 
+  const scopeWhere = buildProductScopeWhere(normalizedLocationCode);
+  const whereClause = { AND: [scopeWhere, { id: { in: ids } }] };
+  
+  // For ambiguous location codes, use branchCode for disambiguation
+  if (normalizedBranchCode && normalizedLocationCode === 'SH') {
+    whereClause.AND.push({
+      branchCode: { equals: normalizedBranchCode, mode: 'insensitive' },
+    });
+  }
+
   const products = await prisma.product.findMany({
-    where: {
-      AND: [
-        buildProductScopeWhere(normalizedLocationCode),
-        { id: { in: ids } },
-      ],
-    },
+    where: whereClause,
     select: {
       id: true,
       name: true,
