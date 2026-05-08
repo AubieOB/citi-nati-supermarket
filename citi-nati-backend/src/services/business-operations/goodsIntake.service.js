@@ -5,7 +5,6 @@ const posCommandQueueService = require('../posCommandQueue.service');
 const { updateProductPrice: updateCachedProductPrice } = require('../cache.service');
 const {
   normalizeScopeCode,
-  expandLocationScopeCodes,
 } = require('../../utils/operationalScope');
 const { enrichProductStock } = require('../../utils/stockResolver');
 
@@ -22,6 +21,16 @@ const POS_ZOMBA_SELLING_LOCATION_CODE = normalizeScopeCode(
   || process.env.POS_ZOMBA_PROMOTION_LOCATION_CODE
   || 'SH'
 ) || 'SH';
+
+function expandLocationScopeCodes(locationCode) {
+  const code = normalizeScopeCode(locationCode);
+
+  if (!code) return [];
+
+  // Important: do not expand SH globally because SH exists in more than one branch.
+  // Branch filtering must handle BLANTYRE+SH vs ZOMBA+SH.
+  return [code];
+}
 
 function roundMoney(value) {
   const parsed = Number(value);
