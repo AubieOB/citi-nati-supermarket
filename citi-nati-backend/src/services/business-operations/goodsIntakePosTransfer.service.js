@@ -5,7 +5,7 @@ const posCommandQueueService = require('../posCommandQueue.service');
 
 const prisma = new PrismaClient();
 
-const BLANTYRE_LOCATION_CODE = 'BT';
+const BLANTYRE_LOCATION_CODES = new Set(['BT', 'SH']);
 const DEFAULT_OPEN_STOCK_BALANCES_CODE = 'OPEN STOCK BALANCES';   // Blantyre POS supplier name
 const ZOMBA_OPEN_BALANCES_CODE = 'OPEN BALANCES';                 // Zomba POS supplier name
 const ZOMBA_OPEN_BALANCES_SUPPLIER_CODE = 1;
@@ -188,10 +188,10 @@ async function transferGoodsIntakeToBlantyrePosPending(intakeId, options = {}) {
 
   // --- Blantyre-only guard ---
   const locationCode = String(intake.locationCode || '').trim().toUpperCase();
-  if (locationCode !== BLANTYRE_LOCATION_CODE) {
+  if (!BLANTYRE_LOCATION_CODES.has(locationCode)) {
     return {
       success: false,
-      error: `Transfer to POS pending stock is available for Blantyre (SH) location only. This intake is for ${intake.locationName || locationCode || '(unknown location)'}.`,
+      error: `Transfer to POS pending stock is available for Blantyre locations only (BT or SH). This intake is for ${intake.locationName || locationCode || '(unknown location)'}.`,
     };
   }
 
