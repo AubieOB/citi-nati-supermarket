@@ -916,11 +916,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     const payload = toPayload({ ...form, status }, validItems);
 
     if (payload.locationId && !payload.locationName) {
-      const chosen = locations.find((location) => Number(location.id) === Number(payload.locationId));
-      if (chosen) {
-        payload.locationName = chosen.name;
-        payload.locationCode = chosen.code || normalizeLocationCode(chosen);
-      }
+      payload.locationName = '';
+      payload.locationCode = effectiveLocationCode;
     }
 
     setSaving(true);
@@ -1522,25 +1519,11 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
 
           <div>
             <label style={{ display: 'block', fontSize: '0.78rem', color: '#64748b', marginBottom: '0.25rem' }}>Branch / Location</label>
-            <select
-              value={form.locationId}
-              onChange={(event) => {
-                const location = locations.find((entry) => String(entry.id) === event.target.value) || null;
-                setForm((prev) => ({
-                  ...prev,
-                  locationId: event.target.value,
-                  locationCode: location?.code || normalizeLocationCode(location),
-                  locationName: location?.name || '',
-                }));
-              }}
-              onKeyDown={handleEntryFieldEnter}
-              style={themedInputStyle}
-            >
-              <option value="">Select location</option>
-              {locations.map((location) => (
-                <option key={location.id} value={String(location.id)}>{location.name}{location.code ? ` (${location.code})` : ''}</option>
-              ))}
-            </select>
+            <input
+              value={`${effectiveBranchCode || ''} / ${effectiveLocationCode || ''}`.trim().replace(/^\/|\/$/g, '')}
+              readOnly
+              style={{ ...themedInputStyle, backgroundColor: isAdminDarkTheme ? '#2a2a2a' : '#f8f9fa', cursor: 'not-allowed' }}
+            />
           </div>
 
           <div>
@@ -2088,9 +2071,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                 </select>
                 <select value={transferLocationFilter} onChange={(event) => setTransferLocationFilter(event.target.value)} style={themedInputStyle}>
                   <option value="all">All Locations</option>
-                  {locations.map((location) => (
-                    <option key={location.id} value={String(location.code || normalizeLocationCode(location)).toUpperCase()}>{location.name}</option>
-                  ))}
+                  <option value={effectiveLocationCode}>{effectiveBranchCode} / {effectiveLocationCode}</option>
                 </select>
                 <input type="date" value={transferStartDate} onFocus={selectInputText} onChange={(event) => setTransferStartDate(event.target.value)} style={themedInputStyle} />
                 <input type="date" value={transferEndDate} onFocus={selectInputText} onChange={(event) => setTransferEndDate(event.target.value)} style={themedInputStyle} />
