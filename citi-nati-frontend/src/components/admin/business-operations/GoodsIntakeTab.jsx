@@ -1046,17 +1046,27 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
 
     if (transferSupplierId > 0 && recordBranchCode) {
       const selectedSupplier = suppliers.find((entry) => Number(entry.id) === transferSupplierId);
-      const hasBranchLink = Array.isArray(selectedSupplier?.posLinks)
-        && selectedSupplier.posLinks.some((link) => String(link.branchCode || '').trim().toUpperCase() === recordBranchCode && Number(link.posSupplierCode || 0) > 0);
+      if (transferSupplierId > 0 && recordBranchCode) {
+  const selectedSupplier = suppliers.find((entry) => Number(entry.id) === transferSupplierId);
 
-      if (!hasBranchLink) {
-        await boAlert({
-          title: 'Supplier Not POS-Linked',
-          message: 'This supplier is not linked to a POS SupplierCode for this branch. Sync or link supplier first.',
-          type: 'warning',
-        });
-        return;
-      }
+  const posLinks = Array.isArray(selectedSupplier?.posLinks) ? selectedSupplier.posLinks : [];
+
+  const hasBranchLink = posLinks.some((link) =>
+    String(link.branchCode || '').trim().toUpperCase() === recordBranchCode
+    && Number(link.posSupplierCode || 0) > 0
+  );
+
+  // Only block when posLinks were actually loaded and clearly show no match.
+  // If posLinks were not included in the supplier list response, let backend validate.
+  if (posLinks.length > 0 && !hasBranchLink) {
+    await boAlert({
+      title: 'Supplier Not POS-Linked',
+      message: 'This supplier is not linked to a POS SupplierCode for this branch. Sync or link supplier first.',
+      type: 'warning',
+    });
+    return;
+  }
+}
     }
 
     if (manualGrnOverride && !manualGrn) {
