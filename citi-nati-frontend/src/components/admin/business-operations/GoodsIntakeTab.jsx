@@ -761,13 +761,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     setPage(1);
   }, [search, statusFilter, startDate, endDate, effectiveBranchCode, effectiveLocationCode, selectedLocationId]);
 
-  useEffect(() => {
-    if (productPickerOpen) {
-      window.addEventListener('keydown', handleProductPickerKeyDown);
-      return () => window.removeEventListener('keydown', handleProductPickerKeyDown);
-    }
-  }, [productPickerOpen, handleProductPickerKeyDown]);
-
   const setLineValue = (index, key, value) => {
     setForm((prev) => ({
       ...prev,
@@ -1377,6 +1370,13 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
       return;
     }
   }, [productPickerOpen, productPickerResults, productPickerHighlightedIndex, productPickerRowIndex, closeProductPicker, applyProductToLine]);
+
+  useEffect(() => {
+    if (productPickerOpen) {
+      window.addEventListener('keydown', handleProductPickerKeyDown);
+      return () => window.removeEventListener('keydown', handleProductPickerKeyDown);
+    }
+  }, [productPickerOpen, handleProductPickerKeyDown]);
 
   useEffect(() => {
     if (!isIntakeWorkspaceOpen) return;
