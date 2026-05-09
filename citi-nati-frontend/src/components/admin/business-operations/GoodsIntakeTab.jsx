@@ -504,6 +504,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
   const [saving, setSaving] = useState(false);
   const [transferring, setTransferring] = useState(false);
   const [activeLookupRow, setActiveLookupRow] = useState(-1);
+  const [activeRowIndex, setActiveRowIndex] = useState(0);
+  const inputRefs = useRef({});
   const [lookupWarning, setLookupWarning] = useState('');
   const [isIntakeWorkspaceOpen, setIsIntakeWorkspaceOpen] = useState(false);
   const [isIntakeWorkspaceMaximized, setIsIntakeWorkspaceMaximized] = useState(false);
@@ -537,6 +539,31 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
   const [productPickerHighlightedIndex, setProductPickerHighlightedIndex] = useState(0);
   const productPickerInputRef = useRef(null);
   const productPickerTimeoutRef = useRef(null);
+
+  const setLineInputRef = useCallback((rowIndex, fieldName, element) => {
+    inputRefs.current[rowIndex] = inputRefs.current[rowIndex] || {};
+    if (element) {
+      inputRefs.current[rowIndex][fieldName] = element;
+    } else if (inputRefs.current[rowIndex]) {
+      delete inputRefs.current[rowIndex][fieldName];
+      if (Object.keys(inputRefs.current[rowIndex]).length === 0) {
+        delete inputRefs.current[rowIndex];
+      }
+    }
+  }, []);
+
+  const focusField = useCallback((rowIndex, fieldName) => {
+    const target = inputRefs.current?.[rowIndex]?.[fieldName];
+    if (!target) return false;
+    if (typeof target.focus === 'function') {
+      target.focus();
+    }
+    if (typeof target.select === 'function' && target.tagName !== 'SELECT') {
+      target.select();
+    }
+    setActiveRowIndex(rowIndex);
+    return true;
+  }, []);
 
   const activeLookupLocationCode = useMemo(() => {
     const formLocationCode = String(form.locationCode || '').trim().toUpperCase();
@@ -779,7 +806,9 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
 
   const addLine = () => {
     if (!(canCreate || canEdit)) return;
+    const nextRowIndex = form.items.length;
     setForm((prev) => ({ ...prev, items: [...prev.items, createEmptyLine()] }));
+    setActiveRowIndex(nextRowIndex);
   };
 
   const duplicateLine = (index) => {
@@ -1268,12 +1297,16 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     setProductPickerResults([]);
     setProductPickerError('');
     setProductPickerHighlightedIndex(0);
-    
+    setActiveRowIndex(rowIndex);
+    if (initialQuery) {
+      fetchProductPickerResults(initialQuery);
+    }
+
     setTimeout(() => {
       productPickerInputRef.current?.focus();
       productPickerInputRef.current?.select?.();
     }, 100);
-  }, [form.items]);
+  }, [form.items, fetchProductPickerResults]);
 
   const closeProductPicker = useCallback(() => {
     setProductPickerOpen(false);
@@ -1341,31 +1374,40 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
   const handleProductPickerKeyDown = useCallback((event) => {
     if (!productPickerOpen) return;
 
-    if (event.key === 'Escape') {
+    if (event.key === 'Escape' || event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Enter') {
       event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+    }
+
+    if (event.key === 'Escape') {
       closeProductPicker();
       return;
     }
 
     if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      const nextIndex = Math.min(productPickerHighlightedIndex + 1, productPickerResults.length - 1);
-      setProductPickerHighlightedIndex(nextIndex);
-      setTimeout(() => {
-        const resultRow = document.querySelector(`[data-product-result-index="${nextIndex}"]`);
-        resultRow?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }, 0);
+      setProductPickerHighlightedIndex((prevIndex) => {
+        const nextIndex = Math.min(prevIndex + 1, productPickerResults.length - 1);
+        requestAnimationFrame(() => {
+          const resultRow = document.querySelector(`[data-product-result-index="${nextIndex}"]`);
+          resultRow?.scrollIntoView({ block: 'nearest' });
+        });
+        return nextIndex;
+      });
       return;
     }
 
     if (event.key === 'ArrowUp') {
       event.preventDefault();
-      const prevIndex = Math.max(productPickerHighlightedIndex - 1, 0);
-      setProductPickerHighlightedIndex(prevIndex);
-      setTimeout(() => {
-        const resultRow = document.querySelector(`[data-product-result-index="${prevIndex}"]`);
-        resultRow?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }, 0);
+      event.stopPropagation();
+      setProductPickerHighlightedIndex((prevIndex) => {
+        const prev = Math.max(prevIndex - 1, 0);
+        requestAnimationFrame(() => {
+          const resultRow = document.querySelector(`[data-product-result-index="${prev}"]`);
+          resultRow?.scrollIntoView({ block: 'nearest' });
+        });
+        return prev;
+      });
       return;
     }
 
@@ -1398,18 +1440,13 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
         }
       } else if (event.key === 'F1') {
         event.preventDefault();
-        // F1 opens product picker for the focused row
-        const activeElement = document.activeElement;
-        if (activeElement) {
-          // Try dataset first, fallback to getAttribute for compatibility
-          const rowIndexStr = activeElement.dataset?.rowIndex ?? activeElement.getAttribute('data-row-index');
-          if (rowIndexStr !== undefined && rowIndexStr !== null) {
-            const rowIndex = Number(rowIndexStr);
-            if (!Number.isNaN(rowIndex) && rowIndex >= 0) {
-              const query = String(activeElement.value || '').trim();
-              openProductPicker(rowIndex, query);
-            }
-          }
+        event.stopPropagation();
+        if (productPickerOpen) return;
+        const rowIndex = Number(activeRowIndex);
+        if (!Number.isNaN(rowIndex) && rowIndex >= 0 && rowIndex < (form.items || []).length) {
+          const row = form.items[rowIndex] || {};
+          const query = String(row.barcode || row.productName || '').trim();
+          openProductPicker(rowIndex, query);
         }
       }
     };
@@ -1495,58 +1532,38 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     };
   }, [activeLookupLocationCode, isIntakeWorkspaceOpen, refreshResolvedLineStock, resolvedLineProductIds.length]);
 
-  const handleEntryFieldEnter = useCallback((event, options = {}) => {
+  const handleEntryFieldEnter = useCallback((event, rowIndex, fieldName) => {
     if (event.key !== 'Enter') return;
-
-    const { lookupRowIndex = null } = options;
     event.preventDefault();
+    setActiveRowIndex(rowIndex);
 
-    if (lookupRowIndex != null) {
-      handleLookup(lookupRowIndex);
-    }
-
-    const container = workspaceRef.current;
-    if (!container) {
-      focusNextWorkspaceField(container, event.currentTarget);
+    if (fieldName === 'barcode') {
+      handleLookup(rowIndex);
+      focusField(rowIndex, 'productName');
       return;
     }
 
-    // Check if this is the lineNotes field (last field in the row)
-    const isLastField = event.currentTarget.name === 'lineNotes' || (
-      event.currentTarget.value !== undefined && 
-      event.currentTarget.parentElement?.parentElement?.querySelectorAll('input, select, textarea').length > 0 &&
-      Array.from(event.currentTarget.parentElement?.parentElement?.querySelectorAll('input, select, textarea') || []).pop() === event.currentTarget
-    );
-
-    // Check if this is the last row
-    const isLastRow = lookupRowIndex != null && lookupRowIndex === (form.items?.length - 1);
-
-    if (isLastField && isLastRow) {
-      // This is the last field of the last row - auto-create a new row
-      addLine();
-      // Focus the first field of the new row after DOM updates
-      setTimeout(() => {
-        const newRowIndex = form.items?.length || 0;
-        const allInputs = Array.from(
-          container.querySelectorAll('input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])')
-        ).filter((field) => !field.readOnly && field.tabIndex !== -1 && field.offsetParent !== null);
-        // Find the first input of the new row (barcode field)
-        const newRowFirstInput = allInputs.find((input) => {
-          const rowIdx = input.getAttribute('data-row-index');
-          return rowIdx == newRowIndex;
-        });
-        if (newRowFirstInput) {
-          newRowFirstInput.focus();
-          if (typeof newRowFirstInput.select === 'function') {
-            newRowFirstInput.select();
-          }
-        }
-      }, 50);
-    } else {
-      // Not the last row or not the last field, move to next field normally
-      focusNextWorkspaceField(container, event.currentTarget);
+    const lineFields = ['barcode', 'productName', 'quantity', 'unitCost', 'sellingPrice', 'expiryDate', 'lineNotes'];
+    const currentIndex = lineFields.indexOf(fieldName);
+    const nextIndex = currentIndex + 1;
+    if (nextIndex >= 0 && nextIndex < lineFields.length) {
+      const nextField = lineFields[nextIndex];
+      if (focusField(rowIndex, nextField)) return;
     }
-  }, [handleLookup, form.items, addLine]);
+
+    if (fieldName === 'lineNotes') {
+      const isLastRow = rowIndex === ((form.items?.length || 1) - 1);
+      if (isLastRow) {
+        const newRowIndex = form.items?.length || 0;
+        addLine();
+        setTimeout(() => {
+          focusField(newRowIndex, 'barcode');
+        }, 50);
+      } else {
+        focusField(rowIndex + 1, 'barcode');
+      }
+    }
+  }, [handleLookup, focusField, form.items?.length, addLine]);
 
   const renderTransferBadge = (record, { compact = false } = {}) => {
     const key = resolveTransferStatus(record);
@@ -1865,44 +1882,63 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                     ? { color: '#b45309', bg: isAdminDarkTheme ? '#242418' : '#fffbeb', border: isAdminDarkTheme ? '#7a5f2a' : '#fcd34d', label: 'Low stock' }
                     : { color: '#166534', bg: isAdminDarkTheme ? '#1a2a1a' : '#f0fdf4', border: isAdminDarkTheme ? '#2f7f58' : '#bbf7d0', label: 'In stock' };
                 return (
-                  <tr key={`line-${index}`}>
+                  <tr key={`line-${index}`} data-row-index={index}>
                     <td style={{ fontWeight: 700, color: colors.subtleText, fontSize: '0.8rem', padding: '0.5rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>{index + 1}</td>
                     <td style={{ padding: '0.4rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
                       <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'flex-start' }}>
                         <input
+                          name="barcode"
                           data-row-index={index}
+                          ref={(element) => setLineInputRef(index, 'barcode', element)}
                           value={line.barcode || ''}
-                          onFocus={selectInputText}
-                          onKeyDown={(event) => handleEntryFieldEnter(event, { lookupRowIndex: index })}
+                          onFocus={(event) => { selectInputText(event); setActiveRowIndex(index); }}
+                          onKeyDown={(event) => handleEntryFieldEnter(event, index, 'barcode')}
                           onChange={(event) => setLineValue(index, 'barcode', event.target.value)}
                           onBlur={() => handleLookup(index)}
                           style={{ ...compactLineInputStyle, backgroundColor: line.productName && !line.barcode ? (isAdminDarkTheme ? '#26201a' : '#fff7ed') : compactLineInputStyle.backgroundColor, flex: 1 }}
                           placeholder="scan/manual"
                         />
-                        <button
-                          type="button"
-                          onClick={() => openProductPicker(index, line.barcode || '')}
-                          style={{ padding: '0.35rem 0.5rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, lineHeight: 1, transition: 'background 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                          onMouseEnter={(e) => e.target.style.background = '#1d4ed8'}
-                          onMouseLeave={(e) => e.target.style.background = '#2563eb'}
-                          title="Press F1 or click to search products"
-                        >
-                          <i className="fas fa-search" />
-                        </button>
                       </div>
                       <div style={{ marginTop: '0.18rem', fontSize: '0.7rem', color: colors.mutedText, lineHeight: 1.25, overflowWrap: 'anywhere' }}>{line.barcode || '-'}</div>
                     </td>
                     <td style={{ padding: '0.4rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
-                      <input
-                        data-row-index={index}
-                        value={line.productName || ''}
-                        onFocus={selectInputText}
-                        onKeyDown={(event) => handleEntryFieldEnter(event, { lookupRowIndex: index })}
-                        onChange={(event) => setLineValue(index, 'productName', event.target.value)}
-                        onBlur={() => { if (!line.productName) return; handleLookup(index); }}
-                        style={compactLineInputStyle}
-                        placeholder="Product name"
-                      />
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          name="productName"
+                          data-row-index={index}
+                          ref={(element) => setLineInputRef(index, 'productName', element)}
+                          value={line.productName || ''}
+                          onFocus={(event) => { selectInputText(event); setActiveRowIndex(index); }}
+                          onKeyDown={(event) => handleEntryFieldEnter(event, index, 'productName')}
+                          onChange={(event) => setLineValue(index, 'productName', event.target.value)}
+                          onBlur={() => { if (!line.productName) return; handleLookup(index); }}
+                          style={{ ...compactLineInputStyle, paddingRight: '2.4rem' }}
+                          placeholder="Product name"
+                        />
+                        <button
+                          type="button"
+                          tabIndex={-1}
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => openProductPicker(index, line.productName || line.barcode || '')}
+                          title="Search products (F1)"
+                          style={{
+                            position: 'absolute',
+                            top: '50%',
+                            right: '0.65rem',
+                            transform: 'translateY(-50%)',
+                            border: 'none',
+                            background: 'transparent',
+                            color: isAdminDarkTheme ? '#94a3b8' : '#475569',
+                            cursor: 'pointer',
+                            padding: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <i className="fas fa-search" aria-hidden="true" />
+                        </button>
+                      </div>
                       <div style={{ marginTop: '0.18rem', fontSize: '0.72rem', color: colors.text, lineHeight: 1.25, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{line.productName || '-'}</div>
                       <div style={{ marginTop: '0.28rem', display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '0.68rem', color: colors.mutedText, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Latest synced stock</span>
@@ -1917,22 +1953,77 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                       </div>
                     </td>
                     <td style={{ padding: '0.4rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
-                      <input type="number" min="0" step="1" value={line.quantity} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'quantity', event.target.value)} style={compactLineInputStyle} />
+                      <input
+                        ref={(element) => setLineInputRef(index, 'quantity', element)}
+                        name="quantity"
+                        data-row-index={index}
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={line.quantity}
+                        onFocus={(event) => { selectInputText(event); setActiveRowIndex(index); }}
+                        onKeyDown={(event) => handleEntryFieldEnter(event, index, 'quantity')}
+                        onChange={(event) => setLineValue(index, 'quantity', event.target.value)}
+                        style={compactLineInputStyle}
+                      />
                     </td>
                     <td style={{ padding: '0.4rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
-                      <input type="number" min="0" step="0.01" value={line.unitCost} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'unitCost', event.target.value)} style={compactLineInputStyle} />
+                      <input
+                        ref={(element) => setLineInputRef(index, 'unitCost', element)}
+                        name="unitCost"
+                        data-row-index={index}
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={line.unitCost}
+                        onFocus={(event) => { selectInputText(event); setActiveRowIndex(index); }}
+                        onKeyDown={(event) => handleEntryFieldEnter(event, index, 'unitCost')}
+                        onChange={(event) => setLineValue(index, 'unitCost', event.target.value)}
+                        style={compactLineInputStyle}
+                      />
                     </td>
                     <td style={{ color: colors.text, fontWeight: 700, fontSize: '0.8rem', padding: '0.5rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, whiteSpace: 'nowrap', verticalAlign: 'top' }}>{money(line.totalCost)}</td>
                     <td style={{ padding: '0.4rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
-                      <input type="number" min="0" step="0.01" value={line.sellingPrice == null ? '' : line.sellingPrice} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'sellingPrice', event.target.value)} style={{ ...compactLineInputStyle, borderColor: belowCost ? '#f59e0b' : (isAdminDarkTheme ? '#333333' : '#cbd5e1'), backgroundColor: belowCost ? (isAdminDarkTheme ? '#242418' : '#fffbeb') : compactLineInputStyle.backgroundColor }} />
+                      <input
+                        ref={(element) => setLineInputRef(index, 'sellingPrice', element)}
+                        name="sellingPrice"
+                        data-row-index={index}
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={line.sellingPrice == null ? '' : line.sellingPrice}
+                        onFocus={(event) => { selectInputText(event); setActiveRowIndex(index); }}
+                        onKeyDown={(event) => handleEntryFieldEnter(event, index, 'sellingPrice')}
+                        onChange={(event) => setLineValue(index, 'sellingPrice', event.target.value)}
+                        style={{ ...compactLineInputStyle, borderColor: belowCost ? '#f59e0b' : (isAdminDarkTheme ? '#333333' : '#cbd5e1'), backgroundColor: belowCost ? (isAdminDarkTheme ? '#242418' : '#fffbeb') : compactLineInputStyle.backgroundColor }}
+                      />
                     </td>
                     <td style={{ fontWeight: 700, color: colors.subtleText, fontSize: '0.8rem', padding: '0.5rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, whiteSpace: 'nowrap', verticalAlign: 'top' }}>{line.marginPercent == null ? '-' : `${line.marginPercent.toFixed(2)}%`}</td>
                     <td style={{ fontWeight: 700, color: line.estimatedProfit >= 0 ? '#166534' : '#b91c1c', fontSize: '0.8rem', padding: '0.5rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, whiteSpace: 'nowrap', verticalAlign: 'top' }}>{money(line.estimatedProfit)}</td>
                     <td style={{ padding: '0.4rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
-                      <input type="date" value={line.expiryDate || ''} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'expiryDate', event.target.value)} style={{ ...compactLineInputStyle, backgroundColor: line.productName && !line.expiryDate ? (isAdminDarkTheme ? '#26201a' : '#fff7ed') : compactLineInputStyle.backgroundColor }} />
+                      <input
+                        ref={(element) => setLineInputRef(index, 'expiryDate', element)}
+                        name="expiryDate"
+                        data-row-index={index}
+                        type="date"
+                        value={line.expiryDate || ''}
+                        onFocus={(event) => { selectInputText(event); setActiveRowIndex(index); }}
+                        onKeyDown={(event) => handleEntryFieldEnter(event, index, 'expiryDate')}
+                        onChange={(event) => setLineValue(index, 'expiryDate', event.target.value)}
+                        style={{ ...compactLineInputStyle, backgroundColor: line.productName && !line.expiryDate ? (isAdminDarkTheme ? '#26201a' : '#fff7ed') : compactLineInputStyle.backgroundColor }}
+                      />
                     </td>
                     <td style={{ padding: '0.4rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
-                      <input value={line.lineNotes || ''} onFocus={selectInputText} onKeyDown={handleEntryFieldEnter} onChange={(event) => setLineValue(index, 'lineNotes', event.target.value)} style={compactLineInputStyle} />
+                      <input
+                        ref={(element) => setLineInputRef(index, 'lineNotes', element)}
+                        name="lineNotes"
+                        data-row-index={index}
+                        value={line.lineNotes || ''}
+                        onFocus={(event) => { selectInputText(event); setActiveRowIndex(index); }}
+                        onKeyDown={(event) => handleEntryFieldEnter(event, index, 'lineNotes')}
+                        onChange={(event) => setLineValue(index, 'lineNotes', event.target.value)}
+                        style={compactLineInputStyle}
+                      />
                     </td>
                     <td style={{ padding: '0.4rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
                       {(canCreate || canEdit) && (
