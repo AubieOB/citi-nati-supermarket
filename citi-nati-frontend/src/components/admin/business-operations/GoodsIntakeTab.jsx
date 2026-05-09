@@ -464,6 +464,69 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     launchCardSixBg: isAdminDarkTheme ? 'linear-gradient(135deg, #232323 0%, #1c1c1c 65%)' : 'linear-gradient(135deg, #e0f2fe 0%, #ffffff 60%)',
   }), [isAdminDarkTheme]);
 
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+  const responsiveSettings = useMemo(() => {
+    const isSmallScreen = windowWidth < 1024; // Below laptop size
+    const isCompactScreen = windowWidth < 768; // Below tablet size
+
+    return {
+      isSmallScreen,
+      isCompactScreen,
+      // Column visibility based on screen size
+      showBarcode: !isCompactScreen,
+      showMargin: !isSmallScreen,
+      showEstimatedProfit: !isSmallScreen,
+      showComments: !isCompactScreen,
+      showExpiryDate: !isCompactScreen,
+      // Font and padding adjustments
+      tableFontSize: isCompactScreen ? '0.75rem' : isSmallScreen ? '0.8rem' : '0.86rem',
+      tablePadding: isCompactScreen ? '0.3rem 0.35rem' : isSmallScreen ? '0.35rem 0.4rem' : '0.45rem 0.5rem',
+      headerFontSize: isCompactScreen ? '0.65rem' : isSmallScreen ? '0.7rem' : '0.72rem',
+      // Column widths adjustments
+      colWidths: isCompactScreen ? {
+        index: '2%',
+        barcode: '12%',
+        productName: '28%',
+        quantity: '6%',
+        unitCost: '8%',
+        totalCost: '9%',
+        sellingPrice: '9%',
+        margin: '5%', // hidden but kept for consistency
+        estimatedProfit: '8%', // hidden but kept
+        expiryDate: '7%', // hidden but kept
+        comments: '6%', // hidden but kept
+        actions: '5%'
+      } : isSmallScreen ? {
+        index: '3%',
+        barcode: '14%',
+        productName: '26%',
+        quantity: '5%',
+        unitCost: '7%',
+        totalCost: '8%',
+        sellingPrice: '8%',
+        margin: '5%', // hidden but kept
+        estimatedProfit: '8%', // hidden but kept
+        expiryDate: '8%', // hidden but kept
+        comments: '5%', // hidden but kept
+        actions: '4%'
+      } : {
+        index: '3%',
+        barcode: '15%',
+        productName: '24%',
+        quantity: '5%',
+        unitCost: '7%',
+        totalCost: '8%',
+        sellingPrice: '8%',
+        margin: '5%',
+        estimatedProfit: '8%',
+        expiryDate: '8%',
+        comments: '5%',
+        actions: '4%'
+      }
+    };
+  }, [windowWidth]);
+
   const [records, setRecords] = useState([]);
   const [pagination, setPagination] = useState(null);
   const [listLoading, setListLoading] = useState(true);
@@ -598,6 +661,12 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     code: effectiveLocationCode,
     name: '',
   }), [effectiveLocationCode]);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     const existing = readGoodsIntakeAutosaves();
@@ -1966,29 +2035,38 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
           <div style={{ marginTop: '0.8rem', width: '100%', maxWidth: '100%', overflowX: 'auto', border: isAdminDarkTheme ? '1px solid #2d2d2d' : '1px solid #dbe5f0', borderRadius: '12px', background: isAdminDarkTheme ? '#181818' : '#ffffff' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
             <colgroup>
-              <col style={{ width: '3%' }} />
-              <col style={{ width: '15%' }} />
-              <col style={{ width: '24%' }} />
-              <col style={{ width: '5%' }} />
-              <col style={{ width: '7%' }} />
-              <col style={{ width: '8%' }} />
-              <col style={{ width: '8%' }} />
-              <col style={{ width: '5%' }} />
-              <col style={{ width: '8%' }} />
-              <col style={{ width: '8%' }} />
-              <col style={{ width: '5%' }} />
-              <col style={{ width: '4%' }} />
+              <col style={{ width: responsiveSettings.colWidths.index }} />
+              <col style={{ width: responsiveSettings.colWidths.barcode, display: responsiveSettings.showBarcode ? 'table-column' : 'none' }} />
+              <col style={{ width: responsiveSettings.colWidths.productName }} />
+              <col style={{ width: responsiveSettings.colWidths.quantity }} />
+              <col style={{ width: responsiveSettings.colWidths.unitCost }} />
+              <col style={{ width: responsiveSettings.colWidths.totalCost }} />
+              <col style={{ width: responsiveSettings.colWidths.sellingPrice }} />
+              <col style={{ width: responsiveSettings.colWidths.margin, display: responsiveSettings.showMargin ? 'table-column' : 'none' }} />
+              <col style={{ width: responsiveSettings.colWidths.estimatedProfit, display: responsiveSettings.showEstimatedProfit ? 'table-column' : 'none' }} />
+              <col style={{ width: responsiveSettings.colWidths.expiryDate, display: responsiveSettings.showExpiryDate ? 'table-column' : 'none' }} />
+              <col style={{ width: responsiveSettings.colWidths.comments, display: responsiveSettings.showComments ? 'table-column' : 'none' }} />
+              <col style={{ width: responsiveSettings.colWidths.actions }} />
             </colgroup>
             <thead>
               <tr>
-                {['#', 'Barcode', 'Product Name', 'Qty', 'Unit Cost', 'Total Cost', 'Selling Price', 'Margin %', 'Est. Profit', 'Expiry Date', 'Comments', 'Actions'].map((label) => (
-                  <th key={label} style={{ textAlign: 'left', fontSize: '0.72rem', color: colors.mutedText, fontWeight: 700, padding: '0.55rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, background: isAdminDarkTheme ? '#1e1e1e' : '#f8fafc', whiteSpace: 'nowrap' }}>{label}</th>
-                ))}
+                <th style={{ textAlign: 'left', fontSize: responsiveSettings.headerFontSize, color: colors.mutedText, fontWeight: 700, padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, background: isAdminDarkTheme ? '#1e1e1e' : '#f8fafc', whiteSpace: 'nowrap' }}>#</th>
+                {responsiveSettings.showBarcode && <th style={{ textAlign: 'left', fontSize: responsiveSettings.headerFontSize, color: colors.mutedText, fontWeight: 700, padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, background: isAdminDarkTheme ? '#1e1e1e' : '#f8fafc', whiteSpace: 'nowrap' }}>Barcode</th>}
+                <th style={{ textAlign: 'left', fontSize: responsiveSettings.headerFontSize, color: colors.mutedText, fontWeight: 700, padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, background: isAdminDarkTheme ? '#1e1e1e' : '#f8fafc', whiteSpace: 'nowrap' }}>Product Name</th>
+                <th style={{ textAlign: 'left', fontSize: responsiveSettings.headerFontSize, color: colors.mutedText, fontWeight: 700, padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, background: isAdminDarkTheme ? '#1e1e1e' : '#f8fafc', whiteSpace: 'nowrap' }}>Qty</th>
+                <th style={{ textAlign: 'left', fontSize: responsiveSettings.headerFontSize, color: colors.mutedText, fontWeight: 700, padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, background: isAdminDarkTheme ? '#1e1e1e' : '#f8fafc', whiteSpace: 'nowrap' }}>Unit Cost</th>
+                <th style={{ textAlign: 'left', fontSize: responsiveSettings.headerFontSize, color: colors.mutedText, fontWeight: 700, padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, background: isAdminDarkTheme ? '#1e1e1e' : '#f8fafc', whiteSpace: 'nowrap' }}>Total Cost</th>
+                <th style={{ textAlign: 'left', fontSize: responsiveSettings.headerFontSize, color: colors.mutedText, fontWeight: 700, padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, background: isAdminDarkTheme ? '#1e1e1e' : '#f8fafc', whiteSpace: 'nowrap' }}>Selling Price</th>
+                {responsiveSettings.showMargin && <th style={{ textAlign: 'left', fontSize: responsiveSettings.headerFontSize, color: colors.mutedText, fontWeight: 700, padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, background: isAdminDarkTheme ? '#1e1e1e' : '#f8fafc', whiteSpace: 'nowrap' }}>Margin %</th>}
+                {responsiveSettings.showEstimatedProfit && <th style={{ textAlign: 'left', fontSize: responsiveSettings.headerFontSize, color: colors.mutedText, fontWeight: 700, padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, background: isAdminDarkTheme ? '#1e1e1e' : '#f8fafc', whiteSpace: 'nowrap' }}>Est. Profit</th>}
+                {responsiveSettings.showExpiryDate && <th style={{ textAlign: 'left', fontSize: responsiveSettings.headerFontSize, color: colors.mutedText, fontWeight: 700, padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, background: isAdminDarkTheme ? '#1e1e1e' : '#f8fafc', whiteSpace: 'nowrap' }}>Expiry Date</th>}
+                {responsiveSettings.showComments && <th style={{ textAlign: 'left', fontSize: responsiveSettings.headerFontSize, color: colors.mutedText, fontWeight: 700, padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, background: isAdminDarkTheme ? '#1e1e1e' : '#f8fafc', whiteSpace: 'nowrap' }}>Comments</th>}
+                <th style={{ textAlign: 'left', fontSize: responsiveSettings.headerFontSize, color: colors.mutedText, fontWeight: 700, padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, background: isAdminDarkTheme ? '#1e1e1e' : '#f8fafc', whiteSpace: 'nowrap' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {calculatedItems.map((line, index) => {
-                const compactLineInputStyle = { ...themedInputStyle, padding: '0.34rem 0.4rem', fontSize: '0.8rem' };
+                const compactLineInputStyle = { ...themedInputStyle, padding: responsiveSettings.tablePadding, fontSize: responsiveSettings.tableFontSize };
                 const belowCost = line.sellingPrice != null && Number(line.sellingPrice) < Number(line.unitCost || 0);
                 const lineLiveStock = Number.isFinite(Number(line.productId)) ? liveLineStockByProductId[Number(line.productId)] : null;
                 const displayStock = lineLiveStock?.latestSyncedStock ?? line.latestSyncedStock;
@@ -2000,8 +2078,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                     : { color: '#166534', bg: isAdminDarkTheme ? '#1a2a1a' : '#f0fdf4', border: isAdminDarkTheme ? '#2f7f58' : '#bbf7d0', label: 'In stock' };
                 return (
                   <tr key={`line-${index}`} data-row-index={index}>
-                    <td style={{ fontWeight: 700, color: colors.subtleText, fontSize: '0.8rem', padding: '0.5rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>{index + 1}</td>
-                    <td style={{ padding: '0.4rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
+                    <td style={{ fontWeight: 700, color: colors.subtleText, fontSize: responsiveSettings.tableFontSize, padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>{index + 1}</td>
+                    {responsiveSettings.showBarcode && <td style={{ padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
                       <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'flex-start' }}>
                         <input
                           name="barcode"
@@ -2016,9 +2094,9 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                           placeholder="scan/manual"
                         />
                       </div>
-                      <div style={{ marginTop: '0.18rem', fontSize: '0.7rem', color: colors.mutedText, lineHeight: 1.25, overflowWrap: 'anywhere' }}>{line.barcode || '-'}</div>
-                    </td>
-                    <td style={{ padding: '0.4rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
+                      <div style={{ marginTop: '0.18rem', fontSize: responsiveSettings.isCompactScreen ? '0.65rem' : '0.7rem', color: colors.mutedText, lineHeight: 1.25, overflowWrap: 'anywhere' }}>{line.barcode || '-'}</div>
+                    </td>}
+                    <td style={{ padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
                       <div style={{ position: 'relative' }}>
                         <input
                           name="productName"
@@ -2056,20 +2134,20 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                           <i className="fas fa-search" aria-hidden="true" />
                         </button>
                       </div>
-                      <div style={{ marginTop: '0.18rem', fontSize: '0.72rem', color: colors.text, lineHeight: 1.25, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{line.productName || '-'}</div>
+                      <div style={{ marginTop: '0.18rem', fontSize: responsiveSettings.isCompactScreen ? '0.68rem' : '0.72rem', color: colors.text, lineHeight: 1.25, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{line.productName || '-'}</div>
                       <div style={{ marginTop: '0.28rem', display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '0.68rem', color: colors.mutedText, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Latest synced stock</span>
-                        <span style={{ fontSize: '0.74rem', fontWeight: 800, color: displayStock == null ? colors.mutedText : syncedStockTone.color }}>
+                        <span style={{ fontSize: responsiveSettings.isCompactScreen ? '0.64rem' : '0.68rem', color: colors.mutedText, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Latest synced stock</span>
+                        <span style={{ fontSize: responsiveSettings.isCompactScreen ? '0.7rem' : '0.74rem', fontWeight: 800, color: displayStock == null ? colors.mutedText : syncedStockTone.color }}>
                           {displayStock == null ? 'Resolve product to view' : Number(displayStock).toLocaleString('en-US')}
                         </span>
                         {displayStock != null && (
-                          <span style={{ border: `1px solid ${syncedStockTone.border}`, background: syncedStockTone.bg, color: syncedStockTone.color, borderRadius: '999px', padding: '0.08rem 0.4rem', fontSize: '0.66rem', fontWeight: 800 }}>
+                          <span style={{ border: `1px solid ${syncedStockTone.border}`, background: syncedStockTone.bg, color: syncedStockTone.color, borderRadius: '999px', padding: '0.08rem 0.4rem', fontSize: responsiveSettings.isCompactScreen ? '0.62rem' : '0.66rem', fontWeight: 800 }}>
                             {syncedStockTone.label}
                           </span>
                         )}
                       </div>
                     </td>
-                    <td style={{ padding: '0.4rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
+                    <td style={{ padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
                       <input
                         ref={(element) => setLineInputRef(index, 'quantity', element)}
                         name="quantity"
@@ -2084,7 +2162,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                         style={compactLineInputStyle}
                       />
                     </td>
-                    <td style={{ padding: '0.4rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
+                    <td style={{ padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
                       <input
                         ref={(element) => setLineInputRef(index, 'unitCost', element)}
                         name="unitCost"
@@ -2099,8 +2177,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                         style={compactLineInputStyle}
                       />
                     </td>
-                    <td style={{ color: colors.text, fontWeight: 700, fontSize: '0.8rem', padding: '0.5rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, whiteSpace: 'nowrap', verticalAlign: 'top' }}>{money(line.totalCost)}</td>
-                    <td style={{ padding: '0.4rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
+                    <td style={{ color: colors.text, fontWeight: 700, fontSize: responsiveSettings.tableFontSize, padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, whiteSpace: 'nowrap', verticalAlign: 'top' }}>{money(line.totalCost)}</td>
+                    <td style={{ padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
                       <input
                         ref={(element) => setLineInputRef(index, 'sellingPrice', element)}
                         name="sellingPrice"
@@ -2115,9 +2193,9 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                         style={{ ...compactLineInputStyle, borderColor: belowCost ? '#f59e0b' : (isAdminDarkTheme ? '#333333' : '#cbd5e1'), backgroundColor: belowCost ? (isAdminDarkTheme ? '#242418' : '#fffbeb') : compactLineInputStyle.backgroundColor }}
                       />
                     </td>
-                    <td style={{ fontWeight: 700, color: colors.subtleText, fontSize: '0.8rem', padding: '0.5rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, whiteSpace: 'nowrap', verticalAlign: 'top' }}>{line.marginPercent == null ? '-' : `${line.marginPercent.toFixed(2)}%`}</td>
-                    <td style={{ fontWeight: 700, color: line.estimatedProfit >= 0 ? '#166534' : '#b91c1c', fontSize: '0.8rem', padding: '0.5rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, whiteSpace: 'nowrap', verticalAlign: 'top' }}>{money(line.estimatedProfit)}</td>
-                    <td style={{ padding: '0.4rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
+                    {responsiveSettings.showMargin && <td style={{ fontWeight: 700, color: colors.subtleText, fontSize: responsiveSettings.tableFontSize, padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, whiteSpace: 'nowrap', verticalAlign: 'top' }}>{line.marginPercent == null ? '-' : `${line.marginPercent.toFixed(2)}%`}</td>}
+                    {responsiveSettings.showEstimatedProfit && <td style={{ fontWeight: 700, color: line.estimatedProfit >= 0 ? '#166534' : '#b91c1c', fontSize: responsiveSettings.tableFontSize, padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, whiteSpace: 'nowrap', verticalAlign: 'top' }}>{money(line.estimatedProfit)}</td>}
+                    {responsiveSettings.showExpiryDate && <td style={{ padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
                       <input
                         ref={(element) => setLineInputRef(index, 'expiryDate', element)}
                         name="expiryDate"
@@ -2129,8 +2207,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                         onChange={(event) => setLineValue(index, 'expiryDate', event.target.value)}
                         style={{ ...compactLineInputStyle, backgroundColor: line.productName && !line.expiryDate ? (isAdminDarkTheme ? '#26201a' : '#fff7ed') : compactLineInputStyle.backgroundColor }}
                       />
-                    </td>
-                    <td style={{ padding: '0.4rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
+                    </td>}
+                    {responsiveSettings.showComments && <td style={{ padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
                       <input
                         ref={(element) => setLineInputRef(index, 'lineNotes', element)}
                         name="lineNotes"
@@ -2141,15 +2219,15 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                         onChange={(event) => setLineValue(index, 'lineNotes', event.target.value)}
                         style={compactLineInputStyle}
                       />
-                    </td>
-                    <td style={{ padding: '0.4rem 0.45rem', borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
+                    </td>}
+                    <td style={{ padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
                       {(canCreate || canEdit) && (
                         <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
-                          <button type="button" onClick={() => duplicateLine(index)} style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #cbd5e1', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text, borderRadius: '7px', padding: '0.25rem 0.45rem', fontWeight: 600, fontSize: '0.76rem', cursor: 'pointer' }}>Dup</button>
-                          <button type="button" onClick={() => removeLine(index)} style={{ border: '1px solid #fecaca', background: isAdminDarkTheme ? '#2d1a1a' : '#fff5f5', color: '#b91c1c', borderRadius: '7px', padding: '0.25rem 0.45rem', fontWeight: 600, fontSize: '0.76rem', cursor: 'pointer' }}>Del</button>
+                          <button type="button" onClick={() => duplicateLine(index)} style={{ border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #cbd5e1', background: isAdminDarkTheme ? '#1e1e1e' : '#fff', color: colors.text, borderRadius: '7px', padding: responsiveSettings.isCompactScreen ? '0.2rem 0.35rem' : '0.25rem 0.45rem', fontWeight: 600, fontSize: responsiveSettings.isCompactScreen ? '0.7rem' : '0.76rem', cursor: 'pointer' }}>Dup</button>
+                          <button type="button" onClick={() => removeLine(index)} style={{ border: '1px solid #fecaca', background: isAdminDarkTheme ? '#2d1a1a' : '#fff5f5', color: '#b91c1c', borderRadius: '7px', padding: responsiveSettings.isCompactScreen ? '0.2rem 0.35rem' : '0.25rem 0.45rem', fontWeight: 600, fontSize: responsiveSettings.isCompactScreen ? '0.7rem' : '0.76rem', cursor: 'pointer' }}>Del</button>
                         </div>
                       )}
-                      {activeLookupRow === index && <div style={{ marginTop: '0.25rem', fontSize: '0.72rem', color: '#2563eb' }}>Looking up...</div>}
+                      {activeLookupRow === index && <div style={{ marginTop: '0.25rem', fontSize: responsiveSettings.isCompactScreen ? '0.68rem' : '0.72rem', color: '#2563eb' }}>Looking up...</div>}
                     </td>
                   </tr>
                 );
