@@ -478,6 +478,10 @@ async function lookupGoodsIntakeProducts({ query, branchCode, locationCode, loca
       branchCode: { equals: normalizedBranchCode, mode: 'insensitive' },
     });
   }
+  // Filter by active price rows: only products with valid price for this branch/location
+  whereClause.AND.push({
+    price: { gt: 0 },
+  });
   whereClause.AND.push({
     OR: [
       { barcode: { equals: normalizedQuery, mode: 'insensitive' } },

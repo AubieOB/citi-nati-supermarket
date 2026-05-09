@@ -541,6 +541,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
   const [priceChangeValue, setPriceChangeValue] = useState('');
   const [priceChangeLoading, setPriceChangeLoading] = useState(false);
   const [priceChangeError, setPriceChangeError] = useState('');
+  const [isPriceChangeModalOpen, setIsPriceChangeModalOpen] = useState(false);
   const productPickerInputRef = useRef(null);
   const priceChangeInputRef = useRef(null);
   const productPickerTimeoutRef = useRef(null);
@@ -1292,6 +1293,13 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
         }, effectiveBranchCode, activeLookupLocationCode, selectedLocationId),
       });
       const products = response.data?.products || [];
+      console.log('[DEBUG] Product Search:', {
+        branchCode: effectiveBranchCode,
+        locationCode: activeLookupLocationCode,
+        query,
+        resultsCount: products.length,
+        results: products.map(p => ({ code: p.sourceCode || p.productCode, name: p.name, price: p.price })),
+      });
       setProductPickerResults(products);
       setProductPickerHighlightedIndex(0);
       if (products.length === 0) {
@@ -1405,6 +1413,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     setPriceChangeError('');
     const currentPrice = product.sellingPrice ?? product.selling_price ?? product.unitPrice ?? product.unit_price ?? product.price ?? '';
     setPriceChangeValue(currentPrice == null ? '' : String(currentPrice));
+    setIsPriceChangeModalOpen(true);
   }, []);
 
   const handleClosePriceChange = useCallback(() => {
@@ -1412,6 +1421,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     setPriceChangeValue('');
     setPriceChangeLoading(false);
     setPriceChangeError('');
+    setIsPriceChangeModalOpen(false);
   }, []);
 
   const handleConfirmPriceChange = useCallback(async () => {
@@ -1551,6 +1561,15 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [handleCloseWorkspace, isIntakeWorkspaceOpen, productPickerOpen, closeProductPicker, openProductPicker]);
+
+  useEffect(() => {
+    if (isPriceChangeModalOpen && priceChangeInputRef.current) {
+      setTimeout(() => {
+        priceChangeInputRef.current?.focus();
+        priceChangeInputRef.current?.select?.();
+      }, 100);
+    }
+  }, [isPriceChangeModalOpen]);
 
   const refreshResolvedLineStock = useCallback(async () => {
     if (!isIntakeWorkspaceOpen || !activeLookupLocationCode || resolvedLineProductIds.length === 0) {
@@ -2925,58 +2944,71 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                 {productPickerResults.length > 0 && <span>⏎ to select</span>}
               </div>
             </div>
-            {priceChangeProduct && (
-              <div style={{ marginTop: '1rem', border: `1px solid ${colors.tableBorder}`, borderRadius: '14px', padding: '1rem', background: isAdminDarkTheme ? '#111827' : '#f8fafc' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                  <div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: colors.strongText }}>Quick Price Change</div>
-                    <div style={{ fontSize: '0.78rem', color: colors.mutedText }}>Update the product price and queue POS writeback for the current branch/location.</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleClosePriceChange}
-                    style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: isAdminDarkTheme ? '#2d1a1a' : '#fff5f5', color: '#b91c1c', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                  >
-                    <i className="fas fa-times" />
-                  </button>
-                </div>
+          </div>
+        </div>
+      )}
 
-                <div style={{ marginTop: '0.85rem', display: 'grid', gap: '0.75rem', gridTemplateColumns: '1fr auto' }}>
-                  <div>
-                    <div style={{ marginBottom: '0.35rem', fontSize: '0.78rem', color: colors.mutedText }}>Product</div>
-                    <div style={{ fontSize: '0.91rem', color: colors.strongText, fontWeight: 700 }}>{priceChangeProduct.name || priceChangeProduct.sourceCode || priceChangeProduct.productCode || 'Unnamed product'}</div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ marginBottom: '0.35rem', fontSize: '0.78rem', color: colors.mutedText }}>Current Price</div>
-                    <div style={{ fontSize: '0.91rem', color: colors.text, fontWeight: 700 }}>{money(priceChangeProduct.sellingPrice ?? priceChangeProduct.selling_price ?? priceChangeProduct.unitPrice ?? priceChangeProduct.unit_price ?? priceChangeProduct.price ?? 0)}</div>
-                  </div>
-                </div>
-
-                <div style={{ marginTop: '0.85rem', display: 'grid', gap: '0.75rem', gridTemplateColumns: '1fr auto' }}>
-                  <input
-                    ref={priceChangeInputRef}
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={priceChangeValue}
-                    onChange={(event) => setPriceChangeValue(event.target.value)}
-                    style={{ ...themedInputStyle, width: '100%' }}
-                    placeholder="Enter new selling price"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleConfirmPriceChange}
-                    disabled={priceChangeLoading}
-                    style={{ border: '1px solid #3b82f6', background: '#eff6ff', color: '#1d4ed8', borderRadius: '10px', cursor: 'pointer', padding: '0.8rem 1rem', fontWeight: 700 }}
-                  >
-                    {priceChangeLoading ? 'Updating...' : 'Save Price'}
-                  </button>
-                </div>
-                {priceChangeError && (
-                  <div style={{ marginTop: '0.75rem', color: '#b91c1c', fontSize: '0.82rem' }}>{priceChangeError}</div>
-                )}
+      {isPriceChangeModalOpen && priceChangeProduct && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(12, 14, 18, 0.72)', zIndex: 180, display: 'grid', placeItems: 'center', padding: '1rem' }}>
+          <div style={{ ...themedCardStyle, width: 'min(520px, 95vw)', borderRadius: '18px', padding: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
+              <div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: colors.strongText }}>Quick Price Change</div>
+                <div style={{ fontSize: '0.78rem', color: colors.mutedText }}>Update the product price and queue POS writeback for the current branch/location.</div>
               </div>
+              <button
+                type="button"
+                onClick={handleClosePriceChange}
+                style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: isAdminDarkTheme ? '#2d1a1a' : '#fff5f5', color: '#b91c1c', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <i className="fas fa-times" />
+              </button>
+            </div>
+
+            <div style={{ marginBottom: '1.25rem', display: 'grid', gap: '0.75rem', gridTemplateColumns: '1fr auto' }}>
+              <div>
+                <div style={{ marginBottom: '0.35rem', fontSize: '0.78rem', color: colors.mutedText }}>Product</div>
+                <div style={{ fontSize: '0.91rem', color: colors.strongText, fontWeight: 700 }}>{priceChangeProduct.name || priceChangeProduct.sourceCode || priceChangeProduct.productCode || 'Unnamed product'}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ marginBottom: '0.35rem', fontSize: '0.78rem', color: colors.mutedText }}>Current Price</div>
+                <div style={{ fontSize: '0.91rem', color: colors.text, fontWeight: 700 }}>{money(priceChangeProduct.sellingPrice ?? priceChangeProduct.selling_price ?? priceChangeProduct.unitPrice ?? priceChangeProduct.unit_price ?? priceChangeProduct.price ?? 0)}</div>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '1.25rem', display: 'grid', gap: '0.75rem', gridTemplateColumns: '1fr auto' }}>
+              <input
+                ref={priceChangeInputRef}
+                type="number"
+                min="0"
+                step="0.01"
+                value={priceChangeValue}
+                onChange={(event) => setPriceChangeValue(event.target.value)}
+                style={{ ...themedInputStyle, width: '100%' }}
+                placeholder="Enter new selling price"
+              />
+              <button
+                type="button"
+                onClick={handleConfirmPriceChange}
+                disabled={priceChangeLoading}
+                style={{ border: '1px solid #3b82f6', background: '#eff6ff', color: '#1d4ed8', borderRadius: '10px', cursor: 'pointer', padding: '0.8rem 1rem', fontWeight: 700 }}
+              >
+                {priceChangeLoading ? 'Updating...' : 'Save Price'}
+              </button>
+            </div>
+            {priceChangeError && (
+              <div style={{ marginBottom: '1rem', color: '#b91c1c', fontSize: '0.82rem' }}>{priceChangeError}</div>
             )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+              <button
+                type="button"
+                onClick={handleClosePriceChange}
+                style={{ border: '1px solid #d1d5db', background: isAdminDarkTheme ? '#374151' : '#f9fafb', color: colors.text, borderRadius: '10px', cursor: 'pointer', padding: '0.6rem 1rem', fontWeight: 700 }}
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
