@@ -1349,15 +1349,23 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
 
     if (event.key === 'ArrowDown') {
       event.preventDefault();
-      setProductPickerHighlightedIndex((prev) => 
-        Math.min(prev + 1, productPickerResults.length - 1)
-      );
+      const nextIndex = Math.min(productPickerHighlightedIndex + 1, productPickerResults.length - 1);
+      setProductPickerHighlightedIndex(nextIndex);
+      setTimeout(() => {
+        const resultRow = document.querySelector(`[data-product-result-index="${nextIndex}"]`);
+        resultRow?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 0);
       return;
     }
 
     if (event.key === 'ArrowUp') {
       event.preventDefault();
-      setProductPickerHighlightedIndex((prev) => Math.max(prev - 1, 0));
+      const prevIndex = Math.max(productPickerHighlightedIndex - 1, 0);
+      setProductPickerHighlightedIndex(prevIndex);
+      setTimeout(() => {
+        const resultRow = document.querySelector(`[data-product-result-index="${prevIndex}"]`);
+        resultRow?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 0);
       return;
     }
 
@@ -1392,11 +1400,15 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
         event.preventDefault();
         // F1 opens product picker for the focused row
         const activeElement = document.activeElement;
-        if (activeElement && activeElement.dataset?.rowIndex !== undefined) {
-          const rowIndex = Number(activeElement.dataset.rowIndex);
-          if (!Number.isNaN(rowIndex) && rowIndex >= 0) {
-            const query = String(activeElement.value || '').trim();
-            openProductPicker(rowIndex, query);
+        if (activeElement) {
+          // Try dataset first, fallback to getAttribute for compatibility
+          const rowIndexStr = activeElement.dataset?.rowIndex ?? activeElement.getAttribute('data-row-index');
+          if (rowIndexStr !== undefined && rowIndexStr !== null) {
+            const rowIndex = Number(rowIndexStr);
+            if (!Number.isNaN(rowIndex) && rowIndex >= 0) {
+              const query = String(activeElement.value || '').trim();
+              openProductPicker(rowIndex, query);
+            }
           }
         }
       }
@@ -1493,8 +1505,48 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
       handleLookup(lookupRowIndex);
     }
 
-    focusNextWorkspaceField(workspaceRef.current, event.currentTarget);
-  }, [handleLookup]);
+    const container = workspaceRef.current;
+    if (!container) {
+      focusNextWorkspaceField(container, event.currentTarget);
+      return;
+    }
+
+    // Check if this is the lineNotes field (last field in the row)
+    const isLastField = event.currentTarget.name === 'lineNotes' || (
+      event.currentTarget.value !== undefined && 
+      event.currentTarget.parentElement?.parentElement?.querySelectorAll('input, select, textarea').length > 0 &&
+      Array.from(event.currentTarget.parentElement?.parentElement?.querySelectorAll('input, select, textarea') || []).pop() === event.currentTarget
+    );
+
+    // Check if this is the last row
+    const isLastRow = lookupRowIndex != null && lookupRowIndex === (form.items?.length - 1);
+
+    if (isLastField && isLastRow) {
+      // This is the last field of the last row - auto-create a new row
+      addLine();
+      // Focus the first field of the new row after DOM updates
+      setTimeout(() => {
+        const newRowIndex = form.items?.length || 0;
+        const allInputs = Array.from(
+          container.querySelectorAll('input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])')
+        ).filter((field) => !field.readOnly && field.tabIndex !== -1 && field.offsetParent !== null);
+        // Find the first input of the new row (barcode field)
+        const newRowFirstInput = allInputs.find((input) => {
+          const rowIdx = input.getAttribute('data-row-index');
+          return rowIdx == newRowIndex;
+        });
+        if (newRowFirstInput) {
+          newRowFirstInput.focus();
+          if (typeof newRowFirstInput.select === 'function') {
+            newRowFirstInput.select();
+          }
+        }
+      }, 50);
+    } else {
+      // Not the last row or not the last field, move to next field normally
+      focusNextWorkspaceField(container, event.currentTarget);
+    }
+  }, [handleLookup, form.items, addLine]);
 
   const renderTransferBadge = (record, { compact = false } = {}) => {
     const key = resolveTransferStatus(record);
@@ -1830,12 +1882,12 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                         <button
                           type="button"
                           onClick={() => openProductPicker(index, line.barcode || '')}
-                          style={{ padding: '0.35rem 0.5rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, lineHeight: 1, transition: 'background 0.15s' }}
+                          style={{ padding: '0.35rem 0.5rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, lineHeight: 1, transition: 'background 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                           onMouseEnter={(e) => e.target.style.background = '#1d4ed8'}
                           onMouseLeave={(e) => e.target.style.background = '#2563eb'}
                           title="Press F1 or click to search products"
                         >
-                          🔍
+                          <i className="fas fa-search" />
                         </button>
                       </div>
                       <div style={{ marginTop: '0.18rem', fontSize: '0.7rem', color: colors.mutedText, lineHeight: 1.25, overflowWrap: 'anywhere' }}>{line.barcode || '-'}</div>
@@ -2623,6 +2675,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                       return (
                         <tr
                           key={`product-${product.id || resultIndex}`}
+                          data-product-result-index={resultIndex}
                           onClick={() => applyProductToLine(product, productPickerRowIndex)}
                           onMouseEnter={() => setProductPickerHighlightedIndex(resultIndex)}
                           style={{
