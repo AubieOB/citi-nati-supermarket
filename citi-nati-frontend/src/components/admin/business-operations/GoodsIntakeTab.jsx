@@ -537,7 +537,12 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
   const [productPickerLoading, setProductPickerLoading] = useState(false);
   const [productPickerError, setProductPickerError] = useState('');
   const [productPickerHighlightedIndex, setProductPickerHighlightedIndex] = useState(0);
+  const [priceChangeProduct, setPriceChangeProduct] = useState(null);
+  const [priceChangeValue, setPriceChangeValue] = useState('');
+  const [priceChangeLoading, setPriceChangeLoading] = useState(false);
+  const [priceChangeError, setPriceChangeError] = useState('');
   const productPickerInputRef = useRef(null);
+  const priceChangeInputRef = useRef(null);
   const productPickerTimeoutRef = useRef(null);
 
   const setLineInputRef = useCallback((rowIndex, fieldName, element) => {
@@ -1330,6 +1335,10 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     setProductPickerResults([]);
     setProductPickerError('');
     setProductPickerHighlightedIndex(0);
+    setPriceChangeProduct(null);
+    setPriceChangeValue('');
+    setPriceChangeLoading(false);
+    setPriceChangeError('');
     if (productPickerTimeoutRef.current) {
       clearTimeout(productPickerTimeoutRef.current);
     }
@@ -1390,8 +1399,73 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     }, 300);
   }, [fetchProductPickerResults]);
 
+  const handleOpenPriceChange = useCallback((product) => {
+    if (!product || !product.id) return;
+    setPriceChangeProduct(product);
+    setPriceChangeError('');
+    const currentPrice = product.sellingPrice ?? product.selling_price ?? product.unitPrice ?? product.unit_price ?? product.price ?? '';
+    setPriceChangeValue(currentPrice == null ? '' : String(currentPrice));
+  }, []);
+
+  const handleClosePriceChange = useCallback(() => {
+    setPriceChangeProduct(null);
+    setPriceChangeValue('');
+    setPriceChangeLoading(false);
+    setPriceChangeError('');
+  }, []);
+
+  const handleConfirmPriceChange = useCallback(async () => {
+    if (!priceChangeProduct || !priceChangeProduct.id) {
+      setPriceChangeError('Cannot update price for this product.');
+      return;
+    }
+
+    const parsedPrice = Number(priceChangeValue);
+    if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+      setPriceChangeError('Enter a valid non-negative price.');
+      return;
+    }
+
+    try {
+      setPriceChangeLoading(true);
+      const response = await api.put(`/products/${priceChangeProduct.id}`, {
+        price: parsedPrice,
+        branchCode: effectiveBranchCode || undefined,
+        locationCode: activeLookupLocationCode || undefined,
+      });
+
+      const updatedPrice = parsedPrice;
+      setProductPickerResults((prevResults) => prevResults.map((item) => {
+        if (Number(item.id) !== Number(priceChangeProduct.id)) return item;
+        return {
+          ...item,
+          sellingPrice: updatedPrice,
+          selling_price: updatedPrice,
+          unitPrice: updatedPrice,
+          unit_price: updatedPrice,
+          price: updatedPrice,
+        };
+      }));
+
+      await boAlert({
+        title: 'Price Updated',
+        message: `Updated ${priceChangeProduct.name || 'product'} price to ${money(updatedPrice)}.`, 
+        type: 'success',
+      });
+      handleClosePriceChange();
+    } catch (error) {
+      console.error('Price change failed:', error);
+      setPriceChangeError(error.response?.data?.error || 'Failed to update product price.');
+    } finally {
+      setPriceChangeLoading(false);
+    }
+  }, [activeLookupLocationCode, effectiveBranchCode, handleClosePriceChange, priceChangeProduct, priceChangeValue]);
+
   const handleProductPickerKeyDown = useCallback((event) => {
     if (!productPickerOpen) return;
+    if (priceChangeProduct && priceChangeInputRef.current && priceChangeInputRef.current.contains(event.target)) {
+      return;
+    }
 
     if (event.key === 'Escape' || event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Enter') {
       event.preventDefault();
@@ -2771,7 +2845,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ background: isAdminDarkTheme ? '#2a2a2a' : '#f8fafc', stickyTop: 0 }}>
-                      {['Product Name', 'Barcode', 'Code', 'Price', 'Stock', 'Status'].map((label) => (
+                      {['Product Name', 'Code', 'Price', 'Stock', 'Status', 'Actions'].map((label) => (
                         <th key={label} style={{ textAlign: 'left', padding: '0.6rem 0.65rem', fontSize: '0.76rem', fontWeight: 700, color: colors.mutedText, borderBottom: `2px solid ${colors.tableBorder}` }}>{label}</th>
                       ))}
                     </tr>
@@ -2801,7 +2875,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                           }}
                         >
                           <td style={{ padding: '0.65rem 0.65rem', color: colors.text, fontSize: '0.82rem', fontWeight: 600 }}>{product.name || '-'}</td>
-                          <td style={{ padding: '0.65rem 0.65rem', color: colors.mutedText, fontSize: '0.8rem' }}>{product.barcode || '-'}</td>
                           <td style={{ padding: '0.65rem 0.65rem', color: colors.mutedText, fontSize: '0.8rem' }}>{product.sourceCode || product.productCode || '-'}</td>
                           <td style={{ padding: '0.65rem 0.65rem', color: colors.strongText, fontSize: '0.82rem', fontWeight: 700 }}>{money(product.sellingPrice || product.selling_price || product.unitPrice || product.unit_price || product.price || 0)}</td>
                           <td style={{ padding: '0.65rem 0.65rem', color: colors.text, fontSize: '0.82rem' }}>{displayStock == null ? 'Unknown' : Number(displayStock).toLocaleString('en-US')}</td>
@@ -2809,6 +2882,26 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                             <span style={{ border: `1px solid ${stockTone.color}`, background: stockTone.bg, color: stockTone.color, borderRadius: '999px', padding: '0.12rem 0.4rem', fontSize: '0.7rem', fontWeight: 700, display: 'inline-block' }}>
                               {stockStatus || 'Unknown'}
                             </span>
+                          </td>
+                          <td style={{ padding: '0.65rem 0.65rem', textAlign: 'left' }}>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleOpenPriceChange(product);
+                              }}
+                              style={{
+                                border: '1px solid #cbd5e1',
+                                background: isAdminDarkTheme ? '#1f2937' : '#f8fafc',
+                                color: colors.text,
+                                borderRadius: '10px',
+                                padding: '0.35rem 0.55rem',
+                                cursor: 'pointer',
+                                fontSize: '0.76rem',
+                              }}
+                            >
+                              Change Price
+                            </button>
                           </td>
                         </tr>
                       );
@@ -2832,6 +2925,58 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                 {productPickerResults.length > 0 && <span>⏎ to select</span>}
               </div>
             </div>
+            {priceChangeProduct && (
+              <div style={{ marginTop: '1rem', border: `1px solid ${colors.tableBorder}`, borderRadius: '14px', padding: '1rem', background: isAdminDarkTheme ? '#111827' : '#f8fafc' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: colors.strongText }}>Quick Price Change</div>
+                    <div style={{ fontSize: '0.78rem', color: colors.mutedText }}>Update the product price and queue POS writeback for the current branch/location.</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleClosePriceChange}
+                    style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: isAdminDarkTheme ? '#2d1a1a' : '#fff5f5', color: '#b91c1c', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <i className="fas fa-times" />
+                  </button>
+                </div>
+
+                <div style={{ marginTop: '0.85rem', display: 'grid', gap: '0.75rem', gridTemplateColumns: '1fr auto' }}>
+                  <div>
+                    <div style={{ marginBottom: '0.35rem', fontSize: '0.78rem', color: colors.mutedText }}>Product</div>
+                    <div style={{ fontSize: '0.91rem', color: colors.strongText, fontWeight: 700 }}>{priceChangeProduct.name || priceChangeProduct.sourceCode || priceChangeProduct.productCode || 'Unnamed product'}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ marginBottom: '0.35rem', fontSize: '0.78rem', color: colors.mutedText }}>Current Price</div>
+                    <div style={{ fontSize: '0.91rem', color: colors.text, fontWeight: 700 }}>{money(priceChangeProduct.sellingPrice ?? priceChangeProduct.selling_price ?? priceChangeProduct.unitPrice ?? priceChangeProduct.unit_price ?? priceChangeProduct.price ?? 0)}</div>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '0.85rem', display: 'grid', gap: '0.75rem', gridTemplateColumns: '1fr auto' }}>
+                  <input
+                    ref={priceChangeInputRef}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={priceChangeValue}
+                    onChange={(event) => setPriceChangeValue(event.target.value)}
+                    style={{ ...themedInputStyle, width: '100%' }}
+                    placeholder="Enter new selling price"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleConfirmPriceChange}
+                    disabled={priceChangeLoading}
+                    style={{ border: '1px solid #3b82f6', background: '#eff6ff', color: '#1d4ed8', borderRadius: '10px', cursor: 'pointer', padding: '0.8rem 1rem', fontWeight: 700 }}
+                  >
+                    {priceChangeLoading ? 'Updating...' : 'Save Price'}
+                  </button>
+                </div>
+                {priceChangeError && (
+                  <div style={{ marginTop: '0.75rem', color: '#b91c1c', fontSize: '0.82rem' }}>{priceChangeError}</div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

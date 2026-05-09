@@ -12,6 +12,7 @@ const {
   toDate,
   listResponse,
 } = require('../../utils/business-operations/common');
+const { resolveOperationalScope } = require('../../utils/operationalScope');
 
 const GOODS_INTAKE_SORT_FIELDS = new Set(['id', 'purchaseDate', 'status', 'totalCost', 'createdAt', 'updatedAt']);
 
@@ -201,17 +202,13 @@ async function listGoodsIntakes(req, res) {
 async function lookupGoodsIntakeProducts(req, res) {
   try {
     const query = String(req.query.q || req.query.search || '').trim();
-    const branchCode = req.query.branchCode ? String(req.query.branchCode).trim() : null;
-    const locationCode = req.query.locationCode ? String(req.query.locationCode).trim() : null;
     const locationId = req.query.locationId ? String(req.query.locationId).trim() : null;
 
     if (!query) {
       return res.json({ success: true, products: [] });
     }
 
-    if (!locationCode) {
-      return res.status(400).json({ success: false, error: 'locationCode is required for goods intake lookup' });
-    }
+    const { branchCode, locationCode } = resolveOperationalScope(req);
 
     const products = await goodsIntakeService.lookupGoodsIntakeProducts({
       query,
@@ -224,20 +221,19 @@ async function lookupGoodsIntakeProducts(req, res) {
     return res.json({ success: true, products });
   } catch (error) {
     console.error('[BO][GOODS_INTAKE] lookup error:', error);
-    return res.status(500).json({ success: false, error: 'Failed to lookup goods intake products' });
+    const status = String(error?.message || '').toLowerCase().includes('branchcode')
+      || String(error?.message || '').toLowerCase().includes('locationcode')
+      ? 400
+      : 500;
+    return res.status(status).json({ success: false, error: error.message || 'Failed to lookup goods intake products' });
   }
 }
 
 async function getGoodsIntakeLineStock(req, res) {
   try {
-    const branchCode = req.body?.branchCode ? String(req.body.branchCode).trim() : null;
-    const locationCode = req.body?.locationCode ? String(req.body.locationCode).trim() : null;
+    const { branchCode, locationCode } = resolveOperationalScope(req);
     const locationId = req.body?.locationId ? String(req.body.locationId).trim() : null;
     const productIds = Array.isArray(req.body?.productIds) ? req.body.productIds : [];
-
-    if (!locationCode) {
-      return res.status(400).json({ success: false, error: 'locationCode is required for goods intake stock refresh' });
-    }
 
     const lines = await goodsIntakeService.getGoodsIntakeLineStock({
       branchCode,
@@ -249,7 +245,11 @@ async function getGoodsIntakeLineStock(req, res) {
     return res.json({ success: true, lines });
   } catch (error) {
     console.error('[BO][GOODS_INTAKE] line stock refresh error:', error);
-    return res.status(500).json({ success: false, error: 'Failed to refresh goods intake line stock' });
+    const status = String(error?.message || '').toLowerCase().includes('branchcode')
+      || String(error?.message || '').toLowerCase().includes('locationcode')
+      ? 400
+      : 500;
+    return res.status(status).json({ success: false, error: error.message || 'Failed to refresh goods intake line stock' });
   }
 }
 
