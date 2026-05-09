@@ -883,6 +883,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     setActiveAutosaveId(String(entry.id || createGoodsIntakeAutosaveId()));
     setIsAutosaveRecoveryOpen(false);
     setIsIntakeWorkspaceMaximized(false);
+    setActiveRowIndex(0);
     setIsIntakeWorkspaceOpen(true);
   };
 
@@ -904,9 +905,19 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
       setActiveAutosaveId(createGoodsIntakeAutosaveId());
       setForm(buildNewForm(selectedLocation, effectiveBranchCode));
     }
+    setActiveRowIndex(0);
     setIsIntakeWorkspaceMaximized(false);
     setIsIntakeWorkspaceOpen(true);
   };
+
+  useEffect(() => {
+    if (!isIntakeWorkspaceOpen) return;
+    const rowCount = Array.isArray(form.items) ? form.items.length : 0;
+    if (rowCount === 0) return;
+    if (!Number.isFinite(activeRowIndex) || activeRowIndex < 0 || activeRowIndex >= rowCount) {
+      setActiveRowIndex(0);
+    }
+  }, [isIntakeWorkspaceOpen, form.items, activeRowIndex]);
 
   const openFinalizedHistoryModal = () => {
     if (!canViewHistory) return;
@@ -1032,6 +1043,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
       setForm(toFormFromRecord(data));
       setActivePriceSyncRecord(data);
       setLastFinalizePriceSync(null);
+      setActiveRowIndex(0);
       setIsIntakeWorkspaceOpen(true);
     } catch (error) {
       await boAlert({ title: 'Load Failed', message: error.response?.data?.error || 'Failed to load record.', type: 'error' });
@@ -1290,14 +1302,17 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
   }, [effectiveBranchCode, activeLookupLocationCode, selectedLocationId]);
 
   const openProductPicker = useCallback((rowIndex, initialQuery = '') => {
-    if (rowIndex < 0 || rowIndex >= (form.items || []).length) return;
+    const itemsLength = Array.isArray(form.items) ? form.items.length : 0;
+    if (itemsLength === 0) return;
+    const requestedIndex = Number.isFinite(Number(rowIndex)) ? Number(rowIndex) : 0;
+    const normalizedRowIndex = requestedIndex >= 0 && requestedIndex < itemsLength ? requestedIndex : 0;
     setProductPickerOpen(true);
-    setProductPickerRowIndex(rowIndex);
+    setProductPickerRowIndex(normalizedRowIndex);
     setProductPickerQuery(initialQuery);
     setProductPickerResults([]);
     setProductPickerError('');
     setProductPickerHighlightedIndex(0);
-    setActiveRowIndex(rowIndex);
+    setActiveRowIndex(normalizedRowIndex);
     if (initialQuery) {
       fetchProductPickerResults(initialQuery);
     }
@@ -1423,9 +1438,10 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
 
   useEffect(() => {
     if (productPickerOpen) {
-      window.addEventListener('keydown', handleProductPickerKeyDown);
-      return () => window.removeEventListener('keydown', handleProductPickerKeyDown);
+      document.addEventListener('keydown', handleProductPickerKeyDown, true);
+      return () => document.removeEventListener('keydown', handleProductPickerKeyDown, true);
     }
+    return undefined;
   }, [productPickerOpen, handleProductPickerKeyDown]);
 
   useEffect(() => {
@@ -1442,12 +1458,16 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
         event.preventDefault();
         event.stopPropagation();
         if (productPickerOpen) return;
-        const rowIndex = Number(activeRowIndex);
-        if (!Number.isNaN(rowIndex) && rowIndex >= 0 && rowIndex < (form.items || []).length) {
-          const row = form.items[rowIndex] || {};
-          const query = String(row.barcode || row.productName || '').trim();
-          openProductPicker(rowIndex, query);
+        const itemsLength = Array.isArray(form.items) ? form.items.length : 0;
+        if (itemsLength === 0) return;
+        let rowIndex = Number(activeRowIndex);
+        if (!Number.isFinite(rowIndex) || rowIndex < 0 || rowIndex >= itemsLength) {
+          rowIndex = 0;
+          setActiveRowIndex(0);
         }
+        const row = form.items[rowIndex] || {};
+        const query = String(row.barcode || row.productName || '').trim();
+        openProductPicker(rowIndex, query);
       }
     };
     window.addEventListener('keydown', handler);
