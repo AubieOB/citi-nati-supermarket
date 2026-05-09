@@ -609,6 +609,12 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
   const priceChangeInputRef = useRef(null);
   const productPickerTimeoutRef = useRef(null);
 
+  // Product replacement confirmation modal state
+  const [productReplacementModalOpen, setProductReplacementModalOpen] = useState(false);
+  const [pendingProductToApply, setPendingProductToApply] = useState(null);
+  const [pendingRowIndex, setPendingRowIndex] = useState(-1);
+  const [currentProductName, setCurrentProductName] = useState('');
+
   const setLineInputRef = useCallback((rowIndex, fieldName, element) => {
     inputRefs.current[rowIndex] = inputRefs.current[rowIndex] || {};
     if (element) {
@@ -1424,6 +1430,27 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
   const applyProductToLine = useCallback((product, rowIndex) => {
     if (!product || rowIndex < 0) return;
 
+    // Check if the current row already has a product
+    const currentLine = form.items?.[rowIndex];
+    const hasExistingProduct = currentLine && (currentLine.productId || currentLine.productName?.trim());
+
+    if (hasExistingProduct) {
+      // Show confirmation modal
+      setPendingProductToApply(product);
+      setPendingRowIndex(rowIndex);
+      setCurrentProductName(currentLine.productName || 'Unknown Product');
+      setProductReplacementModalOpen(true);
+      closeProductPicker();
+      return;
+    }
+
+    // If no existing product, apply directly
+    applyProductDirectly(product, rowIndex);
+  }, [form.items, closeProductPicker]);
+
+  const applyProductDirectly = useCallback((product, rowIndex) => {
+    if (!product || rowIndex < 0) return;
+
     const lookupPriceCandidates = [
       product?.sellingPrice,
       product?.selling_price,
@@ -1465,6 +1492,47 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
       focusField(rowIndex, 'quantity');
     }, 0);
   }, [closeProductPicker, focusField]);
+
+  const handleReplaceCurrentProduct = useCallback(() => {
+    if (pendingProductToApply && pendingRowIndex >= 0) {
+      applyProductDirectly(pendingProductToApply, pendingRowIndex);
+    }
+    setProductReplacementModalOpen(false);
+    setPendingProductToApply(null);
+    setPendingRowIndex(-1);
+    setCurrentProductName('');
+  }, [pendingProductToApply, pendingRowIndex, applyProductDirectly]);
+
+  const handleAddToNewRow = useCallback(() => {
+    if (!pendingProductToApply) return;
+
+    // Add a new row if needed
+    const currentItems = form.items || [];
+    const newRowIndex = currentItems.length;
+
+    // Add empty row
+    setForm((prev) => ({
+      ...prev,
+      items: [...(prev.items || []), createEmptyLine()],
+    }));
+
+    // Apply product to the new row
+    setTimeout(() => {
+      applyProductDirectly(pendingProductToApply, newRowIndex);
+    }, 0);
+
+    setProductReplacementModalOpen(false);
+    setPendingProductToApply(null);
+    setPendingRowIndex(-1);
+    setCurrentProductName('');
+  }, [pendingProductToApply, form.items, applyProductDirectly]);
+
+  const handleCancelProductReplacement = useCallback(() => {
+    setProductReplacementModalOpen(false);
+    setPendingProductToApply(null);
+    setPendingRowIndex(-1);
+    setCurrentProductName('');
+  }, []);
 
   const handleProductPickerSearch = useCallback((query) => {
     setProductPickerQuery(query);
@@ -1601,12 +1669,34 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     return undefined;
   }, [productPickerOpen, handleProductPickerKeyDown]);
 
+  const handleProductReplacementKeyDown = useCallback((event) => {
+    if (!productReplacementModalOpen) return;
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      handleReplaceCurrentProduct();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      handleCancelProductReplacement();
+    }
+  }, [productReplacementModalOpen, handleReplaceCurrentProduct, handleCancelProductReplacement]);
+
+  useEffect(() => {
+    if (productReplacementModalOpen) {
+      document.addEventListener('keydown', handleProductReplacementKeyDown, true);
+      return () => document.removeEventListener('keydown', handleProductReplacementKeyDown, true);
+    }
+    return undefined;
+  }, [productReplacementModalOpen, handleProductReplacementKeyDown]);
+
   useEffect(() => {
     if (!isIntakeWorkspaceOpen) return;
     const handler = (event) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        if (productPickerOpen) {
+        if (productReplacementModalOpen) {
+          handleCancelProductReplacement();
+        } else if (productPickerOpen) {
           closeProductPicker();
         } else {
           handleCloseWorkspace();
@@ -3021,6 +3111,107 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                 {productPickerResults.length > 0 && <span>↑↓ to navigate</span>}
                 {productPickerResults.length > 0 && <span>⏎ to select</span>}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {productReplacementModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(12, 14, 18, 0.72)', zIndex: 190, display: 'grid', placeItems: 'center', padding: '1rem' }}>
+          <div style={{ ...themedCardStyle, width: 'min(480px, 95vw)', borderRadius: '18px', padding: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
+              <div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 800, color: colors.strongText }}>Replace Product?</div>
+              </div>
+              <button
+                type="button"
+                onClick={handleCancelProductReplacement}
+                style={{ border: 'none', background: 'transparent', color: colors.mutedText, cursor: 'pointer', padding: '0.25rem', borderRadius: '6px' }}
+                title="Cancel (Esc)"
+              >
+                <i className="fas fa-times" aria-hidden="true" />
+              </button>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <div style={{ fontSize: '0.85rem', color: colors.text, lineHeight: 1.5 }}>
+                This row already contains <strong>{currentProductName}</strong>. What would you like to do?
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', flexDirection: 'column' }}>
+              <button
+                type="button"
+                onClick={handleReplaceCurrentProduct}
+                style={{
+                  border: `1px solid ${isAdminDarkTheme ? '#3f3f3f' : '#dbeafe'}`,
+                  background: isAdminDarkTheme ? '#242424' : '#eff6ff',
+                  color: isAdminDarkTheme ? '#e4e4e7' : '#1d4ed8',
+                  borderRadius: '8px',
+                  padding: '0.75rem 1rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontSize: '0.85rem',
+                  textAlign: 'left',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+                title="Replace the current product (Enter)"
+              >
+                <i className="fas fa-exchange-alt" aria-hidden="true" />
+                Replace Current Product
+              </button>
+
+              <button
+                type="button"
+                onClick={handleAddToNewRow}
+                style={{
+                  border: `1px solid ${isAdminDarkTheme ? '#3a3a3a' : '#d8b4fe'}`,
+                  background: isAdminDarkTheme ? '#232323' : '#f8f5ff',
+                  color: isAdminDarkTheme ? '#e4e4e7' : '#7c3aed',
+                  borderRadius: '8px',
+                  padding: '0.75rem 1rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontSize: '0.85rem',
+                  textAlign: 'left',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+                title="Add to a new row"
+              >
+                <i className="fas fa-plus" aria-hidden="true" />
+                Add To New Row
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCancelProductReplacement}
+                style={{
+                  border: `1px solid ${isAdminDarkTheme ? '#404040' : '#e2e8f0'}`,
+                  background: isAdminDarkTheme ? '#1e1e1e' : '#f8fafc',
+                  color: colors.mutedText,
+                  borderRadius: '8px',
+                  padding: '0.75rem 1rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontSize: '0.85rem',
+                  textAlign: 'left',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+                title="Cancel and keep current product"
+              >
+                <i className="fas fa-times" aria-hidden="true" />
+                Cancel
+              </button>
+            </div>
+
+            <div style={{ marginTop: '1rem', fontSize: '0.75rem', color: colors.mutedText, textAlign: 'center' }}>
+              Press Enter for Replace • Tab to navigate • Esc to cancel
             </div>
           </div>
         </div>
