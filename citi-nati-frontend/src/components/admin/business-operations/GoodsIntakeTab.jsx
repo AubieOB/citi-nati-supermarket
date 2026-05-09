@@ -1374,7 +1374,11 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     }));
 
     closeProductPicker();
-  }, [closeProductPicker]);
+    setActiveRowIndex(rowIndex);
+    setTimeout(() => {
+      focusField(rowIndex, 'quantity');
+    }, 0);
+  }, [closeProductPicker, focusField]);
 
   const handleProductPickerSearch = useCallback((query) => {
     setProductPickerQuery(query);
