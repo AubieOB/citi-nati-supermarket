@@ -762,33 +762,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
   }, [search, statusFilter, startDate, endDate, effectiveBranchCode, effectiveLocationCode, selectedLocationId]);
 
   useEffect(() => {
-    if (!isIntakeWorkspaceOpen) return;
-    const handler = (event) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        if (productPickerOpen) {
-          closeProductPicker();
-        } else {
-          handleCloseWorkspace();
-        }
-      } else if (event.key === 'F1') {
-        event.preventDefault();
-        // F1 opens product picker for the focused row
-        const activeElement = document.activeElement;
-        if (activeElement && activeElement.dataset?.rowIndex !== undefined) {
-          const rowIndex = Number(activeElement.dataset.rowIndex);
-          if (!Number.isNaN(rowIndex) && rowIndex >= 0) {
-            const query = String(activeElement.value || '').trim();
-            openProductPicker(rowIndex, query);
-          }
-        }
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [handleCloseWorkspace, isIntakeWorkspaceOpen, productPickerOpen, closeProductPicker, openProductPicker]);
-
-  useEffect(() => {
     if (productPickerOpen) {
       window.addEventListener('keydown', handleProductPickerKeyDown);
       return () => window.removeEventListener('keydown', handleProductPickerKeyDown);
@@ -1404,6 +1377,33 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
       return;
     }
   }, [productPickerOpen, productPickerResults, productPickerHighlightedIndex, productPickerRowIndex, closeProductPicker, applyProductToLine]);
+
+  useEffect(() => {
+    if (!isIntakeWorkspaceOpen) return;
+    const handler = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        if (productPickerOpen) {
+          closeProductPicker();
+        } else {
+          handleCloseWorkspace();
+        }
+      } else if (event.key === 'F1') {
+        event.preventDefault();
+        // F1 opens product picker for the focused row
+        const activeElement = document.activeElement;
+        if (activeElement && activeElement.dataset?.rowIndex !== undefined) {
+          const rowIndex = Number(activeElement.dataset.rowIndex);
+          if (!Number.isNaN(rowIndex) && rowIndex >= 0) {
+            const query = String(activeElement.value || '').trim();
+            openProductPicker(rowIndex, query);
+          }
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [handleCloseWorkspace, isIntakeWorkspaceOpen, productPickerOpen, closeProductPicker, openProductPicker]);
 
   const refreshResolvedLineStock = useCallback(async () => {
     if (!isIntakeWorkspaceOpen || !activeLookupLocationCode || resolvedLineProductIds.length === 0) {
