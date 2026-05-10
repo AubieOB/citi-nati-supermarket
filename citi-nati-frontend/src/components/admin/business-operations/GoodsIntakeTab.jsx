@@ -614,6 +614,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
   const [pendingProductToApply, setPendingProductToApply] = useState(null);
   const [pendingRowIndex, setPendingRowIndex] = useState(-1);
   const [currentProductName, setCurrentProductName] = useState('');
+  const [replacementModalFocusedButton, setReplacementModalFocusedButton] = useState(0); // 0=Replace, 1=AddNew, 2=Cancel
 
   const setLineInputRef = useCallback((rowIndex, fieldName, element) => {
     inputRefs.current[rowIndex] = inputRefs.current[rowIndex] || {};
@@ -1532,7 +1533,29 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     setPendingProductToApply(null);
     setPendingRowIndex(-1);
     setCurrentProductName('');
+    setReplacementModalFocusedButton(0);
   }, []);
+
+  const handlePriceChangeKeyDown = useCallback((event) => {
+    if (!isPriceChangeModalOpen) return;
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      event.stopPropagation();
+      handleConfirmPriceChange();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      handleClosePriceChange();
+    }
+  }, [isPriceChangeModalOpen, handleConfirmPriceChange, handleClosePriceChange]);
+
+  useEffect(() => {
+    if (isPriceChangeModalOpen) {
+      document.addEventListener('keydown', handlePriceChangeKeyDown, true);
+      return () => document.removeEventListener('keydown', handlePriceChangeKeyDown, true);
+    }
+    return undefined;
+  }, [isPriceChangeModalOpen, handlePriceChangeKeyDown]);
 
   const handleProductPickerSearch = useCallback((query) => {
     setProductPickerQuery(query);
@@ -1674,15 +1697,28 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
 
     if (event.key === 'Enter') {
       event.preventDefault();
-      handleReplaceCurrentProduct();
+      if (replacementModalFocusedButton === 0) {
+        handleReplaceCurrentProduct();
+      } else if (replacementModalFocusedButton === 1) {
+        handleAddToNewRow();
+      } else if (replacementModalFocusedButton === 2) {
+        handleCancelProductReplacement();
+      }
+    } else if (event.key === 'ArrowDown' || event.key === 'Tab') {
+      event.preventDefault();
+      setReplacementModalFocusedButton((prev) => (prev + 1) % 3);
+    } else if (event.key === 'ArrowUp' || (event.key === 'Tab' && event.shiftKey)) {
+      event.preventDefault();
+      setReplacementModalFocusedButton((prev) => (prev - 1 + 3) % 3);
     } else if (event.key === 'Escape') {
       event.preventDefault();
       handleCancelProductReplacement();
     }
-  }, [productReplacementModalOpen, handleReplaceCurrentProduct, handleCancelProductReplacement]);
+  }, [productReplacementModalOpen, replacementModalFocusedButton, handleReplaceCurrentProduct, handleAddToNewRow, handleCancelProductReplacement]);
 
   useEffect(() => {
     if (productReplacementModalOpen) {
+      setReplacementModalFocusedButton(0);
       document.addEventListener('keydown', handleProductReplacementKeyDown, true);
       return () => document.removeEventListener('keydown', handleProductReplacementKeyDown, true);
     }
@@ -2559,7 +2595,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
       )}
 
       {isFinalizedHistoryOpen && canViewHistory && (
-        <div style={{ position: 'fixed', inset: 0, background: 'radial-gradient(circle at 78% 10%, rgba(110, 110, 110, 0.16), rgba(12, 14, 18, 0.72) 48%)', backdropFilter: 'blur(2px)', zIndex: 172, display: 'grid', placeItems: 'center', padding: isFinalizedHistoryMaximized ? '0.35rem' : '1rem' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'radial-gradient(circle at 78% 10%, rgba(110, 110, 110, 0.16), rgba(12, 14, 18, 0.72) 48%)', backdropFilter: 'blur(2px)', zIndex: 180, display: 'grid', placeItems: 'center', padding: isFinalizedHistoryMaximized ? '0.35rem' : '1rem' }}>
           <div style={{ ...themedCardStyle, width: isFinalizedHistoryMaximized ? 'calc(100vw - 0.7rem)' : 'min(1500px, 98vw)', height: isFinalizedHistoryMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isFinalizedHistoryMaximized ? '10px' : '20px', display: 'flex', flexDirection: 'column', padding: '0.95rem', boxShadow: isAdminDarkTheme ? '0 28px 70px rgba(0, 0, 0, 0.56)' : '0 28px 70px rgba(15, 23, 42, 0.25)', border: isAdminDarkTheme ? '1px solid #333333' : '1px solid #bbf7d0' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap', border: isAdminDarkTheme ? '1px solid #2d2d2d' : '1px solid #bbf7d0', borderRadius: '14px', padding: '0.75rem 0.85rem', background: isAdminDarkTheme ? 'linear-gradient(140deg, #1a1a1a 0%, #1e1e1e 55%)' : 'linear-gradient(140deg, #f0fdf4 0%, #ffffff 55%)' }}>
               <div>
@@ -2670,7 +2706,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
       )}
 
       {isTransferHistoryOpen && canViewHistory && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(12, 14, 18, 0.72)', zIndex: 173, display: 'grid', placeItems: 'center', padding: isTransferHistoryMaximized ? '0.35rem' : '1rem' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(12, 14, 18, 0.72)', zIndex: 181, display: 'grid', placeItems: 'center', padding: isTransferHistoryMaximized ? '0.35rem' : '1rem' }}>
           <div style={{ ...themedCardStyle, width: isTransferHistoryMaximized ? 'calc(100vw - 0.7rem)' : 'min(1520px, 98vw)', height: isTransferHistoryMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isTransferHistoryMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column', padding: '0.95rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
               <div>
@@ -2789,7 +2825,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
       )}
 
       {isPriceSyncHistoryOpen && canViewHistory && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(12, 14, 18, 0.72)', zIndex: 174, display: 'grid', placeItems: 'center', padding: isPriceSyncHistoryMaximized ? '0.35rem' : '1rem' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(12, 14, 18, 0.72)', zIndex: 182, display: 'grid', placeItems: 'center', padding: isPriceSyncHistoryMaximized ? '0.35rem' : '1rem' }}>
           <div style={{ ...themedCardStyle, width: isPriceSyncHistoryMaximized ? 'calc(100vw - 0.7rem)' : 'min(1560px, 98vw)', height: isPriceSyncHistoryMaximized ? 'calc(100vh - 0.7rem)' : '90vh', maxHeight: 'none', overflow: 'hidden', borderRadius: isPriceSyncHistoryMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column', padding: '0.95rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
               <div>
@@ -2909,7 +2945,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
       )}
 
       {isPriceSyncDetailOpen && activePriceSyncRecord && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(12, 14, 18, 0.72)', zIndex: 176, display: 'grid', placeItems: 'center', padding: '1rem' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(12, 14, 18, 0.72)', zIndex: 183, display: 'grid', placeItems: 'center', padding: '1rem' }}>
           <div style={{ ...themedCardStyle, width: 'min(1380px, 98vw)', height: '90vh', overflow: 'hidden', borderRadius: '18px', display: 'flex', flexDirection: 'column', padding: '0.95rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.7rem', flexWrap: 'wrap' }}>
               <div>
@@ -3143,9 +3179,10 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
               <button
                 type="button"
                 onClick={handleReplaceCurrentProduct}
+                autoFocus={replacementModalFocusedButton === 0}
                 style={{
                   border: `1px solid ${isAdminDarkTheme ? '#3f3f3f' : '#dbeafe'}`,
-                  background: isAdminDarkTheme ? '#242424' : '#eff6ff',
+                  background: replacementModalFocusedButton === 0 ? (isAdminDarkTheme ? '#1e3a5f' : '#dbeafe') : (isAdminDarkTheme ? '#242424' : '#eff6ff'),
                   color: isAdminDarkTheme ? '#e4e4e7' : '#1d4ed8',
                   borderRadius: '8px',
                   padding: '0.75rem 1rem',
@@ -3155,7 +3192,9 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                   textAlign: 'left',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem'
+                  gap: '0.5rem',
+                  outline: replacementModalFocusedButton === 0 ? `2px solid ${isAdminDarkTheme ? '#3b82f6' : '#2563eb'}` : 'none',
+                  outlineOffset: '2px'
                 }}
                 title="Replace the current product (Enter)"
               >
@@ -3166,9 +3205,10 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
               <button
                 type="button"
                 onClick={handleAddToNewRow}
+                autoFocus={replacementModalFocusedButton === 1}
                 style={{
                   border: `1px solid ${isAdminDarkTheme ? '#3a3a3a' : '#d8b4fe'}`,
-                  background: isAdminDarkTheme ? '#232323' : '#f8f5ff',
+                  background: replacementModalFocusedButton === 1 ? (isAdminDarkTheme ? '#3f2e5f' : '#d8b4fe') : (isAdminDarkTheme ? '#232323' : '#f8f5ff'),
                   color: isAdminDarkTheme ? '#e4e4e7' : '#7c3aed',
                   borderRadius: '8px',
                   padding: '0.75rem 1rem',
@@ -3178,7 +3218,9 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                   textAlign: 'left',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem'
+                  gap: '0.5rem',
+                  outline: replacementModalFocusedButton === 1 ? `2px solid ${isAdminDarkTheme ? '#a855f7' : '#7c3aed'}` : 'none',
+                  outlineOffset: '2px'
                 }}
                 title="Add to a new row"
               >
@@ -3189,9 +3231,10 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
               <button
                 type="button"
                 onClick={handleCancelProductReplacement}
+                autoFocus={replacementModalFocusedButton === 2}
                 style={{
                   border: `1px solid ${isAdminDarkTheme ? '#404040' : '#e2e8f0'}`,
-                  background: isAdminDarkTheme ? '#1e1e1e' : '#f8fafc',
+                  background: replacementModalFocusedButton === 2 ? (isAdminDarkTheme ? '#2d2d2d' : '#e2e8f0') : (isAdminDarkTheme ? '#1e1e1e' : '#f8fafc'),
                   color: colors.mutedText,
                   borderRadius: '8px',
                   padding: '0.75rem 1rem',
@@ -3201,7 +3244,9 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                   textAlign: 'left',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem'
+                  gap: '0.5rem',
+                  outline: replacementModalFocusedButton === 2 ? `2px solid ${isAdminDarkTheme ? '#6b7280' : '#9ca3af'}` : 'none',
+                  outlineOffset: '2px'
                 }}
                 title="Cancel and keep current product"
               >
@@ -3218,7 +3263,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
       )}
 
       {isPriceChangeModalOpen && priceChangeProduct && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(12, 14, 18, 0.72)', zIndex: 180, display: 'grid', placeItems: 'center', padding: '1rem' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(12, 14, 18, 0.72)', zIndex: 195, display: 'grid', placeItems: 'center', padding: '1rem' }}>
           <div style={{ ...themedCardStyle, width: 'min(520px, 95vw)', borderRadius: '18px', padding: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
               <div>
@@ -3283,7 +3328,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
       )}
 
       {isTransferDetailOpen && transferDetailRecord && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(12, 14, 18, 0.72)', zIndex: 175, display: 'grid', placeItems: 'center', padding: '1rem' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(12, 14, 18, 0.72)', zIndex: 184, display: 'grid', placeItems: 'center', padding: '1rem' }}>
           <div style={{ ...themedCardStyle, width: 'min(1320px, 98vw)', height: '90vh', overflow: 'hidden', borderRadius: '18px', display: 'flex', flexDirection: 'column', padding: '0.95rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.7rem', flexWrap: 'wrap' }}>
               <div>
