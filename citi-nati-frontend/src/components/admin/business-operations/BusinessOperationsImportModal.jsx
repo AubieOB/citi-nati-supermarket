@@ -134,7 +134,7 @@ const ParseDiagnosticPanel = ({ diagnostic }) => {
   );
 };
 
-const BusinessOperationsImportModal = ({ isOpen, onClose, onImportSuccess, onViewImportedData }) => {
+const BusinessOperationsImportModal = ({ isOpen, onClose, onImportSuccess, onViewImportedData, isAggregateMode = false, onToggleAggregateMode = () => {} }) => {
   const [currentStep, setCurrentStep] = useState(STEPS.SELECT_TYPE);
 
   // Step 1: Type Selection
@@ -382,6 +382,52 @@ const BusinessOperationsImportModal = ({ isOpen, onClose, onImportSuccess, onVie
               {currentStep === STEPS.SELECT_SECTIONS && 'Select sections to import'}
               {currentStep === STEPS.RESULTS && 'Import results'}
             </p>
+          </div>
+          <div
+            onClick={onToggleAggregateMode}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              fontSize: '0.88rem',
+              color: '#374151',
+              cursor: 'pointer',
+            }}
+          >
+            <label
+              htmlFor="import-modal-aggregate-toggle"
+              style={{
+                cursor: 'pointer',
+                userSelect: 'none',
+              }}
+            >
+              All Locations Mode
+            </label>
+            <div
+              title="Toggle All Locations aggregate mode"
+              style={{
+                position: 'relative',
+                width: '44px',
+                height: '24px',
+                backgroundColor: isAggregateMode ? '#10b981' : '#d1d5db',
+                borderRadius: '12px',
+                transition: 'background-color 0.2s ease',
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '2px',
+                  left: isAggregateMode ? '22px' : '2px',
+                  width: '20px',
+                  height: '20px',
+                  backgroundColor: 'white',
+                  borderRadius: '50%',
+                  transition: 'left 0.2s ease',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                }}
+              />
+            </div>
           </div>
           <button
             type="button"

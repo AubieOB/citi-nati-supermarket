@@ -12,6 +12,7 @@ const Modal = ({
   cancelText = 'Cancel',
   showCancelButton = true,
   confirmButtonColor = null,
+  headerActions = null,
   children
 }) => {
   const modalRef = useRef(null);
@@ -191,6 +192,11 @@ const Modal = ({
               {title}
             </h3>
           </div>
+          {headerActions && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginRight: '0.5rem' }}>
+              {headerActions}
+            </div>
+          )}
           <button
             onClick={onCancel}
             style={{

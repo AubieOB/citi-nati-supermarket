@@ -21,6 +21,14 @@ const money = (value) => `MWK ${Number(value || 0).toLocaleString('en-US', { min
 
 const normalizeCode = (value) => String(value || '').trim().toUpperCase();
 
+const compactParams = (params = {}) =>
+  Object.entries(params).reduce((filtered, [key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      filtered[key] = value;
+    }
+    return filtered;
+  }, {});
+
 const balanceMeta = (value, debtLabel, creditLabel) => {
   const amount = Number(value || 0);
 

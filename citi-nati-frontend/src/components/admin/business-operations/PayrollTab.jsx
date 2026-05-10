@@ -24,6 +24,14 @@ const cardStyle = {
 
 const normalizeCode = (value) => String(value || '').trim().toUpperCase();
 
+const compactParams = (params = {}) =>
+  Object.entries(params).reduce((filtered, [key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      filtered[key] = value;
+    }
+    return filtered;
+  }, {});
+
 const getApiError = (err, fallback) =>
   err?.response?.data?.error || err?.response?.data?.message || err?.message || fallback;
 
