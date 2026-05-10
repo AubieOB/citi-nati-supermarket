@@ -978,8 +978,21 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     setForm(buildNewForm(selectedLocation, effectiveBranchCode));
   };
 
+  const closeWorkspaceOverlayModals = useCallback(() => {
+    closeProductPicker();
+    setIsAutosaveRecoveryOpen(false);
+    setIsFinalizedHistoryOpen(false);
+    setIsTransferHistoryOpen(false);
+    setIsPriceSyncHistoryOpen(false);
+    setIsPriceSyncDetailOpen(false);
+    setIsTransferDetailOpen(false);
+    setProductReplacementModalOpen(false);
+    setIsPriceChangeModalOpen(false);
+  }, [closeProductPicker]);
+
   const openWorkspace = ({ reset = false } = {}) => {
     if (!canViewForm) return;
+    closeWorkspaceOverlayModals();
     if (reset) {
       setLiveLineStockByProductId({});
       setLastFinalizePriceSync(null);
@@ -1116,6 +1129,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
 
   const handleEditRecord = async (recordId) => {
     if (!(canEdit && canViewForm)) return;
+    closeWorkspaceOverlayModals();
     try {
       const response = await api.get(`/business-operations/goods-intake/${recordId}`);
       const data = response.data?.data;
@@ -1548,12 +1562,13 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
 
   const handleOpenPriceChange = useCallback((product) => {
     if (!product || !product.id) return;
+    closeProductPicker();
     setPriceChangeProduct(product);
     setPriceChangeError('');
     const currentPrice = product.sellingPrice ?? product.selling_price ?? product.unitPrice ?? product.unit_price ?? product.price ?? '';
     setPriceChangeValue(currentPrice == null ? '' : String(currentPrice));
     setIsPriceChangeModalOpen(true);
-  }, []);
+  }, [closeProductPicker]);
 
   const handleClosePriceChange = useCallback(() => {
     setPriceChangeProduct(null);
@@ -1632,7 +1647,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
   }, [isPriceChangeModalOpen, handlePriceChangeKeyDown]);
 
   const handleProductPickerKeyDown = useCallback((event) => {
-    if (!productPickerOpen) return;
+    if (!productPickerOpen || isPriceChangeModalOpen || productReplacementModalOpen) return;
     if (priceChangeProduct && priceChangeInputRef.current && priceChangeInputRef.current.contains(event.target)) {
       return;
     }
@@ -1695,8 +1710,12 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
   const handleProductReplacementKeyDown = useCallback((event) => {
     if (!productReplacementModalOpen) return;
 
-    if (event.key === 'Enter') {
+    if (['Enter', 'Escape', 'Tab', 'ArrowDown', 'ArrowUp'].includes(event.key)) {
       event.preventDefault();
+      event.stopPropagation();
+    }
+
+    if (event.key === 'Enter') {
       if (replacementModalFocusedButton === 0) {
         handleReplaceCurrentProduct();
       } else if (replacementModalFocusedButton === 1) {
@@ -1704,14 +1723,17 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
       } else if (replacementModalFocusedButton === 2) {
         handleCancelProductReplacement();
       }
-    } else if (event.key === 'ArrowDown' || event.key === 'Tab') {
-      event.preventDefault();
+    } else if (event.key === 'Tab') {
+      if (event.shiftKey) {
+        setReplacementModalFocusedButton((prev) => (prev - 1 + 3) % 3);
+      } else {
+        setReplacementModalFocusedButton((prev) => (prev + 1) % 3);
+      }
+    } else if (event.key === 'ArrowDown') {
       setReplacementModalFocusedButton((prev) => (prev + 1) % 3);
-    } else if (event.key === 'ArrowUp' || (event.key === 'Tab' && event.shiftKey)) {
-      event.preventDefault();
+    } else if (event.key === 'ArrowUp') {
       setReplacementModalFocusedButton((prev) => (prev - 1 + 3) % 3);
     } else if (event.key === 'Escape') {
-      event.preventDefault();
       handleCancelProductReplacement();
     }
   }, [productReplacementModalOpen, replacementModalFocusedButton, handleReplaceCurrentProduct, handleAddToNewRow, handleCancelProductReplacement]);
