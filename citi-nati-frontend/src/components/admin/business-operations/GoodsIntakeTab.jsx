@@ -978,18 +978,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     setForm(buildNewForm(selectedLocation, effectiveBranchCode));
   };
 
-  const closeWorkspaceOverlayModals = useCallback(() => {
-    closeProductPicker();
-    setIsAutosaveRecoveryOpen(false);
-    setIsFinalizedHistoryOpen(false);
-    setIsTransferHistoryOpen(false);
-    setIsPriceSyncHistoryOpen(false);
-    setIsPriceSyncDetailOpen(false);
-    setIsTransferDetailOpen(false);
-    setProductReplacementModalOpen(false);
-    setIsPriceChangeModalOpen(false);
-  }, [closeProductPicker]);
-
   const openWorkspace = ({ reset = false } = {}) => {
     if (!canViewForm) return;
     closeWorkspaceOverlayModals();
@@ -1441,6 +1429,18 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
       clearTimeout(productPickerTimeoutRef.current);
     }
   }, []);
+
+  const closeWorkspaceOverlayModals = useCallback(() => {
+    closeProductPicker();
+    setIsAutosaveRecoveryOpen(false);
+    setIsFinalizedHistoryOpen(false);
+    setIsTransferHistoryOpen(false);
+    setIsPriceSyncHistoryOpen(false);
+    setIsPriceSyncDetailOpen(false);
+    setIsTransferDetailOpen(false);
+    setProductReplacementModalOpen(false);
+    setIsPriceChangeModalOpen(false);
+  }, [closeProductPicker]);
 
   const applyProductToLine = useCallback((product, rowIndex) => {
     if (!product || rowIndex < 0) return;
