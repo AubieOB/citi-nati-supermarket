@@ -615,6 +615,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
   const [pendingRowIndex, setPendingRowIndex] = useState(-1);
   const [currentProductName, setCurrentProductName] = useState('');
   const [replacementModalFocusedButton, setReplacementModalFocusedButton] = useState(0); // 0=Replace, 1=AddNew, 2=Cancel
+  const replacementModalRef = useRef(null);
+  const replacementModalButtonRefs = useRef([null, null, null]);
 
   const setLineInputRef = useCallback((rowIndex, fieldName, element) => {
     inputRefs.current[rowIndex] = inputRefs.current[rowIndex] || {};
@@ -1713,6 +1715,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     if (['Enter', 'Escape', 'Tab', 'ArrowDown', 'ArrowUp'].includes(event.key)) {
       event.preventDefault();
       event.stopPropagation();
+      event.stopImmediatePropagation();
     }
 
     if (event.key === 'Enter') {
@@ -1746,6 +1749,12 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     }
     return undefined;
   }, [productReplacementModalOpen, handleProductReplacementKeyDown]);
+
+  useEffect(() => {
+    if (productReplacementModalOpen) {
+      replacementModalButtonRefs.current[replacementModalFocusedButton]?.focus();
+    }
+  }, [productReplacementModalOpen, replacementModalFocusedButton]);
 
   useEffect(() => {
     if (!isIntakeWorkspaceOpen) return;
@@ -3175,7 +3184,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
       )}
 
       {productReplacementModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(12, 14, 18, 0.72)', zIndex: 190, display: 'grid', placeItems: 'center', padding: '1rem' }}>
+        <div ref={replacementModalRef} tabIndex={-1} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(12, 14, 18, 0.72)', zIndex: 190, display: 'grid', placeItems: 'center', padding: '1rem' }}>
           <div style={{ ...themedCardStyle, width: 'min(480px, 95vw)', borderRadius: '18px', padding: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
               <div>
@@ -3200,6 +3209,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
             <div style={{ display: 'flex', gap: '0.75rem', flexDirection: 'column' }}>
               <button
                 type="button"
+                ref={(el) => { replacementModalButtonRefs.current[0] = el; }}
                 onClick={handleReplaceCurrentProduct}
                 autoFocus={replacementModalFocusedButton === 0}
                 style={{
@@ -3226,6 +3236,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
 
               <button
                 type="button"
+                ref={(el) => { replacementModalButtonRefs.current[1] = el; }}
                 onClick={handleAddToNewRow}
                 autoFocus={replacementModalFocusedButton === 1}
                 style={{
@@ -3252,6 +3263,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
 
               <button
                 type="button"
+                ref={(el) => { replacementModalButtonRefs.current[2] = el; }}
                 onClick={handleCancelProductReplacement}
                 autoFocus={replacementModalFocusedButton === 2}
                 style={{
