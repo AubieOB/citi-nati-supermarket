@@ -57,12 +57,58 @@ const EmployeesTab = ({
   selectedLocationName = '',
   locations = [],
   isAggregateMode = false,
+  onToggleAggregateMode = () => {},
 }) => {
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
 
   const effectiveBranchCode = normalizeCode(selectedBranchCode);
   const effectiveLocationCode = normalizeCode(selectedLocationCode);
   const scopeLabel = selectedLocationName || (effectiveBranchCode && effectiveLocationCode ? `${effectiveBranchCode} / ${effectiveLocationCode}` : 'All Locations');
+
+  const aggregateModeToggle = (
+    <button
+      type="button"
+      onClick={onToggleAggregateMode}
+      aria-pressed={isAggregateMode}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '0.45rem',
+        border: '1px solid #cbd5e1',
+        borderRadius: '999px',
+        padding: '0.42rem 0.72rem',
+        backgroundColor: isAggregateMode ? '#ecfdf5' : '#f8fafc',
+        color: '#0f172a',
+        cursor: 'pointer',
+        fontSize: '0.82rem',
+        fontWeight: 700,
+      }}
+    >
+      <span>All Locations Mode</span>
+      <span
+        style={{
+          width: '30px',
+          height: '16px',
+          borderRadius: '999px',
+          backgroundColor: isAggregateMode ? '#10b981' : '#d1d5db',
+          display: 'inline-flex',
+          alignItems: 'center',
+          padding: '2px',
+        }}
+      >
+        <span
+          style={{
+            width: '12px',
+            height: '12px',
+            borderRadius: '50%',
+            backgroundColor: '#fff',
+            transform: isAggregateMode ? 'translateX(14px)' : 'translateX(0)',
+            transition: 'transform 0.2s ease',
+          }}
+        />
+      </span>
+    </button>
+  );
 
   const themedCardStyle = isAdminDarkTheme
     ? {
@@ -482,7 +528,8 @@ const EmployeesTab = ({
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    {aggregateModeToggle}
                     <button type="button" onClick={handleAddEmployee} style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.65rem 1rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.86rem' }}>
                       <i className="fas fa-plus" style={{ marginRight: '0.4rem' }} />Add Employee
                     </button>
@@ -594,6 +641,7 @@ const EmployeesTab = ({
               </div>
 
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                {aggregateModeToggle}
                 <button type="button" onClick={handleEditEmployee} disabled={!selectedEmployee} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '10px', padding: '0.55rem 0.82rem', fontWeight: 700, cursor: selectedEmployee ? 'pointer' : 'not-allowed', opacity: selectedEmployee ? 1 : 0.65 }}>
                   Edit Employee
                 </button>

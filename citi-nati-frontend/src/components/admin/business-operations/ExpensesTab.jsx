@@ -48,6 +48,7 @@ const ExpensesTab = ({
   selectedLocationName = '',
   locations = [],
   isAggregateMode = false,
+  onToggleAggregateMode = () => {},
 }) => {
   const initialRange = getCurrentMonthRange();
 
@@ -57,6 +58,51 @@ const ExpensesTab = ({
     effectiveBranchCode && effectiveLocationCode
       ? `${effectiveBranchCode} / ${effectiveLocationCode}`
       : 'All Locations'
+  );
+
+  const aggregateModeToggle = (
+    <button
+      type="button"
+      onClick={onToggleAggregateMode}
+      aria-pressed={isAggregateMode}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '0.45rem',
+        border: '1px solid #cbd5e1',
+        borderRadius: '999px',
+        padding: '0.42rem 0.7rem',
+        backgroundColor: isAggregateMode ? '#ecfdf5' : '#f8fafc',
+        color: '#0f172a',
+        cursor: 'pointer',
+        fontSize: '0.82rem',
+        fontWeight: 700,
+      }}
+    >
+      <span>All Locations Mode</span>
+      <span
+        style={{
+          width: '30px',
+          height: '16px',
+          borderRadius: '999px',
+          backgroundColor: isAggregateMode ? '#10b981' : '#d1d5db',
+          display: 'inline-flex',
+          alignItems: 'center',
+          padding: '2px',
+        }}
+      >
+        <span
+          style={{
+            width: '12px',
+            height: '12px',
+            borderRadius: '50%',
+            backgroundColor: '#fff',
+            transform: isAggregateMode ? 'translateX(14px)' : 'translateX(0)',
+            transition: 'transform 0.2s ease',
+          }}
+        />
+      </span>
+    </button>
   );
 
   const [activeTab, setActiveTab] = useState(TAB_EXPENSES);
@@ -547,6 +593,7 @@ const ExpensesTab = ({
                   </div>
 
                   <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    {aggregateModeToggle}
                     <button
                       type="button"
                       onClick={openAddExpense}
@@ -755,6 +802,7 @@ const ExpensesTab = ({
               </div>
 
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                {aggregateModeToggle}
                 <button
                   type="button"
                   onClick={() => selectedExpense && openEditExpense(selectedExpense)}
@@ -818,7 +866,8 @@ const ExpensesTab = ({
             <div style={{ position: 'sticky', top: '-0.95rem', zIndex: 5, backgroundColor: '#fff', margin: '-0.95rem -0.95rem 0.75rem', padding: '0.95rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
               <strong style={{ color: '#0f172a' }}>Categories Workspace</strong>
 
-              <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                {aggregateModeToggle}
                 <button
                   type="button"
                   onClick={openAddCategory}

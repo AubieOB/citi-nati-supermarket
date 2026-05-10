@@ -394,6 +394,7 @@ const AdminBusinessOperations = ({ selectedLocationCode, selectedBranchCode }) =
     isAllLocationsSelected,
     operationalScopeKey: scopeKey,
     isAggregateMode: AGGREGATE_SUPPORTED_TABS.has(activeTab) && isAggregateMode,
+    onToggleAggregateMode: () => setIsAggregateMode((prev) => !prev),
   };
 
   const contentByTab = {
@@ -600,7 +601,6 @@ const AdminBusinessOperations = ({ selectedLocationCode, selectedBranchCode }) =
         cancelText={modal.cancelText}
         showCancelButton={modal.showCancelButton}
         confirmButtonColor={modal.confirmButtonColor}
-        headerActions={aggregateModeControl}
       >
         {modal.children}
       </Modal>

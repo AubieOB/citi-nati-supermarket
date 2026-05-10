@@ -53,6 +53,7 @@ const SuppliersTab = ({
   selectedLocationName = '',
   locations = [],
   isAggregateMode = false,
+  onToggleAggregateMode = () => {},
 }) => {
   const effectiveBranchCode = normalizeCode(selectedBranchCode);
   const effectiveLocationCode = normalizeCode(selectedLocationCode);
@@ -60,6 +61,52 @@ const SuppliersTab = ({
     effectiveBranchCode && effectiveLocationCode
       ? `${effectiveBranchCode} / ${effectiveLocationCode}`
       : 'All Locations'
+  );
+
+  const aggregateModeToggle = (
+    <button
+      type="button"
+      onClick={onToggleAggregateMode}
+      aria-pressed={isAggregateMode}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '0.45rem',
+        border: '1px solid #cbd5e1',
+        borderRadius: '999px',
+        padding: '0.4rem 0.75rem',
+        backgroundColor: isAggregateMode ? '#ecfdf5' : '#f8fafc',
+        color: '#0f172a',
+        cursor: 'pointer',
+        fontSize: '0.82rem',
+        fontWeight: 700,
+      }}
+    >
+      <span>All Locations Mode</span>
+      <span
+        style={{
+          width: '30px',
+          height: '16px',
+          borderRadius: '999px',
+          backgroundColor: isAggregateMode ? '#10b981' : '#d1d5db',
+          position: 'relative',
+          display: 'inline-flex',
+          alignItems: 'center',
+          padding: '2px',
+        }}
+      >
+        <span
+          style={{
+            width: '12px',
+            height: '12px',
+            borderRadius: '50%',
+            backgroundColor: '#fff',
+            transform: isAggregateMode ? 'translateX(14px)' : 'translateX(0)',
+            transition: 'transform 0.2s ease',
+          }}
+        />
+      </span>
+    </button>
   );
 
   const scopeParams = useMemo(() => {
@@ -579,6 +626,7 @@ const SuppliersTab = ({
                   </div>
 
                   <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    {aggregateModeToggle}
                     <button type="button" onClick={openCreateSupplier} style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer' }}>
                       <i className="fas fa-plus" style={{ marginRight: '0.42rem' }}></i>
                       Add New Supplier
@@ -683,7 +731,8 @@ const SuppliersTab = ({
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+<div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {aggregateModeToggle}
                 <button type="button" title={isSupplierProfileModalMaximized ? 'Restore' : 'Maximize'} onClick={() => setIsSupplierProfileModalMaximized((prev) => !prev)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.45rem 0.62rem', cursor: 'pointer', fontWeight: 700 }}>
                   <i className={`fas ${isSupplierProfileModalMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
                 </button>
@@ -733,7 +782,8 @@ const SuppliersTab = ({
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+<div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {aggregateModeToggle}
                 <button type="button" onClick={openCreateTransaction} style={{ border: 'none', backgroundColor: '#0f766e', color: '#fff', borderRadius: '10px', padding: '0.55rem 0.82rem', fontWeight: 700, cursor: 'pointer' }}>
                   Add Transaction
                 </button>

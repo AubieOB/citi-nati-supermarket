@@ -60,6 +60,7 @@ const PayrollTab = ({
   selectedLocationName = '',
   locations = [],
   isAggregateMode = false,
+  onToggleAggregateMode = () => {},
 }) => {
   const effectiveBranchCode = normalizeCode(selectedBranchCode);
   const effectiveLocationCode = normalizeCode(selectedLocationCode);
@@ -67,6 +68,51 @@ const PayrollTab = ({
     effectiveBranchCode && effectiveLocationCode
       ? `${effectiveBranchCode} / ${effectiveLocationCode}`
       : 'All Locations'
+  );
+
+  const aggregateModeToggle = (
+    <button
+      type="button"
+      onClick={onToggleAggregateMode}
+      aria-pressed={isAggregateMode}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '0.45rem',
+        border: '1px solid #cbd5e1',
+        borderRadius: '999px',
+        padding: '0.42rem 0.7rem',
+        backgroundColor: isAggregateMode ? '#ecfdf5' : '#f8fafc',
+        color: '#0f172a',
+        cursor: 'pointer',
+        fontSize: '0.82rem',
+        fontWeight: 700,
+      }}
+    >
+      <span>All Locations Mode</span>
+      <span
+        style={{
+          width: '30px',
+          height: '16px',
+          borderRadius: '999px',
+          backgroundColor: isAggregateMode ? '#10b981' : '#d1d5db',
+          display: 'inline-flex',
+          alignItems: 'center',
+          padding: '2px',
+        }}
+      >
+        <span
+          style={{
+            width: '12px',
+            height: '12px',
+            borderRadius: '50%',
+            backgroundColor: '#fff',
+            transform: isAggregateMode ? 'translateX(14px)' : 'translateX(0)',
+            transition: 'transform 0.2s ease',
+          }}
+        />
+      </span>
+    </button>
   );
 
   const scopeParams = useMemo(() => {
@@ -1053,6 +1099,7 @@ const PayrollTab = ({
                 </div>
 
                 <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  {aggregateModeToggle}
                   <button type="button" onClick={() => handleExport('pdf')} disabled={exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '10px', padding: '0.55rem 0.85rem', fontWeight: 700, cursor: exportingExcel || exportingPdf || exportingFullWorkbook || importingFullWorkbook ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}>
                     <i className={`fas ${exportingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'}`} style={{ marginRight: '0.38rem' }}></i>Export PDF
                   </button>
@@ -1246,7 +1293,8 @@ const PayrollTab = ({
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                {aggregateModeToggle}
                 <button type="button" onClick={handleAddEntry} disabled={!selectedPeriodId} style={{ border: 'none', backgroundColor: '#5B4B8A', color: '#fff', borderRadius: '10px', padding: '0.55rem 0.82rem', fontWeight: 700, cursor: selectedPeriodId ? 'pointer' : 'not-allowed', opacity: selectedPeriodId ? 1 : 0.65 }}>
                   Add Payroll Entry
                 </button>
