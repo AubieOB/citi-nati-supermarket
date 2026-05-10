@@ -617,6 +617,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
   const [replacementModalFocusedButton, setReplacementModalFocusedButton] = useState(0); // 0=Replace, 1=AddNew, 2=Cancel
   const replacementModalRef = useRef(null);
   const replacementModalButtonRefs = useRef([null, null, null]);
+  const workspaceScrollRef = useRef(null);
+  const previousWorkspaceRowsCountRef = useRef(form.items.length);
 
   const setLineInputRef = useCallback((rowIndex, fieldName, element) => {
     inputRefs.current[rowIndex] = inputRefs.current[rowIndex] || {};
@@ -1744,6 +1746,11 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
   useEffect(() => {
     if (productReplacementModalOpen) {
       setReplacementModalFocusedButton(0);
+    }
+  }, [productReplacementModalOpen]);
+
+  useEffect(() => {
+    if (productReplacementModalOpen) {
       document.addEventListener('keydown', handleProductReplacementKeyDown, true);
       return () => document.removeEventListener('keydown', handleProductReplacementKeyDown, true);
     }
@@ -1755,6 +1762,22 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
       replacementModalButtonRefs.current[replacementModalFocusedButton]?.focus();
     }
   }, [productReplacementModalOpen, replacementModalFocusedButton]);
+
+  useEffect(() => {
+    if (workspaceScrollRef.current && isIntakeWorkspaceOpen) {
+      if (form.items.length > previousWorkspaceRowsCountRef.current) {
+        requestAnimationFrame(() => {
+          const scrollContainer = workspaceScrollRef.current;
+          if (scrollContainer) {
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+          }
+        });
+      }
+      previousWorkspaceRowsCountRef.current = form.items.length;
+    } else {
+      previousWorkspaceRowsCountRef.current = form.items.length;
+    }
+  }, [form.items.length, isIntakeWorkspaceOpen]);
 
   useEffect(() => {
     if (!isIntakeWorkspaceOpen) return;
@@ -2547,7 +2570,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
               </div>
             </div>
 
-            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0.35rem', borderRadius: '14px', border: isAdminDarkTheme ? '1px solid #2d2d2d' : '1px solid #e2e8f0', background: isAdminDarkTheme ? '#181818' : '#f8fbff' }}>
+            <div ref={workspaceScrollRef} style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '0.35rem', borderRadius: '14px', border: isAdminDarkTheme ? '1px solid #2d2d2d' : '1px solid #e2e8f0', background: isAdminDarkTheme ? '#181818' : '#f8fbff' }}>
               {workspaceContent}
             </div>
           </div>
@@ -3211,7 +3234,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                 type="button"
                 ref={(el) => { replacementModalButtonRefs.current[0] = el; }}
                 onClick={handleReplaceCurrentProduct}
-                autoFocus={replacementModalFocusedButton === 0}
                 style={{
                   border: `1px solid ${isAdminDarkTheme ? '#3f3f3f' : '#dbeafe'}`,
                   background: replacementModalFocusedButton === 0 ? (isAdminDarkTheme ? '#1e3a5f' : '#dbeafe') : (isAdminDarkTheme ? '#242424' : '#eff6ff'),
@@ -3238,7 +3260,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                 type="button"
                 ref={(el) => { replacementModalButtonRefs.current[1] = el; }}
                 onClick={handleAddToNewRow}
-                autoFocus={replacementModalFocusedButton === 1}
                 style={{
                   border: `1px solid ${isAdminDarkTheme ? '#3a3a3a' : '#d8b4fe'}`,
                   background: replacementModalFocusedButton === 1 ? (isAdminDarkTheme ? '#3f2e5f' : '#d8b4fe') : (isAdminDarkTheme ? '#232323' : '#f8f5ff'),
@@ -3265,7 +3286,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                 type="button"
                 ref={(el) => { replacementModalButtonRefs.current[2] = el; }}
                 onClick={handleCancelProductReplacement}
-                autoFocus={replacementModalFocusedButton === 2}
                 style={{
                   border: `1px solid ${isAdminDarkTheme ? '#404040' : '#e2e8f0'}`,
                   background: replacementModalFocusedButton === 2 ? (isAdminDarkTheme ? '#2d2d2d' : '#e2e8f0') : (isAdminDarkTheme ? '#1e1e1e' : '#f8fafc'),
