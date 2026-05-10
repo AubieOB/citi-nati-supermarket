@@ -14,6 +14,7 @@ const Modal = ({
   confirmButtonColor = null,
   children
 }) => {
+  const modalRef = useRef(null);
   const confirmBtnRef = useRef(null);
   const cancelBtnRef = useRef(null);
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
@@ -36,27 +37,30 @@ const Modal = ({
     const handleKeyDown = (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
+        e.stopImmediatePropagation();
         confirmBtnRef.current?.click();
       } else if (e.key === 'Escape') {
         e.preventDefault();
+        e.stopImmediatePropagation();
         onCancel?.();
       } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
         e.preventDefault();
-        // Move focus to cancel button
+        e.stopImmediatePropagation();
         if (showCancelButton) {
           cancelBtnRef.current?.focus();
         }
       } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
         e.preventDefault();
-        // Move focus to confirm button
+        e.stopImmediatePropagation();
         confirmBtnRef.current?.focus();
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown, true);
     confirmBtnRef.current?.focus();
-    
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    modalRef.current?.focus();
+
+    return () => document.removeEventListener('keydown', handleKeyDown, true);
   }, [isOpen, onCancel, showCancelButton]);
 
   if (!isOpen) return null;
@@ -120,6 +124,7 @@ const Modal = ({
 
       {/* Modal */}
       <div
+        ref={modalRef}
         className={`app-modal-shell ${isAdminDarkTheme ? 'dark' : 'light'}`}
         style={{
           position: 'fixed',
@@ -143,6 +148,16 @@ const Modal = ({
         }}
         role="dialog"
         aria-modal="true"
+        aria-labelledby="modal-title"
+        aria-describedby="modal-description"
+        tabIndex={-1}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            confirmBtnRef.current?.click();
+          }
+        }}
       >
         <style>{`
           @keyframes modalSlideIn {
@@ -172,7 +187,7 @@ const Modal = ({
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px' }}>
               {getIcon()}
             </div>
-            <h3 style={{ margin: 0, color: isAdminDarkTheme ? '#dbe7f8' : '#333', fontSize: '1.1rem', fontWeight: '600' }}>
+            <h3 id="modal-title" style={{ margin: 0, color: isAdminDarkTheme ? '#dbe7f8' : '#333', fontSize: '1.1rem', fontWeight: '600' }}>
               {title}
             </h3>
           </div>
@@ -200,6 +215,7 @@ const Modal = ({
 
         {/* Modal Body */}
         <div
+          id="modal-description"
           style={{
             padding: '1rem',
             color: isAdminDarkTheme ? '#cccccc' : '#555',
@@ -226,6 +242,7 @@ const Modal = ({
         >
           {showCancelButton && (
             <button
+              type="button"
               ref={cancelBtnRef}
               onClick={onCancel}
               style={{
@@ -252,6 +269,7 @@ const Modal = ({
             </button>
           )}
           <button
+            type="button"
             ref={confirmBtnRef}
             onClick={async () => {
               try {
