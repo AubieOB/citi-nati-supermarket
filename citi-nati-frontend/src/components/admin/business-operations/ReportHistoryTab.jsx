@@ -77,7 +77,7 @@ const activityTabStyle = (active) => ({
   cursor: 'pointer',
 });
 
-const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedBranchCode = '', selectedLocationCode = '', onNavigateTab }) => {
+const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedBranchCode = '', selectedLocationCode = '', onNavigateTab, isAggregateMode = false }) => {
   const [state, setState] = useState({
     loading: true,
     error: '',
@@ -117,18 +117,20 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedB
 
     const monthParams = {
       ...getCurrentMonthParams(),
-      ...(selectedLocationId && { locationId: selectedLocationId }),
-      ...(normalizedLocationCode && { locationCode: normalizedLocationCode }),
-      ...(normalizedBranchCode && { branchCode: normalizedBranchCode }),
+      ...(isAggregateMode ? { aggregate: true } : {
+        ...(selectedLocationId && { locationId: selectedLocationId }),
+        ...(normalizedLocationCode && { locationCode: normalizedLocationCode }),
+        ...(normalizedBranchCode && { branchCode: normalizedBranchCode }),
+      }),
     };
 
     try {
       const [salesSummaryResponse, invoicesResponse, expensesResponse, supplierTransactionsResponse, payrollPeriodsResponse] = await Promise.all([
         api.get('/business-operations/reports/sales/summary', { params: monthParams }),
         api.get('/business-operations/reports/sales/invoices', { params: { ...monthParams, page: 1, pageSize: 5, sortBy: 'invoiceDate', sortOrder: 'desc' } }),
-        api.get('/business-operations/expenses', { params: { page: 1, pageSize: 5, sortBy: 'expenseDate', sortOrder: 'desc', ...(selectedLocationId && { locationId: selectedLocationId }) } }),
-        api.get('/business-operations/suppliers/transactions/list', { params: { page: 1, pageSize: 5, sortBy: 'transactionDate', sortOrder: 'desc', ...(selectedLocationId && { locationId: selectedLocationId }) } }),
-        api.get('/business-operations/payroll/periods', { params: { page: 1, pageSize: 5, sortBy: 'createdAt', sortOrder: 'desc', ...(selectedLocationId && { locationId: selectedLocationId }) } }),
+        api.get('/business-operations/expenses', { params: { page: 1, pageSize: 5, sortBy: 'expenseDate', sortOrder: 'desc', ...(selectedLocationId && !isAggregateMode && { locationId: selectedLocationId }) } }),
+        api.get('/business-operations/suppliers/transactions/list', { params: { page: 1, pageSize: 5, sortBy: 'transactionDate', sortOrder: 'desc', ...(selectedLocationId && !isAggregateMode && { locationId: selectedLocationId }) } }),
+        api.get('/business-operations/payroll/periods', { params: { page: 1, pageSize: 5, sortBy: 'createdAt', sortOrder: 'desc', ...(selectedLocationId && !isAggregateMode && { locationId: selectedLocationId }) } }),
       ]);
 
       setState({

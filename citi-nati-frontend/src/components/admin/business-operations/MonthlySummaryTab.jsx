@@ -97,6 +97,7 @@ const MonthlySummaryTab = ({
   selectedLocationCode = '',
   selectedLocationName = '',
   permissions = {},
+  isAggregateMode = false,
 }) => {
   const canViewOverviewCards = permissions.canViewOverviewCards !== false;
   const canViewSalesOverview = permissions.canViewSalesOverview !== false;
@@ -131,15 +132,22 @@ const MonthlySummaryTab = ({
       : effectiveLocationCode || 'All Locations');
 
   const scopeParams = useMemo(
-    () =>
-      compactParams({
-        branchCode: effectiveBranchCode || undefined,
-        locationCode: effectiveLocationCode || undefined,
+    () => {
+      const params = {};
 
-        // Legacy fallback only. Backend should prefer branchCode + locationCode.
-        locationId: selectedLocationId || undefined,
-      }),
-    [effectiveBranchCode, effectiveLocationCode, selectedLocationId]
+      if (!isAggregateMode) {
+        params.branchCode = effectiveBranchCode || undefined;
+        params.locationCode = effectiveLocationCode || undefined;
+        params.locationId = selectedLocationId || undefined;
+      }
+
+      if (isAggregateMode) {
+        params.aggregate = true;
+      }
+
+      return compactParams(params);
+    },
+    [effectiveBranchCode, effectiveLocationCode, selectedLocationId, isAggregateMode]
   );
 
   const [showControls, setShowControls] = useState(false);

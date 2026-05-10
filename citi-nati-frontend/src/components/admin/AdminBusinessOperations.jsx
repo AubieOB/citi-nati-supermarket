@@ -27,15 +27,14 @@ import {
   hasPermission,
 } from '../../utils/permissions.js';
 
-const BO_OPERATIONAL_SCOPES = getOperationalScopeOptions().map((scope, index) => ({
-  id: index + 1, // legacy UI-only id; do not use for true branch scoping
-  code: scope.locationCode,
-  locationCode: scope.locationCode,
-  uiCode: scope.uiCode,
-  name: scope.label,
-  label: scope.label,
-  branchCode: scope.branchCode,
-}));
+const AGGREGATE_SUPPORTED_TABS = new Set([
+  'sales-reports',
+  'analytics-performance',
+  'monthly-summary',
+  'report-history',
+  'sales-balancing',
+  'inventory-activity',
+]);
 
 const TABS = [
   { id: 'sales-reports', label: 'Sales Reports', icon: 'fa-chart-column', permission: PERMISSION_KEYS.BO_SALES_REPORTS_VIEW },
@@ -100,6 +99,7 @@ const AdminBusinessOperations = ({ selectedLocationCode, selectedBranchCode }) =
   const [dataRefreshKey, setDataRefreshKey] = useState(0);
   const [drilldownRequests, setDrilldownRequests] = useState({});
   const [locationRefreshKey, setLocationRefreshKey] = useState(0);
+  const [isAggregateMode, setIsAggregateMode] = useState(false);
 
   const filterBarRef = useRef(null);
 
@@ -327,6 +327,7 @@ const AdminBusinessOperations = ({ selectedLocationCode, selectedBranchCode }) =
     selectedLocationName,
     isAllLocationsSelected,
     operationalScopeKey: scopeKey,
+    isAggregateMode: AGGREGATE_SUPPORTED_TABS.has(activeTab) && isAggregateMode,
   };
 
   const contentByTab = {
@@ -359,6 +360,7 @@ const AdminBusinessOperations = ({ selectedLocationCode, selectedBranchCode }) =
         {...commonScopeProps}
         onNavigateTab={handleNavigateTab}
         permissions={monthlySummaryPermissions}
+        isAggregateMode={isAggregateMode}
       />
     ),
 
@@ -370,12 +372,13 @@ const AdminBusinessOperations = ({ selectedLocationCode, selectedBranchCode }) =
       <ReportHistoryTab
         {...commonScopeProps}
         onNavigateTab={handleNavigateTab}
+        isAggregateMode={isAggregateMode}
       />
     ),
 
     'sales-balancing': <SalesBalancingTab {...commonScopeProps} />,
 
-    'analytics-performance': <BusinessAnalyticsTab {...commonScopeProps} />,
+    'analytics-performance': <BusinessAnalyticsTab {...commonScopeProps} isAggregateMode={isAggregateMode} />,
 
     'inventory-activity': <InventoryActivityLedger {...commonScopeProps} />,
 
@@ -490,6 +493,56 @@ const AdminBusinessOperations = ({ selectedLocationCode, selectedBranchCode }) =
               justifySelf: isMobileViewport ? 'stretch' : 'end',
             }}
           >
+            <div
+              className="bo-aggregate-toggle"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                marginRight: '1rem',
+                fontSize: '0.85rem',
+                fontWeight: 500,
+              }}
+            >
+              <label
+                htmlFor="aggregate-mode-toggle"
+                style={{
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  color: '#374151',
+                }}
+              >
+                All Locations Mode
+              </label>
+              <div
+                className={`toggle-switch ${isAggregateMode ? 'active' : ''}`}
+                onClick={() => setIsAggregateMode(!isAggregateMode)}
+                style={{
+                  position: 'relative',
+                  width: '44px',
+                  height: '24px',
+                  backgroundColor: isAggregateMode ? '#10b981' : '#d1d5db',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s ease',
+                }}
+              >
+                <div
+                  className="toggle-knob"
+                  style={{
+                    position: 'absolute',
+                    top: '2px',
+                    left: isAggregateMode ? '22px' : '2px',
+                    width: '20px',
+                    height: '20px',
+                    backgroundColor: 'white',
+                    borderRadius: '50%',
+                    transition: 'left 0.2s ease',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                  }}
+                />
+              </div>
+            </div>
             <BusinessOperationsImportButton onClick={() => setIsImportModalOpen(true)} />
           </div>
         </div>

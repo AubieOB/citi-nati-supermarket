@@ -92,6 +92,7 @@ function extractFilters(query) {
     productName: sanitizeStr(query.productName),
     payMethod: sanitizeStr(query.payMethod),
     invoiceType: sanitizeStr(query.invoiceType),
+    aggregate: query.aggregate === 'true' || query.aggregate === true,
   };
 }
 
@@ -133,14 +134,17 @@ function buildInvoiceWhere(dateRange, filters = {}) {
     };
   }
 
-  const branchScopePredicate = buildBranchScopePredicate(filters.branchCode);
-  if (branchScopePredicate) {
-    andConditions.push(branchScopePredicate);
-  }
+  // Skip branch and location scoping when aggregate mode is enabled
+  if (!filters.aggregate) {
+    const branchScopePredicate = buildBranchScopePredicate(filters.branchCode);
+    if (branchScopePredicate) {
+      andConditions.push(branchScopePredicate);
+    }
 
-  const locationScopePredicate = buildLocationScopePredicate(filters.locationCode);
-  if (locationScopePredicate) {
-    andConditions.push(locationScopePredicate);
+    const locationScopePredicate = buildLocationScopePredicate(filters.locationCode);
+    if (locationScopePredicate) {
+      andConditions.push(locationScopePredicate);
+    }
   }
 
   if (filters.syncSourceCode) {
@@ -172,6 +176,7 @@ function buildInvoiceWhere(dateRange, filters = {}) {
   }
 
   console.log('[REPORTING SCOPE]', {
+    aggregate: filters.aggregate || false,
     branchCode: filters.branchCode || null,
     locationCode: filters.locationCode || null,
     locationId: filters.locationId || null,

@@ -55,11 +55,16 @@ function normalizeCode(code) {
   return String(code || '').trim().toUpperCase();
 }
 
-function buildScopedParams(params, branchCode, locationCode, locationId) {
+function buildScopedParams(params, branchCode, locationCode, locationId, isAggregateMode = false) {
   const scoped = { ...params };
-  if (branchCode) scoped.branchCode = branchCode;
-  if (locationCode) scoped.locationCode = locationCode;
-  if (locationId) scoped.locationId = locationId;
+  if (!isAggregateMode) {
+    if (branchCode) scoped.branchCode = branchCode;
+    if (locationCode) scoped.locationCode = locationCode;
+    if (locationId) scoped.locationId = locationId;
+  }
+  if (isAggregateMode) {
+    scoped.aggregate = true;
+  }
   return scoped;
 }
 
@@ -538,7 +543,7 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, scopeLabel, periodLab
     setLoading(true);
     setError('');
     try {
-      const params = buildScopedParams(buildParamsForPeriod(selectedPeriod), selectedBranchCode, selectedLocationCode, selectedLocationId);
+      const params = buildScopedParams(buildParamsForPeriod(selectedPeriod), selectedBranchCode, selectedLocationCode, selectedLocationId, isAggregateMode);
       const response = await api.get('/business-operations/reports/sales/profit-latest-cost', { params });
       setProfitData(response?.data?.data || null);
     } catch (err) {
@@ -946,20 +951,30 @@ const BusinessAnalyticsTab = ({
   selectedLocationId = null,
   selectedBranchCode = '',
   selectedLocationCode = '',
+  isAggregateMode = false,
 }) => {
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
   const now = new Date();
 
   const effectiveBranchCode = normalizeCode(selectedBranchCode);
   const effectiveLocationCode = normalizeCode(selectedLocationCode);
-  const scopeLabel = effectiveBranchCode && effectiveLocationCode
-    ? `${effectiveBranchCode} / ${effectiveLocationCode}`
-    : 'All Locations';
-  const scopeParams = useMemo(() => ({
-    branchCode: effectiveBranchCode || undefined,
-    locationCode: effectiveLocationCode || undefined,
-    locationId: selectedLocationId || undefined,
-  }), [effectiveBranchCode, effectiveLocationCode, selectedLocationId]);
+  const scopeLabel = isAggregateMode
+    ? 'All Locations (Aggregated)'
+    : (effectiveBranchCode && effectiveLocationCode
+      ? `${effectiveBranchCode} / ${effectiveLocationCode}`
+      : 'All Locations');
+  const scopeParams = useMemo(() => {
+    if (isAggregateMode) {
+      return {
+        locationId: selectedLocationId || undefined,
+      };
+    }
+    return {
+      branchCode: effectiveBranchCode || undefined,
+      locationCode: effectiveLocationCode || undefined,
+      locationId: selectedLocationId || undefined,
+    };
+  }, [effectiveBranchCode, effectiveLocationCode, selectedLocationId, isAggregateMode]);
 
   const [filters, setFilters] = useState({
     periodType: 'month',
@@ -1045,12 +1060,12 @@ const BusinessAnalyticsTab = ({
       const now = new Date();
       const thisYear = now.getFullYear();
 
-      const periodParams = buildScopedParams(buildParamsForPeriod(selectedPeriod), effectiveBranchCode, effectiveLocationCode, selectedLocationId);
-      const prevPeriodParams = buildScopedParams(buildParamsForPeriod(previousPeriod(selectedPeriod)), effectiveBranchCode, effectiveLocationCode, selectedLocationId);
-      const monthParams = buildScopedParams(buildParamsForPeriod(getCurrentMonthPeriod()), effectiveBranchCode, effectiveLocationCode, selectedLocationId);
-      const prevMonthParams = buildScopedParams(buildParamsForPeriod(previousPeriod(getCurrentMonthPeriod())), effectiveBranchCode, effectiveLocationCode, selectedLocationId);
-      const yearParams = buildScopedParams(buildParamsForPeriod(getCurrentYearPeriod()), effectiveBranchCode, effectiveLocationCode, selectedLocationId);
-      const prevYearParams = buildScopedParams(buildParamsForPeriod(previousPeriod(getCurrentYearPeriod())), effectiveBranchCode, effectiveLocationCode, selectedLocationId);
+      const periodParams = buildScopedParams(buildParamsForPeriod(selectedPeriod), effectiveBranchCode, effectiveLocationCode, selectedLocationId, isAggregateMode);
+      const prevPeriodParams = buildScopedParams(buildParamsForPeriod(previousPeriod(selectedPeriod)), effectiveBranchCode, effectiveLocationCode, selectedLocationId, isAggregateMode);
+      const monthParams = buildScopedParams(buildParamsForPeriod(getCurrentMonthPeriod()), effectiveBranchCode, effectiveLocationCode, selectedLocationId, isAggregateMode);
+      const prevMonthParams = buildScopedParams(buildParamsForPeriod(previousPeriod(getCurrentMonthPeriod())), effectiveBranchCode, effectiveLocationCode, selectedLocationId, isAggregateMode);
+      const yearParams = buildScopedParams(buildParamsForPeriod(getCurrentYearPeriod()), effectiveBranchCode, effectiveLocationCode, selectedLocationId, isAggregateMode);
+      const prevYearParams = buildScopedParams(buildParamsForPeriod(previousPeriod(getCurrentYearPeriod())), effectiveBranchCode, effectiveLocationCode, selectedLocationId, isAggregateMode);
 
       const MAX_MONTH_POINTS = 6;
       const MAX_YEAR_POINTS = 3;
@@ -1106,15 +1121,15 @@ const BusinessAnalyticsTab = ({
         // 7: users
         api.get('/business-operations/reports/sales/users', { params: { ...periodParams, page: 1, pageSize: 10, sortBy: 'totalSales', sortOrder: 'desc' } }),
         // Trend summaries (capped to keep initial render fast)
-        ...recentMonths.map((p) => api.get('/business-operations/reports/sales/summary', { params: buildScopedParams(buildParamsForPeriod(p), effectiveBranchCode, effectiveLocationCode, selectedLocationId) })),
-        ...recentYears.map((p) => api.get('/business-operations/reports/sales/summary', { params: buildScopedParams(buildParamsForPeriod(p), effectiveBranchCode, effectiveLocationCode, selectedLocationId) })),
-        ...quarters.map((p) => api.get('/business-operations/reports/sales/summary', { params: buildScopedParams(buildParamsForPeriod(p), effectiveBranchCode, effectiveLocationCode, selectedLocationId) })),
+        ...recentMonths.map((p) => api.get('/business-operations/reports/sales/summary', { params: buildScopedParams(buildParamsForPeriod(p), effectiveBranchCode, effectiveLocationCode, selectedLocationId, isAggregateMode) })),
+        ...recentYears.map((p) => api.get('/business-operations/reports/sales/summary', { params: buildScopedParams(buildParamsForPeriod(p), effectiveBranchCode, effectiveLocationCode, selectedLocationId, isAggregateMode) })),
+        ...quarters.map((p) => api.get('/business-operations/reports/sales/summary', { params: buildScopedParams(buildParamsForPeriod(p), effectiveBranchCode, effectiveLocationCode, selectedLocationId, isAggregateMode) })),
         // Daily trend (sampled points for short ranges)
-        ...dailyPeriods.map((p) => api.get('/business-operations/reports/sales/summary', { params: buildScopedParams(buildParamsForPeriod(p), effectiveBranchCode, effectiveLocationCode, selectedLocationId) })),
+        ...dailyPeriods.map((p) => api.get('/business-operations/reports/sales/summary', { params: buildScopedParams(buildParamsForPeriod(p), effectiveBranchCode, effectiveLocationCode, selectedLocationId, isAggregateMode) })),
         // last 2: branch summaries (BT, ZA)
         ...branchCodes.map((code) => {
           const resolved = resolveOperationalScope(code);
-          return api.get('/business-operations/reports/sales/summary', { params: buildScopedParams({ ...periodParams }, resolved.branchCode, resolved.locationCode, selectedLocationId) });
+          return api.get('/business-operations/reports/sales/summary', { params: buildScopedParams({ ...periodParams }, resolved.branchCode, resolved.locationCode, selectedLocationId, isAggregateMode) });
         }),
       ]);
 

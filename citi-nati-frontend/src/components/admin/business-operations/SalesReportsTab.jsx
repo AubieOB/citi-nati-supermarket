@@ -180,17 +180,28 @@ function compactParams(filters) {
   }, {});
 }
 
-function buildReportParams(filters, extras = {}) {
+function buildReportParams(filters, extras = {}, isAggregateMode = false) {
   const params = compactParams({ ...filters, ...extras });
 
   // Canonical BO scoping is branchCode + locationCode.
   // Never let legacy locationId become the main report scope.
   delete params.locationId;
 
+  if (isAggregateMode) {
+    params.aggregate = true;
+  }
+
   return params;
 }
 
-function buildScopeFilters(selectedBranchCode = '', selectedLocationCode = '') {
+function buildScopeFilters(selectedBranchCode = '', selectedLocationCode = '', isAggregateMode = false) {
+  if (isAggregateMode) {
+    return {
+      branchCode: '',
+      locationCode: '',
+      locationId: '',
+    };
+  }
   return {
     branchCode: normalizeCode(selectedBranchCode),
     locationCode: normalizeCode(selectedLocationCode),
@@ -241,6 +252,7 @@ const SalesReportsTab = ({
   selectedBranchCode = '',
   selectedLocationCode = '',
   permissions = {},
+  isAggregateMode = false,
 }) => {
   const isAdminDarkTheme =
     typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
@@ -254,8 +266,8 @@ const SalesReportsTab = ({
   const hasAnyVisibleSection = canViewSummary || canViewSalesBy;
 
   const canonicalScope = useMemo(
-    () => buildScopeFilters(selectedBranchCode, selectedLocationCode),
-    [selectedBranchCode, selectedLocationCode]
+    () => buildScopeFilters(selectedBranchCode, selectedLocationCode, isAggregateMode),
+    [selectedBranchCode, selectedLocationCode, isAggregateMode]
   );
 
   const [filters, setFilters] = useState({
@@ -457,7 +469,7 @@ const SalesReportsTab = ({
 
       try {
         const response = await api.get('/business-operations/reports/sales/summary', {
-          params: buildReportParams(filters),
+          params: buildReportParams(filters, {}, isAggregateMode),
         });
 
         setSummary(response.data?.data || null);
@@ -485,7 +497,7 @@ const SalesReportsTab = ({
 
       try {
         const response = await api.get('/business-operations/reports/sales/profit-latest-cost', {
-          params: buildReportParams(filters),
+          params: buildReportParams(filters, {}, isAggregateMode),
         });
 
         setProfitSummary(response.data?.data?.summary || null);
@@ -509,7 +521,7 @@ const SalesReportsTab = ({
       }));
 
       try {
-        const params = buildReportParams(filters, viewState.invoices);
+        const params = buildReportParams(filters, viewState.invoices, isAggregateMode);
         const response = await api.get('/business-operations/reports/sales/invoices', { params });
 
         setInvoicesState({
@@ -540,7 +552,7 @@ const SalesReportsTab = ({
       }));
 
       try {
-        const params = buildReportParams(filters, viewState.products);
+        const params = buildReportParams(filters, viewState.products, isAggregateMode);
         const response = await api.get('/business-operations/reports/sales/products', { params });
 
         setProductsState({
@@ -571,7 +583,7 @@ const SalesReportsTab = ({
       }));
 
       try {
-        const params = buildReportParams(filters, viewState.users);
+        const params = buildReportParams(filters, viewState.users, isAggregateMode);
         const response = await api.get('/business-operations/reports/sales/users', { params });
 
         setUsersState({
@@ -603,7 +615,7 @@ const SalesReportsTab = ({
 
       try {
         const response = await api.get('/business-operations/reports/sales/payments', {
-          params: buildReportParams(filters),
+          params: buildReportParams(filters, {}, isAggregateMode),
         });
 
         setPaymentsState({
@@ -789,7 +801,7 @@ const SalesReportsTab = ({
           ...viewConfig,
           page,
           pageSize,
-        });
+        }, isAggregateMode);
         const response = await api.get(endpoint, { params });
         const pageRows = Array.isArray(response.data?.data) ? response.data.data : [];
         rows.push(...pageRows);
@@ -902,7 +914,7 @@ const SalesReportsTab = ({
           format,
           module: 'sales',
           type: activeView,
-          filters: buildReportParams(filters),
+          filters: buildReportParams(filters, {}, isAggregateMode),
         });
       } catch (error) {
         const message =
@@ -950,7 +962,7 @@ const SalesReportsTab = ({
           syncSourceCode: filters.syncSourceCode,
           startDate: filters.startDate,
           endDate: filters.endDate,
-        }),
+        }, {}, isAggregateMode),
       });
     } catch (error) {
       const message = error?.response?.data?.error || error?.message || 'Failed to export full workbook.';
