@@ -1536,27 +1536,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
     setReplacementModalFocusedButton(0);
   }, []);
 
-  const handlePriceChangeKeyDown = useCallback((event) => {
-    if (!isPriceChangeModalOpen) return;
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      event.stopPropagation();
-      handleConfirmPriceChange();
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
-      event.stopPropagation();
-      handleClosePriceChange();
-    }
-  }, [isPriceChangeModalOpen, handleConfirmPriceChange, handleClosePriceChange]);
-
-  useEffect(() => {
-    if (isPriceChangeModalOpen) {
-      document.addEventListener('keydown', handlePriceChangeKeyDown, true);
-      return () => document.removeEventListener('keydown', handlePriceChangeKeyDown, true);
-    }
-    return undefined;
-  }, [isPriceChangeModalOpen, handlePriceChangeKeyDown]);
-
   const handleProductPickerSearch = useCallback((query) => {
     setProductPickerQuery(query);
     if (productPickerTimeoutRef.current) {
@@ -1630,6 +1609,27 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
       setPriceChangeLoading(false);
     }
   }, [activeLookupLocationCode, effectiveBranchCode, handleClosePriceChange, priceChangeProduct, priceChangeValue]);
+
+  const handlePriceChangeKeyDown = useCallback((event) => {
+    if (!isPriceChangeModalOpen) return;
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      event.stopPropagation();
+      handleConfirmPriceChange();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      handleClosePriceChange();
+    }
+  }, [isPriceChangeModalOpen, handleConfirmPriceChange, handleClosePriceChange]);
+
+  useEffect(() => {
+    if (isPriceChangeModalOpen) {
+      document.addEventListener('keydown', handlePriceChangeKeyDown, true);
+      return () => document.removeEventListener('keydown', handlePriceChangeKeyDown, true);
+    }
+    return undefined;
+  }, [isPriceChangeModalOpen, handlePriceChangeKeyDown]);
 
   const handleProductPickerKeyDown = useCallback((event) => {
     if (!productPickerOpen) return;
