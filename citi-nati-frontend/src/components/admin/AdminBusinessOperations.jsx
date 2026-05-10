@@ -27,6 +27,16 @@ import {
   hasPermission,
 } from '../../utils/permissions.js';
 
+const BO_OPERATIONAL_SCOPES = getOperationalScopeOptions().map((scope, index) => ({
+  id: index + 1, // legacy UI-only id; do not use for true branch scoping
+  code: scope.locationCode,
+  locationCode: scope.locationCode,
+  uiCode: scope.uiCode,
+  name: scope.label,
+  label: scope.label,
+  branchCode: scope.branchCode,
+}));
+
 const AGGREGATE_SUPPORTED_TABS = new Set([
   'sales-reports',
   'analytics-performance',
