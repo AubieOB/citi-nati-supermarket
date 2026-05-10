@@ -47,6 +47,7 @@ const ExpensesTab = ({
   selectedLocationCode = '',
   selectedLocationName = '',
   locations = [],
+  isAggregateMode = false,
 }) => {
   const initialRange = getCurrentMonthRange();
 
@@ -100,23 +101,30 @@ const ExpensesTab = ({
   const [exportingExcel, setExportingExcel] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
 
-  const expenseQueryParams = useMemo(() => ({
-    page: expensePage,
-    pageSize: 20,
-    sortBy: 'expenseDate',
-    sortOrder: 'desc',
-    search: filters.search || undefined,
-    expenseCategoryId: filters.expenseCategoryId || undefined,
-    startDate: filters.startDate || undefined,
-    endDate: filters.endDate || undefined,
+  const expenseQueryParams = useMemo(() => {
+    const params = {
+      page: expensePage,
+      pageSize: 20,
+      sortBy: 'expenseDate',
+      sortOrder: 'desc',
+      search: filters.search || undefined,
+      expenseCategoryId: filters.expenseCategoryId || undefined,
+      startDate: filters.startDate || undefined,
+      endDate: filters.endDate || undefined,
+    };
 
-    // Canonical production scope
-    branchCode: effectiveBranchCode || undefined,
-    locationCode: effectiveLocationCode || undefined,
+    if (!isAggregateMode) {
+      params.branchCode = effectiveBranchCode || undefined;
+      params.locationCode = effectiveLocationCode || undefined;
+      params.locationId = selectedLocationId || undefined;
+    }
 
-    // Legacy fallback only
-    locationId: selectedLocationId || undefined,
-  }), [
+    if (isAggregateMode) {
+      params.aggregate = true;
+    }
+
+    return params;
+  }, [
     expensePage,
     filters.endDate,
     filters.expenseCategoryId,
@@ -125,6 +133,7 @@ const ExpensesTab = ({
     effectiveBranchCode,
     effectiveLocationCode,
     selectedLocationId,
+    isAggregateMode,
   ]);
 
   const fetchCategories = useCallback(async () => {

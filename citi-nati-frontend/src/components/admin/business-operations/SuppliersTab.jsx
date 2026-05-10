@@ -44,6 +44,7 @@ const SuppliersTab = ({
   selectedLocationCode = '',
   selectedLocationName = '',
   locations = [],
+  isAggregateMode = false,
 }) => {
   const effectiveBranchCode = normalizeCode(selectedBranchCode);
   const effectiveLocationCode = normalizeCode(selectedLocationCode);
@@ -53,11 +54,18 @@ const SuppliersTab = ({
       : 'All Locations'
   );
 
-  const scopeParams = useMemo(() => ({
-    branchCode: effectiveBranchCode || undefined,
-    locationCode: effectiveLocationCode || undefined,
-    locationId: selectedLocationId || undefined,
-  }), [effectiveBranchCode, effectiveLocationCode, selectedLocationId]);
+  const scopeParams = useMemo(() => {
+    const params = {};
+    if (!isAggregateMode) {
+      params.branchCode = effectiveBranchCode || undefined;
+      params.locationCode = effectiveLocationCode || undefined;
+      params.locationId = selectedLocationId || undefined;
+    }
+    if (isAggregateMode) {
+      params.aggregate = true;
+    }
+    return compactParams(params);
+  }, [effectiveBranchCode, effectiveLocationCode, selectedLocationId, isAggregateMode]);
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');

@@ -28,17 +28,25 @@ const buildScopeParams = ({
   selectedLocationId,
   selectedBranchCode,
   selectedLocationCode,
+  isAggregateMode = false,
   extra = {},
 }) => {
   const branchCode = normalizeCode(selectedBranchCode);
   const locationCode = normalizeCode(selectedLocationCode);
 
-  return {
-    ...extra,
-    branchCode: branchCode || undefined,
-    locationCode: locationCode || undefined,
-    locationId: selectedLocationId || undefined,
-  };
+  const params = { ...extra };
+
+  if (!isAggregateMode) {
+    params.branchCode = branchCode || undefined;
+    params.locationCode = locationCode || undefined;
+    params.locationId = selectedLocationId || undefined;
+  }
+
+  if (isAggregateMode) {
+    params.aggregate = true;
+  }
+
+  return params;
 };
 
 const EmployeesTab = ({
@@ -48,6 +56,7 @@ const EmployeesTab = ({
   selectedLocationCode = '',
   selectedLocationName = '',
   locations = [],
+  isAggregateMode = false,
 }) => {
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
 
@@ -107,8 +116,9 @@ const EmployeesTab = ({
         selectedLocationId,
         selectedBranchCode: effectiveBranchCode,
         selectedLocationCode: effectiveLocationCode,
+        isAggregateMode,
       }),
-    [effectiveBranchCode, effectiveLocationCode, selectedLocationId]
+    [effectiveBranchCode, effectiveLocationCode, selectedLocationId, isAggregateMode]
   );
 
   const fetchEmployees = useCallback(async (pg = page) => {

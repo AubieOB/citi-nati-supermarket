@@ -44,6 +44,10 @@ const AGGREGATE_SUPPORTED_TABS = new Set([
   'report-history',
   'sales-balancing',
   'inventory-activity',
+  'suppliers',
+  'expenses',
+  'employees',
+  'payroll',
 ]);
 
 const TABS = [
@@ -349,7 +353,7 @@ const AdminBusinessOperations = ({ selectedLocationCode, selectedBranchCode }) =
       />
     ),
 
-    suppliers: <SuppliersTab {...commonScopeProps} />,
+    suppliers: <SuppliersTab {...commonScopeProps} isAggregateMode={isAggregateMode} />,
 
     'goods-intake': (
       <GoodsIntakeTab
@@ -362,6 +366,7 @@ const AdminBusinessOperations = ({ selectedLocationCode, selectedBranchCode }) =
       <ExpensesTab
         {...commonScopeProps}
         drilldownRequest={drilldownRequests.expenses}
+        isAggregateMode={isAggregateMode}
       />
     ),
 
@@ -374,9 +379,9 @@ const AdminBusinessOperations = ({ selectedLocationCode, selectedBranchCode }) =
       />
     ),
 
-    employees: <EmployeesTab {...commonScopeProps} />,
+    employees: <EmployeesTab {...commonScopeProps} isAggregateMode={isAggregateMode} />,
 
-    payroll: <PayrollTab {...commonScopeProps} />,
+    payroll: <PayrollTab {...commonScopeProps} isAggregateMode={isAggregateMode} />,
 
     'report-history': (
       <ReportHistoryTab
@@ -570,6 +575,66 @@ const AdminBusinessOperations = ({ selectedLocationCode, selectedBranchCode }) =
 
       <div className="bo-content-grid">
         {contentByTab[activeTab] || contentByTab[defaultVisibleTabId]}
+      </div>
+
+      {/* Floating Aggregate Mode Toggle */}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: '2rem',
+          right: '2rem',
+          zIndex: 70,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          backgroundColor: '#ffffff',
+          border: '1px solid #e2e8f0',
+          borderRadius: '12px',
+          padding: '0.7rem 1rem',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+          cursor: 'pointer',
+          userSelect: 'none',
+        }}
+        title="Toggle All Locations Aggregated Mode"
+      >
+        <label
+          style={{
+            fontSize: '0.85rem',
+            fontWeight: 500,
+            color: '#374151',
+            cursor: 'pointer',
+          }}
+        >
+          Agg Mode
+        </label>
+        <div
+          className={`toggle-switch-floating ${isAggregateMode ? 'active' : ''}`}
+          onClick={() => setIsAggregateMode(!isAggregateMode)}
+          style={{
+            position: 'relative',
+            width: '40px',
+            height: '22px',
+            backgroundColor: isAggregateMode ? '#10b981' : '#d1d5db',
+            borderRadius: '11px',
+            cursor: 'pointer',
+            transition: 'background-color 0.2s ease',
+          }}
+        >
+          <div
+            className="toggle-knob-floating"
+            style={{
+              position: 'absolute',
+              top: '2px',
+              left: isAggregateMode ? '20px' : '2px',
+              width: '18px',
+              height: '18px',
+              backgroundColor: 'white',
+              borderRadius: '50%',
+              transition: 'left 0.2s ease',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+            }}
+          />
+        </div>
       </div>
 
       <BusinessOperationsImportModal
