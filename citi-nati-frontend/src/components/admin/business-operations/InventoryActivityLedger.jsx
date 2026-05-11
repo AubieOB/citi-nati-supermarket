@@ -204,10 +204,10 @@ const InventoryActivityLedger = ({
     const rows = data.ledger;
     if (rows.length === 0) return;
 
-    let csvContent = 'Timestamp,Movement Type,Reference,User,Product Code,Product Name,Qty In,Qty Out,Running Balance,Unit Price,Amount\n';
+    let csvContent = 'Timestamp,Movement Type,Reference,User,Product Code,Product Name,Opening Balance,Qty In,Qty Out,Balance After Transaction,Closing Balance,Unit Price,Amount\n';
 
     rows.forEach((row) => {
-      csvContent += `"${formatDateTime(row.timestamp)}","${row.movementType}","${row.referenceNo || ''}","${row.user || ''}","${row.productCode || ''}","${row.productName || ''}",${row.qtyIn},${row.qtyOut},${row.runningBalance},${row.unitPrice},${row.lineAmount}\n`;
+      csvContent += `"${formatDateTime(row.timestamp)}","${row.movementType}","${row.referenceNo || ''}","${row.user || ''}","${row.productCode || ''}","${row.productName || ''}",${row.openingBalance},${row.qtyIn},${row.qtyOut},${row.balanceAfterTransaction},${row.closingBalance},${row.unitPrice},${row.lineAmount}\n`;
     });
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -403,9 +403,11 @@ const InventoryActivityLedger = ({
                   <th style={{ ...thStyle }}>Reference</th>
                   <th style={{ ...thStyle }}>User</th>
                   <th style={{ ...thStyle }}>Product</th>
+                  <th style={{ ...thStyle, textAlign: 'right' }}>Opening Balance</th>
                   <th style={{ ...thStyle, textAlign: 'right' }}>Qty In</th>
                   <th style={{ ...thStyle, textAlign: 'right' }}>Qty Out</th>
-                  <th style={{ ...thStyle, textAlign: 'right' }}>Balance</th>
+                  <th style={{ ...thStyle, textAlign: 'right' }}>Balance After Transaction</th>
+                  <th style={{ ...thStyle, textAlign: 'right' }}>Closing Balance</th>
                   <th style={{ ...thStyle, textAlign: 'right' }}>Amount</th>
                 </tr>
               </thead>
@@ -418,9 +420,11 @@ const InventoryActivityLedger = ({
                     <td style={{ ...tdStyle }}>{row.referenceNo || '-'}</td>
                     <td style={{ ...tdStyle }}>{row.user || '-'}</td>
                     <td style={{ ...tdStyle }}>{row.productName || row.productCode || '-'}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: '#0f172a' }}>{row.openingBalance}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', color: '#166534' }}>{row.qtyIn}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', color: '#b91c1c' }}>{row.qtyOut}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700 }}>{row.runningBalance}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700 }}>{row.balanceAfterTransaction}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: '#7c3aed' }}>{row.closingBalance}</td>
                     <td style={{ ...tdStyle, textAlign: 'right' }}>{money(row.lineAmount)}</td>
                   </tr>
                 ))}

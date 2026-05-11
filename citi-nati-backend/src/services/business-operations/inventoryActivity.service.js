@@ -891,7 +891,7 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       getAdjustmentMovements(period, filters),
     ]);
 
-    // Combine and sort movements
+    // Combine and sort movements chronologically
     let allMovements = [...saleMovements, ...intakeMovements, ...emergencySalesMovements, ...adjustmentMovements]
       .filter((row) => {
         if (!filters.movementType) return true;
@@ -899,73 +899,62 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       })
       .sort((a, b) => new Date(a.movementDate).getTime() - new Date(b.movementDate).getTime());
 
-    // Calculate summary
-    let totalQtyIn = 0;
-    let totalQtyOut = 0;
-    let totalSalesAmount = 0;
+    // Get unique product codes from movements
+    const uniqueProductCodes = [...new Set(allMovements.map(m => m.productCode).filter(Boolean))];
 
-    allMovements = allMovements.map((movement) => {
-      totalQtyIn += Number(movement.qtyIn || 0);
-      totalQtyOut += Number(movement.qtyOut || 0);
-      totalSalesAmount += Number(movement.lineAmount || 0);
-      
-      const runningBalance = totalQtyIn - totalQtyOut;
-      return { ...movement, runningBalance: toNum(runningBalance) };
-    });
+    // Calculate opening balances for each product
+    const productOpeningBalances = {};
+    const productClosingBalances = {};
+    const productCurrentBalances = {};
 
-    // Get product summary if no product filter
-    const products = hasProductFilter ? [] : await getProductSummary(period, filters);
-
-    // Get opening balance if product-specific filter
-    let openingBalance = 0;
-    let closingBalance = toNum(totalQtyIn - totalQtyOut);
-    
-    if (hasProductFilter && !isAllLocations) {
-      openingBalance = await getOpeningBalance(
-        filters.productCode || null,
-        filters.productName || null,
+    for (const productCode of uniqueProductCodes) {
+      const openingBal = await getOpeningBalance(
+        productCode,
+        null, // productName not needed since we have code
         filters.locationCode || null,
         period.startDate,
         filters
       );
-      closingBalance = toNum(openingBalance + totalQtyIn - totalQtyOut);
+      productOpeningBalances[productCode] = toNum(openingBal);
+      productCurrentBalances[productCode] = toNum(openingBal);
     }
 
-    // Prepend opening balance row if product-specific
-    if (hasProductFilter && !isAllLocations && openingBalance !== null) {
-      allMovements.unshift({
-        movementDate: new Date(period.startDate),
-        movementType: 'OPENING_BALANCE',
-        referenceNo: 'Opening Balance',
-        cashierName: null,
-        productCode: filters.productCode || null,
-        productName: filters.productName || null,
-        qtyIn: 0,
-        qtyOut: 0,
-        runningBalance: openingBalance,
-        unitPrice: 0,
-        lineAmount: 0,
-        locationCode: filters.locationCode || null,
-      });
+    // Calculate running balances per product
+    allMovements.forEach((movement) => {
+      const productCode = movement.productCode;
+      if (productCode && productCurrentBalances.hasOwnProperty(productCode)) {
+        productCurrentBalances[productCode] = toNum(productCurrentBalances[productCode] + movement.qtyIn - movement.qtyOut);
+        movement.balanceAfterTransaction = productCurrentBalances[productCode];
+      } else {
+        movement.balanceAfterTransaction = 0; // fallback
+      }
+    });
+
+    // Set closing balances
+    for (const productCode of uniqueProductCodes) {
+      productClosingBalances[productCode] = productCurrentBalances[productCode];
     }
 
-    // Add closing balance row if there are movements
-    if (allMovements.length > 0 && hasProductFilter && !isAllLocations) {
-      allMovements.push({
-        movementDate: new Date(period.endDate),
-        movementType: 'CLOSING_BALANCE',
-        referenceNo: 'Closing Balance',
-        cashierName: null,
-        productCode: filters.productCode || null,
-        productName: filters.productName || null,
-        qtyIn: 0,
-        qtyOut: 0,
-        runningBalance: closingBalance,
-        unitPrice: 0,
-        lineAmount: 0,
-        locationCode: filters.locationCode || null,
-      });
-    }
+    // Calculate summary totals
+    let totalQtyIn = 0;
+    let totalQtyOut = 0;
+    let totalSalesAmount = 0;
+    let totalOpeningBalance = 0;
+    let totalClosingBalance = 0;
+
+    allMovements.forEach((movement) => {
+      totalQtyIn += Number(movement.qtyIn || 0);
+      totalQtyOut += Number(movement.qtyOut || 0);
+      totalSalesAmount += Number(movement.lineAmount || 0);
+    });
+
+    uniqueProductCodes.forEach((productCode) => {
+      totalOpeningBalance += productOpeningBalances[productCode] || 0;
+      totalClosingBalance += productClosingBalances[productCode] || 0;
+    });
+
+    // Get product summary if no product filter
+    const products = hasProductFilter ? [] : await getProductSummary(period, filters);
 
     // Get current product stock if product filter and location specified
     let currentProductStock = null;
@@ -986,22 +975,39 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       }
     }
 
-    // Build ledger rows in the expected frontend shape
-    const ledger = allMovements.map((movement, idx) => ({
-      transactionId: movement.transactionId || `${movement.movementType}-${idx}`,
-      timestamp: movement.movementDate,
-      movementType: movement.movementType,
-      referenceNo: movement.referenceNo,
-      user: movement.cashierName,
-      productCode: movement.productCode,
-      productName: movement.productName,
-      qtyIn: movement.qtyIn,
-      qtyOut: movement.qtyOut,
-      runningBalance: movement.runningBalance,
-      unitPrice: movement.unitPrice,
-      lineAmount: movement.lineAmount,
-      locationCode: movement.locationCode,
-    }));
+    // Build ledger rows in the expected frontend shape with local time
+    const ledger = allMovements.map((movement, idx) => {
+      const productCode = movement.productCode;
+      const openingBalance = productOpeningBalances[productCode] || 0;
+      const closingBalance = productClosingBalances[productCode] || 0;
+      const timestampLocal = new Date(movement.movementDate).toLocaleString('en-US', { 
+        timeZone: 'Africa/Blantyre',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+
+      return {
+        transactionId: movement.transactionId || `${movement.movementType}-${idx}`,
+        timestamp: timestampLocal,
+        movementType: movement.movementType,
+        referenceNo: movement.referenceNo,
+        user: movement.cashierName,
+        productCode: movement.productCode,
+        productName: movement.productName,
+        openingBalance,
+        qtyIn: movement.qtyIn,
+        qtyOut: movement.qtyOut,
+        balanceAfterTransaction: movement.balanceAfterTransaction,
+        closingBalance,
+        unitPrice: movement.unitPrice,
+        lineAmount: movement.lineAmount,
+        locationCode: movement.locationCode,
+      };
+    });
 
     // Build summary
     const summary = {
@@ -1013,8 +1019,8 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       productCount: products.length,
       currentProductStock,
       productInfo,
-      openingBalance: toNum(openingBalance),
-      closingBalance: toNum(closingBalance),
+      openingBalance: toNum(totalOpeningBalance),
+      closingBalance: toNum(totalClosingBalance),
     };
 
     // Data quality info
