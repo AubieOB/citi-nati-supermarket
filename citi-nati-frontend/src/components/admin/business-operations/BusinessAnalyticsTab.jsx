@@ -754,8 +754,13 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, scopeLabel, periodLab
               <div>
                 <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0f766e', fontWeight: 800 }}>Daily Breakdown</div>
                 <div style={{ marginTop: '0.2rem', fontWeight: 800, fontSize: '1.05rem', color: '#0f172a' }}>Daily Profit Totals</div>
+                <div style={{ marginTop: '0.35rem', color: '#64748b', fontSize: '0.84rem' }}>{selectedDateRange.label} • {scopeLabel}</div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                <button type="button" onClick={() => setFiltersExpanded((prev) => !prev)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.42rem 0.65rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>
+                  <i className={`fas ${filtersExpanded ? 'fa-chevron-up' : 'fa-sliders'}`} style={{ marginRight: '0.38rem' }}></i>
+                  {filtersExpanded ? 'Hide Filters' : 'Filters'}
+                </button>
                 <button
                   type="button"
                   title={isModalMaximized('daily') ? 'Restore' : 'Maximize'}
@@ -770,6 +775,7 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, scopeLabel, periodLab
                 </button>
               </div>
             </div>
+            {filtersExpanded && filtersPanel}
             <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1.1rem', display: 'grid', gap: '0.42rem' }}>
               {dailyTotals.length === 0 ? (
                 <div style={{ color: '#94a3b8', fontSize: '0.84rem' }}>No daily profit data for this period.</div>
@@ -800,8 +806,13 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, scopeLabel, periodLab
               <div>
                 <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1d4ed8', fontWeight: 800 }}>Category Totals</div>
                 <div style={{ marginTop: '0.2rem', fontWeight: 800, fontSize: '1.05rem', color: '#0f172a' }}>Category Profit Totals</div>
+                <div style={{ marginTop: '0.35rem', color: '#64748b', fontSize: '0.84rem' }}>{selectedDateRange.label} • {scopeLabel}</div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                <button type="button" onClick={() => setFiltersExpanded((prev) => !prev)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.42rem 0.65rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>
+                  <i className={`fas ${filtersExpanded ? 'fa-chevron-up' : 'fa-sliders'}`} style={{ marginRight: '0.38rem' }}></i>
+                  {filtersExpanded ? 'Hide Filters' : 'Filters'}
+                </button>
                 <button
                   type="button"
                   title={isModalMaximized('category') ? 'Restore' : 'Maximize'}
@@ -816,6 +827,7 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, scopeLabel, periodLab
                 </button>
               </div>
             </div>
+            {filtersExpanded && filtersPanel}
             <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1.1rem', display: 'grid', gap: '0.42rem' }}>
               {categoryTotals.length === 0 ? (
                 <div style={{ color: '#94a3b8', fontSize: '0.84rem' }}>No category profit totals available.</div>
@@ -846,8 +858,13 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, scopeLabel, periodLab
               <div>
                 <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#b45309', fontWeight: 800 }}>Missing Cost</div>
                 <div style={{ marginTop: '0.2rem', fontWeight: 800, fontSize: '1.05rem', color: '#92400e' }}>Products Missing Latest Cost</div>
+                <div style={{ marginTop: '0.35rem', color: '#64748b', fontSize: '0.84rem' }}>{selectedDateRange.label} • {scopeLabel}</div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                <button type="button" onClick={() => setFiltersExpanded((prev) => !prev)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.42rem 0.65rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>
+                  <i className={`fas ${filtersExpanded ? 'fa-chevron-up' : 'fa-sliders'}`} style={{ marginRight: '0.38rem' }}></i>
+                  {filtersExpanded ? 'Hide Filters' : 'Filters'}
+                </button>
                 <button
                   type="button"
                   title={isModalMaximized('missing') ? 'Restore' : 'Maximize'}
@@ -862,6 +879,7 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, scopeLabel, periodLab
                 </button>
               </div>
             </div>
+            {filtersExpanded && filtersPanel}
             <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1.1rem', display: 'grid', gap: '0.42rem', alignContent: 'start' }}>
               {incompleteProducts.length === 0 ? (
                 <div style={{ color: '#166534', fontSize: '0.84rem', fontWeight: 700 }}>All tracked products have a valid latest cost basis.</div>
@@ -888,8 +906,13 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, scopeLabel, periodLab
               <div>
                 <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6d28d9', fontWeight: 800 }}>Per-Product Profit</div>
                 <div style={{ marginTop: '0.2rem', fontWeight: 800, fontSize: '1.05rem', color: '#0f172a' }}>{completeProducts.length} Product{completeProducts.length !== 1 ? 's' : ''} with Cost Basis</div>
+                <div style={{ marginTop: '0.35rem', color: '#64748b', fontSize: '0.84rem' }}>{selectedDateRange.label} • {scopeLabel}</div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                <button type="button" onClick={() => setFiltersExpanded((prev) => !prev)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.42rem 0.65rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>
+                  <i className={`fas ${filtersExpanded ? 'fa-chevron-up' : 'fa-sliders'}`} style={{ marginRight: '0.38rem' }}></i>
+                  {filtersExpanded ? 'Hide Filters' : 'Filters'}
+                </button>
                 <button
                   type="button"
                   title={isModalMaximized('product') ? 'Restore' : 'Maximize'}
@@ -904,6 +927,7 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, scopeLabel, periodLab
                 </button>
               </div>
             </div>
+            {filtersExpanded && filtersPanel}
             <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1.1rem', display: 'grid', gap: '0.42rem', alignContent: 'start' }}>
               {completeProducts.length === 0 ? (
                 <div style={{ color: '#94a3b8', fontSize: '0.84rem' }}>No complete product profit rows available.</div>
