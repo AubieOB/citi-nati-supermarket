@@ -106,9 +106,18 @@ function extractFilters(query) {
  *
  * All conditions are optional – only those with a non-null value are added.
  */
-function buildLocationScopePredicate(locationCode) {
+function buildLocationScopePredicate(locationCode, branchCode) {
   const normalizedLocation = normalizeScopeCode(locationCode);
   if (!normalizedLocation) return null;
+
+  const normalizedBranch = normalizeBranchCode(branchCode);
+  const isBranchAlias = normalizedLocation === 'ZA' || normalizedLocation === 'BT';
+
+  // When a specific branch is supplied and a concrete location code is provided,
+  // apply exact matching so each location row is scoped to its own invoices.
+  if (normalizedBranch && !isBranchAlias) {
+    return { locationCode: { equals: normalizedLocation, mode: 'insensitive' } };
+  }
 
   const scopeCodes = expandOperationalLocationScopeCodes(normalizedLocation);
   if (!Array.isArray(scopeCodes) || scopeCodes.length === 0) return null;
@@ -141,7 +150,7 @@ function buildInvoiceWhere(dateRange, filters = {}) {
       andConditions.push(branchScopePredicate);
     }
 
-    const locationScopePredicate = buildLocationScopePredicate(filters.locationCode);
+    const locationScopePredicate = buildLocationScopePredicate(filters.locationCode, filters.branchCode);
     if (locationScopePredicate) {
       andConditions.push(locationScopePredicate);
     }
