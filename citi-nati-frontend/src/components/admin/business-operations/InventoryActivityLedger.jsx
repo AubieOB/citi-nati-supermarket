@@ -199,32 +199,22 @@ const InventoryActivityLedger = ({
   };
 
   const exportCSV = () => {
-    if (!data) return;
+    if (!data || !data.ledger) return;
 
-    const rows = data.mode === 'ledger' ? data.movements || [] : data.products || [];
+    const rows = data.ledger;
     if (rows.length === 0) return;
 
-    let csvContent = '';
+    let csvContent = 'Timestamp,Movement Type,Reference,User,Product Code,Product Name,Qty In,Qty Out,Running Balance,Unit Price,Amount\n';
 
-    if (data.mode === 'ledger') {
-      csvContent = 'Time,Type,Reference,Cashier,Product,Qty In,Qty Out,Balance,Amount\n';
-
-      rows.forEach((m) => {
-        csvContent += `"${formatDateTime(m.movementDate)}","${m.movementType}","${m.referenceNo || ''}","${m.cashierName || ''}","${m.productName || m.productCode || ''}",${m.qtyIn},${m.qtyOut},${m.runningBalance},${m.lineAmount}\n`;
-      });
-    } else {
-      csvContent = 'Product Code,Product Name,Qty In,Qty Out,Net Movement,Sales Amount,Movements\n';
-
-      rows.forEach((row) => {
-        csvContent += `"${row.productCode || ''}","${row.productName || ''}",${row.totalQtyIn},${row.totalQtyOut},${row.netMovement},${row.totalSalesAmount || 0},${row.movementCount}\n`;
-      });
-    }
+    rows.forEach((row) => {
+      csvContent += `"${formatDateTime(row.timestamp)}","${row.movementType}","${row.referenceNo || ''}","${row.user || ''}","${row.productCode || ''}","${row.productName || ''}",${row.qtyIn},${row.qtyOut},${row.runningBalance},${row.unitPrice},${row.lineAmount}\n`;
+    });
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
 
     link.href = URL.createObjectURL(blob);
-    link.download = `inventory-activity-${data.mode}-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `inventory-ledger-${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
   };
 
@@ -240,8 +230,7 @@ const InventoryActivityLedger = ({
   }, [activeModal]);
 
   const summary = data?.summary || {};
-  const movements = data?.movements || [];
-  const products = data?.products || [];
+  const ledger = data?.ledger || [];
   const dataQuality = data?.dataQuality || {};
 
   const renderModalFilters = () => (
@@ -337,81 +326,6 @@ const InventoryActivityLedger = ({
     </div>
   );
 
-  const renderSummaryContent = () => (
-    <div style={{ display: 'grid', gap: '1rem' }}>
-      {renderModalFilters()}
-
-      {error && (
-        <div style={{ padding: '1rem', color: '#b91c1c', backgroundColor: '#fff1f2', borderRadius: '10px', border: '1px solid #fecaca' }}>
-          {error}
-        </div>
-      )}
-
-      {dataQuality.message && (
-        <div style={{ padding: '0.85rem 1rem', color: dataQuality.level === 'warning' ? '#92400e' : '#64748b', backgroundColor: dataQuality.level === 'warning' ? '#fffbeb' : '#f8fafc', borderRadius: '10px' }}>
-          <i className="fas fa-info-circle" style={{ marginRight: '0.42rem' }} />
-          {dataQuality.message}
-        </div>
-      )}
-
-      {loading ? (
-        <div style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
-          <i className="fas fa-spinner fa-spin" style={{ fontSize: '2rem' }} />
-          <p style={{ marginTop: '1rem' }}>Loading inventory activity...</p>
-        </div>
-      ) : products.length === 0 ? (
-        <div style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
-          <i className="fas fa-box-open" style={{ fontSize: '3rem', color: '#cbd5e1' }} />
-          <p style={{ marginTop: '1rem', fontSize: '1.1rem' }}>No inventory activity found for this period.</p>
-          <p style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Try adjusting the date range or location filter.</p>
-        </div>
-      ) : (
-        <div style={{ ...cardStyle, overflow: 'hidden' }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f8fafc' }}>
-                  <th style={{ ...thStyle }}>Product Code</th>
-                  <th style={{ ...thStyle }}>Product Name</th>
-                  <th style={{ ...thStyle, textAlign: 'right' }}>Qty In</th>
-                  <th style={{ ...thStyle, textAlign: 'right' }}>Qty Out</th>
-                  <th style={{ ...thStyle, textAlign: 'right' }}>Net Movement</th>
-                  <th style={{ ...thStyle, textAlign: 'right' }}>Sales Amount</th>
-                  <th style={{ ...thStyle, textAlign: 'right' }}>Movements</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {products.map((row, idx) => (
-                  <tr key={`${row.productCode || idx}-summary`} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ ...tdStyle }}>{row.productCode || '-'}</td>
-                    <td style={{ ...tdStyle }}>{row.productName || '-'}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', color: '#166534', fontWeight: 700 }}>{row.totalQtyIn}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', color: '#b91c1c', fontWeight: 700 }}>{row.totalQtyOut}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', color: row.netMovement > 0 ? '#166534' : row.netMovement < 0 ? '#b91c1c' : '#0f172a', fontWeight: 700 }}>
-                      {row.netMovement > 0 ? '+' : ''}{row.netMovement}
-                    </td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>{money(row.totalSalesAmount)}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>{row.movementCount}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {products.length > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <button type="button" onClick={exportCSV} style={{ ...inputStyle, cursor: 'pointer', backgroundColor: '#5B4B8A', color: '#fff', border: 'none', fontWeight: 700, padding: '0.65rem 1rem' }}>
-            <i className="fas fa-download" style={{ marginRight: '0.42rem' }} />
-            Export CSV ({products.length} products)
-          </button>
-        </div>
-      )}
-    </div>
-  );
-
   const renderLedgerContent = () => (
     <div style={{ display: 'grid', gap: '1rem' }}>
       {renderModalFilters()}
@@ -429,7 +343,7 @@ const InventoryActivityLedger = ({
         </div>
       )}
 
-      {data?.mode === 'ledger' && (
+      {data?.ledger && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
           {summary.openingBalance !== undefined && (
             <div style={{ ...cardStyle, padding: '0.9rem 1rem' }}>
@@ -454,8 +368,8 @@ const InventoryActivityLedger = ({
           </div>
 
           <div style={{ ...cardStyle, padding: '0.9rem 1rem' }}>
-            <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800 }}>Movements</div>
-            <div style={{ marginTop: '0.35rem', fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>{summary.movementCount ?? 0}</div>
+            <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800 }}>Transactions</div>
+            <div style={{ marginTop: '0.35rem', fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>{summary.transactionCount ?? 0}</div>
           </div>
 
           {summary.closingBalance !== undefined && (
@@ -470,12 +384,12 @@ const InventoryActivityLedger = ({
       {loading ? (
         <div style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
           <i className="fas fa-spinner fa-spin" style={{ fontSize: '2rem' }} />
-          <p style={{ marginTop: '1rem' }}>Loading movements...</p>
+          <p style={{ marginTop: '1rem' }}>Loading inventory ledger...</p>
         </div>
-      ) : movements.length === 0 ? (
+      ) : ledger.length === 0 ? (
         <div style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
           <i className="fas fa-list-ol" style={{ fontSize: '3rem', color: '#cbd5e1' }} />
-          <p style={{ marginTop: '1rem', fontSize: '1.1rem' }}>No stock movements found.</p>
+          <p style={{ marginTop: '1rem', fontSize: '1.1rem' }}>No inventory transactions found.</p>
           <p style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Try adjusting the filters or date range.</p>
         </div>
       ) : (
@@ -487,7 +401,7 @@ const InventoryActivityLedger = ({
                   <th style={{ ...thStyle }}>Time</th>
                   <th style={{ ...thStyle }}>Type</th>
                   <th style={{ ...thStyle }}>Reference</th>
-                  <th style={{ ...thStyle }}>Cashier</th>
+                  <th style={{ ...thStyle }}>User</th>
                   <th style={{ ...thStyle }}>Product</th>
                   <th style={{ ...thStyle, textAlign: 'right' }}>Qty In</th>
                   <th style={{ ...thStyle, textAlign: 'right' }}>Qty Out</th>
@@ -497,17 +411,17 @@ const InventoryActivityLedger = ({
               </thead>
 
               <tbody>
-                {movements.map((m, idx) => (
-                  <tr key={`${m.referenceNo || idx}-movement`} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ ...tdStyle }}>{formatDateTime(m.movementDate)}</td>
-                    <td style={{ ...tdStyle }}><MovementBadge type={m.movementType} /></td>
-                    <td style={{ ...tdStyle }}>{m.referenceNo || '-'}</td>
-                    <td style={{ ...tdStyle }}>{m.cashierName || '-'}</td>
-                    <td style={{ ...tdStyle }}>{m.productName || m.productCode || '-'}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', color: '#166534' }}>{m.qtyIn}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', color: '#b91c1c' }}>{m.qtyOut}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700 }}>{m.runningBalance}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>{money(m.lineAmount)}</td>
+                {ledger.map((row, idx) => (
+                  <tr key={`${row.transactionId || idx}-ledger`} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ ...tdStyle }}>{formatDateTime(row.timestamp)}</td>
+                    <td style={{ ...tdStyle }}><MovementBadge type={row.movementType} /></td>
+                    <td style={{ ...tdStyle }}>{row.referenceNo || '-'}</td>
+                    <td style={{ ...tdStyle }}>{row.user || '-'}</td>
+                    <td style={{ ...tdStyle }}>{row.productName || row.productCode || '-'}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: '#166534' }}>{row.qtyIn}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: '#b91c1c' }}>{row.qtyOut}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700 }}>{row.runningBalance}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>{money(row.lineAmount)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -516,11 +430,11 @@ const InventoryActivityLedger = ({
         </div>
       )}
 
-      {movements.length > 0 && (
+      {ledger.length > 0 && (
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <button type="button" onClick={exportCSV} style={{ ...inputStyle, cursor: 'pointer', backgroundColor: '#5B4B8A', color: '#fff', border: 'none', fontWeight: 700, padding: '0.65rem 1rem' }}>
             <i className="fas fa-download" style={{ marginRight: '0.42rem' }} />
-            Export CSV ({movements.length} movements)
+            Export CSV ({ledger.length} transactions)
           </button>
         </div>
       )}
@@ -553,24 +467,6 @@ const InventoryActivityLedger = ({
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
-        <button type="button" onClick={() => setActiveModal('summary')} style={{ ...cardStyle, padding: '1.1rem', cursor: 'pointer', border: '1px solid #e2e8f0', backgroundColor: '#fff', borderRadius: '14px', textAlign: 'left', transition: 'all 0.2s' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', borderRadius: '10px', backgroundColor: '#e0e7ff', color: '#4338ca' }}>
-              <i className="fas fa-boxes-stacked" style={{ fontSize: '1.1rem' }} />
-            </span>
-
-            <div>
-              <div style={{ color: '#0f172a', fontWeight: 800, fontSize: '0.95rem' }}>Product Movement Summary</div>
-              <div style={{ color: '#64748b', fontSize: '0.82rem' }}>View aggregated stock by product</div>
-            </div>
-          </div>
-
-          <div style={{ color: '#5B4B8A', fontSize: '0.85rem', fontWeight: 700 }}>
-            <i className="fas fa-arrow-right" style={{ marginRight: '0.42rem' }} />
-            Open Summary
-          </div>
-        </button>
-
         <button type="button" onClick={() => setActiveModal('ledger')} style={{ ...cardStyle, padding: '1.1rem', cursor: 'pointer', border: '1px solid #e2e8f0', backgroundColor: '#fff', borderRadius: '14px', textAlign: 'left', transition: 'all 0.2s' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', borderRadius: '10px', backgroundColor: '#dcfce7', color: '#166534' }}>
@@ -597,10 +493,10 @@ const InventoryActivityLedger = ({
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <div>
                   <h2 style={{ margin: 0, color: '#0f172a', fontSize: '1.15rem', fontWeight: 800 }}>
-                    {activeModal === 'summary' ? 'Product Movement Summary' : 'Stock Movement Ledger'}
+                    Stock Movement Ledger
                   </h2>
                   <p style={{ margin: '0.35rem 0 0', color: '#64748b', fontSize: '0.85rem' }}>
-                    {activeModal === 'summary' ? 'Aggregated stock movement by product' : 'Detailed invoice-by-invoice stock activity'}
+                    Chronological inventory activity with running balances
                   </p>
                   <p style={{ margin: '0.25rem 0 0', color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>
                     Scope: {scopeLabel}
@@ -620,7 +516,7 @@ const InventoryActivityLedger = ({
             </div>
 
             <div style={{ flex: 1, overflow: 'auto', padding: '1rem' }}>
-              {activeModal === 'summary' ? renderSummaryContent() : renderLedgerContent()}
+              {renderLedgerContent()}
             </div>
           </div>
         </div>

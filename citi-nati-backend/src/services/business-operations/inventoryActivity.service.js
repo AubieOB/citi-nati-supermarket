@@ -80,6 +80,414 @@ function buildLocationFilter(filters = {}) {
 }
 
 /**
+ * Get opening stock balance before the period (all locations/products)
+ */
+async function getOpeningBalance(productCode, productName, locationCode, periodStartDate, filters = {}) {
+  const locationFilter = buildLocationFilter(filters);
+  const beforePeriod = new Date(periodStartDate);
+  beforePeriod.setDate(beforePeriod.getDate() - 1);
+  beforePeriod.setHours(23, 59, 59, 999);
+
+  const productFilter = productCode || productName ? {
+    OR: [
+      productCode ? { productCode: { equals: productCode, mode: 'insensitive' } } : null,
+      productName ? { productName: { contains: productName, mode: 'insensitive' } } : null,
+    ].filter(Boolean)
+  } : {};
+
+  try {
+    const [salesBefore, intakeBefore] = await Promise.all([
+      prisma.salesInvoiceItem.findMany({
+        where: {
+          ...productFilter,
+          salesInvoice: {
+            ...locationFilter,
+            invoiceDate: { lte: beforePeriod },
+          },
+        },
+        select: { qty: true },
+      }),
+      prisma.goodsIntakeItem.findMany({
+        where: {
+          ...productFilter,
+          goodsIntake: {
+            ...locationFilter,
+            status: { not: 'draft' },
+            finalizedAt: { lte: beforePeriod },
+          },
+        },
+        select: { quantity: true },
+      }),
+    ]);
+
+    const totalIn = intakeBefore.reduce((sum, row) => sum + toNum(row.quantity), 0);
+    const totalOut = salesBefore.reduce((sum, row) => sum + toNum(row.qty), 0);
+
+    return toNum(totalIn - totalOut);
+  } catch (err) {
+    return 0;
+  }
+}
+
+/**
+ * Get all transaction-level inventory events for a period
+ */
+async function getInventoryTransactions(period, filters = {}) {
+  const locationFilter = buildLocationFilter(filters);
+  const productCode = filters.productCode ? normalizeUpper(filters.productCode) : null;
+  const productName = filters.productName ? normalize(filters.productName).toLowerCase() : null;
+
+  const allTransactions = [];
+
+  try {
+    // Fetch sales transactions
+    const salesItems = await prisma.salesInvoiceItem.findMany({
+      where: {
+        salesInvoice: {
+          ...locationFilter,
+          invoiceDate: { gte: period.startDate, lte: period.endDate },
+        },
+      },
+      select: {
+        id: true,
+        productCode: true,
+        productName: true,
+        qty: true,
+        unitPrice: true,
+        amount: true,
+        createdAt: true,
+        salesInvoice: {
+          select: {
+            id: true,
+            invoiceDate: true,
+            invoiceTime: true,
+            sourceInvoiceNo: true,
+            refNo: true,
+            userName: true,
+            locationCode: true,
+            locationId: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+      take: 10000,
+    });
+
+    salesItems.forEach((item) => {
+      // Apply product filter
+      if (productCode && normalizeUpper(item.productCode || '') !== productCode) return;
+      if (productName && normalize(item.productName || '').toLowerCase().indexOf(productName) === -1) return;
+
+      allTransactions.push({
+        transactionId: `SALE-${item.salesInvoice.id}-${item.id}`,
+        timestamp: item.salesInvoice.invoiceTime || item.salesInvoice.invoiceDate || item.createdAt,
+        movementType: 'SALE',
+        referenceNo: item.salesInvoice.refNo || String(item.salesInvoice.sourceInvoiceNo || ''),
+        user: item.salesInvoice.userName || null,
+        productCode: item.productCode || null,
+        productName: item.productName || null,
+        qtyIn: 0,
+        qtyOut: toNum(item.qty),
+        unitPrice: roundMoney(item.unitPrice),
+        lineAmount: roundMoney(item.amount),
+        locationCode: item.salesInvoice.locationCode || null,
+        locationId: item.salesInvoice.locationId || null,
+      });
+    });
+
+    // Fetch intake transactions
+    const intakeItems = await prisma.goodsIntakeItem.findMany({
+      where: {
+        goodsIntake: {
+          ...locationFilter,
+          status: { not: 'draft' },
+          finalizedAt: { gte: period.startDate, lte: period.endDate },
+        },
+      },
+      select: {
+        id: true,
+        productName: true,
+        quantity: true,
+        unitCost: true,
+        totalCost: true,
+        createdAt: true,
+        product: {
+          select: { sourceCode: true },
+        },
+        goodsIntake: {
+          select: {
+            id: true,
+            intakeRef: true,
+            finalizedAt: true,
+            enteredBy: true,
+            locationCode: true,
+            locationId: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+      take: 10000,
+    });
+
+    intakeItems.forEach((item) => {
+      // Apply product filter
+      if (productCode && normalizeUpper(item.product?.sourceCode || '') !== productCode) return;
+      if (productName && normalize(item.productName || '').toLowerCase().indexOf(productName) === -1) return;
+
+      allTransactions.push({
+        transactionId: `INTAKE-${item.goodsIntake.id}-${item.id}`,
+        timestamp: item.goodsIntake.finalizedAt || item.createdAt,
+        movementType: 'STOCK_INTAKE',
+        referenceNo: item.goodsIntake.intakeRef || null,
+        user: item.goodsIntake.enteredBy || null,
+        productCode: item.product?.sourceCode || null,
+        productName: item.productName || null,
+        qtyIn: toNum(item.quantity),
+        qtyOut: 0,
+        unitPrice: roundMoney(item.unitCost),
+        lineAmount: roundMoney(item.totalCost),
+        locationCode: item.goodsIntake.locationCode || null,
+        locationId: item.goodsIntake.locationId || null,
+      });
+    });
+
+    // Fetch emergency sales if table exists
+    if (prisma.emergencySale) {
+      try {
+        const emergencySales = await prisma.emergencySale.findMany({
+          where: {
+            ...locationFilter,
+            status: { in: ['approved', 'completed'] },
+            createdAt: { gte: period.startDate, lte: period.endDate },
+          },
+          select: {
+            id: true,
+            productName: true,
+            quantity: true,
+            unitPrice: true,
+            totalAmount: true,
+            approvedBy: true,
+            approvalDate: true,
+            locationCode: true,
+            locationId: true,
+            createdAt: true,
+            referenceNo: true,
+          },
+          orderBy: { createdAt: 'asc' },
+          take: 5000,
+        });
+
+        emergencySales.forEach((item) => {
+          // Apply product filter
+          if (productName && normalize(item.productName || '').toLowerCase().indexOf(productName) === -1) return;
+
+          allTransactions.push({
+            transactionId: `EMERGENCY-${item.id}`,
+            timestamp: item.approvalDate || item.createdAt,
+            movementType: 'EMERGENCY_SALE',
+            referenceNo: item.referenceNo || null,
+            user: item.approvedBy || 'Emergency',
+            productCode: null,
+            productName: item.productName || null,
+            qtyIn: 0,
+            qtyOut: toNum(item.quantity),
+            unitPrice: roundMoney(item.unitPrice),
+            lineAmount: roundMoney(item.totalAmount),
+            locationCode: item.locationCode || null,
+            locationId: item.locationId || null,
+          });
+        });
+      } catch (err) {
+        // Emergency sales table doesn't exist or error occurred
+      }
+    }
+
+  } catch (err) {
+    console.error('Error fetching inventory transactions:', err);
+  }
+
+  return allTransactions;
+}
+
+/**
+ * Main function to get inventory activity ledger
+ */
+async function getInventoryActivityLedgerData({ filters = {} }) {
+  try {
+    const period = buildPeriod(filters);
+    const hasProductFilter = Boolean(normalize(filters.productCode) || normalize(filters.productName));
+    const isAllLocations = !filters.locationId && !filters.locationCode;
+
+    // Get all transactions for the period
+    let transactions = await getInventoryTransactions(period, filters);
+
+    // Filter by movement type if specified
+    if (filters.movementType) {
+      const movementType = normalizeUpper(filters.movementType);
+      transactions = transactions.filter(t => t.movementType === movementType);
+    }
+
+    // Sort chronologically
+    transactions.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+    // Get opening balance
+    let openingBalance = 0;
+    if (hasProductFilter && !isAllLocations) {
+      openingBalance = await getOpeningBalance(
+        filters.productCode || null,
+        filters.productName || null,
+        filters.locationCode || null,
+        period.startDate,
+        filters
+      );
+    }
+
+    // Calculate running balances
+    let runningBalance = openingBalance;
+    const ledgerRows = transactions.map((txn) => {
+      runningBalance = toNum(runningBalance + txn.qtyIn - txn.qtyOut);
+      return {
+        ...txn,
+        runningBalance,
+      };
+    });
+
+    const closingBalance = runningBalance;
+
+    // Build ledger with opening and closing balance rows
+    const ledger = [];
+
+    // Add opening balance row
+    if (hasProductFilter && !isAllLocations) {
+      ledger.push({
+        transactionId: 'OPENING_BALANCE',
+        timestamp: new Date(period.startDate),
+        movementType: 'OPENING_BALANCE',
+        referenceNo: 'Opening Balance',
+        user: null,
+        productCode: filters.productCode || null,
+        productName: filters.productName || null,
+        qtyIn: 0,
+        qtyOut: 0,
+        runningBalance: openingBalance,
+        unitPrice: 0,
+        lineAmount: 0,
+        locationCode: filters.locationCode || null,
+        locationId: filters.locationId || null,
+      });
+    }
+
+    // Add all transaction rows
+    ledger.push(...ledgerRows);
+
+    // Add closing balance row
+    if (hasProductFilter && !isAllLocations && ledgerRows.length > 0) {
+      ledger.push({
+        transactionId: 'CLOSING_BALANCE',
+        timestamp: new Date(period.endDate),
+        movementType: 'CLOSING_BALANCE',
+        referenceNo: 'Closing Balance',
+        user: null,
+        productCode: filters.productCode || null,
+        productName: filters.productName || null,
+        qtyIn: 0,
+        qtyOut: 0,
+        runningBalance: closingBalance,
+        unitPrice: 0,
+        lineAmount: 0,
+        locationCode: filters.locationCode || null,
+        locationId: filters.locationId || null,
+      });
+    }
+
+    // Calculate summary statistics
+    const summary = {
+      totalQtyIn: toNum(transactions.reduce((sum, t) => sum + t.qtyIn, 0)),
+      totalQtyOut: toNum(transactions.reduce((sum, t) => sum + t.qtyOut, 0)),
+      totalSalesAmount: roundMoney(transactions.reduce((sum, t) => sum + t.lineAmount, 0)),
+      transactionCount: transactions.length,
+      openingBalance: toNum(openingBalance),
+      closingBalance: toNum(closingBalance),
+    };
+
+    // Data quality info
+    let dataQuality = {
+      level: 'ok',
+      message: null,
+    };
+
+    if (isAllLocations && hasProductFilter) {
+      dataQuality = {
+        level: 'warning',
+        message: 'Select a specific location for accurate running balance. Stock is location-specific.',
+      };
+    }
+
+    return {
+      success: true,
+      period: {
+        startDate: period.startDate,
+        endDate: period.endDate,
+        periodType: filters.periodType || 'day',
+      },
+      location: {
+        locationId: filters.locationId || null,
+        locationCode: filters.locationCode || null,
+        isAllLocations,
+      },
+      summary,
+      ledger,
+      dataQuality,
+    };
+  } catch (error) {
+    console.error('Inventory Activity Ledger Error:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to load inventory activity ledger',
+      period: {},
+      location: {},
+      summary: {},
+      ledger: [],
+      dataQuality: { level: 'error', message: error.message },
+    };
+  }
+}
+
+module.exports = {
+  getInventoryActivityLedgerData,
+};
+      startDate = new Date(filters.startDate || now);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(filters.endDate || now);
+      endDate.setHours(23, 59, 59, 999);
+      break;
+    default:
+      startDate = new Date(now);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(now);
+      endDate.setHours(23, 59, 59, 999);
+  }
+
+  return { startDate, endDate };
+}
+
+/**
+ * Build location filter
+ */
+function buildLocationFilter(filters = {}) {
+  const locationFilter = {};
+  
+  if (filters.locationId) {
+    locationFilter.locationId = Number(filters.locationId);
+  }
+  if (filters.locationCode) {
+    locationFilter.locationCode = normalizeUpper(filters.locationCode);
+  }
+  
+  return locationFilter;
+}
+
+/**
  * Get sales movements for a period and location
  */
 async function getSaleMovements(period, filters = {}) {
