@@ -2461,6 +2461,9 @@ const BusinessAnalyticsTab = ({
                     <div style={{ marginTop: '0.2rem', fontWeight: 800, fontSize: '1.05rem', color: '#0f172a' }}>
                       {activeWorkspaceModal === 'overview' ? 'Overview' : activeWorkspaceModal === 'trends' ? 'Trends' : 'Rankings'}
                     </div>
+                    <div style={{ marginTop: '0.35rem', color: '#64748b', fontSize: '0.84rem' }}>
+                      {selectedDateRange.label} • {scopeLabel}
+                    </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                     {renderAggregateToggle()}
@@ -2494,6 +2497,9 @@ const BusinessAnalyticsTab = ({
                   <div>
                     <div style={{ fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#059669', fontWeight: 800 }}>Latest Cost Profit</div>
                     <div style={{ marginTop: '0.2rem', fontWeight: 800, fontSize: '1.05rem', color: '#0f172a' }}>Latest-Cost Profit Analytics</div>
+                    <div style={{ marginTop: '0.35rem', color: '#64748b', fontSize: '0.84rem' }}>
+                      {selectedDateRange.label} • {scopeLabel}
+                    </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                     <button type="button" onClick={() => setFiltersExpanded((prev) => !prev)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.42rem 0.65rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>
@@ -2562,9 +2568,12 @@ const BusinessAnalyticsTab = ({
                             Run practical business calculators, comparison analysis, and scenario forecasting using manual or live system values.
                           </p>
                         </div>
-                        <div style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Scope: {analytics.scopeLabel}</div>
+                        <div style={{ display: 'grid', gap: '0.22rem', textAlign: 'right' }}>
+                          <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>{selectedDateRange.label}</span>
+                          <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Scope: {analytics.scopeLabel}</span>
+                        </div>
                       </div>
-                      <div style={{ marginTop: '0.75rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '0.55rem' }}>
+                      <div style={{ marginTop: '0.75rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '0.55rem' }}
                         {ANALYSIS_TOOLS.map((tool) => {
                           const isActive = activeTool === tool.id;
                           return (
