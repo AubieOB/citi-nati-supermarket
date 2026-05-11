@@ -740,14 +740,12 @@ async function getAdjustmentMovements(period, filters = {}) {
 }
 
 /**
- * Get opening stock balance before the period
+ * Get opening stock balance for a product at period start
+ * Formula: currentSyncedStock + (qtyOut after period - qtyIn after period)
+ * This represents the stock that existed at the START of the period
  */
 async function getOpeningBalance(productCode, productName, locationCode, periodStartDate, filters = {}) {
   const locationFilter = buildLocationFilter(filters);
-
-  const beforePeriod = new Date(periodStartDate);
-  beforePeriod.setDate(beforePeriod.getDate() - 1);
-  beforePeriod.setHours(23, 59, 59, 999);
 
   const productFilter = productCode || productName ? {
     OR: [
@@ -765,13 +763,29 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
   } : {};
 
   try {
-    const [salesBefore, intakeBefore, emergencySalesBefore] = await Promise.all([
+    // 1. Get current synced POS stock
+    const currentSyncedStock = await prisma.product.findFirst({
+      where: {
+        OR: [
+          productCode ? { sourceCode: { equals: productCode, mode: 'insensitive' } } : null,
+          productName ? { name: { contains: productName, mode: 'insensitive' } } : null,
+        ].filter(Boolean),
+        ...(locationFilter.locationCode ? { locationCode: locationFilter.locationCode } : {}),
+        ...(locationFilter.locationId ? { locationId: locationFilter.locationId } : {}),
+      },
+      select: { stock: true, sourceCode: true, name: true, locationCode: true },
+    });
+
+    const currentStock = currentSyncedStock ? toNum(currentSyncedStock.stock) : 0;
+
+    // 2. Get all transactions AFTER the period start (to calculate what's happened since period began)
+    const [salesAfter, intakeAfter, emergencySalesAfter] = await Promise.all([
       prisma.salesInvoiceItem.findMany({
         where: {
           ...productFilter,
           salesInvoice: {
             ...locationFilter,
-            invoiceDate: { lte: beforePeriod },
+            invoiceDate: { gt: periodStartDate },
           },
         },
         select: { qty: true },
@@ -782,7 +796,7 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
           goodsIntake: {
             ...locationFilter,
             status: { not: 'draft' },
-            finalizedAt: { lte: beforePeriod },
+            finalizedAt: { gt: periodStartDate },
           },
         },
         select: { quantity: true },
@@ -791,20 +805,29 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
         where: {
           ...locationFilter,
           status: { in: ['approved', 'completed'] },
-          createdAt: { lte: beforePeriod },
+          createdAt: { gt: periodStartDate },
           productName: productName ? { contains: productName, mode: 'insensitive' } : undefined,
         },
         select: { quantity: true },
       }) || [],
     ]);
 
-    const totalIn = intakeBefore.reduce((sum, row) => sum + toNum(row.quantity), 0);
-    const totalOut = salesBefore.reduce((sum, row) => sum + toNum(row.qty), 0)
-      + emergencySalesBefore.reduce((sum, row) => sum + toNum(row.quantity), 0);
+    const qtyOutAfter = salesAfter.reduce((sum, row) => sum + toNum(row.qty), 0)
+      + emergencySalesAfter.reduce((sum, row) => sum + toNum(row.quantity), 0);
+    const qtyInAfter = intakeAfter.reduce((sum, row) => sum + toNum(row.quantity), 0);
 
-    console.log('[OPENING BALANCE] Product:', { productCode, productName }, 'Before:', beforePeriod.toISOString(), 'Result:', { salesQty: totalOut, intakeQty: totalIn, balance: totalIn - totalOut });
+    // Opening Balance = current stock + (sales after period - intakes after period)
+    // Because sales reduce stock and intakes increase it, we're calculating what was there at period start
+    const openingBal = toNum(currentStock + qtyOutAfter - qtyInAfter);
+
+    console.log('[OPENING BALANCE] Product:', { productCode, productName, locationCode }, 'PeriodStart:', periodStartDate.toISOString(), 'Calculation:', {
+      currentSyncedStock: currentStock,
+      qtyOutAfter,
+      qtyInAfter,
+      openingBalance: openingBal,
+    });
     
-    return toNum(totalIn - totalOut);
+    return openingBal;
   } catch (err) {
     console.error('[OPENING BALANCE] Error:', err);
     return 0;
@@ -978,6 +1001,8 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
     const productClosingBalances = {};
     const productCurrentBalances = {};
 
+    console.log('[INVENTORY LEDGER] Processing opening balances for', uniqueProductKeys.length, 'unique products');
+
     for (const productKey of uniqueProductKeys) {
       const { productCode, productName } = productKeyLookup.get(productKey) || {};
       const openingBal = await getOpeningBalance(
@@ -989,16 +1014,32 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       );
       productOpeningBalances[productKey] = toNum(openingBal);
       productCurrentBalances[productKey] = toNum(openingBal);
+      
+      console.log('[INVENTORY LEDGER] Opening balance set for', { productCode, productName }, 'value:', openingBal);
     }
 
     // Calculate running balances per product key
     allMovements.forEach((movement) => {
       const productKey = movement.productCode || normalizeUpper(movement.productName || '');
       if (productKey && productCurrentBalances.hasOwnProperty(productKey)) {
-        productCurrentBalances[productKey] = toNum(productCurrentBalances[productKey] + movement.qtyIn - movement.qtyOut);
+        const prevBalance = productCurrentBalances[productKey];
+        productCurrentBalances[productKey] = toNum(prevBalance + movement.qtyIn - movement.qtyOut);
         movement.balanceAfterTransaction = productCurrentBalances[productKey];
+        
+        // Diagnostic logging for each movement
+        console.log('[LEDGER BALANCE] Movement:', {
+          productCode: movement.productCode,
+          productName: movement.productName,
+          movementType: movement.movementType,
+          timestamp: movement.movementDate,
+          qtyIn: movement.qtyIn,
+          qtyOut: movement.qtyOut,
+          balanceBeforeTransaction: prevBalance,
+          balanceAfterTransaction: movement.balanceAfterTransaction,
+        });
       } else {
         movement.balanceAfterTransaction = 0; // fallback
+        console.warn('[LEDGER BALANCE] No balance tracking for productKey:', productKey);
       }
     });
 
@@ -1023,6 +1064,16 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
     uniqueProductKeys.forEach((productKey) => {
       totalOpeningBalance += productOpeningBalances[productKey] || 0;
       totalClosingBalance += productClosingBalances[productKey] || 0;
+      
+      // Log summary per product
+      const { productCode, productName } = productKeyLookup.get(productKey) || {};
+      console.log('[LEDGER SUMMARY PER PRODUCT]', {
+        productCode,
+        productName,
+        openingBalance: productOpeningBalances[productKey],
+        closingBalance: productClosingBalances[productKey],
+        netMovement: (productClosingBalances[productKey] || 0) - (productOpeningBalances[productKey] || 0),
+      });
     });
 
     // Get product summary if no product filter
@@ -1061,6 +1112,20 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit'
+      });
+
+      // Diagnostic log for each ledger row
+      console.log('[LEDGER ROW]', {
+        productCode: movement.productCode,
+        branchCode: filters.branchCode,
+        locationCode: movement.locationCode,
+        movementType: movement.movementType,
+        timestamp: movement.movementDate,
+        openingBalance,
+        qtyIn: movement.qtyIn,
+        qtyOut: movement.qtyOut,
+        balanceAfterTransaction: movement.balanceAfterTransaction,
+        timestampLocalBlantyre: timestampLocal,
       });
 
       return {
