@@ -75,6 +75,9 @@ function buildLocationFilter(filters = {}) {
   if (filters.locationCode) {
     locationFilter.locationCode = normalizeUpper(filters.locationCode);
   }
+  if (filters.branchCode) {
+    locationFilter.branchCode = normalizeUpper(filters.branchCode);
+  }
   
   return locationFilter;
 }
@@ -500,6 +503,9 @@ function buildLocationFilter(filters = {}) {
   if (filters.locationCode) {
     locationFilter.locationCode = normalizeUpper(filters.locationCode);
   }
+  if (filters.branchCode) {
+    locationFilter.branchCode = normalizeUpper(filters.branchCode);
+  }
   
   return locationFilter;
 }
@@ -518,13 +524,22 @@ async function getSaleMovements(period, filters = {}) {
 
   // Build salesInvoice filter with location scoping
   const salesInvoiceFilter = {
-  invoiceDate: { gte: period.startDate, lte: period.endDate },
-};
+    OR: [
+      { invoiceDate: { gte: period.startDate, lte: period.endDate } },
+      { invoiceTime: { gte: period.startDate, lte: period.endDate } },
+    ],
+  };
   if (filters.locationId) {
     salesInvoiceFilter.locationId = Number(filters.locationId);
   }
   if (filters.locationCode) {
     salesInvoiceFilter.locationCode = normalizeUpper(filters.locationCode);
+  }
+  if (filters.branchCode) {
+    salesInvoiceFilter.branchCode = normalizeUpper(filters.branchCode);
+  }
+  if (filters.branchCode) {
+    salesInvoiceFilter.branchCode = normalizeUpper(filters.branchCode);
   }
 
   const where = {

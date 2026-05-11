@@ -16,10 +16,13 @@ async function getInventoryActivityLedger(req, res) {
       // Handle location filters - only set if explicitly provided
       locationId: req.query.locationId && req.query.locationId !== 'undefined' ? Number(req.query.locationId) : null,
       locationCode: req.query.locationCode && req.query.locationCode !== 'undefined' ? req.query.locationCode : null,
+      branchCode: req.query.branchCode || null,
       productCode: req.query.productCode || null,
       productName: req.query.productName || null,
       movementType: req.query.movementType || null,
     };
+
+    console.log('[INVENTORY ACTIVITY] getInventoryActivityLedger filters:', filters);
 
     const data = await getInventoryActivityLedgerData({
       filters,
