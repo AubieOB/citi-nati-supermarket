@@ -304,8 +304,8 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
 
   const productFilter = productCode || productName ? {
     OR: [
-      productCode ? { productCode: { equals: productCode, mode: 'insensitive' } } : null,
-      productName ? { productName: { contains: productName, mode: 'insensitive' } } : null,
+      productCode ? { sourceCode: { equals: productCode, mode: 'insensitive' } } : null,
+      productName ? { name: { contains: productName, mode: 'insensitive' } } : null,
     ].filter(Boolean)
   } : {};
 
@@ -338,6 +338,7 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
         sourceCode: true,
         name: true,
         locationCode: true,
+        branchCode: true,
       },
     });
 
@@ -390,6 +391,10 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
       qtyOutAfter,
       qtyInAfter,
       openingBalance: openingBal,
+      stockSource: 'Product.stock (effective via resolveEffectiveStock)',
+      branchCode: currentSyncedStock?.branchCode || null,
+      locationCode: currentSyncedStock?.locationCode || null,
+      productFound: !!currentSyncedStock,
     });
     
     return openingBal;
@@ -575,6 +580,7 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
 
     console.log('[INVENTORY LEDGER] Processing opening balances for', uniqueProductKeys.length, 'unique products');
 
+    let diagnosticCounter = 0;
     for (const productKey of uniqueProductKeys) {
       const { productCode, productName } = productKeyLookup.get(productKey) || {};
       const openingBal = await getOpeningBalance(
@@ -588,6 +594,76 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       productCurrentBalances[productKey] = toNum(openingBal);
       
       console.log('[INVENTORY LEDGER] Opening balance set for', { productCode, productName }, 'value:', openingBal);
+
+      // Diagnostic logging for first 10 products
+      if (diagnosticCounter < 10) {
+        // Get current stock info for diagnostics
+        const currentProduct = await prisma.product.findFirst({
+          where: {
+            OR: [
+              productCode ? { sourceCode: { equals: productCode, mode: 'insensitive' } } : null,
+              productName ? { name: { contains: productName, mode: 'insensitive' } } : null,
+            ].filter(Boolean),
+            ...(filters.branchCode ? { branchCode: filters.branchCode } : {}),
+            ...(filters.locationCode ? { locationCode: { equals: filters.locationCode, mode: 'insensitive' } } : {}),
+            ...(filters.locationId ? { locationId: Number(filters.locationId) } : {}),
+          },
+          select: { stock: true, posStock: true, overrideActive: true, overrideStock: true, effectiveStock: true, branchCode: true, locationCode: true },
+        });
+        const currentStock = currentProduct ? toNum(resolveEffectiveStock(currentProduct)) : 0;
+
+        // Get movements after period start for diagnostics
+        const [salesAfter, intakeAfter] = await Promise.all([
+          prisma.salesInvoiceItem.findMany({
+            where: {
+              OR: [
+                productCode ? { productCode: { equals: productCode, mode: 'insensitive' } } : null,
+                productName ? { productName: { contains: productName, mode: 'insensitive' } } : null,
+              ].filter(Boolean),
+              salesInvoice: {
+                ...(filters.branchCode ? { branchCode: filters.branchCode } : {}),
+                ...(filters.locationCode ? { locationCode: { equals: filters.locationCode, mode: 'insensitive' } } : {}),
+                ...(filters.locationId ? { locationId: Number(filters.locationId) } : {}),
+                invoiceDate: { gt: period.startDate },
+              },
+            },
+            select: { qty: true },
+          }),
+          prisma.goodsIntakeItem.findMany({
+            where: {
+              OR: [
+                productCode ? { product: { sourceCode: { equals: productCode, mode: 'insensitive' } } } : null,
+                productName ? { productName: { contains: productName, mode: 'insensitive' } } : null,
+              ].filter(Boolean),
+              goodsIntake: {
+                ...(filters.branchCode ? { branchCode: filters.branchCode } : {}),
+                ...(filters.locationCode ? { locationCode: { equals: filters.locationCode, mode: 'insensitive' } } : {}),
+                ...(filters.locationId ? { locationId: Number(filters.locationId) } : {}),
+                status: { not: 'draft' },
+                finalizedAt: { gt: period.startDate },
+              },
+            },
+            select: { quantity: true },
+          }),
+        ]);
+
+        const qtyOutAfter = salesAfter.reduce((sum, row) => sum + toNum(row.qty), 0);
+        const qtyInAfter = intakeAfter.reduce((sum, row) => sum + toNum(row.quantity), 0);
+
+        console.log(`[LEDGER DIAGNOSTIC ${diagnosticCounter + 1}/10]`, {
+          productCode,
+          productName,
+          branchCode: currentProduct?.branchCode || null,
+          locationCode: currentProduct?.locationCode || null,
+          currentStockFound: currentStock,
+          stockSource: 'Product.stock (effective via resolveEffectiveStock)',
+          qtyOutAfterPeriodStart: qtyOutAfter,
+          qtyInAfterPeriodStart: qtyInAfter,
+          computedOpeningBalance: openingBal,
+          firstBalanceAfterTransaction: null, // Will be set later
+        });
+        diagnosticCounter++;
+      }
     }
 
     // Calculate running balances per product key
