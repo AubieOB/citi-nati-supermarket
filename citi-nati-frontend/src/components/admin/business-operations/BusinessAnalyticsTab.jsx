@@ -2573,7 +2573,7 @@ const BusinessAnalyticsTab = ({
                           <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>Scope: {analytics.scopeLabel}</span>
                         </div>
                       </div>
-                      <div style={{ marginTop: '0.75rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '0.55rem' }}
+                      <div style={{ marginTop: '0.75rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '0.55rem' }}>
                         {ANALYSIS_TOOLS.map((tool) => {
                           const isActive = activeTool === tool.id;
                           return (
