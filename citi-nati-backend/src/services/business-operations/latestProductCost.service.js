@@ -43,11 +43,16 @@ function buildBranchScopePredicate(branchCode) {
 }
 
 function buildLatestCostScope(filters = {}) {
+  // In aggregate mode, don't scope by branch/location to get costs from all branches
+  if (filters.aggregate) {
+    return {};
+  }
+
   if (!filters.branchCode) {
-    throw new Error('branchCode is required for latest product cost scope');
+    throw new Error('branchCode is required for latest product cost scope when not in aggregate mode');
   }
   if (!filters.locationCode) {
-    throw new Error('locationCode is required for latest product cost scope');
+    throw new Error('locationCode is required for latest product cost scope when not in aggregate mode');
   }
 
   const where = {};

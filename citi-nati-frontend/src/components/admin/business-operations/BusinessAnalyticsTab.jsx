@@ -1148,8 +1148,8 @@ const BusinessAnalyticsTab = ({
           })
         : [];
 
-      // Branch summaries (BT + ZA)
-      const branchCodes = ['BT', 'ZA'];
+      // Branch summaries (all operational locations)
+      const branchCodes = ['BT', 'ZA', 'BAR', 'RES'];
 
       // Slot indices in the flat allResponses array
       const FIXED = 8; // 6 summaries + products + users
@@ -1177,10 +1177,10 @@ const BusinessAnalyticsTab = ({
         ...quarters.map((p) => api.get('/business-operations/reports/sales/summary', { params: buildScopedParams(buildParamsForPeriod(p), effectiveBranchCode, effectiveLocationCode, selectedLocationId, isAggregateMode) })),
         // Daily trend (sampled points for short ranges)
         ...dailyPeriods.map((p) => api.get('/business-operations/reports/sales/summary', { params: buildScopedParams(buildParamsForPeriod(p), effectiveBranchCode, effectiveLocationCode, selectedLocationId, isAggregateMode) })),
-        // last 2: branch summaries (BT, ZA)
+        // last 2: branch summaries (BT, ZA) - always get individual branch data for rankings
         ...branchCodes.map((code) => {
           const resolved = resolveOperationalScope(code);
-          return api.get('/business-operations/reports/sales/summary', { params: buildScopedParams({ ...periodParams }, resolved.branchCode, resolved.locationCode, selectedLocationId, isAggregateMode) });
+          return api.get('/business-operations/reports/sales/summary', { params: buildScopedParams({ ...periodParams }, resolved.branchCode, resolved.locationCode, selectedLocationId, false) });
         }),
       ]);
 
@@ -1247,11 +1247,13 @@ const BusinessAnalyticsTab = ({
       // Branch performance from location-scoped summaries
       // First, get all branch data
       const allBranchData = branchCodes.map((code, i) => {
+        const resolved = resolveOperationalScope(code);
         const s = allResponses[BRANCH_SLICE[0] + i]?.data?.data || {};
         const bSales = Number(s.netSales || 0);
         const bInvoices = Number(s.totalInvoices || 0);
         return {
           code,
+          label: resolved?.label || code,
           sales: bSales,
           invoices: bInvoices,
           averageBasket: bInvoices > 0 ? bSales / bInvoices : 0,
@@ -1816,7 +1818,7 @@ const BusinessAnalyticsTab = ({
                         {analytics.rankings.branchPerformance.length === 0 ? (
                           <tr><td colSpan={5} style={emptyStyle}>No branch data in this period.</td></tr>
                         ) : analytics.rankings.branchPerformance.map((row, i) => (
-                          <tr key={`${row.code}-${i}`}><td style={tdBold}>{row.code}</td><td style={tdStyle}>{intFmt(row.invoices)}</td><td style={tdBold}>{money(row.sales)}</td><td style={tdStyle}>{money(row.averageBasket)}</td><td style={{ ...tdStyle, color: '#2563eb', fontWeight: 700 }}>{row.contributionShare.toFixed(1)}%</td></tr>
+                          <tr key={`${row.code}-${i}`}><td style={tdBold}>{row.label}</td><td style={tdStyle}>{intFmt(row.invoices)}</td><td style={tdBold}>{money(row.sales)}</td><td style={tdStyle}>{money(row.averageBasket)}</td><td style={{ ...tdStyle, color: '#2563eb', fontWeight: 700 }}>{row.contributionShare.toFixed(1)}%</td></tr>
                         ))}
                       </tbody>
                     </table>
@@ -2230,7 +2232,7 @@ const BusinessAnalyticsTab = ({
                           <tr><td colSpan={5} style={emptyStyle}>No branch data in this period.</td></tr>
                         ) : analytics.rankings.branchPerformance.map((row, i) => (
                           <tr key={`${row.code}-${i}`}>
-                            <td style={tdBold}>{row.code}</td>
+                            <td style={tdBold}>{row.label}</td>
                             <td style={tdStyle}>{intFmt(row.invoices)}</td>
                             <td style={tdBold}>{money(row.sales)}</td>
                             <td style={tdStyle}>{money(row.averageBasket)}</td>
