@@ -330,10 +330,8 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
       },
       select: {
         stock: true,
-        posStock: true,
         overrideActive: true,
         overrideStock: true,
-        effectiveStock: true,
         sourceCode: true,
         name: true,
         locationCode: true,
@@ -506,10 +504,8 @@ async function getCurrentProductStock(productCode, locationCode, branchCode, loc
     },
     select: {
       stock: true,
-      posStock: true,
       overrideActive: true,
       overrideStock: true,
-      effectiveStock: true,
       name: true,
       sourceCode: true,
     },
@@ -607,7 +603,7 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
             ...(filters.branchCode ? { branchCode: filters.branchCode } : {}),
             ...(filters.locationCode ? { locationCode: { equals: filters.locationCode, mode: 'insensitive' } } : {}),
           },
-          select: { stock: true, posStock: true, overrideActive: true, overrideStock: true, effectiveStock: true, branchCode: true, locationCode: true },
+          select: { stock: true, overrideActive: true, overrideStock: true, branchCode: true, locationCode: true },
         });
         const currentStock = currentProduct ? toNum(resolveEffectiveStock(currentProduct)) : 0;
 
