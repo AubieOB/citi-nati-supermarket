@@ -514,12 +514,14 @@ function buildLocationFilter(filters = {}) {
  * Get sales movements for a period and location
  */
 async function getSaleMovements(period, filters = {}) {
+  const normalizedProductCode = normalize(filters.productCode);
+  const normalizedProductName = normalize(filters.productName);
 
-  const productFilter = filters.productCode || filters.productName ? {
+  const productFilter = normalizedProductCode || normalizedProductName ? {
     OR: [
-      { productCode: { contains: filters.productCode || '', mode: 'insensitive' } },
-      { productName: { contains: filters.productName || '', mode: 'insensitive' } },
-    ]
+      normalizedProductCode ? { productCode: { equals: normalizedProductCode, mode: 'insensitive' } } : null,
+      normalizedProductName ? { productName: { contains: normalizedProductName, mode: 'insensitive' } } : null,
+    ].filter(Boolean)
   } : {};
 
   // Build salesInvoice filter with location scoping
@@ -594,10 +596,14 @@ async function getSaleMovements(period, filters = {}) {
  */
 async function getIntakeMovements(period, filters = {}) {
   const locationFilter = buildLocationFilter(filters);
-  const productFilter = filters.productCode || filters.productName ? {
+  const normalizedProductCode = normalize(filters.productCode);
+  const normalizedProductName = normalize(filters.productName);
+
+  const productFilter = normalizedProductCode || normalizedProductName ? {
     OR: [
-      { productName: { contains: filters.productCode || filters.productName || '', mode: 'insensitive' } },
-    ]
+      normalizedProductCode ? { product: { sourceCode: { equals: normalizedProductCode, mode: 'insensitive' } } } : null,
+      normalizedProductName ? { productName: { contains: normalizedProductName, mode: 'insensitive' } } : null,
+    ].filter(Boolean)
   } : {};
 
   const where = {
@@ -656,10 +662,12 @@ async function getIntakeMovements(period, filters = {}) {
  */
 async function getEmergencySalesMovements(period, filters = {}) {
   const locationFilter = buildLocationFilter(filters);
-  const productFilter = filters.productCode || filters.productName ? {
-    OR: [
-      { productName: { contains: filters.productCode || filters.productName || '', mode: 'insensitive' } },
-    ]
+  const normalizedProductCode = normalize(filters.productCode);
+  const normalizedProductName = normalize(filters.productName);
+
+  const searchTerm = normalizedProductCode || normalizedProductName;
+  const productFilter = searchTerm ? {
+    productName: { contains: searchTerm, mode: 'insensitive' }
   } : {};
 
   const where = {
@@ -893,6 +901,16 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
     const hasProductFilter = Boolean(normalize(filters.productCode) || normalize(filters.productName));
     const isAllLocations = !filters.locationId && !filters.locationCode;
 
+    // Determine if the queried period is today (ongoing)
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const periodStartDay = new Date(period.startDate.getFullYear(), period.startDate.getMonth(), period.startDate.getDate());
+    const isPeriodToday = periodStartDay.getTime() === today.getTime();
+
+    console.log('[INVENTORY LEDGER] Period is today:', isPeriodToday, 'startDate:', period.startDate.toISOString(), 'today:', today.toISOString());
+    console.log('[INVENTORY LEDGER] Product filter:', { hasProductFilter, productCode: filters.productCode, productName: filters.productName });
+    console.log('[INVENTORY LEDGER] Location filter:', { isAllLocations, locationCode: filters.locationCode, locationId: filters.locationId });
+
     // Get all movement types in parallel
     const [saleMovements, intakeMovements, emergencySalesMovements, adjustmentMovements] = await Promise.all([
       getSaleMovements(period, filters),
@@ -900,6 +918,8 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       getEmergencySalesMovements(period, filters).catch(() => []),
       getAdjustmentMovements(period, filters),
     ]);
+
+    console.log('[INVENTORY LEDGER] Movements fetched:', { sales: saleMovements.length, intakes: intakeMovements.length, emergencySales: emergencySalesMovements.length, adjustments: adjustmentMovements.length });
 
     // Combine and sort movements chronologically
     let allMovements = [...saleMovements, ...intakeMovements, ...emergencySalesMovements, ...adjustmentMovements]
@@ -1002,7 +1022,8 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
     const ledger = allMovements.map((movement, idx) => {
       const productKey = movement.productCode || normalizeUpper(movement.productName || '');
       const openingBalance = productOpeningBalances[productKey] || 0;
-      const closingBalance = productClosingBalances[productKey] || 0;
+      // Only show closing balance for completed periods (not today)
+      const closingBalance = !isPeriodToday ? (productClosingBalances[productKey] || 0) : null;
       const timestampLocal = new Date(movement.movementDate).toLocaleString('en-US', { 
         timeZone: 'Africa/Blantyre',
         year: 'numeric',
@@ -1032,7 +1053,7 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       };
     });
 
-    // Build summary
+    // Build summary (closing balance only for completed periods)
     const summary = {
       totalQtyIn: toNum(totalQtyIn),
       totalQtyOut: toNum(totalQtyOut),
@@ -1043,7 +1064,8 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       currentProductStock,
       productInfo,
       openingBalance: toNum(totalOpeningBalance),
-      closingBalance: toNum(totalClosingBalance),
+      closingBalance: !isPeriodToday ? toNum(totalClosingBalance) : null,
+      isPeriodToday,
     };
 
     // Data quality info

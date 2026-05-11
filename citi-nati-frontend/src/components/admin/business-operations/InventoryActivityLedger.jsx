@@ -207,7 +207,8 @@ const InventoryActivityLedger = ({
     let csvContent = 'Timestamp,Movement Type,Reference,User,Product Code,Product Name,Opening Balance,Qty In,Qty Out,Balance After Transaction,Closing Balance,Unit Price,Amount\n';
 
     rows.forEach((row) => {
-      csvContent += `"${formatDateTime(row.timestamp)}","${row.movementType}","${row.referenceNo || ''}","${row.user || ''}","${row.productCode || ''}","${row.productName || ''}",${row.openingBalance},${row.qtyIn},${row.qtyOut},${row.balanceAfterTransaction},${row.closingBalance},${row.unitPrice},${row.lineAmount}\n`;
+      const closingBalanceValue = row.closingBalance !== null && row.closingBalance !== undefined ? row.closingBalance : '';
+      csvContent += `"${formatDateTime(row.timestamp)}","${row.movementType}","${row.referenceNo || ''}","${row.user || ''}","${row.productCode || ''}","${row.productName || ''}",${row.openingBalance},${row.qtyIn},${row.qtyOut},${row.balanceAfterTransaction},${closingBalanceValue},${row.unitPrice},${row.lineAmount}\n`;
     });
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -372,10 +373,19 @@ const InventoryActivityLedger = ({
             <div style={{ marginTop: '0.35rem', fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>{summary.transactionCount ?? 0}</div>
           </div>
 
-          {summary.closingBalance !== undefined && (
+          {summary.closingBalance !== null && summary.closingBalance !== undefined && (
             <div style={{ ...cardStyle, padding: '0.9rem 1rem' }}>
               <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800 }}>Closing Balance</div>
               <div style={{ marginTop: '0.35rem', fontSize: '1.25rem', fontWeight: 800, color: '#7c3aed' }}>{summary.closingBalance ?? 0}</div>
+            </div>
+          )}
+          {(summary.closingBalance === null || summary.closingBalance === undefined) && summary.isPeriodToday && (
+            <div style={{ ...cardStyle, padding: '0.9rem 1rem', border: '1px dashed #cbd5e1' }}>
+              <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800 }}>Closing Balance</div>
+              <div style={{ marginTop: '0.35rem', fontSize: '0.9rem', color: '#94a3b8' }}>
+                <i className="fas fa-clock" style={{ marginRight: '0.35rem' }} />
+                Not available until end of period
+              </div>
             </div>
           )}
         </div>
@@ -424,7 +434,7 @@ const InventoryActivityLedger = ({
                     <td style={{ ...tdStyle, textAlign: 'right', color: '#166534' }}>{row.qtyIn}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', color: '#b91c1c' }}>{row.qtyOut}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700 }}>{row.balanceAfterTransaction}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', color: '#7c3aed' }}>{row.closingBalance}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', color: '#7c3aed' }}>{row.closingBalance !== null && row.closingBalance !== undefined ? row.closingBalance : '-'}</td>
                     <td style={{ ...tdStyle, textAlign: 'right' }}>{money(row.lineAmount)}</td>
                   </tr>
                 ))}
