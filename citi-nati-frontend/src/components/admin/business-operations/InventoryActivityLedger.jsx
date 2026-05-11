@@ -319,6 +319,7 @@ const InventoryActivityLedger = ({
           <option value="">All</option>
           <option value="SALE">Sales Only</option>
           <option value="STOCK_INTAKE">Stock Intake Only</option>
+          <option value="EMERGENCY_SALE">Emergency Sales</option>
         </select>
       </div>
 
@@ -430,6 +431,13 @@ const InventoryActivityLedger = ({
 
       {data?.mode === 'ledger' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
+          {summary.openingBalance !== undefined && (
+            <div style={{ ...cardStyle, padding: '0.9rem 1rem' }}>
+              <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800 }}>Opening Balance</div>
+              <div style={{ marginTop: '0.35rem', fontSize: '1.25rem', fontWeight: 800, color: '#4338ca' }}>{summary.openingBalance ?? 0}</div>
+            </div>
+          )}
+
           <div style={{ ...cardStyle, padding: '0.9rem 1rem' }}>
             <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800 }}>Total Qty In</div>
             <div style={{ marginTop: '0.35rem', fontSize: '1.25rem', fontWeight: 800, color: '#166534' }}>{summary.totalQtyIn ?? 0}</div>
@@ -449,6 +457,13 @@ const InventoryActivityLedger = ({
             <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800 }}>Movements</div>
             <div style={{ marginTop: '0.35rem', fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>{summary.movementCount ?? 0}</div>
           </div>
+
+          {summary.closingBalance !== undefined && (
+            <div style={{ ...cardStyle, padding: '0.9rem 1rem' }}>
+              <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800 }}>Closing Balance</div>
+              <div style={{ marginTop: '0.35rem', fontSize: '1.25rem', fontWeight: 800, color: '#7c3aed' }}>{summary.closingBalance ?? 0}</div>
+            </div>
+          )}
         </div>
       )}
 
@@ -615,7 +630,39 @@ const InventoryActivityLedger = ({
 };
 
 const MovementBadge = ({ type }) => {
-  const isSale = type === 'SALE';
+  let color, bgColor, label;
+
+  switch (type) {
+    case 'SALE':
+      color = '#b91c1c';
+      bgColor = '#fee2e2';
+      label = 'SALE';
+      break;
+    case 'STOCK_INTAKE':
+      color = '#166534';
+      bgColor = '#dcfce7';
+      label = 'INTAKE';
+      break;
+    case 'EMERGENCY_SALE':
+      color = '#b45309';
+      bgColor = '#fef3c7';
+      label = 'EMERGENCY SALE';
+      break;
+    case 'OPENING_BALANCE':
+      color = '#4338ca';
+      bgColor = '#e0e7ff';
+      label = 'OPENING BALANCE';
+      break;
+    case 'CLOSING_BALANCE':
+      color = '#7c3aed';
+      bgColor = '#f3e8ff';
+      label = 'CLOSING BALANCE';
+      break;
+    default:
+      color = '#64748b';
+      bgColor = '#f1f5f9';
+      label = type || 'MOVEMENT';
+  }
 
   return (
     <span style={{
@@ -624,10 +671,10 @@ const MovementBadge = ({ type }) => {
       borderRadius: '999px',
       fontSize: '0.72rem',
       fontWeight: 900,
-      color: isSale ? '#b91c1c' : '#166534',
-      background: isSale ? '#fee2e2' : '#dcfce7',
+      color,
+      background: bgColor,
     }}>
-      {isSale ? 'SALE' : 'INTAKE'}
+      {label}
     </span>
   );
 };

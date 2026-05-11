@@ -130,7 +130,7 @@ async function getSaleMovements(period, filters = {}) {
       },
     },
     orderBy: { createdAt: 'asc' },
-    take: 2000,
+    take: 5000,
   });
 
   return rows.map((row) => ({
@@ -209,6 +209,119 @@ async function getIntakeMovements(period, filters = {}) {
     lineAmount: roundMoney(row.totalCost),
     locationCode: row.goodsIntake?.locationCode || null,
   }));
+}
+
+/**
+ * Get emergency sales movements for a period and location
+ */
+async function getEmergencySalesMovements(period, filters = {}) {
+  const locationFilter = buildLocationFilter(filters);
+  const productFilter = filters.productCode || filters.productName ? {
+    OR: [
+      { productName: { contains: filters.productCode || filters.productName || '', mode: 'insensitive' } },
+    ]
+  } : {};
+
+  const where = {
+    ...productFilter,
+    ...locationFilter,
+    status: { in: ['approved', 'completed'] },
+    createdAt: { gte: period.startDate, lte: period.endDate },
+  };
+
+  const rows = await prisma.emergencySale?.findMany?.({
+    where,
+    select: {
+      id: true,
+      productName: true,
+      quantity: true,
+      unitPrice: true,
+      totalAmount: true,
+      approvedBy: true,
+      approvalDate: true,
+      locationCode: true,
+      createdAt: true,
+      referenceNo: true,
+    },
+    orderBy: { createdAt: 'asc' },
+    take: 2000,
+  }) || [];
+
+  return rows.map((row) => ({
+    movementDate: row.approvalDate || row.createdAt,
+    movementType: 'EMERGENCY_SALE',
+    referenceNo: row.referenceNo || null,
+    cashierName: row.approvedBy || 'Emergency',
+    productCode: null,
+    productName: row.productName,
+    qtyIn: 0,
+    qtyOut: toNum(row.quantity),
+    runningBalance: null,
+    unitPrice: roundMoney(row.unitPrice),
+    lineAmount: roundMoney(row.totalAmount),
+    locationCode: row.locationCode || null,
+  }));
+}
+
+/**
+ * Get stock adjustment movements for a period and location
+ * Note: Stock adjustments are handled through POS sync and stored in external tables
+ */
+async function getAdjustmentMovements(period, filters = {}) {
+  // Stock adjustments are not stored in Prisma database
+  // They are handled through POS sync agents in external tables
+  return [];
+}
+
+/**
+ * Get opening stock balance before the period
+ */
+async function getOpeningBalance(productCode, productName, locationCode, periodStartDate, filters = {}) {
+  const locationFilter = buildLocationFilter(filters);
+
+  const beforePeriod = new Date(periodStartDate);
+  beforePeriod.setDate(beforePeriod.getDate() - 1);
+  beforePeriod.setHours(23, 59, 59, 999);
+
+  const productFilter = productCode || productName ? {
+    OR: [
+      productCode ? { productCode: { equals: productCode, mode: 'insensitive' } } : null,
+      productName ? { productName: { contains: productName, mode: 'insensitive' } } : null,
+    ].filter(Boolean)
+  } : {};
+
+  try {
+    const [salesBefore, intakeBefore] = await Promise.all([
+      prisma.salesInvoiceItem.findMany({
+        where: {
+          ...productFilter,
+          ...locationFilter,
+          salesInvoice: {
+            invoiceDate: { lte: beforePeriod },
+          },
+        },
+        select: { qty: true },
+      }),
+      prisma.goodsIntakeItem.findMany({
+        where: {
+          ...productFilter,
+          goodsIntake: {
+            ...locationFilter,
+            status: { not: 'draft' },
+            finalizedAt: { lte: beforePeriod },
+          },
+        },
+        select: { quantity: true },
+      }),
+    ]);
+
+    const totalIn = intakeBefore.reduce((sum, row) => sum + toNum(row.quantity), 0);
+    const totalOut = salesBefore.reduce((sum, row) => sum + toNum(row.qty), 0);
+
+    return toNum(totalIn - totalOut);
+  } catch (err) {
+    return 0;
+  }
 }
 
 /**
@@ -330,14 +443,16 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
     const hasProductFilter = Boolean(normalize(filters.productCode) || normalize(filters.productName));
     const isAllLocations = !filters.locationId && !filters.locationCode;
 
-    // Get movements
-    const [saleMovements, intakeMovements] = await Promise.all([
+    // Get all movement types in parallel
+    const [saleMovements, intakeMovements, emergencySalesMovements, adjustmentMovements] = await Promise.all([
       getSaleMovements(period, filters),
       getIntakeMovements(period, filters),
+      getEmergencySalesMovements(period, filters).catch(() => []),
+      getAdjustmentMovements(period, filters),
     ]);
 
     // Combine and sort movements
-    let allMovements = [...saleMovements, ...intakeMovements]
+    let allMovements = [...saleMovements, ...intakeMovements, ...emergencySalesMovements, ...adjustmentMovements]
       .filter((row) => {
         if (!filters.movementType) return true;
         return row.movementType === normalizeUpper(filters.movementType);
@@ -360,6 +475,57 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
 
     // Get product summary if no product filter
     const products = hasProductFilter ? [] : await getProductSummary(period, filters);
+
+    // Get opening balance if product-specific filter
+    let openingBalance = 0;
+    let closingBalance = toNum(totalQtyIn - totalQtyOut);
+    
+    if (hasProductFilter && !isAllLocations) {
+      openingBalance = await getOpeningBalance(
+        filters.productCode || null,
+        filters.productName || null,
+        filters.locationCode || null,
+        period.startDate,
+        filters
+      );
+      closingBalance = toNum(openingBalance + totalQtyIn - totalQtyOut);
+    }
+
+    // Prepend opening balance row if product-specific
+    if (hasProductFilter && !isAllLocations && openingBalance !== null) {
+      allMovements.unshift({
+        movementDate: new Date(period.startDate),
+        movementType: 'OPENING_BALANCE',
+        referenceNo: 'Opening Balance',
+        cashierName: null,
+        productCode: filters.productCode || null,
+        productName: filters.productName || null,
+        qtyIn: 0,
+        qtyOut: 0,
+        runningBalance: openingBalance,
+        unitPrice: 0,
+        lineAmount: 0,
+        locationCode: filters.locationCode || null,
+      });
+    }
+
+    // Add closing balance row if there are movements
+    if (allMovements.length > 0 && hasProductFilter && !isAllLocations) {
+      allMovements.push({
+        movementDate: new Date(period.endDate),
+        movementType: 'CLOSING_BALANCE',
+        referenceNo: 'Closing Balance',
+        cashierName: null,
+        productCode: filters.productCode || null,
+        productName: filters.productName || null,
+        qtyIn: 0,
+        qtyOut: 0,
+        runningBalance: closingBalance,
+        unitPrice: 0,
+        lineAmount: 0,
+        locationCode: filters.locationCode || null,
+      });
+    }
 
     // Get current product stock if product filter and location specified
     let currentProductStock = null;
@@ -389,6 +555,8 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       productCount: products.length,
       currentProductStock,
       productInfo,
+      openingBalance: toNum(openingBalance),
+      closingBalance: toNum(closingBalance),
     };
 
     // Data quality info
