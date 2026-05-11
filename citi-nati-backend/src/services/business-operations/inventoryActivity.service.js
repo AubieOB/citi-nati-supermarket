@@ -295,8 +295,8 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
       prisma.salesInvoiceItem.findMany({
         where: {
           ...productFilter,
-          ...locationFilter,
           salesInvoice: {
+            ...locationFilter,
             invoiceDate: { lte: beforePeriod },
           },
         },
@@ -333,10 +333,10 @@ async function getProductSummary(period, filters = {}) {
   const [salesItems, intakeItems] = await Promise.all([
     prisma.salesInvoiceItem.findMany({
       where: {
-        ...locationFilter,
         salesInvoice: {
-  invoiceDate: { gte: period.startDate, lte: period.endDate },
-},
+          ...locationFilter,
+          invoiceDate: { gte: period.startDate, lte: period.endDate },
+        },
       },
       select: {
         productCode: true,
