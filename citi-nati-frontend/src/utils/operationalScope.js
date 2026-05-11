@@ -1,28 +1,28 @@
 const OPERATIONAL_SCOPE_MAP = {
   BLANTYRE_SH: {
     uiCode: 'BLANTYRE_SH',
-    label: 'Blantyre supermarket',
+    label: 'Blantyre SH',
     branchCode: 'BLANTYRE',
     locationCode: 'SH',
     salesMode: 'live',
   },
   ZOMBA_SH: {
     uiCode: 'ZOMBA_SH',
-    label: 'Zomba supermarket',
+    label: 'Zomba SH',
     branchCode: 'ZOMBA',
     locationCode: 'SH',
     salesMode: 'live',
   },
   ZOMBA_BAR: {
     uiCode: 'ZOMBA_BAR',
-    label: 'Zomba stopover',
+    label: 'Zomba BAR',
     branchCode: 'ZOMBA',
     locationCode: 'BAR',
     salesMode: 'future',
   },
   ZOMBA_RES: {
     uiCode: 'ZOMBA_RES',
-    label: 'Zomba ST999 (Zomba Stopover)',
+    label: 'Zomba RES',
     branchCode: 'ZOMBA',
     locationCode: 'ST999',
     salesMode: 'future',

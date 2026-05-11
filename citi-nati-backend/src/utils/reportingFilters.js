@@ -145,14 +145,14 @@ function buildInvoiceWhere(dateRange, filters = {}) {
     if (locationScopePredicate) {
       andConditions.push(locationScopePredicate);
     }
-
-    if (filters.locationId !== null && filters.locationId !== undefined) {
-      where.locationId = filters.locationId;
-    }
   }
 
   if (filters.syncSourceCode) {
     where.syncSourceCode = filters.syncSourceCode;
+  }
+
+  if (filters.locationId !== null && filters.locationId !== undefined) {
+    where.locationId = filters.locationId;
   }
 
   if (filters.userName) {

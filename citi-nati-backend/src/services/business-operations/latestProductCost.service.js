@@ -43,6 +43,13 @@ function buildBranchScopePredicate(branchCode) {
 }
 
 function buildLatestCostScope(filters = {}) {
+  if (!filters.branchCode) {
+    throw new Error('branchCode is required for latest product cost scope');
+  }
+  if (!filters.locationCode) {
+    throw new Error('locationCode is required for latest product cost scope');
+  }
+
   const where = {};
   const andConditions = [];
 
@@ -74,14 +81,6 @@ function buildLookupKey(syncSourceCode, productCode) {
   const normalizedProduct = normalizeProductCode(productCode);
   if (!normalizedSource || !normalizedProduct) return null;
   return `${normalizedSource}::${normalizedProduct}`;
-}
-
-function buildLatestCostLookupKey(syncSourceCode, productCode, branchCode, locationCode) {
-  const normalizedBranch = normalizeProductCode(branchCode);
-  const normalizedLocation = normalizeProductCode(locationCode);
-  const baseKey = buildLookupKey(syncSourceCode, productCode);
-  if (!baseKey) return null;
-  return `${baseKey}::${normalizedBranch || 'ALL'}::${normalizedLocation || 'ALL'}`;
 }
 
 function shapeLatestCostRecord(record) {
@@ -157,8 +156,7 @@ async function resolveLatestProductCosts({ productKeys = [], filters = {} } = {}
 
   const costMap = new Map();
   for (const snapshot of snapshots) {
-    const key = buildLatestCostLookupKey(snapshot.syncSourceCode, snapshot.productCode, snapshot.branchCode, snapshot.locationCode)
-      || buildLookupKey(snapshot.syncSourceCode, snapshot.productCode);
+    const key = buildLookupKey(snapshot.syncSourceCode, snapshot.productCode);
     if (!key) continue;
     costMap.set(key, shapeLatestCostRecord(snapshot));
   }

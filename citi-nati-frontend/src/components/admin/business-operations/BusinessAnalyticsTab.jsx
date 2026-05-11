@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../../../utils/api.js';
-import { resolveOperationalScope, getOperationalScopeOptions } from '../../../utils/operationalScope.js';
+import { resolveOperationalScope } from '../../../utils/operationalScope.js';
 
 
 const cardStyle = {
@@ -1148,9 +1148,8 @@ const BusinessAnalyticsTab = ({
           })
         : [];
 
-      // Branch summaries for the four operational locations
-      const branchScopes = getOperationalScopeOptions();
-      const branchCodes = branchScopes.map((scope) => scope.uiCode);
+      // Branch summaries (BT + ZA)
+      const branchCodes = ['BT', 'ZA'];
 
       // Slot indices in the flat allResponses array
       const FIXED = 8; // 6 summaries + products + users
@@ -1181,7 +1180,7 @@ const BusinessAnalyticsTab = ({
         // last 2: branch summaries (BT, ZA)
         ...branchCodes.map((code) => {
           const resolved = resolveOperationalScope(code);
-          return api.get('/business-operations/reports/sales/summary', { params: buildScopedParams({ ...periodParams }, resolved.branchCode, resolved.locationCode, undefined, isAggregateMode) });
+          return api.get('/business-operations/reports/sales/summary', { params: buildScopedParams({ ...periodParams }, resolved.branchCode, resolved.locationCode, selectedLocationId, isAggregateMode) });
         }),
       ]);
 
@@ -1248,13 +1247,11 @@ const BusinessAnalyticsTab = ({
       // Branch performance from location-scoped summaries
       // First, get all branch data
       const allBranchData = branchCodes.map((code, i) => {
-        const resolved = resolveOperationalScope(code);
         const s = allResponses[BRANCH_SLICE[0] + i]?.data?.data || {};
         const bSales = Number(s.netSales || 0);
         const bInvoices = Number(s.totalInvoices || 0);
         return {
-          code: resolved.uiCode || code,
-          label: resolved.label || code,
+          code,
           sales: bSales,
           invoices: bInvoices,
           averageBasket: bInvoices > 0 ? bSales / bInvoices : 0,
@@ -2221,7 +2218,7 @@ const BusinessAnalyticsTab = ({
                     <table style={tableStyle}>
                       <thead>
                         <tr>
-                          <th style={thStyle}>Location</th>
+                          <th style={thStyle}>Branch</th>
                           <th style={thStyle}>Inv</th>
                           <th style={thStyle}>Sales</th>
                           <th style={thStyle}>Avg Basket</th>
@@ -2230,10 +2227,10 @@ const BusinessAnalyticsTab = ({
                       </thead>
                       <tbody>
                         {analytics.rankings.branchPerformance.length === 0 ? (
-                          <tr><td colSpan={5} style={emptyStyle}>No location data in this period.</td></tr>
+                          <tr><td colSpan={5} style={emptyStyle}>No branch data in this period.</td></tr>
                         ) : analytics.rankings.branchPerformance.map((row, i) => (
                           <tr key={`${row.code}-${i}`}>
-                            <td style={tdBold}>{row.label || row.code}</td>
+                            <td style={tdBold}>{row.code}</td>
                             <td style={tdStyle}>{intFmt(row.invoices)}</td>
                             <td style={tdBold}>{money(row.sales)}</td>
                             <td style={tdStyle}>{money(row.averageBasket)}</td>
