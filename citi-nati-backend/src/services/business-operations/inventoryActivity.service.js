@@ -1,6 +1,7 @@
 ﻿'use strict';
 
 const { PrismaClient } = require('@prisma/client');
+const { resolveEffectiveStock } = require('../../utils/stockResolver');
 
 const prisma = new PrismaClient();
 
@@ -324,21 +325,23 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
           productCode ? { sourceCode: { equals: productCode, mode: 'insensitive' } } : null,
           productName ? { name: { contains: productName, mode: 'insensitive' } } : null,
         ].filter(Boolean),
+        ...(locationFilter.branchCode ? { branchCode: locationFilter.branchCode } : {}),
         ...(locationFilter.locationCode ? { locationCode: locationFilter.locationCode } : {}),
         ...(locationFilter.locationId ? { locationId: locationFilter.locationId } : {}),
       },
-      select: { stock: true, sourceCode: true, name: true, locationCode: true },
+      select: {
+        stock: true,
+        posStock: true,
+        overrideActive: true,
+        overrideStock: true,
+        effectiveStock: true,
+        sourceCode: true,
+        name: true,
+        locationCode: true,
+      },
     });
 
-    const currentStock = currentSyncedStock ? toNum(currentSyncedStock.stock) : 0;
-
-    // 2. Get all transactions AFTER the period start (to calculate what's happened since period began)
-    const [salesAfter, intakeAfter, emergencySalesAfter] = await Promise.all([
-      prisma.salesInvoiceItem.findMany({
-        where: {
-          ...productFilter,
-          salesInvoice: {
-            ...locationFilter,
+    const currentStock = currentSyncedStock ? toNum(resolveEffectiveStock(currentSyncedStock)) : 0;
             invoiceDate: { gt: periodStartDate },
           },
         },
@@ -477,7 +480,7 @@ async function getProductSummary(period, filters = {}) {
 /**
  * Get current product stock for a location
  */
-async function getCurrentProductStock(productCode, locationCode) {
+async function getCurrentProductStock(productCode, locationCode, branchCode, locationId) {
   if (!productCode || !locationCode) return null;
 
   const product = await prisma.product.findFirst({
@@ -486,16 +489,22 @@ async function getCurrentProductStock(productCode, locationCode) {
         { sourceCode: { equals: productCode, mode: 'insensitive' } },
         { name: { contains: productCode, mode: 'insensitive' } },
       ],
+      ...(branchCode ? { branchCode: normalizeUpper(branchCode) } : {}),
       locationCode: normalizeUpper(locationCode),
+      ...(locationId ? { locationId: Number(locationId) } : {}),
     },
     select: {
       stock: true,
+      posStock: true,
+      overrideActive: true,
+      overrideStock: true,
+      effectiveStock: true,
       name: true,
       sourceCode: true,
     },
   });
 
-  return product ? toNum(product.stock) : null;
+  return product ? toNum(resolveEffectiveStock(product)) : null;
 }
 
 /**
@@ -641,7 +650,9 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
     if (hasProductFilter && !isAllLocations) {
       currentProductStock = await getCurrentProductStock(
         filters.productCode || filters.productName,
-        filters.locationCode
+        filters.locationCode,
+        filters.branchCode,
+        filters.locationId,
       );
       
       if (currentProductStock !== null) {
