@@ -986,12 +986,30 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       }
     }
 
+    // Build ledger rows in the expected frontend shape
+    const ledger = allMovements.map((movement, idx) => ({
+      transactionId: movement.transactionId || `${movement.movementType}-${idx}`,
+      timestamp: movement.movementDate,
+      movementType: movement.movementType,
+      referenceNo: movement.referenceNo,
+      user: movement.cashierName,
+      productCode: movement.productCode,
+      productName: movement.productName,
+      qtyIn: movement.qtyIn,
+      qtyOut: movement.qtyOut,
+      runningBalance: movement.runningBalance,
+      unitPrice: movement.unitPrice,
+      lineAmount: movement.lineAmount,
+      locationCode: movement.locationCode,
+    }));
+
     // Build summary
     const summary = {
       totalQtyIn: toNum(totalQtyIn),
       totalQtyOut: toNum(totalQtyOut),
       totalSalesAmount: roundMoney(totalSalesAmount),
       movementCount: allMovements.length,
+      transactionCount: allMovements.length,
       productCount: products.length,
       currentProductStock,
       productInfo,
@@ -1033,6 +1051,7 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       summary,
       products,
       movements: allMovements,
+      ledger,
       dataQuality,
     };
   } catch (error) {
