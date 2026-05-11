@@ -456,20 +456,6 @@ async function getInventoryActivityLedgerData({ filters = {} }) {
 module.exports = {
   getInventoryActivityLedgerData,
 };
-      startDate = new Date(filters.startDate || now);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(filters.endDate || now);
-      endDate.setHours(23, 59, 59, 999);
-      break;
-    default:
-      startDate = new Date(now);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(now);
-      endDate.setHours(23, 59, 59, 999);
-  }
-
-  return { startDate, endDate };
-}
 
 /**
  * Build location filter
