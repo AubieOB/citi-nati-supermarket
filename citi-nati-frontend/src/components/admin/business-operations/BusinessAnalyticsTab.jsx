@@ -1178,10 +1178,11 @@ const BusinessAnalyticsTab = ({
         ...quarters.map((p) => api.get('/business-operations/reports/sales/summary', { params: buildScopedParams(buildParamsForPeriod(p), effectiveBranchCode, effectiveLocationCode, selectedLocationId, isAggregateMode) })),
         // Daily trend (sampled points for short ranges)
         ...dailyPeriods.map((p) => api.get('/business-operations/reports/sales/summary', { params: buildScopedParams(buildParamsForPeriod(p), effectiveBranchCode, effectiveLocationCode, selectedLocationId, isAggregateMode) })),
-        // last 2: branch summaries (BT, ZA) - always get individual branch data for rankings
+        // last 2: branch summaries (BT, ZA, BAR, RES) - always get individual branch/location data for rankings
         ...branchCodes.map((code) => {
           const resolved = resolveOperationalScope(code);
-          return api.get('/business-operations/reports/sales/summary', { params: buildScopedParams({ ...periodParams }, resolved.branchCode, resolved.locationCode, selectedLocationId, false) });
+          const branchLocationId = isAggregateMode ? undefined : selectedLocationId;
+          return api.get('/business-operations/reports/sales/summary', { params: buildScopedParams({ ...periodParams }, resolved.branchCode, resolved.locationCode, branchLocationId, false) });
         }),
       ]);
 
