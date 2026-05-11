@@ -581,6 +581,8 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
     console.log('[INVENTORY LEDGER] Processing opening balances for', uniqueProductKeys.length, 'unique products');
 
     let diagnosticCounter = 0;
+    const diagnosticLoggedProducts = new Set();
+
     for (const productKey of uniqueProductKeys) {
       const { productCode, productName } = productKeyLookup.get(productKey) || {};
       const openingBal = await getOpeningBalance(
@@ -662,17 +664,25 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
           computedOpeningBalance: openingBal,
           firstBalanceAfterTransaction: null, // Will be set later
         });
+        diagnosticLoggedProducts.add(productKey);
         diagnosticCounter++;
       }
     }
 
     // Calculate running balances per product key
+    const firstBalanceLogged = new Set();
     allMovements.forEach((movement) => {
       const productKey = movement.productCode || normalizeUpper(movement.productName || '');
       if (productKey && productCurrentBalances.hasOwnProperty(productKey)) {
         const prevBalance = productCurrentBalances[productKey];
         productCurrentBalances[productKey] = toNum(prevBalance + movement.qtyIn - movement.qtyOut);
         movement.balanceAfterTransaction = productCurrentBalances[productKey];
+        
+        // Update diagnostic first balance if this is the first movement for a logged product
+        if (diagnosticLoggedProducts.has(productKey) && !firstBalanceLogged.has(productKey)) {
+          console.log(`[LEDGER DIAGNOSTIC UPDATE] First balance after transaction for ${movement.productCode || movement.productName}: ${movement.balanceAfterTransaction}`);
+          firstBalanceLogged.add(productKey);
+        }
         
         // Diagnostic logging for each movement
         console.log('[LEDGER BALANCE] Movement:', {
