@@ -98,8 +98,16 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
     ].filter(Boolean)
   } : {};
 
+  // Separate product filter for goodsIntakeItem (uses product.sourceCode)
+  const intakeProductFilter = productCode || productName ? {
+    OR: [
+      productCode ? { product: { sourceCode: { equals: productCode, mode: 'insensitive' } } } : null,
+      productName ? { productName: { contains: productName, mode: 'insensitive' } } : null,
+    ].filter(Boolean)
+  } : {};
+
   try {
-    const [salesBefore, intakeBefore] = await Promise.all([
+    const [salesBefore, intakeBefore, emergencySalesBefore] = await Promise.all([
       prisma.salesInvoiceItem.findMany({
         where: {
           ...productFilter,
@@ -112,7 +120,7 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
       }),
       prisma.goodsIntakeItem.findMany({
         where: {
-          ...productFilter,
+          ...intakeProductFilter,
           goodsIntake: {
             ...locationFilter,
             status: { not: 'draft' },
@@ -121,10 +129,20 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
         },
         select: { quantity: true },
       }),
+      prisma.emergencySale?.findMany?.({
+        where: {
+          ...locationFilter,
+          status: { in: ['approved', 'completed'] },
+          createdAt: { lte: beforePeriod },
+          productName: productName ? { contains: productName, mode: 'insensitive' } : undefined,
+        },
+        select: { quantity: true },
+      }) || [],
     ]);
 
     const totalIn = intakeBefore.reduce((sum, row) => sum + toNum(row.quantity), 0);
-    const totalOut = salesBefore.reduce((sum, row) => sum + toNum(row.qty), 0);
+    const totalOut = salesBefore.reduce((sum, row) => sum + toNum(row.qty), 0)
+      + emergencySalesBefore.reduce((sum, row) => sum + toNum(row.quantity), 0);
 
     return toNum(totalIn - totalOut);
   } catch (err) {
@@ -738,6 +756,14 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
     ].filter(Boolean)
   } : {};
 
+  // Separate product filter for goodsIntakeItem (uses product.sourceCode)
+  const intakeProductFilter = productCode || productName ? {
+    OR: [
+      productCode ? { product: { sourceCode: { equals: productCode, mode: 'insensitive' } } } : null,
+      productName ? { productName: { contains: productName, mode: 'insensitive' } } : null,
+    ].filter(Boolean)
+  } : {};
+
   try {
     const [salesBefore, intakeBefore, emergencySalesBefore] = await Promise.all([
       prisma.salesInvoiceItem.findMany({
@@ -752,7 +778,7 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
       }),
       prisma.goodsIntakeItem.findMany({
         where: {
-          ...productFilter,
+          ...intakeProductFilter,
           goodsIntake: {
             ...locationFilter,
             status: { not: 'draft' },
@@ -776,8 +802,11 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
     const totalOut = salesBefore.reduce((sum, row) => sum + toNum(row.qty), 0)
       + emergencySalesBefore.reduce((sum, row) => sum + toNum(row.quantity), 0);
 
+    console.log('[OPENING BALANCE] Product:', { productCode, productName }, 'Before:', beforePeriod.toISOString(), 'Result:', { salesQty: totalOut, intakeQty: totalIn, balance: totalIn - totalOut });
+    
     return toNum(totalIn - totalOut);
   } catch (err) {
+    console.error('[OPENING BALANCE] Error:', err);
     return 0;
   }
 }
