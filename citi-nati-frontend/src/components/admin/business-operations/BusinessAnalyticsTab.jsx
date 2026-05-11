@@ -58,6 +58,7 @@ function normalizeCode(code) {
 function buildScopedParams(params, branchCode, locationCode, locationId, isAggregateMode = false) {
   const scoped = { ...params };
   if (!isAggregateMode) {
+    delete scoped.aggregate;
     if (branchCode) scoped.branchCode = branchCode;
     if (locationCode) scoped.locationCode = locationCode;
     if (locationId) scoped.locationId = locationId;
