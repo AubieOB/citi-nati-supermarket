@@ -58,7 +58,7 @@ function buildExpenseWhere(itemWhere, filters = {}) {
   }
 
   // STRICT location-based filtering (matches your system design)
-  if (filters.locationId) {
+  if (!filters.aggregate && filters.locationId) {
     expenseWhere.locationId = Number(filters.locationId);
   }
 
@@ -443,41 +443,96 @@ function dayKeyFromDate(value) {
 }
 
 async function queryLatestCostProfitAnalytics(itemWhere, filters = {}) {
-  const [groupedProducts, salesItems] = await Promise.all([
-    prisma.salesInvoiceItem.groupBy({
-      by: ['syncSourceCode', 'productCode', 'productName'],
-      where: itemWhere,
-      _sum: {
-        qty: true,
-        amount: true,
-        taxAmount: true,
-        discountAmount: true,
-      },
-      _avg: {
-        unitPrice: true,
-      },
-      _count: {
-        id: true,
-      },
-    }),
-    prisma.salesInvoiceItem.findMany({
-      where: itemWhere,
-      select: {
-        syncSourceCode: true,
-        productCode: true,
-        productName: true,
-        qty: true,
-        amount: true,
-        salesInvoice: {
-          select: {
-            invoiceDate: true,
-            branchCode: true,
-            branchName: true,
-          },
+  const salesItemsRaw = await prisma.salesInvoiceItem.findMany({
+    where: itemWhere,
+    select: {
+      syncSourceCode: true,
+      productCode: true,
+      productName: true,
+      qty: true,
+      amount: true,
+      taxAmount: true,
+      discountAmount: true,
+      unitPrice: true,
+      locationCode: true,
+      locationId: true,
+      salesInvoice: {
+        select: {
+          invoiceDate: true,
+          branchCode: true,
+          branchName: true,
+          locationCode: true,
+          locationId: true,
         },
       },
-    }),
-  ]);
+    },
+  });
+
+  const groupedMap = new Map();
+  for (const row of salesItemsRaw) {
+    const syncSourceCode = normalizeProductCode(row.syncSourceCode);
+    const productCode = normalizeProductCode(row.productCode);
+    const productName = row.productName || '';
+    const branchCode = normalizeProductCode(row.salesInvoice?.branchCode);
+    const branchName = row.salesInvoice?.branchName || '';
+    const locationCode = normalizeProductCode(row.salesInvoice?.locationCode || row.locationCode);
+    const locationId = Number.isInteger(row.salesInvoice?.locationId)
+      ? row.salesInvoice.locationId
+      : Number(row.locationId);
+    const groupKey = `${syncSourceCode || ''}||${productCode || ''}||${productName || ''}||${branchCode || ''}||${locationCode || ''}||${locationId || ''}`;
+
+    const existing = groupedMap.get(groupKey);
+    const qty = toNum(row.qty, 4);
+    const amount = toNum(row.amount);
+    const taxAmount = toNum(row.taxAmount);
+    const discountAmount = toNum(row.discountAmount);
+    const unitPrice = toNum(row.unitPrice);
+
+    if (existing) {
+      existing.qty += qty;
+      existing.amount += amount;
+      existing.taxAmount += taxAmount;
+      existing.discountAmount += discountAmount;
+      existing.unitPriceNumerator += unitPrice * qty;
+      existing.unitPriceDivisor += qty;
+      existing.linesSold += 1;
+    } else {
+      groupedMap.set(groupKey, {
+        syncSourceCode,
+        productCode,
+        productName,
+        branchCode,
+        branchName,
+        locationCode,
+        locationId,
+        qty,
+        amount,
+        taxAmount,
+        discountAmount,
+        unitPriceNumerator: unitPrice * qty,
+        unitPriceDivisor: qty,
+        linesSold: 1,
+      });
+    }
+  }
+
+  const groupedProducts = Array.from(groupedMap.values()).map((entry) => ({
+    syncSourceCode: entry.syncSourceCode,
+    productCode: entry.productCode,
+    productName: entry.productName,
+    quantity: entry.qty,
+    amount: entry.amount,
+    taxAmount: entry.taxAmount,
+    discountAmount: entry.discountAmount,
+    averageUnitPrice: entry.unitPriceDivisor > 0 ? roundMoney(entry.unitPriceNumerator / entry.unitPriceDivisor) : 0,
+    branchCode: entry.branchCode,
+    branchName: entry.branchName,
+    locationCode: entry.locationCode,
+    locationId: entry.locationId,
+    linesSold: entry.linesSold,
+  }));
+
+  const salesItems = salesItemsRaw;
 
   const productCodes = Array.from(new Set(
     groupedProducts
@@ -517,10 +572,17 @@ async function queryLatestCostProfitAnalytics(itemWhere, filters = {}) {
       const syncSourceCode = normalizeProductCode(group.syncSourceCode);
       const productCode = normalizeProductCode(group.productCode);
       const detail = productCode ? productDetailsMap.get(productCode) : null;
-      const costBasisKey = buildLookupKey(syncSourceCode, productCode);
-      const costBasis = costBasisKey ? latestCostMap.get(costBasisKey) : null;
-      const revenue = toNum(group._sum.amount);
-      const quantitySold = toNum(group._sum.qty, 4);
+      const branchCode = group.branchCode || null;
+      const locationCode = group.locationCode || null;
+      const lookupKey = buildLatestCostLookupKey(syncSourceCode, productCode, branchCode, locationCode)
+        || buildLookupKey(syncSourceCode, productCode);
+      let costBasis = lookupKey ? latestCostMap.get(lookupKey) : null;
+      if (!costBasis) {
+        const genericKey = buildLookupKey(syncSourceCode, productCode);
+        costBasis = genericKey ? latestCostMap.get(genericKey) : null;
+      }
+      const revenue = toNum(group.amount);
+      const quantitySold = toNum(group.quantity, 4);
       const hasValidLatestCost = !!costBasis?.hasValidCost;
       const costOfGoodsSold = hasValidLatestCost
         ? roundMoney(costBasis.latestUnitCost * quantitySold)
@@ -543,17 +605,19 @@ async function queryLatestCostProfitAnalytics(itemWhere, filters = {}) {
 
       return {
         syncSourceCode,
-        branchCode: costBasis?.branchCode || null,
-        branchName: costBasis?.branchName || null,
+        branchCode: group.branchCode || costBasis?.branchCode || null,
+        branchName: group.branchName || costBasis?.branchName || null,
+        locationCode,
+        locationId: group.locationId || null,
         productCode,
         productName: group.productName || detail?.name || costBasis?.productNameAtCostBasis || 'Unnamed product',
         category: categoryLabel(detail?.category),
         quantitySold,
         revenue,
-        totalTax: toNum(group._sum.taxAmount),
-        totalDiscount: toNum(group._sum.discountAmount),
-        averageUnitPrice: toNum(group._avg.unitPrice),
-        linesSold: group._count.id || 0,
+        totalTax: toNum(group.taxAmount),
+        totalDiscount: toNum(group.discountAmount),
+        averageUnitPrice: group.averageUnitPrice != null ? toNum(group.averageUnitPrice) : 0,
+        linesSold: group.linesSold || 0,
         hasValidLatestCost,
         isIncomplete: !hasValidLatestCost,
         incompleteReason,
