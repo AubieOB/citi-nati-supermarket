@@ -1020,9 +1020,9 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       totalSalesAmount += Number(movement.lineAmount || 0);
     });
 
-    uniqueProductCodes.forEach((productCode) => {
-      totalOpeningBalance += productOpeningBalances[productCode] || 0;
-      totalClosingBalance += productClosingBalances[productCode] || 0;
+    uniqueProductKeys.forEach((productKey) => {
+      totalOpeningBalance += productOpeningBalances[productKey] || 0;
+      totalClosingBalance += productClosingBalances[productKey] || 0;
     });
 
     // Get product summary if no product filter
