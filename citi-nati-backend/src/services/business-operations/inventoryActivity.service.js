@@ -302,6 +302,8 @@ async function getAdjustmentMovements(period, filters = {}) {
 async function getOpeningBalance(productCode, productName, locationCode, periodStartDate, filters = {}) {
   const locationFilter = buildLocationFilter(filters);
 
+  console.log('[OPENING_BALANCE_DEBUG] Input:', { productCode, productName, locationCode, periodStartDate: periodStartDate.toISOString(), locationFilter });
+
   const productFilter = productCode || productName ? {
     OR: [
       productCode ? { sourceCode: { equals: productCode, mode: 'insensitive' } } : null,
@@ -339,8 +341,11 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
       },
     });
 
+    console.log('[OPENING_BALANCE_DEBUG] First query (exact location):', { found: !!currentSyncedStock, product: currentSyncedStock });
+
     // Fallback: if not found with location code, try branch level only
     if (!currentSyncedStock && locationFilter.branchCode) {
+      console.log('[OPENING_BALANCE_DEBUG] Fallback: trying branch level only');
       currentSyncedStock = await prisma.product.findFirst({
         where: {
           OR: [
@@ -359,9 +364,11 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
           branchCode: true,
         },
       });
+      console.log('[OPENING_BALANCE_DEBUG] Fallback query result:', { found: !!currentSyncedStock, product: currentSyncedStock });
     }
 
     const currentStock = currentSyncedStock ? toNum(resolveEffectiveStock(currentSyncedStock)) : 0;
+    console.log('[OPENING_BALANCE_DEBUG] Current stock resolved:', { currentStock });
 
     // 2. Get all transactions AFTER the period start (to calculate what's happened since period began)
     const [salesAfter, intakeAfter, emergencySalesAfter] = await Promise.all([
