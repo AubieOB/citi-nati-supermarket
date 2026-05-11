@@ -136,11 +136,31 @@ async function getInventoryTransactions(period, filters = {}) {
   const locationFilter = buildLocationFilter(filters);
   const productCode = filters.productCode ? normalizeUpper(filters.productCode) : null;
   const productName = filters.productName ? normalize(filters.productName).toLowerCase() : null;
+  const isAllLocations = !filters.locationId && !filters.locationCode;
 
   const allTransactions = [];
 
+  // Diagnostic logging
+  console.log('[LEDGER_DEBUG] ==== INVENTORY ACTIVITY FETCH ====');
+  console.log('[LEDGER_DEBUG] Period:', {
+    startDate: period.startDate.toISOString(),
+    endDate: period.endDate.toISOString(),
+    localStart: period.startDate.toString(),
+    localEnd: period.endDate.toString(),
+  });
+  console.log('[LEDGER_DEBUG] Filters:', {
+    branchCode: filters.branchCode,
+    locationCode: filters.locationCode,
+    locationId: filters.locationId,
+    isAllLocations,
+    productCode,
+    productName,
+  });
+  console.log('[LEDGER_DEBUG] Location filter object:', locationFilter);
+
   try {
     // Fetch sales transactions
+    console.log('[LEDGER_DEBUG] Querying SalesInvoiceItem...');
     const salesItems = await prisma.salesInvoiceItem.findMany({
       where: {
         salesInvoice: {
@@ -172,6 +192,14 @@ async function getInventoryTransactions(period, filters = {}) {
       orderBy: { createdAt: 'asc' },
       take: 10000,
     });
+
+    console.log(`[LEDGER_DEBUG] Found ${salesItems.length} SalesInvoiceItem records`);
+    if (salesItems.length > 0) {
+      console.log('[LEDGER_DEBUG] Sample sales items (first 3):');
+      salesItems.slice(0, 3).forEach((item, idx) => {
+        console.log(`  [${idx}] productCode=${item.productCode}, qty=${item.qty}, invoiceDate=${item.salesInvoice?.invoiceDate?.toISOString()}`);
+      });
+    }
 
     salesItems.forEach((item) => {
       // Apply product filter
@@ -306,6 +334,7 @@ async function getInventoryTransactions(period, filters = {}) {
     console.error('Error fetching inventory transactions:', err);
   }
 
+  console.log(`[LEDGER_DEBUG] Total transactions collected: ${allTransactions.length}`);
   return allTransactions;
 }
 
@@ -320,6 +349,8 @@ async function getInventoryActivityLedgerData({ filters = {} }) {
 
     // Get all transactions for the period
     let transactions = await getInventoryTransactions(period, filters);
+
+    console.log(`[LEDGER_DEBUG] Processing ${transactions.length} transactions for ledger...`);
 
     // Filter by movement type if specified
     if (filters.movementType) {
