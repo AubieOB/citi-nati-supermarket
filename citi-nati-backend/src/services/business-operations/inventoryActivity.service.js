@@ -327,7 +327,6 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
         ].filter(Boolean),
         ...(locationFilter.branchCode ? { branchCode: locationFilter.branchCode } : {}),
         ...(locationFilter.locationCode ? { locationCode: locationFilter.locationCode } : {}),
-        ...(locationFilter.locationId ? { locationId: locationFilter.locationId } : {}),
       },
       select: {
         stock: true,
@@ -504,7 +503,6 @@ async function getCurrentProductStock(productCode, locationCode, branchCode, loc
       ],
       ...(branchCode ? { branchCode: normalizeUpper(branchCode) } : {}),
       locationCode: normalizeUpper(locationCode),
-      ...(locationId ? { locationId: Number(locationId) } : {}),
     },
     select: {
       stock: true,
@@ -608,7 +606,6 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
             ].filter(Boolean),
             ...(filters.branchCode ? { branchCode: filters.branchCode } : {}),
             ...(filters.locationCode ? { locationCode: { equals: filters.locationCode, mode: 'insensitive' } } : {}),
-            ...(filters.locationId ? { locationId: Number(filters.locationId) } : {}),
           },
           select: { stock: true, posStock: true, overrideActive: true, overrideStock: true, effectiveStock: true, branchCode: true, locationCode: true },
         });
