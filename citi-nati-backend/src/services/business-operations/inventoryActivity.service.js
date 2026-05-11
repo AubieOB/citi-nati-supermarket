@@ -342,6 +342,14 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
     });
 
     const currentStock = currentSyncedStock ? toNum(resolveEffectiveStock(currentSyncedStock)) : 0;
+
+    // 2. Get all transactions AFTER the period start (to calculate what's happened since period began)
+    const [salesAfter, intakeAfter, emergencySalesAfter] = await Promise.all([
+      prisma.salesInvoiceItem.findMany({
+        where: {
+          ...productFilter,
+          salesInvoice: {
+            ...locationFilter,
             invoiceDate: { gt: periodStartDate },
           },
         },
