@@ -731,7 +731,7 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
   } : {};
 
   try {
-    const [salesBefore, intakeBefore] = await Promise.all([
+    const [salesBefore, intakeBefore, emergencySalesBefore] = await Promise.all([
       prisma.salesInvoiceItem.findMany({
         where: {
           ...productFilter,
@@ -753,10 +753,20 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
         },
         select: { quantity: true },
       }),
+      prisma.emergencySale?.findMany?.({
+        where: {
+          ...locationFilter,
+          status: { in: ['approved', 'completed'] },
+          createdAt: { lte: beforePeriod },
+          productName: productName ? { contains: productName, mode: 'insensitive' } : undefined,
+        },
+        select: { quantity: true },
+      }) || [],
     ]);
 
     const totalIn = intakeBefore.reduce((sum, row) => sum + toNum(row.quantity), 0);
-    const totalOut = salesBefore.reduce((sum, row) => sum + toNum(row.qty), 0);
+    const totalOut = salesBefore.reduce((sum, row) => sum + toNum(row.qty), 0)
+      + emergencySalesBefore.reduce((sum, row) => sum + toNum(row.quantity), 0);
 
     return toNum(totalIn - totalOut);
   } catch (err) {
@@ -899,40 +909,53 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       })
       .sort((a, b) => new Date(a.movementDate).getTime() - new Date(b.movementDate).getTime());
 
-    // Get unique product codes from movements
-    const uniqueProductCodes = [...new Set(allMovements.map(m => m.productCode).filter(Boolean))];
+    // Get unique product keys from movements (use productCode if present, else normalized productName)
+    const productKeyLookup = new Map();
+    allMovements.forEach((movement) => {
+      const key = movement.productCode || normalizeUpper(movement.productName || '');
+      if (!key) return;
+      if (!productKeyLookup.has(key)) {
+        productKeyLookup.set(key, {
+          productCode: movement.productCode || null,
+          productName: movement.productName || null,
+        });
+      }
+    });
 
-    // Calculate opening balances for each product
+    const uniqueProductKeys = Array.from(productKeyLookup.keys());
+
+    // Calculate opening balances for each product key
     const productOpeningBalances = {};
     const productClosingBalances = {};
     const productCurrentBalances = {};
 
-    for (const productCode of uniqueProductCodes) {
+    for (const productKey of uniqueProductKeys) {
+      const { productCode, productName } = productKeyLookup.get(productKey) || {};
       const openingBal = await getOpeningBalance(
         productCode,
-        null, // productName not needed since we have code
+        productName,
         filters.locationCode || null,
         period.startDate,
         filters
       );
-      productOpeningBalances[productCode] = toNum(openingBal);
-      productCurrentBalances[productCode] = toNum(openingBal);
+      productOpeningBalances[productKey] = toNum(openingBal);
+      productCurrentBalances[productKey] = toNum(openingBal);
     }
 
-    // Calculate running balances per product
+    // Calculate running balances per product key
     allMovements.forEach((movement) => {
-      const productCode = movement.productCode;
-      if (productCode && productCurrentBalances.hasOwnProperty(productCode)) {
-        productCurrentBalances[productCode] = toNum(productCurrentBalances[productCode] + movement.qtyIn - movement.qtyOut);
-        movement.balanceAfterTransaction = productCurrentBalances[productCode];
+      const productKey = movement.productCode || normalizeUpper(movement.productName || '');
+      if (productKey && productCurrentBalances.hasOwnProperty(productKey)) {
+        productCurrentBalances[productKey] = toNum(productCurrentBalances[productKey] + movement.qtyIn - movement.qtyOut);
+        movement.balanceAfterTransaction = productCurrentBalances[productKey];
       } else {
         movement.balanceAfterTransaction = 0; // fallback
       }
     });
 
     // Set closing balances
-    for (const productCode of uniqueProductCodes) {
-      productClosingBalances[productCode] = productCurrentBalances[productCode];
+    for (const productKey of uniqueProductKeys) {
+      productClosingBalances[productKey] = productCurrentBalances[productKey];
     }
 
     // Calculate summary totals
@@ -977,9 +1000,9 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
 
     // Build ledger rows in the expected frontend shape with local time
     const ledger = allMovements.map((movement, idx) => {
-      const productCode = movement.productCode;
-      const openingBalance = productOpeningBalances[productCode] || 0;
-      const closingBalance = productClosingBalances[productCode] || 0;
+      const productKey = movement.productCode || normalizeUpper(movement.productName || '');
+      const openingBalance = productOpeningBalances[productKey] || 0;
+      const closingBalance = productClosingBalances[productKey] || 0;
       const timestampLocal = new Date(movement.movementDate).toLocaleString('en-US', { 
         timeZone: 'Africa/Blantyre',
         year: 'numeric',
