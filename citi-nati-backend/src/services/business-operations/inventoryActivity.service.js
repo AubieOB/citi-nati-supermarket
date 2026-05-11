@@ -318,8 +318,8 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
   } : {};
 
   try {
-    // 1. Get current synced POS stock
-    const currentSyncedStock = await prisma.product.findFirst({
+    // 1. Get current synced POS stock - try exact location match first, then fallback to branch-level
+    let currentSyncedStock = await prisma.product.findFirst({
       where: {
         OR: [
           productCode ? { sourceCode: { equals: productCode, mode: 'insensitive' } } : null,
@@ -338,6 +338,28 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
         branchCode: true,
       },
     });
+
+    // Fallback: if not found with location code, try branch level only
+    if (!currentSyncedStock && locationFilter.branchCode) {
+      currentSyncedStock = await prisma.product.findFirst({
+        where: {
+          OR: [
+            productCode ? { sourceCode: { equals: productCode, mode: 'insensitive' } } : null,
+            productName ? { name: { contains: productName, mode: 'insensitive' } } : null,
+          ].filter(Boolean),
+          branchCode: locationFilter.branchCode,
+        },
+        select: {
+          stock: true,
+          overrideActive: true,
+          overrideStock: true,
+          sourceCode: true,
+          name: true,
+          locationCode: true,
+          branchCode: true,
+        },
+      });
+    }
 
     const currentStock = currentSyncedStock ? toNum(resolveEffectiveStock(currentSyncedStock)) : 0;
 
@@ -491,9 +513,10 @@ async function getProductSummary(period, filters = {}) {
  * Get current product stock for a location
  */
 async function getCurrentProductStock(productCode, locationCode, branchCode, locationId) {
-  if (!productCode || !locationCode) return null;
+  if (!productCode) return null;
 
-  const product = await prisma.product.findFirst({
+  // Try exact location match first
+  let product = locationCode ? await prisma.product.findFirst({
     where: {
       OR: [
         { sourceCode: { equals: productCode, mode: 'insensitive' } },
@@ -509,7 +532,27 @@ async function getCurrentProductStock(productCode, locationCode, branchCode, loc
       name: true,
       sourceCode: true,
     },
-  });
+  }) : null;
+
+  // Fallback to branch level if exact location not found
+  if (!product && branchCode) {
+    product = await prisma.product.findFirst({
+      where: {
+        OR: [
+          { sourceCode: { equals: productCode, mode: 'insensitive' } },
+          { name: { contains: productCode, mode: 'insensitive' } },
+        ],
+        branchCode: normalizeUpper(branchCode),
+      },
+      select: {
+        stock: true,
+        overrideActive: true,
+        overrideStock: true,
+        name: true,
+        sourceCode: true,
+      },
+    });
+  }
 
   return product ? toNum(resolveEffectiveStock(product)) : null;
 }
@@ -593,18 +636,33 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
 
       // Diagnostic logging for first 10 products
       if (diagnosticCounter < 10) {
-        // Get current stock info for diagnostics
-        const currentProduct = await prisma.product.findFirst({
+        // Get current stock info for diagnostics - try exact location first, then fallback
+        let currentProduct = await prisma.product.findFirst({
           where: {
             OR: [
               productCode ? { sourceCode: { equals: productCode, mode: 'insensitive' } } : null,
               productName ? { name: { contains: productName, mode: 'insensitive' } } : null,
             ].filter(Boolean),
-            ...(filters.branchCode ? { branchCode: filters.branchCode } : {}),
-            ...(filters.locationCode ? { locationCode: { equals: filters.locationCode, mode: 'insensitive' } } : {}),
+            ...(filters.branchCode ? { branchCode: normalizeUpper(filters.branchCode) } : {}),
+            ...(filters.locationCode ? { locationCode: { equals: normalizeUpper(filters.locationCode), mode: 'insensitive' } } : {}),
           },
           select: { stock: true, overrideActive: true, overrideStock: true, branchCode: true, locationCode: true },
         });
+
+        // Fallback: try branch level only if exact location not found
+        if (!currentProduct && filters.branchCode) {
+          currentProduct = await prisma.product.findFirst({
+            where: {
+              OR: [
+                productCode ? { sourceCode: { equals: productCode, mode: 'insensitive' } } : null,
+                productName ? { name: { contains: productName, mode: 'insensitive' } } : null,
+              ].filter(Boolean),
+              branchCode: normalizeUpper(filters.branchCode),
+            },
+            select: { stock: true, overrideActive: true, overrideStock: true, branchCode: true, locationCode: true },
+          });
+        }
+
         const currentStock = currentProduct ? toNum(resolveEffectiveStock(currentProduct)) : 0;
 
         // Get movements after period start for diagnostics
