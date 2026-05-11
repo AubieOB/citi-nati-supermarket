@@ -98,6 +98,7 @@ const MonthlySummaryTab = ({
   selectedLocationName = '',
   permissions = {},
   isAggregateMode = false,
+  onToggleAggregateMode = () => {},
 }) => {
   const canViewOverviewCards = permissions.canViewOverviewCards !== false;
   const canViewSalesOverview = permissions.canViewSalesOverview !== false;
@@ -125,11 +126,12 @@ const MonthlySummaryTab = ({
   const effectiveBranchCode = normalizeCode(selectedBranchCode);
   const effectiveLocationCode = normalizeCode(selectedLocationCode);
 
-  const scopeLabel =
-    selectedLocationName ||
-    (effectiveBranchCode && effectiveLocationCode
-      ? `${effectiveBranchCode} / ${effectiveLocationCode}`
-      : effectiveLocationCode || 'All Locations');
+  const scopeLabel = isAggregateMode
+    ? 'All Locations (Aggregated)'
+    : selectedLocationName ||
+      (effectiveBranchCode && effectiveLocationCode
+        ? `${effectiveBranchCode} / ${effectiveLocationCode}`
+        : effectiveLocationCode || 'All Locations');
 
   const scopeParams = useMemo(
     () => {
@@ -149,6 +151,58 @@ const MonthlySummaryTab = ({
     },
     [effectiveBranchCode, effectiveLocationCode, selectedLocationId, isAggregateMode]
   );
+
+  const renderAggregateToggle = () => {
+    if (typeof onToggleAggregateMode !== 'function') return null;
+    const isAggregate = Boolean(isAggregateMode);
+    return (
+      <button
+        type="button"
+        onClick={onToggleAggregateMode}
+        aria-pressed={isAggregate}
+        style={{
+          minWidth: '170px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.45rem',
+          border: '1px solid #cbd5e1',
+          borderRadius: '999px',
+          padding: '0.4rem 0.75rem',
+          backgroundColor: isAggregate ? '#ecfdf5' : '#f8fafc',
+          color: '#0f172a',
+          cursor: 'pointer',
+          fontSize: '0.82rem',
+          fontWeight: 700,
+        }}
+      >
+        <span>All Locations Mode</span>
+        <span
+          style={{
+            width: '30px',
+            height: '16px',
+            borderRadius: '999px',
+            backgroundColor: isAggregateMode ? '#10b981' : '#d1d5db',
+            position: 'relative',
+            display: 'inline-flex',
+            alignItems: 'center',
+            padding: '2px',
+          }}
+        >
+          <span
+            style={{
+              width: '12px',
+              height: '12px',
+              borderRadius: '50%',
+              backgroundColor: '#fff',
+              transform: isAggregateMode ? 'translateX(14px)' : 'translateX(0)',
+              transition: 'transform 0.2s ease',
+            }}
+          />
+        </span>
+      </button>
+    );
+  };
 
   const [showControls, setShowControls] = useState(false);
   const [isInsightsModalOpen, setIsInsightsModalOpen] = useState(false);
@@ -623,11 +677,14 @@ const MonthlySummaryTab = ({
     <div style={{ display: 'grid', gap: '1rem' }}>
       <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
         <div style={{ display: 'grid', gap: '0.78rem' }}>
-          <div>
-            <strong style={{ color: '#0f172a' }}>Insights Workspaces</strong>
-            <p style={{ margin: '0.3rem 0 0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
-              Scope: {scopeLabel}
-            </p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.8rem', flexWrap: 'wrap' }}>
+            <div>
+              <strong style={{ color: '#0f172a' }}>Insights Workspaces</strong>
+              <p style={{ margin: '0.3rem 0 0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700 }}>
+                Scope: {scopeLabel}
+              </p>
+            </div>
+            <div>{renderAggregateToggle()}</div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '0.75rem' }}>
@@ -700,6 +757,7 @@ const MonthlySummaryTab = ({
                   </div>
 
                   <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+                    {renderAggregateToggle()}
                     {canExport && (
                       <button
                         type="button"

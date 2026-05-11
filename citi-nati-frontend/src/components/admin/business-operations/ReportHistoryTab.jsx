@@ -168,7 +168,7 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedB
         };
       });
     }
-  }, [selectedLocationCode, selectedLocationId]);
+  }, [selectedLocationCode, selectedLocationId, selectedBranchCode, isAggregateMode]);
 
   useEffect(() => {
     fetchActivity();

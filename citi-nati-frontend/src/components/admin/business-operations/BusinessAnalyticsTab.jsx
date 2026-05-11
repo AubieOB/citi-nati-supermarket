@@ -527,7 +527,8 @@ function joinLabels(values = []) {
   return rows.length > 0 ? rows.join(', ') : 'N/A';
 }
 
-const LatestCostProfitSubview = ({ active, selectedPeriod, scopeLabel, periodLabel, refreshTick, selectedBranchCode, selectedLocationCode, selectedLocationId }) => {
+const LatestCostProfitSubview = ({ active, selectedPeriod, scopeLabel, periodLabel, refreshTick, selectedBranchCode, selectedLocationCode, selectedLocationId, isAggregateMode = false }) => {
+  const mode = Boolean(isAggregateMode);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [profitData, setProfitData] = useState(null);
@@ -543,7 +544,7 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, scopeLabel, periodLab
     setLoading(true);
     setError('');
     try {
-      const params = buildScopedParams(buildParamsForPeriod(selectedPeriod), selectedBranchCode, selectedLocationCode, selectedLocationId, isAggregateMode);
+      const params = buildScopedParams(buildParamsForPeriod(selectedPeriod), selectedBranchCode, selectedLocationCode, selectedLocationId, mode);
       const response = await api.get('/business-operations/reports/sales/profit-latest-cost', { params });
       setProfitData(response?.data?.data || null);
     } catch (err) {
@@ -551,7 +552,7 @@ const LatestCostProfitSubview = ({ active, selectedPeriod, scopeLabel, periodLab
     } finally {
       setLoading(false);
     }
-  }, [active, selectedPeriod, selectedBranchCode, selectedLocationCode, selectedLocationId]);
+  }, [active, selectedPeriod, selectedBranchCode, selectedLocationCode, selectedLocationId, isAggregateMode]);
 
   useEffect(() => {
     fetchProfitAnalytics();
@@ -952,6 +953,7 @@ const BusinessAnalyticsTab = ({
   selectedBranchCode = '',
   selectedLocationCode = '',
   isAggregateMode = false,
+  onToggleAggregateMode = () => {},
 }) => {
   const isAdminDarkTheme = typeof document !== 'undefined' && document.body.classList.contains('admin-theme-dark');
   const now = new Date();
@@ -975,6 +977,55 @@ const BusinessAnalyticsTab = ({
       locationId: selectedLocationId || undefined,
     };
   }, [effectiveBranchCode, effectiveLocationCode, selectedLocationId, isAggregateMode]);
+
+  const renderAggregateToggle = () => {
+    if (!onToggleAggregateMode) return null;
+    return (
+      <button
+        type="button"
+        onClick={onToggleAggregateMode}
+        aria-pressed={isAggregateMode}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '0.45rem',
+          border: '1px solid #cbd5e1',
+          borderRadius: '999px',
+          padding: '0.4rem 0.75rem',
+          backgroundColor: isAggregateMode ? '#ecfdf5' : '#f8fafc',
+          color: '#0f172a',
+          cursor: 'pointer',
+          fontSize: '0.82rem',
+          fontWeight: 700,
+        }}
+      >
+        <span>All Locations Mode</span>
+        <span
+          style={{
+            width: '30px',
+            height: '16px',
+            borderRadius: '999px',
+            backgroundColor: isAggregateMode ? '#10b981' : '#d1d5db',
+            position: 'relative',
+            display: 'inline-flex',
+            alignItems: 'center',
+            padding: '2px',
+          }}
+        >
+          <span
+            style={{
+              width: '12px',
+              height: '12px',
+              borderRadius: '50%',
+              backgroundColor: '#fff',
+              transform: isAggregateMode ? 'translateX(14px)' : 'translateX(0)',
+              transition: 'transform 0.2s ease',
+            }}
+          />
+        </span>
+      </button>
+    );
+  };
 
   const [filters, setFilters] = useState({
     periodType: 'month',
@@ -1626,6 +1677,7 @@ const BusinessAnalyticsTab = ({
                   <strong style={{ color: '#0f172a', fontSize: '1rem' }}>{activeRankingMeta?.title || 'Details'}</strong>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  {renderAggregateToggle()}
                   <button type="button" title={isRankingSectionMaximized ? 'Restore' : 'Maximize'} aria-label={isRankingSectionMaximized ? 'Restore' : 'Maximize'} onClick={() => setIsRankingSectionMaximized((prev) => !prev)} style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', color: '#334155', cursor: 'pointer' }}>
                     <i className={`fas ${isRankingSectionMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
                   </button>
@@ -1843,17 +1895,20 @@ const BusinessAnalyticsTab = ({
       <div style={{ ...cardStyle, padding: '1rem 1.1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.9rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.12rem' }}>Business Analytics & Performance</h3>
-          <button
-            type="button"
-            onClick={() => {
-              computeAnalytics();
-              setProfitRefreshTick((prev) => prev + 1);
-            }}
-            style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '9px', padding: '0.55rem 0.78rem', fontWeight: 700, cursor: 'pointer' }}
-          >
-            <i className={`fas ${refreshing ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`} style={{ marginRight: '0.4rem' }}></i>
-            Refresh Analytics
-          </button>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            {renderAggregateToggle()}
+            <button
+              type="button"
+              onClick={() => {
+                computeAnalytics();
+                setProfitRefreshTick((prev) => prev + 1);
+              }}
+              style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0f172a', borderRadius: '9px', padding: '0.55rem 0.78rem', fontWeight: 700, cursor: 'pointer' }}
+            >
+              <i className={`fas ${refreshing ? 'fa-spinner fa-spin' : 'fa-rotate-right'}`} style={{ marginRight: '0.4rem' }}></i>
+              Refresh Analytics
+            </button>
+          </div>
         </div>
         <p style={{ margin: '0.38rem 0 0', color: '#64748b', fontSize: '0.9rem', lineHeight: 1.5 }}>
           Growth tracking, performance trends, and contribution insights by period, branch, category, and team.
@@ -2404,7 +2459,8 @@ const BusinessAnalyticsTab = ({
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                    <button type="button" onClick={() => setFiltersExpanded((prev) => !prev)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.42rem 0.65rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>
+                    {renderAggregateToggle()}
+                  <button type="button" onClick={() => setFiltersExpanded((prev) => !prev)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', borderRadius: '9px', padding: '0.42rem 0.65rem', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>
                       <i className={`fas ${filtersExpanded ? 'fa-chevron-up' : 'fa-sliders'}`} style={{ marginRight: '0.38rem' }}></i>
                       {filtersExpanded ? 'Hide Filters' : 'Filters'}
                     </button>
@@ -2440,6 +2496,7 @@ const BusinessAnalyticsTab = ({
                       <i className={`fas ${filtersExpanded ? 'fa-chevron-up' : 'fa-sliders'}`} style={{ marginRight: '0.38rem' }}></i>
                       {filtersExpanded ? 'Hide Filters' : 'Filters'}
                     </button>
+                      {renderAggregateToggle()}
                     <button type="button" title={isLatestProfitMaximized ? 'Restore' : 'Maximize'} onClick={() => setIsLatestProfitMaximized((prev) => !prev)} style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', color: '#334155', cursor: 'pointer' }}>
                       <i className={`fas ${isLatestProfitMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
                     </button>
@@ -2459,6 +2516,7 @@ const BusinessAnalyticsTab = ({
                     selectedBranchCode={effectiveBranchCode}
                     selectedLocationCode={effectiveLocationCode}
                     selectedLocationId={selectedLocationId}
+                    isAggregateMode={isAggregateMode}
                   />
                 </div>
               </div>
@@ -2481,7 +2539,8 @@ const BusinessAnalyticsTab = ({
                         <i className={`fas ${filtersExpanded ? 'fa-chevron-up' : 'fa-sliders'}`} style={{ marginRight: '0.38rem' }}></i>
                         {filtersExpanded ? 'Hide Filters' : 'Filters'}
                       </button>
-                      <button type="button" title={isActionCenterMaximized ? 'Restore' : 'Maximize'} onClick={() => setIsActionCenterMaximized((prev) => !prev)} style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', color: '#334155', cursor: 'pointer' }}>
+                        {renderAggregateToggle()}
+                    <button type="button" title={isActionCenterMaximized ? 'Restore' : 'Maximize'} onClick={() => setIsActionCenterMaximized((prev) => !prev)} style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', color: '#334155', cursor: 'pointer' }}>
                         <i className={`fas ${isActionCenterMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
                       </button>
                       <button type="button" onClick={() => setIsActionCenterModalOpen(false)} style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #fecaca', background: '#fff5f5', color: '#b91c1c', cursor: 'pointer' }}>
@@ -2523,9 +2582,12 @@ const BusinessAnalyticsTab = ({
                               <strong style={{ color: '#0f172a' }}>{activeToolConfig.title}</strong>
                               <p style={{ margin: '0.26rem 0 0', color: '#64748b', fontSize: '0.82rem' }}>{activeToolConfig.description}</p>
                             </div>
-                            <button type="button" onClick={() => setIsToolModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '9px', color: '#334155', padding: '0.42rem 0.7rem', fontWeight: 800, cursor: 'pointer' }}>
-                              <i className="fas fa-xmark" style={{ marginRight: '0.35rem' }}></i>Close
-                            </button>
+                            <div style={{ display: 'flex', gap: '0.55rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                              {renderAggregateToggle()}
+                              <button type="button" onClick={() => setIsToolModalOpen(false)} style={{ border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '9px', color: '#334155', padding: '0.42rem 0.7rem', fontWeight: 800, cursor: 'pointer' }}>
+                                <i className="fas fa-xmark" style={{ marginRight: '0.35rem' }}></i>Close
+                              </button>
+                            </div>
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '0.8rem' }}>
                             <div style={{ ...cardStyle, padding: '0.95rem 1rem', background: 'linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)', borderColor: '#bfdbfe' }}>
