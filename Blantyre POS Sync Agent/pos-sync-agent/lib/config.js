@@ -43,6 +43,7 @@ function buildBranchConfig() {
 function buildFeatureFlags() {
   return {
     enableReportingSync: parseBoolean(process.env.ENABLE_REPORTING_SYNC, true),
+    enablePosGrnSync: parseBoolean(process.env.ENABLE_POS_GRN_SYNC, true),
     enableOnlineOrderWriteback: parseBoolean(process.env.ENABLE_ONLINE_ORDER_WRITEBACK, true),
     enableStockWriteback: parseBoolean(process.env.ENABLE_STOCK_WRITEBACK, true),
     enablePromotionSync: parseBoolean(process.env.ENABLE_PROMOTION_SYNC, true),
@@ -114,6 +115,7 @@ function buildConfig() {
 
   config.modules = {
     reportingSync: features.enableReportingSync,
+    posGrnSync: features.enablePosGrnSync,
     commandPolling: features.enableOnlineOrderWriteback
       || features.enableStockWriteback
       || features.enablePromotionSync
@@ -132,9 +134,12 @@ function buildConfig() {
   config.reporting = {
   backendReportingEndpoint: normalizeString(process.env.REPORTING_BACKEND_ENDPOINT, '/api/pos-sync/reporting/invoices'),
   backendLatestProductCostEndpoint: normalizeString(process.env.REPORTING_LATEST_COST_ENDPOINT, '/api/pos-sync/reporting/latest-product-costs'),
+  backendPosGrnEndpoint: normalizeString(process.env.REPORTING_POS_GRN_ENDPOINT, '/api/pos-sync/reporting/pos-grns'),
   batchSize: parseInteger(process.env.REPORTING_BATCH_SIZE, 100),
+  posGrnBatchSize: parseInteger(process.env.REPORTING_POS_GRN_BATCH_SIZE, 50),
   latestCostBatchSize: parseInteger(process.env.REPORTING_LATEST_COST_BATCH_SIZE, 500),
   pollingIntervalMs: parseInteger(process.env.REPORTING_POLLING_INTERVAL_MS, parseInteger(process.env.POLLING_INTERVAL_MS || process.env.SYNC_INTERVAL_MS, 60000)),
+  posGrnPollingIntervalMs: parseInteger(process.env.REPORTING_POS_GRN_INTERVAL_MS, parseInteger(process.env.REPORTING_POLLING_INTERVAL_MS, parseInteger(process.env.POLLING_INTERVAL_MS || process.env.SYNC_INTERVAL_MS, 60000))),
   latestCostSyncIntervalMs: parseInteger(process.env.REPORTING_LATEST_COST_INTERVAL_MS, 300000),
   limitToRecentDays: parseNonNegativeInteger(process.env.REPORTING_LIMIT_TO_RECENT_DAYS, 0),
 

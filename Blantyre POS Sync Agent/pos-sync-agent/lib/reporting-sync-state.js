@@ -28,9 +28,11 @@ class ReportingSyncState {
     return {
       branchCode: this.branchCode,
       lastSyncedInvoiceNo: 0,
+      lastSyncedGrnDate: null,
       lastSyncedAt: null,
       lastSuccessfulSyncAt: null,
       totalInvoicesSynced: 0,
+      totalGrnsSynced: 0,
       createdAt: new Date().toISOString(),
     };
   }
@@ -58,6 +60,18 @@ class ReportingSyncState {
     this.state.lastSyncedAt = new Date().toISOString();
     this.state.lastSuccessfulSyncAt = new Date().toISOString();
     this.state.totalInvoicesSynced += invoiceCount;
+    return this.saveState();
+  }
+
+  getLastSyncedGrnDate() {
+    return this.state.lastSyncedGrnDate ? new Date(this.state.lastSyncedGrnDate) : null;
+  }
+
+  updateGrnCheckpoint(lastSyncedGrnDate, grnCount = 0) {
+    this.state.lastSyncedGrnDate = lastSyncedGrnDate ? new Date(lastSyncedGrnDate).toISOString() : this.state.lastSyncedGrnDate;
+    this.state.lastSyncedAt = new Date().toISOString();
+    this.state.lastSuccessfulSyncAt = new Date().toISOString();
+    this.state.totalGrnsSynced += grnCount;
     return this.saveState();
   }
 
