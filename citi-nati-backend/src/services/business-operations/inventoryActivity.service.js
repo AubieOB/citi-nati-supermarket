@@ -598,11 +598,11 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
     const hasProductFilter = Boolean(normalize(filters.productCode) || normalize(filters.productName));
     const isAllLocations = !filters.locationId && !filters.locationCode;
 
-    // Determine if the queried period is today in Africa/Blantyre local time
     const now = new Date();
+    const isPeriodOngoing = now.getTime() <= period.endDate.getTime();
+    const periodStartDay = new Date(Date.UTC(period.startDate.getUTCFullYear(), period.startDate.getUTCMonth(), period.startDate.getUTCDate()));
     const localNow = new Date(now.getTime() + BLANTYRE_TZ_OFFSET_MS);
     const today = new Date(Date.UTC(localNow.getUTCFullYear(), localNow.getUTCMonth(), localNow.getUTCDate()));
-    const periodStartDay = new Date(Date.UTC(period.startDate.getUTCFullYear(), period.startDate.getUTCMonth(), period.startDate.getUTCDate()));
     const isPeriodToday = periodStartDay.getTime() === today.getTime();
 
     console.log('[INVENTORY LEDGER] Period is today:', isPeriodToday, 'startDate:', period.startDate.toISOString(), 'today:', today.toISOString());
@@ -918,8 +918,7 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
     const ledger = allMovements.map((movement, idx) => {
       const productKey = movement.productCode || normalizeUpper(movement.productName || '');
       const openingBalance = productOpeningBalances[productKey] || 0;
-      // Only show closing balance for completed periods (not today)
-      const closingBalance = !isPeriodToday ? (productClosingBalances[productKey] || 0) : null;
+      const closingBalance = isPeriodOngoing ? null : (productClosingBalances[productKey] || 0);
       const timestampValue = movement.movementDate instanceof Date ? movement.movementDate.toISOString() : movement.movementDate;
 
       // Diagnostic log for each ledger row
@@ -965,8 +964,9 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       currentProductStock,
       productInfo,
       openingBalance: toNum(totalOpeningBalance),
-      closingBalance: !isPeriodToday ? toNum(totalClosingBalance) : null,
+      closingBalance: isPeriodOngoing ? null : toNum(totalClosingBalance),
       isPeriodToday,
+      isPeriodOngoing,
     };
 
     // Data quality info
