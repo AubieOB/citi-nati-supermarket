@@ -477,7 +477,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
       showBarcode: !isCompactScreen,
       showMargin: !isSmallScreen,
       showEstimatedProfit: !isSmallScreen,
-      showComments: !isSmallScreen,
+      showComments: false,
       showExpiryDate: !isCompactScreen,
       // Font and padding adjustments
       tableFontSize: isCompactScreen ? '0.75rem' : isSmallScreen ? '0.8rem' : '0.86rem',
@@ -495,7 +495,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
         margin: '5%', // hidden but kept for consistency
         estimatedProfit: '8%', // hidden but kept
         expiryDate: '7%', // hidden but kept
-        comments: '6%', // hidden but kept
         actions: '5%'
       } : isSmallScreen ? {
         index: '3%',
@@ -508,7 +507,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
         margin: '5%', // hidden but kept
         estimatedProfit: '8%', // hidden but kept
         expiryDate: '8%', // hidden but kept
-        comments: '5%', // hidden but kept
         actions: '4%'
       } : {
         index: '3%',
@@ -521,7 +519,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
         margin: '5%',
         estimatedProfit: '8%',
         expiryDate: '8%',
-        comments: '5%',
         actions: '4%'
       }
     };
@@ -2225,7 +2222,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
               <col style={{ width: responsiveSettings.colWidths.margin, display: responsiveSettings.showMargin ? 'table-column' : 'none' }} />
               <col style={{ width: responsiveSettings.colWidths.estimatedProfit, display: responsiveSettings.showEstimatedProfit ? 'table-column' : 'none' }} />
               <col style={{ width: responsiveSettings.colWidths.expiryDate, display: responsiveSettings.showExpiryDate ? 'table-column' : 'none' }} />
-              <col style={{ width: responsiveSettings.colWidths.comments, display: responsiveSettings.showComments ? 'table-column' : 'none' }} />
               <col style={{ width: responsiveSettings.colWidths.actions }} />
             </colgroup>
             <thead>
@@ -2240,7 +2236,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                 {responsiveSettings.showMargin && <th style={{ textAlign: 'left', fontSize: responsiveSettings.headerFontSize, color: colors.mutedText, fontWeight: 700, padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, background: isAdminDarkTheme ? '#1e1e1e' : '#f8fafc', whiteSpace: 'nowrap' }}>Margin %</th>}
                 {responsiveSettings.showEstimatedProfit && <th style={{ textAlign: 'left', fontSize: responsiveSettings.headerFontSize, color: colors.mutedText, fontWeight: 700, padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, background: isAdminDarkTheme ? '#1e1e1e' : '#f8fafc', whiteSpace: 'nowrap' }}>Est. Profit</th>}
                 {responsiveSettings.showExpiryDate && <th style={{ textAlign: 'left', fontSize: responsiveSettings.headerFontSize, color: colors.mutedText, fontWeight: 700, padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, background: isAdminDarkTheme ? '#1e1e1e' : '#f8fafc', whiteSpace: 'nowrap' }}>Expiry Date</th>}
-                {responsiveSettings.showComments && <th style={{ textAlign: 'left', fontSize: responsiveSettings.headerFontSize, color: colors.mutedText, fontWeight: 700, padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, background: isAdminDarkTheme ? '#1e1e1e' : '#f8fafc', whiteSpace: 'nowrap' }}>Comments</th>}
                 <th style={{ textAlign: 'left', fontSize: responsiveSettings.headerFontSize, color: colors.mutedText, fontWeight: 700, padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, background: isAdminDarkTheme ? '#1e1e1e' : '#f8fafc', whiteSpace: 'nowrap' }}>Actions</th>
               </tr>
             </thead>
@@ -2387,18 +2382,6 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                         onKeyDown={(event) => handleEntryFieldEnter(event, index, 'expiryDate')}
                         onChange={(event) => setLineValue(index, 'expiryDate', event.target.value)}
                         style={{ ...compactLineInputStyle, backgroundColor: line.productName && !line.expiryDate ? (isAdminDarkTheme ? '#26201a' : '#fff7ed') : compactLineInputStyle.backgroundColor }}
-                      />
-                    </td>}
-                    {responsiveSettings.showComments && <td style={{ padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
-                      <input
-                        ref={(element) => setLineInputRef(index, 'lineNotes', element)}
-                        name="lineNotes"
-                        data-row-index={index}
-                        value={line.lineNotes || ''}
-                        onFocus={(event) => { selectInputText(event); setActiveRowIndex(index); }}
-                        onKeyDown={(event) => handleEntryFieldEnter(event, index, 'lineNotes')}
-                        onChange={(event) => setLineValue(index, 'lineNotes', event.target.value)}
-                        style={compactLineInputStyle}
                       />
                     </td>}
                     <td style={{ padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
