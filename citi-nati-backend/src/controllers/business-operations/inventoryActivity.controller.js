@@ -4,22 +4,32 @@ const {
   getInventoryActivityLedgerData,
 } = require('../../services/business-operations/inventoryActivity.service');
 
+function normalizeQueryValue(value) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  if (!normalized || normalized.toLowerCase() === 'undefined' || normalized.toLowerCase() === 'null') return null;
+  return normalized;
+}
+
 async function getInventoryActivityLedger(req, res) {
   try {
     const filters = {
-      periodType: req.query.periodType || 'day',
-      date: req.query.date || null,
-      month: req.query.month ? parseInt(req.query.month) : null,
-      year: req.query.year ? parseInt(req.query.year) : null,
-      startDate: req.query.startDate || null,
-      endDate: req.query.endDate || null,
+      periodType: normalizeQueryValue(req.query.periodType) || 'day',
+      date: normalizeQueryValue(req.query.date) || null,
+      month: req.query.month ? parseInt(req.query.month, 10) : null,
+      year: req.query.year ? parseInt(req.query.year, 10) : null,
+      startDate: normalizeQueryValue(req.query.startDate) || null,
+      endDate: normalizeQueryValue(req.query.endDate) || null,
       // Handle location filters - only set if explicitly provided
-      locationId: req.query.locationId && req.query.locationId !== 'undefined' ? Number(req.query.locationId) : null,
-      locationCode: req.query.locationCode && req.query.locationCode !== 'undefined' ? req.query.locationCode : null,
-      branchCode: req.query.branchCode || null,
-      productCode: req.query.productCode || null,
-      productName: req.query.productName || null,
-      movementType: req.query.movementType || null,
+      locationId:
+        req.query.locationId && String(req.query.locationId).trim().toLowerCase() !== 'undefined'
+          ? Number(req.query.locationId)
+          : null,
+      locationCode: normalizeQueryValue(req.query.locationCode),
+      branchCode: normalizeQueryValue(req.query.branchCode),
+      productCode: normalizeQueryValue(req.query.productCode),
+      productName: normalizeQueryValue(req.query.productName),
+      movementType: normalizeQueryValue(req.query.movementType),
     };
 
     console.log('[INVENTORY ACTIVITY] getInventoryActivityLedger filters:', filters);

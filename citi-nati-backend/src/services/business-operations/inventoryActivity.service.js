@@ -310,6 +310,7 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
     productName,
     branchCode: normalizedBranchCode,
     locationCode: normalizedLocationCode,
+    locationId: filters.locationId || null,
     periodStartDate: periodStartDate.toISOString(),
   });
 
@@ -334,11 +335,11 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
   try {
     // 1. Get current synced POS stock from the same Product table used by Products / Emergency Sales
     const currentSyncedStock = await resolveExactPersistedProduct(
-  normalizedProductCode,
-  normalizedBranchCode,
-  normalizedLocationCode,
-  productName
-);
+      normalizedProductCode,
+      normalizedBranchCode,
+      normalizedLocationCode,
+      productName
+    );
 
     const latestStockBalance = currentSyncedStock ? toNum(resolveEffectiveStock(currentSyncedStock)) : null;
     const stockSource = currentSyncedStock ? 'PersistedProduct.stock' : 'PersistedProduct.not_found';
@@ -598,7 +599,20 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
 
     console.log('[INVENTORY LEDGER] Period is today:', isPeriodToday, 'startDate:', period.startDate.toISOString(), 'today:', today.toISOString());
     console.log('[INVENTORY LEDGER] Product filter:', { hasProductFilter, productCode: filters.productCode, productName: filters.productName });
-    console.log('[INVENTORY LEDGER] Location filter:', { isAllLocations, locationCode: filters.locationCode, locationId: filters.locationId });
+    console.log('[INVENTORY LEDGER] Location filter:', {
+      isAllLocations,
+      branchCode: filters.branchCode,
+      locationCode: filters.locationCode,
+      locationId: filters.locationId,
+    });
+
+    if ((filters.locationId || filters.branchCode || filters.locationCode) && (!filters.branchCode || !filters.locationCode)) {
+      console.warn('[INVENTORY LEDGER] Incomplete canonical location scope. Exact opening balance requires branchCode + locationCode.', {
+        branchCode: filters.branchCode,
+        locationCode: filters.locationCode,
+        locationId: filters.locationId,
+      });
+    }
 
     // Get all movement types in parallel
     const [saleMovements, intakeMovements, emergencySalesMovements, adjustmentMovements] = await Promise.all([
@@ -662,7 +676,12 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
         let stockSource = 'PersistedProduct.not_found';
 
         if (productCode && filters.branchCode && filters.locationCode) {
-          const currentProduct = await resolveExactPersistedProduct(productCode, filters.branchCode, filters.locationCode);
+          const currentProduct = await resolveExactPersistedProduct(
+            productCode,
+            filters.branchCode,
+            filters.locationCode,
+            productName
+          );
 
           if (currentProduct) {
             currentStock = toNum(resolveEffectiveStock(currentProduct));
@@ -747,7 +766,12 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
 
       let resolvedProduct = movementProductCache.get(lookupKey);
       if (!resolvedProduct && movement.productCode && movementBranchCode && movementLocationCode) {
-        resolvedProduct = await resolveExactPersistedProduct(movement.productCode, movementBranchCode, movementLocationCode);
+        resolvedProduct = await resolveExactPersistedProduct(
+        movement.productCode,
+        movementBranchCode,
+        movementLocationCode,
+        movement.productName
+      );
         movementProductCache.set(lookupKey, resolvedProduct || null);
       }
 
