@@ -776,10 +776,27 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       }
 
       if (productKey && productCurrentBalances.hasOwnProperty(productKey)) {
-        const prevBalance = productCurrentBalances[productKey];
-        productCurrentBalances[productKey] = toNum(prevBalance + movement.qtyIn - movement.qtyOut);
-        movement.balanceAfterTransaction = productCurrentBalances[productKey];
+               // Initialize from opening balance once
+      if (productCurrentBalances[productKey] == null) {
+        productCurrentBalances[productKey] =
+          productOpeningBalances[productKey] ?? 0;
+      }
 
+      const prevBalance = toNum(productCurrentBalances[productKey]);
+
+      // Apply movement chronologically
+      const nextBalance = toNum(
+        prevBalance +
+        movement.qtyIn -
+        movement.qtyOut
+      );
+
+      movement.balanceBeforeTransaction = prevBalance;
+      movement.balanceAfterTransaction = nextBalance;
+
+      // Persist running balance
+      productCurrentBalances[productKey] = nextBalance;
+      productClosingBalances[productKey] = nextBalance;
         if (productDiagnostics.has(productKey) && !firstBalanceLogged.has(productKey)) {
           const diag = productDiagnostics.get(productKey);
           diag.firstBalanceAfterTransaction = movement.balanceAfterTransaction;
@@ -803,7 +820,10 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
           balanceAfterTransaction: movement.balanceAfterTransaction,
         });
       } else {
-        movement.balanceAfterTransaction = 0; // fallback
+        movement.balanceAfterTransaction =
+        productCurrentBalances[productKey] ??
+        productOpeningBalances[productKey] ??
+        null;
         console.warn('[LEDGER BALANCE] No balance tracking for productKey:', productKey, {
           branchCode: movementBranchCode,
           locationCode: movementLocationCode,
