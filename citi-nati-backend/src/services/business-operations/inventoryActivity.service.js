@@ -23,51 +23,57 @@ function normalizeUpper(value) {
   return normalize(value).toUpperCase();
 }
 
-/**
- * Build period from filter parameters using Africa/Blantyre local time (UTC+2)
- */
+const BLANTYRE_TZ_OFFSET_MS = 2 * 60 * 60 * 1000; // Africa/Blantyre UTC+2
+
+function pad(value) {
+  return String(value).padStart(2, '0');
+}
+
+function buildBlantyreDate(year, month, day, hour = 0, minute = 0, second = 0, ms = 0) {
+  return new Date(`${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}:${pad(second)}.${String(ms).padStart(3, '0')}+02:00`);
+}
+
 function buildPeriod(filters = {}) {
-  const TZ_OFFSET_MS = 2 * 60 * 60 * 1000; // Africa/Blantyre UTC+2
   const now = new Date();
   let startDate, endDate;
 
-  const buildBounds = (year, month, day) => ({
-    startDate: new Date(Date.UTC(year, month, day, 0, 0, 0, 0) - TZ_OFFSET_MS),
-    endDate: new Date(Date.UTC(year, month, day, 23, 59, 59, 999) - TZ_OFFSET_MS),
-  });
+  const localNow = new Date(now.getTime() + BLANTYRE_TZ_OFFSET_MS);
+  const currentYear = localNow.getUTCFullYear();
+  const currentMonth = localNow.getUTCMonth() + 1;
+  const currentDay = localNow.getUTCDate();
 
   switch (filters.periodType) {
     case 'day': {
-      const d = filters.date ? new Date(filters.date) : now;
-      const dayYear = d.getUTCFullYear();
-      const dayMonth = d.getUTCMonth();
-      const dayDay = d.getUTCDate();
-      ({ startDate, endDate } = buildBounds(dayYear, dayMonth, dayDay));
+      const dateValue = filters.date || `${currentYear}-${pad(currentMonth)}-${pad(currentDay)}`;
+      startDate = buildBlantyreDate(dateValue.split('-')[0], Number(dateValue.split('-')[1]), Number(dateValue.split('-')[2]), 0, 0, 0, 0);
+      endDate = buildBlantyreDate(dateValue.split('-')[0], Number(dateValue.split('-')[1]), Number(dateValue.split('-')[2]), 23, 59, 59, 999);
       break;
     }
     case 'month': {
-      const month = parseInt(filters.month || (now.getUTCMonth() + 1), 10);
-      const year = parseInt(filters.year || now.getUTCFullYear(), 10);
-      startDate = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0) - TZ_OFFSET_MS);
-      endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999) - TZ_OFFSET_MS);
+      const month = parseInt(filters.month || currentMonth, 10);
+      const year = parseInt(filters.year || currentYear, 10);
+      startDate = buildBlantyreDate(year, month, 1, 0, 0, 0, 0);
+      endDate = buildBlantyreDate(year, month, new Date(Date.UTC(year, month, 0)).getUTCDate(), 23, 59, 59, 999);
       break;
     }
     case 'year': {
-      const yr = parseInt(filters.year || now.getUTCFullYear(), 10);
-      startDate = new Date(Date.UTC(yr, 0, 1, 0, 0, 0, 0) - TZ_OFFSET_MS);
-      endDate = new Date(Date.UTC(yr, 11, 31, 23, 59, 59, 999) - TZ_OFFSET_MS);
+      const year = parseInt(filters.year || currentYear, 10);
+      startDate = buildBlantyreDate(year, 1, 1, 0, 0, 0, 0);
+      endDate = buildBlantyreDate(year, 12, 31, 23, 59, 59, 999);
       break;
     }
     case 'custom': {
-      const start = filters.startDate ? new Date(filters.startDate) : now;
-      const end = filters.endDate ? new Date(filters.endDate) : now;
-      ({ startDate } = buildBounds(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
-      ({ endDate } = buildBounds(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()));
+      const startValue = filters.startDate || `${currentYear}-${pad(currentMonth)}-${pad(currentDay)}`;
+      const endValue = filters.endDate || `${currentYear}-${pad(currentMonth)}-${pad(currentDay)}`;
+      const [startYear, startMonth, startDay] = startValue.split('-').map(Number);
+      const [endYear, endMonth, endDay] = endValue.split('-').map(Number);
+      startDate = buildBlantyreDate(startYear, startMonth, startDay, 0, 0, 0, 0);
+      endDate = buildBlantyreDate(endYear, endMonth, endDay, 23, 59, 59, 999);
       break;
     }
     default: {
-      const localNow = new Date(now.getTime() + TZ_OFFSET_MS);
-      ({ startDate, endDate } = buildBounds(localNow.getUTCFullYear(), localNow.getUTCMonth(), localNow.getUTCDate()));
+      startDate = buildBlantyreDate(currentYear, currentMonth, currentDay, 0, 0, 0, 0);
+      endDate = buildBlantyreDate(currentYear, currentMonth, currentDay, 23, 59, 59, 999);
       break;
     }
   }
@@ -592,10 +598,11 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
     const hasProductFilter = Boolean(normalize(filters.productCode) || normalize(filters.productName));
     const isAllLocations = !filters.locationId && !filters.locationCode;
 
-    // Determine if the queried period is today (ongoing)
+    // Determine if the queried period is today in Africa/Blantyre local time
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const periodStartDay = new Date(period.startDate.getFullYear(), period.startDate.getMonth(), period.startDate.getDate());
+    const localNow = new Date(now.getTime() + BLANTYRE_TZ_OFFSET_MS);
+    const today = new Date(Date.UTC(localNow.getUTCFullYear(), localNow.getUTCMonth(), localNow.getUTCDate()));
+    const periodStartDay = new Date(Date.UTC(period.startDate.getUTCFullYear(), period.startDate.getUTCMonth(), period.startDate.getUTCDate()));
     const isPeriodToday = periodStartDay.getTime() === today.getTime();
 
     console.log('[INVENTORY LEDGER] Period is today:', isPeriodToday, 'startDate:', period.startDate.toISOString(), 'today:', today.toISOString());
