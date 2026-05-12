@@ -31,37 +31,45 @@ function buildPeriod(filters = {}) {
   const now = new Date();
   let startDate, endDate;
 
+  const buildBounds = (year, month, day) => ({
+    startDate: new Date(Date.UTC(year, month, day, 0, 0, 0, 0) - TZ_OFFSET_MS),
+    endDate: new Date(Date.UTC(year, month, day, 23, 59, 59, 999) - TZ_OFFSET_MS),
+  });
+
   switch (filters.periodType) {
-    case 'day':
+    case 'day': {
       const d = filters.date ? new Date(filters.date) : now;
-      const dayYear = d.getFullYear();
-      const dayMonth = d.getMonth();
-      const dayDay = d.getDate();
-      startDate = new Date(Date.UTC(dayYear, dayMonth, dayDay, 0, 0, 0, 0) - TZ_OFFSET_MS);
-      endDate = new Date(Date.UTC(dayYear, dayMonth, dayDay, 23, 59, 59, 999) - TZ_OFFSET_MS);
+      const dayYear = d.getUTCFullYear();
+      const dayMonth = d.getUTCMonth();
+      const dayDay = d.getUTCDate();
+      ({ startDate, endDate } = buildBounds(dayYear, dayMonth, dayDay));
       break;
-    case 'month':
-      const month = parseInt(filters.month || (now.getMonth() + 1));
-      const year = parseInt(filters.year || now.getFullYear());
+    }
+    case 'month': {
+      const month = parseInt(filters.month || (now.getUTCMonth() + 1), 10);
+      const year = parseInt(filters.year || now.getUTCFullYear(), 10);
       startDate = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0) - TZ_OFFSET_MS);
       endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999) - TZ_OFFSET_MS);
       break;
-    case 'year':
-      const yr = parseInt(filters.year || now.getFullYear());
+    }
+    case 'year': {
+      const yr = parseInt(filters.year || now.getUTCFullYear(), 10);
       startDate = new Date(Date.UTC(yr, 0, 1, 0, 0, 0, 0) - TZ_OFFSET_MS);
       endDate = new Date(Date.UTC(yr, 11, 31, 23, 59, 59, 999) - TZ_OFFSET_MS);
       break;
-    case 'custom':
-      startDate = new Date(filters.startDate || now);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(filters.endDate || now);
-      endDate.setHours(23, 59, 59, 999);
+    }
+    case 'custom': {
+      const start = filters.startDate ? new Date(filters.startDate) : now;
+      const end = filters.endDate ? new Date(filters.endDate) : now;
+      ({ startDate } = buildBounds(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
+      ({ endDate } = buildBounds(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()));
       break;
-    default:
-      startDate = new Date(now);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(now);
-      endDate.setHours(23, 59, 59, 999);
+    }
+    default: {
+      const localNow = new Date(now.getTime() + TZ_OFFSET_MS);
+      ({ startDate, endDate } = buildBounds(localNow.getUTCFullYear(), localNow.getUTCMonth(), localNow.getUTCDate()));
+      break;
+    }
   }
 
   return { startDate, endDate };
@@ -905,15 +913,7 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       const openingBalance = productOpeningBalances[productKey] || 0;
       // Only show closing balance for completed periods (not today)
       const closingBalance = !isPeriodToday ? (productClosingBalances[productKey] || 0) : null;
-      const timestampLocal = new Date(movement.movementDate).toLocaleString('en-US', { 
-        timeZone: 'Africa/Blantyre',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      });
+      const timestampValue = movement.movementDate instanceof Date ? movement.movementDate.toISOString() : movement.movementDate;
 
       // Diagnostic log for each ledger row
       console.log('[LEDGER ROW]', {
@@ -921,17 +921,16 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
         branchCode: filters.branchCode,
         locationCode: movement.locationCode,
         movementType: movement.movementType,
-        timestamp: movement.movementDate,
+        timestamp: timestampValue,
         openingBalance,
         qtyIn: movement.qtyIn,
         qtyOut: movement.qtyOut,
         balanceAfterTransaction: movement.balanceAfterTransaction,
-        timestampLocalBlantyre: timestampLocal,
       });
 
       return {
         transactionId: movement.transactionId || `${movement.movementType}-${idx}`,
-        timestamp: timestampLocal,
+        timestamp: timestampValue,
         movementType: movement.movementType,
         referenceNo: movement.referenceNo,
         user: movement.cashierName,

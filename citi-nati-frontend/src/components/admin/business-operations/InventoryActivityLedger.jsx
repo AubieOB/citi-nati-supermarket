@@ -384,15 +384,6 @@ const InventoryActivityLedger = ({
               <div style={{ marginTop: '0.35rem', fontSize: '1.25rem', fontWeight: 800, color: '#7c3aed' }}>{summary.closingBalance ?? 0}</div>
             </div>
           )}
-          {(summary.closingBalance === null || summary.closingBalance === undefined) && summary.isPeriodToday && (
-            <div style={{ ...cardStyle, padding: '0.9rem 1rem', border: '1px dashed #cbd5e1' }}>
-              <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800 }}>Closing Balance</div>
-              <div style={{ marginTop: '0.35rem', fontSize: '0.9rem', color: '#94a3b8' }}>
-                <i className="fas fa-clock" style={{ marginRight: '0.35rem' }} />
-                Not available until end of period
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -422,7 +413,7 @@ const InventoryActivityLedger = ({
                   <th style={{ ...thStyle, textAlign: 'right' }}>Qty In</th>
                   <th style={{ ...thStyle, textAlign: 'right' }}>Qty Out</th>
                   <th style={{ ...thStyle, textAlign: 'right' }}>Balance After Transaction</th>
-                  <th style={{ ...thStyle, textAlign: 'right' }}>Closing Balance</th>
+                  {!summary.isPeriodToday && <th style={{ ...thStyle, textAlign: 'right' }}>Closing Balance</th>}
                   <th style={{ ...thStyle, textAlign: 'right' }}>Amount</th>
                 </tr>
               </thead>
@@ -439,7 +430,9 @@ const InventoryActivityLedger = ({
                     <td style={{ ...tdStyle, textAlign: 'right', color: '#166534' }}>{row.qtyIn}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', color: '#b91c1c' }}>{row.qtyOut}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700 }}>{row.balanceAfterTransaction}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', color: '#7c3aed' }}>{row.closingBalance !== null && row.closingBalance !== undefined ? row.closingBalance : '-'}</td>
+                    {!summary.isPeriodToday && (
+                      <td style={{ ...tdStyle, textAlign: 'right', color: '#7c3aed' }}>{row.closingBalance !== null && row.closingBalance !== undefined ? row.closingBalance : '-'}</td>
+                    )}
                     <td style={{ ...tdStyle, textAlign: 'right' }}>{money(row.lineAmount)}</td>
                   </tr>
                 ))}
