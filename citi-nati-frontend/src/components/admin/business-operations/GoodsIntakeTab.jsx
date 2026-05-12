@@ -2247,7 +2247,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
             <tbody>
               {calculatedItems.map((line, index) => {
                 const compactLineInputStyle = { ...themedInputStyle, padding: responsiveSettings.tablePadding, fontSize: responsiveSettings.tableFontSize };
-                const rowMoney = (value) => responsiveSettings.isSmallScreen ? Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : money(value);
+                const rowMoney = (value) => Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 const belowCost = line.sellingPrice != null && Number(line.sellingPrice) < Number(line.unitCost || 0);
                 const lineLiveStock = Number.isFinite(Number(line.productId)) ? liveLineStockByProductId[Number(line.productId)] : null;
                 const displayStock = lineLiveStock?.latestSyncedStock ?? line.latestSyncedStock;

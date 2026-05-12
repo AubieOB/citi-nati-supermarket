@@ -319,13 +319,8 @@ const InventoryActivityLedger = ({
       </div>
 
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem' }}>
-        <button type="button" onClick={fetchData} disabled={loading} style={{ padding: '0.55rem 1rem', cursor: 'pointer', backgroundColor: '#5B4B8A', color: '#fff', border: 'none', fontWeight: 700, borderRadius: '10px', fontSize: '0.88rem' }}>
-          <i className={`fas ${loading ? 'fa-spinner fa-spin' : 'fa-search'}`} style={{ marginRight: '0.42rem' }} />
-          Search
-        </button>
-
-        <button type="button" onClick={clearModalFilters} style={{ padding: '0.55rem 1rem', cursor: 'pointer', backgroundColor: '#fff', color: '#475569', fontWeight: 700, border: '1px solid #cbd5e1', borderRadius: '10px', fontSize: '0.88rem' }}>
-          <i className="fas fa-times" style={{ marginRight: '0.42rem' }} />
+        <button type="button" onClick={clearModalFilters} style={{ padding: '0.45rem 0.75rem', cursor: 'pointer', backgroundColor: '#fff', color: '#475569', fontWeight: 700, border: '1px solid #cbd5e1', borderRadius: '9px', fontSize: '0.84rem' }}>
+          <i className="fas fa-times" style={{ marginRight: '0.35rem' }} />
           Clear
         </button>
       </div>
