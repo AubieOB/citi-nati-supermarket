@@ -776,10 +776,11 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
 
       // Apply movement chronologically
       const nextBalance = toNum(
-        prevBalance -
-        movement.qtyIn +
+        prevBalance +
+        movement.qtyIn -
         movement.qtyOut
       );
+
       movement.balanceBeforeTransaction = prevBalance;
       movement.balanceAfterTransaction = nextBalance;
 
