@@ -398,7 +398,146 @@ async function ingestLatestProductCosts(payload) {
   return result;
 }
 
+function normalizePosStockIntake(grn, batchMeta) {
+  return {
+    syncSourceId: batchMeta.syncSourceId,
+    branchCode: batchMeta.branchCode,
+    branchName: batchMeta.branchName,
+    locationId: batchMeta.locationId,
+    locationCode: toStringOrNull(grn.locationCode),
+    syncSourceCode: batchMeta.syncSourceCode,
+    grnNo: toStringOrNull(grn.grnNo),
+    grnDate: toDateOrNull(grn.grnDate),
+    grnReference: toStringOrNull(grn.grnReference),
+    supplierCode: toStringOrNull(grn.supplierCode),
+    orderNumber: toStringOrNull(grn.orderNumber),
+    uploadStatus: toInt(grn.uploadStatus),
+    sourceUpdatedAt: toDateOrNull(grn.sourceUpdatedAt),
+    sourceSyncedAt: batchMeta.syncedAt,
+    lastReceivedAt: new Date(),
+  };
+}
+
+function normalizePosStockIntakeItem(item, grnMeta) {
+  return {
+    posStockIntakeId: grnMeta.id,
+    syncSourceCode: grnMeta.syncSourceCode,
+    stockDetailId: toStringOrNull(item.stockDetailId),
+    productCode: toStringOrNull(item.productCode),
+    productName: toStringOrNull(item.productName),
+    quantity: toFloat(item.quantity, 0),
+    unitCost: item.unitCost == null ? null : toFloat(item.unitCost, null),
+    lineAmount: item.lineAmount == null ? null : toFloat(item.lineAmount, null),
+    expiryDate: toDateOrNull(item.expiryDate),
+    uploadStatus: toInt(item.uploadStatus),
+    sourceUpdatedAt: toDateOrNull(item.sourceUpdatedAt),
+    sourceSyncedAt: grnMeta.syncedAt,
+    lastReceivedAt: new Date(),
+  };
+}
+
+async function ingestPosStockIntakes(payload) {
+  const posStockIntakes = Array.isArray(payload.posStockIntakes) ? payload.posStockIntakes : [];
+  const syncedAt = toDateOrNull(payload.syncedAt) || new Date();
+
+  const result = {
+    receivedGrns: posStockIntakes.length,
+    storedGrns: 0,
+    updatedGrns: 0,
+    storedItems: 0,
+    updatedItems: 0,
+    syncSourceCode: payload.syncSourceCode,
+  };
+
+  const source = await upsertSyncSource(prisma, payload);
+
+  const batchMeta = {
+    syncSourceId: source.id,
+    branchCode: payload.branchCode,
+    branchName: payload.branchName,
+    locationId: toInt(payload.locationId),
+    syncSourceCode: payload.syncSourceCode,
+    syncedAt,
+  };
+
+  for (const grn of posStockIntakes) {
+    const grnNo = toStringOrNull(grn.grnNo);
+    if (!grnNo) continue;
+
+    const grnData = normalizePosStockIntake(grn, batchMeta);
+    let grnRecord;
+
+    const existingGrn = await prisma.posStockIntake.findUnique({
+      where: {
+        syncSourceCode_grnNo: {
+          syncSourceCode: batchMeta.syncSourceCode,
+          grnNo,
+        },
+      },
+      select: { id: true },
+    });
+
+    if (!existingGrn) {
+      grnRecord = await prisma.posStockIntake.create({
+        data: {
+          ...grnData,
+          firstReceivedAt: new Date(),
+        },
+      });
+      result.storedGrns += 1;
+    } else {
+      grnRecord = await prisma.posStockIntake.update({
+        where: { id: existingGrn.id },
+        data: grnData,
+      });
+      result.updatedGrns += 1;
+    }
+
+    // Process items
+    const items = Array.isArray(grn.items) ? grn.items : [];
+    for (const item of items) {
+      const productCode = toStringOrNull(item.productCode);
+      if (!productCode) continue;
+
+      const itemData = normalizePosStockIntakeItem(item, {
+        id: grnRecord.id,
+        syncSourceCode: batchMeta.syncSourceCode,
+        syncedAt,
+      });
+
+      const existingItem = await prisma.posStockIntakeItem.findUnique({
+        where: {
+          posStockIntakeId_stockDetailId: {
+            posStockIntakeId: grnRecord.id,
+            stockDetailId: itemData.stockDetailId,
+          },
+        },
+        select: { id: true },
+      });
+
+      if (!existingItem) {
+        await prisma.posStockIntakeItem.create({
+          data: {
+            ...itemData,
+            firstReceivedAt: new Date(),
+          },
+        });
+        result.storedItems += 1;
+      } else {
+        await prisma.posStockIntakeItem.update({
+          where: { id: existingItem.id },
+          data: itemData,
+        });
+        result.updatedItems += 1;
+      }
+    }
+  }
+
+  return result;
+}
+
 module.exports = {
   ingestReportingBatch,
   ingestLatestProductCosts,
+  ingestPosStockIntakes,
 };

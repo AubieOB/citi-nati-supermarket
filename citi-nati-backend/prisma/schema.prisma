@@ -567,6 +567,7 @@ model SalesSyncSource {
   updatedAt     DateTime      @updatedAt @map("updated_at")
   invoices      SalesInvoice[]
   latestProductCosts PosLatestProductCost[]
+  posStockIntakes PosStockIntake[]
 
   @@map("sales_sync_sources")
 }
@@ -709,6 +710,64 @@ model SalesInvoiceItem {
   @@index([locationCode])
   @@index([salesInvoiceId])
   @@map("sales_invoice_items")
+}
+
+model PosStockIntake {
+  id                Int                   @id @default(autoincrement())
+  syncSourceId      Int                   @map("sync_source_id")
+  syncSource        SalesSyncSource       @relation(fields: [syncSourceId], references: [id], onDelete: Cascade)
+  branchCode        String                @map("branch_code")
+  branchName        String                @map("branch_name")
+  locationId        Int?                  @map("location_id")
+  locationCode      String?               @map("location_code")
+  syncSourceCode    String                @map("sync_source_code")
+  grnNo             String                @map("grn_no")
+  grnDate           DateTime?             @map("grn_date")
+  grnReference      String?               @map("grn_reference")
+  supplierCode      String?               @map("supplier_code")
+  orderNumber       String?               @map("order_number")
+  uploadStatus      Int?                  @map("upload_status")
+  sourceUpdatedAt   DateTime?             @map("source_updated_at")
+  sourceSyncedAt    DateTime              @default(now()) @map("source_synced_at")
+  firstReceivedAt   DateTime              @default(now()) @map("first_received_at")
+  lastReceivedAt    DateTime              @default(now()) @map("last_received_at")
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+  items             PosStockIntakeItem[]
+
+  @@unique([syncSourceCode, grnNo])
+  @@index([syncSourceCode])
+  @@index([grnNo])
+  @@index([branchCode])
+  @@index([grnDate])
+  @@map("pos_stock_intakes")
+}
+
+model PosStockIntakeItem {
+  id                Int             @id @default(autoincrement())
+  posStockIntakeId  Int             @map("pos_stock_intake_id")
+  posStockIntake    PosStockIntake @relation(fields: [posStockIntakeId], references: [id], onDelete: Cascade)
+  syncSourceCode    String          @map("sync_source_code")
+  stockDetailId     String?         @map("stock_detail_id")
+  productCode       String          @map("product_code")
+  productName       String?         @map("product_name")
+  quantity          Float           @map("quantity")
+  unitCost          Float?          @map("unit_cost")
+  lineAmount        Float?          @map("line_amount")
+  expiryDate        DateTime?       @map("expiry_date")
+  uploadStatus      Int?            @map("upload_status")
+  sourceUpdatedAt   DateTime?       @map("source_updated_at")
+  sourceSyncedAt    DateTime        @default(now()) @map("source_synced_at")
+  firstReceivedAt   DateTime        @default(now()) @map("first_received_at")
+  lastReceivedAt    DateTime        @default(now()) @map("last_received_at")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  @@unique([posStockIntakeId, stockDetailId])
+  @@index([syncSourceCode])
+  @@index([productCode])
+  @@index([posStockIntakeId])
+  @@map("pos_stock_intake_items")
 }
 
 model Supplier {

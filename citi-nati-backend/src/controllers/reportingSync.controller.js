@@ -1,4 +1,4 @@
-const { ingestReportingBatch, ingestLatestProductCosts } = require('../services/reportingSyncIngest.service');
+const { ingestReportingBatch, ingestLatestProductCosts, ingestPosStockIntakes } = require('../services/reportingSyncIngest.service');
 const { recordPosSyncEvent } = require('../services/posSyncMonitor.service');
 
 function deriveAgentLocationCode(branchCode, payloadLocationCode) {
@@ -139,6 +139,68 @@ function validateLatestProductCostsPayload(payload) {
 
       if (item.latestUnitCost !== undefined && item.latestUnitCost !== null && !isFiniteNumber(item.latestUnitCost)) {
         errors.push(`latestProductCosts[${index}].latestUnitCost must be numeric`);
+      }
+    });
+  }
+
+  return errors;
+}
+
+function validatePosStockIntakesPayload(payload) {
+  const errors = [];
+
+  if (!payload || typeof payload !== 'object') {
+    return ['Payload must be a JSON object'];
+  }
+
+  if (!payload.branchCode || typeof payload.branchCode !== 'string') {
+    errors.push('branchCode is required');
+  }
+
+  if (!payload.branchName || typeof payload.branchName !== 'string') {
+    errors.push('branchName is required');
+  }
+
+  if (!payload.syncSourceCode || typeof payload.syncSourceCode !== 'string') {
+    errors.push('syncSourceCode is required');
+  }
+
+  if (!Array.isArray(payload.posStockIntakes)) {
+    errors.push('posStockIntakes must be an array');
+  } else {
+    payload.posStockIntakes.forEach((grn, grnIndex) => {
+      if (!grn || typeof grn !== 'object') {
+        errors.push(`posStockIntakes[${grnIndex}] must be an object`);
+        return;
+      }
+
+      if (!grn.grnNo || typeof grn.grnNo !== 'string') {
+        errors.push(`posStockIntakes[${grnIndex}].grnNo is required`);
+      }
+
+      if (!Array.isArray(grn.items)) {
+        errors.push(`posStockIntakes[${grnIndex}].items must be an array`);
+      } else if (grn.items.length === 0) {
+        errors.push(`posStockIntakes[${grnIndex}].items cannot be empty`);
+      } else {
+        grn.items.forEach((item, itemIndex) => {
+          if (!item || typeof item !== 'object') {
+            errors.push(`posStockIntakes[${grnIndex}].items[${itemIndex}] must be an object`);
+            return;
+          }
+
+          if (!item.productCode || typeof item.productCode !== 'string') {
+            errors.push(`posStockIntakes[${grnIndex}].items[${itemIndex}].productCode is required`);
+          }
+
+          if (!isFiniteNumber(item.quantity) || item.quantity <= 0) {
+            errors.push(`posStockIntakes[${grnIndex}].items[${itemIndex}].quantity must be a positive number`);
+          }
+
+          if (item.unitCost !== undefined && item.unitCost !== null && !isFiniteNumber(item.unitCost)) {
+            errors.push(`posStockIntakes[${grnIndex}].items[${itemIndex}].unitCost must be numeric`);
+          }
+        });
       }
     });
   }
@@ -345,7 +407,114 @@ async function receiveLatestProductCosts(req, res) {
   }
 }
 
+async function receivePosStockIntakes(req, res) {
+  try {
+    if (!isAuthorizedAgent(req)) {
+      return res.status(403).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const payload = req.body || {};
+    const validationErrors = validatePosStockIntakesPayload(payload);
+
+    if (validationErrors.length > 0) {
+      console.error('[REPORTING SYNC][POS GRNS] Validation failed:', {
+        syncSourceCode: payload.syncSourceCode,
+        branchCode: payload.branchCode,
+        errors: validationErrors,
+      });
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: validationErrors,
+      });
+    }
+
+    const totalItems = payload.posStockIntakes.reduce((sum, grn) => {
+      const items = Array.isArray(grn.items) ? grn.items.length : 0;
+      return sum + items;
+    }, 0);
+
+    console.log('[REPORTING SYNC][POS GRNS] Received POS stock intakes batch', {
+      branchCode: payload.branchCode,
+      branchName: payload.branchName,
+      syncSourceCode: payload.syncSourceCode,
+      grns: payload.posStockIntakes.length,
+      items: totalItems,
+    });
+
+    const result = await ingestPosStockIntakes(payload);
+
+    await recordReportingMonitorEvent({
+      eventType: 'agent-reporting-pos-grns',
+      source: 'pos-sync-agent',
+      status: 'success',
+      level: 'info',
+      title: 'POS stock intakes synced',
+      message: `POS agent synced ${result.receivedGrns} GRN(s) with ${result.storedItems + result.updatedItems} item row(s).`,
+      suggestion: 'No action required.',
+      metadata: {
+        branchCode: String(payload.branchCode || '').trim().toUpperCase() || null,
+        branchName: payload.branchName || null,
+        locationCode: deriveAgentLocationCode(payload.branchCode, payload.locationCode),
+        syncSourceCode: payload.syncSourceCode || null,
+        receivedGrns: result.receivedGrns,
+        storedGrns: result.storedGrns + result.updatedGrns,
+        storedItems: result.storedItems + result.updatedItems,
+      },
+    });
+
+    console.log('[REPORTING SYNC][POS GRNS] Batch persisted', {
+      branchCode: payload.branchCode,
+      syncSourceCode: payload.syncSourceCode,
+      receivedGrns: result.receivedGrns,
+      storedGrns: result.storedGrns,
+      updatedGrns: result.updatedGrns,
+      storedItems: result.storedItems,
+      updatedItems: result.updatedItems,
+    });
+
+    return res.status(200).json({
+      success: true,
+      receivedGrns: result.receivedGrns,
+      storedGrns: result.storedGrns + result.updatedGrns,
+      insertedGrns: result.storedGrns,
+      updatedGrns: result.updatedGrns,
+      storedItems: result.storedItems + result.updatedItems,
+      insertedItems: result.storedItems,
+      updatedItems: result.updatedItems,
+      syncSourceCode: result.syncSourceCode,
+    });
+  } catch (error) {
+    console.error('[REPORTING SYNC][POS GRNS] Processing failed:', error.message);
+
+    await recordReportingMonitorEvent({
+      eventType: 'agent-reporting-pos-grns',
+      source: 'pos-sync-agent',
+      status: 'failed',
+      level: 'error',
+      title: 'POS stock intakes sync failed',
+      message: 'The backend failed to process POS GRN payload from POS agent.',
+      reason: error.message,
+      suggestion: 'Review POS GRN payload structure and backend ingest constraints.',
+      metadata: {
+        branchCode: req.body && req.body.branchCode ? String(req.body.branchCode).trim().toUpperCase() : null,
+        branchName: req.body && req.body.branchName ? req.body.branchName : null,
+        locationCode: deriveAgentLocationCode(req.body && req.body.branchCode, req.body && req.body.locationCode),
+        syncSourceCode: req.body && req.body.syncSourceCode ? req.body.syncSourceCode : null,
+        grnCount: req.body && Array.isArray(req.body.posStockIntakes) ? req.body.posStockIntakes.length : 0,
+      },
+    });
+
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to process POS stock intakes sync batch',
+      details: error.message,
+    });
+  }
+}
+
 module.exports = {
   receiveReportingInvoices,
   receiveLatestProductCosts,
+  receivePosStockIntakes,
 };

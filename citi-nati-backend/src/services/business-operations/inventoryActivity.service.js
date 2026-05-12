@@ -367,40 +367,87 @@ async function getAdjustmentMovements(period, filters = {}) {
  */
 async function getPOSGRNMovements(period, filters = {}) {
   const locationFilter = buildLocationFilter(filters);
-  
+
   console.log('[INVENTORY_ACTIVITY_SERVICE] getPOSGRNMovements requested:', {
     period: { start: period.startDate.toISOString(), end: period.endDate.toISOString() },
     locationFilter,
-    status: 'NOT_IMPLEMENTED_POS_DATA_UNAVAILABLE',
-    description: 'POS GRN data is stored in external POS SQL Server database (stocks_temp, stockdetails_temp)',
-    nextSteps: [
-      'Option 1: Configure POS Sync Agent to push approved GRN records to backend API',
-      'Option 2: Establish secure direct connection to POS database for approved stock reads',
-      'Option 3: Implement batch GRN import endpoint for manual/scheduled uploads',
-    ],
   });
 
-  // TODO: When POS GRN sync is implemented, query the synced data here
-  // Expected data structure from POS:
-  // {
-  //   grnNo: string,              // GRN number from POS
-  //   grnDate: DateTime,          // GRN received date
-  //   locationCode: string,       // POS location code
-  //   branchCode: string,         // Branch
-  //   supplierCode: string,       // POS supplier code
-  //   items: [
-  //     {
-  //       productCode: string,
-  //       productName: string,
-  //       quantity: number,       // Stock received qty
-  //       unitCost: number,
-  //       approvalStatus: 'pending'|'approved'|'posted'
-  //     }
-  //   ]
-  // }
+  try {
+    // Query synced POS GRN data from database
+    const grnItems = await prisma.posStockIntakeItem.findMany({
+      where: {
+        posStockIntake: {
+          grnDate: {
+            gte: period.startDate,
+            lte: period.endDate,
+          },
+          branchCode: locationFilter.branchCode ? {
+            equals: locationFilter.branchCode,
+            mode: 'insensitive',
+          } : undefined,
+          locationCode: locationFilter.locationCode ? {
+            equals: locationFilter.locationCode,
+            mode: 'insensitive',
+          } : undefined,
+        },
+        quantity: {
+          gt: 0, // Only positive stock intakes
+        },
+      },
+      include: {
+        posStockIntake: {
+          select: {
+            grnNo: true,
+            grnDate: true,
+            grnReference: true,
+            branchCode: true,
+            locationCode: true,
+            supplierCode: true,
+            orderNumber: true,
+            sourceUpdatedAt: true,
+          },
+        },
+      },
+      orderBy: [
+        { posStockIntake: { grnDate: 'asc' } },
+        { posStockIntake: { grnNo: 'asc' } },
+        { productCode: 'asc' },
+      ],
+    });
 
-  // Return empty until POS GRN sync is available
-  return [];
+    console.log(`[INVENTORY_ACTIVITY_SERVICE] Found ${grnItems.length} POS GRN item records`);
+
+    // Transform to movement format expected by ledger
+    const movements = grnItems.map((item) => ({
+      id: `pos-grn-${item.posStockIntake.grnNo}-${item.stockDetailId || item.productCode}`,
+      type: 'pos_grn',
+      date: item.posStockIntake.grnDate,
+      productCode: item.productCode,
+      productName: item.productName || item.productCode,
+      locationCode: item.posStockIntake.locationCode || locationFilter.locationCode,
+      branchCode: item.posStockIntake.branchCode,
+      quantity: item.quantity,
+      unitCost: item.unitCost,
+      lineAmount: item.lineAmount,
+      reference: item.posStockIntake.grnNo,
+      referenceType: 'pos_grn',
+      supplierCode: item.posStockIntake.supplierCode,
+      orderNumber: item.posStockIntake.orderNumber,
+      grnReference: item.posStockIntake.grnReference,
+      expiryDate: item.expiryDate,
+      source: 'pos_sync',
+      sourceUpdatedAt: item.posStockIntake.sourceUpdatedAt,
+      syncedAt: item.sourceSyncedAt,
+    }));
+
+    console.log(`[INVENTORY_ACTIVITY_SERVICE] Returning ${movements.length} POS GRN movements`);
+    return movements;
+  } catch (error) {
+    console.error('[INVENTORY_ACTIVITY_SERVICE] Error fetching POS GRN movements:', error);
+    // Return empty array on error to avoid breaking the ledger
+    return [];
+  }
 }
 
 /**
