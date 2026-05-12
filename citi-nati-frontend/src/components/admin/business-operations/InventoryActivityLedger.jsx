@@ -318,12 +318,7 @@ const InventoryActivityLedger = ({
         </select>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <button type="button" onClick={clearModalFilters} style={{ padding: '0.45rem 0.75rem', cursor: 'pointer', backgroundColor: '#fff', color: '#475569', fontWeight: 700, border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.85rem', minHeight: '36px' }}>
-          <i className="fas fa-times" style={{ marginRight: '0.35rem' }} />
-          Clear
-        </button>
-      </div>
+
     </div>
   );
 

@@ -487,8 +487,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
       colWidths: isCompactScreen ? {
         index: '2%',
         barcode: '12%',
-        productName: '28%',
-        quantity: '6%',
+        productName: '26%',
+        quantity: '8%',
         unitCost: '8%',
         totalCost: '9%',
         sellingPrice: '9%',
@@ -499,8 +499,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
       } : isSmallScreen ? {
         index: '3%',
         barcode: '14%',
-        productName: '26%',
-        quantity: '5%',
+        productName: '24%',
+        quantity: '7%',
         unitCost: '7%',
         totalCost: '8%',
         sellingPrice: '8%',
@@ -511,8 +511,8 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
       } : {
         index: '3%',
         barcode: '15%',
-        productName: '24%',
-        quantity: '5%',
+        productName: '22%',
+        quantity: '7%',
         unitCost: '7%',
         totalCost: '8%',
         sellingPrice: '8%',
