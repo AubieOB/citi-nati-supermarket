@@ -693,23 +693,6 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       locationId: filters.locationId,
     });
 
-    // Log intake movement quality check
-    if (intakeMovements.length > 0) {
-      console.log('[INVENTORY LEDGER] Intake movements summary:');
-      const intakeSummary = {};
-      intakeMovements.forEach(m => {
-        const key = `${m.branchCode || '?'}/${m.locationCode || '?'}`;
-        intakeSummary[key] = (intakeSummary[key] || 0) + 1;
-      });
-      console.log('[INVENTORY LEDGER] Intakes by location:', intakeSummary);
-    } else {
-      console.warn('[INVENTORY LEDGER] ⚠️ NO INTAKE MOVEMENTS FOUND', {
-        period: { start: period.startDate.toISOString(), end: period.endDate.toISOString() },
-        filters: { branchCode: filters.branchCode, locationCode: filters.locationCode, locationId: filters.locationId },
-        advice: 'Check that Goods Intake records exist in the database with status != draft and finalizedAt within period',
-      });
-    }
-
     if ((filters.locationId || filters.branchCode || filters.locationCode) && (!filters.branchCode || !filters.locationCode)) {
       console.warn('[INVENTORY LEDGER] Incomplete canonical location scope. Exact opening balance requires branchCode + locationCode.', {
         branchCode: filters.branchCode,
@@ -728,6 +711,23 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
     ]);
 
     console.log('[INVENTORY LEDGER] Movements fetched:', { sales: saleMovements.length, intakes: intakeMovements.length, emergencySales: emergencySalesMovements.length, adjustments: adjustmentMovements.length, posGrn: posGrnMovements.length });
+
+    // Log intake movement quality check
+    if (intakeMovements.length > 0) {
+      console.log('[INVENTORY LEDGER] Intake movements summary:');
+      const intakeSummary = {};
+      intakeMovements.forEach(m => {
+        const key = `${m.branchCode || '?'}/${m.locationCode || '?'}`;
+        intakeSummary[key] = (intakeSummary[key] || 0) + 1;
+      });
+      console.log('[INVENTORY LEDGER] Intakes by location:', intakeSummary);
+    } else {
+      console.warn('[INVENTORY LEDGER] ⚠️ NO INTAKE MOVEMENTS FOUND', {
+        period: { start: period.startDate.toISOString(), end: period.endDate.toISOString() },
+        filters: { branchCode: filters.branchCode, locationCode: filters.locationCode, locationId: filters.locationId },
+        advice: 'Check that Goods Intake records exist in the database with status != draft and finalizedAt within period',
+      });
+    }
 
     // Combine and sort movements chronologically oldest-to-newest
     let allMovements = [...saleMovements, ...intakeMovements, ...emergencySalesMovements, ...adjustmentMovements, ...posGrnMovements]
