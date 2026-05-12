@@ -96,6 +96,7 @@ const InventoryActivityLedger = ({
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
 
   const [activeModal, setActiveModal] = useState(null);
   const [modalMaximized, setModalMaximized] = useState(false);
@@ -314,17 +315,16 @@ const InventoryActivityLedger = ({
           <option value="">All</option>
           <option value="SALE">Sales Only</option>
           <option value="STOCK_INTAKE">Stock Intake Only</option>
-          <option value="EMERGENCY_SALE">Emergency Sales</option>
         </select>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem' }}>
-        <button type="button" onClick={fetchData} disabled={loading} style={{ ...inputStyle, cursor: 'pointer', backgroundColor: '#5B4B8A', color: '#fff', border: 'none', fontWeight: 700 }}>
+        <button type="button" onClick={fetchData} disabled={loading} style={{ padding: '0.55rem 1rem', cursor: 'pointer', backgroundColor: '#5B4B8A', color: '#fff', border: 'none', fontWeight: 700, borderRadius: '10px', fontSize: '0.88rem' }}>
           <i className={`fas ${loading ? 'fa-spinner fa-spin' : 'fa-search'}`} style={{ marginRight: '0.42rem' }} />
           Search
         </button>
 
-        <button type="button" onClick={clearModalFilters} style={{ ...inputStyle, cursor: 'pointer', backgroundColor: '#fff', color: '#475569', fontWeight: 700 }}>
+        <button type="button" onClick={clearModalFilters} style={{ padding: '0.55rem 1rem', cursor: 'pointer', backgroundColor: '#fff', color: '#475569', fontWeight: 700, border: '1px solid #cbd5e1', borderRadius: '10px', fontSize: '0.88rem' }}>
           <i className="fas fa-times" style={{ marginRight: '0.42rem' }} />
           Clear
         </button>
@@ -334,7 +334,17 @@ const InventoryActivityLedger = ({
 
   const renderLedgerContent = () => (
     <div style={{ display: 'grid', gap: '1rem' }}>
-      {renderModalFilters()}
+      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.25rem' }}>
+        <button type="button" onClick={() => setShowFilters(!showFilters)} style={{ padding: '0.45rem 0.75rem', cursor: 'pointer', backgroundColor: showFilters ? '#5B4B8A' : '#f1f5f9', color: showFilters ? '#fff' : '#334155', fontWeight: 700, border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.85rem', transition: 'all 0.2s' }}>
+          <i className={`fas fa-${showFilters ? 'filter' : 'sliders-h'}`} style={{ marginRight: '0.42rem' }} />
+          Filters
+        </button>
+        <button type="button" onClick={fetchData} disabled={loading} title="Refresh" style={{ padding: '0.45rem 0.75rem', cursor: 'pointer', backgroundColor: '#fff', color: '#334155', fontWeight: 700, border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.85rem' }}>
+          <i className={`fas fa-sync-alt ${loading ? 'fa-spin' : ''}`} />
+        </button>
+      </div>
+
+      {showFilters && renderModalFilters()}
 
       {error && (
         <div style={{ padding: '1rem', color: '#b91c1c', backgroundColor: '#fff1f2', borderRadius: '10px', border: '1px solid #fecaca' }}>
@@ -454,7 +464,7 @@ const InventoryActivityLedger = ({
 
       {ledger.length > 0 && (
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <button type="button" onClick={exportCSV} style={{ ...inputStyle, cursor: 'pointer', backgroundColor: '#5B4B8A', color: '#fff', border: 'none', fontWeight: 700, padding: '0.65rem 1rem' }}>
+          <button type="button" onClick={exportCSV} style={{ padding: '0.55rem 1rem', cursor: 'pointer', backgroundColor: '#5B4B8A', color: '#fff', border: 'none', fontWeight: 700, borderRadius: '10px', fontSize: '0.88rem' }}>
             <i className="fas fa-download" style={{ marginRight: '0.42rem' }} />
             Export CSV ({ledger.length} transactions)
           </button>
