@@ -357,7 +357,7 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
     });
 
     // 2. Get all transactions AFTER the period start (to calculate what's happened since period began)
-    const [salesAfter, intakeAfter, emergencySalesAfter] = await Promise.all([
+    const [salesAfter, intakeAfter] = await Promise.all([
       prisma.salesInvoiceItem.findMany({
         where: {
           productCode: { equals: normalizedProductCode, mode: 'insensitive' },
@@ -379,19 +379,9 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
         },
         select: { quantity: true },
       }),
-      prisma.emergencySale?.findMany?.({
-        where: {
-          ...locationFilter,
-          status: { in: ['approved', 'completed'] },
-          createdAt: { gte: periodStartDate },
-          productCode: { equals: normalizedProductCode, mode: 'insensitive' },
-        },
-        select: { quantity: true },
-      }) || [],
     ]);
 
-    const totalQtyOutInSelectedPeriod = salesAfter.reduce((sum, row) => sum + toNum(row.qty), 0)
-      + emergencySalesAfter.reduce((sum, row) => sum + toNum(row.quantity), 0);
+    const totalQtyOutInSelectedPeriod = salesAfter.reduce((sum, row) => sum + toNum(row.qty), 0);
     const totalQtyInInSelectedPeriod = intakeAfter.reduce((sum, row) => sum + toNum(row.quantity), 0);
 
     const openingBal = latestStockBalance != null
