@@ -199,14 +199,27 @@ async function getIntakeMovements(period, filters = {}) {
   } : {};
 
   // Build comprehensive location filter for goodsIntake
+  // Handle both finalized intakes (with finalizedAt) and non-draft intakes where finalizedAt may be null
   const goodsIntakeFilter = {
     ...locationFilter,
-    // Only include finalized (non-draft) intakes with valid finalizedAt timestamp
     status: { not: 'draft' }, // Include: finalized, posted, approved, completed, etc.
-    finalizedAt: { 
-      gte: period.startDate, 
-      lte: period.endDate,
-    },
+    OR: [
+      // Priority: use finalizedAt if it exists
+      {
+        finalizedAt: { 
+          gte: period.startDate, 
+          lte: period.endDate,
+        },
+      },
+      // Fallback: if finalizedAt is null, check purchaseDate
+      {
+        finalizedAt: null,
+        purchaseDate: {
+          gte: period.startDate,
+          lte: period.endDate,
+        },
+      },
+    ],
   };
 
   console.log('[INVENTORY_ACTIVITY_SERVICE] getIntakeMovements filters:', {
