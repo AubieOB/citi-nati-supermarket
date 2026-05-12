@@ -333,26 +333,12 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
 
   try {
     // 1. Get current synced POS stock from the same Product table used by Products / Emergency Sales
-    const currentSyncedStock = await prisma.product.findFirst({
-      where: {
-        branchCode: normalizedBranchCode,
-        locationCode: normalizedLocationCode,
-        OR: [
-          { sourceCode: { equals: normalizedProductCode, mode: 'insensitive' } },
-          { barcode: { equals: normalizedProductCode, mode: 'insensitive' } },
-        ],
-      },
-      select: {
-        id: true,
-        stock: true,
-        overrideActive: true,
-        overrideStock: true,
-        sourceCode: true,
-        barcode: true,
-        branchCode: true,
-        locationCode: true,
-      },
-    });
+    const currentSyncedStock = await resolveExactPersistedProduct(
+  normalizedProductCode,
+  normalizedBranchCode,
+  normalizedLocationCode,
+  productName
+);
 
     const latestStockBalance = currentSyncedStock ? toNum(resolveEffectiveStock(currentSyncedStock)) : null;
     const stockSource = currentSyncedStock ? 'PersistedProduct.stock' : 'PersistedProduct.not_found';
@@ -517,55 +503,78 @@ async function getProductSummary(period, filters = {}) {
 /**
  * Get current product stock for a location
  */
-async function resolveExactPersistedProduct(productCode, branchCode, locationCode) {
-  if (!productCode || !branchCode || !locationCode) return null;
+async function resolveExactPersistedProduct(productCode, branchCode, locationCode, productName = null) {
+  if ((!productCode && !productName) || !branchCode || !locationCode) {
+    return null;
+  }
 
   const normalizedProductCode = normalize(productCode);
+  const normalizedProductName = normalize(productName);
   const normalizedBranchCode = normalizeUpper(branchCode);
   const normalizedLocationCode = normalizeUpper(locationCode);
 
-  // Exact lookup by sourceCode first, then fallback to barcode.
-  let product = await prisma.product.findFirst({
-    where: {
-      branchCode: normalizedBranchCode,
-      locationCode: normalizedLocationCode,
-      sourceCode: { equals: normalizedProductCode, mode: 'insensitive' },
-    },
-    select: {
-      id: true,
-      stock: true,
-      overrideActive: true,
-      overrideStock: true,
-      sourceCode: true,
-      barcode: true,
-      branchCode: true,
-      locationCode: true,
-    },
-  });
+  const select = {
+    id: true,
+    stock: true,
+    overrideActive: true,
+    overrideStock: true,
+    sourceCode: true,
+    barcode: true,
+    name: true,
+    branchCode: true,
+    locationCode: true,
+  };
 
-  if (!product) {
-    product = await prisma.product.findFirst({
+  // 1. Exact lookup by sourceCode/barcode
+  if (normalizedProductCode) {
+    const byCode = await prisma.product.findFirst({
       where: {
         branchCode: normalizedBranchCode,
         locationCode: normalizedLocationCode,
-        barcode: { equals: normalizedProductCode, mode: 'insensitive' },
+        OR: [
+          {
+            sourceCode: {
+              equals: normalizedProductCode,
+              mode: 'insensitive',
+            },
+          },
+          {
+            barcode: {
+              equals: normalizedProductCode,
+              mode: 'insensitive',
+            },
+          },
+        ],
       },
-      select: {
-        id: true,
-        stock: true,
-        overrideActive: true,
-        overrideStock: true,
-        sourceCode: true,
-        barcode: true,
-        branchCode: true,
-        locationCode: true,
-      },
+      select,
     });
+
+    if (byCode) {
+      return byCode;
+    }
   }
 
-  return product;
-}
+  // 2. Fallback exact product name lookup
+  if (normalizedProductName) {
+    const byName = await prisma.product.findFirst({
+      where: {
+        branchCode: normalizedBranchCode,
+        locationCode: normalizedLocationCode,
+        name: {
+          equals: normalizedProductName,
+          mode: 'insensitive',
+        },
+      },
+      select,
+    });
 
+    if (byName) {
+      return byName;
+    }
+  }
+
+  return null;
+}
 async function getCurrentProductStock(productCode, locationCode, branchCode, locationId) {
   const product = await resolveExactPersistedProduct(productCode, branchCode, locationCode);
   return product ? toNum(resolveEffectiveStock(product)) : null;
