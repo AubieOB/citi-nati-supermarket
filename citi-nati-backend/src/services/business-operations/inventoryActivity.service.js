@@ -183,12 +183,14 @@ async function getSaleMovements(period, filters = {}) {
 
 /**
  * Get intake movements for a period and location
+ * Fetches web-based goods intake entries that were finalized/posted
  */
 async function getIntakeMovements(period, filters = {}) {
   const locationFilter = buildLocationFilter(filters);
   const normalizedProductCode = normalize(filters.productCode);
   const normalizedProductName = normalize(filters.productName);
 
+  // Product filter - by sourceCode or name
   const productFilter = normalizedProductCode || normalizedProductName ? {
     OR: [
       normalizedProductCode ? { product: { sourceCode: { equals: normalizedProductCode, mode: 'insensitive' } } } : null,
@@ -196,13 +198,27 @@ async function getIntakeMovements(period, filters = {}) {
     ].filter(Boolean)
   } : {};
 
+  // Build comprehensive location filter for goodsIntake
+  const goodsIntakeFilter = {
+    ...locationFilter,
+    // Only include finalized (non-draft) intakes with valid finalizedAt timestamp
+    status: { not: 'draft' }, // Include: finalized, posted, approved, completed, etc.
+    finalizedAt: { 
+      gte: period.startDate, 
+      lte: period.endDate,
+    },
+  };
+
+  console.log('[INVENTORY_ACTIVITY_SERVICE] getIntakeMovements filters:', {
+    period: { start: period.startDate.toISOString(), end: period.endDate.toISOString() },
+    locationFilter,
+    goodsIntakeFilter,
+    productFilter: productFilter ? 'applied' : 'none',
+  });
+
   const where = {
     ...productFilter,
-    goodsIntake: {
-      ...locationFilter,
-      status: { not: 'draft' },
-      finalizedAt: { gte: period.startDate, lte: period.endDate },
-    },
+    goodsIntake: goodsIntakeFilter,
   };
 
   const rows = await prisma.goodsIntakeItem.findMany({
@@ -224,12 +240,19 @@ async function getIntakeMovements(period, filters = {}) {
           enteredBy: true,
           locationCode: true,
           locationId: true,
+          branchCode: true,
+          status: true,
         },
       },
     },
-    orderBy: { createdAt: 'asc' },
-    take: 2000,
+    orderBy: [
+      { goodsIntake: { finalizedAt: 'asc' } }, // Primary: finalized time
+      { createdAt: 'asc' }, // Secondary: item creation time
+    ],
+    take: 5000,
   });
+
+  console.log('[INVENTORY_ACTIVITY_SERVICE] getIntakeMovements found', rows.length, 'items');
 
   return rows.map((row) => ({
     movementDate: row.goodsIntake?.finalizedAt || row.createdAt,
@@ -244,6 +267,8 @@ async function getIntakeMovements(period, filters = {}) {
     unitPrice: roundMoney(row.unitCost),
     lineAmount: roundMoney(row.totalCost),
     locationCode: row.goodsIntake?.locationCode || null,
+    branchCode: row.goodsIntake?.branchCode || null,
+    status: row.goodsIntake?.status || null,
   }));
 }
 
@@ -308,6 +333,60 @@ async function getEmergencySalesMovements(period, filters = {}) {
 async function getAdjustmentMovements(period, filters = {}) {
   // Stock adjustments are not stored in Prisma database
   // They are handled through POS sync agents in external tables
+  return [];
+}
+
+/**
+ * Get POS-initiated GRN (Goods Received Note) movements for a period and location
+ * These are stock intakes entered directly in the physical POS system, not through our web interface
+ * 
+ * Current Status: POS GRN data is stored in POS database SQL Server tables (stocks_temp, stockdetails_temp)
+ * Backend does NOT currently have access to POS database or received/approved GRN records
+ * 
+ * To enable POS GRN movements in the ledger, one of these approaches must be implemented:
+ * 1. POS Agent periodically syncs approved GRN records to backend via webhook/API endpoint
+ * 2. Backend connects to POS database directly (requires secure SQL Server connection config)
+ * 3. Manual import of GRN records from POS via batch upload
+ * 
+ * @param {object} period - Period with startDate and endDate
+ * @param {object} filters - Location and product filters
+ * @returns {array} Empty array (POS GRN data not yet available in backend)
+ */
+async function getPOSGRNMovements(period, filters = {}) {
+  const locationFilter = buildLocationFilter(filters);
+  
+  console.log('[INVENTORY_ACTIVITY_SERVICE] getPOSGRNMovements requested:', {
+    period: { start: period.startDate.toISOString(), end: period.endDate.toISOString() },
+    locationFilter,
+    status: 'NOT_IMPLEMENTED_POS_DATA_UNAVAILABLE',
+    description: 'POS GRN data is stored in external POS SQL Server database (stocks_temp, stockdetails_temp)',
+    nextSteps: [
+      'Option 1: Configure POS Sync Agent to push approved GRN records to backend API',
+      'Option 2: Establish secure direct connection to POS database for approved stock reads',
+      'Option 3: Implement batch GRN import endpoint for manual/scheduled uploads',
+    ],
+  });
+
+  // TODO: When POS GRN sync is implemented, query the synced data here
+  // Expected data structure from POS:
+  // {
+  //   grnNo: string,              // GRN number from POS
+  //   grnDate: DateTime,          // GRN received date
+  //   locationCode: string,       // POS location code
+  //   branchCode: string,         // Branch
+  //   supplierCode: string,       // POS supplier code
+  //   items: [
+  //     {
+  //       productCode: string,
+  //       productName: string,
+  //       quantity: number,       // Stock received qty
+  //       unitCost: number,
+  //       approvalStatus: 'pending'|'approved'|'posted'
+  //     }
+  //   ]
+  // }
+
+  // Return empty until POS GRN sync is available
   return [];
 }
 
@@ -614,6 +693,23 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       locationId: filters.locationId,
     });
 
+    // Log intake movement quality check
+    if (intakeMovements.length > 0) {
+      console.log('[INVENTORY LEDGER] Intake movements summary:');
+      const intakeSummary = {};
+      intakeMovements.forEach(m => {
+        const key = `${m.branchCode || '?'}/${m.locationCode || '?'}`;
+        intakeSummary[key] = (intakeSummary[key] || 0) + 1;
+      });
+      console.log('[INVENTORY LEDGER] Intakes by location:', intakeSummary);
+    } else {
+      console.warn('[INVENTORY LEDGER] ⚠️ NO INTAKE MOVEMENTS FOUND', {
+        period: { start: period.startDate.toISOString(), end: period.endDate.toISOString() },
+        filters: { branchCode: filters.branchCode, locationCode: filters.locationCode, locationId: filters.locationId },
+        advice: 'Check that Goods Intake records exist in the database with status != draft and finalizedAt within period',
+      });
+    }
+
     if ((filters.locationId || filters.branchCode || filters.locationCode) && (!filters.branchCode || !filters.locationCode)) {
       console.warn('[INVENTORY LEDGER] Incomplete canonical location scope. Exact opening balance requires branchCode + locationCode.', {
         branchCode: filters.branchCode,
@@ -623,17 +719,18 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
     }
 
     // Get all movement types in parallel
-    const [saleMovements, intakeMovements, emergencySalesMovements, adjustmentMovements] = await Promise.all([
+    const [saleMovements, intakeMovements, emergencySalesMovements, adjustmentMovements, posGrnMovements] = await Promise.all([
       getSaleMovements(period, filters),
       getIntakeMovements(period, filters),
       getEmergencySalesMovements(period, filters).catch(() => []),
       getAdjustmentMovements(period, filters),
+      getPOSGRNMovements(period, filters),
     ]);
 
-    console.log('[INVENTORY LEDGER] Movements fetched:', { sales: saleMovements.length, intakes: intakeMovements.length, emergencySales: emergencySalesMovements.length, adjustments: adjustmentMovements.length });
+    console.log('[INVENTORY LEDGER] Movements fetched:', { sales: saleMovements.length, intakes: intakeMovements.length, emergencySales: emergencySalesMovements.length, adjustments: adjustmentMovements.length, posGrn: posGrnMovements.length });
 
     // Combine and sort movements chronologically oldest-to-newest
-    let allMovements = [...saleMovements, ...intakeMovements, ...emergencySalesMovements, ...adjustmentMovements]
+    let allMovements = [...saleMovements, ...intakeMovements, ...emergencySalesMovements, ...adjustmentMovements, ...posGrnMovements]
       .filter((row) => {
         if (!filters.movementType) return true;
         return row.movementType === normalizeUpper(filters.movementType);
@@ -950,6 +1047,8 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
         unitPrice: movement.unitPrice,
         lineAmount: movement.lineAmount,
         locationCode: movement.locationCode,
+        branchCode: movement.branchCode || null,
+        status: movement.status || null,
       };
     });
 
