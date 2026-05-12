@@ -335,15 +335,20 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
     // 1. Get current synced POS stock from the same Product table used by Products / Emergency Sales
     const currentSyncedStock = await prisma.product.findFirst({
       where: {
-        sourceCode: { equals: normalizedProductCode, mode: 'insensitive' },
         branchCode: normalizedBranchCode,
         locationCode: normalizedLocationCode,
+        OR: [
+          { sourceCode: { equals: normalizedProductCode, mode: 'insensitive' } },
+          { barcode: { equals: normalizedProductCode, mode: 'insensitive' } },
+        ],
       },
       select: {
+        id: true,
         stock: true,
         overrideActive: true,
         overrideStock: true,
         sourceCode: true,
+        barcode: true,
         branchCode: true,
         locationCode: true,
       },
@@ -512,32 +517,57 @@ async function getProductSummary(period, filters = {}) {
 /**
  * Get current product stock for a location
  */
-async function getCurrentProductStock(productCode, locationCode, branchCode, locationId) {
-  if (!productCode) return null;
+async function resolveExactPersistedProduct(productCode, branchCode, locationCode) {
+  if (!productCode || !branchCode || !locationCode) return null;
 
   const normalizedProductCode = normalize(productCode);
-  const normalizedBranchCode = branchCode ? normalizeUpper(branchCode) : null;
-  const normalizedLocationCode = locationCode ? normalizeUpper(locationCode) : null;
+  const normalizedBranchCode = normalizeUpper(branchCode);
+  const normalizedLocationCode = normalizeUpper(locationCode);
 
-  if (!normalizedProductCode || !normalizedBranchCode || !normalizedLocationCode) {
-    return null;
-  }
-
-  const product = await prisma.product.findFirst({
+  // Exact lookup by sourceCode first, then fallback to barcode.
+  let product = await prisma.product.findFirst({
     where: {
-      sourceCode: { equals: normalizedProductCode, mode: 'insensitive' },
       branchCode: normalizedBranchCode,
       locationCode: normalizedLocationCode,
+      sourceCode: { equals: normalizedProductCode, mode: 'insensitive' },
     },
     select: {
+      id: true,
       stock: true,
       overrideActive: true,
       overrideStock: true,
-      name: true,
       sourceCode: true,
+      barcode: true,
+      branchCode: true,
+      locationCode: true,
     },
   });
 
+  if (!product) {
+    product = await prisma.product.findFirst({
+      where: {
+        branchCode: normalizedBranchCode,
+        locationCode: normalizedLocationCode,
+        barcode: { equals: normalizedProductCode, mode: 'insensitive' },
+      },
+      select: {
+        id: true,
+        stock: true,
+        overrideActive: true,
+        overrideStock: true,
+        sourceCode: true,
+        barcode: true,
+        branchCode: true,
+        locationCode: true,
+      },
+    });
+  }
+
+  return product;
+}
+
+async function getCurrentProductStock(productCode, locationCode, branchCode, locationId) {
+  const product = await resolveExactPersistedProduct(productCode, branchCode, locationCode);
   return product ? toNum(resolveEffectiveStock(product)) : null;
 }
 
@@ -623,14 +653,7 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
         let stockSource = 'PersistedProduct.not_found';
 
         if (productCode && filters.branchCode && filters.locationCode) {
-          const currentProduct = await prisma.product.findFirst({
-            where: {
-              sourceCode: { equals: productCode, mode: 'insensitive' },
-              branchCode: normalizeUpper(filters.branchCode),
-              locationCode: normalizeUpper(filters.locationCode),
-            },
-            select: { stock: true, overrideActive: true, overrideStock: true, branchCode: true, locationCode: true },
-          });
+          const currentProduct = await resolveExactPersistedProduct(productCode, filters.branchCode, filters.locationCode);
 
           if (currentProduct) {
             currentStock = toNum(resolveEffectiveStock(currentProduct));
@@ -705,14 +728,25 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
 
     // Calculate running balances per product key
     const firstBalanceLogged = new Set();
-    allMovements.forEach((movement) => {
+    const movementProductCache = new Map();
+
+    for (const movement of allMovements) {
       const productKey = movement.productCode || normalizeUpper(movement.productName || '');
+      const movementBranchCode = movement.branchCode || filters.branchCode || null;
+      const movementLocationCode = movement.locationCode || filters.locationCode || null;
+      const lookupKey = `${normalize(movement.productCode || '')}|${normalizeUpper(movementBranchCode || '')}|${normalizeUpper(movementLocationCode || '')}`;
+
+      let resolvedProduct = movementProductCache.get(lookupKey);
+      if (!resolvedProduct && movement.productCode && movementBranchCode && movementLocationCode) {
+        resolvedProduct = await resolveExactPersistedProduct(movement.productCode, movementBranchCode, movementLocationCode);
+        movementProductCache.set(lookupKey, resolvedProduct || null);
+      }
+
       if (productKey && productCurrentBalances.hasOwnProperty(productKey)) {
         const prevBalance = productCurrentBalances[productKey];
         productCurrentBalances[productKey] = toNum(prevBalance + movement.qtyIn - movement.qtyOut);
         movement.balanceAfterTransaction = productCurrentBalances[productKey];
 
-        // Update diagnostic first balance if this is the first movement for a logged product
         if (productDiagnostics.has(productKey) && !firstBalanceLogged.has(productKey)) {
           const diag = productDiagnostics.get(productKey);
           diag.firstBalanceAfterTransaction = movement.balanceAfterTransaction;
@@ -720,10 +754,14 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
           firstBalanceLogged.add(productKey);
         }
 
-        // Diagnostic logging for each movement
         console.log('[LEDGER BALANCE] Movement:', {
           productCode: movement.productCode,
-          productName: movement.productName,
+          branchCode: movementBranchCode,
+          locationCode: movementLocationCode,
+          resolvedProductId: resolvedProduct?.id || null,
+          resolvedProductSourceCode: resolvedProduct?.sourceCode || null,
+          resolvedProductStock: resolvedProduct ? toNum(resolveEffectiveStock(resolvedProduct)) : null,
+          matched: Boolean(resolvedProduct),
           movementType: movement.movementType,
           timestamp: movement.movementDate,
           qtyIn: movement.qtyIn,
@@ -733,9 +771,14 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
         });
       } else {
         movement.balanceAfterTransaction = 0; // fallback
-        console.warn('[LEDGER BALANCE] No balance tracking for productKey:', productKey);
+        console.warn('[LEDGER BALANCE] No balance tracking for productKey:', productKey, {
+          branchCode: movementBranchCode,
+          locationCode: movementLocationCode,
+          matched: Boolean(resolvedProduct),
+          resolvedProductId: resolvedProduct?.id || null,
+        });
       }
-    });
+    }
 
     // Set closing balances
     for (const productKey of uniqueProductKeys) {
