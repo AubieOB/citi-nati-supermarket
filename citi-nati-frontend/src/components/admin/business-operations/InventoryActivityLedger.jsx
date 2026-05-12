@@ -156,8 +156,13 @@ const InventoryActivityLedger = ({
       setLoading(true);
       setError('');
 
+      const requestParams = { ...modalFilters };
+      if (import.meta.env.DEV) {
+        console.debug('[INVENTORY ACTIVITY] Fetching ledger with params:', requestParams);
+      }
+
       const res = await api.get('/business-operations/inventory-activity/ledger', {
-        params: modalFilters,
+        params: requestParams,
       });
 
       if (res.data.success) {
@@ -596,6 +601,7 @@ function formatDateTime(value) {
   if (Number.isNaN(d.getTime())) return '-';
 
   return d.toLocaleString('en-GB', {
+    timeZone: 'Africa/Blantyre',
     year: 'numeric',
     month: 'short',
     day: '2-digit',

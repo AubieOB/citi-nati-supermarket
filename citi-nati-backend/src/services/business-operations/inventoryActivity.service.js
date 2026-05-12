@@ -24,29 +24,32 @@ function normalizeUpper(value) {
 }
 
 /**
- * Build period from filter parameters
+ * Build period from filter parameters using Africa/Blantyre local time (UTC+2)
  */
 function buildPeriod(filters = {}) {
+  const TZ_OFFSET_MS = 2 * 60 * 60 * 1000; // Africa/Blantyre UTC+2
   const now = new Date();
   let startDate, endDate;
 
   switch (filters.periodType) {
     case 'day':
-      startDate = new Date(filters.date || now);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(filters.date || now);
-      endDate.setHours(23, 59, 59, 999);
+      const d = filters.date ? new Date(filters.date) : now;
+      const dayYear = d.getFullYear();
+      const dayMonth = d.getMonth();
+      const dayDay = d.getDate();
+      startDate = new Date(Date.UTC(dayYear, dayMonth, dayDay, 0, 0, 0, 0) - TZ_OFFSET_MS);
+      endDate = new Date(Date.UTC(dayYear, dayMonth, dayDay, 23, 59, 59, 999) - TZ_OFFSET_MS);
       break;
     case 'month':
       const month = parseInt(filters.month || (now.getMonth() + 1));
       const year = parseInt(filters.year || now.getFullYear());
-      startDate = new Date(year, month - 1, 1);
-      endDate = new Date(year, month, 0, 23, 59, 59, 999);
+      startDate = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0) - TZ_OFFSET_MS);
+      endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999) - TZ_OFFSET_MS);
       break;
     case 'year':
       const yr = parseInt(filters.year || now.getFullYear());
-      startDate = new Date(yr, 0, 1);
-      endDate = new Date(yr, 11, 31, 23, 59, 59, 999);
+      startDate = new Date(Date.UTC(yr, 0, 1, 0, 0, 0, 0) - TZ_OFFSET_MS);
+      endDate = new Date(Date.UTC(yr, 11, 31, 23, 59, 59, 999) - TZ_OFFSET_MS);
       break;
     case 'custom':
       startDate = new Date(filters.startDate || now);
@@ -354,13 +357,13 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
     });
 
     // 2. Get all transactions AFTER the period start (to calculate what's happened since period began)
-    const [salesAfter, intakeAfter] = await Promise.all([
+    const [salesAfter, intakeAfter, emergencySalesAfter] = await Promise.all([
       prisma.salesInvoiceItem.findMany({
         where: {
           productCode: { equals: normalizedProductCode, mode: 'insensitive' },
           salesInvoice: {
             ...locationFilter,
-            invoiceDate: { gt: periodStartDate },
+            invoiceDate: { gte: periodStartDate },
           },
         },
         select: { qty: true },
@@ -371,14 +374,24 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
           goodsIntake: {
             ...locationFilter,
             status: { not: 'draft' },
-            finalizedAt: { gt: periodStartDate },
+            finalizedAt: { gte: periodStartDate },
           },
         },
         select: { quantity: true },
       }),
+      prisma.emergencySale?.findMany?.({
+        where: {
+          ...locationFilter,
+          status: { in: ['approved', 'completed'] },
+          createdAt: { gte: periodStartDate },
+          productCode: { equals: normalizedProductCode, mode: 'insensitive' },
+        },
+        select: { quantity: true },
+      }) || [],
     ]);
 
-    const totalQtyOutInSelectedPeriod = salesAfter.reduce((sum, row) => sum + toNum(row.qty), 0);
+    const totalQtyOutInSelectedPeriod = salesAfter.reduce((sum, row) => sum + toNum(row.qty), 0)
+      + emergencySalesAfter.reduce((sum, row) => sum + toNum(row.quantity), 0);
     const totalQtyInInSelectedPeriod = intakeAfter.reduce((sum, row) => sum + toNum(row.quantity), 0);
 
     const openingBal = latestStockBalance != null
