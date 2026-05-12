@@ -632,13 +632,13 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
 
     console.log('[INVENTORY LEDGER] Movements fetched:', { sales: saleMovements.length, intakes: intakeMovements.length, emergencySales: emergencySalesMovements.length, adjustments: adjustmentMovements.length });
 
-    // Combine and sort movements chronologically
+    // Combine and sort movements chronologically oldest-to-newest
     let allMovements = [...saleMovements, ...intakeMovements, ...emergencySalesMovements, ...adjustmentMovements]
       .filter((row) => {
         if (!filters.movementType) return true;
         return row.movementType === normalizeUpper(filters.movementType);
       })
-      .sort((a, b) => new Date(b.movementDate).getTime() - new Date(a.movementDate).getTime());
+      .sort((a, b) => new Date(a.movementDate).getTime() - new Date(b.movementDate).getTime());
 
     // Get unique product keys from movements (use productCode if present, else normalized productName)
     const productKeyLookup = new Map();

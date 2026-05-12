@@ -477,7 +477,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
       showBarcode: !isCompactScreen,
       showMargin: !isSmallScreen,
       showEstimatedProfit: !isSmallScreen,
-      showComments: !isCompactScreen,
+      showComments: !isSmallScreen,
       showExpiryDate: !isCompactScreen,
       // Font and padding adjustments
       tableFontSize: isCompactScreen ? '0.75rem' : isSmallScreen ? '0.8rem' : '0.86rem',
@@ -2247,6 +2247,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
             <tbody>
               {calculatedItems.map((line, index) => {
                 const compactLineInputStyle = { ...themedInputStyle, padding: responsiveSettings.tablePadding, fontSize: responsiveSettings.tableFontSize };
+                const rowMoney = (value) => responsiveSettings.isSmallScreen ? Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : money(value);
                 const belowCost = line.sellingPrice != null && Number(line.sellingPrice) < Number(line.unitCost || 0);
                 const lineLiveStock = Number.isFinite(Number(line.productId)) ? liveLineStockByProductId[Number(line.productId)] : null;
                 const displayStock = lineLiveStock?.latestSyncedStock ?? line.latestSyncedStock;
@@ -2357,7 +2358,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                         style={compactLineInputStyle}
                       />
                     </td>
-                    <td style={{ color: colors.text, fontWeight: 700, fontSize: responsiveSettings.tableFontSize, padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, whiteSpace: 'nowrap', verticalAlign: 'top' }}>{money(line.totalCost)}</td>
+                    <td style={{ color: colors.text, fontWeight: 700, fontSize: responsiveSettings.tableFontSize, padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, whiteSpace: 'nowrap', verticalAlign: 'top' }}>{rowMoney(line.totalCost)}</td>
                     <td style={{ padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
                       <input
                         ref={(element) => setLineInputRef(index, 'sellingPrice', element)}
@@ -2374,7 +2375,7 @@ const GoodsIntakeTab = ({ selectedLocationId = null, selectedBranchCode = '', se
                       />
                     </td>
                     {responsiveSettings.showMargin && <td style={{ fontWeight: 700, color: colors.subtleText, fontSize: responsiveSettings.tableFontSize, padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, whiteSpace: 'nowrap', verticalAlign: 'top' }}>{line.marginPercent == null ? '-' : `${line.marginPercent.toFixed(2)}%`}</td>}
-                    {responsiveSettings.showEstimatedProfit && <td style={{ fontWeight: 700, color: line.estimatedProfit >= 0 ? '#166534' : '#b91c1c', fontSize: responsiveSettings.tableFontSize, padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, whiteSpace: 'nowrap', verticalAlign: 'top' }}>{money(line.estimatedProfit)}</td>}
+                    {responsiveSettings.showEstimatedProfit && <td style={{ fontWeight: 700, color: line.estimatedProfit >= 0 ? '#166534' : '#b91c1c', fontSize: responsiveSettings.tableFontSize, padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, whiteSpace: 'nowrap', verticalAlign: 'top' }}>{rowMoney(line.estimatedProfit)}</td>}
                     {responsiveSettings.showExpiryDate && <td style={{ padding: responsiveSettings.tablePadding, borderBottom: `1px solid ${colors.tableBorder}`, verticalAlign: 'top' }}>
                       <input
                         ref={(element) => setLineInputRef(index, 'expiryDate', element)}
