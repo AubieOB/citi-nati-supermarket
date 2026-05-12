@@ -378,7 +378,12 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
       }),
       prisma.emergencySale?.findMany?.({
         where: {
-          ...locationFilter,
+         ...(normalizedBranchCode
+          ? { branchCode: normalizedBranchCode }
+          : {}),
+        ...(normalizedLocationCode
+          ? { locationCode: normalizedLocationCode }
+          : {}),
           status: { in: ['approved', 'completed'] },
           createdAt: { gt: periodStartDate },
           productCode: { equals: normalizedProductCode, mode: 'insensitive' },
