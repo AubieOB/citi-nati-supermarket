@@ -334,32 +334,114 @@ async function getPOSGRNMovements(period, filters = {}) {
   });
 
   try {
+    const locationWhere = {};
+    if (locationFilter.branchCode) {
+      locationWhere.branchCode = {
+        equals: locationFilter.branchCode,
+        mode: 'insensitive',
+      };
+    }
+    if (locationFilter.locationCode) {
+      locationWhere.locationCode = {
+        equals: locationFilter.locationCode,
+        mode: 'insensitive',
+      };
+    }
+
+    const dateWhere = {
+      OR: [
+        {
+          grnDate: {
+            gte: period.startDate,
+            lte: period.endDate,
+          },
+        },
+        {
+          sourceUpdatedAt: {
+            gte: period.startDate,
+            lte: period.endDate,
+          },
+        },
+      ],
+    };
+
+    console.log('[LEDGER POS_GRN QUERY FILTERS]', {
+      table: 'posStockIntakeItem',
+      relation: 'posStockIntake',
+      movementType: 'STOCK_IN',
+      branchCode: locationFilter.branchCode || null,
+      locationCode: locationFilter.locationCode || null,
+      locationId: locationFilter.locationId || null,
+      periodStart: period.startDate.toISOString(),
+      periodEnd: period.endDate.toISOString(),
+    });
+
+    const countNoDateWithLocation = await prisma.posStockIntakeItem.count({
+      where: {
+        posStockIntake: locationWhere,
+        quantity: { gt: 0 },
+      },
+    });
+
+    const countWithDate = await prisma.posStockIntakeItem.count({
+      where: {
+        posStockIntake: {
+          ...dateWhere,
+          ...locationWhere,
+        },
+        quantity: { gt: 0 },
+      },
+    });
+
+    const countDateOnly = await prisma.posStockIntakeItem.count({
+      where: {
+        posStockIntake: dateWhere,
+        quantity: { gt: 0 },
+      },
+    });
+
+    const sampleRow = await prisma.posStockIntakeItem.findFirst({
+      where: {
+        posStockIntake: locationWhere,
+        quantity: { gt: 0 },
+      },
+      select: {
+        id: true,
+        productCode: true,
+        productName: true,
+        quantity: true,
+        unitCost: true,
+        lineAmount: true,
+        sourceUpdatedAt: true,
+        sourceSyncedAt: true,
+        createdAt: true,
+        posStockIntake: {
+          select: {
+            grnNo: true,
+            grnDate: true,
+            grnReference: true,
+            grnUserName: true,
+            branchCode: true,
+            locationCode: true,
+            sourceUpdatedAt: true,
+            sourceSyncedAt: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    console.log('[LEDGER POS_GRN COUNT NO DATE]', countNoDateWithLocation);
+    console.log('[LEDGER POS_GRN COUNT WITH DATE]', countWithDate);
+    console.log('[LEDGER POS_GRN COUNT DATE_ONLY]', countDateOnly);
+    console.log('[LEDGER POS_GRN SAMPLE ROW]', sampleRow || null);
+
     // Query synced POS GRN data from database
     const grnItems = await prisma.posStockIntakeItem.findMany({
       where: {
         posStockIntake: {
-          OR: [
-            {
-              grnDate: {
-                gte: period.startDate,
-                lte: period.endDate,
-              },
-            },
-            {
-              sourceUpdatedAt: {
-                gte: period.startDate,
-                lte: period.endDate,
-              },
-            },
-          ],
-          branchCode: locationFilter.branchCode ? {
-            equals: locationFilter.branchCode,
-            mode: 'insensitive',
-          } : undefined,
-          locationCode: locationFilter.locationCode ? {
-            equals: locationFilter.locationCode,
-            mode: 'insensitive',
-          } : undefined,
+          ...dateWhere,
+          ...locationWhere,
         },
         quantity: {
           gt: 0, // Only positive stock intakes
