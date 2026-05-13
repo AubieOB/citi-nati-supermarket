@@ -1,4 +1,4 @@
-﻿-- CreateTable
+-- CreateTable
 CREATE TABLE "pos_stock_intakes" (
     "id" SERIAL NOT NULL,
     "sync_source_id" INTEGER NOT NULL,
