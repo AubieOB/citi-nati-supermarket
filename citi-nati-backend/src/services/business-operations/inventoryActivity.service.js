@@ -110,6 +110,49 @@ function buildLocationFilter(filters = {}) {
   return locationFilter;
 }
 
+function isSameUtcDate(left, right) {
+  if (!(left instanceof Date) || !(right instanceof Date)) return false;
+  return left.getUTCFullYear() === right.getUTCFullYear()
+    && left.getUTCMonth() === right.getUTCMonth()
+    && left.getUTCDate() === right.getUTCDate();
+}
+
+function isMidnightUtc(dateValue) {
+  if (!(dateValue instanceof Date)) return false;
+  return dateValue.getUTCHours() === 0 && dateValue.getUTCMinutes() === 0 && dateValue.getUTCSeconds() === 0 && dateValue.getUTCMilliseconds() === 0;
+}
+
+function getBestPosGrnMovementDate(item) {
+  const grnDate = item.posStockIntake?.grnDate;
+  const sourceUpdatedAt = item.posStockIntake?.sourceUpdatedAt || item.sourceUpdatedAt || item.sourceSyncedAt || item.posStockIntake?.sourceSyncedAt;
+
+  if (grnDate instanceof Date) {
+    if (isMidnightUtc(grnDate) && sourceUpdatedAt instanceof Date && isSameUtcDate(grnDate, sourceUpdatedAt)) {
+      return sourceUpdatedAt;
+    }
+    return grnDate;
+  }
+
+  if (sourceUpdatedAt instanceof Date) {
+    return sourceUpdatedAt;
+  }
+
+  return new Date();
+}
+
+function movementTypeMatchesFilter(movementType, filterType) {
+  if (!filterType) return true;
+  const requested = normalizeUpper(filterType);
+  const actual = normalizeUpper(movementType);
+
+  const intakeTypes = new Set(['STOCK_IN', 'STOCK_INTAKE', 'POS_GRN']);
+  if (intakeTypes.has(requested) && intakeTypes.has(actual)) {
+    return true;
+  }
+
+  return actual === requested;
+}
+
 /**
  * Get sales movements for a period and location
  */
@@ -388,10 +431,20 @@ async function getPOSGRNMovements(period, filters = {}) {
     const grnItems = await prisma.posStockIntakeItem.findMany({
       where: {
         posStockIntake: {
-          grnDate: {
-            gte: period.startDate,
-            lte: period.endDate,
-          },
+          OR: [
+            {
+              grnDate: {
+                gte: period.startDate,
+                lte: period.endDate,
+              },
+            },
+            {
+              sourceUpdatedAt: {
+                gte: period.startDate,
+                lte: period.endDate,
+              },
+            },
+          ],
           branchCode: locationFilter.branchCode ? {
             equals: locationFilter.branchCode,
             mode: 'insensitive',
@@ -415,12 +468,17 @@ async function getPOSGRNMovements(period, filters = {}) {
             locationCode: true,
             supplierCode: true,
             orderNumber: true,
+            grnUserName: true,
             sourceUpdatedAt: true,
+            sourceSyncedAt: true,
           },
         },
+        sourceUpdatedAt: true,
+        sourceSyncedAt: true,
       },
       orderBy: [
         { posStockIntake: { grnDate: 'asc' } },
+        { posStockIntake: { sourceUpdatedAt: 'asc' } },
         { posStockIntake: { grnNo: 'asc' } },
         { productCode: 'asc' },
       ],
@@ -430,7 +488,7 @@ async function getPOSGRNMovements(period, filters = {}) {
 
     // Transform to movement format expected by ledger
     const movements = grnItems.map((item) => {
-      const movementDate = item.posStockIntake.grnDate || item.posStockIntake.sourceUpdatedAt || item.syncedAt || new Date();
+      const movementDate = getBestPosGrnMovementDate(item);
       const { transactionDate, transactionTime } = formatBlantyreDateTimeParts(movementDate);
       return {
         id: `pos-grn-${item.posStockIntake.grnNo}-${item.stockDetailId || item.productCode}`,
@@ -453,11 +511,12 @@ async function getPOSGRNMovements(period, filters = {}) {
         supplierCode: item.posStockIntake.supplierCode,
         orderNumber: item.posStockIntake.orderNumber,
         grnReference: item.posStockIntake.grnReference,
+        grnUserName: item.posStockIntake.grnUserName || null,
         expiryDate: item.expiryDate,
         source: 'POS_GRN_SYNC',
         sourceUpdatedAt: item.posStockIntake.sourceUpdatedAt,
         syncedAt: item.sourceSyncedAt,
-        userName: null,
+        userName: item.posStockIntake.grnUserName || null,
       };
     });
 
@@ -531,7 +590,7 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
     });
 
     // 2. Get all transactions AFTER the period start (to calculate what's happened since period began)
-    const [salesAfter, intakeAfter] = await Promise.all([
+    const [salesAfter, intakeAfter, posGrnAfter] = await Promise.all([
       prisma.salesInvoiceItem.findMany({
         where: {
           productCode: { equals: normalizedProductCode, mode: 'insensitive' },
@@ -553,10 +612,24 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
         },
         select: { quantity: true },
       }),
+      prisma.posStockIntakeItem.findMany({
+        where: {
+          productCode: { equals: normalizedProductCode, mode: 'insensitive' },
+          posStockIntake: {
+            OR: [
+              { grnDate: { gte: periodStartDate } },
+              { sourceUpdatedAt: { gte: periodStartDate } },
+            ],
+            ...locationFilter,
+          },
+          quantity: { gt: 0 },
+        },
+        select: { quantity: true },
+      }),
     ]);
 
     const totalQtyOutInSelectedPeriod = salesAfter.reduce((sum, row) => sum + toNum(row.qty), 0);
-    const totalQtyInInSelectedPeriod = intakeAfter.reduce((sum, row) => sum + toNum(row.quantity), 0);
+    const totalQtyInInSelectedPeriod = intakeAfter.reduce((sum, row) => sum + toNum(row.quantity), 0) + posGrnAfter.reduce((sum, row) => sum + toNum(row.quantity), 0);
 
     const openingBal = latestStockBalance != null
       ? toNum(latestStockBalance + totalQtyOutInSelectedPeriod - totalQtyInInSelectedPeriod)
@@ -812,10 +885,7 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
 
     // Combine and sort movements chronologically oldest-to-newest
     let allMovements = [...saleMovements, ...intakeMovements, ...emergencySalesMovements, ...adjustmentMovements, ...posGrnMovements]
-      .filter((row) => {
-        if (!filters.movementType) return true;
-        return row.movementType === normalizeUpper(filters.movementType);
-      })
+      .filter((row) => movementTypeMatchesFilter(row.movementType, filters.movementType))
       .sort((a, b) => new Date(a.movementDate).getTime() - new Date(b.movementDate).getTime());
 
     // Get unique product keys from movements (use productCode if present, else normalized productName)
