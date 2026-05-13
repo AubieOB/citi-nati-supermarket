@@ -241,7 +241,7 @@ async function getSaleMovements(period, filters = {}) {
 async function getIntakeMovements(period, filters = {}) {
   // Treat POS-approved GRN / POS stock intake as the single source of truth for stock intake movements.
   const movements = await getPOSGRNMovements(period, filters);
-  console.log('[INVENTORY_ACTIVITY_SERVICE] getIntakeMovements returning POS GRN intake rows:', movements.length);
+  console.log('[LEDGER STOCK_IN MOVEMENTS] getIntakeMovements returning POS GRN intake rows:', movements.length);
   return movements;
 }
 
@@ -388,6 +388,13 @@ async function getPOSGRNMovements(period, filters = {}) {
         { posStockIntake: { grnNo: 'asc' } },
         { productCode: 'asc' },
       ],
+    });
+
+    console.log('[LEDGER POS_GRN QUERY] count', grnItems.length, {
+      periodStart: period.startDate.toISOString(),
+      periodEnd: period.endDate.toISOString(),
+      branchCode: locationFilter.branchCode || null,
+      locationCode: locationFilter.locationCode || null,
     });
 
     console.log(`[INVENTORY_ACTIVITY_SERVICE] Found ${grnItems.length} POS GRN item records`);
@@ -761,6 +768,7 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
     ]);
 
     console.log('[INVENTORY LEDGER] Movements fetched:', { sales: saleMovements.length, intakes: intakeMovements.length, emergencySales: emergencySalesMovements.length, adjustments: adjustmentMovements.length });
+    console.log('[LEDGER STOCK_IN MOVEMENTS] count', intakeMovements.length);
 
     // Log intake movement quality check
     if (intakeMovements.length > 0) {
@@ -779,10 +787,37 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       });
     }
 
-    // Combine and sort movements chronologically oldest-to-newest
-    let allMovements = [...saleMovements, ...intakeMovements, ...emergencySalesMovements, ...adjustmentMovements]
-      .filter((row) => movementTypeMatchesFilter(row.movementType, filters.movementType))
-      .sort((a, b) => new Date(a.movementDate).getTime() - new Date(b.movementDate).getTime());
+    // Combine movements before filtering
+    const rawAllMovements = [...saleMovements, ...intakeMovements, ...emergencySalesMovements, ...adjustmentMovements];
+    const rawCounts = { sales: 0, stockIn: 0, other: 0 };
+    rawAllMovements.forEach((row) => {
+      if (normalizeUpper(row.movementType) === 'SALE') rawCounts.sales += 1;
+      else if (normalizeUpper(row.movementType) === 'STOCK_IN') rawCounts.stockIn += 1;
+      else rawCounts.other += 1;
+    });
+
+    const requestedMovementType = normalizeUpper(filters.movementType || 'ALL');
+    const preFilterCount = rawAllMovements.length;
+    const allMovements = rawAllMovements
+      .filter((row) => movementTypeMatchesFilter(row.movementType, filters.movementType));
+
+    const postCounts = { sales: 0, stockIn: 0, other: 0 };
+    allMovements.forEach((row) => {
+      if (normalizeUpper(row.movementType) === 'SALE') postCounts.sales += 1;
+      else if (normalizeUpper(row.movementType) === 'STOCK_IN') postCounts.stockIn += 1;
+      else postCounts.other += 1;
+    });
+
+    console.log('[LEDGER ALL MOVEMENTS] sales count:', rawCounts.sales, 'stockIn count:', rawCounts.stockIn, 'total count:', preFilterCount);
+    console.log('[LEDGER FILTER]', {
+      requestedMovementType,
+      beforeCount: preFilterCount,
+      afterCount: allMovements.length,
+      before: rawCounts,
+      after: postCounts,
+    });
+
+    allMovements.sort((a, b) => new Date(a.movementDate).getTime() - new Date(b.movementDate).getTime());
 
     // Get unique product keys from movements (use productCode if present, else normalized productName)
     const productKeyLookup = new Map();
