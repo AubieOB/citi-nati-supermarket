@@ -145,8 +145,6 @@ function movementTypeMatchesFilter(movementType, filterType) {
   const requested = normalizeUpper(filterType);
   const actual = normalizeUpper(movementType);
 
-  if (requested === 'ALL') return true;
-
   const intakeTypes = new Set(['STOCK_IN', 'STOCK_INTAKE', 'POS_GRN']);
   if (intakeTypes.has(requested) && intakeTypes.has(actual)) {
     return true;
