@@ -141,16 +141,18 @@ function getBestPosGrnMovementDate(item) {
 }
 
 function movementTypeMatchesFilter(movementType, filterType) {
-  const requestedType = normalizeUpper(filterType);
-  const actualType = normalizeUpper(movementType);
+  if (!filterType) return true;
+  const requested = normalizeUpper(filterType);
+  const actual = normalizeUpper(movementType);
 
-  if (!requestedType || requestedType === 'ALL') return true;
-  if (requestedType === 'SALE' || requestedType === 'SALES') return actualType === 'SALE';
+  if (requested === 'ALL') return true;
 
-  const intakeAliases = new Set(['STOCK_IN', 'STOCK_INTAKE', 'POS_GRN', 'GOODS_INTAKE']);
-  if (intakeAliases.has(requestedType)) return intakeAliases.has(actualType);
+  const intakeTypes = new Set(['STOCK_IN', 'STOCK_INTAKE', 'POS_GRN']);
+  if (intakeTypes.has(requested) && intakeTypes.has(actual)) {
+    return true;
+  }
 
-  return actualType === requestedType;
+  return actual === requested;
 }
 
 /**
@@ -322,7 +324,7 @@ async function getIntakeMovements(period, filters = {}) {
 
   return rows.map((row) => ({
     movementDate: row.goodsIntake?.finalizedAt || row.createdAt,
-    movementType: 'STOCK_IN',
+    movementType: 'STOCK_INTAKE',
     referenceNo: row.goodsIntake?.intakeRef || null,
     cashierName: row.goodsIntake?.enteredBy || null,
     productCode: row.product?.sourceCode || null,
