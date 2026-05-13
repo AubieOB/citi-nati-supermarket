@@ -295,7 +295,7 @@ function buildPosGrnPayload(rows) {
     const header = grnMap.get(grnNo) || {
       grnNo,
       grnDate: row.GRNDate instanceof Date ? row.GRNDate.toISOString() : row.GRNDate || null,
-      grnReference: row.GRNReference || null,
+      grnReference: row.GRNReference && row.GRNReference.trim() ? row.GRNReference.trim() : grnNo, // Use GRNNo as fallback reference
       locationCode: row.LocationCode || null,
       branchCode: BRANCH_CODE,
       supplierCode: row.SupplierCode || null,
@@ -364,8 +364,45 @@ async function sendPosGrnsToBackend(posGrns) {
   }
 }
 
+async function getTableColumns(pool, tableName) {
+  try {
+    const request = pool.request();
+    request.input('tableName', sql.VarChar(128), tableName);
+    const result = await request.query(`
+      SELECT COLUMN_NAME
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = @tableName
+      ORDER BY ORDINAL_POSITION
+    `);
+    return new Set((result.recordset || []).map((row) => String(row.COLUMN_NAME || '').trim()));
+  } catch (error) {
+    console.error(`[POS GRN SYNC] Failed to get columns for table ${tableName}:`, error.message);
+    return new Set();
+  }
+}
+
+async function resolvePosGrnColumnConfig(pool) {
+  const stocksColumns = await getTableColumns(pool, 'stocks');
+
+  // Look for GRN reference columns in order of preference
+  const grnRefCandidates = ['GRNReference', 'ReferenceNo', 'ReceiptReference', 'RefNo', 'GRNNo'];
+  const grnRefColumn = grnRefCandidates.find((column) => stocksColumns.has(column)) || null;
+
+  console.log('[POS GRN SYNC] Detected stocks table columns for GRN reference:', {
+    availableColumns: Array.from(stocksColumns).filter(col => grnRefCandidates.includes(col)),
+    selectedColumn: grnRefColumn || 'GRNNo (fallback)',
+  });
+
+  return {
+    grnReferenceExpr: grnRefColumn ? `COALESCE(s.${grnRefColumn}, '')` : `COALESCE(s.GRNNo, '')`,
+  };
+}
+
 async function fetchApprovedPosGrnRows(pool, lookbackDays = 90) {
   if (!pool) await initializePool();
+
+  // Detect available GRN reference column
+  const columnConfig = await resolvePosGrnColumnConfig(pool);
 
   const request = pool.request();
   request.input('LocationCode', sql.VarChar(10), appConfig.posDb.locationCode);
@@ -378,7 +415,7 @@ async function fetchApprovedPosGrnRows(pool, lookbackDays = 90) {
       s.LocationCode,
       COALESCE(s.SupplierCode, '') AS SupplierCode,
       COALESCE(s.OrderNumber, '') AS OrderNumber,
-      COALESCE(s.GRNReference, '') AS GRNReference,
+      ${columnConfig.grnReferenceExpr} AS GRNReference,
       s.UploadStatus,
       sd.StockDetailID,
       sd.ProductCode,
