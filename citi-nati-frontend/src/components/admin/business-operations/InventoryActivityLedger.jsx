@@ -314,7 +314,7 @@ const InventoryActivityLedger = ({
         <select value={modalMovementType} onChange={(e) => setModalMovementType(e.target.value)} style={inputStyle}>
           <option value="">All</option>
           <option value="SALE">Sales Only</option>
-          <option value="STOCK_INTAKE">Stock Intake Only</option>
+          <option value="STOCK_IN">Stock Intake Only</option>
         </select>
       </div>
 
@@ -556,7 +556,7 @@ const MovementBadge = ({ type }) => {
       bgColor = '#fee2e2';
       label = 'SALE';
       break;
-    case 'STOCK_INTAKE':
+    case 'STOCK_IN':
       color = '#166534';
       bgColor = '#dcfce7';
       label = 'INTAKE';

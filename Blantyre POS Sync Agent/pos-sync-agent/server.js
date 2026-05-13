@@ -303,6 +303,7 @@ function buildPosGrnPayload(rows) {
       uploadStatus: Number.isFinite(Number(row.UploadStatus)) ? Number(row.UploadStatus) : null,
       sourceUpdatedAt: row.GRNDate instanceof Date ? row.GRNDate.toISOString() : row.GRNDate || null,
       items: [],
+      userName: row.GRNUserName ? String(row.GRNUserName).trim() : null,
     };
 
     header.items.push({
@@ -384,17 +385,27 @@ async function getTableColumns(pool, tableName) {
 async function resolvePosGrnColumnConfig(pool) {
   const stocksColumns = await getTableColumns(pool, 'stocks');
 
-  // Look for GRN reference columns in order of preference
   const grnRefCandidates = ['GRNReference', 'ReferenceNo', 'ReceiptReference', 'RefNo', 'GRNNo'];
-  const grnRefColumn = grnRefCandidates.find((column) => stocksColumns.has(column)) || null;
+  const userCandidates = ['GRNUserName', 'UserName', 'CreatedBy', 'EnteredBy', 'Operator', 'Cashier', 'UpdatedBy'];
+  const grnDateCandidates = ['GRNDateTime', 'GRNDate', 'CreatedAt', 'CreatedDate', 'EntryDateTime', 'PostedAt', 'UpdatedAt', 'UpdatedDate'];
 
-  console.log('[POS GRN SYNC] Detected stocks table columns for GRN reference:', {
-    availableColumns: Array.from(stocksColumns).filter(col => grnRefCandidates.includes(col)),
-    selectedColumn: grnRefColumn || 'GRNNo (fallback)',
+  const grnRefColumn = grnRefCandidates.find((column) => stocksColumns.has(column)) || null;
+  const grnUserColumn = userCandidates.find((column) => stocksColumns.has(column)) || null;
+  const grnDateColumn = grnDateCandidates.find((column) => stocksColumns.has(column));
+  const grnDateExpr = grnDateColumn
+    ? `COALESCE(s.${grnDateColumn}, s.GRNDate)`
+    : 's.GRNDate';
+
+  console.log('[POS GRN SYNC] Detected stocks table columns for POS GRN sync:', {
+    grnReferenceColumn: grnRefColumn || 'GRNNo (fallback)',
+    grnUserColumn: grnUserColumn || 'none',
+    grnDateColumn,
   });
 
   return {
     grnReferenceExpr: grnRefColumn ? `COALESCE(s.${grnRefColumn}, '')` : `COALESCE(s.GRNNo, '')`,
+    grnUserNameExpr: grnUserColumn ? `s.${grnUserColumn}` : 'NULL',
+    grnDateExpr,
   };
 }
 
@@ -411,11 +422,12 @@ async function fetchApprovedPosGrnRows(pool, lookbackDays = 90) {
   const query = `
     SELECT
       s.GRNNo,
-      s.GRNDate,
+      ${columnConfig.grnDateExpr} AS GRNDate,
       s.LocationCode,
       COALESCE(s.SupplierCode, '') AS SupplierCode,
       COALESCE(s.OrderNumber, '') AS OrderNumber,
       ${columnConfig.grnReferenceExpr} AS GRNReference,
+      ${columnConfig.grnUserNameExpr} AS GRNUserName,
       s.UploadStatus,
       sd.StockDetailID,
       sd.ProductCode,
@@ -438,6 +450,7 @@ async function fetchApprovedPosGrnRows(pool, lookbackDays = 90) {
   const rows = (result.recordset || []).map((row) => ({
     GRNNo: row.GRNNo == null ? null : String(row.GRNNo).trim(),
     GRNDate: row.GRNDate instanceof Date ? row.GRNDate : (row.GRNDate || null),
+    GRNUserName: row.GRNUserName == null ? null : String(row.GRNUserName).trim(),
     LocationCode: row.LocationCode == null ? null : String(row.LocationCode).trim(),
     SupplierCode: row.SupplierCode == null ? null : String(row.SupplierCode).trim(),
     OrderNumber: row.OrderNumber == null ? null : String(row.OrderNumber).trim(),

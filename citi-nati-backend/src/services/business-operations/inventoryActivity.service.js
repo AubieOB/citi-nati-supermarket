@@ -110,6 +110,49 @@ function buildLocationFilter(filters = {}) {
   return locationFilter;
 }
 
+function isSameUtcDate(left, right) {
+  if (!(left instanceof Date) || !(right instanceof Date)) return false;
+  return left.getUTCFullYear() === right.getUTCFullYear()
+    && left.getUTCMonth() === right.getUTCMonth()
+    && left.getUTCDate() === right.getUTCDate();
+}
+
+function isMidnightUtc(dateValue) {
+  if (!(dateValue instanceof Date)) return false;
+  return dateValue.getUTCHours() === 0 && dateValue.getUTCMinutes() === 0 && dateValue.getUTCSeconds() === 0 && dateValue.getUTCMilliseconds() === 0;
+}
+
+function getBestPosGrnMovementDate(item) {
+  const grnDate = item.posStockIntake?.grnDate;
+  const sourceUpdatedAt = item.posStockIntake?.sourceUpdatedAt || item.sourceUpdatedAt || item.sourceSyncedAt;
+
+  if (grnDate instanceof Date) {
+    if (isMidnightUtc(grnDate) && sourceUpdatedAt instanceof Date && isSameUtcDate(grnDate, sourceUpdatedAt)) {
+      return sourceUpdatedAt;
+    }
+    return grnDate;
+  }
+
+  if (sourceUpdatedAt instanceof Date) {
+    return sourceUpdatedAt;
+  }
+
+  return new Date();
+}
+
+function movementTypeMatchesFilter(movementType, filterType) {
+  const requestedType = normalizeUpper(filterType);
+  const actualType = normalizeUpper(movementType);
+
+  if (!requestedType || requestedType === 'ALL') return true;
+  if (requestedType === 'SALE' || requestedType === 'SALES') return actualType === 'SALE';
+
+  const intakeAliases = new Set(['STOCK_IN', 'STOCK_INTAKE', 'POS_GRN', 'GOODS_INTAKE']);
+  if (intakeAliases.has(requestedType)) return intakeAliases.has(actualType);
+
+  return actualType === requestedType;
+}
+
 /**
  * Get sales movements for a period and location
  */
@@ -196,103 +239,10 @@ async function getSaleMovements(period, filters = {}) {
  * Fetches web-based goods intake entries that were finalized/posted
  */
 async function getIntakeMovements(period, filters = {}) {
-  const locationFilter = buildLocationFilter(filters);
-  const normalizedProductCode = normalize(filters.productCode);
-  const normalizedProductName = normalize(filters.productName);
-
-  // Product filter - by sourceCode or name
-  const productFilter = normalizedProductCode || normalizedProductName ? {
-    OR: [
-      normalizedProductCode ? { product: { sourceCode: { equals: normalizedProductCode, mode: 'insensitive' } } } : null,
-      normalizedProductName ? { productName: { contains: normalizedProductName, mode: 'insensitive' } } : null,
-    ].filter(Boolean)
-  } : {};
-
-  // Build comprehensive location filter for goodsIntake
-  // Handle both finalized intakes (with finalizedAt) and non-draft intakes where finalizedAt may be null
-  const goodsIntakeFilter = {
-    ...locationFilter,
-    status: { not: 'draft' }, // Include: finalized, posted, approved, completed, etc.
-    OR: [
-      // Priority: use finalizedAt if it exists
-      {
-        finalizedAt: { 
-          gte: period.startDate, 
-          lte: period.endDate,
-        },
-      },
-      // Fallback: if finalizedAt is null, check purchaseDate
-      {
-        finalizedAt: null,
-        purchaseDate: {
-          gte: period.startDate,
-          lte: period.endDate,
-        },
-      },
-    ],
-  };
-
-  console.log('[INVENTORY_ACTIVITY_SERVICE] getIntakeMovements filters:', {
-    period: { start: period.startDate.toISOString(), end: period.endDate.toISOString() },
-    locationFilter,
-    goodsIntakeFilter,
-    productFilter: productFilter ? 'applied' : 'none',
-  });
-
-  const where = {
-    ...productFilter,
-    goodsIntake: goodsIntakeFilter,
-  };
-
-  const rows = await prisma.goodsIntakeItem.findMany({
-    where,
-    select: {
-      id: true,
-      productName: true,
-      quantity: true,
-      unitCost: true,
-      totalCost: true,
-      createdAt: true,
-      product: {
-        select: { sourceCode: true },
-      },
-      goodsIntake: {
-        select: {
-          intakeRef: true,
-          finalizedAt: true,
-          enteredBy: true,
-          locationCode: true,
-          locationId: true,
-          branchCode: true,
-          status: true,
-        },
-      },
-    },
-    orderBy: [
-      { goodsIntake: { finalizedAt: 'asc' } }, // Primary: finalized time
-      { createdAt: 'asc' }, // Secondary: item creation time
-    ],
-    take: 5000,
-  });
-
-  console.log('[INVENTORY_ACTIVITY_SERVICE] getIntakeMovements found', rows.length, 'items');
-
-  return rows.map((row) => ({
-    movementDate: row.goodsIntake?.finalizedAt || row.createdAt,
-    movementType: 'STOCK_INTAKE',
-    referenceNo: row.goodsIntake?.intakeRef || null,
-    cashierName: row.goodsIntake?.enteredBy || null,
-    productCode: row.product?.sourceCode || null,
-    productName: row.productName,
-    qtyIn: toNum(row.quantity),
-    qtyOut: 0,
-    runningBalance: null,
-    unitPrice: roundMoney(row.unitCost),
-    lineAmount: roundMoney(row.totalCost),
-    locationCode: row.goodsIntake?.locationCode || null,
-    branchCode: row.goodsIntake?.branchCode || null,
-    status: row.goodsIntake?.status || null,
-  }));
+  // Treat POS-approved GRN / POS stock intake as the single source of truth for stock intake movements.
+  const movements = await getPOSGRNMovements(period, filters);
+  console.log('[INVENTORY_ACTIVITY_SERVICE] getIntakeMovements returning POS GRN intake rows:', movements.length);
+  return movements;
 }
 
 /**
@@ -388,10 +338,20 @@ async function getPOSGRNMovements(period, filters = {}) {
     const grnItems = await prisma.posStockIntakeItem.findMany({
       where: {
         posStockIntake: {
-          grnDate: {
-            gte: period.startDate,
-            lte: period.endDate,
-          },
+          OR: [
+            {
+              grnDate: {
+                gte: period.startDate,
+                lte: period.endDate,
+              },
+            },
+            {
+              sourceUpdatedAt: {
+                gte: period.startDate,
+                lte: period.endDate,
+              },
+            },
+          ],
           branchCode: locationFilter.branchCode ? {
             equals: locationFilter.branchCode,
             mode: 'insensitive',
@@ -415,9 +375,13 @@ async function getPOSGRNMovements(period, filters = {}) {
             locationCode: true,
             supplierCode: true,
             orderNumber: true,
+            grnUserName: true,
             sourceUpdatedAt: true,
+            sourceSyncedAt: true,
           },
         },
+        sourceUpdatedAt: true,
+        sourceSyncedAt: true,
       },
       orderBy: [
         { posStockIntake: { grnDate: 'asc' } },
@@ -430,7 +394,7 @@ async function getPOSGRNMovements(period, filters = {}) {
 
     // Transform to movement format expected by ledger
     const movements = grnItems.map((item) => {
-      const movementDate = item.posStockIntake.grnDate || item.posStockIntake.sourceUpdatedAt || item.syncedAt || new Date();
+      const movementDate = getBestPosGrnMovementDate(item);
       const { transactionDate, transactionTime } = formatBlantyreDateTimeParts(movementDate);
       return {
         id: `pos-grn-${item.posStockIntake.grnNo}-${item.stockDetailId || item.productCode}`,
@@ -457,7 +421,7 @@ async function getPOSGRNMovements(period, filters = {}) {
         source: 'POS_GRN_SYNC',
         sourceUpdatedAt: item.posStockIntake.sourceUpdatedAt,
         syncedAt: item.sourceSyncedAt,
-        userName: null,
+        userName: item.posStockIntake.grnUserName || null,
       };
     });
 
@@ -531,32 +495,38 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
     });
 
     // 2. Get all transactions AFTER the period start (to calculate what's happened since period began)
-    const [salesAfter, intakeAfter] = await Promise.all([
+    const [salesAfter, posGrnAfter] = await Promise.all([
       prisma.salesInvoiceItem.findMany({
         where: {
           productCode: { equals: normalizedProductCode, mode: 'insensitive' },
           salesInvoice: {
             ...locationFilter,
-            invoiceDate: { gte: periodStartDate },
+            OR: [
+              { invoiceDate: { gt: periodStartDate } },
+              { invoiceTime: { gt: periodStartDate } },
+            ],
           },
         },
         select: { qty: true },
       }),
-      prisma.goodsIntakeItem.findMany({
+      prisma.posStockIntakeItem.findMany({
         where: {
-          product: { sourceCode: { equals: normalizedProductCode, mode: 'insensitive' } },
-          goodsIntake: {
+          productCode: { equals: normalizedProductCode, mode: 'insensitive' },
+          posStockIntake: {
             ...locationFilter,
-            status: { not: 'draft' },
-            finalizedAt: { gte: periodStartDate },
+            OR: [
+              { grnDate: { gt: periodStartDate } },
+              { sourceUpdatedAt: { gt: periodStartDate } },
+            ],
           },
+          quantity: { gt: 0 },
         },
         select: { quantity: true },
       }),
     ]);
 
     const totalQtyOutInSelectedPeriod = salesAfter.reduce((sum, row) => sum + toNum(row.qty), 0);
-    const totalQtyInInSelectedPeriod = intakeAfter.reduce((sum, row) => sum + toNum(row.quantity), 0);
+    const totalQtyInInSelectedPeriod = posGrnAfter.reduce((sum, row) => sum + toNum(row.quantity), 0);
 
     const openingBal = latestStockBalance != null
       ? toNum(latestStockBalance + totalQtyOutInSelectedPeriod - totalQtyInInSelectedPeriod)
@@ -783,15 +753,14 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
     }
 
     // Get all movement types in parallel
-    const [saleMovements, intakeMovements, emergencySalesMovements, adjustmentMovements, posGrnMovements] = await Promise.all([
+    const [saleMovements, intakeMovements, emergencySalesMovements, adjustmentMovements] = await Promise.all([
       getSaleMovements(period, filters),
       getIntakeMovements(period, filters),
       getEmergencySalesMovements(period, filters).catch(() => []),
       getAdjustmentMovements(period, filters),
-      getPOSGRNMovements(period, filters),
     ]);
 
-    console.log('[INVENTORY LEDGER] Movements fetched:', { sales: saleMovements.length, intakes: intakeMovements.length, emergencySales: emergencySalesMovements.length, adjustments: adjustmentMovements.length, posGrn: posGrnMovements.length });
+    console.log('[INVENTORY LEDGER] Movements fetched:', { sales: saleMovements.length, intakes: intakeMovements.length, emergencySales: emergencySalesMovements.length, adjustments: adjustmentMovements.length });
 
     // Log intake movement quality check
     if (intakeMovements.length > 0) {
@@ -806,16 +775,13 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       console.warn('[INVENTORY LEDGER] ⚠️ NO INTAKE MOVEMENTS FOUND', {
         period: { start: period.startDate.toISOString(), end: period.endDate.toISOString() },
         filters: { branchCode: filters.branchCode, locationCode: filters.locationCode, locationId: filters.locationId },
-        advice: 'Check that Goods Intake records exist in the database with status != draft and finalizedAt within period',
+        advice: 'Check that POS GRN / stock intake sync records exist in the backend for the selected period and location',
       });
     }
 
     // Combine and sort movements chronologically oldest-to-newest
-    let allMovements = [...saleMovements, ...intakeMovements, ...emergencySalesMovements, ...adjustmentMovements, ...posGrnMovements]
-      .filter((row) => {
-        if (!filters.movementType) return true;
-        return row.movementType === normalizeUpper(filters.movementType);
-      })
+    let allMovements = [...saleMovements, ...intakeMovements, ...emergencySalesMovements, ...adjustmentMovements]
+      .filter((row) => movementTypeMatchesFilter(row.movementType, filters.movementType))
       .sort((a, b) => new Date(a.movementDate).getTime() - new Date(b.movementDate).getTime());
 
     // Get unique product keys from movements (use productCode if present, else normalized productName)
@@ -842,6 +808,7 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
     console.log('[INVENTORY LEDGER] Processing opening balances for', uniqueProductKeys.length, 'unique products');
 
     let diagnosticCounter = 0;
+    let stockInDiagnostics = 0;
 
     for (const productKey of uniqueProductKeys) {
       const { productCode, productName } = productKeyLookup.get(productKey) || {};
@@ -879,7 +846,7 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
         let totalQtyInInSelectedPeriod = 0;
 
         if (productCode) {
-          const [salesAfter, intakeAfter] = await Promise.all([
+          const [salesAfter, posGrnAfter] = await Promise.all([
             prisma.salesInvoiceItem.findMany({
               where: {
                 productCode: { equals: productCode, mode: 'insensitive' },
@@ -887,28 +854,34 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
                   ...(filters.branchCode ? { branchCode: normalizeUpper(filters.branchCode) } : {}),
                   ...(filters.locationCode ? { locationCode: { equals: normalizeUpper(filters.locationCode), mode: 'insensitive' } } : {}),
                   ...(filters.locationId ? { locationId: Number(filters.locationId) } : {}),
-                  invoiceDate: { gt: period.startDate },
+                  OR: [
+                    { invoiceDate: { gt: period.startDate } },
+                    { invoiceTime: { gt: period.startDate } },
+                  ],
                 },
               },
               select: { qty: true },
             }),
-            prisma.goodsIntakeItem.findMany({
+            prisma.posStockIntakeItem.findMany({
               where: {
-                product: { sourceCode: { equals: productCode, mode: 'insensitive' } },
-                goodsIntake: {
+                productCode: { equals: productCode, mode: 'insensitive' },
+                posStockIntake: {
                   ...(filters.branchCode ? { branchCode: normalizeUpper(filters.branchCode) } : {}),
                   ...(filters.locationCode ? { locationCode: { equals: normalizeUpper(filters.locationCode), mode: 'insensitive' } } : {}),
                   ...(filters.locationId ? { locationId: Number(filters.locationId) } : {}),
-                  status: { not: 'draft' },
-                  finalizedAt: { gt: period.startDate },
+                  OR: [
+                    { grnDate: { gt: period.startDate } },
+                    { sourceUpdatedAt: { gt: period.startDate } },
+                  ],
                 },
+                quantity: { gt: 0 },
               },
               select: { quantity: true },
             }),
           ]);
 
           totalQtyOutInSelectedPeriod = salesAfter.reduce((sum, row) => sum + toNum(row.qty), 0);
-          totalQtyInInSelectedPeriod = intakeAfter.reduce((sum, row) => sum + toNum(row.quantity), 0);
+          totalQtyInInSelectedPeriod = posGrnAfter.reduce((sum, row) => sum + toNum(row.quantity), 0);
         }
 
         productDiagnostics.set(productKey, {
@@ -962,27 +935,42 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       }
 
       if (productKey && productCurrentBalances.hasOwnProperty(productKey)) {
-               // Initialize from opening balance once
-      if (productCurrentBalances[productKey] == null) {
-        productCurrentBalances[productKey] =
-          productOpeningBalances[productKey] ?? 0;
-      }
+        // Initialize from opening balance once
+        if (productCurrentBalances[productKey] == null) {
+          productCurrentBalances[productKey] =
+            productOpeningBalances[productKey] ?? 0;
+        }
 
-      const prevBalance = toNum(productCurrentBalances[productKey]);
+        const prevBalance = toNum(productCurrentBalances[productKey]);
+        const runningBalanceBefore = prevBalance;
 
-      // Apply movement chronologically
-      const nextBalance = toNum(
-        prevBalance +
-        movement.qtyIn -
-        movement.qtyOut
-      );
+        // Apply movement chronologically
+        const nextBalance = toNum(
+          prevBalance +
+          movement.qtyIn -
+          movement.qtyOut
+        );
 
-      movement.balanceBeforeTransaction = prevBalance;
-      movement.balanceAfterTransaction = nextBalance;
+        movement.balanceBeforeTransaction = prevBalance;
+        movement.balanceAfterTransaction = nextBalance;
 
-      // Persist running balance
-      productCurrentBalances[productKey] = nextBalance;
-      productClosingBalances[productKey] = nextBalance;
+        if (movement.movementType === 'STOCK_IN' && stockInDiagnostics < 10) {
+          console.log('[LEDGER STOCK_IN FLOW]', {
+            productCode: movement.productCode,
+            GRNNo: movement.referenceNo,
+            transactionTime: movement.transactionTime,
+            openingBalance: productOpeningBalances[productKey],
+            qtyIn: movement.qtyIn,
+            runningBalanceBefore,
+            balanceAfterTransaction: nextBalance,
+            userName: movement.userName || movement.cashierName || 'POS GRN',
+          });
+          stockInDiagnostics += 1;
+        }
+
+        // Persist running balance
+        productCurrentBalances[productKey] = nextBalance;
+        productClosingBalances[productKey] = nextBalance;
         if (productDiagnostics.has(productKey) && !firstBalanceLogged.has(productKey)) {
           const diag = productDiagnostics.get(productKey);
           diag.firstBalanceAfterTransaction = movement.balanceAfterTransaction;

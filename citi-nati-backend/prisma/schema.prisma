@@ -724,6 +724,7 @@ model PosStockIntake {
   grnNo             String                @map("grn_no")
   grnDate           DateTime?             @map("grn_date")
   grnReference      String?               @map("grn_reference")
+  grnUserName       String?               @map("grn_user_name")
   supplierCode      String?               @map("supplier_code")
   orderNumber       String?               @map("order_number")
   uploadStatus      Int?                  @map("upload_status")

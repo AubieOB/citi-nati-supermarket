@@ -409,6 +409,7 @@ function normalizePosStockIntake(grn, batchMeta) {
     grnNo: toStringOrNull(grn.grnNo),
     grnDate: toDateOrNull(grn.grnDate),
     grnReference: toStringOrNull(grn.grnReference),
+    grnUserName: toStringOrNull(grn.userName || grn.grnUserName),
     supplierCode: toStringOrNull(grn.supplierCode),
     orderNumber: toStringOrNull(grn.orderNumber),
     uploadStatus: toInt(grn.uploadStatus),
