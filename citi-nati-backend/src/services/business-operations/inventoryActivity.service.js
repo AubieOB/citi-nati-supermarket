@@ -33,6 +33,16 @@ function buildBlantyreDate(year, month, day, hour = 0, minute = 0, second = 0, m
   return new Date(`${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}:${pad(second)}.${String(ms).padStart(3, '0')}+02:00`);
 }
 
+function formatBlantyreDateTimeParts(dateValue) {
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return { transactionDate: null, transactionTime: null };
+  const shifted = new Date(date.getTime() + BLANTYRE_TZ_OFFSET_MS);
+  return {
+    transactionDate: `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())}`,
+    transactionTime: `${pad(shifted.getUTCHours())}:${pad(shifted.getUTCMinutes())}:${pad(shifted.getUTCSeconds())}`,
+  };
+}
+
 function buildPeriod(filters = {}) {
   const now = new Date();
   let startDate, endDate;
@@ -419,28 +429,39 @@ async function getPOSGRNMovements(period, filters = {}) {
     console.log(`[INVENTORY_ACTIVITY_SERVICE] Found ${grnItems.length} POS GRN item records`);
 
     // Transform to movement format expected by ledger
-    const movements = grnItems.map((item) => ({
-      id: `pos-grn-${item.posStockIntake.grnNo}-${item.stockDetailId || item.productCode}`,
-      type: 'pos_grn',
-      date: item.posStockIntake.grnDate,
-      productCode: item.productCode,
-      productName: item.productName || item.productCode,
-      locationCode: item.posStockIntake.locationCode || locationFilter.locationCode,
-      branchCode: item.posStockIntake.branchCode,
-      quantity: item.quantity,
-      unitCost: item.unitCost,
-      lineAmount: item.lineAmount,
-      reference: item.posStockIntake.grnNo,
-      referenceType: 'pos_grn',
-      supplierCode: item.posStockIntake.supplierCode,
-      orderNumber: item.posStockIntake.orderNumber,
-      grnReference: item.posStockIntake.grnReference,
-      expiryDate: item.expiryDate,
-      source: 'pos_sync',
-      sourceUpdatedAt: item.posStockIntake.sourceUpdatedAt,
-      syncedAt: item.sourceSyncedAt,
-    }));
+    const movements = grnItems.map((item) => {
+      const movementDate = item.posStockIntake.grnDate || item.posStockIntake.sourceUpdatedAt || item.syncedAt || new Date();
+      const { transactionDate, transactionTime } = formatBlantyreDateTimeParts(movementDate);
+      return {
+        id: `pos-grn-${item.posStockIntake.grnNo}-${item.stockDetailId || item.productCode}`,
+        type: 'pos_grn',
+        movementDate,
+        movementType: 'STOCK_IN',
+        transactionDate,
+        transactionTime,
+        productCode: item.productCode,
+        productName: item.productName || item.productCode,
+        locationCode: item.posStockIntake.locationCode || locationFilter.locationCode,
+        branchCode: item.posStockIntake.branchCode,
+        qtyIn: toNum(item.quantity),
+        qtyOut: 0,
+        unitCost: item.unitCost,
+        unitPrice: roundMoney(item.unitCost),
+        lineAmount: roundMoney(item.lineAmount),
+        referenceNo: item.posStockIntake.grnNo,
+        referenceType: 'GRN',
+        supplierCode: item.posStockIntake.supplierCode,
+        orderNumber: item.posStockIntake.orderNumber,
+        grnReference: item.posStockIntake.grnReference,
+        expiryDate: item.expiryDate,
+        source: 'POS_GRN_SYNC',
+        sourceUpdatedAt: item.posStockIntake.sourceUpdatedAt,
+        syncedAt: item.sourceSyncedAt,
+        userName: null,
+      };
+    });
 
+    console.log('[INVENTORY_ACTIVITY_SERVICE][LEDGER GRN NORMALIZATION] POS GRN movement sample:', movements[0] || null);
     console.log(`[INVENTORY_ACTIVITY_SERVICE] Returning ${movements.length} POS GRN movements`);
     return movements;
   } catch (error) {
@@ -1094,9 +1115,11 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       return {
         transactionId: movement.transactionId || `${movement.movementType}-${idx}`,
         timestamp: timestampValue,
+        transactionDate: movement.transactionDate || null,
+        transactionTime: movement.transactionTime || null,
         movementType: movement.movementType,
         referenceNo: movement.referenceNo,
-        user: movement.cashierName,
+        user: movement.userName || movement.cashierName || 'POS GRN',
         productCode: movement.productCode,
         productName: movement.productName,
         openingBalance,
