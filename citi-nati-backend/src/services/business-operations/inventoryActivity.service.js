@@ -378,7 +378,9 @@ async function getPOSGRNMovements(period, filters = {}) {
 
     const countNoDateWithLocation = await prisma.posStockIntakeItem.count({
       where: {
-        posStockIntake: locationWhere,
+        posStockIntake: {
+          is: locationWhere,
+        },
         quantity: { gt: 0 },
       },
     });
@@ -386,8 +388,10 @@ async function getPOSGRNMovements(period, filters = {}) {
     const countWithDate = await prisma.posStockIntakeItem.count({
       where: {
         posStockIntake: {
-          ...dateWhere,
-          ...locationWhere,
+          is: {
+            ...dateWhere,
+            ...locationWhere,
+          },
         },
         quantity: { gt: 0 },
       },
@@ -395,14 +399,18 @@ async function getPOSGRNMovements(period, filters = {}) {
 
     const countDateOnly = await prisma.posStockIntakeItem.count({
       where: {
-        posStockIntake: dateWhere,
+        posStockIntake: {
+          is: dateWhere,
+        },
         quantity: { gt: 0 },
       },
     });
 
     const sampleRow = await prisma.posStockIntakeItem.findFirst({
       where: {
-        posStockIntake: locationWhere,
+        posStockIntake: {
+          is: locationWhere,
+        },
         quantity: { gt: 0 },
       },
       select: {
@@ -440,8 +448,10 @@ async function getPOSGRNMovements(period, filters = {}) {
     const grnItems = await prisma.posStockIntakeItem.findMany({
       where: {
         posStockIntake: {
-          ...dateWhere,
-          ...locationWhere,
+          is: {
+            ...dateWhere,
+            ...locationWhere,
+          },
         },
         quantity: {
           gt: 0, // Only positive stock intakes
