@@ -507,8 +507,7 @@ export function exportStockMovementLedgerPdf({
 
   const summaryCards = [
     { label: 'Visible Rows', value: fmtCount(ledger.length), color: BRAND_PURPLE },
-    { label: 'Opening Balance', value: fmtCurrency(summary.openingBalance ?? 0), color: BRAND_GREEN },
-    { label: 'Total Qty In', value: fmtCount(summary.totalQtyIn ?? 0), color: BRAND_PURPLE },
+    { label: 'Total Qty In', value: fmtCount(summary.totalQtyIn ?? 0), color: BRAND_GREEN },
     { label: 'Total Qty Out', value: fmtCount(summary.totalQtyOut ?? 0), color: BRAND_PURPLE },
   ];
 
