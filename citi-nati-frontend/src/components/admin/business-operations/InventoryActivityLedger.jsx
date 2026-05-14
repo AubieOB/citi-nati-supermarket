@@ -374,8 +374,8 @@ const InventoryActivityLedger = ({
           </div>
 
           <div style={{ ...cardStyle, padding: '0.9rem 1rem' }}>
-            <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800 }}>Transactions</div>
-            <div style={{ marginTop: '0.35rem', fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>{summary.transactionCount ?? 0}</div>
+            <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 800 }}>Total Intake Value</div>
+            <div style={{ marginTop: '0.35rem', fontSize: '1.25rem', fontWeight: 800, color: '#166534' }}>{money(summary.totalIntakeValue)}</div>
           </div>
 
           {summary.closingBalance !== null && summary.closingBalance !== undefined && (

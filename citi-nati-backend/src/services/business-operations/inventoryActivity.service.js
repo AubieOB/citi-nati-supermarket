@@ -491,7 +491,7 @@ async function getPOSGRNMovements(period, filters = {}) {
 
     // Transform to movement format expected by ledger
     const movements = grnItems.map((item) => {
-      const movementDate = getBestPosGrnMovementDate(item);
+      const movementDate = item.posStockIntake.sourceUpdatedAt || item.posStockIntake.grnDate || new Date();
       const { transactionDate, transactionTime } = formatBlantyreDateTimeParts(movementDate);
       return {
         id: `pos-grn-${item.posStockIntake.grnNo}-${item.stockDetailId || item.productCode}`,
@@ -518,7 +518,7 @@ async function getPOSGRNMovements(period, filters = {}) {
         source: 'POS_GRN_SYNC',
         sourceUpdatedAt: item.posStockIntake.sourceUpdatedAt,
         syncedAt: item.sourceSyncedAt,
-        userName: item.posStockIntake.grnUserName || null,
+        userName: item.posStockIntake.grnUserName || 'POS',
       };
     });
 
@@ -1088,7 +1088,7 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
             qtyIn: movement.qtyIn,
             runningBalanceBefore,
             balanceAfterTransaction: nextBalance,
-            userName: movement.userName || movement.cashierName || 'POS GRN',
+            userName: movement.userName || movement.cashierName || 'POS',
           });
           stockInDiagnostics += 1;
         }
@@ -1144,13 +1144,19 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
     let totalQtyIn = 0;
     let totalQtyOut = 0;
     let totalSalesAmount = 0;
+    let totalIntakeValue = 0;
     let totalOpeningBalance = 0;
     let totalClosingBalance = 0;
 
     allMovements.forEach((movement) => {
       totalQtyIn += Number(movement.qtyIn || 0);
       totalQtyOut += Number(movement.qtyOut || 0);
-      totalSalesAmount += Number(movement.lineAmount || 0);
+      if (movement.movementType === 'SALE') {
+        totalSalesAmount += Number(movement.lineAmount || 0);
+      }
+      if (movement.movementType === 'STOCK_IN') {
+        totalIntakeValue += Number(movement.lineAmount || 0);
+      }
     });
 
     uniqueProductKeys.forEach((productKey) => {
@@ -1232,7 +1238,7 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
         transactionTime: movement.transactionTime || null,
         movementType: movement.movementType,
         referenceNo: movement.referenceNo,
-        user: movement.userName || movement.cashierName || 'POS GRN',
+        user: movement.userName || movement.cashierName || 'POS',
         productCode: movement.productCode,
         productName: movement.productName,
         openingBalance,
@@ -1253,6 +1259,7 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       totalQtyIn: toNum(totalQtyIn),
       totalQtyOut: toNum(totalQtyOut),
       totalSalesAmount: roundMoney(totalSalesAmount),
+      totalIntakeValue: roundMoney(totalIntakeValue),
       movementCount: allMovements.length,
       transactionCount: allMovements.length,
       productCount: products.length,
