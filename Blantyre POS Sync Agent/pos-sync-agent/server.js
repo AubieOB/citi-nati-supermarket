@@ -387,7 +387,7 @@ async function resolvePosGrnColumnConfig(pool) {
 
   const grnRefCandidates = ['GRNReference', 'ReferenceNo', 'ReceiptReference', 'RefNo', 'GRNNo'];
   const userCandidates = ['GRNUserName', 'UserName', 'CreatedBy', 'EnteredBy', 'Operator', 'Cashier', 'UpdatedBy'];
-  const grnDateCandidates = ['GRNDateTime', 'GRNDate', 'CreatedAt', 'CreatedDate', 'EntryDateTime', 'PostedAt', 'UpdatedAt', 'UpdatedDate'];
+  const grnDateCandidates = ['GRNDateTime', 'CreatedAt', 'CreatedDate', 'EntryDateTime', 'PostedAt', 'UpdatedAt', 'UpdatedDate', 'GRNDate'];
 
   const grnRefColumn = grnRefCandidates.find((column) => stocksColumns.has(column)) || null;
   const grnUserColumn = userCandidates.find((column) => stocksColumns.has(column)) || null;
