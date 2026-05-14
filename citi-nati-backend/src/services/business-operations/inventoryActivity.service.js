@@ -530,10 +530,21 @@ async function getPOSGRNMovements(period, filters = {}) {
     const movements = grnItems.map((item) => {
       const selectedUser = item.posStockIntake.grnUserName || item.posStockIntake.syncSourceCode || 'POS GRN Sync';
 
-      // Determine if this is a historical GRN (grnDate earlier than grnObservedAt)
+      // Determine if this is a historical GRN (from a previous day, not just earlier time today)
       const grnDate = item.posStockIntake.grnDate;
       const grnObservedAt = item.posStockIntake.grnObservedAt;
-      const isHistoricalGrn = grnDate && grnObservedAt && new Date(grnDate).getTime() < new Date(grnObservedAt).getTime();
+      let isHistoricalGrn = false;
+
+      if (grnDate && grnObservedAt) {
+        const grnDateObj = new Date(grnDate);
+        const observedDateObj = new Date(grnObservedAt);
+
+        // Only consider historical if grnDate is from a different day (not just earlier time today)
+        const grnDateOnly = new Date(grnDateObj.getFullYear(), grnDateObj.getMonth(), grnDateObj.getDate());
+        const observedDateOnly = new Date(observedDateObj.getFullYear(), observedDateObj.getMonth(), observedDateObj.getDate());
+
+        isHistoricalGrn = grnDateOnly.getTime() < observedDateOnly.getTime();
+      }
 
       let movementDate;
       let isDateOnly = false;
@@ -588,6 +599,8 @@ async function getPOSGRNMovements(period, filters = {}) {
         grnNo: item.posStockIntake.grnNo,
         grnDate: item.posStockIntake.grnDate,
         grnObservedAt: item.posStockIntake.grnObservedAt,
+        grnDateOnly: grnDate ? new Date(new Date(grnDate).getFullYear(), new Date(grnDate).getMonth(), new Date(grnDate).getDate()).toDateString() : null,
+        observedDateOnly: grnObservedAt ? new Date(new Date(grnObservedAt).getFullYear(), new Date(grnObservedAt).getMonth(), new Date(grnObservedAt).getDate()).toDateString() : null,
         isHistoricalGrn,
         isDateOnly,
         selectedMovementDate: movementDate.toISOString(),
