@@ -206,35 +206,6 @@ const InventoryActivityLedger = ({
     setModalEndDate(today.toISOString().slice(0, 10));
   };
 
-  const exportCSV = () => {
-    if (!data || !data.ledger) return;
-
-    const rows = data.ledger;
-    if (rows.length === 0) return;
-
-    // Use tab-delimited format for better Excel compatibility
-    let csvContent = 'Timestamp\tMovement Type\tReference\tUser\tProduct Code\tProduct Name\tOpening Balance\tQty In\tQty Out\tBalance After Transaction\tClosing Balance\tUnit Price\tAmount\n';
-
-    rows.forEach((row) => {
-      const closingBalanceValue = row.closingBalance !== null && row.closingBalance !== undefined ? row.closingBalance : '';
-      
-      // Format product code - prefix with single quote to prevent Excel scientific notation
-      const productCodeFormatted = row.productCode ? `'${row.productCode}` : '';
-      
-      // Format timestamp to ensure proper width and readability
-      const timestamp = formatDateTime(row.timestamp, row.isDateOnly);
-      
-      csvContent += `${timestamp}\t${row.movementType}\t${row.referenceNo || ''}\t${row.user || ''}\t${productCodeFormatted}\t${row.productName || ''}\t${row.openingBalance}\t${row.qtyIn}\t${row.qtyOut}\t${row.balanceAfterTransaction}\t${closingBalanceValue}\t${row.unitPrice}\t${row.lineAmount}\n`;
-    });
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-
-    link.href = URL.createObjectURL(blob);
-    link.download = `inventory-ledger-${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-  };
-
   const exportPDF = () => {
     if (!data || !data.ledger) return;
 
@@ -468,10 +439,6 @@ const InventoryActivityLedger = ({
         </div>
 
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <button type="button" onClick={exportCSV} disabled={!ledger.length} title="Export CSV" style={{ padding: '0.45rem 0.75rem', cursor: ledger.length ? 'pointer' : 'not-allowed', backgroundColor: '#5B4B8A', color: '#fff', fontWeight: 700, border: '1px solid #5B4B8A', borderRadius: '8px', fontSize: '0.85rem' }}>
-            <i className="fas fa-file-csv" style={{ marginRight: '0.42rem' }} />
-            CSV
-          </button>
           <button type="button" onClick={exportPDF} disabled={!ledger.length} title="Export PDF" style={{ padding: '0.45rem 0.75rem', cursor: ledger.length ? 'pointer' : 'not-allowed', backgroundColor: '#7c3aed', color: '#fff', fontWeight: 700, border: '1px solid #7c3aed', borderRadius: '8px', fontSize: '0.85rem' }}>
             <i className="fas fa-file-pdf" style={{ marginRight: '0.42rem' }} />
             PDF
