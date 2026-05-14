@@ -600,7 +600,7 @@ const MovementBadge = ({ type }) => {
 function formatDateTime(value, isDateOnly = false) {
   if (!value) return '-';
 
-  // For historical date-only entries, show only the date
+  // For historical date-only entries, show only the date without "(Date only)" text
   if (isDateOnly) {
     if (typeof value === 'string') {
       const isoMatch = value.match(/^([0-9]{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?)?(?:Z|[+-]\d{2}:?\d{2})?$/);
@@ -608,7 +608,7 @@ function formatDateTime(value, isDateOnly = false) {
         const [, year, month, day] = isoMatch;
         const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         const monthName = monthNames[Number(month) - 1] || month;
-        return `${day} ${monthName} ${year} (Date only)`;
+        return `${day} ${monthName} ${year}`;
       }
     }
 
@@ -618,10 +618,10 @@ function formatDateTime(value, isDateOnly = false) {
         year: 'numeric',
         month: 'short',
         day: '2-digit',
-      }) + ' (Date only)';
+      });
     }
 
-    return String(value) + ' (Date only)';
+    return String(value);
   }
 
   if (typeof value === 'string') {

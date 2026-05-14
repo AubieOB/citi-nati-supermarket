@@ -554,8 +554,8 @@ async function getPOSGRNMovements(period, filters = {}) {
         movementDate = grnDate;
         isDateOnly = true;
       } else {
-        // For live GRNs, use observed timestamp or fallback
-        movementDate =
+        // For live GRNs, use observed timestamp or fallback, converted to Malawi local time
+        const rawTimestamp =
           item.posStockIntake.grnObservedAt ||
           item.posStockIntake.sourceSyncedAt ||
           item.posStockIntake.sourceUpdatedAt ||
@@ -563,6 +563,9 @@ async function getPOSGRNMovements(period, filters = {}) {
           item.posStockIntake.updatedAt ||
           item.posStockIntake.createdAt ||
           new Date();
+        
+        // Convert from UTC to Africa/Blantyre (add 2 hours) to match SALE row display
+        movementDate = new Date(rawTimestamp.getTime() + BLANTYRE_TZ_OFFSET_MS);
       }
 
       const { transactionDate, transactionTime } = formatBlantyreDateTimeParts(movementDate);
