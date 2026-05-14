@@ -1,5 +1,28 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+
+function normalizeBackfillLocationId(locationId) {
+  const rawLocationId = locationId;
+  const normalizedLocationId =
+    rawLocationId !== undefined &&
+    rawLocationId !== null &&
+    rawLocationId !== ''
+      ? Number(rawLocationId)
+      : null;
+  const safeLocationId = Number.isInteger(normalizedLocationId)
+    ? normalizedLocationId
+    : null;
+
+  console.log('[BACKFILL LOCATION NORMALIZATION]', {
+    rawLocationId,
+    normalizedLocationId,
+    typeofRawLocationId: typeof rawLocationId,
+    safeLocationId,
+  });
+
+  return safeLocationId;
+}
+
 exports.backfillSales = async (req, res) => {
   try {
     const payload = req.body || {};
@@ -55,14 +78,14 @@ exports.backfillSales = async (req, res) => {
           create: {
             branchCode,
             branchName: invoice.branchName || branchCode,
-            locationId: metadata.locationId || null,
+            locationId: normalizeBackfillLocationId(metadata.locationId),
             syncSourceCode,
             lastSeenAt: new Date(),
           },
           update: {
             branchCode,
             branchName: invoice.branchName || branchCode,
-            locationId: metadata.locationId || null,
+            locationId: normalizeBackfillLocationId(metadata.locationId),
             lastSeenAt: new Date(),
           },
         });

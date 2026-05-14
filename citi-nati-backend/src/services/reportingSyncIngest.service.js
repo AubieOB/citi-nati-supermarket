@@ -12,6 +12,28 @@ function toFloat(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function normalizeLocationId(value) {
+  const rawLocationId = value;
+  const normalizedLocationId =
+    rawLocationId !== undefined &&
+    rawLocationId !== null &&
+    rawLocationId !== ''
+      ? Number(rawLocationId)
+      : null;
+  const safeLocationId = Number.isInteger(normalizedLocationId)
+    ? normalizedLocationId
+    : null;
+
+  console.log('[BACKFILL LOCATION NORMALIZATION]', {
+    rawLocationId,
+    normalizedLocationId,
+    typeofRawLocationId: typeof rawLocationId,
+    safeLocationId,
+  });
+
+  return safeLocationId;
+}
+
 function toStringOrNull(value) {
   if (value === undefined || value === null) return null;
   const text = String(value).trim();
@@ -133,14 +155,14 @@ async function upsertSyncSource(tx, payload) {
     create: {
       branchCode: payload.branchCode,
       branchName: payload.branchName,
-      locationId: toInt(payload.locationId),
+      locationId: normalizeLocationId(payload.locationId),
       syncSourceCode: payload.syncSourceCode,
       lastSeenAt: now,
     },
     update: {
       branchCode: payload.branchCode,
       branchName: payload.branchName,
-      locationId: toInt(payload.locationId),
+      locationId: normalizeLocationId(payload.locationId),
       lastSeenAt: now,
       updatedAt: now,
     },
@@ -310,7 +332,7 @@ async function ingestReportingBatch(payload) {
     syncSourceId: source.id,
     branchCode: payload.branchCode,
     branchName: payload.branchName,
-    locationId: toInt(payload.locationId),
+    locationId: normalizeLocationId(payload.locationId),
     syncSourceCode: payload.syncSourceCode,
     syncedAt,
   };
@@ -358,7 +380,7 @@ async function ingestLatestProductCosts(payload) {
     syncSourceId: source.id,
     branchCode: payload.branchCode,
     branchName: payload.branchName,
-    locationId: toInt(payload.locationId),
+    locationId: normalizeLocationId(payload.locationId),
     syncSourceCode: payload.syncSourceCode,
     syncedAt,
   };
@@ -457,7 +479,7 @@ async function ingestPosStockIntakes(payload) {
     syncSourceId: source.id,
     branchCode: payload.branchCode,
     branchName: payload.branchName,
-    locationId: toInt(payload.locationId),
+    locationId: normalizeLocationId(payload.locationId),
     syncSourceCode: payload.syncSourceCode,
     syncedAt,
   };
