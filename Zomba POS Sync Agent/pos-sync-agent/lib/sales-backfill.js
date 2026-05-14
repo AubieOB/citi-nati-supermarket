@@ -15,6 +15,7 @@ class SalesBackfillService {
     this.pool = pool;
     this.branchTag = config.branch.logPrefix || `[${config.branch.branchCode} SYNC]`;
     this.invoiceDetailsColumnSupport = null;
+    this.invoiceColumnSupport = null;
   }
 
   async getTableColumns(tableName) {
@@ -52,14 +53,29 @@ class SalesBackfillService {
     return this.invoiceDetailsColumnSupport;
   }
 
-  async resolveInvoiceQuoteNoSupport() {
+  async resolveInvoiceColumnSupport() {
+    if (this.invoiceColumnSupport) {
+      return this.invoiceColumnSupport;
+    }
+
     try {
       const invoiceColumns = await this.getTableColumns('invoice');
-      return invoiceColumns.has('QuoteNo');
+      const detailColumns = await this.getTableColumns('invoicedetails');
+      this.invoiceColumnSupport = {
+        hasInvoiceCode: invoiceColumns.has('InvoiceCode'),
+        hasQuoteNo: invoiceColumns.has('QuoteNo'),
+        detailUsesInvoiceCode: detailColumns.has('InvoiceCode'),
+      };
     } catch (error) {
-      console.warn(`${this.branchTag} [BACKFILL SCHEMA][WARN] Could not detect invoice.QuoteNo: ${error.message}`);
-      return false;
+      console.warn(`${this.branchTag} [BACKFILL SCHEMA][WARN] Could not detect invoice schema support: ${error.message}`);
+      this.invoiceColumnSupport = {
+        hasInvoiceCode: false,
+        hasQuoteNo: false,
+        detailUsesInvoiceCode: true,
+      };
     }
+
+    return this.invoiceColumnSupport;
   }
 
   /**
@@ -67,18 +83,23 @@ class SalesBackfillService {
    */
   async fetchHistoricalInvoiceHeaders(fromDate, toDate, batchSize = 100) {
     try {
-      const hasQuoteNo = await this.resolveInvoiceQuoteNoSupport();
+      const support = await this.resolveInvoiceColumnSupport();
       const request = this.pool.request();
       
       request.input('fromDate', sql.Date, fromDate);
       request.input('toDate', sql.Date, toDate);
       request.input('batchSize', sql.Int, batchSize);
 
-      const quoteNoSelect = hasQuoteNo ? ',\n            QuoteNo' : '';
+      const invoiceCodeSelect = support.hasInvoiceCode
+        ? 'InvoiceCode'
+        : support.hasQuoteNo
+          ? 'QuoteNo AS InvoiceCode'
+          : 'InvoiceNo AS InvoiceCode';
 
       const query = `
         SELECT TOP (@batchSize)
             InvoiceNo,
+            ${invoiceCodeSelect},
             InvoiceSerialNo,
             RefNo,
             InvoiceDate,
@@ -111,7 +132,7 @@ class SalesBackfillService {
             Bank_Name,
             Bank_CARD_HOLDER,
             Bank_CARD_NO,
-            Bank_CARD_EXPIARY${quoteNoSelect}
+            Bank_CARD_EXPIARY
         FROM invoice
         WHERE InvoiceDate >= @fromDate AND InvoiceDate <= @toDate
         ORDER BY InvoiceNo ASC
@@ -204,6 +225,7 @@ class SalesBackfillService {
 
     return {
       invoiceNo: Number(row.InvoiceNo),
+      invoiceCode: Number(row.InvoiceCode || row.InvoiceNo),
       invoiceSerialNo: Number(row.InvoiceSerialNo),
       refNo: row.RefNo || null,
       invoiceDate: row.InvoiceDate instanceof Date ? row.InvoiceDate.toISOString() : row.InvoiceDate,

@@ -258,7 +258,7 @@ class SalesBackfillService {
 
     return {
       invDetailID: Number(row.InvDetailID),
-      invoiceCode: Number(row.InvoiceCode),
+      invoiceCode: Number(row.InvoiceCode || row.InvoiceNo),
       productCode: row.ProductCode || null,
       qty: Number(row.Qty) || 0,
       priceTypeCode: row.PriceTypeCode || null,

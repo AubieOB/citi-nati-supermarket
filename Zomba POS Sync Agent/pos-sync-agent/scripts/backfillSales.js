@@ -69,31 +69,39 @@ async function getTableColumns(tableName) {
   return new Set((result.recordset || []).map((row) => String(row.COLUMN_NAME || '').trim()));
 }
 
-async function resolveInvoiceDetailsColumnSupport() {
+let invoiceColumnSupportCache = null;
+
+async function resolveInvoiceColumnSupport() {
+  if (invoiceColumnSupportCache) {
+    return invoiceColumnSupportCache;
+  }
+
   try {
+    const invoiceColumns = await getTableColumns('invoice');
     const invoiceDetailsColumns = await getTableColumns('invoicedetails');
-    return {
+    invoiceColumnSupportCache = {
+      hasInvoiceCode: invoiceColumns.has('InvoiceCode'),
+      hasQuoteNo: invoiceColumns.has('QuoteNo'),
+      detailUsesInvoiceCode: invoiceDetailsColumns.has('InvoiceCode'),
       hasCostPrice: invoiceDetailsColumns.has('CostPrice'),
       hasGrnDate: invoiceDetailsColumns.has('GrnDate'),
     };
   } catch (error) {
-    console.warn(`${BRANCH_TAG} [BACKFILL][WARN] Could not detect invoicedetails columns: ${error.message}`);
-    return { hasCostPrice: false, hasGrnDate: false };
+    console.warn(`${BRANCH_TAG} [BACKFILL][WARN] Could not detect invoice schema support: ${error.message}`);
+    invoiceColumnSupportCache = {
+      hasInvoiceCode: false,
+      hasQuoteNo: false,
+      detailUsesInvoiceCode: true,
+      hasCostPrice: false,
+      hasGrnDate: false,
+    };
   }
-}
 
-async function resolveInvoiceQuoteNoSupport() {
-  try {
-    const invoiceColumns = await getTableColumns('invoice');
-    return invoiceColumns.has('QuoteNo');
-  } catch (error) {
-    console.warn(`${BRANCH_TAG} [BACKFILL][WARN] Could not detect invoice.QuoteNo: ${error.message}`);
-    return false;
-  }
+  return invoiceColumnSupportCache;
 }
 
 async function fetchHistoricalInvoiceHeaders(fromDate, toDate, batchSize = 100, lastInvoiceNo = 0) {
-  const hasQuoteNo = await resolveInvoiceQuoteNoSupport();
+  const support = await resolveInvoiceColumnSupport();
   const request = pool.request();
   
   request.input('fromDate', sql.Date, fromDate);
@@ -101,14 +109,16 @@ async function fetchHistoricalInvoiceHeaders(fromDate, toDate, batchSize = 100, 
   request.input('batchSize', sql.Int, batchSize);
   request.input('lastInvoiceNo', sql.Int, lastInvoiceNo);
 
-  const quoteNoSelect = hasQuoteNo ? ',\n            QuoteNo' : '';
+  const invoiceCodeSelect = support.hasInvoiceCode
+    ? 'InvoiceCode'
+    : support.hasQuoteNo
+      ? 'QuoteNo AS InvoiceCode'
+      : 'InvoiceNo AS InvoiceCode';
 
-  // FIX: Use cursor-based pagination with WHERE InvoiceNo > @lastInvoiceNo
-  // This prevents infinite loop by advancing through records
   const query = `
     SELECT TOP (@batchSize)
         InvoiceNo,
-        InvoiceCode,
+        ${invoiceCodeSelect},
         InvoiceSerialNo,
         RefNo,
         InvoiceDate,
@@ -141,7 +151,7 @@ async function fetchHistoricalInvoiceHeaders(fromDate, toDate, batchSize = 100, 
         Bank_Name,
         Bank_CARD_HOLDER,
         Bank_CARD_NO,
-        Bank_CARD_EXPIARY${quoteNoSelect}
+        Bank_CARD_EXPIARY
     FROM invoice
     WHERE InvoiceDate >= @fromDate AND InvoiceDate <= @toDate
       AND InvoiceNo > @lastInvoiceNo
@@ -159,7 +169,7 @@ async function fetchInvoiceDetails(invoiceCodes) {
     return {};
   }
 
-  const columnSupport = await resolveInvoiceDetailsColumnSupport();
+  const support = await resolveInvoiceColumnSupport();
   const request = pool.request();
 
   const placeholders = invoiceCodes.map((_, idx) => `@invoiceCode${idx}`).join(',');
@@ -167,13 +177,14 @@ async function fetchInvoiceDetails(invoiceCodes) {
     request.input(`invoiceCode${idx}`, sql.Int, code);
   });
 
-  const costPriceSelect = columnSupport.hasCostPrice ? ',\n            CostPrice' : '';
-  const grnDateSelect = columnSupport.hasGrnDate ? ',\n            GrnDate' : '';
+  const costPriceSelect = support.hasCostPrice ? ',\n            CostPrice' : '';
+  const grnDateSelect = support.hasGrnDate ? ',\n            GrnDate' : '';
+  const detailInvoiceKey = support.detailUsesInvoiceCode ? 'InvoiceCode' : 'InvoiceNo';
 
   const query = `
     SELECT
         InvDetailID,
-        InvoiceCode,
+        ${detailInvoiceKey} AS InvoiceCode,
         ProductCode,
         Qty,
         PriceTypeCode,
@@ -195,8 +206,8 @@ async function fetchInvoiceDetails(invoiceCodes) {
         Sub_Qty,
         DiscountAmount${costPriceSelect}${grnDateSelect}
     FROM invoicedetails
-    WHERE InvoiceCode IN (${placeholders})
-    ORDER BY InvoiceCode ASC, InvDetailID ASC
+    WHERE ${detailInvoiceKey} IN (${placeholders})
+    ORDER BY ${detailInvoiceKey} ASC, InvDetailID ASC
   `;
 
   const result = await request.query(query);
@@ -204,12 +215,11 @@ async function fetchInvoiceDetails(invoiceCodes) {
 
   const detailsMap = {};
   result.recordset.forEach((detail) => {
-    // FIX: Use InvoiceNo (display number) as key to match live reporting behavior
-    // This ensures details are properly mapped to invoices
-    if (!detailsMap[detail.InvoiceCode]) {
-      detailsMap[detail.InvoiceCode] = [];
+    const invoiceCode = Number(detail.InvoiceCode);
+    if (!detailsMap[invoiceCode]) {
+      detailsMap[invoiceCode] = [];
     }
-    detailsMap[detail.InvoiceCode].push(detail);
+    detailsMap[invoiceCode].push(detail);
   });
 
   return detailsMap;
