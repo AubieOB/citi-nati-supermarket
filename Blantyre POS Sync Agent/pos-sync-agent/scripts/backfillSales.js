@@ -372,7 +372,7 @@ async function runBackfill() {
   let totalBatches = 0;
   let batchNumber = 1;
   let lastInvoiceNo = 0; // Cursor for pagination
-  const maxBatches = 2; // Limit to 2 batches for testing
+  const maxBatches = parseInt(process.env.BACKFILL_MAX_BATCHES) || 1000; // Safety limit
 
   while (true) {
     // FIX: Pass lastInvoiceNo cursor for proper pagination
@@ -387,7 +387,7 @@ async function runBackfill() {
     totalBatches++;
 
     if (totalBatches >= maxBatches) {
-      console.log(`${BRANCH_TAG} [SALES BACKFILL] Stopping after ${maxBatches} batches for testing`);
+      console.log(`${BRANCH_TAG} [SALES BACKFILL] Stopping after ${maxBatches} batches (safety limit)`);
       break;
     }
 

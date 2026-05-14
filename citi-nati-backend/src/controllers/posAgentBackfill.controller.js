@@ -14,11 +14,24 @@ exports.backfillSales = async (req, res) => {
       });
     }
 
+    console.log('[SALES BACKFILL] Starting batch processing', {
+      invoiceCount: invoices.length,
+      branchCode: metadata.branchCode,
+      syncSourceCode: metadata.syncSourceCode,
+      backfillMode: metadata.backfillMode,
+    });
+
     let synced = 0;
     let skipped = 0;
     const errors = [];
+    const batchSize = 50; // Process in smaller batches to prevent timeouts
 
-    for (const invoice of invoices) {
+    // Process invoices in batches
+    for (let i = 0; i < invoices.length; i += batchSize) {
+      const batch = invoices.slice(i, i + batchSize);
+      console.log(`[SALES BACKFILL] Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(invoices.length / batchSize)} (${batch.length} invoices)`);
+
+      for (const invoice of batch) {
       try {
         // Resolve syncSourceCode from invoice, metadata, or header
         const syncSourceCode = invoice.syncSourceCode || metadata.syncSourceCode || req.headers['x-sync-source-code'];
@@ -36,15 +49,23 @@ exports.backfillSales = async (req, res) => {
           continue;
         }
 
-        // Find sync source
-        const syncSource = await prisma.salesSyncSource.findFirst({
+        // Upsert sync source
+        const syncSource = await prisma.salesSyncSource.upsert({
           where: { syncSourceCode },
+          create: {
+            branchCode,
+            branchName: invoice.branchName || branchCode,
+            locationId: metadata.locationId || null,
+            syncSourceCode,
+            lastSeenAt: new Date(),
+          },
+          update: {
+            branchCode,
+            branchName: invoice.branchName || branchCode,
+            locationId: metadata.locationId || null,
+            lastSeenAt: new Date(),
+          },
         });
-        if (!syncSource) {
-          errors.push(`Invoice ${invoice.invoiceNo || 'unknown'}: sync source '${syncSourceCode}' not found`);
-          skipped++;
-          continue;
-        }
 
         // Process invoice in transaction
         const result = await prisma.$transaction(async (tx) => {
@@ -119,15 +140,11 @@ exports.backfillSales = async (req, res) => {
 
           // Handle items
           if (invoice.details && Array.isArray(invoice.details)) {
-            // Delete existing items for this invoice
-            await tx.salesInvoiceItem.deleteMany({
-              where: { salesInvoiceId: salesInvoice.id },
-            });
+            // Upsert items individually to maintain data integrity
+            for (const item of invoice.details) {
+              if (!item.invDetailID) continue; // Skip items without invDetailID
 
-            // Prepare new items
-            const itemData = invoice.details
-              .filter(item => item.invDetailID) // Skip items without invDetailID
-              .map(item => ({
+              const itemData = {
                 salesInvoiceId: salesInvoice.id,
                 syncSourceCode,
                 sourceInvDetailId: Number(item.invDetailID),
@@ -154,14 +171,21 @@ exports.backfillSales = async (req, res) => {
                 discountAmount: Number(item.discountAmount) || 0,
                 costPrice: Number(item.costPrice) || null,
                 grnDate: item.grnDate ? new Date(item.grnDate) : null,
-                firstReceivedAt: new Date(),
                 lastReceivedAt: new Date(),
-              }));
+              };
 
-            if (itemData.length > 0) {
-              await tx.salesInvoiceItem.createMany({
-                data: itemData,
-                skipDuplicates: true,
+              await tx.salesInvoiceItem.upsert({
+                where: {
+                  syncSourceCode_sourceInvDetailId: {
+                    syncSourceCode,
+                    sourceInvDetailId: Number(item.invDetailID),
+                  },
+                },
+                create: {
+                  ...itemData,
+                  firstReceivedAt: new Date(),
+                },
+                update: itemData,
               });
             }
           }
@@ -176,6 +200,14 @@ exports.backfillSales = async (req, res) => {
         skipped++;
       }
     }
+    }
+
+    console.log('[SALES BACKFILL] Batch processing completed', {
+      totalInvoices: invoices.length,
+      synced,
+      skipped,
+      errors: errors.length,
+    });
 
     return res.json({
       success: true,

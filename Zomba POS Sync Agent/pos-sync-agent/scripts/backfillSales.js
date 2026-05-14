@@ -373,7 +373,7 @@ async function runBackfill() {
   let totalBatches = 0;
   let batchNumber = 1;
   let lastInvoiceNo = 0; // Cursor for pagination
-  const maxBatches = 2; // Limit to 2 batches for testing
+  const maxBatches = parseInt(process.env.BACKFILL_MAX_BATCHES) || 1000; // Safety limit
 
   while (true) {
     // FIX: Pass lastInvoiceNo cursor for proper pagination
