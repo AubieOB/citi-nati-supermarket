@@ -408,6 +408,7 @@ function normalizePosStockIntake(grn, batchMeta) {
     syncSourceCode: batchMeta.syncSourceCode,
     grnNo: toStringOrNull(grn.grnNo),
     grnDate: toDateOrNull(grn.grnDate),
+    grnObservedAt: toDateOrNull(grn.grnObservedAt),
     grnReference: toStringOrNull(grn.grnReference),
     grnUserName: toStringOrNull(grn.userName || grn.grnUserName),
     supplierCode: toStringOrNull(grn.supplierCode),
@@ -468,6 +469,21 @@ async function ingestPosStockIntakes(payload) {
     const grnData = normalizePosStockIntake(grn, batchMeta);
     let grnRecord;
 
+    // RUNTIME VERIFICATION: Log ingest input & normalization
+    console.log('[POS GRN INGEST ENRICHMENT] Received payload:', {
+      grnNo,
+      payloadGrnDate: grn.grnDate,
+      payloadGrnObservedAt: grn.grnObservedAt,
+      payloadGrnUserName: grn.userName || grn.grnUserName || null,
+      payloadSyncSourceCode: batchMeta.syncSourceCode,
+      normalizedData: {
+        grnDate: grnData.grnDate,
+        grnObservedAt: grnData.grnObservedAt,
+        grnUserName: grnData.grnUserName,
+        syncSourceCode: grnData.syncSourceCode,
+      },
+    });
+
     const existingGrn = await prisma.posStockIntake.findUnique({
       where: {
         syncSourceCode_grnNo: {
@@ -475,7 +491,7 @@ async function ingestPosStockIntakes(payload) {
           grnNo,
         },
       },
-      select: { id: true },
+      select: { id: true, grnUserName: true, grnObservedAt: true },
     });
 
     if (!existingGrn) {
@@ -485,11 +501,35 @@ async function ingestPosStockIntakes(payload) {
           firstReceivedAt: new Date(),
         },
       });
+      console.log('[POS GRN INGEST] Created new GRN record:', {
+        grnNo,
+        storedGrnObservedAt: grnRecord.grnObservedAt,
+        storedGrnUserName: grnRecord.grnUserName,
+      });
       result.storedGrns += 1;
     } else {
+      const updateData = { ...grnData };
+      if (existingGrn.grnUserName && !updateData.grnUserName) {
+        updateData.grnUserName = existingGrn.grnUserName;
+      }
+      if (existingGrn.grnObservedAt) {
+        updateData.grnObservedAt = existingGrn.grnObservedAt;
+      }
+
+      // RUNTIME VERIFICATION: Log preserved metadata
+      console.log('[POS GRN INGEST] Updating existing GRN record:', {
+        grnNo,
+        existingGrnObservedAt: existingGrn.grnObservedAt,
+        preservingGrnObservedAt: !!existingGrn.grnObservedAt,
+        existingGrnUserName: existingGrn.grnUserName,
+        preservingGrnUserName: !!existingGrn.grnUserName && !updateData.grnUserName,
+        updateDataGrnObservedAt: updateData.grnObservedAt,
+        updateDataGrnUserName: updateData.grnUserName,
+      });
+
       grnRecord = await prisma.posStockIntake.update({
         where: { id: existingGrn.id },
-        data: grnData,
+        data: updateData,
       });
       result.updatedGrns += 1;
     }

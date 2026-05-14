@@ -295,6 +295,7 @@ function buildPosGrnPayload(rows) {
     const header = grnMap.get(grnNo) || {
       grnNo,
       grnDate: row.GRNDate instanceof Date ? row.GRNDate.toISOString() : row.GRNDate || null,
+      grnObservedAt: new Date().toISOString(),
       grnReference: row.GRNReference && row.GRNReference.trim() ? row.GRNReference.trim() : grnNo, // Use GRNNo as fallback reference
       locationCode: row.LocationCode || null,
       branchCode: BRANCH_CODE,
@@ -333,6 +334,18 @@ async function sendPosGrnsToBackend(posGrns) {
     const endpoint = appConfig.reporting.backendPosGrnEndpoint || '/api/pos-sync/reporting/pos-grns';
     const fullUrl = `${BACKEND_BASE_URL}${endpoint}`;
     console.log('[POS GRN SYNC] Sending', posGrns.length, 'GRN payload(s) to backend');
+
+    // RUNTIME VERIFICATION: Log agent payload enrichment
+    posGrns.slice(0, 3).forEach((grn, idx) => {
+      console.log(`[POS GRN AGENT PAYLOAD VERIFICATION] GRN #${idx + 1}:`, {
+        grnNo: grn.grnNo,
+        grnDate: grn.grnDate,
+        grnObservedAt: grn.grnObservedAt, // REQUIRED: agent-generated timestamp
+        syncSourceCode: SYNC_SOURCE_CODE, // Always present from config
+        grnUserName: grn.userName || grn.grnUserName || null, // User name from source
+        itemCount: (grn.items || []).length,
+      });
+    });
 
     const payload = {
       ...getSyncMetadata(appConfig),

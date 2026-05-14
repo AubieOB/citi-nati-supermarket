@@ -427,8 +427,10 @@ async function getPOSGRNMovements(period, filters = {}) {
           select: {
             grnNo: true,
             grnDate: true,
+            grnObservedAt: true,
             grnReference: true,
             grnUserName: true,
+            syncSourceCode: true,
             branchCode: true,
             locationCode: true,
             sourceUpdatedAt: true,
@@ -443,6 +445,37 @@ async function getPOSGRNMovements(period, filters = {}) {
     console.log('[LEDGER POS_GRN COUNT WITH DATE]', countWithDate);
     console.log('[LEDGER POS_GRN COUNT DATE_ONLY]', countDateOnly);
     console.log('[LEDGER POS_GRN SAMPLE ROW]', sampleRow || null);
+
+    // RUNTIME VERIFICATION: Log Prisma field selection
+    console.log('[PRISMA SELECT VERIFICATION] posStockIntakeItem.findMany() will select:', {
+      requiredFields: [
+        'id',
+        'productCode',
+        'productName',
+        'quantity',
+        'unitCost',
+        'lineAmount',
+        'sourceUpdatedAt',
+        'sourceSyncedAt',
+        'createdAt',
+      ],
+      posStockIntakeRelation: [
+        'grnNo',
+        'grnDate',
+        'grnObservedAt (PRIORITY 1)',
+        'sourceSyncedAt (PRIORITY 2)',
+        'sourceUpdatedAt (PRIORITY 3)',
+        'grnUserName',
+        'syncSourceCode',
+        'branchCode',
+        'locationCode',
+        'supplierCode',
+        'orderNumber',
+        'grnReference',
+        'createdAt',
+        'updatedAt',
+      ],
+    });
 
     // Query synced POS GRN data from database
     const grnItems = await prisma.posStockIntakeItem.findMany({
@@ -462,7 +495,9 @@ async function getPOSGRNMovements(period, filters = {}) {
           select: {
             grnNo: true,
             grnDate: true,
+            grnObservedAt: true,
             grnReference: true,
+            syncSourceCode: true,
             branchCode: true,
             locationCode: true,
             supplierCode: true,
@@ -470,6 +505,8 @@ async function getPOSGRNMovements(period, filters = {}) {
             grnUserName: true,
             sourceUpdatedAt: true,
             sourceSyncedAt: true,
+            createdAt: true,
+            updatedAt: true,
           },
         },
       },
@@ -491,14 +528,14 @@ async function getPOSGRNMovements(period, filters = {}) {
 
     // Transform to movement format expected by ledger
     const movements = grnItems.map((item) => {
+      const selectedUser = item.posStockIntake.grnUserName || item.posStockIntake.syncSourceCode || 'POS GRN Sync';
       const movementDate =
+        item.posStockIntake.grnObservedAt ||
+        item.posStockIntake.sourceSyncedAt ||
         item.posStockIntake.sourceUpdatedAt ||
         item.posStockIntake.grnDate ||
         item.posStockIntake.updatedAt ||
         item.posStockIntake.createdAt ||
-        item.posStockIntake.sourceSyncedAt ||
-        item.sourceUpdatedAt ||
-        item.sourceSyncedAt ||
         new Date();
 
       const { transactionDate, transactionTime } = formatBlantyreDateTimeParts(movementDate);
@@ -527,15 +564,27 @@ async function getPOSGRNMovements(period, filters = {}) {
         source: 'POS_GRN_SYNC',
         sourceUpdatedAt: item.posStockIntake.sourceUpdatedAt,
         syncedAt: item.sourceSyncedAt,
-        userName: item.posStockIntake.grnUserName || 'POS',
+        userName: selectedUser,
       };
 
-      console.log('[POS GRN RAW]', {
+      console.log('[LEDGER STOCK_IN METADATA] Metadata selection priority chain:', {
         grnNo: item.posStockIntake.grnNo,
-        grnUserName: item.posStockIntake.grnUserName,
-        grnDate: item.posStockIntake.grnDate,
-        sourceUpdatedAt: item.posStockIntake.sourceUpdatedAt,
-        sourceSyncedAt: item.posStockIntake.sourceSyncedAt,
+        productCode: item.productCode,
+        movementDateSource: {
+          grnObservedAt: item.posStockIntake.grnObservedAt || 'NULL',
+          sourceSyncedAt: item.posStockIntake.sourceSyncedAt || 'NULL',
+          sourceUpdatedAt: item.posStockIntake.sourceUpdatedAt || 'NULL',
+          grnDate: item.posStockIntake.grnDate || 'NULL',
+          updatedAt: item.posStockIntake.updatedAt || 'NULL',
+          createdAt: item.posStockIntake.createdAt || 'NULL',
+        },
+        selectedMovementDate: movementDate.toISOString(),
+        userSource: {
+          grnUserName: item.posStockIntake.grnUserName || 'NULL',
+          syncSourceCode: item.posStockIntake.syncSourceCode || 'NULL',
+          fallback: 'POS GRN Sync',
+        },
+        selectedUser,
       });
       console.log('[POS GRN MAPPED ROW]', mappedRow);
       return mappedRow;

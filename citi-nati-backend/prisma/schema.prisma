@@ -723,6 +723,7 @@ model PosStockIntake {
   syncSourceCode    String                @map("sync_source_code")
   grnNo             String                @map("grn_no")
   grnDate           DateTime?             @map("grn_date")
+  grnObservedAt     DateTime?             @map("grn_observed_at")
   grnReference      String?               @map("grn_reference")
   grnUserName       String?               @map("grn_user_name")
   supplierCode      String?               @map("supplier_code")
