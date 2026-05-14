@@ -529,14 +529,30 @@ async function getPOSGRNMovements(period, filters = {}) {
     // Transform to movement format expected by ledger
     const movements = grnItems.map((item) => {
       const selectedUser = item.posStockIntake.grnUserName || item.posStockIntake.syncSourceCode || 'POS GRN Sync';
-      const movementDate =
-        item.posStockIntake.grnObservedAt ||
-        item.posStockIntake.sourceSyncedAt ||
-        item.posStockIntake.sourceUpdatedAt ||
-        item.posStockIntake.grnDate ||
-        item.posStockIntake.updatedAt ||
-        item.posStockIntake.createdAt ||
-        new Date();
+
+      // Determine if this is a historical GRN (grnDate earlier than grnObservedAt)
+      const grnDate = item.posStockIntake.grnDate;
+      const grnObservedAt = item.posStockIntake.grnObservedAt;
+      const isHistoricalGrn = grnDate && grnObservedAt && new Date(grnDate).getTime() < new Date(grnObservedAt).getTime();
+
+      let movementDate;
+      let isDateOnly = false;
+
+      if (isHistoricalGrn) {
+        // For historical GRNs, use grnDate and mark as date-only
+        movementDate = grnDate;
+        isDateOnly = true;
+      } else {
+        // For live GRNs, use observed timestamp or fallback
+        movementDate =
+          item.posStockIntake.grnObservedAt ||
+          item.posStockIntake.sourceSyncedAt ||
+          item.posStockIntake.sourceUpdatedAt ||
+          item.posStockIntake.grnDate ||
+          item.posStockIntake.updatedAt ||
+          item.posStockIntake.createdAt ||
+          new Date();
+      }
 
       const { transactionDate, transactionTime } = formatBlantyreDateTimeParts(movementDate);
       const mappedRow = {
@@ -546,6 +562,7 @@ async function getPOSGRNMovements(period, filters = {}) {
         movementType: 'STOCK_IN',
         transactionDate,
         transactionTime,
+        isDateOnly, // NEW: Flag for historical date-only entries
         productCode: item.productCode,
         productName: item.productName || item.productCode,
         locationCode: item.posStockIntake.locationCode || locationFilter.locationCode,
@@ -567,23 +584,13 @@ async function getPOSGRNMovements(period, filters = {}) {
         userName: selectedUser,
       };
 
-      console.log('[LEDGER STOCK_IN METADATA] Metadata selection priority chain:', {
+      console.log('[LEDGER STOCK_IN METADATA] Historical GRN detection:', {
         grnNo: item.posStockIntake.grnNo,
-        productCode: item.productCode,
-        movementDateSource: {
-          grnObservedAt: item.posStockIntake.grnObservedAt || 'NULL',
-          sourceSyncedAt: item.posStockIntake.sourceSyncedAt || 'NULL',
-          sourceUpdatedAt: item.posStockIntake.sourceUpdatedAt || 'NULL',
-          grnDate: item.posStockIntake.grnDate || 'NULL',
-          updatedAt: item.posStockIntake.updatedAt || 'NULL',
-          createdAt: item.posStockIntake.createdAt || 'NULL',
-        },
+        grnDate: item.posStockIntake.grnDate,
+        grnObservedAt: item.posStockIntake.grnObservedAt,
+        isHistoricalGrn,
+        isDateOnly,
         selectedMovementDate: movementDate.toISOString(),
-        userSource: {
-          grnUserName: item.posStockIntake.grnUserName || 'NULL',
-          syncSourceCode: item.posStockIntake.syncSourceCode || 'NULL',
-          fallback: 'POS GRN Sync',
-        },
         selectedUser,
       });
       console.log('[POS GRN MAPPED ROW]', mappedRow);
@@ -1304,6 +1311,7 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
         timestamp: timestampValue,
         transactionDate: movement.transactionDate || null,
         transactionTime: movement.transactionTime || null,
+        isDateOnly: movement.isDateOnly || false, // NEW: Flag for historical date-only entries
         movementType: movement.movementType,
         referenceNo: movement.referenceNo,
         user: movement.userName || movement.cashierName || 'POS',

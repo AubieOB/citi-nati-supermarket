@@ -214,7 +214,7 @@ const InventoryActivityLedger = ({
 
     rows.forEach((row) => {
       const closingBalanceValue = row.closingBalance !== null && row.closingBalance !== undefined ? row.closingBalance : '';
-      csvContent += `"${formatDateTime(row.timestamp)}","${row.movementType}","${row.referenceNo || ''}","${row.user || ''}","${row.productCode || ''}","${row.productName || ''}",${row.openingBalance},${row.qtyIn},${row.qtyOut},${row.balanceAfterTransaction},${closingBalanceValue},${row.unitPrice},${row.lineAmount}\n`;
+      csvContent += `"${formatDateTime(row.timestamp, row.isDateOnly)}","${row.movementType}","${row.referenceNo || ''}","${row.user || ''}","${row.productCode || ''}","${row.productName || ''}",${row.openingBalance},${row.qtyIn},${row.qtyOut},${row.balanceAfterTransaction},${closingBalanceValue},${row.unitPrice},${row.lineAmount}\n`;
     });
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -431,7 +431,7 @@ const InventoryActivityLedger = ({
               <tbody>
                 {ledger.map((row, idx) => (
                   <tr key={`${row.transactionId || idx}-ledger`} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ ...tdStyle }}>{formatDateTime(row.timestamp)}</td>
+                    <td style={{ ...tdStyle }}>{formatDateTime(row.timestamp, row.isDateOnly)}</td>
                     <td style={{ ...tdStyle }}><MovementBadge type={row.movementType} /></td>
                     <td style={{ ...tdStyle }}>{row.referenceNo || '-'}</td>
                     <td style={{ ...tdStyle }}>{row.user || '-'}</td>
@@ -597,8 +597,32 @@ const MovementBadge = ({ type }) => {
   );
 };
 
-function formatDateTime(value) {
+function formatDateTime(value, isDateOnly = false) {
   if (!value) return '-';
+
+  // For historical date-only entries, show only the date
+  if (isDateOnly) {
+    if (typeof value === 'string') {
+      const isoMatch = value.match(/^([0-9]{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?)?(?:Z|[+-]\d{2}:?\d{2})?$/);
+      if (isoMatch) {
+        const [, year, month, day] = isoMatch;
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const monthName = monthNames[Number(month) - 1] || month;
+        return `${day} ${monthName} ${year} (Date only)`;
+      }
+    }
+
+    const d = new Date(value);
+    if (!Number.isNaN(d.getTime())) {
+      return d.toLocaleString('en-GB', {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+      }) + ' (Date only)';
+    }
+
+    return String(value) + ' (Date only)';
+  }
 
   if (typeof value === 'string') {
     const text = value.trim();
