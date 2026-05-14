@@ -493,6 +493,11 @@ async function sendProductsToLiveServer(products, syncContext = {}) {
       };
     });
 
+    const debugProductCodes = String(process.env.STOCK_DEBUG_PRODUCT_CODES || process.env.STOCK_DEBUG_PRODUCT_CODE || '')
+      .split(',')
+      .map((code) => String(code || '').trim().toUpperCase())
+      .filter(Boolean);
+
     const syncedLocations = Array.isArray(syncContext.syncLocations) && syncContext.syncLocations.length > 0
       ? syncContext.syncLocations.map((code) => String(code || '').trim().toUpperCase())
       : Array.from(new Set(normalizedProducts.map((product) => product.LocationCode).filter(Boolean)));
@@ -562,6 +567,34 @@ async function sendProductsToLiveServer(products, syncContext = {}) {
         batchLocationBreakdown,
         attemptLimit: MAX_BATCH_ATTEMPTS,
       });
+
+      if (debugProductCodes.length > 0) {
+        const batchDebugProducts = batch.filter((product) => debugProductCodes.includes(String(product.ProductCode || '').trim().toUpperCase()));
+        batchDebugProducts.forEach((product) => {
+          const payload = {
+            sourceCode: product.ProductCode,
+            name: product.ProductName,
+            price: product.SellingPrice,
+            stock: product.QuantityAvailable,
+            stockSource: product.StockSource || null,
+            stockDate: product.StockDate ? (product.StockDate instanceof Date ? product.StockDate.toISOString() : product.StockDate) : null,
+            barcode: product.Barcode || '',
+            category: product.CategoryName || 'Uncategorized',
+            expiryDate: product.ExpiryDate ? (product.ExpiryDate instanceof Date ? product.ExpiryDate.toISOString() : product.ExpiryDate) : null,
+            expirySource: product.ExpirySource || null,
+            nearestExpiryDate: product.ExpiryDate ? (product.ExpiryDate instanceof Date ? product.ExpiryDate.toISOString() : product.ExpiryDate) : null,
+            expiryBatchCount: Number.isFinite(Number(product.ExpiryBatchCount)) ? Number(product.ExpiryBatchCount) : 0,
+            daysToExpiry: Number.isFinite(Number(product.DaysToExpiry)) ? product.DaysToExpiry : null,
+            expiryStatus: product.ExpiryStatus || null,
+            expiryBatches: Array.isArray(product.ExpiryBatches) ? product.ExpiryBatches : [],
+            branchCode: product.BranchCode || appConfig.branch.branchCode,
+            branchName: appConfig.branch.branchName,
+            locationCode: product.LocationCode,
+          };
+          console.log(`${SYNC_LOG_PREFIX} [DEBUG PRODUCT PAYLOAD] branchCode=${product.BranchCode} configuredLocationCode=${product.LocationCode} sqlLocationCodeReturned=${product.LocationCode} productCode=${String(product.ProductCode || '').trim()} productName=${String(product.ProductName || '').trim()} stockBalanceReturned=${product.QuantityAvailable == null ? 'NULL' : product.QuantityAvailable} sourceTableUsed=${product.StockSource || 'UNKNOWN'} backendPayloadStock=${product.QuantityAvailable == null ? 'NULL' : product.QuantityAvailable}`);
+          console.log(`${SYNC_LOG_PREFIX} [DEBUG PRODUCT PAYLOAD OBJECT]`, payload);
+        });
+      }
 
       let batchCompleted = false;
       for (let attempt = 1; attempt <= MAX_BATCH_ATTEMPTS; attempt++) {
@@ -979,6 +1012,10 @@ async function fetchProductsFromPOS(locationCode) {
     const safeActivityTimestampColumn = stockConfig.productActivityTimestampColumn
       ? String(stockConfig.productActivityTimestampColumn).replace(/[^A-Za-z0-9_]/g, '')
       : null;
+    const debugProductCodes = String(process.env.STOCK_DEBUG_PRODUCT_CODES || process.env.STOCK_DEBUG_PRODUCT_CODE || '')
+      .split(',')
+      .map((code) => String(code || '').trim().toUpperCase())
+      .filter(Boolean);
     const canUseFreshProductActivityFallback = Boolean(stockConfig.hasProductActivity && safeActivityTimestampColumn);
     const productActivityTimestampExpr = safeActivityTimestampColumn
       ? `MAX(TRY_CONVERT(datetime2, pa.[${safeActivityTimestampColumn}])) AS ActivityLatestAt`
@@ -1020,6 +1057,7 @@ async function fetchProductsFromPOS(locationCode) {
       )
       SELECT
           p.ProductCode,
+          @LocationCode AS LocationCode,
           p.ProductName,
           ISNULL(p.Barcode, '') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
@@ -1030,7 +1068,7 @@ async function fetchProductsFromPOS(locationCode) {
           pa.ActivityLatestAt,
           pa.ActivityStockBalance,
           ds.StockDate AS StockDate,
-          ISNULL(ds.StockBalance, 0) AS QuantityAvailable,
+          ds.StockBalance AS QuantityAvailable,
           CASE
             WHEN ds.StockBalance IS NOT NULL THEN 'DailyStockBalance'
             WHEN pa.ProductCode IS NOT NULL THEN 'ProductActivityCandidate'
@@ -1092,6 +1130,7 @@ async function fetchProductsFromPOS(locationCode) {
       )
       SELECT
           p.ProductCode,
+          @LocationCode AS LocationCode,
           p.ProductName,
           ISNULL(p.Barcode, '') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
@@ -1102,13 +1141,10 @@ async function fetchProductsFromPOS(locationCode) {
             WHEN pa.ProductCode IS NOT NULL THEN pa.ActivityLatestAt
             ELSE NULL
           END AS StockDate,
-          ISNULL(
-            CASE
-              WHEN ds.StockBalance IS NOT NULL THEN ds.StockBalance
-              ELSE pa.ActivityStockBalance
-            END,
-            0
-          ) AS QuantityAvailable,
+          CASE
+            WHEN ds.StockBalance IS NOT NULL THEN ds.StockBalance
+            ELSE pa.ActivityStockBalance
+          END AS QuantityAvailable,
           CASE
             WHEN ds.StockBalance IS NOT NULL THEN 'DailyStockBalance'
             WHEN pa.ProductCode IS NOT NULL THEN 'ProductActivityFallback'
@@ -1159,13 +1195,14 @@ async function fetchProductsFromPOS(locationCode) {
       )
       SELECT
           p.ProductCode,
+          @LocationCode AS LocationCode,
           p.ProductName,
           ISNULL(p.Barcode, '') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
           ebd.EffectiveStockDate,
           ebd.EffectiveStockDate AS LatestBalanceDate,
           ls.StockDate,
-          ISNULL(ls.StockBalance, 0) AS QuantityAvailable,
+          ls.StockBalance AS QuantityAvailable,
           CASE
             WHEN ls.StockBalance IS NOT NULL THEN 'DailyStockBalance'
             ELSE 'NoStockRow'
@@ -1197,11 +1234,12 @@ async function fetchProductsFromPOS(locationCode) {
       )
       SELECT
           p.ProductCode,
+          @LocationCode AS LocationCode,
           p.ProductName,
           ISNULL(p.Barcode, '') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
           NULL AS StockDate,
-          ISNULL(pa.ActivityStockBalance, 0) AS QuantityAvailable,
+          pa.ActivityStockBalance AS QuantityAvailable,
           CASE
             WHEN pa.ProductCode IS NOT NULL THEN 'ProductActivity'
             ELSE 'NoStockRow'
@@ -1222,11 +1260,12 @@ async function fetchProductsFromPOS(locationCode) {
       : `
       SELECT
           p.ProductCode,
+          @LocationCode AS LocationCode,
           p.ProductName,
           ISNULL(p.Barcode, '') AS Barcode,
           ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
           NULL AS StockDate,
-          0 AS QuantityAvailable,
+          NULL AS QuantityAvailable,
           'NoStockRow' AS StockSource,
           ISNULL(
               (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC),
@@ -1321,7 +1360,7 @@ async function fetchProductsFromPOS(locationCode) {
           && activityValue >= 0
           && Math.abs(activityValue) <= appConfig.stock.activityMaxAbsStock;
 
-        let finalStock = hasDaily ? dailyValue : 0;
+        let finalStock = hasDaily ? dailyValue : null;
         let finalSource = hasDaily ? 'DailyStockBalance' : 'NoStockRow';
 
         if (hasDaily && hasLiveStockDetails && dailyStockIsStale) {
@@ -1467,18 +1506,20 @@ async function fetchProductsFromPOS(locationCode) {
         console.log(`${SYNC_LOG_PREFIX} [DEBUG] First 5 products for location ${LOCATION_CODE}:`);
         result.recordset.slice(0, 5).forEach(product => {
           const stockDateLabel = product.StockDate ? new Date(product.StockDate).toISOString().slice(0, 10) : 'NULL';
-          console.log(`${SYNC_LOG_PREFIX} [DEBUG]  ${product.ProductCode}: ${product.ProductName} | stock=${product.QuantityAvailable} | source=${product.StockSource} | price=${product.SellingPrice}`);
+          console.log(`${SYNC_LOG_PREFIX} [DEBUG]  ${product.ProductCode}: ${product.ProductName} | location=${product.LocationCode || 'UNKNOWN'} | stock=${product.QuantityAvailable == null ? 'NULL' : product.QuantityAvailable} | source=${product.StockSource} | price=${product.SellingPrice}`);
         });
       }
 
-      const debugProductCode = String(process.env.STOCK_DEBUG_PRODUCT_CODE || '').trim();
-      if (debugProductCode) {
-        const matched = result.recordset.find((row) => String(row.ProductCode || '').trim() === debugProductCode);
-        if (matched) {
-          const stockDateLabel = matched.StockDate ? new Date(matched.StockDate).toISOString().slice(0, 19) : 'NULL';
-          console.log(`${SYNC_LOG_PREFIX} [DEBUG] Product ${debugProductCode} at ${LOCATION_CODE}: stock=${Number(matched.QuantityAvailable || 0)} source=${matched.StockSource} price=${Number(matched.SellingPrice || 0)}`);
+      const debugProductCodesList = debugProductCodes;
+      if (debugProductCodesList.length > 0) {
+        const matches = result.recordset.filter((row) => debugProductCodesList.includes(String(row.ProductCode || '').trim().toUpperCase()));
+        if (matches.length > 0) {
+          matches.forEach((matched) => {
+            const stockDateLabel = matched.StockDate ? new Date(matched.StockDate).toISOString().slice(0, 19) : 'NULL';
+            console.log(`${SYNC_LOG_PREFIX} [DEBUG PRODUCT] branchCode=${appConfig.branch.branchCode} configuredLocationCode=${normalizedLocationCode || 'NULL'} sqlLocationUsed=${LOCATION_CODE} productCode=${String(matched.ProductCode || '').trim()} productName=${String(matched.ProductName || '').trim()} stock=${matched.QuantityAvailable == null ? 'NULL' : matched.QuantityAvailable} stockSource=${matched.StockSource} stockDate=${stockDateLabel}`);
+          });
         } else {
-          console.log(`${SYNC_LOG_PREFIX} [DEBUG] Product ${debugProductCode} not found at location ${LOCATION_CODE}`);
+          console.log(`${SYNC_LOG_PREFIX} [DEBUG PRODUCT] No matching debug products found for ${debugProductCodesList.join(', ')} at ${LOCATION_CODE}`);
         }
       }
     }
