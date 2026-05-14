@@ -42,6 +42,55 @@ const toDateTime = (value) => {
   });
 };
 
+const formatLedgerDateTime = (value, isDateOnly = false) => {
+  if (!value) return '-';
+
+  // For historical date-only entries, show only the date without "(Date only)" text
+  if (isDateOnly) {
+    if (typeof value === 'string') {
+      const isoMatch = value.match(/^([0-9]{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?)?(?:Z|[+-]\d{2}:?\d{2})?$/);
+      if (isoMatch) {
+        const [, year, month, day] = isoMatch;
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const monthName = monthNames[Number(month) - 1] || month;
+        return `${day} ${monthName} ${year}`;
+      }
+    }
+
+    const d = new Date(value);
+    if (!Number.isNaN(d.getTime())) {
+      // Don't use toLocaleString to avoid timezone issues
+      return String(value);
+    }
+
+    return String(value);
+  }
+
+  if (typeof value === 'string') {
+    const text = value.trim();
+
+    const timeOnlyMatch = text.match(/^(\d{2}):(\d{2})(?::\d{2})?$/);
+    if (timeOnlyMatch) {
+      return `${timeOnlyMatch[1]}:${timeOnlyMatch[2]}`;
+    }
+
+    const isoMatch = text.match(/^([0-9]{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?)?(?:Z|[+-]\d{2}:?\d{2})?$/);
+    if (isoMatch) {
+      const [, year, month, day, hour = '00', minute = '00'] = isoMatch;
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthName = monthNames[Number(month) - 1] || month;
+      return `${day} ${monthName} ${year} ${hour}:${minute}`;
+    }
+  }
+
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+
+  // Don't use toLocaleString to avoid timezone conversion issues
+  // Just return the string representation
+  return String(value);
+};
+
 const normalizeTransferStatus = (record = {}) => {
   const status = String(record?.posTransferStatus || '').trim().toLowerCase();
   if (status === 'queued') return 'queued';
@@ -522,7 +571,7 @@ export function exportStockMovementLedgerPdf({
   ];
 
   const rows = ledger.map((row) => [
-    toDateTime(row.timestamp),
+    formatLedgerDateTime(row.timestamp, row.isDateOnly),
     row.movementType || '-',
     row.referenceNo || '-',
     row.user || '-',
