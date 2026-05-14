@@ -93,18 +93,22 @@ async function resolveInvoiceColumnSupport() {
     const invoiceColumns = await getTableColumns('invoice');
     const invoiceDetailsColumns = await getTableColumns('invoicedetails');
     invoiceColumnSupportCache = {
+      hasInvoiceNo: invoiceColumns.has('InvoiceNo'),
       hasInvoiceCode: invoiceColumns.has('InvoiceCode'),
       hasQuoteNo: invoiceColumns.has('QuoteNo'),
-      detailUsesInvoiceCode: invoiceDetailsColumns.has('InvoiceCode'),
+      detailHasInvoiceCode: invoiceDetailsColumns.has('InvoiceCode'),
+      detailHasInvoiceNo: invoiceDetailsColumns.has('InvoiceNo'),
       hasCostPrice: invoiceDetailsColumns.has('CostPrice'),
       hasGrnDate: invoiceDetailsColumns.has('GrnDate'),
     };
   } catch (error) {
     console.warn(`${BRANCH_TAG} [BACKFILL][WARN] Could not detect invoice schema support: ${error.message}`);
     invoiceColumnSupportCache = {
+      hasInvoiceNo: true,
       hasInvoiceCode: false,
       hasQuoteNo: false,
-      detailUsesInvoiceCode: true,
+      detailHasInvoiceCode: true,
+      detailHasInvoiceNo: false,
       hasCostPrice: false,
       hasGrnDate: false,
     };
@@ -122,11 +126,14 @@ async function fetchHistoricalInvoiceHeaders(fromDate, toDate, batchSize = 100, 
   request.input('batchSize', sql.Int, batchSize);
   request.input('lastInvoiceNo', sql.Int, lastInvoiceNo);
 
-  const invoiceCodeSelect = support.hasInvoiceCode
-    ? 'InvoiceCode'
-    : support.hasQuoteNo
-      ? 'QuoteNo AS InvoiceCode'
-      : 'InvoiceNo AS InvoiceCode';
+  const invoiceCodeSelect = 'InvoiceNo AS InvoiceCode';
+  const headerKey = 'InvoiceNo';
+
+  const detailKey = 'InvoiceCode';
+
+  console.log(`${BRANCH_TAG} [BACKFILL] Schema support: invoice.hasInvoiceNo=${support.hasInvoiceNo}, invoice.hasInvoiceCode=${support.hasInvoiceCode}, invoice.hasQuoteNo=${support.hasQuoteNo}, details.hasInvoiceCode=${support.detailHasInvoiceCode}, details.hasInvoiceNo=${support.detailHasInvoiceNo}`);
+  console.log(`${BRANCH_TAG} [BACKFILL] Using header key 'InvoiceNo' and detail key 'InvoiceCode' for join`);
+  console.log(`${BRANCH_TAG} [BACKFILL] Join mapping: invoice.InvoiceNo = invoicedetails.InvoiceCode`);
 
   const query = `
     SELECT TOP (@batchSize)
@@ -192,12 +199,13 @@ async function fetchInvoiceDetails(invoiceCodes) {
 
   const costPriceSelect = support.hasCostPrice ? ',\n            CostPrice' : '';
   const grnDateSelect = support.hasGrnDate ? ',\n            GrnDate' : '';
-  const detailInvoiceKey = support.detailUsesInvoiceCode ? 'InvoiceCode' : 'InvoiceNo';
+  const detailInvoiceKey = 'InvoiceCode';
+  console.log(`${BRANCH_TAG} [BACKFILL] Using header key 'InvoiceNo' and detail key 'InvoiceCode' for backfill join`);
 
   const query = `
     SELECT
         InvDetailID,
-        ${detailInvoiceKey} AS InvoiceCode,
+        InvoiceCode AS InvoiceCode,
         ProductCode,
         Qty,
         PriceTypeCode,
@@ -219,8 +227,8 @@ async function fetchInvoiceDetails(invoiceCodes) {
         Sub_Qty,
         DiscountAmount${costPriceSelect}${grnDateSelect}
     FROM invoicedetails
-    WHERE ${detailInvoiceKey} IN (${placeholders})
-    ORDER BY ${detailInvoiceKey} ASC, InvDetailID ASC
+    WHERE InvoiceCode IN (${placeholders})
+    ORDER BY InvoiceCode ASC, InvDetailID ASC
   `;
 
   const result = await request.query(query);
@@ -245,7 +253,7 @@ function normalizeInvoiceRow(row) {
 
   return {
     invoiceNo: Number(row.InvoiceNo),
-    invoiceCode: Number(row.InvoiceCode),
+    invoiceCode: Number(row.InvoiceCode || row.InvoiceNo),
     invoiceSerialNo: Number(row.InvoiceSerialNo),
     refNo: row.RefNo || null,
     invoiceDate: row.InvoiceDate instanceof Date ? row.InvoiceDate.toISOString() : row.InvoiceDate,
