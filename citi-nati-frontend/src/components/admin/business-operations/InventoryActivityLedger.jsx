@@ -1,7 +1,6 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../../../utils/api.js';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { exportStockMovementLedgerPdf } from '../../../utils/businessOperationsPdfExports.js';
 
 const today = new Date();
 const currentYear = today.getFullYear();
@@ -208,113 +207,25 @@ const InventoryActivityLedger = ({
 
   const exportPDF = () => {
     if (!data || !data.ledger) return;
-
     const rows = data.ledger;
     if (rows.length === 0) return;
 
-    const doc = new jsPDF('l', 'mm', 'a4'); // Landscape for better width
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    
-    // Add title
-    doc.setFontSize(16);
-    doc.setFont(undefined, 'bold');
-    doc.text('Stock Movement Ledger', pageWidth / 2, 15, { align: 'center' });
-    
-    // Add scope and date info
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'normal');
-    doc.text(`Scope: ${scopeLabel}`, 14, 25);
-    doc.text(`Generated: ${new Date().toLocaleString('en-GB')}`, 14, 32);
-    
-    // Prepare table data
-    const tableData = rows.map((row) => {
-      const closingBalance = row.closingBalance !== null && row.closingBalance !== undefined ? row.closingBalance : '-';
-      return [
-        formatDateTime(row.timestamp, row.isDateOnly),
-        row.movementType,
-        row.referenceNo || '-',
-        row.user || '-',
-        row.productCode || '-',
-        row.productName || '-',
-        row.openingBalance,
-        row.qtyIn,
-        row.qtyOut,
-        row.balanceAfterTransaction,
-        closingBalance,
-        row.unitPrice,
-        typeof row.lineAmount === 'number' ? row.lineAmount.toFixed(2) : row.lineAmount,
-      ];
+    exportStockMovementLedgerPdf({
+      scopeLabel,
+      filters: {
+        periodType: modalPeriodType,
+        date: modalDate,
+        month: modalMonth,
+        year: modalYear,
+        startDate: modalStartDate,
+        endDate: modalEndDate,
+        movementType: modalMovementType,
+        productCode: modalProductCode,
+        productName: modalProductName,
+      },
+      ledger: rows,
+      summary: data.summary || {},
     });
-
-    // Generate table with better layout
-    autoTable(doc, {
-      startY: 40,
-      head: [['Time', 'Type', 'Ref', 'User', 'Product Code', 'Product Name', 'Open Bal', 'Qty In', 'Qty Out', 'Balance', 'Close Bal', 'Unit Price', 'Amount']],
-      body: tableData,
-      didDrawPage: (data) => {
-        // Footer
-        const pageCount = doc.internal.pages.length - 1;
-        doc.setFontSize(8);
-        doc.setTextColor(128);
-        doc.text(
-          `Page ${data.pageNumber} of ${pageCount}`,
-          pageWidth / 2,
-          pageHeight - 10,
-          { align: 'center' }
-        );
-      },
-      margin: { top: 40, right: 6, bottom: 15, left: 6 },
-      headStyles: {
-        fillColor: [91, 75, 138],
-        textColor: 255,
-        fontStyle: 'bold',
-        fontSize: 9,
-        cellPadding: 3,
-      },
-      bodyStyles: {
-        fontSize: 8,
-        textColor: 15,
-        cellPadding: 2.5,
-      },
-      alternateRowStyles: {
-        fillColor: [248, 250, 252],
-      },
-      columnStyles: {
-        0: { cellWidth: 20, halign: 'left' },
-        1: { cellWidth: 12, halign: 'center' },
-        2: { cellWidth: 11, halign: 'center' },
-        3: { cellWidth: 12, halign: 'center' },
-        4: { cellWidth: 14, halign: 'left' },
-        5: { cellWidth: 32, halign: 'left' },
-        6: { cellWidth: 11, halign: 'right' },
-        7: { cellWidth: 10, halign: 'right' },
-        8: { cellWidth: 10, halign: 'right' },
-        9: { cellWidth: 12, halign: 'right' },
-        10: { cellWidth: 12, halign: 'right' },
-        11: { cellWidth: 11, halign: 'right' },
-        12: { cellWidth: 13, halign: 'right' },
-      },
-    });
-
-    // Add summary at the end
-    const summaryY = doc.lastAutoTable.finalY + 10;
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'bold');
-    doc.text('Summary', 14, summaryY);
-    
-    doc.setFontSize(8);
-    doc.setFont(undefined, 'normal');
-    doc.text(`Opening Balance: ${summary.openingBalance ?? 0}`, 14, summaryY + 7);
-    doc.text(`Total Qty In: ${summary.totalQtyIn ?? 0}`, 14, summaryY + 13);
-    doc.text(`Total Qty Out: ${summary.totalQtyOut ?? 0}`, 14, summaryY + 19);
-    doc.text(`Total Sales Amount: MWK ${(summary.totalSalesAmount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, summaryY + 25);
-    doc.text(`Total Intake Value: MWK ${(summary.totalIntakeValue ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, summaryY + 31);
-    if (summary.closingBalance !== null && summary.closingBalance !== undefined) {
-      doc.text(`Closing Balance: ${summary.closingBalance}`, 14, summaryY + 37);
-    }
-
-    doc.save(`inventory-ledger-${new Date().toISOString().slice(0, 10)}.pdf`);
   };
 
   useEffect(() => {
