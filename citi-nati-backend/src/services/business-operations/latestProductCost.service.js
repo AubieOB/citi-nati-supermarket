@@ -1,6 +1,11 @@
 'use strict';
 
 const { PrismaClient } = require('@prisma/client');
+const {
+  normalizeScopeCode,
+  normalizeBranchCode,
+  expandOperationalLocationScopeCodes,
+} = require('../../utils/operationalScope');
 
 const prisma = new PrismaClient();
 
@@ -27,7 +32,7 @@ const BRANCH_SYNC_SOURCE_PREFIXES = {
 // Mirrors the same function in reportingFilters.js — kept local to avoid
 // coupling unrelated modules. Must stay in sync with that version.
 function buildBranchScopePredicate(branchCode) {
-  const normalized = String(branchCode || '').trim().toUpperCase();
+  const normalized = normalizeBranchCode(branchCode);
   if (!normalized) return null;
 
   const prefixes = BRANCH_SYNC_SOURCE_PREFIXES[normalized] || [normalized];
@@ -63,9 +68,11 @@ function buildLatestCostScope(filters = {}) {
     andConditions.push(branchScopePredicate);
   }
 
-  const locationCode = normalizeProductCode(filters.locationCode);
-  if (locationCode) {
-    where.locationCode = locationCode;
+  const locationCodes = expandOperationalLocationScopeCodes(filters.locationCode);
+  if (locationCodes.length === 1) {
+    where.locationCode = locationCodes[0];
+  } else if (locationCodes.length > 1) {
+    where.OR = locationCodes.map((code) => ({ locationCode: code }));
   }
 
   const locationId = Number.isInteger(filters.locationId) ? filters.locationId : Number(filters.locationId);

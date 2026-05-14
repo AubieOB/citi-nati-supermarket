@@ -20,13 +20,14 @@ const BRANCH_ALIASES = {
   BT: 'BLANTYRE',
   BLANTYRE: 'BLANTYRE',
   BLANTYRE_SH: 'BLANTYRE',
+  ZA: 'ZOMBA',
+  ZOMBA: 'ZOMBA',
   ZOMBA_SH: 'ZOMBA',
   ZOMBA_BAR: 'ZOMBA',
   ZOMBA_RES: 'ZOMBA',
-  ZA: 'ZOMBA',
-  ZOMBA: 'ZOMBA',
 };
 
+const CORE_BLANTYRE_LOCATION_CODES = ['BT', 'SH', 'WH'];
 const CORE_ZOMBA_LOCATION_CODES = ['SH', 'BAR', 'ST999'];
 
 // Location codes that exist in multiple branches and require explicit branchCode
@@ -43,14 +44,25 @@ function normalizeScopeCode(value) {
   return LOCATION_ALIASES[normalized] || normalized;
 }
 
+function normalizeBranchCode(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (!normalized) return null;
+  return BRANCH_ALIASES[normalized] || normalized;
+}
+
 function expandOperationalLocationScopeCodes(locationCode) {
   const normalized = normalizeScopeCode(locationCode);
   if (!normalized) return [];
 
-  // Expand Zomba locations to include all Zomba sub-locations (SH, BAR, ST999).
-  // All Zomba locations share the same supplier pool and product catalog within the ZOMBA branch.
-  if (normalized === 'ZA' || ['SH', 'BAR', 'ST999'].includes(normalized)) {
-    return ['SH', 'BAR', 'ST999'];
+  // Expand Blantyre branch alias to all known Blantyre operational locations.
+  if (normalized === 'BT') {
+    return CORE_BLANTYRE_LOCATION_CODES;
+  }
+
+  // Expand Zomba branch alias and all Zomba operational locations to the full
+  // branch-level location set.
+  if (normalized === 'ZA' || CORE_ZOMBA_LOCATION_CODES.includes(normalized)) {
+    return CORE_ZOMBA_LOCATION_CODES;
   }
 
   return [normalized];
@@ -112,8 +124,10 @@ function resolveOperationalScope(req) {
 
 module.exports = {
   normalizeScopeCode,
+  normalizeBranchCode,
   expandOperationalLocationScopeCodes,
   resolveOperationalScope,
   isAmbiguousLocationCode,
+  CORE_BLANTYRE_LOCATION_CODES,
   CORE_ZOMBA_LOCATION_CODES,
 };

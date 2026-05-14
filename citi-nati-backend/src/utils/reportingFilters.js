@@ -43,15 +43,11 @@ const BRANCH_SYNC_SOURCE_PREFIXES = {
   ZOMBA: ['ZOMBA', 'ZA'],
 };
 
-const { normalizeScopeCode, expandOperationalLocationScopeCodes } = require('./operationalScope');
-
-function normalizeBranchCode(branchCode) {
-  const normalized = sanitizeStr(branchCode)?.toUpperCase();
-  if (!normalized) return null;
-  if (['BT', 'BLANTYRE', 'BLANTYRE_SH'].includes(normalized)) return 'BLANTYRE';
-  if (['ZA', 'ZOMBA', 'ZOMBA_SH', 'ZOMBA_BAR', 'ZOMBA_RES'].includes(normalized)) return 'ZOMBA';
-  return normalized;
-}
+const {
+  normalizeScopeCode,
+  normalizeBranchCode,
+  expandOperationalLocationScopeCodes,
+} = require('./operationalScope');
 
 function buildBranchScopePredicate(branchCode) {
   const normalizedBranch = normalizeBranchCode(branchCode);
@@ -157,7 +153,7 @@ function buildInvoiceWhere(dateRange, filters = {}) {
   }
 
   if (filters.syncSourceCode) {
-    where.syncSourceCode = filters.syncSourceCode;
+    where.syncSourceCode = { equals: filters.syncSourceCode, mode: 'insensitive' };
   }
 
   if (filters.locationId !== null && filters.locationId !== undefined) {
