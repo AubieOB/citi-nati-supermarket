@@ -1028,6 +1028,15 @@ async function fetchProductsFromPOS(locationCode) {
         FROM POS.dbo.DailyStockBalance
         WHERE LocationCode = @LocationCode
       ),
+      eligible_products AS (
+        SELECT DISTINCT ProductCode FROM (
+          SELECT ProductCode FROM POS.dbo.DailyStockBalance WHERE LocationCode = @LocationCode
+          UNION
+          SELECT ProductCode FROM POS.dbo.ProductActivity WHERE LocationCode = @LocationCode
+          UNION
+          SELECT ProductCode FROM POS.dbo.productprices WHERE LocationCode = @LocationCode
+        ) AS combined
+      ),
       latest_daily AS (
         SELECT
           ds.ProductCode,
@@ -1079,7 +1088,8 @@ async function fetchProductsFromPOS(locationCode) {
             WHEN lp.FPrice IS NOT NULL THEN 'PriceByLocation'
             ELSE 'NoPriceRow'
           END AS PriceSource
-      FROM POS.dbo.productsmaster p
+      FROM eligible_products ep
+      INNER JOIN POS.dbo.productsmaster p ON p.ProductCode = ep.ProductCode
           CROSS JOIN effective_balance_date ebd
       LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
       LEFT JOIN latest_daily ds ON ds.ProductCode = p.ProductCode AND ds.LocationCode = @LocationCode AND ds.rn = 1
@@ -1170,7 +1180,67 @@ async function fetchProductsFromPOS(locationCode) {
       ORDER BY p.ProductCode
     `
       : stockConfig.hasDailyStockBalance
-      ? `
+      ? (isGuardedZombaLocation
+        ? `
+        WITH effective_balance_date AS (
+          SELECT
+            MAX(CAST(StockDate AS date)) AS EffectiveStockDate
+          FROM POS.dbo.DailyStockBalance
+          WHERE LocationCode = @LocationCode
+        ),
+        eligible_products AS (
+          SELECT DISTINCT ProductCode FROM (
+            SELECT ProductCode FROM POS.dbo.DailyStockBalance WHERE LocationCode = @LocationCode
+            UNION
+            SELECT ProductCode FROM POS.dbo.productprices WHERE LocationCode = @LocationCode
+          ) AS combined
+        ),
+        latest_stock AS (
+          SELECT
+            ds.ProductCode,
+            ds.LocationCode,
+            ds.StockDate,
+            ds.StockBalance,
+            ROW_NUMBER() OVER (
+              PARTITION BY ds.ProductCode, ds.LocationCode
+              ORDER BY ds.StockDate DESC
+            ) AS rn
+          FROM POS.dbo.DailyStockBalance ds
+          CROSS JOIN effective_balance_date ebd
+          WHERE ds.LocationCode = @LocationCode
+            AND ebd.EffectiveStockDate IS NOT NULL
+            AND CAST(ds.StockDate AS date) = ebd.EffectiveStockDate
+        )
+        SELECT
+            p.ProductCode,
+            @LocationCode AS LocationCode,
+            p.ProductName,
+            ISNULL(p.Barcode, '') AS Barcode,
+            ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
+            ebd.EffectiveStockDate,
+            ebd.EffectiveStockDate AS LatestBalanceDate,
+            ls.StockDate,
+            ls.StockBalance AS QuantityAvailable,
+            CASE
+              WHEN ls.StockBalance IS NOT NULL THEN 'DailyStockBalance'
+              ELSE 'NoStockRow'
+            END AS StockSource,
+            ISNULL(
+                (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC),
+                0
+            ) AS SellingPrice,
+            CASE
+              WHEN (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC) IS NOT NULL THEN 'PriceByLocation'
+              ELSE 'NoPriceRow'
+            END AS PriceSource
+        FROM eligible_products ep
+        INNER JOIN POS.dbo.productsmaster p ON p.ProductCode = ep.ProductCode
+            CROSS JOIN effective_balance_date ebd
+        LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
+        LEFT JOIN latest_stock ls ON ls.ProductCode = p.ProductCode AND ls.LocationCode = @LocationCode AND ls.rn = 1
+        ORDER BY p.ProductCode
+      `
+      : `
       WITH effective_balance_date AS (
         SELECT
           MAX(CAST(StockDate AS date)) AS EffectiveStockDate
@@ -1220,9 +1290,53 @@ async function fetchProductsFromPOS(locationCode) {
       LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
       LEFT JOIN latest_stock ls ON ls.ProductCode = p.ProductCode AND ls.LocationCode = @LocationCode AND ls.rn = 1
       ORDER BY p.ProductCode
-    `
+    `)
       : stockConfig.hasProductActivity
-      ? `
+      ? (isGuardedZombaLocation
+        ? `
+        WITH eligible_products AS (
+          SELECT DISTINCT ProductCode FROM (
+            SELECT ProductCode FROM POS.dbo.ProductActivity WHERE LocationCode = @LocationCode
+            UNION
+            SELECT ProductCode FROM POS.dbo.productprices WHERE LocationCode = @LocationCode
+          ) AS combined
+        ),
+        product_activity AS (
+          SELECT
+            ProductCode,
+            LocationCode,
+            SUM(ISNULL(QtyIn, 0) - ISNULL(QtyOut, 0)) AS ActivityStockBalance
+          FROM POS.dbo.ProductActivity
+          WHERE LocationCode = @LocationCode
+          GROUP BY ProductCode, LocationCode
+        )
+        SELECT
+            p.ProductCode,
+            @LocationCode AS LocationCode,
+            p.ProductName,
+            ISNULL(p.Barcode, '') AS Barcode,
+            ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
+            NULL AS StockDate,
+            pa.ActivityStockBalance AS QuantityAvailable,
+            CASE
+              WHEN pa.ProductCode IS NOT NULL THEN 'ProductActivity'
+              ELSE 'NoStockRow'
+            END AS StockSource,
+            ISNULL(
+                (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC),
+                0
+            ) AS SellingPrice,
+            CASE
+              WHEN (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC) IS NOT NULL THEN 'PriceByLocation'
+              ELSE 'NoPriceRow'
+            END AS PriceSource
+        FROM eligible_products ep
+        INNER JOIN POS.dbo.productsmaster p ON p.ProductCode = ep.ProductCode
+        LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
+        LEFT JOIN product_activity pa ON pa.ProductCode = p.ProductCode AND pa.LocationCode = @LocationCode
+        ORDER BY p.ProductCode
+      `
+      : `
       WITH product_activity AS (
         SELECT
           ProductCode,
@@ -1256,7 +1370,34 @@ async function fetchProductsFromPOS(locationCode) {
       LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
       LEFT JOIN product_activity pa ON pa.ProductCode = p.ProductCode AND pa.LocationCode = @LocationCode
       ORDER BY p.ProductCode
-    `
+    `)
+      : (isGuardedZombaLocation
+        ? `
+        WITH eligible_products AS (
+          SELECT DISTINCT ProductCode FROM POS.dbo.productprices WHERE LocationCode = @LocationCode
+        )
+        SELECT
+            p.ProductCode,
+            @LocationCode AS LocationCode,
+            p.ProductName,
+            ISNULL(p.Barcode, '') AS Barcode,
+            ISNULL(pt.ProductTypeName, 'General') AS CategoryName,
+            NULL AS StockDate,
+            NULL AS QuantityAvailable,
+            'NoStockRow' AS StockSource,
+            ISNULL(
+                (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC),
+                0
+            ) AS SellingPrice,
+            CASE
+              WHEN (SELECT TOP 1 FPrice FROM POS.dbo.productprices WHERE ProductCode = p.ProductCode AND LocationCode = @LocationCode ORDER BY PriceID DESC) IS NOT NULL THEN 'PriceByLocation'
+              ELSE 'NoPriceRow'
+            END AS PriceSource
+        FROM eligible_products ep
+        INNER JOIN POS.dbo.productsmaster p ON p.ProductCode = ep.ProductCode
+        LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
+        ORDER BY p.ProductCode
+      `
       : `
       SELECT
           p.ProductCode,
@@ -1278,7 +1419,7 @@ async function fetchProductsFromPOS(locationCode) {
       FROM POS.dbo.productsmaster p
       LEFT JOIN POS.dbo.producttypes pt ON p.ProductTypeCode = pt.ProductTypeCode
       ORDER BY p.ProductCode
-    `;
+    `);
 
     const request = pool.request();
     request.input('LocationCode', sql.VarChar(10), LOCATION_CODE);
@@ -1309,6 +1450,40 @@ async function fetchProductsFromPOS(locationCode) {
       });
     }
     let result = await request.query(query);
+
+    // For Zomba locations, log eligibility breakdown
+    if (isGuardedZombaLocation) {
+      const eligibilityQuery = `
+        SELECT
+          (SELECT COUNT(*) FROM POS.dbo.productsmaster) AS globalProductsScanned,
+          (SELECT COUNT(DISTINCT ProductCode) FROM POS.dbo.DailyStockBalance WHERE LocationCode = @LocationCode) AS eligibleByStock,
+          (SELECT COUNT(DISTINCT ProductCode) FROM POS.dbo.productprices WHERE LocationCode = @LocationCode) AS eligibleByPrice,
+          (SELECT COUNT(DISTINCT ProductCode) FROM POS.dbo.ProductActivity WHERE LocationCode = @LocationCode) AS eligibleByActivity
+      `;
+      const eligibilityRequest = pool.request();
+      eligibilityRequest.input('LocationCode', sql.VarChar(10), LOCATION_CODE);
+      const eligibilityResult = await eligibilityRequest.query(eligibilityQuery);
+      const eligibility = eligibilityResult.recordset[0];
+      
+      const globalProductsScanned = Number(eligibility.globalProductsScanned || 0);
+      const eligibleByStock = Number(eligibility.eligibleByStock || 0);
+      const eligibleByPrice = Number(eligibility.eligibleByPrice || 0);
+      const eligibleByActivity = Number(eligibility.eligibleByActivity || 0);
+      const finalEligibleProducts = result.recordset.length;
+      const skippedGlobalOnlyProducts = globalProductsScanned - finalEligibleProducts;
+
+      console.log(`${SYNC_LOG_PREFIX} [ZOMBA LOCATION ELIGIBILITY]`, {
+        locationCode: LOCATION_CODE,
+        globalProductsScanned,
+        eligibleByStock,
+        eligibleByPrice,
+        eligibleByActivity,
+        finalEligibleProducts,
+        skippedGlobalOnlyProducts,
+        noStockButPriceRows: result.recordset.filter(p => p.StockSource === 'NoStockRow' && p.PriceSource === 'PriceByLocation').length,
+        noPriceButStockRows: result.recordset.filter(p => p.StockSource !== 'NoStockRow' && p.PriceSource === 'NoPriceRow').length,
+      });
+    }
 
     const locationStockDateRow = result.recordset.find((row) => row && (row.EffectiveStockDate || row.LatestBalanceDate)) || null;
     const effectiveStockDate = locationStockDateRow && locationStockDateRow.EffectiveStockDate
@@ -1521,6 +1696,24 @@ async function fetchProductsFromPOS(locationCode) {
         } else {
           console.log(`${SYNC_LOG_PREFIX} [DEBUG PRODUCT] No matching debug products found for ${debugProductCodesList.join(', ')} at ${LOCATION_CODE}`);
         }
+      }
+
+      // Zomba product eligibility debug logging
+      if (isGuardedZombaLocation && debugProductCodesList.length > 0) {
+        const debugMatches = result.recordset.filter((row) => debugProductCodesList.includes(String(row.ProductCode || '').trim().toUpperCase()));
+        debugMatches.forEach((product) => {
+          console.log(`${SYNC_LOG_PREFIX} [ZOMBA PRODUCT ELIGIBILITY DEBUG]`, {
+            productCode: product.ProductCode,
+            locationCode: LOCATION_CODE,
+            hasStockRow: product.StockSource !== 'NoStockRow',
+            stockBalance: product.QuantityAvailable,
+            hasPriceRow: product.PriceSource === 'PriceByLocation',
+            hasActivity: product.StockSource && product.StockSource.includes('ProductActivity'),
+            eligible: true, // Since it's in the result set, it was eligible
+            reason: 'Has location-specific signal (stock/price/activity)',
+            backendPayloadStock: product.QuantityAvailable,
+          });
+        });
       }
     }
 
