@@ -109,11 +109,8 @@ async function fetchHistoricalInvoiceHeaders(fromDate, toDate, batchSize = 100, 
   request.input('batchSize', sql.Int, batchSize);
   request.input('lastInvoiceNo', sql.Int, lastInvoiceNo);
 
-  const invoiceCodeSelect = support.hasInvoiceCode
-    ? 'InvoiceCode'
-    : support.hasQuoteNo
-      ? 'QuoteNo AS InvoiceCode'
-      : 'InvoiceNo AS InvoiceCode';
+  const invoiceCodeSelect = 'InvoiceNo AS InvoiceCode';
+  console.log(`${BRANCH_TAG} [BACKFILL] Using header key 'InvoiceNo' and invoiceCode alias for backfill join`);
 
   const query = `
     SELECT TOP (@batchSize)
@@ -179,13 +176,13 @@ async function fetchInvoiceDetails(invoiceCodes) {
 
   const costPriceSelect = support.hasCostPrice ? ',\n            CostPrice' : '';
   const grnDateSelect = support.hasGrnDate ? ',\n            GrnDate' : '';
-  const detailInvoiceKey = support.detailUsesInvoiceCode ? 'InvoiceCode' : 'InvoiceNo';
-  console.log(`${BRANCH_TAG} [BACKFILL] Invoice detail query using invoicedetails.${detailInvoiceKey}`);
+  const detailInvoiceKey = 'InvoiceCode';
+  console.log(`${BRANCH_TAG} [BACKFILL] Using header key 'InvoiceNo' and detail key 'InvoiceCode' for backfill join`);
 
   const query = `
     SELECT
         InvDetailID,
-        ${detailInvoiceKey} AS InvoiceCode,
+        InvoiceCode AS InvoiceCode,
         ProductCode,
         Qty,
         PriceTypeCode,
@@ -207,8 +204,8 @@ async function fetchInvoiceDetails(invoiceCodes) {
         Sub_Qty,
         DiscountAmount${costPriceSelect}${grnDateSelect}
     FROM invoicedetails
-    WHERE ${detailInvoiceKey} IN (${placeholders})
-    ORDER BY ${detailInvoiceKey} ASC, InvDetailID ASC
+    WHERE InvoiceCode IN (${placeholders})
+    ORDER BY InvoiceCode ASC, InvDetailID ASC
   `;
 
   const result = await request.query(query);
