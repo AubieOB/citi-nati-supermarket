@@ -705,6 +705,266 @@ function rejectDirectWritebackInProduction(req, res, next) {
   });
 }
 
+function chunkArray(array, size) {
+  if (!Array.isArray(array) || size <= 0) return [];
+  const chunks = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunks.push(array.slice(i, i + size));
+  }
+  return chunks;
+}
+
+function buildPosGrnPayload(rows) {
+  const grnMap = new Map();
+
+  rows.forEach((row) => {
+    if (!row.GRNNo) return;
+    const grnNo = String(row.GRNNo).trim();
+    const header = grnMap.get(grnNo) || {
+      grnNo,
+      grnDate: row.GRNDate instanceof Date ? row.GRNDate.toISOString() : row.GRNDate || null,
+      grnObservedAt: new Date().toISOString(),
+      grnReference: row.GRNReference && row.GRNReference.trim() ? row.GRNReference.trim() : grnNo,
+      locationCode: row.LocationCode || null,
+      branchCode: appConfig.branch.branchCode,
+      supplierCode: row.SupplierCode || null,
+      orderNumber: row.OrderNumber || null,
+      uploadStatus: Number.isFinite(Number(row.UploadStatus)) ? Number(row.UploadStatus) : null,
+      sourceUpdatedAt: row.GRNDate instanceof Date ? row.GRNDate.toISOString() : row.GRNDate || null,
+      items: [],
+      userName: row.GRNUserName ? String(row.GRNUserName).trim() : null,
+    };
+
+    header.items.push({
+      stockDetailId: row.StockDetailID == null ? null : String(row.StockDetailID).trim(),
+      productCode: row.ProductCode == null ? null : String(row.ProductCode).trim(),
+      productName: row.ProductName == null ? null : String(row.ProductName).trim(),
+      quantity: Number.isFinite(Number(row.StockQty)) ? Number(row.StockQty) : 0,
+      unitCost: Number.isFinite(Number(row.CostPrice)) ? Number(row.CostPrice) : null,
+      lineAmount: Number.isFinite(Number(row.LineAmount)) ? Number(row.LineAmount) : null,
+      expiryDate: row.ExpiryDate instanceof Date ? row.ExpiryDate.toISOString() : row.ExpiryDate || null,
+      uploadStatus: Number.isFinite(Number(row.ItemUploadStatus)) ? Number(row.ItemUploadStatus) : null,
+      sourceUpdatedAt: row.GRNDate instanceof Date ? row.GRNDate.toISOString() : row.GRNDate || null,
+    });
+
+    grnMap.set(grnNo, header);
+  });
+
+  return Array.from(grnMap.values());
+}
+
+async function sendPosGrnsToBackend(posGrns, syncLocations) {
+  try {
+    if (!appConfig.backend.baseUrl) {
+      throw new Error('BACKEND_URL not configured');
+    }
+
+    const endpoint = appConfig.reporting.backendPosGrnEndpoint || '/api/pos-sync/reporting/pos-grns';
+    const fullUrl = `${appConfig.backend.baseUrl}${endpoint}`;
+    console.log(`${BRANCH_TAG} [POS GRN SYNC] Sending ${posGrns.length} GRN payload(s) to backend`);
+
+    posGrns.slice(0, 3).forEach((grn, idx) => {
+      console.log(`${BRANCH_TAG} [POS GRN AGENT PAYLOAD VERIFICATION] GRN #${idx + 1}:`, {
+        grnNo: grn.grnNo,
+        grnDate: grn.grnDate,
+        grnObservedAt: grn.grnObservedAt,
+        syncSourceCode: appConfig.branch.syncSourceCode,
+        grnUserName: grn.userName || grn.grnUserName || null,
+        itemCount: (grn.items || []).length,
+      });
+    });
+
+    const payload = {
+      ...getSyncMetadata(appConfig, {
+        locationCode: null,
+        syncedLocations: syncLocations,
+      }),
+      posStockIntakes: posGrns,
+      intakeCount: posGrns.length,
+    };
+
+    const response = await axios.post(fullUrl, payload, {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-pos-secret': appConfig.backend.apiToken,
+        'x-branch-code': appConfig.branch.branchCode,
+        'x-sync-source-code': appConfig.branch.syncSourceCode,
+      },
+      timeout: 120000,
+    });
+
+    if (!(response.data && response.data.success)) {
+      throw new Error(`Backend rejected POS GRN payload: ${JSON.stringify(response.data)}`);
+    }
+
+    return {
+      success: true,
+      received: posGrns.length,
+      backendResult: response.data,
+    };
+  } catch (error) {
+    console.error(`${BRANCH_TAG} [POS GRN SYNC] Failed to send payload:`, error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+async function resolvePosGrnColumnConfig(pool) {
+  const stocksColumns = await getTableColumns('stocks');
+
+  const grnRefCandidates = ['GRNReference', 'ReferenceNo', 'ReceiptReference', 'RefNo', 'GRNNo'];
+  const userCandidates = ['GRNUserName', 'UserName', 'CreatedBy', 'EnteredBy', 'Operator', 'Cashier', 'UpdatedBy'];
+  const grnDateCandidates = ['GRNDateTime', 'CreatedAt', 'CreatedDate', 'EntryDateTime', 'PostedAt', 'UpdatedAt', 'UpdatedDate', 'GRNDate'];
+
+  const grnRefColumn = grnRefCandidates.find((column) => stocksColumns.has(column)) || null;
+  const grnUserColumn = userCandidates.find((column) => stocksColumns.has(column)) || null;
+  const grnDateColumn = grnDateCandidates.find((column) => stocksColumns.has(column));
+  const grnDateExpr = grnDateColumn
+    ? `COALESCE(s.${grnDateColumn}, s.GRNDate)`
+    : 's.GRNDate';
+
+  console.log(`${BRANCH_TAG} [POS GRN SYNC] Detected stocks table columns for POS GRN sync:`, {
+    grnReferenceColumn: grnRefColumn || 'GRNNo (fallback)',
+    grnUserColumn: grnUserColumn || 'none',
+    grnDateColumn,
+  });
+
+  return {
+    grnReferenceExpr: grnRefColumn ? `COALESCE(s.${grnRefColumn}, '')` : `COALESCE(s.GRNNo, '')`,
+    grnUserNameExpr: grnUserColumn ? `s.${grnUserColumn}` : 'NULL',
+    grnDateExpr,
+  };
+}
+
+async function fetchApprovedPosGrnRows(pool, locationCodes, lookbackDays = 90) {
+  if (!pool) await initializePool();
+
+  const syncLocations = Array.isArray(locationCodes) && locationCodes.length > 0
+    ? locationCodes.map((loc) => String(loc || '').trim().toUpperCase()).filter(Boolean)
+    : [appConfig.posDb.locationCode];
+
+  if (syncLocations.length === 0) {
+    syncLocations.push(appConfig.posDb.locationCode);
+  }
+
+  const columnConfig = await resolvePosGrnColumnConfig(pool);
+  const request = pool.request();
+  request.input('LookbackDays', sql.Int, lookbackDays);
+
+  const locationPlaceholders = syncLocations.map((locationCode, index) => {
+    const paramName = `LocationCode${index}`;
+    request.input(paramName, sql.VarChar(10), locationCode);
+    return `@${paramName}`;
+  }).join(', ');
+
+  const query = `
+    SELECT
+      s.GRNNo,
+      ${columnConfig.grnDateExpr} AS GRNDate,
+      s.LocationCode,
+      COALESCE(s.SupplierCode, '') AS SupplierCode,
+      COALESCE(s.OrderNumber, '') AS OrderNumber,
+      ${columnConfig.grnReferenceExpr} AS GRNReference,
+      ${columnConfig.grnUserNameExpr} AS GRNUserName,
+      s.UploadStatus,
+      sd.StockDetailID,
+      sd.ProductCode,
+      pm.ProductName,
+      sd.StockQty,
+      sd.CostPrice,
+      CAST(ISNULL(sd.StockQty, 0) * ISNULL(sd.CostPrice, 0) AS decimal(18, 4)) AS LineAmount,
+      sd.ExpiryDate,
+      sd.UploadStatus AS ItemUploadStatus
+    FROM POS.dbo.stocks s
+    INNER JOIN POS.dbo.stockdetails sd ON sd.GRNNo = s.GRNNo
+    LEFT JOIN POS.dbo.productsmaster pm ON pm.ProductCode = sd.ProductCode
+    WHERE s.LocationCode IN (${locationPlaceholders})
+      AND sd.ProductCode IS NOT NULL
+      AND s.GRNDate >= DATEADD(DAY, -@LookbackDays, CAST(GETDATE() AS date))
+    ORDER BY s.GRNDate ASC, s.GRNNo ASC
+  `;
+
+  const result = await request.query(query);
+  const rows = (result.recordset || []).map((row) => ({
+    GRNNo: row.GRNNo == null ? null : String(row.GRNNo).trim(),
+    GRNDate: row.GRNDate instanceof Date ? row.GRNDate : (row.GRNDate || null),
+    GRNUserName: row.GRNUserName == null ? null : String(row.GRNUserName).trim(),
+    LocationCode: row.LocationCode == null ? null : String(row.LocationCode).trim(),
+    SupplierCode: row.SupplierCode == null ? null : String(row.SupplierCode).trim(),
+    OrderNumber: row.OrderNumber == null ? null : String(row.OrderNumber).trim(),
+    UploadStatus: Number.isFinite(Number(row.UploadStatus)) ? Number(row.UploadStatus) : null,
+    GRNReference: row.GRNReference == null ? null : String(row.GRNReference).trim(),
+    StockDetailID: row.StockDetailID == null ? null : String(row.StockDetailID).trim(),
+    ProductCode: row.ProductCode == null ? null : String(row.ProductCode).trim(),
+    ProductName: row.ProductName == null ? null : String(row.ProductName).trim(),
+    StockQty: Number.isFinite(Number(row.StockQty)) ? Number(row.StockQty) : 0,
+    CostPrice: Number.isFinite(Number(row.CostPrice)) ? Number(row.CostPrice) : null,
+    LineAmount: Number.isFinite(Number(row.LineAmount)) ? Number(row.LineAmount) : null,
+    ExpiryDate: row.ExpiryDate instanceof Date ? row.ExpiryDate : (row.ExpiryDate || null),
+    ItemUploadStatus: Number.isFinite(Number(row.ItemUploadStatus)) ? Number(row.ItemUploadStatus) : null,
+  }));
+
+  console.log(`${BRANCH_TAG} [POS GRN SYNC] Fetched ${rows.length} approved POS GRN rows from POS database for locations: ${syncLocations.join(', ')}`);
+  return rows;
+}
+
+async function syncPosGrnsToBackend() {
+  if (!ENABLE_POS_GRN_SYNC) {
+    console.log(`${BRANCH_TAG} [POS GRN SYNC] Disabled by configuration`);
+    return;
+  }
+
+  if (!appConfig.backend.baseUrl || !appConfig.backend.apiToken) {
+    console.warn(`${BRANCH_TAG} [POS GRN SYNC] Skipped because backend base URL or API token is missing`);
+    return;
+  }
+
+  if (isPosGrnSyncRunning) {
+    console.log(`${BRANCH_TAG} [POS GRN SYNC] Skipped tick - previous sync still running`);
+    return;
+  }
+
+  isPosGrnSyncRunning = true;
+
+  try {
+    if (!pool) await initializePool();
+
+    const syncLocations = getOperationalSyncLocations();
+    const rows = await fetchApprovedPosGrnRows(pool, syncLocations, 90);
+    if (rows.length === 0) {
+      console.log(`${BRANCH_TAG} [POS GRN SYNC] No approved POS GRN records found for sync`);
+      return;
+    }
+
+    const posGrns = buildPosGrnPayload(rows);
+    if (posGrns.length === 0) {
+      console.log(`${BRANCH_TAG} [POS GRN SYNC] No GRN headers were built from fetched rows`);
+      return;
+    }
+
+    const batches = chunkArray(posGrns, appConfig.reporting.posGrnBatchSize || 50);
+    let totalSent = 0;
+    let totalFailed = 0;
+
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+      const batch = batches[batchIndex];
+      console.log(`${BRANCH_TAG} [POS GRN SYNC] Sending batch ${batchIndex + 1}/${batches.length} (GRNs: ${batch.length})`);
+      const result = await sendPosGrnsToBackend(batch, syncLocations);
+      if (result.success) {
+        totalSent += batch.length;
+      } else {
+        totalFailed += 1;
+        console.error(`${BRANCH_TAG} [POS GRN SYNC] Batch failed:`, result.error);
+      }
+    }
+
+    console.log(`${BRANCH_TAG} [POS GRN SYNC] Sync complete`, { totalSent, totalFailed });
+  } catch (error) {
+    console.error(`${BRANCH_TAG} [POS GRN SYNC] Unexpected error:`, error.message);
+  } finally {
+    isPosGrnSyncRunning = false;
+  }
+}
+
 /** Fetch products from POS with category information for a specific operational location. */
 async function fetchProductsFromPOS(locationCode) {
   try {
@@ -2676,6 +2936,10 @@ async function gracefulShutdown() {
     clearInterval(reportingSyncInterval);
     console.log('Reporting sync interval cleared');
   }
+  if (posGrnSyncInterval) {
+    clearInterval(posGrnSyncInterval);
+    console.log('POS GRN sync interval cleared');
+  }
   if (fastReportingCatchup) {
     fastReportingCatchup.stop();
     console.log('Fast reporting catchup stopped');
@@ -2727,6 +2991,12 @@ let isEmergencySalesPollRunning = false;
 let reportingSyncInterval;
 const REPORTING_SYNC_INTERVAL_MS = appConfig.reporting.pollingIntervalMs;
 let isReportingSyncRunning = false;
+
+/** POS GRN stock intake sync interval */
+let posGrnSyncInterval;
+const POS_GRN_SYNC_INTERVAL_MS = appConfig.reporting.posGrnPollingIntervalMs;
+const ENABLE_POS_GRN_SYNC = appConfig.features.enablePosGrnSync;
+let isPosGrnSyncRunning = false;
 
 /** Supplier sync interval */
 let supplierSyncInterval;
@@ -3228,9 +3498,11 @@ function logStartupConfiguration() {
     enableReportingSync: appConfig.features.enableReportingSync,
     enableOnlineOrderWriteback: appConfig.features.enableOnlineOrderWriteback,
     enableStockWriteback: appConfig.features.enableStockWriteback,
+    enablePromotionSync: appConfig.features.enablePromotionSync,
     enablePriceSync: appConfig.features.enablePriceSync,
     enableProductNameSync: appConfig.features.enableProductNameSync,
     enableInvoiceWriteback: appConfig.features.enableInvoiceWriteback,
+    enablePosGrnSync: appConfig.features.enablePosGrnSync,
   });
   
   console.log(`${BRANCH_TAG} [BOOT] Startup summary:`, startupSummary);
@@ -3329,9 +3601,7 @@ async function startServer() {
       }
 
       // reporting sync module
-     // reporting sync module
-      // reporting sync module
-if (appConfig.features.enableReportingSync && reportingSyncService) {
+      if (appConfig.features.enableReportingSync && reportingSyncService) {
   reportingSyncInterval = setInterval(pollAndProcessReportingSync, REPORTING_SYNC_INTERVAL_MS);
   console.log(`${BRANCH_TAG} [REPORTING SYNC] ✅ Polling enabled (${REPORTING_SYNC_INTERVAL_MS}ms, batch: ${appConfig.reporting.batchSize})`);
 
@@ -3360,6 +3630,14 @@ if (appConfig.features.enableReportingSync && reportingSyncService) {
 } else {
   console.log(`${BRANCH_TAG} [REPORTING SYNC] ⏸ Polling disabled because service not initialized`);
 }
+
+      if (ENABLE_POS_GRN_SYNC && appConfig.backend.baseUrl && appConfig.backend.apiToken) {
+        posGrnSyncInterval = setInterval(syncPosGrnsToBackend, POS_GRN_SYNC_INTERVAL_MS);
+        console.log(`${BRANCH_TAG} [POS GRN SYNC] ✅ Polling enabled (${POS_GRN_SYNC_INTERVAL_MS}ms, batch: ${appConfig.reporting.posGrnBatchSize})`);
+        syncPosGrnsToBackend();
+      } else {
+        console.log('[POS GRN SYNC] ⚠️ Polling disabled (requires ENABLE_POS_GRN_SYNC=true, BACKEND_URL, BACKEND_API_TOKEN/POS_SECRET)');
+      }
 
       supplierSyncInterval = setInterval(syncSuppliersToBackend, appConfig.stock.supplierSyncIntervalMs);
       console.log(`${BRANCH_TAG} [SUPPLIER SYNC] ✅ Polling enabled (interval: ${appConfig.stock.supplierSyncIntervalMs}ms)`);

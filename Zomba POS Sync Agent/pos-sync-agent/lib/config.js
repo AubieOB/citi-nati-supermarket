@@ -50,6 +50,7 @@ function buildFeatureFlags() {
     enableProductNameSync: parseBoolean(process.env.ENABLE_PRODUCT_NAME_SYNC, true),
     enableManualStockSync: parseBoolean(process.env.ENABLE_MANUAL_STOCK_SYNC, true),
     enableInvoiceWriteback: parseBoolean(process.env.ENABLE_INVOICE_WRITEBACK, true),
+    enablePosGrnSync: parseBoolean(process.env.ENABLE_POS_GRN_SYNC, true),
   };
 }
 
@@ -127,14 +128,18 @@ function buildConfig() {
     productNameSync: features.enableProductNameSync,
     promotionSync: features.enablePromotionSync,
     manualStockSync: features.enableManualStockSync,
+    posGrnSync: features.enablePosGrnSync,
   };
 
   config.reporting = {
   backendReportingEndpoint: normalizeString(process.env.REPORTING_BACKEND_ENDPOINT, '/api/pos-sync/reporting/invoices'),
   backendLatestProductCostEndpoint: normalizeString(process.env.REPORTING_LATEST_COST_ENDPOINT, '/api/pos-sync/reporting/latest-product-costs'),
+  backendPosGrnEndpoint: normalizeString(process.env.REPORTING_POS_GRN_ENDPOINT, '/api/pos-sync/reporting/pos-grns'),
   batchSize: parseInteger(process.env.REPORTING_BATCH_SIZE, 100),
   latestCostBatchSize: parseInteger(process.env.REPORTING_LATEST_COST_BATCH_SIZE, 500),
+  posGrnBatchSize: parseInteger(process.env.REPORTING_POS_GRN_BATCH_SIZE, 50),
   pollingIntervalMs: parseInteger(process.env.REPORTING_POLLING_INTERVAL_MS, parseInteger(process.env.POLLING_INTERVAL_MS || process.env.SYNC_INTERVAL_MS, 60000)),
+  posGrnPollingIntervalMs: parseInteger(process.env.REPORTING_POS_GRN_INTERVAL_MS, parseInteger(process.env.REPORTING_POLLING_INTERVAL_MS, parseInteger(process.env.POLLING_INTERVAL_MS || process.env.SYNC_INTERVAL_MS, 60000))),
   latestCostSyncIntervalMs: parseInteger(process.env.REPORTING_LATEST_COST_INTERVAL_MS, 300000),
   limitToRecentDays: parseNonNegativeInteger(process.env.REPORTING_LIMIT_TO_RECENT_DAYS, 0),
 
@@ -209,7 +214,7 @@ function validateStartupConfig(config) {
 
   requireValue(config.server.agentApiSecret, 'Missing agent API secret (POS_SECRET)');
 
-  if (config.modules.reportingSync || config.modules.commandPolling || config.modules.emergencySalesSync) {
+  if (config.modules.reportingSync || config.modules.commandPolling || config.modules.emergencySalesSync || config.modules.posGrnSync) {
     requireValue(config.backend.baseUrl, 'Missing backend URL (BACKEND_URL or BACKEND_BASE_URL/LIVE_SERVER_URL)');
     requireValue(config.backend.apiToken, 'Missing backend API token (BACKEND_API_TOKEN or POS_SECRET)');
   }

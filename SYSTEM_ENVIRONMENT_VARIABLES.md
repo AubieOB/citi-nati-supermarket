@@ -262,7 +262,10 @@ These apply to both the Zomba and Blantyre agents unless otherwise noted.
 | `REPORTING_LATEST_COST_ENDPOINT` | Backend endpoint for latest-cost reporting sync. | `/api/pos-sync/reporting/latest-product-costs` | No |
 | `REPORTING_BATCH_SIZE` | Invoice reporting sync batch size. | `100` | No |
 | `REPORTING_LATEST_COST_BATCH_SIZE` | Latest-cost reporting sync batch size. | `500` | No |
+| `REPORTING_POS_GRN_ENDPOINT` | Backend endpoint for POS GRN stock-intake reporting sync. | `/api/pos-sync/reporting/pos-grns` | No |
+| `REPORTING_POS_GRN_BATCH_SIZE` | POS GRN reporting sync batch size. | `50` | No |
 | `REPORTING_POLLING_INTERVAL_MS` | Reporting sync interval. | `60000` | No |
+| `REPORTING_POS_GRN_INTERVAL_MS` | POS GRN sync interval. | `60000` | No |
 | `REPORTING_LATEST_COST_INTERVAL_MS` | Latest-cost sync interval. | `300000` | No |
 | `REPORTING_LIMIT_TO_RECENT_DAYS` | Limits reporting sync to recent days when set above zero. | `7` | No |
 
@@ -277,6 +280,7 @@ These apply to both the Zomba and Blantyre agents unless otherwise noted.
 | `ENABLE_PRICE_SYNC` | Enables price sync/write-back. | `true` | No |
 | `ENABLE_PRODUCT_NAME_SYNC` | Enables product-name sync/write-back. | `true` | No |
 | `ENABLE_MANUAL_STOCK_SYNC` | Enables manual stock sync operations. | `true` | No |
+| `ENABLE_POS_GRN_SYNC` | Enables POS GRN stock-intake reporting sync. | `true` | No |
 | `ENABLE_INVOICE_WRITEBACK` | Enables invoice write-back flow. | `true` | No |
 | `ENABLE_DIRECT_POS_WRITEBACK_DEBUG` | Enables debug-only direct write-back endpoint. | `false` | No |
 
