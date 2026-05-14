@@ -491,9 +491,18 @@ async function getPOSGRNMovements(period, filters = {}) {
 
     // Transform to movement format expected by ledger
     const movements = grnItems.map((item) => {
-      const movementDate = item.posStockIntake.sourceUpdatedAt || item.posStockIntake.grnDate || new Date();
+      const movementDate =
+        item.posStockIntake.sourceUpdatedAt ||
+        item.posStockIntake.grnDate ||
+        item.posStockIntake.updatedAt ||
+        item.posStockIntake.createdAt ||
+        item.posStockIntake.sourceSyncedAt ||
+        item.sourceUpdatedAt ||
+        item.sourceSyncedAt ||
+        new Date();
+
       const { transactionDate, transactionTime } = formatBlantyreDateTimeParts(movementDate);
-      return {
+      const mappedRow = {
         id: `pos-grn-${item.posStockIntake.grnNo}-${item.stockDetailId || item.productCode}`,
         type: 'pos_grn',
         movementDate,
@@ -520,6 +529,16 @@ async function getPOSGRNMovements(period, filters = {}) {
         syncedAt: item.sourceSyncedAt,
         userName: item.posStockIntake.grnUserName || 'POS',
       };
+
+      console.log('[POS GRN RAW]', {
+        grnNo: item.posStockIntake.grnNo,
+        grnUserName: item.posStockIntake.grnUserName,
+        grnDate: item.posStockIntake.grnDate,
+        sourceUpdatedAt: item.posStockIntake.sourceUpdatedAt,
+        sourceSyncedAt: item.posStockIntake.sourceSyncedAt,
+      });
+      console.log('[POS GRN MAPPED ROW]', mappedRow);
+      return mappedRow;
     });
 
     console.log('[INVENTORY_ACTIVITY_SERVICE][LEDGER GRN NORMALIZATION] POS GRN movement sample:', movements[0] || null);
