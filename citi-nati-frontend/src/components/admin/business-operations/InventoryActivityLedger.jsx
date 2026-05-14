@@ -367,13 +367,6 @@ const InventoryActivityLedger = ({
         </div>
       )}
 
-      {dataQuality.message && (
-        <div style={{ padding: '0.85rem 1rem', color: dataQuality.level === 'warning' ? '#92400e' : '#64748b', backgroundColor: dataQuality.level === 'warning' ? '#fffbeb' : '#f8fafc', borderRadius: '10px' }}>
-          <i className="fas fa-info-circle" style={{ marginRight: '0.42rem' }} />
-          {dataQuality.message}
-        </div>
-      )}
-
       {data?.ledger && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
           {summary.openingBalance !== undefined && (
