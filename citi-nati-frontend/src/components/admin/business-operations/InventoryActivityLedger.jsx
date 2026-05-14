@@ -241,7 +241,7 @@ const InventoryActivityLedger = ({
     const rows = data.ledger;
     if (rows.length === 0) return;
 
-    const doc = new jsPDF();
+    const doc = new jsPDF('l', 'mm', 'a4'); // Landscape for better width
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     
@@ -293,33 +293,33 @@ const InventoryActivityLedger = ({
           { align: 'center' }
         );
       },
-      margin: { top: 40, right: 10, bottom: 15, left: 10 },
+      margin: { top: 40, right: 8, bottom: 15, left: 8 },
       headStyles: {
         fillColor: [91, 75, 138],
         textColor: 255,
         fontStyle: 'bold',
-        fontSize: 9,
+        fontSize: 8,
       },
       bodyStyles: {
-        fontSize: 8,
+        fontSize: 7,
         textColor: 15,
       },
       alternateRowStyles: {
         fillColor: [248, 250, 252],
       },
       columnStyles: {
-        0: { cellWidth: 20 },
-        1: { cellWidth: 15 },
+        0: { cellWidth: 22 },
+        1: { cellWidth: 14 },
         2: { cellWidth: 12 },
-        3: { cellWidth: 12 },
-        4: { cellWidth: 15 },
-        5: { cellWidth: 25 },
-        6: { cellWidth: 15, halign: 'right' },
-        7: { cellWidth: 12, halign: 'right' },
-        8: { cellWidth: 12, halign: 'right' },
-        9: { cellWidth: 15, halign: 'right' },
-        10: { cellWidth: 15, halign: 'right' },
-        11: { cellWidth: 12, halign: 'right' },
+        3: { cellWidth: 14 },
+        4: { cellWidth: 16 },
+        5: { cellWidth: 28 },
+        6: { cellWidth: 14, halign: 'right' },
+        7: { cellWidth: 11, halign: 'right' },
+        8: { cellWidth: 11, halign: 'right' },
+        9: { cellWidth: 14, halign: 'right' },
+        10: { cellWidth: 14, halign: 'right' },
+        11: { cellWidth: 11, halign: 'right' },
         12: { cellWidth: 15, halign: 'right' },
       },
     });
@@ -554,7 +554,7 @@ const InventoryActivityLedger = ({
           <p style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Try adjusting the filters or date range.</p>
         </div>
       ) : (
-        <div style={{ ...cardStyle, overflow: 'hidden', position: 'relative' }}>
+        <div style={{ ...cardStyle, overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
               <thead>
@@ -593,74 +593,6 @@ const InventoryActivityLedger = ({
                 ))}
               </tbody>
             </table>
-          </div>
-
-          {/* Floating scroll buttons - bottom right */}
-          <div style={{ position: 'absolute', bottom: '1rem', right: '1rem', display: 'flex', gap: '0.5rem', zIndex: 10 }}>
-            <button
-              type="button"
-              onClick={scrollToTop}
-              title="Scroll to top"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '40px',
-                height: '40px',
-                borderRadius: '50%',
-                backgroundColor: '#5B4B8A',
-                color: '#fff',
-                border: 'none',
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(91, 75, 138, 0.35)',
-                transition: 'all 0.2s',
-                fontSize: '1rem',
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#4a3a75';
-                e.target.style.boxShadow = '0 6px 16px rgba(91, 75, 138, 0.5)';
-                e.target.style.transform = 'scale(1.1)';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.backgroundColor = '#5B4B8A';
-                e.target.style.boxShadow = '0 4px 12px rgba(91, 75, 138, 0.35)';
-                e.target.style.transform = 'scale(1)';
-              }}
-            >
-              <i className="fas fa-arrow-up" />
-            </button>
-            <button
-              type="button"
-              onClick={scrollToBottom}
-              title="Scroll to bottom"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '40px',
-                height: '40px',
-                borderRadius: '50%',
-                backgroundColor: '#5B4B8A',
-                color: '#fff',
-                border: 'none',
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(91, 75, 138, 0.35)',
-                transition: 'all 0.2s',
-                fontSize: '1rem',
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#4a3a75';
-                e.target.style.boxShadow = '0 6px 16px rgba(91, 75, 138, 0.5)';
-                e.target.style.transform = 'scale(1.1)';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.backgroundColor = '#5B4B8A';
-                e.target.style.boxShadow = '0 4px 12px rgba(91, 75, 138, 0.35)';
-                e.target.style.transform = 'scale(1)';
-              }}
-            >
-              <i className="fas fa-arrow-down" />
-            </button>
           </div>
         </div>
       )}
@@ -715,7 +647,7 @@ const InventoryActivityLedger = ({
 
       {activeModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 170, display: 'grid', placeItems: 'center', padding: modalMaximized ? '0.35rem' : '1rem' }}>
-          <div style={{ ...cardStyle, width: modalMaximized ? 'calc(100vw - 0.7rem)' : 'min(1400px, 97vw)', height: modalMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', overflow: 'hidden', borderRadius: modalMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ ...cardStyle, width: modalMaximized ? 'calc(100vw - 0.7rem)' : 'min(1400px, 97vw)', height: modalMaximized ? 'calc(100vh - 0.7rem)' : '92vh', maxHeight: 'none', overflow: 'hidden', borderRadius: modalMaximized ? '10px' : '18px', display: 'flex', flexDirection: 'column', position: 'relative' }}>
             <div style={{ flexShrink: 0, padding: '1rem 1.1rem', borderBottom: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(15,23,42,0.04)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <div>
@@ -745,6 +677,74 @@ const InventoryActivityLedger = ({
             <div ref={ledgerScrollRef} style={{ flex: 1, overflow: 'auto', padding: '1rem' }}>
               {renderLedgerContent()}
             </div>
+
+            {/* Floating scroll buttons - truly floating on modal */}
+            {ledger.length > 0 && (
+              <div style={{ position: 'absolute', bottom: '1.5rem', right: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', zIndex: 20 }}>
+                <button
+                  type="button"
+                  onClick={scrollToTop}
+                  title="Scroll to top"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    backgroundColor: 'transparent',
+                    color: '#334155',
+                    border: '1px solid #cbd5e1',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    fontSize: '0.9rem',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#5B4B8A';
+                    e.target.style.color = '#fff';
+                    e.target.style.borderColor = '#5B4B8A';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                    e.target.style.color = '#334155';
+                    e.target.style.borderColor = '#cbd5e1';
+                  }}
+                >
+                  <i className="fas fa-arrow-up" />
+                </button>
+                <button
+                  type="button"
+                  onClick={scrollToBottom}
+                  title="Scroll to bottom"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    backgroundColor: 'transparent',
+                    color: '#334155',
+                    border: '1px solid #cbd5e1',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    fontSize: '0.9rem',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#5B4B8A';
+                    e.target.style.color = '#fff';
+                    e.target.style.borderColor = '#5B4B8A';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                    e.target.style.color = '#334155';
+                    e.target.style.borderColor = '#cbd5e1';
+                  }}
+                >
+                  <i className="fas fa-arrow-down" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
