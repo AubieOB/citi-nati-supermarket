@@ -1,5 +1,7 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../../../utils/api.js';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const today = new Date();
 const currentYear = today.getFullYear();
@@ -210,11 +212,19 @@ const InventoryActivityLedger = ({
     const rows = data.ledger;
     if (rows.length === 0) return;
 
-    let csvContent = 'Timestamp,Movement Type,Reference,User,Product Code,Product Name,Opening Balance,Qty In,Qty Out,Balance After Transaction,Closing Balance,Unit Price,Amount\n';
+    // Use tab-delimited format for better Excel compatibility
+    let csvContent = 'Timestamp\tMovement Type\tReference\tUser\tProduct Code\tProduct Name\tOpening Balance\tQty In\tQty Out\tBalance After Transaction\tClosing Balance\tUnit Price\tAmount\n';
 
     rows.forEach((row) => {
       const closingBalanceValue = row.closingBalance !== null && row.closingBalance !== undefined ? row.closingBalance : '';
-      csvContent += `"${formatDateTime(row.timestamp, row.isDateOnly)}","${row.movementType}","${row.referenceNo || ''}","${row.user || ''}","${row.productCode || ''}","${row.productName || ''}",${row.openingBalance},${row.qtyIn},${row.qtyOut},${row.balanceAfterTransaction},${closingBalanceValue},${row.unitPrice},${row.lineAmount}\n`;
+      
+      // Format product code - prefix with single quote to prevent Excel scientific notation
+      const productCodeFormatted = row.productCode ? `'${row.productCode}` : '';
+      
+      // Format timestamp to ensure proper width and readability
+      const timestamp = formatDateTime(row.timestamp, row.isDateOnly);
+      
+      csvContent += `${timestamp}\t${row.movementType}\t${row.referenceNo || ''}\t${row.user || ''}\t${productCodeFormatted}\t${row.productName || ''}\t${row.openingBalance}\t${row.qtyIn}\t${row.qtyOut}\t${row.balanceAfterTransaction}\t${closingBalanceValue}\t${row.unitPrice}\t${row.lineAmount}\n`;
     });
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -223,6 +233,115 @@ const InventoryActivityLedger = ({
     link.href = URL.createObjectURL(blob);
     link.download = `inventory-ledger-${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
+  };
+
+  const exportPDF = () => {
+    if (!data || !data.ledger) return;
+
+    const rows = data.ledger;
+    if (rows.length === 0) return;
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    
+    // Add title
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    doc.text('Stock Movement Ledger', pageWidth / 2, 15, { align: 'center' });
+    
+    // Add scope and date info
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Scope: ${scopeLabel}`, 14, 25);
+    doc.text(`Generated: ${new Date().toLocaleString('en-GB')}`, 14, 32);
+    
+    // Prepare table data
+    const tableData = rows.map((row) => {
+      const closingBalance = row.closingBalance !== null && row.closingBalance !== undefined ? row.closingBalance : '-';
+      return [
+        formatDateTime(row.timestamp, row.isDateOnly),
+        row.movementType,
+        row.referenceNo || '-',
+        row.user || '-',
+        row.productCode || '-',
+        row.productName || '-',
+        row.openingBalance,
+        row.qtyIn,
+        row.qtyOut,
+        row.balanceAfterTransaction,
+        closingBalance,
+        row.unitPrice,
+        typeof row.lineAmount === 'number' ? row.lineAmount.toFixed(2) : row.lineAmount,
+      ];
+    });
+
+    // Generate table
+    autoTable(doc, {
+      startY: 40,
+      head: [['Time', 'Type', 'Ref', 'User', 'Product Code', 'Product Name', 'Opening Bal', 'Qty In', 'Qty Out', 'Balance After', 'Closing Bal', 'Unit Price', 'Amount']],
+      body: tableData,
+      didDrawPage: (data) => {
+        // Footer
+        const pageCount = doc.internal.pages.length - 1;
+        doc.setFontSize(8);
+        doc.setTextColor(128);
+        doc.text(
+          `Page ${data.pageNumber} of ${pageCount}`,
+          pageWidth / 2,
+          pageHeight - 10,
+          { align: 'center' }
+        );
+      },
+      margin: { top: 40, right: 10, bottom: 15, left: 10 },
+      headStyles: {
+        fillColor: [91, 75, 138],
+        textColor: 255,
+        fontStyle: 'bold',
+        fontSize: 9,
+      },
+      bodyStyles: {
+        fontSize: 8,
+        textColor: 15,
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252],
+      },
+      columnStyles: {
+        0: { cellWidth: 20 },
+        1: { cellWidth: 15 },
+        2: { cellWidth: 12 },
+        3: { cellWidth: 12 },
+        4: { cellWidth: 15 },
+        5: { cellWidth: 25 },
+        6: { cellWidth: 15, halign: 'right' },
+        7: { cellWidth: 12, halign: 'right' },
+        8: { cellWidth: 12, halign: 'right' },
+        9: { cellWidth: 15, halign: 'right' },
+        10: { cellWidth: 15, halign: 'right' },
+        11: { cellWidth: 12, halign: 'right' },
+        12: { cellWidth: 15, halign: 'right' },
+      },
+    });
+
+    // Add summary at the end
+    const summaryY = doc.lastAutoTable.finalY + 10;
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'bold');
+    doc.text('Summary', 14, summaryY);
+    
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Opening Balance: ${summary.openingBalance ?? 0}`, 14, summaryY + 7);
+    doc.text(`Total Qty In: ${summary.totalQtyIn ?? 0}`, 14, summaryY + 14);
+    doc.text(`Total Qty Out: ${summary.totalQtyOut ?? 0}`, 14, summaryY + 21);
+    doc.text(`Total Sales Amount: MWK ${(summary.totalSalesAmount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, summaryY + 28);
+    doc.text(`Total Intake Value: MWK ${(summary.totalIntakeValue ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, summaryY + 35);
+    if (summary.closingBalance !== null && summary.closingBalance !== undefined) {
+      doc.text(`Closing Balance: ${summary.closingBalance}`, 14, summaryY + 42);
+    }
+
+    doc.save(`inventory-ledger-${new Date().toISOString().slice(0, 10)}.pdf`);
   };
 
   useEffect(() => {
@@ -349,14 +468,13 @@ const InventoryActivityLedger = ({
         </div>
 
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <button type="button" onClick={scrollToTop} title="Scroll to top" style={{ padding: '0.45rem 0.75rem', cursor: 'pointer', backgroundColor: '#fff', color: '#334155', fontWeight: 700, border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.85rem' }}>
-            <i className="fas fa-arrow-up" style={{ marginRight: '0.35rem' }} />Top
-          </button>
-          <button type="button" onClick={scrollToBottom} title="Scroll to bottom" style={{ padding: '0.45rem 0.75rem', cursor: 'pointer', backgroundColor: '#fff', color: '#334155', fontWeight: 700, border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.85rem' }}>
-            <i className="fas fa-arrow-down" style={{ marginRight: '0.35rem' }} />Bottom
-          </button>
           <button type="button" onClick={exportCSV} disabled={!ledger.length} title="Export CSV" style={{ padding: '0.45rem 0.75rem', cursor: ledger.length ? 'pointer' : 'not-allowed', backgroundColor: '#5B4B8A', color: '#fff', fontWeight: 700, border: '1px solid #5B4B8A', borderRadius: '8px', fontSize: '0.85rem' }}>
-            <i className="fas fa-download" style={{ marginRight: '0.42rem' }} />Export
+            <i className="fas fa-file-csv" style={{ marginRight: '0.42rem' }} />
+            CSV
+          </button>
+          <button type="button" onClick={exportPDF} disabled={!ledger.length} title="Export PDF" style={{ padding: '0.45rem 0.75rem', cursor: ledger.length ? 'pointer' : 'not-allowed', backgroundColor: '#7c3aed', color: '#fff', fontWeight: 700, border: '1px solid #7c3aed', borderRadius: '8px', fontSize: '0.85rem' }}>
+            <i className="fas fa-file-pdf" style={{ marginRight: '0.42rem' }} />
+            PDF
           </button>
         </div>
       </div>
@@ -436,7 +554,7 @@ const InventoryActivityLedger = ({
           <p style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Try adjusting the filters or date range.</p>
         </div>
       ) : (
-        <div style={{ ...cardStyle, overflow: 'hidden' }}>
+        <div style={{ ...cardStyle, overflow: 'hidden', position: 'relative' }}>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
               <thead>
@@ -475,6 +593,74 @@ const InventoryActivityLedger = ({
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Floating scroll buttons - bottom right */}
+          <div style={{ position: 'absolute', bottom: '1rem', right: '1rem', display: 'flex', gap: '0.5rem', zIndex: 10 }}>
+            <button
+              type="button"
+              onClick={scrollToTop}
+              title="Scroll to top"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                backgroundColor: '#5B4B8A',
+                color: '#fff',
+                border: 'none',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(91, 75, 138, 0.35)',
+                transition: 'all 0.2s',
+                fontSize: '1rem',
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#4a3a75';
+                e.target.style.boxShadow = '0 6px 16px rgba(91, 75, 138, 0.5)';
+                e.target.style.transform = 'scale(1.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = '#5B4B8A';
+                e.target.style.boxShadow = '0 4px 12px rgba(91, 75, 138, 0.35)';
+                e.target.style.transform = 'scale(1)';
+              }}
+            >
+              <i className="fas fa-arrow-up" />
+            </button>
+            <button
+              type="button"
+              onClick={scrollToBottom}
+              title="Scroll to bottom"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                backgroundColor: '#5B4B8A',
+                color: '#fff',
+                border: 'none',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(91, 75, 138, 0.35)',
+                transition: 'all 0.2s',
+                fontSize: '1rem',
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#4a3a75';
+                e.target.style.boxShadow = '0 6px 16px rgba(91, 75, 138, 0.5)';
+                e.target.style.transform = 'scale(1.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = '#5B4B8A';
+                e.target.style.boxShadow = '0 4px 12px rgba(91, 75, 138, 0.35)';
+                e.target.style.transform = 'scale(1)';
+              }}
+            >
+              <i className="fas fa-arrow-down" />
+            </button>
           </div>
         </div>
       )}
