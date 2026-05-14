@@ -180,6 +180,7 @@ async function fetchInvoiceDetails(invoiceCodes) {
   const costPriceSelect = support.hasCostPrice ? ',\n            CostPrice' : '';
   const grnDateSelect = support.hasGrnDate ? ',\n            GrnDate' : '';
   const detailInvoiceKey = support.detailUsesInvoiceCode ? 'InvoiceCode' : 'InvoiceNo';
+  console.log(`${BRANCH_TAG} [BACKFILL] Invoice detail query using invoicedetails.${detailInvoiceKey}`);
 
   const query = `
     SELECT
@@ -232,7 +233,7 @@ function normalizeInvoiceRow(row) {
 
   return {
     invoiceNo: Number(row.InvoiceNo),
-    invoiceCode: Number(row.InvoiceCode),
+    invoiceCode: Number(row.InvoiceCode || row.InvoiceNo),
     invoiceSerialNo: Number(row.InvoiceSerialNo),
     refNo: row.RefNo || null,
     invoiceDate: row.InvoiceDate instanceof Date ? row.InvoiceDate.toISOString() : row.InvoiceDate,
