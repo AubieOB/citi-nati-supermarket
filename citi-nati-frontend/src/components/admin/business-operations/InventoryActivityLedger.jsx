@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../../../utils/api.js';
 
 const today = new Date();
@@ -239,6 +239,19 @@ const InventoryActivityLedger = ({
   const summary = data?.summary || {};
   const ledger = data?.ledger || [];
   const dataQuality = data?.dataQuality || {};
+  const ledgerScrollRef = useRef(null);
+
+  const scrollToTop = () => {
+    if (ledgerScrollRef.current) {
+      ledgerScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const scrollToBottom = () => {
+    if (ledgerScrollRef.current) {
+      ledgerScrollRef.current.scrollTo({ top: ledgerScrollRef.current.scrollHeight, behavior: 'smooth' });
+    }
+  };
 
   const renderModalFilters = () => (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '12px', marginBottom: '1rem' }}>
@@ -324,14 +337,28 @@ const InventoryActivityLedger = ({
 
   const renderLedgerContent = () => (
     <div style={{ display: 'grid', gap: '1rem' }}>
-      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.25rem' }}>
-        <button type="button" onClick={() => setShowFilters(!showFilters)} style={{ padding: '0.45rem 0.75rem', cursor: 'pointer', backgroundColor: showFilters ? '#5B4B8A' : '#f1f5f9', color: showFilters ? '#fff' : '#334155', fontWeight: 700, border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.85rem', transition: 'all 0.2s' }}>
-          <i className={`fas fa-${showFilters ? 'filter' : 'sliders-h'}`} style={{ marginRight: '0.42rem' }} />
-          Filters
-        </button>
-        <button type="button" onClick={fetchData} disabled={loading} title="Refresh" style={{ padding: '0.45rem 0.75rem', cursor: 'pointer', backgroundColor: '#fff', color: '#334155', fontWeight: 700, border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.85rem' }}>
-          <i className={`fas fa-sync-alt ${loading ? 'fa-spin' : ''}`} />
-        </button>
+      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <button type="button" onClick={() => setShowFilters(!showFilters)} style={{ padding: '0.45rem 0.75rem', cursor: 'pointer', backgroundColor: showFilters ? '#5B4B8A' : '#f1f5f9', color: showFilters ? '#fff' : '#334155', fontWeight: 700, border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.85rem', transition: 'all 0.2s' }}>
+            <i className={`fas fa-${showFilters ? 'filter' : 'sliders-h'}`} style={{ marginRight: '0.42rem' }} />
+            Filters
+          </button>
+          <button type="button" onClick={fetchData} disabled={loading} title="Refresh" style={{ padding: '0.45rem 0.75rem', cursor: 'pointer', backgroundColor: '#fff', color: '#334155', fontWeight: 700, border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.85rem' }}>
+            <i className={`fas fa-sync-alt ${loading ? 'fa-spin' : ''}`} />
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <button type="button" onClick={scrollToTop} title="Scroll to top" style={{ padding: '0.45rem 0.75rem', cursor: 'pointer', backgroundColor: '#fff', color: '#334155', fontWeight: 700, border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.85rem' }}>
+            <i className="fas fa-arrow-up" style={{ marginRight: '0.35rem' }} />Top
+          </button>
+          <button type="button" onClick={scrollToBottom} title="Scroll to bottom" style={{ padding: '0.45rem 0.75rem', cursor: 'pointer', backgroundColor: '#fff', color: '#334155', fontWeight: 700, border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.85rem' }}>
+            <i className="fas fa-arrow-down" style={{ marginRight: '0.35rem' }} />Bottom
+          </button>
+          <button type="button" onClick={exportCSV} disabled={!ledger.length} title="Export CSV" style={{ padding: '0.45rem 0.75rem', cursor: ledger.length ? 'pointer' : 'not-allowed', backgroundColor: '#5B4B8A', color: '#fff', fontWeight: 700, border: '1px solid #5B4B8A', borderRadius: '8px', fontSize: '0.85rem' }}>
+            <i className="fas fa-download" style={{ marginRight: '0.42rem' }} />Export
+          </button>
+        </div>
       </div>
 
       {showFilters && renderModalFilters()}
@@ -452,14 +479,6 @@ const InventoryActivityLedger = ({
         </div>
       )}
 
-      {ledger.length > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <button type="button" onClick={exportCSV} style={{ padding: '0.55rem 1rem', cursor: 'pointer', backgroundColor: '#5B4B8A', color: '#fff', border: 'none', fontWeight: 700, borderRadius: '10px', fontSize: '0.88rem' }}>
-            <i className="fas fa-download" style={{ marginRight: '0.42rem' }} />
-            Export CSV ({ledger.length} transactions)
-          </button>
-        </div>
-      )}
     </div>
   );
 
@@ -537,7 +556,7 @@ const InventoryActivityLedger = ({
               </div>
             </div>
 
-            <div style={{ flex: 1, overflow: 'auto', padding: '1rem' }}>
+            <div ref={ledgerScrollRef} style={{ flex: 1, overflow: 'auto', padding: '1rem' }}>
               {renderLedgerContent()}
             </div>
           </div>

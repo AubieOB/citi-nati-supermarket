@@ -327,10 +327,19 @@ async function getAdjustmentMovements(period, filters = {}) {
  */
 async function getPOSGRNMovements(period, filters = {}) {
   const locationFilter = buildLocationFilter(filters);
+  const normalizedProductCode = normalize(filters.productCode);
+  const normalizedProductName = normalize(filters.productName);
+  const productFilter = normalizedProductCode || normalizedProductName ? {
+    OR: [
+      normalizedProductCode ? { productCode: { equals: normalizedProductCode, mode: 'insensitive' } } : null,
+      normalizedProductName ? { productName: { contains: normalizedProductName, mode: 'insensitive' } } : null,
+    ].filter(Boolean),
+  } : {};
 
   console.log('[INVENTORY_ACTIVITY_SERVICE] getPOSGRNMovements requested:', {
     period: { start: period.startDate.toISOString(), end: period.endDate.toISOString() },
     locationFilter,
+    productFilter: filters.productCode || filters.productName ? { productCode: filters.productCode, productName: filters.productName } : null,
   });
 
   try {
@@ -378,6 +387,7 @@ async function getPOSGRNMovements(period, filters = {}) {
 
     const countNoDateWithLocation = await prisma.posStockIntakeItem.count({
       where: {
+        ...productFilter,
         posStockIntake: {
           is: locationWhere,
         },
@@ -387,6 +397,7 @@ async function getPOSGRNMovements(period, filters = {}) {
 
     const countWithDate = await prisma.posStockIntakeItem.count({
       where: {
+        ...productFilter,
         posStockIntake: {
           is: {
             ...dateWhere,
@@ -399,6 +410,7 @@ async function getPOSGRNMovements(period, filters = {}) {
 
     const countDateOnly = await prisma.posStockIntakeItem.count({
       where: {
+        ...productFilter,
         posStockIntake: {
           is: dateWhere,
         },
@@ -408,6 +420,7 @@ async function getPOSGRNMovements(period, filters = {}) {
 
     const sampleRow = await prisma.posStockIntakeItem.findFirst({
       where: {
+        ...productFilter,
         posStockIntake: {
           is: locationWhere,
         },
@@ -480,6 +493,7 @@ async function getPOSGRNMovements(period, filters = {}) {
     // Query synced POS GRN data from database
     const grnItems = await prisma.posStockIntakeItem.findMany({
       where: {
+        ...productFilter,
         posStockIntake: {
           is: {
             ...dateWhere,
