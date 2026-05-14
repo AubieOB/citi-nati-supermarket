@@ -247,10 +247,10 @@ const InventoryActivityLedger = ({
       ];
     });
 
-    // Generate table
+    // Generate table with better layout
     autoTable(doc, {
       startY: 40,
-      head: [['Time', 'Type', 'Ref', 'User', 'Product Code', 'Product Name', 'Opening Bal', 'Qty In', 'Qty Out', 'Balance After', 'Closing Bal', 'Unit Price', 'Amount']],
+      head: [['Time', 'Type', 'Ref', 'User', 'Product Code', 'Product Name', 'Open Bal', 'Qty In', 'Qty Out', 'Balance', 'Close Bal', 'Unit Price', 'Amount']],
       body: tableData,
       didDrawPage: (data) => {
         // Footer
@@ -264,34 +264,36 @@ const InventoryActivityLedger = ({
           { align: 'center' }
         );
       },
-      margin: { top: 40, right: 8, bottom: 15, left: 8 },
+      margin: { top: 40, right: 6, bottom: 15, left: 6 },
       headStyles: {
         fillColor: [91, 75, 138],
         textColor: 255,
         fontStyle: 'bold',
-        fontSize: 8,
+        fontSize: 9,
+        cellPadding: 3,
       },
       bodyStyles: {
-        fontSize: 7,
+        fontSize: 8,
         textColor: 15,
+        cellPadding: 2.5,
       },
       alternateRowStyles: {
         fillColor: [248, 250, 252],
       },
       columnStyles: {
-        0: { cellWidth: 22 },
-        1: { cellWidth: 14 },
-        2: { cellWidth: 12 },
-        3: { cellWidth: 14 },
-        4: { cellWidth: 16 },
-        5: { cellWidth: 28 },
-        6: { cellWidth: 14, halign: 'right' },
-        7: { cellWidth: 11, halign: 'right' },
-        8: { cellWidth: 11, halign: 'right' },
-        9: { cellWidth: 14, halign: 'right' },
-        10: { cellWidth: 14, halign: 'right' },
+        0: { cellWidth: 20, halign: 'left' },
+        1: { cellWidth: 12, halign: 'center' },
+        2: { cellWidth: 11, halign: 'center' },
+        3: { cellWidth: 12, halign: 'center' },
+        4: { cellWidth: 14, halign: 'left' },
+        5: { cellWidth: 32, halign: 'left' },
+        6: { cellWidth: 11, halign: 'right' },
+        7: { cellWidth: 10, halign: 'right' },
+        8: { cellWidth: 10, halign: 'right' },
+        9: { cellWidth: 12, halign: 'right' },
+        10: { cellWidth: 12, halign: 'right' },
         11: { cellWidth: 11, halign: 'right' },
-        12: { cellWidth: 15, halign: 'right' },
+        12: { cellWidth: 13, halign: 'right' },
       },
     });
 
@@ -301,15 +303,15 @@ const InventoryActivityLedger = ({
     doc.setFont(undefined, 'bold');
     doc.text('Summary', 14, summaryY);
     
-    doc.setFontSize(9);
+    doc.setFontSize(8);
     doc.setFont(undefined, 'normal');
     doc.text(`Opening Balance: ${summary.openingBalance ?? 0}`, 14, summaryY + 7);
-    doc.text(`Total Qty In: ${summary.totalQtyIn ?? 0}`, 14, summaryY + 14);
-    doc.text(`Total Qty Out: ${summary.totalQtyOut ?? 0}`, 14, summaryY + 21);
-    doc.text(`Total Sales Amount: MWK ${(summary.totalSalesAmount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, summaryY + 28);
-    doc.text(`Total Intake Value: MWK ${(summary.totalIntakeValue ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, summaryY + 35);
+    doc.text(`Total Qty In: ${summary.totalQtyIn ?? 0}`, 14, summaryY + 13);
+    doc.text(`Total Qty Out: ${summary.totalQtyOut ?? 0}`, 14, summaryY + 19);
+    doc.text(`Total Sales Amount: MWK ${(summary.totalSalesAmount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, summaryY + 25);
+    doc.text(`Total Intake Value: MWK ${(summary.totalIntakeValue ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, summaryY + 31);
     if (summary.closingBalance !== null && summary.closingBalance !== undefined) {
-      doc.text(`Closing Balance: ${summary.closingBalance}`, 14, summaryY + 42);
+      doc.text(`Closing Balance: ${summary.closingBalance}`, 14, summaryY + 37);
     }
 
     doc.save(`inventory-ledger-${new Date().toISOString().slice(0, 10)}.pdf`);
@@ -656,25 +658,24 @@ const InventoryActivityLedger = ({
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '8px',
-                    backgroundColor: 'transparent',
-                    color: '#334155',
-                    border: '1px solid #cbd5e1',
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%',
+                    backgroundColor: '#5B4B8A',
+                    color: '#fff',
+                    border: 'none',
                     cursor: 'pointer',
                     transition: 'all 0.2s',
                     fontSize: '0.9rem',
+                    boxShadow: '0 2px 8px rgba(91, 75, 138, 0.25)',
                   }}
                   onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#5B4B8A';
-                    e.target.style.color = '#fff';
-                    e.target.style.borderColor = '#5B4B8A';
+                    e.target.style.backgroundColor = '#4a3a75';
+                    e.target.style.boxShadow = '0 4px 12px rgba(91, 75, 138, 0.4)';
                   }}
                   onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = 'transparent';
-                    e.target.style.color = '#334155';
-                    e.target.style.borderColor = '#cbd5e1';
+                    e.target.style.backgroundColor = '#5B4B8A';
+                    e.target.style.boxShadow = '0 2px 8px rgba(91, 75, 138, 0.25)';
                   }}
                 >
                   <i className="fas fa-arrow-up" />
@@ -687,25 +688,24 @@ const InventoryActivityLedger = ({
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '8px',
-                    backgroundColor: 'transparent',
-                    color: '#334155',
-                    border: '1px solid #cbd5e1',
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%',
+                    backgroundColor: '#5B4B8A',
+                    color: '#fff',
+                    border: 'none',
                     cursor: 'pointer',
                     transition: 'all 0.2s',
                     fontSize: '0.9rem',
+                    boxShadow: '0 2px 8px rgba(91, 75, 138, 0.25)',
                   }}
                   onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#5B4B8A';
-                    e.target.style.color = '#fff';
-                    e.target.style.borderColor = '#5B4B8A';
+                    e.target.style.backgroundColor = '#4a3a75';
+                    e.target.style.boxShadow = '0 4px 12px rgba(91, 75, 138, 0.4)';
                   }}
                   onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = 'transparent';
-                    e.target.style.color = '#334155';
-                    e.target.style.borderColor = '#cbd5e1';
+                    e.target.style.backgroundColor = '#5B4B8A';
+                    e.target.style.boxShadow = '0 2px 8px rgba(91, 75, 138, 0.25)';
                   }}
                 >
                   <i className="fas fa-arrow-down" />
