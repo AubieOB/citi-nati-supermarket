@@ -472,8 +472,6 @@ async function getPOSGRNMovements(period, filters = {}) {
             sourceSyncedAt: true,
           },
         },
-        sourceUpdatedAt: true,
-        sourceSyncedAt: true,
       },
       orderBy: [
         { posStockIntake: { grnDate: 'asc' } },
