@@ -1,6 +1,7 @@
 'use strict';
 
 const { PrismaClient } = require('@prisma/client');
+const { buildInvoiceWhere } = require('../../utils/reportingFilters');
 
 const prisma = new PrismaClient();
 
@@ -68,18 +69,12 @@ async function getExpectedSystemSales({ balancingDate, locationId, locationCode 
   const start = startOfDay(balancingDate);
   const end = endOfDay(balancingDate);
 
-  const where = {
-    invoiceDate: {
-      gte: start,
-      lte: end,
-    },
-  };
+  const dateRange = { startDate: start, endDate: end };
+  const filters = {};
+  if (locationId) filters.locationId = locationId;
+  if (locationCode) filters.locationCode = locationCode;
 
-  if (locationId) {
-    where.locationId = Number(locationId);
-  } else if (locationCode) {
-    where.locationCode = { equals: String(locationCode).trim(), mode: 'insensitive' };
-  }
+  const where = buildInvoiceWhere(dateRange, filters);
 
   const aggregate = await prisma.salesInvoice.aggregate({
     where,

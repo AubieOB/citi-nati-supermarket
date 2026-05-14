@@ -2,6 +2,7 @@
 
 const { PrismaClient } = require('@prisma/client');
 const { resolveEffectiveStock } = require('../../utils/stockResolver');
+const { buildInvoiceWhere, buildItemWhere } = require('../../utils/reportingFilters');
 
 const prisma = new PrismaClient();
 
@@ -157,40 +158,7 @@ function movementTypeMatchesFilter(movementType, filterType) {
  * Get sales movements for a period and location
  */
 async function getSaleMovements(period, filters = {}) {
-  const normalizedProductCode = normalize(filters.productCode);
-  const normalizedProductName = normalize(filters.productName);
-
-  const productFilter = normalizedProductCode || normalizedProductName ? {
-    OR: [
-      normalizedProductCode ? { productCode: { equals: normalizedProductCode, mode: 'insensitive' } } : null,
-      normalizedProductName ? { productName: { contains: normalizedProductName, mode: 'insensitive' } } : null,
-    ].filter(Boolean)
-  } : {};
-
-  // Build salesInvoice filter with location scoping
-  const salesInvoiceFilter = {
-    OR: [
-      { invoiceDate: { gte: period.startDate, lte: period.endDate } },
-      { invoiceTime: { gte: period.startDate, lte: period.endDate } },
-    ],
-  };
-  if (filters.locationId) {
-    salesInvoiceFilter.locationId = Number(filters.locationId);
-  }
-  if (filters.locationCode) {
-    salesInvoiceFilter.locationCode = normalizeUpper(filters.locationCode);
-  }
-  if (filters.branchCode) {
-    salesInvoiceFilter.branchCode = normalizeUpper(filters.branchCode);
-  }
-  if (filters.branchCode) {
-    salesInvoiceFilter.branchCode = normalizeUpper(filters.branchCode);
-  }
-
-  const where = {
-    ...productFilter,
-    salesInvoice: salesInvoiceFilter,
-  };
+  const where = buildItemWhere(period, filters);
 
   const rows = await prisma.salesInvoiceItem.findMany({
     where,
