@@ -97,17 +97,22 @@ function buildPeriod(filters = {}) {
  */
 function buildLocationFilter(filters = {}) {
   const locationFilter = {};
-  
-  if (filters.locationId) {
-    locationFilter.locationId = Number(filters.locationId);
-  }
+
   if (filters.locationCode) {
     locationFilter.locationCode = normalizeUpper(filters.locationCode);
   }
   if (filters.branchCode) {
     locationFilter.branchCode = normalizeUpper(filters.branchCode);
   }
-  
+
+  if (filters.locationId && !filters.locationCode) {
+    console.warn('[INVENTORY LEDGER] Legacy locationId ignored for canonical reporting scope', {
+      branchCode: filters.branchCode || null,
+      locationCode: filters.locationCode || null,
+      locationId: filters.locationId,
+    });
+  }
+
   return locationFilter;
 }
 
@@ -883,7 +888,7 @@ async function resolveExactPersistedProduct(productCode, branchCode, locationCod
 
   return null;
 }
-async function getCurrentProductStock(productCode, locationCode, branchCode, locationId) {
+async function getCurrentProductStock(productCode, locationCode, branchCode) {
   const product = await resolveExactPersistedProduct(productCode, branchCode, locationCode);
   return product ? toNum(resolveEffectiveStock(product)) : null;
 }
@@ -896,7 +901,7 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
     console.log('[INVENTORY_LEDGER_SERVICE] Active implementation loaded');
     const period = buildPeriod(filters);
     const hasProductFilter = Boolean(normalize(filters.productCode) || normalize(filters.productName));
-    const isAllLocations = !filters.locationId && !filters.locationCode;
+    const isAllLocations = !filters.locationCode;
 
     const now = new Date();
     const isPeriodOngoing = now.getTime() <= period.endDate.getTime();
@@ -1051,7 +1056,6 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
                 salesInvoice: {
                   ...(filters.branchCode ? { branchCode: normalizeUpper(filters.branchCode) } : {}),
                   ...(filters.locationCode ? { locationCode: { equals: normalizeUpper(filters.locationCode), mode: 'insensitive' } } : {}),
-                  ...(filters.locationId ? { locationId: Number(filters.locationId) } : {}),
                   OR: [
                     { invoiceDate: { gt: period.startDate } },
                     { invoiceTime: { gt: period.startDate } },
@@ -1066,7 +1070,6 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
                 posStockIntake: {
                   ...(filters.branchCode ? { branchCode: normalizeUpper(filters.branchCode) } : {}),
                   ...(filters.locationCode ? { locationCode: { equals: normalizeUpper(filters.locationCode), mode: 'insensitive' } } : {}),
-                  ...(filters.locationId ? { locationId: Number(filters.locationId) } : {}),
                   OR: [
                     { grnDate: { gt: period.startDate } },
                     { sourceUpdatedAt: { gt: period.startDate } },
@@ -1272,7 +1275,6 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
         filters.productCode,
         filters.locationCode,
         filters.branchCode,
-        filters.locationId,
       );
       
       if (currentProductStock !== null) {
@@ -1376,6 +1378,9 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
         locationCode: filters.locationCode || null,
         isAllLocations,
       },
+      matchedSalesMovements: saleMovements.length,
+      matchedIntakeMovements: intakeMovements.length,
+      legacyLocationIdIgnored: Boolean(filters.locationId && !filters.locationCode),
       summary,
       products,
       movements: allMovements,

@@ -94,6 +94,8 @@ function logLocationHistoryParity(endpoint, req, filters, whereClause, rowsFetch
       querySource: 'SalesInvoice/SalesInvoiceItem',
       dateFieldUsed: 'invoiceDate',
       whereClause: JSON.stringify(whereClause, null, 2),
+      legacyLocationIdFilterPresent: Boolean(whereClause?.locationId),
+      legacyLocationIdPassed: Boolean(filters?.locationId),
       matchedRows: rowsFetched,
       rowsMatched: rowsFetched,
       ...extra,

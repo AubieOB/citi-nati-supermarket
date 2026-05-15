@@ -157,7 +157,11 @@ function buildInvoiceWhere(dateRange, filters = {}) {
   }
 
   if (filters.locationId !== null && filters.locationId !== undefined) {
-    where.locationId = filters.locationId;
+    console.warn('[REPORTING SCOPE] Legacy locationId ignored for canonical reporting scope', {
+      branchCode: filters.branchCode || null,
+      locationCode: filters.locationCode || null,
+      locationId: filters.locationId,
+    });
   }
 
   if (filters.userName) {

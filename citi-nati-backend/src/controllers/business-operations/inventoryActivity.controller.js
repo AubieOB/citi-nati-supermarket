@@ -44,8 +44,9 @@ async function getInventoryActivityLedger(req, res) {
       selectedLocationCode: filters.locationCode,
       periodStart: filters.startDate || filters.date,
       periodEnd: filters.endDate || filters.date,
-      matchedHistoricalSales: data?.success ? (data.matchedHistoricalSales || 0) : 0,
-      matchedRecentSales: data?.success ? (data.matchedRecentSales || 0) : 0,
+      matchedSalesMovements: data?.success ? (data.matchedSalesMovements || 0) : 0,
+      matchedIntakeMovements: data?.success ? (data.matchedIntakeMovements || 0) : 0,
+      legacyLocationIdIgnored: data?.success ? Boolean(data.legacyLocationIdIgnored) : false,
       sampleInvoiceNo: data?.success ? (data.sampleInvoiceNo || null) : null,
     });
 

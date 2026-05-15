@@ -32,6 +32,10 @@ function roundMoney(val, decimals = 2) {
   return Number(n.toFixed(decimals));
 }
 
+function normalizeUpper(value) {
+  return String(value || '').trim().toUpperCase();
+}
+
 function productGroupKey(productCode, productName) {
   return `${productCode || ''}__${productName || ''}`;
 }
@@ -57,9 +61,22 @@ function buildExpenseWhere(itemWhere, filters = {}) {
     if (dateRange.lte) expenseWhere.expenseDate.lte = dateRange.lte;
   }
 
-  // STRICT location-based filtering (matches your system design)
-  if (filters.locationId) {
-    expenseWhere.locationId = Number(filters.locationId);
+  const scope = {};
+  if (filters.branchCode) {
+    scope.branchCode = { equals: normalizeUpper(filters.branchCode), mode: 'insensitive' };
+  }
+  if (filters.locationCode) {
+    scope.locationCode = { equals: normalizeUpper(filters.locationCode), mode: 'insensitive' };
+  }
+
+  if (Object.keys(scope).length > 0) {
+    expenseWhere.AND = [scope];
+  } else if (filters.locationId) {
+    console.warn('[REPORTING] Legacy locationId ignored for expense scope; canonical reporting scope uses branchCode+locationCode only', {
+      branchCode: filters.branchCode || null,
+      locationCode: filters.locationCode || null,
+      locationId: filters.locationId,
+    });
   }
 
   return Object.keys(expenseWhere).length > 0 ? expenseWhere : null;
