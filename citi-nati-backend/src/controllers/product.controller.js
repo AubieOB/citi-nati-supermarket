@@ -1510,6 +1510,13 @@ const updateProduct = async (req, res) => {
   try {
     console.log('[BACKEND PRODUCT EDIT] updateProduct hit');
     console.log('[BACKEND PRODUCT EDIT] req.body:', req.body);
+    console.log('[BACKEND PRODUCT EDIT] req.query:', req.query);
+    console.log('[BACKEND PRODUCT EDIT] Scope resolution inputs:', {
+      queryLocationCode: req.query?.locationCode,
+      bodyLocationCode: req.body?.locationCode,
+      queryBranchCode: req.query?.branchCode,
+      bodyBranchCode: req.body?.branchCode,
+    });
     const updatedBy = getAdjustmentActor(req);
 
     // Extract and convert id to integer
@@ -1685,6 +1692,26 @@ const updateProduct = async (req, res) => {
 
     console.log('[BACKEND PRODUCT EDIT] changedFields:', [...new Set(changedFields)]);
 
+    // Resolve writeback scope early with detailed logging
+    let writebackScope;
+    try {
+      writebackScope = resolveProductWritebackScope(req, existingProduct);
+      console.log('[BACKEND PRODUCT EDIT] ✅ Writeback scope resolved:', {
+        locationCode: writebackScope.locationCode,
+        posLocationCode: writebackScope.posLocationCode,
+        branchCode: writebackScope.branchCode,
+        priceTypeCode: writebackScope.priceTypeCode,
+      });
+    } catch (scopeErr) {
+      console.error('[BACKEND PRODUCT EDIT] \u274c Writeback scope resolution failed:', {
+        message: scopeErr.message,
+        requestedLocationCode: req.query?.locationCode || req.body?.locationCode,
+        requestedBranchCode: req.query?.branchCode || req.body?.branchCode,
+        productSourceCode: existingProduct?.sourceCode,
+      });
+      throw scopeErr; // Re-throw to be caught by outer try-catch
+    }
+
     // Update product in database
     const updatedProduct = await prisma.product.update({
       where: { id },
@@ -1713,7 +1740,6 @@ const updateProduct = async (req, res) => {
       }
     }
 
-    const writebackScope = resolveProductWritebackScope(req, updatedProduct);
     const posCommands = [];
     let posWritebackSummary = {
       attempted: false,
@@ -2031,9 +2057,21 @@ const updateProduct = async (req, res) => {
       posWritebackSummary,
     });
   } catch (err) {
-    console.error('Error updating product:', err);
+    console.error('[PRODUCT UPDATE] ❌ Error updating product:', {
+      message: err.message,
+      stack: err.stack,
+      productId: req.params.id,
+      bodyFields: Object.keys(req.body || {}),
+      hasFile: !!req.file,
+      scope: {
+        locationCode: req.query?.locationCode || req.body?.locationCode || 'not-provided',
+        branchCode: req.query?.branchCode || req.body?.branchCode || 'not-provided',
+      },
+    });
     return res.status(500).json({
       error: 'Server error while updating product',
+      details: err.message,
+      code: err.code || 'INTERNAL_ERROR',
     });
   }
 };

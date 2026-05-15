@@ -1295,7 +1295,13 @@ const AdminProducts = ({
         if (selectedLocationCode) {
           formPayload.append('locationCode', selectedLocationCode);
         }
-        console.log('[ADMIN PRODUCTS] ✏️ Updating product:', editingId);
+        if (selectedBranchCode) {
+          formPayload.append('branchCode', selectedBranchCode);
+        }
+        console.log('[ADMIN PRODUCTS] ✏️ Updating product:', editingId, {
+          locationCode: selectedLocationCode,
+          branchCode: selectedBranchCode
+        });
         const response = await api.put(`/products/${editingId}`, formPayload, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
