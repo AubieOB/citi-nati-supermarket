@@ -54,6 +54,7 @@ const AdminProducts = ({
     expiryDate: '',
   });
   const [imageFile, setImageFile] = useState(null);
+  const [isEditingPosProduct, setIsEditingPosProduct] = useState(false);
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -1369,6 +1370,7 @@ const AdminProducts = ({
       category: product.category,
       expiryDate: product.expiryDate ? product.expiryDate.split('T')[0] : '',
     });
+    setIsEditingPosProduct(Boolean(product.sourceCode));
     setEditingId(product.id);
     setShowForm(true);
     // Scroll to edit form on next render
@@ -1414,6 +1416,7 @@ const AdminProducts = ({
       expiryDate: '',
     });
     setImageFile(null);
+    setIsEditingPosProduct(false);
     setEditingId(null);
     setShowForm(false);
     setFormError('');
@@ -1544,11 +1547,13 @@ const AdminProducts = ({
                   value={formData.category}
                   onChange={handleFormChange}
                   placeholder="e.g., Fruits"
+                  disabled={editingId && isEditingPosProduct}
                   style={{
                     width: '100%',
                     padding: '0.75rem',
                     border: 'none',
                     borderRadius: '4px',
+                    backgroundColor: editingId && isEditingPosProduct ? '#eceff1' : '#fff',
                   }}
                 />
               </div>
@@ -1627,11 +1632,13 @@ const AdminProducts = ({
                   placeholder="50"
                   min="0"
                   step="1"
+                  disabled={editingId && isEditingPosProduct}
                   style={{
                     width: '100%',
                     padding: '0.75rem',
                     border: 'none',
                     borderRadius: '4px',
+                    backgroundColor: editingId && isEditingPosProduct ? '#eceff1' : '#fff',
                   }}
                 />
               </div>
@@ -1647,11 +1654,13 @@ const AdminProducts = ({
                   name="expiryDate"
                   value={formData.expiryDate}
                   onChange={handleFormChange}
+                  disabled={editingId && isEditingPosProduct}
                   style={{
                     width: '100%',
                     padding: '0.75rem',
                     border: 'none',
                     borderRadius: '4px',
+                    backgroundColor: editingId && isEditingPosProduct ? '#eceff1' : '#fff',
                   }}
                 />
               </div>
