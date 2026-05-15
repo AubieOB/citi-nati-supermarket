@@ -52,6 +52,7 @@ const payrollRoutes = require('./business-operations/payroll.routes');
 const importsRoutes = require('./business-operations/imports.routes');
 const exportRoutes = require('./business-operations/export.routes');
 const goodsIntakeRoutes = require('./business-operations/goodsIntake.routes');
+const purchaseOrdersRoutes = require('./business-operations/purchaseOrders.routes');
 const salesBalancingRoutes = require('./business-operations/salesBalancing.routes');
 const inventoryActivityRoutes = require('./business-operations/inventoryActivity.routes');
 
@@ -81,6 +82,7 @@ router.use('/payroll', payrollRoutes);
 router.use('/imports', importsRoutes);
 router.use('/export', exportRoutes);
 router.use('/goods-intake', goodsIntakeRoutes);
+router.use('/purchase-orders', purchaseOrdersRoutes);
 router.use('/sales-balancing', salesBalancingRoutes);
 router.use('/inventory-activity', inventoryActivityRoutes);
 

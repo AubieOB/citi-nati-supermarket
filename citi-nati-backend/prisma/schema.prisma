@@ -1214,6 +1214,57 @@ model GoodsIntakeItem {
   @@map("goods_intake_items")
 }
 
+model PurchaseOrder {
+  id                    Int                  @id @default(autoincrement())
+  purchaseOrderRef      String               @unique @map("purchase_order_ref")
+  supplierId            Int?                 @map("supplier_id")
+  supplier              Supplier?            @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  supplierName          String?              @map("supplier_name")
+  purchaseDate          DateTime             @map("purchase_date")
+  expectedDeliveryDate  DateTime?            @map("expected_delivery_date")
+  locationId            Int?                 @map("location_id")
+  branchCode            String?              @map("branch_code")
+  locationCode          String?              @map("location_code")
+  locationName          String?              @map("location_name")
+  status                String               @default("draft")
+  notes                 String?              @map("notes")
+  totalItems            Int                  @default(0) @map("total_items")
+  totalQuantity         Float                @default(0) @map("total_quantity")
+  totalCost             Float                @default(0) @map("total_cost")
+  enteredBy             String?              @map("entered_by")
+  createdAt             DateTime             @default(now()) @map("created_at")
+  updatedAt             DateTime             @updatedAt @map("updated_at")
+  items                 PurchaseOrderItem[]
+
+  @@index([status, purchaseDate])
+  @@index([branchCode, locationCode, purchaseDate])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id               Int           @id @default(autoincrement())
+  purchaseOrderId  Int           @map("purchase_order_id")
+  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  lineNo           Int           @map("line_no")
+  barcode          String?
+  productId        Int?          @map("product_id")
+  product          Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productName      String        @map("product_name")
+  quantity         Float         @default(0)
+  unitCost         Float         @default(0) @map("unit_cost")
+  totalCost        Float         @default(0) @map("total_cost")
+  expiryDate       DateTime?     @map("expiry_date")
+  batchRef         String?       @map("batch_ref")
+  notes            String?       @map("notes")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  @@index([purchaseOrderId, lineNo])
+  @@index([barcode])
+  @@index([productId])
+  @@map("purchase_order_items")
+}
+
 model SalesBalancingRecord {
   id                  Int      @id @default(autoincrement())
   balancingDate       DateTime @map("balancing_date")

@@ -7,6 +7,7 @@ import MonthlySummaryTab from './business-operations/MonthlySummaryTab.jsx';
 import PayrollTab from './business-operations/PayrollTab.jsx';
 import SuppliersTab from './business-operations/SuppliersTab.jsx';
 import GoodsIntakeTab from './business-operations/GoodsIntakeTab.jsx';
+import PurchaseOrdersTab from './business-operations/PurchaseOrdersTab.jsx';
 import ReportHistoryTab from './business-operations/ReportHistoryTab.jsx';
 import BusinessOperationsActionsTab from './business-operations/BusinessOperationsActionsTab.jsx';
 import BusinessAnalyticsTab from './business-operations/BusinessAnalyticsTab.jsx';
@@ -45,6 +46,7 @@ const AGGREGATE_SUPPORTED_TABS = new Set([
   'sales-balancing',
   'inventory-activity',
   'suppliers',
+  'purchase-orders',
   'expenses',
   'employees',
   'payroll',
@@ -54,6 +56,7 @@ const TABS = [
   { id: 'sales-reports', label: 'Sales Reports', icon: 'fa-chart-column', permission: PERMISSION_KEYS.BO_SALES_REPORTS_VIEW },
   { id: 'suppliers', label: 'Suppliers', icon: 'fa-truck-field', permission: PERMISSION_KEYS.BO_SUPPLIERS_VIEW },
   { id: 'goods-intake', label: 'Stock Intake & POS Transfer', icon: 'fa-boxes-stacked', permission: PERMISSION_KEYS.BO_GOODS_INTAKE_VIEW },
+  { id: 'purchase-orders', label: 'Purchase Orders', icon: 'fa-file-signature', permission: PERMISSION_KEYS.BO_PURCHASE_ORDERS_VIEW },
   { id: 'expenses', label: 'Expenses', icon: 'fa-file-invoice-dollar', permission: PERMISSION_KEYS.BO_EXPENSES_VIEW },
   { id: 'monthly-summary', label: 'Monthly Summary', icon: 'fa-calendar-days', permission: PERMISSION_KEYS.BO_MONTHLY_SUMMARY_VIEW },
   { id: 'employees', label: 'Employees', icon: 'fa-id-badge', permission: PERMISSION_KEYS.BO_EMPLOYEES_VIEW },
@@ -445,6 +448,8 @@ const AdminBusinessOperations = ({ selectedLocationCode, selectedBranchCode }) =
     ),
 
     'sales-balancing': <SalesBalancingTab {...commonScopeProps} />,
+
+    'purchase-orders': <PurchaseOrdersTab {...commonScopeProps} isAggregateMode={isAggregateMode} />,
 
     'analytics-performance': <BusinessAnalyticsTab {...commonScopeProps} isAggregateMode={isAggregateMode} />,
 
