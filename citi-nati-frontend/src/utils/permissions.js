@@ -94,7 +94,9 @@ export const hasPermission = (user, permissionKey) => {
   if (!user || !permissionKey) return false;
 
   const role = String(user.role || '').toLowerCase();
-  if (role === 'super_admin') return true;
+  // Allow full access for super admins and system/admin roles so the UI shows
+  // privileged tabs (e.g., Business Operations) to system administrators.
+  if (['super_admin', 'admin', 'administrator', 'system_administrator'].includes(role)) return true;
 
   const permissions = Array.isArray(user.permissions) ? user.permissions : [];
   if (hasRawPermission(permissions, permissionKey)) return true;
