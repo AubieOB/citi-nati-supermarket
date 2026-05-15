@@ -64,6 +64,45 @@ function logReportScope(endpoint, req, whereClause, extra = {}) {
   }
 }
 
+function logLocationHistoryParity(endpoint, req, filters, whereClause, rowsFetched, extra = {}) {
+  try {
+    const scope = {
+      selectedBranchCode: req.query.branchCode || null,
+      selectedLocationCode: req.query.locationCode || null,
+      selectedLocationId: req.query.locationId || null,
+      aggregate: req.query.aggregate || null,
+    };
+
+    const periodInfo = {
+      periodType: req.query.periodType || null,
+      date: req.query.date || null,
+      month: req.query.month || null,
+      year: req.query.year || null,
+      quarter: req.query.quarter || null,
+      startDate: req.query.startDate || null,
+      endDate: req.query.endDate || null,
+    };
+
+    console.log('[BO_LOCATION_HISTORY_PARITY]', {
+      module: endpoint,
+      selectedBranchCode: scope.selectedBranchCode,
+      selectedLocationCode: scope.selectedLocationCode,
+      selectedLocationId: scope.selectedLocationId,
+      aggregateMode: filters?.aggregate ? 'true' : 'false',
+      dateRange: `${req.query.date || req.query.startDate || 'N/A'} to ${req.query.endDate || 'N/A'}`,
+      periodType: periodInfo.periodType,
+      querySource: 'SalesInvoice/SalesInvoiceItem',
+      dateFieldUsed: 'invoiceDate',
+      whereClause: JSON.stringify(whereClause, null, 2),
+      matchedRows: rowsFetched,
+      rowsMatched: rowsFetched,
+      ...extra,
+    });
+  } catch (_err) {
+    // Logging must never block report responses.
+  }
+}
+
 function handleReportingValidationError(err, res) {
   const message = String(err?.message || '').trim();
   if (message.includes('branchCode is required') || message.includes('locationCode is required')) {
@@ -163,6 +202,7 @@ async function getSalesSummary(req, res) {
     const data = await querySalesSummary(invoiceWhere);
     const rowsFetched = Number(data?.totalInvoices || 0);
     logReportScope('/reports/sales/summary', req, invoiceWhere, { rowsFetched });
+    logLocationHistoryParity('/reports/sales/summary', req, filters, invoiceWhere, rowsFetched);
 
     // If zero results and a branch scope is active, fire a diagnostic probe
     if (rowsFetched === 0 && (req.query.branchCode || req.query.locationCode || req.query.locationId)) {
@@ -262,6 +302,7 @@ async function getSalesProducts(req, res) {
       page: pagination.page,
       pageSize: pagination.pageSize,
     });
+    logLocationHistoryParity('/reports/sales/products', req, filters, itemWhere?.salesInvoice || {}, Number(total || 0));
 
     return res.json({
       success: true,
@@ -402,6 +443,7 @@ async function getSalesProfitLatestCost(req, res) {
       completeProducts: Number(data?.summary?.completeProducts || 0),
       incompleteProducts: Number(data?.summary?.incompleteProducts || 0),
     });
+    logLocationHistoryParity('/reports/sales/profit-latest-cost', req, filters, itemWhere?.salesInvoice || {}, Number(data?.summary?.totalProducts || 0));
 
     return res.json({
       success: true,

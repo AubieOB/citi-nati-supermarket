@@ -1186,6 +1186,22 @@ const BusinessAnalyticsTab = ({
         }),
       ]);
 
+      // Add diagnostic logging for Analytics tab
+      console.log('[BO_LOCATION_HISTORY_PARITY]', {
+        module: 'Analytics Tab',
+        selectedBranchCode: effectiveBranchCode,
+        selectedLocationCode: effectiveLocationCode,
+        selectedLocationId: selectedLocationId,
+        aggregateMode: isAggregateMode ? 'true' : 'false',
+        dateRange: `${selectedPeriod.startDate || selectedPeriod.date || 'N/A'} to ${selectedPeriod.endDate || 'N/A'}`,
+        periodType: selectedPeriod.periodType,
+        querySource: 'SalesInvoice/SalesInvoiceItem',
+        dateFieldUsed: 'invoiceDate',
+        whereClause: 'Built by buildScopedParams()',
+        matchedRows: 'TBD - see backend logs',
+        sampleInvoiceNo: 'TBD - see backend logs',
+      });
+
       const currentSummary = allResponses[0]?.data?.data || {};
       const previousSummary = allResponses[1]?.data?.data || {};
       const currentMonthSummary = allResponses[2]?.data?.data || {};

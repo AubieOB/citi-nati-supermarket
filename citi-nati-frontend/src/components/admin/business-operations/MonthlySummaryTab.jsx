@@ -324,6 +324,22 @@ const MonthlySummaryTab = ({
           api.get('/business-operations/reports/sales/payments', { params: periodParams }),
         ]);
 
+        // Add diagnostic logging for Monthly Summary tab
+        console.log('[BO_LOCATION_HISTORY_PARITY]', {
+          module: 'Monthly Summary Tab',
+          selectedBranchCode: effectiveBranchCode,
+          selectedLocationCode: effectiveLocationCode,
+          selectedLocationId: selectedLocationId,
+          aggregateMode: isAggregateMode ? 'true' : 'false',
+          dateRange: `${periodParams.startDate || periodParams.date || 'N/A'} to ${periodParams.endDate || 'N/A'}`,
+          periodType: periodParams.periodType,
+          querySource: 'SalesInvoice/SalesInvoiceItem',
+          dateFieldUsed: 'invoiceDate',
+          whereClause: 'Built by scopeParams',
+          matchedRows: 'TBD - see backend logs',
+          sampleInvoiceNo: 'TBD - see backend logs',
+        });
+
         setSalesState({
           loading: false,
           error: '',

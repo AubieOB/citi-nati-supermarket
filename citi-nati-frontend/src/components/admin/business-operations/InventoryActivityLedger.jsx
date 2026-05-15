@@ -163,6 +163,22 @@ const InventoryActivityLedger = ({
         console.debug('[INVENTORY ACTIVITY] Fetching ledger with params:', requestParams);
       }
 
+      // Add diagnostic logging for Inventory Activity tab
+      console.log('[BO_LOCATION_HISTORY_PARITY]', {
+        module: 'Inventory Activity Tab',
+        selectedBranchCode: effectiveBranchCode,
+        selectedLocationCode: effectiveLocationCode,
+        selectedLocationId: selectedLocationId,
+        aggregateMode: 'false (location-scoped only)',
+        dateRange: `${requestParams.startDate || requestParams.date || 'N/A'} to ${requestParams.endDate || 'N/A'}`,
+        periodType: requestParams.periodType,
+        querySource: 'SalesInvoiceItem, PosStockIntakeItem, EmergencySale',
+        dateFieldUsed: 'invoiceDate, grnDate, sourceUpdatedAt, createdAt',
+        whereClause: 'Built by modalFilters',
+        matchedRows: 'TBD - see backend logs',
+        sampleInvoiceNo: 'TBD - see backend logs',
+      });
+
       const res = await api.get('/business-operations/inventory-activity/ledger', {
         params: requestParams,
       });

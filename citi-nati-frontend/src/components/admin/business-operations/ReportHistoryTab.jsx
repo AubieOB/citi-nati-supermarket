@@ -133,6 +133,22 @@ const ReportHistoryTab = ({ refreshKey = 0, selectedLocationId = null, selectedB
         api.get('/business-operations/payroll/periods', { params: { page: 1, pageSize: 5, sortBy: 'createdAt', sortOrder: 'desc', ...(selectedLocationId && !isAggregateMode && { locationId: selectedLocationId }) } }),
       ]);
 
+      // Add diagnostic logging for Report History tab
+      console.log('[BO_LOCATION_HISTORY_PARITY]', {
+        module: 'Report History Tab',
+        selectedBranchCode: normalizedBranchCode,
+        selectedLocationCode: normalizedLocationCode,
+        selectedLocationId: selectedLocationId,
+        aggregateMode: isAggregateMode ? 'true' : 'false',
+        dateRange: `${monthParams.startDate || monthParams.date || 'N/A'} to ${monthParams.endDate || 'N/A'}`,
+        periodType: monthParams.periodType,
+        querySource: 'SalesInvoice/SalesInvoiceItem',
+        dateFieldUsed: 'invoiceDate',
+        whereClause: 'Built by monthParams',
+        matchedRows: 'TBD - see backend logs',
+        sampleInvoiceNo: 'TBD - see backend logs',
+      });
+
       setState({
         loading: false,
         error: '',

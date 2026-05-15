@@ -38,6 +38,17 @@ async function getInventoryActivityLedger(req, res) {
       filters,
     });
 
+    // Add diagnostic logging for historical backfill visibility
+    console.log('[INVENTORY_HISTORY_SALES_TRACE]', {
+      selectedBranchCode: filters.branchCode,
+      selectedLocationCode: filters.locationCode,
+      periodStart: filters.startDate || filters.date,
+      periodEnd: filters.endDate || filters.date,
+      matchedHistoricalSales: data?.success ? (data.matchedHistoricalSales || 0) : 0,
+      matchedRecentSales: data?.success ? (data.matchedRecentSales || 0) : 0,
+      sampleInvoiceNo: data?.success ? (data.sampleInvoiceNo || null) : null,
+    });
+
     return res.json({
       success: data.success,
       data: data.success ? data : null,
