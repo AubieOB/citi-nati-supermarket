@@ -396,7 +396,7 @@ const PurchaseOrdersTab = ({
       setCurrentOrderId(saved?.id || currentOrderId);
       setOrderRef(saved?.purchaseOrderRef || orderRef);
       setSaving(false);
-      await fetchDrafts();
+      fetchDrafts();
       await boAlert({ title: 'Draft saved', message: 'Purchase order draft was saved successfully.', type: 'info' });
     } catch (err) {
       setSaving(false);
