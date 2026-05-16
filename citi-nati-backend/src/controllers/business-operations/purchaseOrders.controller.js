@@ -10,6 +10,8 @@ const {
   listResponse,
 } = require('../../utils/business-operations/common');
 
+const { Prisma } = require('@prisma/client');
+
 const PURCHASE_ORDER_SORT_FIELDS = new Set(['id', 'purchaseDate', 'expectedDeliveryDate', 'status', 'totalCost', 'createdAt', 'updatedAt']);
 const PURCHASE_ORDER_STATUSES = new Set(['draft', 'printed', 'submitted']);
 
@@ -44,7 +46,14 @@ async function createPurchaseOrder(req, res) {
       notes: req.body.notes,
       items: Array.isArray(req.body.items) ? req.body.items : [],
     }));
-    console.error('[PURCHASE_ORDER_SAVE_ERROR] createPurchaseOrder error:', err);
+    console.error('[PURCHASE_ORDER_SAVE_ERROR] createPurchaseOrder validation error:', err && err.message ? err.message : err);
+    if (err instanceof Prisma.PrismaClientKnownRequestError || err instanceof Prisma.PrismaClientValidationError) {
+      console.error('[PURCHASE_ORDER_SAVE_ERROR] createPurchaseOrder Prisma error:', {
+        code: err.code,
+        meta: err.meta,
+        target: err.target,
+      });
+    }
     return res.status(500).json({ success: false, error: 'Failed to create purchase order' });
   }
 }
@@ -71,7 +80,24 @@ async function updatePurchaseOrder(req, res) {
     return res.json({ success: true, data: order });
   } catch (err) {
     console.error('[PURCHASE_ORDER_SAVE_ERROR] updatePurchaseOrder request body:', JSON.stringify(req.body));
-    console.error('[PURCHASE_ORDER_SAVE_ERROR] updatePurchaseOrder error:', err);
+    console.error('[PURCHASE_ORDER_SAVE_ERROR] updatePurchaseOrder payload:', JSON.stringify({
+      purchaseOrderRef: req.body.purchaseOrderRef,
+      branchCode: req.body.branchCode,
+      locationId: req.body.locationId,
+      locationCode: req.body.locationCode,
+      locationName: req.body.locationName,
+      status: req.body.status,
+      notes: req.body.notes,
+      items: Array.isArray(req.body.items) ? req.body.items : [],
+    }));
+    console.error('[PURCHASE_ORDER_SAVE_ERROR] updatePurchaseOrder validation error:', err && err.message ? err.message : err);
+    if (err instanceof Prisma.PrismaClientKnownRequestError || err instanceof Prisma.PrismaClientValidationError) {
+      console.error('[PURCHASE_ORDER_SAVE_ERROR] updatePurchaseOrder Prisma error:', {
+        code: err.code,
+        meta: err.meta,
+        target: err.target,
+      });
+    }
     return res.status(500).json({ success: false, error: 'Failed to update purchase order' });
   }
 }

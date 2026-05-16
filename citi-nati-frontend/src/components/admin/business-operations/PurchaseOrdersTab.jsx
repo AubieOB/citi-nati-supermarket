@@ -55,6 +55,47 @@ const getNextField = (manual, field) => {
   }
 };
 
+const parseNumberValue = (value) => {
+  if (value === '' || value === null || value === undefined) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const formatBadgeValue = (value) => {
+  if (Number.isFinite(value)) {
+    const intValue = Number.isInteger(value) ? value : Number(value.toFixed(2));
+    return intValue;
+  }
+  return value;
+};
+
+const getItemStatus = (item) => {
+  const shelf = parseNumberValue(item.shelfBalance);
+  const pos = parseNumberValue(item.posBalance);
+  if (shelf === null || pos === null) {
+    return { label: 'Pending', background: '#f3f4f6', color: '#6b7280' };
+  }
+
+  const diff = pos - shelf;
+  if (diff > 0) {
+    return {
+      label: `Shortage (-${formatBadgeValue(diff)})`,
+      background: '#fef2f2',
+      color: '#b91c1c',
+    };
+  }
+
+  if (diff < 0) {
+    return {
+      label: `Overage (+${formatBadgeValue(Math.abs(diff))})`,
+      background: '#eef2ff',
+      color: '#4338ca',
+    };
+  }
+
+  return { label: 'Balanced (0)', background: '#ecfdf5', color: '#166534' };
+};
+
 const PurchaseOrdersTab = ({
   selectedLocationId = null,
   selectedBranchCode = '',
@@ -70,7 +111,7 @@ const PurchaseOrdersTab = ({
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [selectedSearchIndex, setSelectedSearchIndex] = useState(0);
-  const [orderItems, setOrderItems] = useState([emptySheetItem(1)]);
+  const [orderItems, setOrderItems] = useState([]);
   const [sheetNotes, setSheetNotes] = useState('');
   const [currentOrderId, setCurrentOrderId] = useState(null);
   const [orderRef, setOrderRef] = useState('');
@@ -213,13 +254,12 @@ const PurchaseOrdersTab = ({
   };
 
   const addManualRow = () => {
-    setOrderItems((prev) => [
-      ...prev,
-      {
-        ...emptySheetItem(prev.length + 1),
-        manual: true,
-      },
-    ]);
+    const newRow = { ...emptySheetItem(Date.now()), manual: true };
+    setOrderItems((prev) => {
+      const next = [...prev, newRow];
+      window.setTimeout(() => focusField(newRow.id, 'productCode'), 75);
+      return next;
+    });
   };
 
   const updateItem = (rowId, field, value) => {
@@ -227,14 +267,11 @@ const PurchaseOrdersTab = ({
   };
 
   const removeItem = (rowId) => {
-    setOrderItems((prev) => {
-      const next = prev.filter((item) => item.id !== rowId).map((item, idx) => ({ ...item, sortOrder: idx + 1 }));
-      return next.length ? next : [emptySheetItem(1)];
-    });
+    setOrderItems((prev) => prev.filter((item) => item.id !== rowId).map((item, idx) => ({ ...item, sortOrder: idx + 1 })));
   };
 
   const clearSheet = () => {
-    setOrderItems([emptySheetItem(1)]);
+    setOrderItems([]);
     setSheetNotes('');
     setOrderRef('');
     setCurrentOrderId(null);
@@ -263,7 +300,7 @@ const PurchaseOrdersTab = ({
           }))
         : [emptySheetItem(1)];
 
-      setOrderItems(rows.length ? rows : [emptySheetItem(1)]);
+      setOrderItems(rows.length ? rows : []);
       setSheetNotes(sheet.notes || '');
       setOrderRef(sheet.purchaseOrderRef || '');
       setCurrentOrderId(sheet.id);
@@ -516,162 +553,173 @@ const PurchaseOrdersTab = ({
   };
 
   const renderOrderTable = () => (
-    <div style={{ overflowX: 'auto' }}>
-      <div style={{ minWidth: 1000, borderRadius: 16, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '40px 120px 240px 100px 100px 100px 110px 220px 90px', gap: '1px', backgroundColor: '#eef2ff', padding: '0.85rem 0.65rem', fontSize: '0.84rem', fontWeight: 700, color: '#1e293b' }}>
+    <div style={{ width: '100%', overflowX: 'auto' }}>
+      <div style={{ minWidth: 1000, width: '100%', borderRadius: 16, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '40px minmax(120px, 1fr) minmax(220px, 2fr) 100px 100px 120px 90px 100px 220px 90px', gap: '1px', backgroundColor: '#eef2ff', padding: '0.85rem 0.65rem', fontSize: '0.85rem', fontWeight: 700, color: '#1e293b' }}>
           <div style={{ textAlign: 'center' }}>#</div>
-          <div>Product code</div>
+          <div>Code</div>
           <div>Product name</div>
-          <div>Shelf balance</div>
-          <div>POS balance</div>
-          <div>Selling price</div>
-          <div>Qty to order</div>
+          <div>Shelf</div>
+          <div>POS</div>
+          <div>Status</div>
+          <div>Price</div>
+          <div>Qty</div>
           <div>Notes</div>
           <div>Action</div>
         </div>
-        {orderItems.map((item, index) => (
-          <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '40px 120px 240px 100px 100px 100px 110px 220px 90px', gap: '1px', backgroundColor: '#fff', alignItems: 'stretch' }}>
-            <div style={{ padding: '0.75rem 0.65rem', backgroundColor: '#f8fafc', color: '#475569', textAlign: 'center' }}>{index + 1}</div>
-            <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff' }}>
-              <input
-                ref={(el) => { inputRefs.current[`${item.id}-productCode`] = el; }}
-                type="text"
-                value={item.productCode}
-                onChange={(e) => updateItem(item.id, 'productCode', e.target.value)}
-                onFocus={(event) => event.target.select()}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    const next = getNextField(item.manual, 'productCode');
-                    if (next === 'addRow') addManualRow(); else focusField(item.id, next);
-                  }
-                }}
-                placeholder="Product code"
-                readOnly={!item.manual}
-                style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.55rem', backgroundColor: item.manual ? '#fff' : '#f8fafc', color: '#0f172a' }}
-              />
-            </div>
-            <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff' }}>
-              <input
-                ref={(el) => { inputRefs.current[`${item.id}-productName`] = el; }}
-                type="text"
-                value={item.productName}
-                onChange={(e) => updateItem(item.id, 'productName', e.target.value)}
-                onFocus={(event) => event.target.select()}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    const next = getNextField(item.manual, 'productName');
-                    if (next === 'addRow') addManualRow(); else focusField(item.id, next);
-                  }
-                }}
-                placeholder="Product name"
-                readOnly={!item.manual}
-                style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.55rem', backgroundColor: item.manual ? '#fff' : '#f8fafc', color: '#0f172a' }}
-              />
-            </div>
-            <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff' }}>
-              <input
-                ref={(el) => { inputRefs.current[`${item.id}-shelfBalance`] = el; }}
-                type="number"
-                value={item.shelfBalance}
-                onChange={(e) => updateItem(item.id, 'shelfBalance', e.target.value)}
-                onFocus={(event) => event.target.select()}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    const next = getNextField(item.manual, 'shelfBalance');
-                    if (next === 'addRow') addManualRow(); else focusField(item.id, next);
-                  }
-                }}
-                placeholder="Shelf balance"
-                style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.55rem', color: '#0f172a' }}
-              />
-            </div>
-            <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff' }}>
-              <input
-                ref={(el) => { inputRefs.current[`${item.id}-posBalance`] = el; }}
-                type="number"
-                value={item.posBalance}
-                onChange={(e) => updateItem(item.id, 'posBalance', e.target.value)}
-                onFocus={(event) => event.target.select()}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    const next = getNextField(item.manual, 'posBalance');
-                    if (next === 'addRow') addManualRow(); else focusField(item.id, next);
-                  }
-                }}
-                placeholder="POS balance"
-                readOnly={!item.manual}
-                style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.55rem', backgroundColor: item.manual ? '#fff' : '#f8fafc', color: '#0f172a' }}
-              />
-            </div>
-            <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff' }}>
-              <input
-                ref={(el) => { inputRefs.current[`${item.id}-sellingPrice`] = el; }}
-                type="number"
-                value={item.sellingPrice}
-                onChange={(e) => updateItem(item.id, 'sellingPrice', e.target.value)}
-                onFocus={(event) => event.target.select()}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    const next = getNextField(item.manual, 'sellingPrice');
-                    if (next === 'addRow') addManualRow(); else focusField(item.id, next);
-                  }
-                }}
-                placeholder="Selling price"
-                readOnly={!item.manual}
-                style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.55rem', backgroundColor: item.manual ? '#fff' : '#f8fafc', color: '#0f172a' }}
-              />
-            </div>
-            <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff' }}>
-              <input
-                ref={(el) => { inputRefs.current[`${item.id}-quantityToOrder`] = el; }}
-                type="number"
-                value={item.quantityToOrder}
-                onChange={(e) => updateItem(item.id, 'quantityToOrder', e.target.value)}
-                onFocus={(event) => event.target.select()}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    const next = getNextField(item.manual, 'quantityToOrder');
-                    if (next === 'addRow') addManualRow(); else focusField(item.id, next);
-                  }
-                }}
-                placeholder="Qty to order"
-                style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.55rem', color: '#0f172a' }}
-              />
-            </div>
-            <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff' }}>
-              <input
-                ref={(el) => { inputRefs.current[`${item.id}-notes`] = el; }}
-                type="text"
-                value={item.notes}
-                onChange={(e) => updateItem(item.id, 'notes', e.target.value)}
-                onFocus={(event) => event.target.select()}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    setSearchModalOpen(true);
-                  }
-                }}
-                placeholder="Notes"
-                style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.55rem', color: '#0f172a' }}
-              />
-            </div>
-            <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <button
-                type="button"
-                onClick={() => removeItem(item.id)}
-                style={{ border: 'none', backgroundColor: '#f8fafc', color: '#0f172a', borderRadius: 10, padding: '0.6rem 0.85rem', cursor: 'pointer' }}
-              >
-                Remove
-              </button>
-            </div>
+        {orderItems.length === 0 ? (
+          <div style={{ backgroundColor: '#fff', padding: '2rem 1rem', textAlign: 'center', color: '#475569' }}>
+            No products added yet. Press F1 or click Search Product to add items.
           </div>
-        ))}
+        ) : orderItems.map((item, index) => {
+          const status = getItemStatus(item);
+          return (
+            <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '40px minmax(120px, 1fr) minmax(220px, 2fr) 100px 100px 120px 90px 100px 220px 90px', gap: '1px', backgroundColor: '#fff', alignItems: 'stretch' }}>
+              <div style={{ padding: '0.75rem 0.65rem', backgroundColor: '#f8fafc', color: '#475569', textAlign: 'center' }}>{index + 1}</div>
+              <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff' }}>
+                <input
+                  ref={(el) => { inputRefs.current[`${item.id}-productCode`] = el; }}
+                  type="text"
+                  value={item.productCode}
+                  onChange={(e) => updateItem(item.id, 'productCode', e.target.value)}
+                  onFocus={(event) => event.target.select()}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      const next = getNextField(item.manual, 'productCode');
+                      if (next === 'addRow') addManualRow(); else focusField(item.id, next);
+                    }
+                  }}
+                  placeholder="Code"
+                  readOnly={!item.manual}
+                  style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.55rem', backgroundColor: item.manual ? '#fff' : '#f8fafc', color: '#0f172a' }}
+                />
+              </div>
+              <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff' }}>
+                <input
+                  ref={(el) => { inputRefs.current[`${item.id}-productName`] = el; }}
+                  type="text"
+                  value={item.productName}
+                  onChange={(e) => updateItem(item.id, 'productName', e.target.value)}
+                  onFocus={(event) => event.target.select()}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      const next = getNextField(item.manual, 'productName');
+                      if (next === 'addRow') addManualRow(); else focusField(item.id, next);
+                    }
+                  }}
+                  placeholder="Product name"
+                  readOnly={!item.manual}
+                  style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.55rem', backgroundColor: item.manual ? '#fff' : '#f8fafc', color: '#0f172a' }}
+                />
+              </div>
+              <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff' }}>
+                <input
+                  ref={(el) => { inputRefs.current[`${item.id}-shelfBalance`] = el; }}
+                  type="number"
+                  value={item.shelfBalance}
+                  onChange={(e) => updateItem(item.id, 'shelfBalance', e.target.value)}
+                  onFocus={(event) => event.target.select()}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      const next = getNextField(item.manual, 'shelfBalance');
+                      if (next === 'addRow') addManualRow(); else focusField(item.id, next);
+                    }
+                  }}
+                  placeholder="Shelf"
+                  style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.55rem', color: '#0f172a' }}
+                />
+              </div>
+              <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff' }}>
+                <input
+                  ref={(el) => { inputRefs.current[`${item.id}-posBalance`] = el; }}
+                  type="number"
+                  value={item.posBalance}
+                  onChange={(e) => updateItem(item.id, 'posBalance', e.target.value)}
+                  onFocus={(event) => event.target.select()}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      const next = getNextField(item.manual, 'posBalance');
+                      if (next === 'addRow') addManualRow(); else focusField(item.id, next);
+                    }
+                  }}
+                  placeholder="POS"
+                  readOnly={!item.manual}
+                  style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.55rem', backgroundColor: item.manual ? '#fff' : '#f8fafc', color: '#0f172a' }}
+                />
+              </div>
+              <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff', display: 'flex', alignItems: 'center' }}>
+                <span style={{ width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minHeight: 44, borderRadius: 10, border: '1px solid #cbd5e1', backgroundColor: status.background, color: status.color, fontWeight: 700 }}>{status.label}</span>
+              </div>
+              <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff' }}>
+                <input
+                  ref={(el) => { inputRefs.current[`${item.id}-sellingPrice`] = el; }}
+                  type="number"
+                  value={item.sellingPrice}
+                  onChange={(e) => updateItem(item.id, 'sellingPrice', e.target.value)}
+                  onFocus={(event) => event.target.select()}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      const next = getNextField(item.manual, 'sellingPrice');
+                      if (next === 'addRow') addManualRow(); else focusField(item.id, next);
+                    }
+                  }}
+                  placeholder="Price"
+                  readOnly={!item.manual}
+                  style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.55rem', backgroundColor: item.manual ? '#fff' : '#f8fafc', color: '#0f172a' }}
+                />
+              </div>
+              <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff' }}>
+                <input
+                  ref={(el) => { inputRefs.current[`${item.id}-quantityToOrder`] = el; }}
+                  type="number"
+                  value={item.quantityToOrder}
+                  onChange={(e) => updateItem(item.id, 'quantityToOrder', e.target.value)}
+                  onFocus={(event) => event.target.select()}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      const next = getNextField(item.manual, 'quantityToOrder');
+                      if (next === 'addRow') addManualRow(); else focusField(item.id, next);
+                    }
+                  }}
+                  placeholder="Qty"
+                  style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.55rem', color: '#0f172a' }}
+                />
+              </div>
+              <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff' }}>
+                <input
+                  ref={(el) => { inputRefs.current[`${item.id}-notes`] = el; }}
+                  type="text"
+                  value={item.notes}
+                  onChange={(e) => updateItem(item.id, 'notes', e.target.value)}
+                  onFocus={(event) => event.target.select()}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      setSearchModalOpen(true);
+                    }
+                  }}
+                  placeholder="Notes"
+                  style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.55rem', color: '#0f172a' }}
+                />
+              </div>
+              <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => removeItem(item.id)}
+                  style={{ border: 'none', backgroundColor: '#f8fafc', color: '#0f172a', borderRadius: 10, padding: '0.6rem 0.85rem', cursor: 'pointer' }}
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -738,33 +786,14 @@ const PurchaseOrdersTab = ({
               </div>
             </div>
             <div style={{ padding: '1.25rem', overflowY: 'auto' }}>
-              <div style={{ display: 'grid', gap: '1rem', marginBottom: '1rem' }}>
-                <div style={{ display: 'grid', gap: '0.75rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-                  <div style={{ borderRadius: 16, border: '1px solid #e2e8f0', background: '#f8fafc', padding: '1rem' }}>
-                    <div style={{ fontSize: '0.76rem', color: '#6b7280', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Drafts</div>
-                    <div style={{ marginTop: '0.55rem', fontSize: '1.2rem', fontWeight: 800, color: '#111827' }}>{drafts.length}</div>
-                    <div style={{ marginTop: '0.5rem', color: '#475569', fontSize: '0.92rem' }}>Saved drafts available for this branch/location.</div>
-                  </div>
-                  <div style={{ borderRadius: 16, border: '1px solid #e2e8f0', background: '#f8fafc', padding: '1rem' }}>
-                    <div style={{ fontSize: '0.76rem', color: '#6b7280', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Printed</div>
-                    <div style={{ marginTop: '0.55rem', fontSize: '1.2rem', fontWeight: 800, color: '#111827' }}>{printedOrders.length}</div>
-                    <div style={{ marginTop: '0.5rem', color: '#475569', fontSize: '0.92rem' }}>Previously printed or exported purchase orders.</div>
-                  </div>
-                  <div style={{ borderRadius: 16, border: '1px solid #e2e8f0', background: '#f8fafc', padding: '1rem' }}>
-                    <div style={{ fontSize: '0.76rem', color: '#6b7280', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Scope</div>
-                    <div style={{ marginTop: '0.55rem', fontSize: '1.2rem', fontWeight: 800, color: '#111827' }}>{visibleBranch} / {visibleLocation}</div>
-                    <div style={{ marginTop: '0.5rem', color: '#475569', fontSize: '0.92rem' }}>Branch and location used for sheet metadata and history queries.</div>
-                  </div>
+              <div style={{ display: 'grid', gap: '0.85rem', marginBottom: '1rem', gridTemplateColumns: '1fr auto', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0f172a' }}>Order details</div>
+                  <div style={{ marginTop: '0.35rem', fontSize: '0.9rem', color: '#475569' }}>Use the product search modal or manual rows to build the sheet.</div>
                 </div>
-                <div style={{ display: 'grid', gap: '0.85rem', gridTemplateColumns: '1fr auto', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0f172a' }}>Order details</div>
-                    <div style={{ marginTop: '0.35rem', fontSize: '0.9rem', color: '#475569' }}>Use the product search modal or manual rows to build the sheet.</div>
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    <button type="button" onClick={() => setSearchModalOpen(true)} style={{ border: '1px solid #c7d2fe', borderRadius: 10, padding: '0.75rem 0.95rem', background: '#eef2ff', color: '#3730a3', cursor: 'pointer' }}>Search product (F1)</button>
-                    <button type="button" onClick={addManualRow} style={{ border: '1px solid #cbd5e1', borderRadius: 10, padding: '0.75rem 0.95rem', background: '#fff', color: '#0f172a', cursor: 'pointer' }}>Add manual row</button>
-                  </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <button type="button" onClick={() => setSearchModalOpen(true)} style={{ border: '1px solid #c7d2fe', borderRadius: 10, padding: '0.75rem 0.95rem', background: '#eef2ff', color: '#3730a3', cursor: 'pointer' }}>Search product (F1)</button>
+                  <button type="button" onClick={addManualRow} style={{ border: '1px solid #cbd5e1', borderRadius: 10, padding: '0.75rem 0.95rem', background: '#fff', color: '#0f172a', cursor: 'pointer' }}>Add manual row</button>
                 </div>
               </div>
 
@@ -772,16 +801,6 @@ const PurchaseOrdersTab = ({
 
               <div style={{ display: 'grid', gap: '1rem' }}>
                 {renderOrderTable()}
-                <div style={{ borderRadius: 16, background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1rem', display: 'grid', gap: '0.7rem' }}>
-                  <div style={{ fontWeight: 700, color: '#0f172a' }}>Draft summary</div>
-                  <div style={{ display: 'grid', gap: '0.5rem', color: '#475569' }}>
-                    <div>Branch: <strong style={{ color: '#111827' }}>{visibleBranch}</strong></div>
-                    <div>Location: <strong style={{ color: '#111827' }}>{visibleLocation}</strong></div>
-                    <div>Reference: <strong style={{ color: '#111827' }}>{orderRef || 'Draft'}</strong></div>
-                    <div>Rows: <strong style={{ color: '#111827' }}>{orderItems.length}</strong></div>
-                    <div>Quantity requested: <strong style={{ color: '#111827' }}>{orderItems.reduce((sum, item) => sum + Number(item.quantityToOrder || 0), 0)}</strong></div>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
