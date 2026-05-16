@@ -1,10 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import api from '../../../utils/api.js';
 import { boAlert } from '../../../utils/boDialogBus.js';
 import { tokenStorage } from '../../../utils/tokenStorage.js';
-import logo from '../../../assets/citi-nati-logo.png.png';
+import { exportWithLayout } from '../../../utils/businessOperationsPdfExports.js';
 
 const normalizeCode = (value) => String(value || '').trim().toUpperCase();
 
@@ -408,74 +406,28 @@ const PurchaseOrdersTab = ({
   };
 
   const exportToPdf = () => {
-    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 14;
     const now = new Date();
     const preparedBy = tokenStorage.getUser()?.name || tokenStorage.getUser()?.email || '-';
-    const orderReference = orderRef || 'Draft';
     const branchLabel = selectedBranchCode || '-';
     const locationLabel = selectedLocationName || selectedLocationCode || '-';
     const dateLabel = now.toLocaleDateString('en-GB');
     const timeLabel = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     const totalQuantity = orderItems.reduce((sum, item) => sum + Number(item.quantityToOrder || 0), 0);
 
-    const headerY = 16;
-    const metadataY = headerY + 26;
+    const summaryCards = [
+      { label: 'Total Items', value: String(orderItems.length), color: '#2D8659' },
+      { label: 'Total Qty', value: String(totalQuantity), color: '#5B4B8A' },
+      { label: 'Status', value: orderRef ? 'Saved Draft' : 'Unsaved', color: orderRef ? '#2D8659' : '#ca8a04' },
+    ];
 
-    const drawPdfHeader = ({ pageNumber }) => {
-      if (logo) {
-        try {
-          doc.addImage(logo, 'PNG', margin, headerY - 2, 30, 18);
-        } catch (error) {
-          // ignore logo failure
-        }
-      }
-
-      doc.setFontSize(18);
-      doc.setFont('helvetica', 'bold');
-      doc.text('CITI-NATI SUPERMARKET', margin + 34, headerY + 6);
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'normal');
-      doc.text('Purchase Order / Replenishment Request', margin + 34, headerY + 13);
-
-      doc.setDrawColor(225, 228, 235);
-      doc.setLineWidth(0.5);
-      doc.line(margin, headerY + 18, pageWidth - margin, headerY + 18);
-
-      doc.setFontSize(9);
-      doc.setTextColor('#1f2937');
-      doc.setFont('helvetica', 'bold');
-      doc.text('Branch:', margin, metadataY);
-      doc.setFont('helvetica', 'normal');
-      doc.text(branchLabel, margin + 16, metadataY);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Location:', margin + 94, metadataY);
-      doc.setFont('helvetica', 'normal');
-      doc.text(locationLabel, margin + 124, metadataY);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Reference:', margin + 230, metadataY);
-      doc.setFont('helvetica', 'normal');
-      doc.text(orderReference, margin + 267, metadataY);
-
-      doc.setFont('helvetica', 'bold');
-      doc.text('Prepared by:', margin, metadataY + 7);
-      doc.setFont('helvetica', 'normal');
-      doc.text(preparedBy, margin + 26, metadataY + 7);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Date:', margin + 94, metadataY + 7);
-      doc.setFont('helvetica', 'normal');
-      doc.text(dateLabel, margin + 107, metadataY + 7);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Time:', margin + 230, metadataY + 7);
-      doc.setFont('helvetica', 'normal');
-      doc.text(timeLabel, margin + 250, metadataY + 7);
-
-      doc.setFontSize(8);
-      doc.setTextColor('#64748b');
-      doc.text(`Page ${pageNumber}`, pageWidth - margin, 10, { align: 'right' });
-    };
+    const metadataRows = [
+      ['Reference', orderRef || 'Draft'],
+      ['Branch', branchLabel],
+      ['Location', locationLabel],
+      ['Prepared by', preparedBy],
+      ['Generated', dateLabel],
+      ['Time', timeLabel],
+    ];
 
     const rows = orderItems.map((item, index) => [
       String(index + 1),
@@ -488,47 +440,37 @@ const PurchaseOrdersTab = ({
       item.notes || '-',
     ]);
 
-    autoTable(doc, {
-      startY: metadataY + 16,
-      margin: { left: margin, right: margin },
-      styles: { fontSize: 9, cellPadding: 4, overflow: 'linebreak', valign: 'middle' },
-      headStyles: { fillColor: [59, 55, 160], textColor: 255, fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [247, 248, 255] },
-      bodyStyles: { minCellHeight: 8 },
-      head: [[
-        'No.',
-        'Product code',
-        'Product name',
-        'Shelf',
-        'POS',
-        'Price',
-        'Order Qty',
-        'Notes',
-      ]],
-      body: rows,
-      columnStyles: {
-        0: { cellWidth: 10, halign: 'center' },
-        1: { cellWidth: 40 },
-        2: { cellWidth: 85 },
-        3: { cellWidth: 24, halign: 'right' },
-        4: { cellWidth: 24, halign: 'right' },
-        5: { cellWidth: 28, halign: 'right' },
-        6: { cellWidth: 22, halign: 'right' },
-        7: { cellWidth: 60 },
+    exportWithLayout({
+      reportTitle: 'Purchase Order Sheet',
+      viewLabel: 'Replenishment Request',
+      periodText: dateLabel,
+      summaryCards,
+      metadataRows,
+      dataTable: {
+        headers: [
+          'No.',
+          'Product code',
+          'Product name',
+          'Shelf',
+          'POS',
+          'Price',
+          'Order Qty',
+          'Notes',
+        ],
+        rows,
+        columnStyles: {
+          0: { cellWidth: 10, halign: 'center' },
+          1: { cellWidth: 32 },
+          2: { cellWidth: 65 },
+          3: { cellWidth: 20, halign: 'right' },
+          4: { cellWidth: 20, halign: 'right' },
+          5: { cellWidth: 24, halign: 'right' },
+          6: { cellWidth: 18, halign: 'right' },
+          7: { cellWidth: 50 },
+        },
       },
-      didDrawPage: drawPdfHeader,
-      showHead: 'everyPage',
-      pageBreak: 'auto',
+      fileName: `purchase-order-sheet-${now.toISOString().slice(0, 10)}.pdf`,
     });
-
-    const finalY = doc.lastAutoTable?.finalY || metadataY + 16;
-    doc.setFontSize(10);
-    doc.setTextColor('#111827');
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Total rows: ${orderItems.length}`, margin, finalY + 10);
-    doc.text(`Total quantity requested: ${totalQuantity}`, pageWidth - margin, finalY + 10, { align: 'right' });
-
-    doc.save(`purchase-order-sheet-${now.toISOString().slice(0, 10)}.pdf`);
   };
 
   const openHistoryModal = () => {
