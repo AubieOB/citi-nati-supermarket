@@ -410,6 +410,7 @@ const PurchaseOrdersTab = ({
   const exportToPdf = () => {
     const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 14;
     const now = new Date();
     const preparedBy = tokenStorage.getUser()?.name || tokenStorage.getUser()?.email || '-';
@@ -417,13 +418,16 @@ const PurchaseOrdersTab = ({
     const branchLabel = selectedBranchCode || '-';
     const locationLabel = selectedLocationName || selectedLocationCode || '-';
     const dateLabel = now.toLocaleDateString('en-GB');
-    const timeLabel = now.toLocaleTimeString('en-GB');
+    const timeLabel = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     const totalQuantity = orderItems.reduce((sum, item) => sum + Number(item.quantityToOrder || 0), 0);
 
-    const pageHeader = () => {
+    const headerY = 16;
+    const metadataY = headerY + 26;
+
+    const drawPdfHeader = ({ pageNumber }) => {
       if (logo) {
         try {
-          doc.addImage(logo, 'PNG', margin, 10, 30, 18);
+          doc.addImage(logo, 'PNG', margin, headerY - 2, 30, 18);
         } catch (error) {
           // ignore logo failure
         }
@@ -431,23 +435,46 @@ const PurchaseOrdersTab = ({
 
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
-      doc.text('CITI-NATI SUPERMARKET', margin + 35, 16);
-      doc.setFontSize(12);
+      doc.text('CITI-NATI SUPERMARKET', margin + 34, headerY + 6);
+      doc.setFontSize(11);
       doc.setFont('helvetica', 'normal');
-      doc.text('Purchase Order / Replenishment Request', margin + 35, 24);
+      doc.text('Purchase Order / Replenishment Request', margin + 34, headerY + 13);
 
-      doc.setFontSize(10);
-      doc.setTextColor('#334155');
-      doc.text(`Branch: ${branchLabel}`, margin, 34);
-      doc.text(`Location: ${locationLabel}`, margin + 90, 34);
-      doc.text(`Reference: ${orderReference}`, margin + 220, 34);
-      doc.text(`Prepared by: ${preparedBy}`, margin, 40);
-      doc.text(`Date: ${dateLabel}`, margin + 90, 40);
-      doc.text(`Time: ${timeLabel}`, margin + 220, 40);
+      doc.setDrawColor(225, 228, 235);
+      doc.setLineWidth(0.5);
+      doc.line(margin, headerY + 18, pageWidth - margin, headerY + 18);
 
       doc.setFontSize(9);
+      doc.setTextColor('#1f2937');
+      doc.setFont('helvetica', 'bold');
+      doc.text('Branch:', margin, metadataY);
+      doc.setFont('helvetica', 'normal');
+      doc.text(branchLabel, margin + 16, metadataY);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Location:', margin + 94, metadataY);
+      doc.setFont('helvetica', 'normal');
+      doc.text(locationLabel, margin + 124, metadataY);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Reference:', margin + 230, metadataY);
+      doc.setFont('helvetica', 'normal');
+      doc.text(orderReference, margin + 267, metadataY);
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('Prepared by:', margin, metadataY + 7);
+      doc.setFont('helvetica', 'normal');
+      doc.text(preparedBy, margin + 26, metadataY + 7);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Date:', margin + 94, metadataY + 7);
+      doc.setFont('helvetica', 'normal');
+      doc.text(dateLabel, margin + 107, metadataY + 7);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Time:', margin + 230, metadataY + 7);
+      doc.setFont('helvetica', 'normal');
+      doc.text(timeLabel, margin + 250, metadataY + 7);
+
+      doc.setFontSize(8);
       doc.setTextColor('#64748b');
-      doc.text(`Page ${doc.internal.getNumberOfPages()}`, pageWidth - margin, 14, { align: 'right' });
+      doc.text(`Page ${pageNumber}`, pageWidth - margin, 10, { align: 'right' });
     };
 
     const rows = orderItems.map((item, index) => [
@@ -462,59 +489,44 @@ const PurchaseOrdersTab = ({
     ]);
 
     autoTable(doc, {
-      startY: 46,
-      margin: { left: margin, right: margin, top: 46 },
-      styles: { fontSize: 9, cellPadding: 3, overflow: 'linebreak', halign: 'left', valign: 'middle' },
-      headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [245, 246, 255] },
+      startY: metadataY + 16,
+      margin: { left: margin, right: margin },
+      styles: { fontSize: 9, cellPadding: 4, overflow: 'linebreak', valign: 'middle' },
+      headStyles: { fillColor: [59, 55, 160], textColor: 255, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [247, 248, 255] },
+      bodyStyles: { minCellHeight: 8 },
       head: [[
         'No.',
         'Product code',
         'Product name',
-        'Shelf balance',
-        'POS balance',
-        'Selling price',
-        'Qty to order',
+        'Shelf',
+        'POS',
+        'Price',
+        'Order Qty',
         'Notes',
       ]],
       body: rows,
       columnStyles: {
         0: { cellWidth: 10, halign: 'center' },
-        1: { cellWidth: 30 },
-        2: { cellWidth: 75 },
+        1: { cellWidth: 40 },
+        2: { cellWidth: 85 },
         3: { cellWidth: 24, halign: 'right' },
         4: { cellWidth: 24, halign: 'right' },
         5: { cellWidth: 28, halign: 'right' },
         6: { cellWidth: 22, halign: 'right' },
-        7: { cellWidth: 66 },
+        7: { cellWidth: 60 },
       },
-      didDrawPage: pageHeader,
+      didDrawPage: drawPdfHeader,
       showHead: 'everyPage',
       pageBreak: 'auto',
     });
 
-    const finalY = doc.lastAutoTable?.finalY || 160;
-    const lineY = finalY + 12;
+    const finalY = doc.lastAutoTable?.finalY || metadataY + 16;
     doc.setFontSize(10);
     doc.setTextColor('#111827');
-    doc.text(`Total rows: ${orderItems.length}`, margin, finalY + 8);
-    doc.text(`Total quantity requested: ${totalQuantity}`, margin + 90, finalY + 8);
-
-    const signY = lineY + 20;
-    const signWidth = 70;
-    const signGap = 24;
-    const signX1 = margin;
-    const signX2 = margin + signWidth + signGap;
-    const signX3 = margin + (signWidth + signGap) * 2;
-    doc.setDrawColor(148, 163, 184);
-    doc.setLineWidth(0.35);
-    doc.line(signX1, signY, signX1 + signWidth, signY);
-    doc.line(signX2, signY, signX2 + signWidth, signY);
-    doc.line(signX3, signY, signX3 + signWidth, signY);
-    doc.setFontSize(9);
-    doc.text('Prepared by', signX1 + signWidth / 2, signY + 6, { align: 'center' });
-    doc.text('Checked by', signX2 + signWidth / 2, signY + 6, { align: 'center' });
-    doc.text('Approved by', signX3 + signWidth / 2, signY + 6, { align: 'center' });
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Total rows: ${orderItems.length}`, margin, finalY + 10);
+    doc.text(`Total quantity requested: ${totalQuantity}`, pageWidth - margin, finalY + 10, { align: 'right' });
 
     doc.save(`purchase-order-sheet-${now.toISOString().slice(0, 10)}.pdf`);
   };
@@ -555,17 +567,17 @@ const PurchaseOrdersTab = ({
   const renderOrderTable = () => (
     <div style={{ width: '100%', overflowX: 'auto' }}>
       <div style={{ minWidth: 1000, width: '100%', borderRadius: 16, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '40px minmax(120px, 1fr) minmax(220px, 2fr) 100px 100px 120px 90px 100px 220px 90px', gap: '1px', backgroundColor: '#eef2ff', padding: '0.85rem 0.65rem', fontSize: '0.85rem', fontWeight: 700, color: '#1e293b' }}>
-          <div style={{ textAlign: 'center' }}>#</div>
-          <div style={{ textAlign: 'left' }}>Code</div>
-          <div style={{ textAlign: 'left' }}>Product name</div>
-          <div style={{ textAlign: 'center' }}>Shelf</div>
-          <div style={{ textAlign: 'center' }}>POS</div>
-          <div style={{ textAlign: 'center' }}>Status</div>
-          <div style={{ textAlign: 'center' }}>Price</div>
-          <div style={{ textAlign: 'center' }}>Order Qty</div>
-          <div style={{ textAlign: 'left' }}>Notes</div>
-          <div style={{ textAlign: 'center' }}>Action</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '40px minmax(120px, 1fr) minmax(220px, 2fr) 100px 100px 120px 90px 100px 220px 90px', gap: '1px', backgroundColor: '#eef2ff', padding: '0.85rem 0.65rem', fontSize: '0.85rem', fontWeight: 700, color: '#1e293b', alignItems: 'center' }}>
+          <div style={{ textAlign: 'center', display: 'flex', alignItems: 'center' }}>#</div>
+          <div style={{ textAlign: 'left', display: 'flex', alignItems: 'center' }}>Code</div>
+          <div style={{ textAlign: 'left', display: 'flex', alignItems: 'center' }}>Product name</div>
+          <div style={{ textAlign: 'center', display: 'flex', alignItems: 'center' }}>Shelf</div>
+          <div style={{ textAlign: 'center', display: 'flex', alignItems: 'center' }}>POS</div>
+          <div style={{ textAlign: 'center', display: 'flex', alignItems: 'center' }}>Status</div>
+          <div style={{ textAlign: 'center', display: 'flex', alignItems: 'center' }}>Price</div>
+          <div style={{ textAlign: 'center', display: 'flex', alignItems: 'center' }}>Order Qty</div>
+          <div style={{ textAlign: 'left', display: 'flex', alignItems: 'center' }}>Notes</div>
+          <div style={{ textAlign: 'center', display: 'flex', alignItems: 'center' }}>Action</div>
         </div>
         {orderItems.length === 0 ? (
           <div style={{ backgroundColor: '#fff', padding: '2rem 1rem', textAlign: 'center', color: '#475569' }}>
@@ -574,7 +586,7 @@ const PurchaseOrdersTab = ({
         ) : orderItems.map((item, index) => {
           const status = getItemStatus(item);
           return (
-            <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '40px minmax(120px, 1fr) minmax(220px, 2fr) 100px 100px 120px 90px 100px 220px 90px', gap: '1px', backgroundColor: '#fff', alignItems: 'stretch' }}>
+            <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '40px minmax(120px, 1fr) minmax(220px, 2fr) 100px 100px 120px 90px 100px 220px 90px', gap: '1px', backgroundColor: '#fff', alignItems: 'center' }}>
               <div style={{ padding: '0.75rem 0.65rem', backgroundColor: '#f8fafc', color: '#475569', textAlign: 'center' }}>{index + 1}</div>
               <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff' }}>
                 <input
@@ -778,7 +790,9 @@ const PurchaseOrdersTab = ({
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                <button type="button" onClick={() => setWorkspaceMaximized((prev) => !prev)} style={{ border: '1px solid #c7d2fe', background: '#eef2ff', color: '#3730a3', borderRadius: 10, padding: '0.75rem 0.9rem', cursor: 'pointer' }}>{workspaceMaximized ? 'Restore' : 'Maximize'}</button>
+                <button type="button" title={workspaceMaximized ? 'Restore workspace' : 'Maximize workspace'} aria-label={workspaceMaximized ? 'Restore workspace' : 'Maximize workspace'} onClick={() => setWorkspaceMaximized((prev) => !prev)} style={{ width: 36, height: 36, border: '1px solid #c7d2fe', background: '#eef2ff', color: '#3730a3', borderRadius: 10, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+                  <i className={`fas ${workspaceMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
+                </button>
                 <button type="button" onClick={clearSheet} style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 10, padding: '0.75rem 0.9rem', cursor: 'pointer' }}>Clear sheet</button>
                 <button type="button" onClick={saveDraft} disabled={saving} style={{ ...buttonStyle, backgroundColor: '#7c3aed' }}>{saving ? 'Saving…' : 'Save Draft'}</button>
                 <button type="button" onClick={exportToPdf} style={{ ...buttonStyle, backgroundColor: '#4338ca' }}>Export PDF</button>
