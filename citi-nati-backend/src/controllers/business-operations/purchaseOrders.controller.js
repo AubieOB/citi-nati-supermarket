@@ -11,36 +11,20 @@ const {
 } = require('../../utils/business-operations/common');
 
 const PURCHASE_ORDER_SORT_FIELDS = new Set(['id', 'purchaseDate', 'expectedDeliveryDate', 'status', 'totalCost', 'createdAt', 'updatedAt']);
-const PURCHASE_ORDER_STATUSES = new Set(['draft', 'submitted', 'approved', 'completed']);
+const PURCHASE_ORDER_STATUSES = new Set(['draft', 'printed', 'submitted']);
 
 async function createPurchaseOrder(req, res) {
   try {
-    const supplierId = toInt(req.body.supplierId);
-    const supplierName = req.body.supplierName ? String(req.body.supplierName).trim() : null;
-    const purchaseDate = toDate(req.body.purchaseDate);
-    const expectedDeliveryDate = toDate(req.body.expectedDeliveryDate);
+    // Minimal payload for purchase order sheet
     const status = req.body.status ? String(req.body.status).trim().toLowerCase() : 'draft';
-
-    if (!supplierId && !supplierName) {
-      return res.status(400).json({ success: false, error: 'Supplier name or supplierId is required' });
-    }
-
-    if (!purchaseDate) {
-      return res.status(400).json({ success: false, error: 'purchaseDate is required and must be valid' });
-    }
-
     const payload = {
       purchaseOrderRef: req.body.purchaseOrderRef,
-      supplierId,
-      supplierName,
-      purchaseDate,
-      expectedDeliveryDate,
       branchCode: req.body.branchCode,
       locationCode: req.body.locationCode,
       locationName: req.body.locationName,
+      preparedBy: req.user?.email || req.user?.name || null,
       status: PURCHASE_ORDER_STATUSES.has(status) ? status : 'draft',
       notes: req.body.notes,
-      enteredBy: req.user?.email || req.user?.name || null,
       items: Array.isArray(req.body.items) ? req.body.items : [],
     };
 
@@ -56,33 +40,15 @@ async function updatePurchaseOrder(req, res) {
   try {
     const id = toInt(req.params.id);
     if (!id) return res.status(400).json({ success: false, error: 'Invalid purchase order id' });
-
-    const supplierId = req.body.supplierId !== undefined ? toInt(req.body.supplierId) : undefined;
-    const supplierName = req.body.supplierName !== undefined ? String(req.body.supplierName).trim() : undefined;
-    const purchaseDate = req.body.purchaseDate !== undefined ? toDate(req.body.purchaseDate) : undefined;
-    const expectedDeliveryDate = req.body.expectedDeliveryDate !== undefined ? toDate(req.body.expectedDeliveryDate) : undefined;
     const status = req.body.status !== undefined ? String(req.body.status).trim().toLowerCase() : undefined;
-
-    if (supplierId === null && supplierName === null && supplierId === undefined && supplierName === undefined) {
-      // allow update without supplier changes
-    }
-
-    if (req.body.purchaseDate !== undefined && !purchaseDate) {
-      return res.status(400).json({ success: false, error: 'purchaseDate must be valid' });
-    }
-
     const payload = {
       purchaseOrderRef: req.body.purchaseOrderRef,
-      supplierId,
-      supplierName,
-      purchaseDate,
-      expectedDeliveryDate,
       branchCode: req.body.branchCode,
       locationCode: req.body.locationCode,
       locationName: req.body.locationName,
+      preparedBy: req.user?.email || req.user?.name || null,
       status: status && PURCHASE_ORDER_STATUSES.has(status) ? status : undefined,
       notes: req.body.notes,
-      enteredBy: req.user?.email || req.user?.name || null,
       items: Array.isArray(req.body.items) ? req.body.items : undefined,
     };
 

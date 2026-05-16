@@ -8,20 +8,21 @@ function roundMoney(value) {
   if (!Number.isFinite(parsed)) return 0;
   return Number(parsed.toFixed(2));
 }
-
 function buildLineItem(line, index) {
-  const quantity = Math.max(0, Number(line.quantity || 0));
-  const unitCost = Math.max(0, Number(line.unitCost || 0));
+  const quantityToOrder = Math.max(0, Number(line.quantityToOrder || line.quantity || 0));
   return {
     lineNo: index + 1,
-    barcode: line.barcode ? String(line.barcode).trim() : null,
+    barcode: line.productCode ? String(line.productCode).trim() : (line.barcode ? String(line.barcode).trim() : null),
     productId: line.productId || null,
     productName: String(line.productName || '').trim(),
-    quantity,
-    unitCost: roundMoney(unitCost),
-    totalCost: roundMoney(quantity * unitCost),
-    expiryDate: line.expiryDate ? new Date(line.expiryDate) : null,
-    batchRef: line.batchRef ? String(line.batchRef).trim() : null,
+    quantity: quantityToOrder,
+    shelfBalance: line.shelfBalance == null ? null : Number(line.shelfBalance),
+    posBalance: line.posBalance == null ? null : Number(line.posBalance),
+    sellingPrice: line.sellingPrice == null ? null : roundMoney(line.sellingPrice),
+    unitCost: 0,
+    totalCost: 0,
+    expiryDate: null,
+    batchRef: null,
     notes: line.notes ? String(line.notes).trim() : null,
   };
 }
@@ -31,7 +32,7 @@ function computeTotals(items) {
   return {
     totalItems: validItems.length,
     totalQuantity: roundMoney(validItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0)),
-    totalCost: roundMoney(validItems.reduce((sum, item) => sum + Number(item.totalCost || 0), 0)),
+    totalCost: 0,
   };
 }
 
@@ -128,61 +129,38 @@ function toWhereFilters(filters = {}) {
 }
 
 async function createPurchaseOrder(payload) {
-  const items = Array.isArray(payload.items) ? payload.items.map(buildLineItem).filter((line) => line.productName) : [];
+  const items = Array.isArray(payload.items) ? payload.items.map(buildLineItem) : [];
   const totals = computeTotals(items);
   const purchaseOrderRef = payload.purchaseOrderRef ? String(payload.purchaseOrderRef).trim() : generatePurchaseOrderRef();
 
-  return prisma.$transaction(async (tx) => {
-    let uniqueRef = purchaseOrderRef;
-    for (let attempt = 0; attempt < 4; attempt += 1) {
-      const existing = await tx.purchaseOrder.findUnique({ where: { purchaseOrderRef: uniqueRef } });
-      if (!existing) break;
-      uniqueRef = generatePurchaseOrderRef();
-    }
-
-    return tx.purchaseOrder.create({
-      data: {
-        purchaseOrderRef: uniqueRef,
-        ...shapeHeader(payload),
-        ...totals,
-        items: {
-          create: items,
-        },
+  // Simple create: store header + items; no side-effects or price sync.
+  return prisma.purchaseOrder.create({
+    data: {
+      purchaseOrderRef,
+      ...shapeHeader(payload),
+      ...totals,
+      items: {
+        create: items,
       },
-      include: includeShape(),
-    });
+    },
+    include: includeShape(),
   });
 }
 
 async function updatePurchaseOrder(id, payload) {
-  const items = Array.isArray(payload.items) ? payload.items.map(buildLineItem).filter((line) => line.productName) : [];
+  const items = Array.isArray(payload.items) ? payload.items.map(buildLineItem) : [];
   const totals = computeTotals(items);
 
-  return prisma.$transaction(async (tx) => {
-    await tx.purchaseOrder.update({
-      where: { id },
-      data: {
-        ...shapeHeader(payload),
-        ...totals,
-      },
+  // Simple update: replace header and items
+  await prisma.purchaseOrder.update({ where: { id }, data: { ...shapeHeader(payload), ...totals } });
+  await prisma.purchaseOrderItem.deleteMany({ where: { purchaseOrderId: id } });
+  if (items.length > 0) {
+    await prisma.purchaseOrderItem.createMany({
+      data: items.map((line) => ({ purchaseOrderId: id, ...line })),
     });
+  }
 
-    await tx.purchaseOrderItem.deleteMany({ where: { purchaseOrderId: id } });
-
-    if (items.length > 0) {
-      await tx.purchaseOrderItem.createMany({
-        data: items.map((line) => ({
-          purchaseOrderId: id,
-          ...line,
-        })),
-      });
-    }
-
-    return tx.purchaseOrder.findUnique({
-      where: { id },
-      include: includeShape(),
-    });
-  });
+  return prisma.purchaseOrder.findUnique({ where: { id }, include: includeShape() });
 }
 
 async function deletePurchaseOrder(id) {
