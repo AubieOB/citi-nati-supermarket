@@ -1,5 +1,6 @@
 import io from 'socket.io-client';
 import { tokenStorage } from './tokenStorage.js';
+import { getBackendUrl } from './runtimeConfig.js';
 
 let socket = null;
 
@@ -12,7 +13,7 @@ export const initSocket = () => {
 
   try {
     const token = tokenStorage.getToken();
-    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+    const backendUrl = getBackendUrl();
 
     console.log('[SOCKET] Initializing connection to:', backendUrl);
 

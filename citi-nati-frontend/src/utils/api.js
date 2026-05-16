@@ -12,6 +12,7 @@
 
 import axios from 'axios';
 import { tokenStorage } from './tokenStorage.js';
+import { getApiBaseUrl } from './runtimeConfig.js';
 
 let isHandlingSessionExpiry = false;
 let refreshPromise = null;
@@ -48,7 +49,7 @@ const isSessionExpiryError = (error) => {
 };
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api',
+  baseURL: getApiBaseUrl(),
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',

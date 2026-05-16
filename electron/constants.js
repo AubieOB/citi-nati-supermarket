@@ -19,23 +19,23 @@ export const WINDOW_SIZES = {
 // URL configuration based on environment
 export const getApiUrl = () => {
   const isDev = process.env.NODE_ENV === 'development';
-  
+
   if (isDev) {
-    return process.env.REACT_APP_API_URL || 'http://localhost:5000';
+    return process.env.ELECTRON_API_URL || process.env.REACT_APP_API_URL || 'http://localhost:5000';
   }
-  
+
   // Production: use environment variable or default to VPS
-  return process.env.REACT_APP_API_URL || 'https://api.citi-nati.com';
+  return process.env.ELECTRON_API_URL || process.env.REACT_APP_API_URL || 'https://www.citinati.com';
 };
 
 export const getWebUrl = () => {
   const isDev = process.env.NODE_ENV === 'development';
-  
+
   if (isDev) {
     return 'http://localhost:3000';
   }
-  
-  return process.env.REACT_APP_WEB_URL || 'https://citi-nati.com';
+
+  return process.env.ELECTRON_WEB_URL || process.env.REACT_APP_WEB_URL || 'https://citi-nati.com';
 };
 
 // IPC channels for main <-> renderer communication
