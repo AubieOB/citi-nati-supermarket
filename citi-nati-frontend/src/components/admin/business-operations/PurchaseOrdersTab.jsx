@@ -531,7 +531,7 @@ const PurchaseOrdersTab = ({
       const posBalance = item.posBalance === '' ? '-' : String(item.posBalance);
       const price = item.sellingPrice === '' || Number.isNaN(Number(item.sellingPrice))
         ? '-'
-        : `MWK ${Number(item.sellingPrice).toFixed(2)}`;
+        : Number(item.sellingPrice).toFixed(2);
       const quantity = String(Number(item.quantityToOrder || 0));
       return [
         String(index + 1),
