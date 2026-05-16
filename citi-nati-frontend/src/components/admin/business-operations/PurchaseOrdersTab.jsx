@@ -81,7 +81,7 @@ const getItemStatus = (item) => {
     return {
       label: `Shortage (-${formatBadgeValue(diff)})`,
       background: '#fef2f2',
-      color: '#b91c1c',
+      color: '#991b1b',
     };
   }
 
@@ -89,7 +89,7 @@ const getItemStatus = (item) => {
     return {
       label: `Overage (+${formatBadgeValue(Math.abs(diff))})`,
       background: '#eef2ff',
-      color: '#4338ca',
+      color: '#3730a3',
     };
   }
 
@@ -651,8 +651,8 @@ const PurchaseOrdersTab = ({
                   style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.55rem', backgroundColor: item.manual ? '#fff' : '#f8fafc', color: '#0f172a' }}
                 />
               </div>
-              <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff', display: 'flex', alignItems: 'center' }}>
-                <span style={{ width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minHeight: 44, borderRadius: 10, border: '1px solid #cbd5e1', backgroundColor: status.background, color: status.color, fontWeight: 700 }}>{status.label}</span>
+              <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ display: 'inline-block', whiteSpace: 'nowrap', minHeight: 32, minWidth: 100, borderRadius: 8, border: '1px solid #cbd5e1', backgroundColor: status.background, color: status.color, fontWeight: 600, fontSize: '0.8rem', padding: '0.35rem 0.5rem', textAlign: 'center' }}>{status.label}</span>
               </div>
               <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff' }}>
                 <input

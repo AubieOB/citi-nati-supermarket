@@ -45,21 +45,44 @@ function normalizeStatus(status) {
   return 'draft';
 }
 
-function generatePurchaseOrderRef() {
+async function generatePurchaseOrderRef(branchCode, locationCode) {
   const now = new Date();
   const yyyy = String(now.getFullYear());
   const mm = String(now.getMonth() + 1).padStart(2, '0');
   const dd = String(now.getDate()).padStart(2, '0');
-  const hh = String(now.getHours()).padStart(2, '0');
-  const min = String(now.getMinutes()).padStart(2, '0');
-  const sec = String(now.getSeconds()).padStart(2, '0');
-  const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `PO-${yyyy}${mm}${dd}-${hh}${min}${sec}-${suffix}`;
+  const dateStr = `${yyyy}${mm}${dd}`;
+
+  const branch = branchCode ? String(branchCode).trim().toUpperCase() : 'XX';
+  const location = locationCode ? String(locationCode).trim().toUpperCase() : 'XX';
+
+  let sequenceNum = 1;
+  let ref = `PO_${branch}_${location}_${dateStr}_${String(sequenceNum).padStart(4, '0')}`;
+  let attempts = 0;
+  const maxAttempts = 50;
+
+  while (attempts < maxAttempts) {
+    try {
+      const existing = await prisma.purchaseOrder.findUnique({
+        where: { purchaseOrderRef: ref },
+      });
+      if (!existing) {
+        return ref;
+      }
+      sequenceNum += 1;
+      ref = `PO_${branch}_${location}_${dateStr}_${String(sequenceNum).padStart(4, '0')}`;
+      attempts += 1;
+    } catch (err) {
+      return ref;
+    }
+  }
+
+  const fallback = `PO_${branch}_${location}_${dateStr}_${String(now.getTime() % 10000).padStart(4, '0')}`;
+  return fallback;
 }
 
-function shapeHeader(payload) {
+function shapeHeader(payload, generatedRef = null) {
   return {
-    purchaseOrderRef: payload.purchaseOrderRef ? String(payload.purchaseOrderRef).trim() : null,
+    purchaseOrderRef: generatedRef || (payload.purchaseOrderRef ? String(payload.purchaseOrderRef).trim() : null),
     supplierId: payload.supplierId || null,
     supplierName: payload.supplierName ? String(payload.supplierName).trim() : null,
     purchaseDate: payload.purchaseDate || new Date(),
@@ -133,13 +156,18 @@ function toWhereFilters(filters = {}) {
 async function createPurchaseOrder(payload) {
   const items = Array.isArray(payload.items) ? payload.items.map(buildLineItem) : [];
   const totals = computeTotals(items);
-  const purchaseOrderRef = payload.purchaseOrderRef ? String(payload.purchaseOrderRef).trim() : generatePurchaseOrderRef();
+
+  let purchaseOrderRef = null;
+  if (payload.purchaseOrderRef) {
+    purchaseOrderRef = String(payload.purchaseOrderRef).trim();
+  } else {
+    purchaseOrderRef = await generatePurchaseOrderRef(payload.branchCode, payload.locationCode);
+  }
 
   // Simple create: store header + items; no side-effects or price sync.
   return prisma.purchaseOrder.create({
     data: {
-      purchaseOrderRef,
-      ...shapeHeader(payload),
+      ...shapeHeader(payload, purchaseOrderRef),
       ...totals,
       items: {
         create: items,
