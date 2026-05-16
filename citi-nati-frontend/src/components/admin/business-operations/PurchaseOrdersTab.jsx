@@ -564,7 +564,7 @@ const PurchaseOrdersTab = ({
       { label: 'Prepared by', value: preparedBy, color: '#0f766e' },
       { label: 'Total quantity', value: String(totalQuantity), color: '#4338ca' },
     ];
-    let y = drawSummaryCards(doc, summaryCards, 26, left, width);
+    let y = drawSummaryCards(doc, summaryCards, 32, left, width);
 
     const metadataRows = [
       ['Order reference', orderReference],
