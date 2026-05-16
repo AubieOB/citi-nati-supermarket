@@ -1,5 +1,5 @@
 import React, { useEffect, Suspense, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import Layout from './components/layout/Layout.jsx';
@@ -32,7 +32,9 @@ const FAQs = React.lazy(() => import('./pages/public/FAQs.jsx'));
 const Terms = React.lazy(() => import('./pages/public/Terms.jsx'));
 const Returns = React.lazy(() => import('./pages/public/Returns.jsx'));
 const MaintenanceMode = React.lazy(() => import('./pages/public/MaintenanceMode.jsx'));
-const AdminMaintenanceLogin = React.lazy(() => import('./pages/public/AdminMaintenanceLogin.jsx'));
+const AdminLogin = React.lazy(() => import('./pages/public/AdminLogin.jsx'));
+const CashierLogin = React.lazy(() => import('./pages/public/CashierLogin.jsx'));
+const DriverLogin = React.lazy(() => import('./pages/public/DriverLogin.jsx'));
 
 // Admin Pages (lazy loaded)
 const AdminDashboard = React.lazy(() => import('./pages/admin/AdminDashboard.jsx'));
@@ -49,12 +51,13 @@ const NotFound = React.lazy(() => import('./pages/NotFound.jsx'));
 // Import global styles
 import './styles/global.css';
 
-const MAINTENANCE_EXEMPT_PATHS = ['/admin', '/admin-login', '/maintenance', '/cashier'];
+const MAINTENANCE_EXEMPT_PATHS = ['/admin', '/admin-login', '/cashier', '/cashier-login', '/driver-login', '/maintenance'];
 const DEFAULT_MAINTENANCE_MESSAGE = 'We are currently carrying out scheduled maintenance. We apologize for the inconvenience and appreciate your patience.';
 
 function AppInner() {
   const { user, isLoading } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [maintenanceState, setMaintenanceState] = useState({
     checked: false,
     enabled: false,
@@ -134,6 +137,26 @@ function AppInner() {
   // Set up global notifications for all pages
   useGlobalNotifications();
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const appTarget = params.get('app');
+    const appRouteMap = {
+      admin: '/admin-login',
+      cashier: '/cashier-login',
+      driver: '/driver-login',
+    };
+
+    if (
+      !isLoading &&
+      location.pathname === '/' &&
+      appTarget &&
+      appRouteMap[appTarget] &&
+      location.pathname !== appRouteMap[appTarget]
+    ) {
+      navigate(appRouteMap[appTarget], { replace: true });
+    }
+  }, [isLoading, location.pathname, location.search, navigate]);
+
   const loadingFallback = <div className="storefront-loading-state">Loading...</div>;
 
 
@@ -149,7 +172,7 @@ function AppInner() {
     return <Navigate to="/maintenance" replace state={{ from: location.pathname }} />;
   }
 
-  if (!maintenanceState.enabled && (isMaintenanceRoute || location.pathname === '/admin-login')) {
+  if (!maintenanceState.enabled && isMaintenanceRoute) {
     return <Navigate to="/" replace />;
   }
 
@@ -190,17 +213,25 @@ function AppInner() {
           <Route
             path="/admin-login"
             element={
-              maintenanceState.enabled ? (
-                isAdminDuringMaintenance ? (
-                  <Navigate to="/admin" replace />
-                ) : (
-                  <Suspense fallback={loadingFallback}>
-                    <AdminMaintenanceLogin />
-                  </Suspense>
-                )
-              ) : (
-                <Navigate to="/login" replace />
-              )
+              <Suspense fallback={loadingFallback}>
+                <AdminLogin />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/cashier-login"
+            element={
+              <Suspense fallback={loadingFallback}>
+                <CashierLogin />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/driver-login"
+            element={
+              <Suspense fallback={loadingFallback}>
+                <DriverLogin />
+              </Suspense>
             }
           />
 

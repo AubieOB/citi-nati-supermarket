@@ -15,6 +15,8 @@ const Layout = ({ children }) => {
                    location.pathname === '/products' ||
                    location.pathname === '/maintenance' ||
                    location.pathname === '/admin-login' ||
+                   location.pathname === '/cashier-login' ||
+                   location.pathname === '/driver-login' ||
                    location.pathname === '/login' ||
                    location.pathname === '/register';
   const hideFooter = location.pathname.startsWith('/admin') ||
@@ -22,6 +24,8 @@ const Layout = ({ children }) => {
                    location.pathname.startsWith('/cashier') ||
                    location.pathname === '/maintenance' ||
                    location.pathname === '/admin-login' ||
+                   location.pathname === '/cashier-login' ||
+                   location.pathname === '/driver-login' ||
                    location.pathname === '/login' ||
                    location.pathname === '/register';
   return (

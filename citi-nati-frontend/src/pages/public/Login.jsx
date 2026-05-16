@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useGoogleLogin } from '@react-oauth/google';
 import Container from '../../components/ui/Container.jsx';
@@ -10,14 +10,31 @@ import { getDashboardPathForUser } from '../../utils/permissions.js';
 import '../../styles/global.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 
-const Login = () => {
+const normalizeRole = (role) => String(role || '').toLowerCase();
+const isAllowedRole = (userRole, allowedRoles = []) => {
+  if (!Array.isArray(allowedRoles) || allowedRoles.length === 0) return true;
+  const normalizedRole = normalizeRole(userRole);
+  if (allowedRoles.includes('admin') && ['admin', 'super_admin', 'administrator', 'system_administrator'].includes(normalizedRole)) {
+    return true;
+  }
+  return allowedRoles.map((role) => normalizeRole(role)).includes(normalizedRole);
+};
+
+const Login = ({ allowedRoles = [], redirectPath = null, roleName = null }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, user, isAuthenticated } = useAuth();
+  const roleDisplayName = roleName || (allowedRoles[0] ? `${allowedRoles[0][0].toUpperCase()}${allowedRoles[0].slice(1)}` : 'Requested');
+
+  useEffect(() => {
+    if (isAuthenticated && user && isAllowedRole(user.role, allowedRoles)) {
+      navigate(redirectPath || getDashboardPathForUser(user) || '/', { replace: true });
+    }
+  }, [isAuthenticated, user, allowedRoles, redirectPath, navigate]);
 
   // Handle standard email/password login
   const handleSubmit = async (e) => {
@@ -44,11 +61,16 @@ const Login = () => {
       // ✅ SUCCESS: Response includes token and user
       const { token, user } = response.data;
 
+      if (!isAllowedRole(user.role, allowedRoles)) {
+        setError(`This app is for ${roleDisplayName} users only.`);
+        return;
+      }
+
       // ✅ STORE: Use AuthContext to save auth state
       login(user, token);
 
-      // ✅ REDIRECT: Route based on permissions/role
-      navigate(getDashboardPathForUser(user) || '/');
+      // ✅ REDIRECT: Route based on permissions/role or explicit page
+      navigate(redirectPath || getDashboardPathForUser(user) || '/');
     } catch (err) {
       // ❌ ERROR HANDLING
       const backendMessage = String(err.response?.data?.error || err.response?.data?.message || '').trim();
@@ -96,9 +118,14 @@ const Login = () => {
 
         const { token, user } = response.data;
 
+        if (!isAllowedRole(user.role, allowedRoles)) {
+          setError(`This app is for ${roleDisplayName} users only.`);
+          return;
+        }
+
         login(user, token);
 
-        navigate(getDashboardPathForUser(user) || '/');
+        navigate(redirectPath || getDashboardPathForUser(user) || '/');
       } catch (err) {
         console.error('Google login error:', err);
         setError(err.response?.data?.error || 'Google login failed. Please try again.');

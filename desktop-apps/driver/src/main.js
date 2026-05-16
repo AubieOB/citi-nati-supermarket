@@ -8,7 +8,7 @@
 const { app, BrowserWindow, ipcMain, Menu } = require('electron');
 const isDev = require('electron-is-dev');
 const path = require('path');
-const { WINDOW_SIZES, IPC_CHANNELS } = require('../../electron/constants.js');
+const { WINDOW_SIZES, IPC_CHANNELS } = require('../../../electron/constants.js');
 
 let mainWindow;
 
@@ -23,7 +23,7 @@ function createWindow() {
     minWidth: WINDOW_SIZES.MIN_WIDTH,
     minHeight: WINDOW_SIZES.MIN_HEIGHT,
     webPreferences: {
-      preload: path.join(__dirname, '../../electron/preload.js'),
+      preload: path.join(__dirname, '../../../electron/preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
       enableRemoteModule: false,

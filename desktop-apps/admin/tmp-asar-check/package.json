@@ -1,0 +1,13 @@
+{
+  "name": "citi-nati-admin-desktop",
+  "version": "1.0.0",
+  "description": "Citi-Nati Supermarket Admin Desktop Application",
+  "main": "src/main.js",
+  "homepage": "./",
+  "author": "Citi-Nati Team",
+  "license": "MIT",
+  "dependencies": {
+    "electron-is-dev": "^2.0.0",
+    "electron-store": "^8.1.0"
+  }
+}

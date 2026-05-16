@@ -10,7 +10,9 @@
     "dev": "electron . --development",
     "start": "electron .",
     "build": "electron-builder",
-    "build:win": "electron-builder --win",
+    "prebuild:win": "cd ../../citi-nati-frontend && npm run build:electron",
+    "prepare:packaging": "node ./scripts/sync-packaging-assets.js",
+    "build:win": "npm run prepare:packaging && node ./scripts/prepare-icons.js && electron-builder --win nsis",
     "build:mac": "electron-builder --mac",
     "build:linux": "electron-builder --linux",
     "pack": "electron-builder --dir",
@@ -20,21 +22,22 @@
     "electron-is-dev": "^2.0.0",
     "electron-store": "^8.1.0"
   },
-  "devDependencies": {
-    "electron": "^latest",
-    "electron-builder": "^latest",
-    "electron-notarize": "^latest"
+    "devDependencies": {
+    "electron": "^42.1.0",
+    "electron-builder": "^26.8.1",
+    "electron-notarize": "^1.2.2"
   },
   "build": {
     "appId": "com.citi-nati.admin",
     "productName": "Citi-Nati Admin",
     "directories": {
-      "buildResources": "public"
+      "buildResources": "public",
+      "output": "dist-electron"
     },
     "files": [
       "src/**/*",
-      "../../electron/**/*",
-      "../../citi-nati-frontend/dist/**/*",
+      "electron/**/*",
+      "citi-nati-frontend/dist/**/*",
       "node_modules/**/*"
     ],
     "win": {
@@ -42,8 +45,9 @@
         "nsis",
         "portable"
       ],
-      "certificateFile": null,
-      "certificatePassword": null
+      "artifactName": "Citi-Nati Admin Setup.${ext}",
+      "icon": "public/icon.png",
+      "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": false,
