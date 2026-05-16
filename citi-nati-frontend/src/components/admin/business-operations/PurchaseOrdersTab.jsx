@@ -1,18 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import html2pdf from 'html2pdf.js';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import api from '../../../utils/api.js';
 import { boAlert } from '../../../utils/boDialogBus.js';
 import { tokenStorage } from '../../../utils/tokenStorage.js';
 import logo from '../../../assets/citi-nati-logo.png.png';
 
 const normalizeCode = (value) => String(value || '').trim().toUpperCase();
-
-const escapeHtml = (value = '') => String(value ?? '')
-  .replace(/&/g, '&amp;')
-  .replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;')
-  .replace(/"/g, '&quot;')
-  .replace(/'/g, '&#39;');
 
 const buildScopeParams = ({ branchCode, locationCode, locationId, isAggregate }) => {
   if (isAggregate) return {};
@@ -38,6 +32,114 @@ const emptySheetItem = (order = 1) => ({
 });
 
 const createRowId = () => `purchase-order-row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const BRAND_PURPLE = '#5B4B8A';
+const BRAND_GREEN = '#2D8659';
+const COLOR_TEXT = [15, 23, 42];
+const COLOR_MUTED = [100, 116, 139];
+const COLOR_BORDER = [226, 232, 240];
+const COLOR_CARD_BG = [248, 250, 252];
+const COLOR_ALT_ROW = [249, 250, 251];
+const PAGE_MARGIN = 12;
+
+const toRgb = (hex) => {
+  const normalized = String(hex || '').replace('#', '');
+  const value = normalized.length === 3
+    ? normalized.split('').map((ch) => `${ch}${ch}`).join('')
+    : normalized;
+  const intVal = parseInt(value, 16);
+  return [(intVal >> 16) & 255, (intVal >> 8) & 255, intVal & 255];
+};
+
+const drawHeader = (doc, { reportTitle, generatedText, periodText }, left, right) => {
+  const logoWidth = 22;
+  const logoHeight = 14;
+  try {
+    doc.addImage(logo, 'PNG', left, 10, logoWidth, logoHeight);
+  } catch {
+    // Ignore image render errors.
+  }
+
+  const titleX = left + logoWidth + 4;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.setTextColor(...toRgb(BRAND_PURPLE));
+  doc.text('Citi-', titleX, 16);
+  const citiWidth = doc.getTextWidth('Citi-');
+  doc.setTextColor(...toRgb(BRAND_GREEN));
+  doc.text('Nati Supermarket', titleX + citiWidth, 16);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(12);
+  doc.setTextColor(...COLOR_TEXT);
+  doc.text(reportTitle, titleX, 21);
+
+  doc.setFontSize(9);
+  doc.setTextColor(...COLOR_MUTED);
+  doc.text(`Generated: ${generatedText}`, right, 12.5, { align: 'right' });
+  doc.text(`Period: ${periodText}`, right, 17.0, { align: 'right' });
+
+  doc.setDrawColor(...toRgb(BRAND_GREEN));
+  doc.setLineWidth(0.4);
+  doc.line(left, 22.5, right, 22.5);
+};
+
+const drawSummaryCards = (doc, cards, startY, left, width) => {
+  const gap = 4;
+  const count = cards.length;
+  const cardWidth = (width - gap * (count - 1)) / count;
+  const cardHeight = 18;
+
+  cards.forEach((card, index) => {
+    const x = left + index * (cardWidth + gap);
+    doc.setFillColor(...COLOR_CARD_BG);
+    doc.setDrawColor(...COLOR_BORDER);
+    doc.roundedRect(x, startY, cardWidth, cardHeight, 2, 2, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...COLOR_MUTED);
+    doc.text(card.label.toUpperCase(), x + 2.5, startY + 5.5, { maxWidth: cardWidth - 5 });
+
+    doc.setFontSize(9.5);
+    doc.setTextColor(...toRgb(card.color || BRAND_GREEN));
+    doc.text(card.value, x + 2.5, startY + 12.5, { maxWidth: cardWidth - 5 });
+  });
+
+  return startY + cardHeight + 6;
+};
+
+const drawMetadataTable = (doc, rows, startY, left, right) => {
+  autoTable(doc, {
+    startY,
+    margin: { left, right, top: 0, bottom: 12 },
+    head: [['Field', 'Value']],
+    body: rows,
+    theme: 'grid',
+    styles: {
+      fontSize: 8.2,
+      cellPadding: 2.8,
+      textColor: COLOR_TEXT,
+      lineColor: COLOR_BORDER,
+      lineWidth: 0.22,
+      valign: 'middle',
+    },
+    headStyles: {
+      fillColor: toRgb(BRAND_PURPLE),
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+    },
+    alternateRowStyles: {
+      fillColor: COLOR_ALT_ROW,
+    },
+    columnStyles: {
+      0: { cellWidth: 46, fontStyle: 'bold', textColor: COLOR_MUTED },
+      1: { cellWidth: right - left - 46 },
+    },
+  });
+
+  return (doc.lastAutoTable?.finalY || startY) + 6;
+};
 
 const getNextField = (manual, field) => {
   if (manual) {
@@ -423,179 +525,92 @@ const PurchaseOrdersTab = ({
     const timeLabel = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     const totalQuantity = orderItems.reduce((sum, item) => sum + Number(item.quantityToOrder || 0), 0);
 
-    const rowsHtml = orderItems.map((item, index) => {
-      const statusObj = typeof getItemStatus === 'function' ? getItemStatus(item) : null;
-      const statusLabel = statusObj?.label || item.status || '-';
-      const statusBackground = statusObj?.background || '#f3f4f6';
-      const statusColor = statusObj?.color || '#334155';
-      const productCode = escapeHtml(item.productCode || '-');
-      const productName = escapeHtml(item.productName || '-');
-      const notes = escapeHtml(item.notes || '-');
-      const shelfBalance = item.shelfBalance === '' ? '-' : escapeHtml(String(item.shelfBalance));
-      const posBalance = item.posBalance === '' ? '-' : escapeHtml(String(item.posBalance));
+    const rows = orderItems.map((item, index) => {
+      const statusLabel = getItemStatus(item)?.label || item.status || '-';
+      const shelfBalance = item.shelfBalance === '' ? '-' : String(item.shelfBalance);
+      const posBalance = item.posBalance === '' ? '-' : String(item.posBalance);
       const price = item.sellingPrice === '' || Number.isNaN(Number(item.sellingPrice))
         ? '-'
         : `MWK ${Number(item.sellingPrice).toFixed(2)}`;
       const quantity = String(Number(item.quantityToOrder || 0));
+      return [
+        String(index + 1),
+        item.productCode || '-',
+        item.productName || '-',
+        shelfBalance,
+        posBalance,
+        statusLabel,
+        price,
+        quantity,
+        item.notes || '-',
+      ];
+    });
 
-      return `
-      <tr style="background-color: ${index % 2 === 0 ? '#ffffff' : '#f8fafc'}; page-break-inside: avoid; break-inside: avoid;">
-        <td style="padding: 10px 12px; border: 1px solid #dde2ee; text-align: center; font-size: 11px; color: #334155;">${index + 1}</td>
-        <td style="padding: 10px 12px; border: 1px solid #dde2ee; word-break: break-word; font-size: 11px; color: #1f2937;">${productCode}</td>
-        <td style="padding: 10px 12px; border: 1px solid #dde2ee; word-break: break-word; font-size: 11px; color: #1f2937;">${productName}</td>
-        <td style="padding: 10px 12px; border: 1px solid #dde2ee; text-align: right; font-size: 11px; color: #1f2937;">${shelfBalance}</td>
-        <td style="padding: 10px 12px; border: 1px solid #dde2ee; text-align: right; font-size: 11px; color: #1f2937;">${posBalance}</td>
-        <td style="padding: 10px 12px; border: 1px solid #dde2ee; text-align: center;"><span style="display: inline-flex; align-items: center; justify-content: center; padding: 5px 10px; border-radius: 999px; background: ${statusBackground}; color: ${statusColor}; font-size: 10px; font-weight: 700; min-width: 60px;">${escapeHtml(statusLabel)}</span></td>
-        <td style="padding: 10px 12px; border: 1px solid #dde2ee; text-align: right; font-size: 11px; color: #1f2937;">${price}</td>
-        <td style="padding: 10px 12px; border: 1px solid #dde2ee; text-align: right; font-size: 11px; color: #1f2937;">${quantity}</td>
-        <td style="padding: 10px 12px; border: 1px solid #dde2ee; word-break: break-word; font-size: 11px; color: #1f2937;">${notes}</td>
-      </tr>
-    `;
-    }).join('');
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const left = PAGE_MARGIN;
+    const right = pageWidth - PAGE_MARGIN;
+    const width = right - left;
 
-    const html = `
-      <div style="font-family: Arial, sans-serif; color: #212121; padding: 16px; width: 100%; max-width: 1200px; box-sizing: border-box; margin: 0 auto; background: #f7fbff;">
-        <style>
-          .po-pdf-root { width: 100%; max-width: 1200px; margin: 0 auto; background: #ffffff; border-radius: 18px; overflow: hidden; box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08); }
-          .po-pdf-header { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 28px 28px 18px 28px; }
-          .po-pdf-logo { height: 58px; width: auto; object-fit: contain; flex: 0 0 auto; }
-          .po-pdf-title { flex: 1; min-width: 260px; text-align: left; }
-          .po-pdf-title h1 { margin: 0; font-size: 28px; font-weight: 700; line-height: 1.05; }
-          .po-pdf-title p { margin: 6px 0 0; color: #475569; font-size: 13px; }
-          .po-pdf-meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; padding: 0 28px 24px 28px; }
-          .po-pdf-meta-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; }
-          .po-pdf-meta-card .label { display: block; margin-bottom: 6px; color: #64748b; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
-          .po-pdf-meta-card .value { color: #0f172a; font-size: 13px; font-weight: 700; }
-          .po-pdf-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; table-layout: fixed; }
-          .po-pdf-table thead { display: table-header-group; }
-          .po-pdf-table th, .po-pdf-table td { padding: 12px 14px; border-bottom: 1px solid #e2e8f0; }
-          .po-pdf-table th { background: #2d8659; color: #ffffff; font-weight: 700; text-align: left; font-size: 11px; letter-spacing: 0.01em; }
-          .po-pdf-table td { color: #334155; vertical-align: top; }
-          .po-pdf-table tr:nth-child(even) td { background: #fbfdff; }
-          .po-pdf-table td:nth-child(1), .po-pdf-table th:nth-child(1) { text-align: center; }
-          .po-pdf-table td:nth-child(4), .po-pdf-table th:nth-child(4), .po-pdf-table td:nth-child(5), .po-pdf-table th:nth-child(5), .po-pdf-table td:nth-child(7), .po-pdf-table th:nth-child(7), .po-pdf-table td:nth-child(8), .po-pdf-table th:nth-child(8) { text-align: right; }
-          .po-pdf-summary { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding: 22px 28px 28px 28px; background: #f8fafc; }
-          .po-pdf-summary-item { flex: 1 1 200px; min-width: 180px; padding: 14px 16px; border-radius: 12px; background: #ffffff; border: 1px solid #e2e8f0; }
-          .po-pdf-summary-item .label { color: #64748b; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
-          .po-pdf-summary-item .value { color: #0f172a; font-size: 13px; font-weight: 700; }
-          @media (max-width: 900px) {
-            .po-pdf-header { padding: 18px 18px 12px 18px; }
-            .po-pdf-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0 18px 18px 18px; }
-            .po-pdf-table th, .po-pdf-table td { padding: 10px 12px; }
-          }
-          @media (max-width: 680px) {
-            .po-pdf-meta { grid-template-columns: 1fr; }
-            .po-pdf-summary { padding: 18px; }
-          }
-        </style>
+    drawHeader(doc, {
+      reportTitle: 'Purchase Order Sheet',
+      generatedText: `${dateLabel} ${timeLabel}`,
+      periodText: `Order ref: ${orderReference}`,
+    }, left, right);
 
-        <div class="po-pdf-root">
-          <div class="po-pdf-header">
-            <img class="po-pdf-logo" src="${logo}" alt="Citi-Nati logo" />
-            <div class="po-pdf-title">
-              <h1>Purchase Order</h1>
-              <p>A clean, printable replenishment sheet for your branch inventory.</p>
-            </div>
-          </div>
+    const summaryCards = [
+      { label: 'Branch', value: branchLabel, color: BRAND_GREEN },
+      { label: 'Location', value: locationLabel, color: BRAND_PURPLE },
+      { label: 'Prepared by', value: preparedBy, color: '#0f766e' },
+      { label: 'Total quantity', value: String(totalQuantity), color: '#4338ca' },
+    ];
+    let y = drawSummaryCards(doc, summaryCards, 26, left, width);
 
-          <div class="po-pdf-meta">
-            <div class="po-pdf-meta-card">
-              <span class="label">Branch</span>
-              <span class="value">${escapeHtml(branchLabel)}</span>
-            </div>
-            <div class="po-pdf-meta-card">
-              <span class="label">Location</span>
-              <span class="value">${escapeHtml(locationLabel)}</span>
-            </div>
-            <div class="po-pdf-meta-card">
-              <span class="label">Order reference</span>
-              <span class="value">${escapeHtml(orderReference)}</span>
-            </div>
-            <div class="po-pdf-meta-card">
-              <span class="label">Prepared by</span>
-              <span class="value">${escapeHtml(preparedBy)}</span>
-            </div>
-            <div class="po-pdf-meta-card">
-              <span class="label">Date</span>
-              <span class="value">${escapeHtml(dateLabel)}</span>
-            </div>
-            <div class="po-pdf-meta-card">
-              <span class="label">Time</span>
-              <span class="value">${escapeHtml(timeLabel)}</span>
-            </div>
-          </div>
+    const metadataRows = [
+      ['Order reference', orderReference],
+      ['Date', dateLabel],
+      ['Time', timeLabel],
+      ['Line count', String(orderItems.length)],
+    ];
+    y = drawMetadataTable(doc, metadataRows, y + 2, left, right);
 
-          <table class="po-pdf-table">
-            <colgroup>
-              <col style="width: 6%;" />
-              <col style="width: 14%;" />
-              <col style="width: 34%;" />
-              <col style="width: 8%;" />
-              <col style="width: 8%;" />
-              <col style="width: 12%;" />
-              <col style="width: 8%;" />
-              <col style="width: 7%;" />
-              <col style="width: 13%;" />
-            </colgroup>
-            <thead>
-              <tr>
-                <th>No.</th>
-                <th>Product code</th>
-                <th>Product name</th>
-                <th>Shelf</th>
-                <th>POS</th>
-                <th>Status</th>
-                <th>Price</th>
-                <th>Qty</th>
-                <th>Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rowsHtml}
-            </tbody>
-          </table>
-
-          <div class="po-pdf-summary">
-            <div class="po-pdf-summary-item">
-              <span class="label">Total lines</span>
-              <span class="value">${orderItems.length}</span>
-            </div>
-            <div class="po-pdf-summary-item">
-              <span class="label">Quantity requested</span>
-              <span class="value">${totalQuantity}</span>
-            </div>
-            <div class="po-pdf-summary-item">
-              <span class="label">Generated by</span>
-              <span class="value">Citi-Nati PDF Export</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-
-    const element = document.createElement('div');
-    element.innerHTML = html;
-
-    const opt = {
-      margin: 8,
-      filename: `purchase-order-sheet-${now.toISOString().slice(0, 10)}.pdf`,
-      image: { type: 'png', quality: 1.0 },
-      html2canvas: {
-        scale: 3,
-        logging: false,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        letterRendering: true,
-        windowWidth: 1400,
+    autoTable(doc, {
+      startY: y + 2,
+      margin: { left, right, top: 0, bottom: 12 },
+      head: [['No.', 'Code', 'Product', 'Shelf', 'POS', 'Status', 'Price', 'Qty', 'Notes']],
+      body: rows.length ? rows : [['No purchase order items were found.', '', '', '', '', '', '', '', '']],
+      theme: 'grid',
+      styles: {
+        fontSize: 8,
+        cellPadding: 2.6,
+        textColor: COLOR_TEXT,
+        lineColor: COLOR_BORDER,
+        lineWidth: 0.22,
+        overflow: 'linebreak',
+        valign: 'middle',
       },
-      jsPDF: { orientation: 'landscape', unit: 'mm', format: 'a4', compress: true },
-      pagebreak: {
-        mode: ['avoid-all', 'css', 'legacy'],
-        avoid: ['tr', 'td', 'th', 'thead', 'tbody'],
+      headStyles: {
+        fillColor: toRgb(BRAND_GREEN),
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
       },
-    };
+      alternateRowStyles: {
+        fillColor: COLOR_ALT_ROW,
+      },
+      columnStyles: {
+        0: { cellWidth: 12, halign: 'center' },
+        1: { cellWidth: 28, halign: 'left' },
+        2: { cellWidth: 78, halign: 'left' },
+        3: { cellWidth: 18, halign: 'right' },
+        4: { cellWidth: 18, halign: 'right' },
+        5: { cellWidth: 32, halign: 'left' },
+        6: { cellWidth: 24, halign: 'right' },
+        7: { cellWidth: 16, halign: 'right' },
+        8: { cellWidth: 56, halign: 'left' },
+      },
+    });
 
-    return html2pdf().set(opt).from(element).save();
+    doc.save(`purchase-order-sheet-${now.toISOString().slice(0, 10)}.pdf`);
   };
 
   const openHistoryModal = () => {
