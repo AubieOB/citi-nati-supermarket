@@ -568,16 +568,16 @@ const PurchaseOrdersTab = ({
     <div style={{ width: '100%', overflowX: 'auto' }}>
       <div style={{ minWidth: 1000, width: '100%', borderRadius: 16, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '40px minmax(120px, 1fr) minmax(220px, 2fr) 100px 100px 120px 90px 100px 220px 90px', gap: '1px', backgroundColor: '#eef2ff', padding: '0.85rem 0.65rem', fontSize: '0.85rem', fontWeight: 700, color: '#1e293b', alignItems: 'center' }}>
-          <div style={{ textAlign: 'center', display: 'flex', alignItems: 'center' }}>#</div>
-          <div style={{ textAlign: 'left', display: 'flex', alignItems: 'center' }}>Code</div>
-          <div style={{ textAlign: 'left', display: 'flex', alignItems: 'center' }}>Product name</div>
-          <div style={{ textAlign: 'center', display: 'flex', alignItems: 'center' }}>Shelf</div>
-          <div style={{ textAlign: 'center', display: 'flex', alignItems: 'center' }}>POS</div>
-          <div style={{ textAlign: 'center', display: 'flex', alignItems: 'center' }}>Status</div>
-          <div style={{ textAlign: 'center', display: 'flex', alignItems: 'center' }}>Price</div>
-          <div style={{ textAlign: 'center', display: 'flex', alignItems: 'center' }}>Order Qty</div>
-          <div style={{ textAlign: 'left', display: 'flex', alignItems: 'center' }}>Notes</div>
-          <div style={{ textAlign: 'center', display: 'flex', alignItems: 'center' }}>Action</div>
+          <div style={{ padding: '0.75rem 0.65rem', textAlign: 'center', display: 'flex', alignItems: 'center' }}>#</div>
+          <div style={{ padding: '0.75rem 0.65rem', textAlign: 'left', display: 'flex', alignItems: 'center' }}>Code</div>
+          <div style={{ padding: '0.75rem 0.65rem', textAlign: 'left', display: 'flex', alignItems: 'center' }}>Product name</div>
+          <div style={{ padding: '0.75rem 0.65rem', textAlign: 'center', display: 'flex', alignItems: 'center' }}>Shelf</div>
+          <div style={{ padding: '0.75rem 0.65rem', textAlign: 'center', display: 'flex', alignItems: 'center' }}>POS</div>
+          <div style={{ padding: '0.75rem 0.65rem', textAlign: 'center', display: 'flex', alignItems: 'center' }}>Status</div>
+          <div style={{ padding: '0.75rem 0.65rem', textAlign: 'center', display: 'flex', alignItems: 'center' }}>Price</div>
+          <div style={{ padding: '0.75rem 0.65rem', textAlign: 'center', display: 'flex', alignItems: 'center' }}>Order Qty</div>
+          <div style={{ padding: '0.75rem 0.65rem', textAlign: 'left', display: 'flex', alignItems: 'center' }}>Notes</div>
+          <div style={{ padding: '0.75rem 0.65rem', textAlign: 'center', display: 'flex', alignItems: 'center' }}>Action</div>
         </div>
         {orderItems.length === 0 ? (
           <div style={{ backgroundColor: '#fff', padding: '2rem 1rem', textAlign: 'center', color: '#475569' }}>
@@ -790,12 +790,12 @@ const PurchaseOrdersTab = ({
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                <button type="button" title={workspaceMaximized ? 'Restore workspace' : 'Maximize workspace'} aria-label={workspaceMaximized ? 'Restore workspace' : 'Maximize workspace'} onClick={() => setWorkspaceMaximized((prev) => !prev)} style={{ width: 36, height: 36, border: '1px solid #c7d2fe', background: '#eef2ff', color: '#3730a3', borderRadius: 10, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
-                  <i className={`fas ${workspaceMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
-                </button>
                 <button type="button" onClick={clearSheet} style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 10, padding: '0.75rem 0.9rem', cursor: 'pointer' }}>Clear sheet</button>
                 <button type="button" onClick={saveDraft} disabled={saving} style={{ ...buttonStyle, backgroundColor: '#7c3aed' }}>{saving ? 'Saving…' : 'Save Draft'}</button>
                 <button type="button" onClick={exportToPdf} style={{ ...buttonStyle, backgroundColor: '#4338ca' }}>Export PDF</button>
+                <button type="button" title={workspaceMaximized ? 'Restore workspace' : 'Maximize workspace'} aria-label={workspaceMaximized ? 'Restore workspace' : 'Maximize workspace'} onClick={() => setWorkspaceMaximized((prev) => !prev)} style={{ width: 36, height: 36, border: '1px solid #c7d2fe', background: '#eef2ff', color: '#3730a3', borderRadius: 10, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+                  <i className={`fas ${workspaceMaximized ? 'fa-window-restore' : 'fa-window-maximize'}`} />
+                </button>
                 <button type="button" onClick={closeWorkspace} style={{ border: 'none', background: 'transparent', color: '#475569', fontSize: '1.25rem', lineHeight: 1, cursor: 'pointer' }}>×</button>
               </div>
             </div>
