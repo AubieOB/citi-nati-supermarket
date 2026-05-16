@@ -17,9 +17,11 @@ async function createPurchaseOrder(req, res) {
   try {
     // Minimal payload for purchase order sheet
     const status = req.body.status ? String(req.body.status).trim().toLowerCase() : 'draft';
+    const locationId = req.body.locationId !== undefined ? toInt(req.body.locationId) : undefined;
     const payload = {
       purchaseOrderRef: req.body.purchaseOrderRef,
       branchCode: req.body.branchCode,
+      locationId,
       locationCode: req.body.locationCode,
       locationName: req.body.locationName,
       enteredBy: req.user?.email || req.user?.name || null,
@@ -31,7 +33,18 @@ async function createPurchaseOrder(req, res) {
     const order = await purchaseOrdersService.createPurchaseOrder(payload);
     return res.status(201).json({ success: true, data: order });
   } catch (err) {
-    console.error('[BO][PURCHASE_ORDERS] createPurchaseOrder error:', err);
+    console.error('[PURCHASE_ORDER_SAVE_ERROR] createPurchaseOrder request body:', JSON.stringify(req.body));
+    console.error('[PURCHASE_ORDER_SAVE_ERROR] createPurchaseOrder payload:', JSON.stringify({
+      purchaseOrderRef: req.body.purchaseOrderRef,
+      branchCode: req.body.branchCode,
+      locationId: req.body.locationId,
+      locationCode: req.body.locationCode,
+      locationName: req.body.locationName,
+      status: req.body.status,
+      notes: req.body.notes,
+      items: Array.isArray(req.body.items) ? req.body.items : [],
+    }));
+    console.error('[PURCHASE_ORDER_SAVE_ERROR] createPurchaseOrder error:', err);
     return res.status(500).json({ success: false, error: 'Failed to create purchase order' });
   }
 }
@@ -41,9 +54,11 @@ async function updatePurchaseOrder(req, res) {
     const id = toInt(req.params.id);
     if (!id) return res.status(400).json({ success: false, error: 'Invalid purchase order id' });
     const status = req.body.status !== undefined ? String(req.body.status).trim().toLowerCase() : undefined;
+    const locationId = req.body.locationId !== undefined ? toInt(req.body.locationId) : undefined;
     const payload = {
       purchaseOrderRef: req.body.purchaseOrderRef,
       branchCode: req.body.branchCode,
+      locationId,
       locationCode: req.body.locationCode,
       locationName: req.body.locationName,
       enteredBy: req.user?.email || req.user?.name || null,
@@ -55,7 +70,8 @@ async function updatePurchaseOrder(req, res) {
     const order = await purchaseOrdersService.updatePurchaseOrder(id, payload);
     return res.json({ success: true, data: order });
   } catch (err) {
-    console.error('[BO][PURCHASE_ORDERS] updatePurchaseOrder error:', err);
+    console.error('[PURCHASE_ORDER_SAVE_ERROR] updatePurchaseOrder request body:', JSON.stringify(req.body));
+    console.error('[PURCHASE_ORDER_SAVE_ERROR] updatePurchaseOrder error:', err);
     return res.status(500).json({ success: false, error: 'Failed to update purchase order' });
   }
 }

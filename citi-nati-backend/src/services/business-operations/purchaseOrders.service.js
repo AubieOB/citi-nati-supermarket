@@ -10,10 +10,11 @@ function roundMoney(value) {
 }
 function buildLineItem(line, index) {
   const quantityToOrder = Math.max(0, Number(line.quantityToOrder || line.quantity || 0));
+  const rawProductId = line.productId != null && line.productId !== '' ? Number(line.productId) : null;
   return {
     lineNo: index + 1,
     barcode: line.productCode ? String(line.productCode).trim() : (line.barcode ? String(line.barcode).trim() : null),
-    productId: line.productId || null,
+    productId: Number.isFinite(rawProductId) ? rawProductId : null,
     productName: String(line.productName || '').trim(),
     quantity: quantityToOrder,
     shelfBalance: line.shelfBalance == null ? null : Number(line.shelfBalance),
@@ -64,6 +65,7 @@ function shapeHeader(payload) {
     purchaseDate: payload.purchaseDate || new Date(),
     expectedDeliveryDate: payload.expectedDeliveryDate || null,
     branchCode: payload.branchCode ? String(payload.branchCode).trim().toUpperCase() : null,
+    locationId: payload.locationId != null && payload.locationId !== '' ? Number(payload.locationId) : null,
     locationCode: payload.locationCode ? String(payload.locationCode).trim().toUpperCase() : null,
     locationName: payload.locationName || null,
     status: normalizeStatus(payload.status),
