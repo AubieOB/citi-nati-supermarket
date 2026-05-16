@@ -423,6 +423,7 @@ const PurchaseOrdersTab = ({
         <td style="padding: 10px; border: 1px solid #dde2ee; word-break: break-word;">${item.productName || '-'}</td>
         <td style="padding: 10px; border: 1px solid #dde2ee; text-align: right;">${item.shelfBalance === '' ? '-' : String(item.shelfBalance)}</td>
         <td style="padding: 10px; border: 1px solid #dde2ee; text-align: right;">${item.posBalance === '' ? '-' : String(item.posBalance)}</td>
+        <td style="padding: 10px; border: 1px solid #dde2ee; text-align: left;">${item.status || '-'}</td>
         <td style="padding: 10px; border: 1px solid #dde2ee; text-align: right;">${item.sellingPrice === '' ? '-' : Number(item.sellingPrice).toFixed(2)}</td>
         <td style="padding: 10px; border: 1px solid #dde2ee; text-align: right;">${String(item.quantityToOrder || 0)}</td>
         <td style="padding: 10px; border: 1px solid #dde2ee; word-break: break-word;">${item.notes || '-'}</td>
@@ -430,7 +431,7 @@ const PurchaseOrdersTab = ({
     `).join('');
 
     const html = `
-      <div style="font-family: Arial, sans-serif; color: #212121; padding: 18px; width: 1120px; box-sizing: border-box;">
+      <div style="font-family: Arial, sans-serif; color: #212121; padding: 18px; max-width: 1000px; width: 100%; box-sizing: border-box;">
         <style>
           .po-pdf-table {
             width: 100%;
@@ -451,6 +452,7 @@ const PurchaseOrdersTab = ({
           .po-pdf-table th {
             page-break-inside: avoid;
             break-inside: avoid;
+            word-break: break-word;
           }
         </style>
 
@@ -498,13 +500,14 @@ const PurchaseOrdersTab = ({
         <table class="po-pdf-table">
           <colgroup>
             <col style="width: 6%;" />
-            <col style="width: 15%;" />
-            <col style="width: 35%;" />
-            <col style="width: 10%;" />
-            <col style="width: 10%;" />
-            <col style="width: 12%;" />
-            <col style="width: 8%;" />
-            <col style="width: 14%;" />
+            <col style="width: 13%;" />
+            <col style="width: 30%;" />
+            <col style="width: 9%;" />
+            <col style="width: 9%;" />
+            <col style="width: 11%;" />
+            <col style="width: 11%;" />
+            <col style="width: 7%;" />
+            <col style="width: 9%;" />
           </colgroup>
           <thead>
             <tr style="background-color: #2D8659; color: #ffffff;">
@@ -513,6 +516,7 @@ const PurchaseOrdersTab = ({
               <th style="padding: 12px; border: 1px solid #dde2ee; text-align: left;">Product name</th>
               <th style="padding: 12px; border: 1px solid #dde2ee; text-align: right;">Shelf</th>
               <th style="padding: 12px; border: 1px solid #dde2ee; text-align: right;">POS</th>
+              <th style="padding: 12px; border: 1px solid #dde2ee; text-align: left;">Status</th>
               <th style="padding: 12px; border: 1px solid #dde2ee; text-align: right;">Price</th>
               <th style="padding: 12px; border: 1px solid #dde2ee; text-align: right;">Order Qty</th>
               <th style="padding: 12px; border: 1px solid #dde2ee; text-align: left;">Notes</th>
