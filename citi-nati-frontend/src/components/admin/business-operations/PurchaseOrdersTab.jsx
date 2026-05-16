@@ -416,22 +416,26 @@ const PurchaseOrdersTab = ({
     const timeLabel = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     const totalQuantity = orderItems.reduce((sum, item) => sum + Number(item.quantityToOrder || 0), 0);
 
-    const rowsHtml = orderItems.map((item, index) => `
+    const rowsHtml = orderItems.map((item, index) => {
+      const statusObj = typeof getItemStatus === 'function' ? getItemStatus(item) : null;
+      const statusLabel = statusObj && statusObj.label ? statusObj.label : (item.status || '-');
+      return `
       <tr style="background-color: ${index % 2 === 0 ? '#ffffff' : '#f8fafc'}; page-break-inside: avoid; break-inside: avoid;">
-        <td style="padding: 10px; border: 1px solid #dde2ee; text-align: center;">${index + 1}</td>
-        <td style="padding: 10px; border: 1px solid #dde2ee; word-break: break-word;">${item.productCode || '-'}</td>
-        <td style="padding: 10px; border: 1px solid #dde2ee; word-break: break-word;">${item.productName || '-'}</td>
-        <td style="padding: 10px; border: 1px solid #dde2ee; text-align: right;">${item.shelfBalance === '' ? '-' : String(item.shelfBalance)}</td>
-        <td style="padding: 10px; border: 1px solid #dde2ee; text-align: right;">${item.posBalance === '' ? '-' : String(item.posBalance)}</td>
-        <td style="padding: 10px; border: 1px solid #dde2ee; text-align: left;">${item.status || '-'}</td>
-        <td style="padding: 10px; border: 1px solid #dde2ee; text-align: right;">${item.sellingPrice === '' ? '-' : Number(item.sellingPrice).toFixed(2)}</td>
-        <td style="padding: 10px; border: 1px solid #dde2ee; text-align: right;">${String(item.quantityToOrder || 0)}</td>
-        <td style="padding: 10px; border: 1px solid #dde2ee; word-break: break-word;">${item.notes || '-'}</td>
+        <td style="padding: 8px; border: 1px solid #dde2ee; text-align: center;">${index + 1}</td>
+        <td style="padding: 8px; border: 1px solid #dde2ee; word-break: break-word;">${item.productCode || '-'}</td>
+        <td style="padding: 8px; border: 1px solid #dde2ee; word-break: break-word;">${item.productName || '-'}</td>
+        <td style="padding: 8px; border: 1px solid #dde2ee; text-align: right;">${item.shelfBalance === '' ? '-' : String(item.shelfBalance)}</td>
+        <td style="padding: 8px; border: 1px solid #dde2ee; text-align: right;">${item.posBalance === '' ? '-' : String(item.posBalance)}</td>
+        <td style="padding: 8px; border: 1px solid #dde2ee; text-align: left; white-space: nowrap;">${escapeHtml(statusLabel)}</td>
+        <td style="padding: 8px; border: 1px solid #dde2ee; text-align: right;">${item.sellingPrice === '' ? '-' : Number(item.sellingPrice).toFixed(2)}</td>
+        <td style="padding: 8px; border: 1px solid #dde2ee; text-align: right;">${String(item.quantityToOrder || 0)}</td>
+        <td style="padding: 8px; border: 1px solid #dde2ee; word-break: break-word;">${item.notes || '-'}</td>
       </tr>
-    `).join('');
+    `;
+    }).join('');
 
     const html = `
-      <div style="font-family: Arial, sans-serif; color: #212121; padding: 18px; max-width: 1000px; width: 100%; box-sizing: border-box;">
+      <div style="font-family: Arial, sans-serif; color: #212121; padding: 12px 8px; width: 1120px; box-sizing: border-box; margin: 0 auto;">
         <style>
           .po-pdf-table {
             width: 100%;
@@ -500,26 +504,26 @@ const PurchaseOrdersTab = ({
         <table class="po-pdf-table">
           <colgroup>
             <col style="width: 6%;" />
-            <col style="width: 13%;" />
-            <col style="width: 30%;" />
+            <col style="width: 15%;" />
+            <col style="width: 36%;" />
+            <col style="width: 8%;" />
+            <col style="width: 8%;" />
+            <col style="width: 10%;" />
             <col style="width: 9%;" />
-            <col style="width: 9%;" />
-            <col style="width: 11%;" />
-            <col style="width: 11%;" />
             <col style="width: 7%;" />
-            <col style="width: 9%;" />
+            <col style="width: 1%;" />
           </colgroup>
           <thead>
             <tr style="background-color: #2D8659; color: #ffffff;">
-              <th style="padding: 12px; border: 1px solid #dde2ee; text-align: center;">No.</th>
-              <th style="padding: 12px; border: 1px solid #dde2ee; text-align: left;">Product code</th>
-              <th style="padding: 12px; border: 1px solid #dde2ee; text-align: left;">Product name</th>
-              <th style="padding: 12px; border: 1px solid #dde2ee; text-align: right;">Shelf</th>
-              <th style="padding: 12px; border: 1px solid #dde2ee; text-align: right;">POS</th>
-              <th style="padding: 12px; border: 1px solid #dde2ee; text-align: left;">Status</th>
-              <th style="padding: 12px; border: 1px solid #dde2ee; text-align: right;">Price</th>
-              <th style="padding: 12px; border: 1px solid #dde2ee; text-align: right;">Order Qty</th>
-              <th style="padding: 12px; border: 1px solid #dde2ee; text-align: left;">Notes</th>
+              <th style="padding: 6px 8px; border: 1px solid #dde2ee; text-align: center; white-space: nowrap; font-size: 11px;">No.</th>
+              <th style="padding: 6px 8px; border: 1px solid #dde2ee; text-align: left; white-space: nowrap; font-size: 11px;">Product code</th>
+              <th style="padding: 6px 8px; border: 1px solid #dde2ee; text-align: left; white-space: nowrap; font-size: 11px;">Product name</th>
+              <th style="padding: 6px 8px; border: 1px solid #dde2ee; text-align: right; white-space: nowrap; font-size: 11px;">Shelf</th>
+              <th style="padding: 6px 8px; border: 1px solid #dde2ee; text-align: right; white-space: nowrap; font-size: 11px;">POS</th>
+              <th style="padding: 6px 8px; border: 1px solid #dde2ee; text-align: left; white-space: nowrap; font-size: 11px;">Status</th>
+              <th style="padding: 6px 8px; border: 1px solid #dde2ee; text-align: right; white-space: nowrap; font-size: 11px;">Price</th>
+              <th style="padding: 6px 8px; border: 1px solid #dde2ee; text-align: right; white-space: nowrap; font-size: 11px;">Order Qty</th>
+              <th style="padding: 6px 8px; border: 1px solid #dde2ee; text-align: left; white-space: nowrap; font-size: 11px;">Notes</th>
             </tr>
           </thead>
           <tbody>
@@ -538,7 +542,7 @@ const PurchaseOrdersTab = ({
     element.innerHTML = html;
 
     const opt = {
-      margin: 8,
+      margin: 6,
       filename: `purchase-order-sheet-${now.toISOString().slice(0, 10)}.pdf`,
       image: { type: 'png', quality: 1.0 },
       html2canvas: {
