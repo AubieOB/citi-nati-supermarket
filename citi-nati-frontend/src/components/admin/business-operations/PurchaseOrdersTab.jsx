@@ -1,10 +1,12 @@
-'use strict';
+ 'use strict';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import api from '../../../utils/api.js';
 import { boAlert, boConfirm } from '../../../utils/boDialogBus.js';
+import { tokenStorage } from '../../../utils/tokenStorage.js';
+import logo from '../../../assets/citi-nati-logo.png.png';
 
 const STATUS_OPTIONS = ['draft', 'submitted', 'approved', 'completed'];
 
@@ -139,9 +141,11 @@ const PurchaseOrdersTab = ({
         }
       }, [scopeParams]);
 
+      const searchTimer = useRef(null);
       useEffect(() => {
-        const t = setTimeout(() => searchProducts(searchTerm), 220);
-        return () => clearTimeout(t);
+        if (searchTimer.current) clearTimeout(searchTimer.current);
+        searchTimer.current = setTimeout(() => searchProducts(searchTerm), 180);
+        return () => clearTimeout(searchTimer.current);
       }, [searchTerm, searchProducts]);
 
       const addProductToSheet = (product) => {
@@ -158,6 +162,19 @@ const PurchaseOrdersTab = ({
           }];
           return next;
         });
+      };
+
+      const handleSearchKey = (e) => {
+        if (e.key === 'Enter') {
+          if (searchResults && searchResults.length > 0) {
+            addProductToSheet(searchResults[0]);
+            setSearchTerm('');
+            setSearchResults([]);
+          } else {
+            // add manual row quickly
+            addManualRow();
+          }
+        }
       };
 
       const addManualRow = () => setOrderItems((prev) => [...prev, emptySheetItem(prev.length + 1)]);
@@ -208,6 +225,33 @@ const PurchaseOrdersTab = ({
         }
       };
 
+      const duplicateSheet = async (id) => {
+        try {
+          const resp = await api.get(`/business-operations/purchase-orders/${id}`);
+          const sheet = resp.data?.data;
+          if (!sheet) return;
+          const payload = {
+            branchCode: sheet.branchCode,
+            locationCode: sheet.locationCode,
+            status: 'draft',
+            items: (sheet.items || []).map((it) => ({
+              productCode: it.barcode || undefined,
+              productName: it.productName || undefined,
+              shelfBalance: it.shelfBalance == null ? undefined : it.shelfBalance,
+              posBalance: it.posBalance == null ? undefined : it.posBalance,
+              sellingPrice: it.sellingPrice == null ? undefined : it.sellingPrice,
+              quantityToOrder: it.quantity || 0,
+              notes: it.notes || undefined,
+            })),
+          };
+          await api.post('/business-operations/purchase-orders', payload);
+          await fetchSheets();
+          await boAlert({ title: 'Duplicated', message: 'Order duplicated to a new draft', type: 'info' });
+        } catch (err) {
+          await boAlert({ title: 'Duplicate failed', message: err.response?.data?.error || 'Unable to duplicate', type: 'error' });
+        }
+      };
+
       const saveDraft = async (status = 'draft') => {
         setSaving(true); setSavingError('');
         const payload = {
@@ -222,7 +266,7 @@ const PurchaseOrdersTab = ({
             shelfBalance: it.shelfBalance === '' ? undefined : Number(it.shelfBalance),
             posBalance: it.posBalance === '' ? undefined : Number(it.posBalance),
             sellingPrice: it.sellingPrice === '' ? undefined : Number(it.sellingPrice),
-            quantityToOrder: it.quantityToOrder === '' ? 0 : Number(it.quantityToOrder),
+            quantity: it.quantityToOrder === '' ? 0 : Number(it.quantityToOrder),
             notes: it.notes || undefined,
             sortOrder: idx + 1,
           })),
@@ -238,44 +282,85 @@ const PurchaseOrdersTab = ({
       };
 
       const exportToPdf = async () => {
-        const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-        doc.setFontSize(14);
-        // Logo placeholder: if you have an image URL/base64, use doc.addImage
-        doc.text('Citi-Nati Supermarket', 14, 14);
-        doc.setFontSize(12);
-        doc.text('Purchase Order / Stock Replenishment Request', 14, 22);
-        doc.setFontSize(10);
-        doc.text(`Branch: ${selectedBranchCode || 'N/A'}`, 14, 28);
-        doc.text(`Location: ${selectedLocationName || selectedLocationCode || 'N/A'}`, 120, 28);
-        doc.text(`Prepared by: ${' '}`, 14, 34);
-        doc.text(`Date: ${new Date().toLocaleString()}`, 120, 34);
+        const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
+        const generatedText = `${new Date().toLocaleDateString('en-GB')} ${new Date().toLocaleTimeString('en-GB')}`;
+
+        // Header branding
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const margin = 12;
+        try { doc.addImage(logo, 'PNG', margin, 8, 24, 16); } catch {}
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(91,75,138);
+        doc.text('Citi-', margin + 28, 16);
+        const citiW = doc.getTextWidth('Citi-');
+        doc.setTextColor(45,134,89);
+        doc.text('Nati Supermarket', margin + 28 + citiW, 16);
+
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(15,23,42);
+        const title = 'PURCHASE ORDER / STOCK REPLENISHMENT REQUEST';
+        doc.text(title, pageWidth / 2, 20, { align: 'center' });
+
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(100,116,139);
+        doc.text(`Branch: ${selectedBranchCode || '-'}`, margin, 28);
+        doc.text(`Location: ${selectedLocationName || selectedLocationCode || '-'}`, margin + 120, 28);
+        const user = tokenStorage.getUser();
+        const preparedBy = user?.name || user?.email || '';
+        doc.text(`Prepared by: ${preparedBy || '-'}`, margin, 34);
+        doc.text(`Date: ${generatedText}`, pageWidth - margin, 34, { align: 'right' });
 
         const tableBody = orderItems.map((it, idx) => ([
           String(idx + 1),
           String(it.productCode || ''),
           String(it.productName || ''),
-          String(it.shelfBalance === '' ? '' : it.shelfBalance),
-          String(it.posBalance === '' ? '' : it.posBalance),
+          it.shelfBalance === '' || it.shelfBalance == null ? '' : String(it.shelfBalance),
+          it.posBalance === '' || it.posBalance == null ? '' : String(it.posBalance),
           it.sellingPrice === '' || it.sellingPrice == null ? '' : Number(it.sellingPrice).toFixed(2),
           String(it.quantityToOrder || ''),
           String(it.notes || ''),
         ]));
 
         autoTable(doc, {
-          startY: 42,
-          head: [[ 'No.', 'Product Code / Barcode', 'Product Name', 'Shelf Balance', 'POS Balance', 'Selling Price', 'Qty to Order', 'Notes' ]],
+          startY: 40,
+          margin: { left: margin, right: margin },
+          head: [[ 'No.', 'Product Code', 'Product Name', 'Shelf Balance', 'POS Balance', 'Selling Price', 'Qty To Order', 'Notes' ]],
           body: tableBody,
-          styles: { fontSize: 10 },
-          headStyles: { fillColor: [33,56,97], textColor: 255 },
-          columnStyles: { 0: { cellWidth: 8 }, 1: { cellWidth: 30 }, 2: { cellWidth: 50 }, 7: { cellWidth: 40 } },
           theme: 'grid',
+          styles: { fontSize: 9, cellPadding: 3, overflow: 'linebreak' },
+          headStyles: { fillColor: [91,75,138], textColor: [255,255,255], fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [249,250,251] },
+          columnStyles: {
+            0: { cellWidth: 10, halign: 'center' },
+            1: { cellWidth: 30 },
+            2: { cellWidth: 100 },
+            3: { cellWidth: 24, halign: 'right' },
+            4: { cellWidth: 24, halign: 'right' },
+            5: { cellWidth: 28, halign: 'right' },
+            6: { cellWidth: 24, halign: 'right' },
+            7: { cellWidth: 60 },
+          },
+          didDrawPage: (data) => {},
         });
 
         const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 200;
+        // totals
+        const totalDistinct = orderItems.filter((r) => r.productName).length;
+        const totalQty = orderItems.reduce((s, r) => s + Number(r.quantityToOrder || 0), 0);
         doc.setFontSize(10);
-        doc.text('Prepared by: ______________________', 14, finalY + 10);
-        doc.text('Checked by: ______________________', 80, finalY + 10);
-        doc.text('Approved by: _____________________', 150, finalY + 10);
+        doc.text(`Total products: ${totalDistinct}`, margin, finalY);
+        doc.text(`Total qty requested: ${totalQty}`, margin + 70, finalY);
+
+        // signatures
+        const signY = finalY + 18;
+        const signGap = 80;
+        doc.setDrawColor(218,222,228);
+        doc.setLineWidth(0.35);
+        doc.line(margin, signY, margin + 60, signY);
+        doc.line(margin + signGap, signY, margin + signGap + 60, signY);
+        doc.line(margin + signGap * 2, signY, margin + signGap * 2 + 60, signY);
+        doc.setFontSize(9);
+        doc.setTextColor(100,116,139);
+        doc.text('Prepared by', margin + 30, signY + 6, { align: 'center' });
+        doc.text('Checked by', margin + signGap + 30, signY + 6, { align: 'center' });
+        doc.text('Approved by', margin + signGap * 2 + 30, signY + 6, { align: 'center' });
 
         doc.save(`purchase-order-sheet-${(new Date()).toISOString().slice(0,10)}.pdf`);
       };
