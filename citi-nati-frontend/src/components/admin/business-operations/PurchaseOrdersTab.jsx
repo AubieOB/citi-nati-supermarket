@@ -425,122 +425,150 @@ const PurchaseOrdersTab = ({
 
     const rowsHtml = orderItems.map((item, index) => {
       const statusObj = typeof getItemStatus === 'function' ? getItemStatus(item) : null;
-      const statusLabel = statusObj && statusObj.label ? statusObj.label : (item.status || '-');
+      const statusLabel = statusObj?.label || item.status || '-';
+      const statusBackground = statusObj?.background || '#f3f4f6';
+      const statusColor = statusObj?.color || '#334155';
+      const productCode = escapeHtml(item.productCode || '-');
+      const productName = escapeHtml(item.productName || '-');
+      const notes = escapeHtml(item.notes || '-');
+      const shelfBalance = item.shelfBalance === '' ? '-' : escapeHtml(String(item.shelfBalance));
+      const posBalance = item.posBalance === '' ? '-' : escapeHtml(String(item.posBalance));
+      const price = item.sellingPrice === '' || Number.isNaN(Number(item.sellingPrice))
+        ? '-'
+        : `MWK ${Number(item.sellingPrice).toFixed(2)}`;
+      const quantity = String(Number(item.quantityToOrder || 0));
+
       return `
       <tr style="background-color: ${index % 2 === 0 ? '#ffffff' : '#f8fafc'}; page-break-inside: avoid; break-inside: avoid;">
-        <td style="padding: 8px; border: 1px solid #dde2ee; text-align: center;">${index + 1}</td>
-        <td style="padding: 8px; border: 1px solid #dde2ee; word-break: break-word;">${item.productCode || '-'}</td>
-        <td style="padding: 8px; border: 1px solid #dde2ee; word-break: break-word;">${item.productName || '-'}</td>
-        <td style="padding: 8px; border: 1px solid #dde2ee; text-align: right;">${item.shelfBalance === '' ? '-' : String(item.shelfBalance)}</td>
-        <td style="padding: 8px; border: 1px solid #dde2ee; text-align: right;">${item.posBalance === '' ? '-' : String(item.posBalance)}</td>
-        <td style="padding: 8px; border: 1px solid #dde2ee; text-align: left; white-space: nowrap;">${escapeHtml(statusLabel)}</td>
-        <td style="padding: 8px; border: 1px solid #dde2ee; text-align: right;">${item.sellingPrice === '' ? '-' : Number(item.sellingPrice).toFixed(2)}</td>
-        <td style="padding: 8px; border: 1px solid #dde2ee; text-align: right;">${String(item.quantityToOrder || 0)}</td>
-        <td style="padding: 8px; border: 1px solid #dde2ee; word-break: break-word;">${item.notes || '-'}</td>
+        <td style="padding: 10px 12px; border: 1px solid #dde2ee; text-align: center; font-size: 11px; color: #334155;">${index + 1}</td>
+        <td style="padding: 10px 12px; border: 1px solid #dde2ee; word-break: break-word; font-size: 11px; color: #1f2937;">${productCode}</td>
+        <td style="padding: 10px 12px; border: 1px solid #dde2ee; word-break: break-word; font-size: 11px; color: #1f2937;">${productName}</td>
+        <td style="padding: 10px 12px; border: 1px solid #dde2ee; text-align: right; font-size: 11px; color: #1f2937;">${shelfBalance}</td>
+        <td style="padding: 10px 12px; border: 1px solid #dde2ee; text-align: right; font-size: 11px; color: #1f2937;">${posBalance}</td>
+        <td style="padding: 10px 12px; border: 1px solid #dde2ee; text-align: center;"><span style="display: inline-flex; align-items: center; justify-content: center; padding: 5px 10px; border-radius: 999px; background: ${statusBackground}; color: ${statusColor}; font-size: 10px; font-weight: 700; min-width: 60px;">${escapeHtml(statusLabel)}</span></td>
+        <td style="padding: 10px 12px; border: 1px solid #dde2ee; text-align: right; font-size: 11px; color: #1f2937;">${price}</td>
+        <td style="padding: 10px 12px; border: 1px solid #dde2ee; text-align: right; font-size: 11px; color: #1f2937;">${quantity}</td>
+        <td style="padding: 10px 12px; border: 1px solid #dde2ee; word-break: break-word; font-size: 11px; color: #1f2937;">${notes}</td>
       </tr>
     `;
     }).join('');
 
     const html = `
-      <div style="font-family: Arial, sans-serif; color: #212121; padding: 12px 8px; width: 1120px; box-sizing: border-box; margin: 0 auto;">
+      <div style="font-family: Arial, sans-serif; color: #212121; padding: 16px; width: 100%; max-width: 1200px; box-sizing: border-box; margin: 0 auto; background: #f7fbff;">
         <style>
-          .po-pdf-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 12px;
-            table-layout: fixed;
-            page-break-inside: auto;
+          .po-pdf-root { width: 100%; max-width: 1200px; margin: 0 auto; background: #ffffff; border-radius: 18px; overflow: hidden; box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08); }
+          .po-pdf-header { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 28px 28px 18px 28px; }
+          .po-pdf-logo { height: 58px; width: auto; object-fit: contain; flex: 0 0 auto; }
+          .po-pdf-title { flex: 1; min-width: 260px; text-align: left; }
+          .po-pdf-title h1 { margin: 0; font-size: 28px; font-weight: 700; line-height: 1.05; }
+          .po-pdf-title p { margin: 6px 0 0; color: #475569; font-size: 13px; }
+          .po-pdf-meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; padding: 0 28px 24px 28px; }
+          .po-pdf-meta-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; }
+          .po-pdf-meta-card .label { display: block; margin-bottom: 6px; color: #64748b; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+          .po-pdf-meta-card .value { color: #0f172a; font-size: 13px; font-weight: 700; }
+          .po-pdf-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; table-layout: fixed; }
+          .po-pdf-table thead { display: table-header-group; }
+          .po-pdf-table th, .po-pdf-table td { padding: 12px 14px; border-bottom: 1px solid #e2e8f0; }
+          .po-pdf-table th { background: #2d8659; color: #ffffff; font-weight: 700; text-align: left; font-size: 11px; letter-spacing: 0.01em; }
+          .po-pdf-table td { color: #334155; vertical-align: top; }
+          .po-pdf-table tr:nth-child(even) td { background: #fbfdff; }
+          .po-pdf-table td:nth-child(1), .po-pdf-table th:nth-child(1) { text-align: center; }
+          .po-pdf-table td:nth-child(4), .po-pdf-table th:nth-child(4), .po-pdf-table td:nth-child(5), .po-pdf-table th:nth-child(5), .po-pdf-table td:nth-child(7), .po-pdf-table th:nth-child(7), .po-pdf-table td:nth-child(8), .po-pdf-table th:nth-child(8) { text-align: right; }
+          .po-pdf-summary { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding: 22px 28px 28px 28px; background: #f8fafc; }
+          .po-pdf-summary-item { flex: 1 1 200px; min-width: 180px; padding: 14px 16px; border-radius: 12px; background: #ffffff; border: 1px solid #e2e8f0; }
+          .po-pdf-summary-item .label { color: #64748b; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+          .po-pdf-summary-item .value { color: #0f172a; font-size: 13px; font-weight: 700; }
+          @media (max-width: 900px) {
+            .po-pdf-header { padding: 18px 18px 12px 18px; }
+            .po-pdf-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0 18px 18px 18px; }
+            .po-pdf-table th, .po-pdf-table td { padding: 10px 12px; }
           }
-          .po-pdf-table thead {
-            display: table-header-group;
-          }
-          .po-pdf-table tr {
-            page-break-inside: avoid;
-            break-inside: avoid;
-            page-break-after: auto;
-          }
-          .po-pdf-table td,
-          .po-pdf-table th {
-            page-break-inside: avoid;
-            break-inside: avoid;
-            word-break: break-word;
+          @media (max-width: 680px) {
+            .po-pdf-meta { grid-template-columns: 1fr; }
+            .po-pdf-summary { padding: 18px; }
           }
         </style>
 
-        <div style="margin-bottom: 24px; border-bottom: 3px solid #2D8659; padding-bottom: 14px;">
-          <div style="display: flex; align-items: center; gap: 12px;">
-            <img src="${logo}" alt="Citi-Nati logo" style="height: 58px; width: auto; object-fit: contain; flex: 0 0 auto;" />
-            <div style="flex: 1; text-align: center;">
-              <h1 style="margin: 0; font-size: 28px; font-weight: 700; line-height: 1.1;">
-                <span style="color: #5B4B8A;">Citi-</span><span style="color: #2D8659;">Nati Supermarket</span>
-              </h1>
-              <p style="margin: 6px 0 0 0; color: #111; font-size: 16px; font-weight: 600;">Purchase Order / Replenishment Request</p>
-              <p style="margin: 6px 0 0 0; color: #555; font-size: 12px;">Purchase order sheet for branch replenishment and stock planning.</p>
+        <div class="po-pdf-root">
+          <div class="po-pdf-header">
+            <img class="po-pdf-logo" src="${logo}" alt="Citi-Nati logo" />
+            <div class="po-pdf-title">
+              <h1>Purchase Order</h1>
+              <p>A clean, printable replenishment sheet for your branch inventory.</p>
             </div>
-            <div style="width: 58px; flex: 0 0 58px;"></div>
           </div>
-        </div>
 
-        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px;">
-          <div style="background: #fafafa; border: 1px solid #dde2ee; border-radius: 8px; padding: 12px;">
-            <div style="font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;">Branch</div>
-            <div style="font-size: 13px; font-weight: 700; color: #111827;">${branchLabel}</div>
+          <div class="po-pdf-meta">
+            <div class="po-pdf-meta-card">
+              <span class="label">Branch</span>
+              <span class="value">${escapeHtml(branchLabel)}</span>
+            </div>
+            <div class="po-pdf-meta-card">
+              <span class="label">Location</span>
+              <span class="value">${escapeHtml(locationLabel)}</span>
+            </div>
+            <div class="po-pdf-meta-card">
+              <span class="label">Order reference</span>
+              <span class="value">${escapeHtml(orderReference)}</span>
+            </div>
+            <div class="po-pdf-meta-card">
+              <span class="label">Prepared by</span>
+              <span class="value">${escapeHtml(preparedBy)}</span>
+            </div>
+            <div class="po-pdf-meta-card">
+              <span class="label">Date</span>
+              <span class="value">${escapeHtml(dateLabel)}</span>
+            </div>
+            <div class="po-pdf-meta-card">
+              <span class="label">Time</span>
+              <span class="value">${escapeHtml(timeLabel)}</span>
+            </div>
           </div>
-          <div style="background: #fafafa; border: 1px solid #dde2ee; border-radius: 8px; padding: 12px;">
-            <div style="font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;">Location</div>
-            <div style="font-size: 13px; font-weight: 700; color: #111827;">${locationLabel}</div>
-          </div>
-          <div style="background: #fafafa; border: 1px solid #dde2ee; border-radius: 8px; padding: 12px;">
-            <div style="font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;">Reference</div>
-            <div style="font-size: 13px; font-weight: 700; color: #111827;">${orderReference}</div>
-          </div>
-          <div style="background: #fafafa; border: 1px solid #dde2ee; border-radius: 8px; padding: 12px;">
-            <div style="font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;">Prepared by</div>
-            <div style="font-size: 13px; font-weight: 700; color: #111827;">${preparedBy}</div>
-          </div>
-          <div style="background: #fafafa; border: 1px solid #dde2ee; border-radius: 8px; padding: 12px;">
-            <div style="font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;">Date</div>
-            <div style="font-size: 13px; font-weight: 700; color: #111827;">${dateLabel}</div>
-          </div>
-          <div style="background: #fafafa; border: 1px solid #dde2ee; border-radius: 8px; padding: 12px;">
-            <div style="font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;">Time</div>
-            <div style="font-size: 13px; font-weight: 700; color: #111827;">${timeLabel}</div>
-          </div>
-        </div>
 
-        <table class="po-pdf-table">
-          <colgroup>
-            <col style="width: 6%;" />
-            <col style="width: 15%;" />
-            <col style="width: 36%;" />
-            <col style="width: 8%;" />
-            <col style="width: 8%;" />
-            <col style="width: 10%;" />
-            <col style="width: 9%;" />
-            <col style="width: 7%;" />
-            <col style="width: 1%;" />
-          </colgroup>
-          <thead>
-            <tr style="background-color: #2D8659; color: #ffffff;">
-              <th style="padding: 6px 8px; border: 1px solid #dde2ee; text-align: center; white-space: nowrap; font-size: 11px;">No.</th>
-              <th style="padding: 6px 8px; border: 1px solid #dde2ee; text-align: left; white-space: nowrap; font-size: 11px;">Product code</th>
-              <th style="padding: 6px 8px; border: 1px solid #dde2ee; text-align: left; white-space: nowrap; font-size: 11px;">Product name</th>
-              <th style="padding: 6px 8px; border: 1px solid #dde2ee; text-align: right; white-space: nowrap; font-size: 11px;">Shelf</th>
-              <th style="padding: 6px 8px; border: 1px solid #dde2ee; text-align: right; white-space: nowrap; font-size: 11px;">POS</th>
-              <th style="padding: 6px 8px; border: 1px solid #dde2ee; text-align: left; white-space: nowrap; font-size: 11px;">Status</th>
-              <th style="padding: 6px 8px; border: 1px solid #dde2ee; text-align: right; white-space: nowrap; font-size: 11px;">Price</th>
-              <th style="padding: 6px 8px; border: 1px solid #dde2ee; text-align: right; white-space: nowrap; font-size: 11px;">Order Qty</th>
-              <th style="padding: 6px 8px; border: 1px solid #dde2ee; text-align: left; white-space: nowrap; font-size: 11px;">Notes</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rowsHtml}
-          </tbody>
-        </table>
+          <table class="po-pdf-table">
+            <colgroup>
+              <col style="width: 6%;" />
+              <col style="width: 14%;" />
+              <col style="width: 34%;" />
+              <col style="width: 8%;" />
+              <col style="width: 8%;" />
+              <col style="width: 12%;" />
+              <col style="width: 8%;" />
+              <col style="width: 7%;" />
+              <col style="width: 13%;" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>No.</th>
+                <th>Product code</th>
+                <th>Product name</th>
+                <th>Shelf</th>
+                <th>POS</th>
+                <th>Status</th>
+                <th>Price</th>
+                <th>Qty</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
 
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 18px; font-size: 12px; color: #111827;">
-          <div style="font-weight: 700;">Total rows: ${orderItems.length}</div>
-          <div style="font-weight: 700;">Total quantity requested: ${totalQuantity}</div>
+          <div class="po-pdf-summary">
+            <div class="po-pdf-summary-item">
+              <span class="label">Total lines</span>
+              <span class="value">${orderItems.length}</span>
+            </div>
+            <div class="po-pdf-summary-item">
+              <span class="label">Quantity requested</span>
+              <span class="value">${totalQuantity}</span>
+            </div>
+            <div class="po-pdf-summary-item">
+              <span class="label">Generated by</span>
+              <span class="value">Citi-Nati PDF Export</span>
+            </div>
+          </div>
         </div>
       </div>
     `;
@@ -549,18 +577,18 @@ const PurchaseOrdersTab = ({
     element.innerHTML = html;
 
     const opt = {
-      margin: 6,
+      margin: 8,
       filename: `purchase-order-sheet-${now.toISOString().slice(0, 10)}.pdf`,
       image: { type: 'png', quality: 1.0 },
       html2canvas: {
-        scale: 4,
+        scale: 3,
         logging: false,
         useCORS: true,
         backgroundColor: '#ffffff',
         letterRendering: true,
-        windowWidth: 1200,
+        windowWidth: 1400,
       },
-      jsPDF: { orientation: 'landscape', unit: 'mm', format: 'a4', compress: false },
+      jsPDF: { orientation: 'landscape', unit: 'mm', format: 'a4', compress: true },
       pagebreak: {
         mode: ['avoid-all', 'css', 'legacy'],
         avoid: ['tr', 'td', 'th', 'thead', 'tbody'],
