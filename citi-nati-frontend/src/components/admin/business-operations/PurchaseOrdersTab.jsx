@@ -147,7 +147,7 @@ const PurchaseOrdersTab = ({
           productId: product.id || product.productId || null,
           productCode: product.barcode || product.productCode || '',
           productName: product.name || product.productName || '',
-          shelfBalance: product.shelfBalance ?? product.availableQuantity ?? product.stock ?? '',
+          shelfBalance: product.shelfBalance ?? product.stock ?? product.availableQuantity ?? '',
           posBalance: product.posBalance ?? product.availableQuantity ?? '',
           sellingPrice: product.sellingPrice ?? product.price ?? '',
           quantityToOrder: 1,
@@ -397,15 +397,7 @@ const PurchaseOrdersTab = ({
 
       <section style={{ display: 'grid', gap: '0.75rem' }}>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <input
-            ref={searchInputRef}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onKeyDown={handleSearchKeyDown}
-            placeholder="Search products by name, barcode or code..."
-            style={{ flex: '1 1 320px', minWidth: 220, padding: '0.75rem 0.9rem', borderRadius: 10, border: '1px solid #cbd5e1', color: '#0f172a' }}
-          />
-          <button type="button" onClick={() => searchProducts(searchTerm)} style={{ border: '1px solid #cbd5e1', borderRadius: 10, padding: '0.75rem 1rem', backgroundColor: '#fff', color: '#0f172a', cursor: 'pointer' }}>{searchLoading ? 'Searching...' : 'Search'}</button>
+          <button type="button" onClick={() => setSearchModalOpen(true)} style={{ border: '1px solid #cbd5e1', borderRadius: 10, padding: '0.75rem 1rem', backgroundColor: '#fff', color: '#0f172a', cursor: 'pointer' }}>Search products</button>
           <button type="button" onClick={addManualRow} style={{ border: '1px solid #cbd5e1', borderRadius: 10, padding: '0.75rem 1rem', backgroundColor: '#fff', color: '#0f172a', cursor: 'pointer' }}>Add manual row</button>
           <span style={{ color: '#475569', fontSize: '0.9rem' }}>Open search with <strong>F1</strong></span>
         </div>
@@ -482,10 +474,10 @@ const PurchaseOrdersTab = ({
             <div>#</div>
             <div>Barcode</div>
             <div>Product name</div>
-            <div>Stock</div>
-            <div>POS</div>
-            <div>Price</div>
-            <div>Qty</div>
+            <div>Shelf balance</div>
+            <div>POS balance</div>
+            <div>Selling price</div>
+            <div>Quantity to order</div>
             <div>Notes</div>
             <div>Action</div>
           </div>
@@ -538,7 +530,7 @@ const PurchaseOrdersTab = ({
                       focusField(item.id, 'posBalance');
                     }
                   }}
-                  placeholder="0"
+                  placeholder="Shelf balance"
                   style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.5rem', color: '#0f172a' }}
                 />
               </div>
@@ -554,7 +546,7 @@ const PurchaseOrdersTab = ({
                       focusField(item.id, 'sellingPrice');
                     }
                   }}
-                  placeholder="0"
+                  placeholder="POS balance"
                   style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.5rem', color: '#0f172a' }}
                 />
               </div>
@@ -570,7 +562,7 @@ const PurchaseOrdersTab = ({
                       focusField(item.id, 'quantityToOrder');
                     }
                   }}
-                  placeholder="0.00"
+                  placeholder="Selling price"
                   style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.5rem', color: '#0f172a' }}
                 />
               </div>
@@ -586,7 +578,7 @@ const PurchaseOrdersTab = ({
                       focusField(item.id, 'notes');
                     }
                   }}
-                  placeholder="0"
+                  placeholder="Quantity to order"
                   style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.5rem', color: '#0f172a' }}
                 />
               </div>
