@@ -54,16 +54,29 @@ function expandOperationalLocationScopeCodes(locationCode) {
   const normalized = normalizeScopeCode(locationCode);
   if (!normalized) return [];
 
-  // Expand Blantyre branch alias to all known Blantyre operational locations.
+  // If the branch-level alias was provided, expand to that branch's locations.
   if (normalized === 'BT') {
     return CORE_BLANTYRE_LOCATION_CODES;
   }
-
-  // Expand Zomba branch alias and all Zomba operational locations to the full
-  // branch-level location set.
-  if (normalized === 'ZA' || CORE_ZOMBA_LOCATION_CODES.includes(normalized)) {
+  if (normalized === 'ZA') {
     return CORE_ZOMBA_LOCATION_CODES;
   }
+
+  // If the code is present in both branch location lists (ambiguous, e.g. 'SH'),
+  // do not expand it to the full branch sets — return the single code so that
+  // callers can apply explicit branch scoping when required. Expanding an
+  // ambiguous code into a branch's entire location set caused cross-branch
+  // mixing (Blantyre SH -> expanded to Zomba locations), which produced
+  // incorrect aggregations.
+  const inBlantyre = CORE_BLANTYRE_LOCATION_CODES.includes(normalized);
+  const inZomba = CORE_ZOMBA_LOCATION_CODES.includes(normalized);
+  if (inBlantyre && inZomba) {
+    return [normalized];
+  }
+
+  // If the code belongs to one branch's core set, return that full set.
+  if (inBlantyre) return CORE_BLANTYRE_LOCATION_CODES;
+  if (inZomba) return CORE_ZOMBA_LOCATION_CODES;
 
   return [normalized];
 }
@@ -104,6 +117,14 @@ function resolveOperationalScope(req) {
   const locationCode = normalizeScopeCode(locationCodeRaw);
   if (!branchCode && locationCode) {
     branchCode = inferBranchFromLocationCode(locationCode);
+  }
+
+  // Defensive warning: ambiguous location codes (like 'SH') should be
+  // accompanied by an explicit branchCode to avoid accidental cross-branch
+  // aggregation. Log a warning to assist in debugging if a client omits
+  // branchCode for an ambiguous location.
+  if (!branchCode && isAmbiguousLocationCode(locationCode)) {
+    console.warn('[SCOPE] Ambiguous locationCode without branchCode', { locationCode });
   }
 
   if (!branchCode && !locationCode) {
