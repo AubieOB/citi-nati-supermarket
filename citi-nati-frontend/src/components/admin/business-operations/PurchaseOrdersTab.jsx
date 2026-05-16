@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import html2pdf from 'html2pdf.js';
 import api from '../../../utils/api.js';
 import { boAlert } from '../../../utils/boDialogBus.js';
 import { tokenStorage } from '../../../utils/tokenStorage.js';
-import { exportWithLayout } from '../../../utils/businessOperationsPdfExports.js';
+import logo from '../../../assets/citi-nati-logo.png.png';
 
 const normalizeCode = (value) => String(value || '').trim().toUpperCase();
 
@@ -408,69 +409,150 @@ const PurchaseOrdersTab = ({
   const exportToPdf = () => {
     const now = new Date();
     const preparedBy = tokenStorage.getUser()?.name || tokenStorage.getUser()?.email || '-';
+    const orderReference = orderRef || 'Draft';
     const branchLabel = selectedBranchCode || '-';
     const locationLabel = selectedLocationName || selectedLocationCode || '-';
     const dateLabel = now.toLocaleDateString('en-GB');
     const timeLabel = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     const totalQuantity = orderItems.reduce((sum, item) => sum + Number(item.quantityToOrder || 0), 0);
 
-    const summaryCards = [
-      { label: 'Total Items', value: String(orderItems.length), color: '#2D8659' },
-      { label: 'Total Qty', value: String(totalQuantity), color: '#5B4B8A' },
-      { label: 'Status', value: orderRef ? 'Saved Draft' : 'Unsaved', color: orderRef ? '#2D8659' : '#ca8a04' },
-    ];
+    const rowsHtml = orderItems.map((item, index) => `
+      <tr style="background-color: ${index % 2 === 0 ? '#ffffff' : '#f8fafc'}; page-break-inside: avoid; break-inside: avoid;">
+        <td style="padding: 10px; border: 1px solid #dde2ee; text-align: center;">${index + 1}</td>
+        <td style="padding: 10px; border: 1px solid #dde2ee; word-break: break-word;">${item.productCode || '-'}</td>
+        <td style="padding: 10px; border: 1px solid #dde2ee; word-break: break-word;">${item.productName || '-'}</td>
+        <td style="padding: 10px; border: 1px solid #dde2ee; text-align: right;">${item.shelfBalance === '' ? '-' : String(item.shelfBalance)}</td>
+        <td style="padding: 10px; border: 1px solid #dde2ee; text-align: right;">${item.posBalance === '' ? '-' : String(item.posBalance)}</td>
+        <td style="padding: 10px; border: 1px solid #dde2ee; text-align: right;">${item.sellingPrice === '' ? '-' : Number(item.sellingPrice).toFixed(2)}</td>
+        <td style="padding: 10px; border: 1px solid #dde2ee; text-align: right;">${String(item.quantityToOrder || 0)}</td>
+        <td style="padding: 10px; border: 1px solid #dde2ee; word-break: break-word;">${item.notes || '-'}</td>
+      </tr>
+    `).join('');
 
-    const metadataRows = [
-      ['Reference', orderRef || 'Draft'],
-      ['Branch', branchLabel],
-      ['Location', locationLabel],
-      ['Prepared by', preparedBy],
-      ['Generated', dateLabel],
-      ['Time', timeLabel],
-    ];
+    const html = `
+      <div style="font-family: Arial, sans-serif; color: #212121; padding: 18px; width: 1120px; box-sizing: border-box;">
+        <style>
+          .po-pdf-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            table-layout: fixed;
+            page-break-inside: auto;
+          }
+          .po-pdf-table thead {
+            display: table-header-group;
+          }
+          .po-pdf-table tr {
+            page-break-inside: avoid;
+            break-inside: avoid;
+            page-break-after: auto;
+          }
+          .po-pdf-table td,
+          .po-pdf-table th {
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+        </style>
 
-    const rows = orderItems.map((item, index) => [
-      String(index + 1),
-      item.productCode || '-',
-      item.productName || '-',
-      item.shelfBalance === '' ? '-' : String(item.shelfBalance),
-      item.posBalance === '' ? '-' : String(item.posBalance),
-      item.sellingPrice === '' ? '-' : Number(item.sellingPrice).toFixed(2),
-      String(item.quantityToOrder || 0),
-      item.notes || '-',
-    ]);
+        <div style="margin-bottom: 24px; border-bottom: 3px solid #2D8659; padding-bottom: 14px;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <img src="${logo}" alt="Citi-Nati logo" style="height: 58px; width: auto; object-fit: contain; flex: 0 0 auto;" />
+            <div style="flex: 1; text-align: center;">
+              <h1 style="margin: 0; font-size: 28px; font-weight: 700; line-height: 1.1;">
+                <span style="color: #5B4B8A;">Citi-</span><span style="color: #2D8659;">Nati Supermarket</span>
+              </h1>
+              <p style="margin: 6px 0 0 0; color: #111; font-size: 16px; font-weight: 600;">Purchase Order / Replenishment Request</p>
+              <p style="margin: 6px 0 0 0; color: #555; font-size: 12px;">Purchase order sheet for branch replenishment and stock planning.</p>
+            </div>
+            <div style="width: 58px; flex: 0 0 58px;"></div>
+          </div>
+        </div>
 
-    exportWithLayout({
-      reportTitle: 'Purchase Order Sheet',
-      viewLabel: 'Replenishment Request',
-      periodText: dateLabel,
-      summaryCards,
-      metadataRows,
-      dataTable: {
-        headers: [
-          'No.',
-          'Product code',
-          'Product name',
-          'Shelf',
-          'POS',
-          'Price',
-          'Order Qty',
-          'Notes',
-        ],
-        rows,
-        columnStyles: {
-          0: { cellWidth: 10, halign: 'center' },
-          1: { cellWidth: 32 },
-          2: { cellWidth: 65 },
-          3: { cellWidth: 20, halign: 'right' },
-          4: { cellWidth: 20, halign: 'right' },
-          5: { cellWidth: 24, halign: 'right' },
-          6: { cellWidth: 18, halign: 'right' },
-          7: { cellWidth: 50 },
-        },
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px;">
+          <div style="background: #fafafa; border: 1px solid #dde2ee; border-radius: 8px; padding: 12px;">
+            <div style="font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;">Branch</div>
+            <div style="font-size: 13px; font-weight: 700; color: #111827;">${branchLabel}</div>
+          </div>
+          <div style="background: #fafafa; border: 1px solid #dde2ee; border-radius: 8px; padding: 12px;">
+            <div style="font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;">Location</div>
+            <div style="font-size: 13px; font-weight: 700; color: #111827;">${locationLabel}</div>
+          </div>
+          <div style="background: #fafafa; border: 1px solid #dde2ee; border-radius: 8px; padding: 12px;">
+            <div style="font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;">Reference</div>
+            <div style="font-size: 13px; font-weight: 700; color: #111827;">${orderReference}</div>
+          </div>
+          <div style="background: #fafafa; border: 1px solid #dde2ee; border-radius: 8px; padding: 12px;">
+            <div style="font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;">Prepared by</div>
+            <div style="font-size: 13px; font-weight: 700; color: #111827;">${preparedBy}</div>
+          </div>
+          <div style="background: #fafafa; border: 1px solid #dde2ee; border-radius: 8px; padding: 12px;">
+            <div style="font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;">Date</div>
+            <div style="font-size: 13px; font-weight: 700; color: #111827;">${dateLabel}</div>
+          </div>
+          <div style="background: #fafafa; border: 1px solid #dde2ee; border-radius: 8px; padding: 12px;">
+            <div style="font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;">Time</div>
+            <div style="font-size: 13px; font-weight: 700; color: #111827;">${timeLabel}</div>
+          </div>
+        </div>
+
+        <table class="po-pdf-table">
+          <colgroup>
+            <col style="width: 6%;" />
+            <col style="width: 15%;" />
+            <col style="width: 35%;" />
+            <col style="width: 10%;" />
+            <col style="width: 10%;" />
+            <col style="width: 12%;" />
+            <col style="width: 8%;" />
+            <col style="width: 14%;" />
+          </colgroup>
+          <thead>
+            <tr style="background-color: #2D8659; color: #ffffff;">
+              <th style="padding: 12px; border: 1px solid #dde2ee; text-align: center;">No.</th>
+              <th style="padding: 12px; border: 1px solid #dde2ee; text-align: left;">Product code</th>
+              <th style="padding: 12px; border: 1px solid #dde2ee; text-align: left;">Product name</th>
+              <th style="padding: 12px; border: 1px solid #dde2ee; text-align: right;">Shelf</th>
+              <th style="padding: 12px; border: 1px solid #dde2ee; text-align: right;">POS</th>
+              <th style="padding: 12px; border: 1px solid #dde2ee; text-align: right;">Price</th>
+              <th style="padding: 12px; border: 1px solid #dde2ee; text-align: right;">Order Qty</th>
+              <th style="padding: 12px; border: 1px solid #dde2ee; text-align: left;">Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 18px; font-size: 12px; color: #111827;">
+          <div style="font-weight: 700;">Total rows: ${orderItems.length}</div>
+          <div style="font-weight: 700;">Total quantity requested: ${totalQuantity}</div>
+        </div>
+      </div>
+    `;
+
+    const element = document.createElement('div');
+    element.innerHTML = html;
+
+    const opt = {
+      margin: 8,
+      filename: `purchase-order-sheet-${now.toISOString().slice(0, 10)}.pdf`,
+      image: { type: 'png', quality: 1.0 },
+      html2canvas: {
+        scale: 4,
+        logging: false,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        letterRendering: true,
+        windowWidth: 1200,
       },
-      fileName: `purchase-order-sheet-${now.toISOString().slice(0, 10)}.pdf`,
-    });
+      jsPDF: { orientation: 'landscape', unit: 'mm', format: 'a4', compress: false },
+      pagebreak: {
+        mode: ['avoid-all', 'css', 'legacy'],
+        avoid: ['tr', 'td', 'th', 'thead', 'tbody'],
+      },
+    };
+
+    return html2pdf().set(opt).from(element).save();
   };
 
   const openHistoryModal = () => {
