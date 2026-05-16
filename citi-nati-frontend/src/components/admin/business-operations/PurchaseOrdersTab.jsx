@@ -557,15 +557,15 @@ const PurchaseOrdersTab = ({
       <div style={{ minWidth: 1000, width: '100%', borderRadius: 16, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '40px minmax(120px, 1fr) minmax(220px, 2fr) 100px 100px 120px 90px 100px 220px 90px', gap: '1px', backgroundColor: '#eef2ff', padding: '0.85rem 0.65rem', fontSize: '0.85rem', fontWeight: 700, color: '#1e293b' }}>
           <div style={{ textAlign: 'center' }}>#</div>
-          <div>Code</div>
-          <div>Product name</div>
-          <div>Shelf</div>
-          <div>POS</div>
-          <div>Status</div>
-          <div>Price</div>
-          <div>Qty</div>
-          <div>Notes</div>
-          <div>Action</div>
+          <div style={{ textAlign: 'left' }}>Code</div>
+          <div style={{ textAlign: 'left' }}>Product name</div>
+          <div style={{ textAlign: 'center' }}>Shelf</div>
+          <div style={{ textAlign: 'center' }}>POS</div>
+          <div style={{ textAlign: 'center' }}>Status</div>
+          <div style={{ textAlign: 'center' }}>Price</div>
+          <div style={{ textAlign: 'center' }}>Order Qty</div>
+          <div style={{ textAlign: 'left' }}>Notes</div>
+          <div style={{ textAlign: 'center' }}>Action</div>
         </div>
         {orderItems.length === 0 ? (
           <div style={{ backgroundColor: '#fff', padding: '2rem 1rem', textAlign: 'center', color: '#475569' }}>
@@ -734,7 +734,7 @@ const PurchaseOrdersTab = ({
           <div>
             <h2 style={{ margin: 0, color: '#0f172a', fontSize: '1.35rem' }}>Purchase Orders</h2>
             <p style={{ margin: '0.65rem 0 0', color: '#475569', maxWidth: 680, lineHeight: 1.6 }}>
-              Use the Purchase Orders workspace to prepare printable replenishment requests without opening the full editor on the tab. Start a new sheet, resume drafts, review history, or inspect printed orders.
+              Build and save purchase order sheets for branch replenishment.
             </p>
           </div>
           <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
