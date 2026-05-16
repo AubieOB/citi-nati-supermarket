@@ -64,24 +64,24 @@ const drawHeader = (doc, { reportTitle, generatedText, periodText }, left, right
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
   doc.setTextColor(...toRgb(BRAND_PURPLE));
-  doc.text('Citi-', titleX, 16);
+  doc.text('Citi-', titleX, 18);
   const citiWidth = doc.getTextWidth('Citi-');
   doc.setTextColor(...toRgb(BRAND_GREEN));
-  doc.text('Nati Supermarket', titleX + citiWidth, 16);
+  doc.text('Nati Supermarket', titleX + citiWidth, 18);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(12);
   doc.setTextColor(...COLOR_TEXT);
-  doc.text(reportTitle, titleX, 21);
+  doc.text(reportTitle, titleX, 23);
 
   doc.setFontSize(9);
   doc.setTextColor(...COLOR_MUTED);
-  doc.text(`Generated: ${generatedText}`, right, 12.5, { align: 'right' });
-  doc.text(`Period: ${periodText}`, right, 17.0, { align: 'right' });
+  doc.text(`Generated: ${generatedText}`, right, 14.5, { align: 'right' });
+  doc.text(`Period: ${periodText}`, right, 19.0, { align: 'right' });
 
   doc.setDrawColor(...toRgb(BRAND_GREEN));
   doc.setLineWidth(0.4);
-  doc.line(left, 22.5, right, 22.5);
+  doc.line(left, 27, right, 27);
 };
 
 const drawSummaryCards = (doc, cards, startY, left, width) => {
