@@ -1,0 +1,69 @@
+{
+  "name": "citi-nati-admin-desktop",
+  "version": "1.0.0",
+  "description": "Citi-Nati Supermarket Admin Desktop Application",
+  "main": "src/main.js",
+  "homepage": "./",
+  "author": "Citi-Nati Team",
+  "license": "MIT",
+  "scripts": {
+    "dev": "electron . --development",
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "electron-is-dev": "^2.0.0",
+    "electron-store": "^8.1.0"
+  },
+  "devDependencies": {
+    "electron": "^latest",
+    "electron-builder": "^latest",
+    "electron-notarize": "^latest"
+  },
+  "build": {
+    "appId": "com.citi-nati.admin",
+    "productName": "Citi-Nati Admin",
+    "directories": {
+      "buildResources": "public"
+    },
+    "files": [
+      "src/**/*",
+      "../../electron/**/*",
+      "../../citi-nati-frontend/dist/**/*",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "certificateFile": null,
+      "certificatePassword": null
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.business"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility"
+    }
+  }
+}

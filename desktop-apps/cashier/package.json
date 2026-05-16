@@ -1,0 +1,62 @@
+{
+  "name": "citi-nati-cashier-desktop",
+  "version": "1.0.0",
+  "description": "Citi-Nati Supermarket Cashier POS Desktop Application",
+  "main": "src/main.js",
+  "homepage": "./",
+  "author": "Citi-Nati Team",
+  "license": "MIT",
+  "scripts": {
+    "dev": "electron . --development",
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "electron-is-dev": "^2.0.0",
+    "electron-store": "^8.1.0"
+  },
+  "devDependencies": {
+    "electron": "^latest",
+    "electron-builder": "^latest"
+  },
+  "build": {
+    "appId": "com.citi-nati.cashier",
+    "productName": "Citi-Nati Cashier",
+    "directories": {
+      "buildResources": "public"
+    },
+    "files": [
+      "src/**/*",
+      "../../electron/**/*",
+      "../../citi-nati-frontend/dist/**/*",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ]
+    }
+  }
+}

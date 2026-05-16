@@ -39,3 +39,28 @@ uploads/*
 
 # Prisma
 prisma/dev.db
+
+# ===== ELECTRON DESKTOP APP BUILDS =====
+# Electron release/dist directories (all desktop apps)
+release/
+dist-electron/
+dist-admin-electron/
+dist-cashier-electron/
+dist-driver-electron/
+
+# Electron builder outputs
+*.exe
+*.msi
+*.dmg
+*.AppImage
+*.deb
+*.rpm
+*.apk
+
+# Electron build artifacts
+out/
+releases/
+
+# Electron cache
+.cache/
+.electron-cache/
