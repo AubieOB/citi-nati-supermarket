@@ -395,15 +395,15 @@ const PurchaseOrdersTab = ({
       const saved = resp.data?.data;
       setCurrentOrderId(saved?.id || currentOrderId);
       setOrderRef(saved?.purchaseOrderRef || orderRef);
+      setSaving(false);
       await fetchDrafts();
       await boAlert({ title: 'Draft saved', message: 'Purchase order draft was saved successfully.', type: 'info' });
     } catch (err) {
+      setSaving(false);
       console.error('[PURCHASE_ORDER_SAVE_ERROR] saveDraft payload:', payload, err);
       const backendMessage = err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to save draft';
       setSavingError(backendMessage);
       await boAlert({ title: 'Save failed', message: backendMessage, type: 'error' });
-    } finally {
-      setSaving(false);
     }
   };
 
