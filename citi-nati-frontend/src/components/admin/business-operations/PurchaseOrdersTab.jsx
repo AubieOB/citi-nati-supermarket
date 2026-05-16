@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import api from '../../../utils/api.js';
@@ -31,6 +31,30 @@ const emptySheetItem = (order = 1) => ({
   sortOrder: order,
 });
 
+const createRowId = () => `purchase-order-row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const getNextField = (manual, field) => {
+  if (manual) {
+    switch (field) {
+      case 'productCode': return 'productName';
+      case 'productName': return 'shelfBalance';
+      case 'shelfBalance': return 'posBalance';
+      case 'posBalance': return 'sellingPrice';
+      case 'sellingPrice': return 'quantityToOrder';
+      case 'quantityToOrder': return 'notes';
+      case 'notes': return 'addRow';
+      default: return null;
+    }
+  }
+
+  switch (field) {
+    case 'shelfBalance': return 'quantityToOrder';
+    case 'quantityToOrder': return 'notes';
+    case 'notes': return 'addRow';
+    default: return null;
+  }
+};
+
 const PurchaseOrdersTab = ({
   selectedLocationId = null,
   selectedBranchCode = '',
@@ -47,10 +71,19 @@ const PurchaseOrdersTab = ({
   const [searchLoading, setSearchLoading] = useState(false);
   const [selectedSearchIndex, setSelectedSearchIndex] = useState(0);
   const [orderItems, setOrderItems] = useState([emptySheetItem(1)]);
+  const [sheetNotes, setSheetNotes] = useState('');
+  const [currentOrderId, setCurrentOrderId] = useState(null);
+  const [orderRef, setOrderRef] = useState('');
   const [saving, setSaving] = useState(false);
   const [savingError, setSavingError] = useState('');
-  const [sheets, setSheets] = useState([]);
-  const [loadingSheets, setLoadingSheets] = useState(false);
+  const [drafts, setDrafts] = useState([]);
+  const [printedOrders, setPrintedOrders] = useState([]);
+  const [loadingDrafts, setLoadingDrafts] = useState(false);
+  const [loadingPrintedOrders, setLoadingPrintedOrders] = useState(false);
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
+  const [workspaceMode, setWorkspaceMode] = useState('new');
+  const [workspaceMaximized, setWorkspaceMaximized] = useState(false);
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
 
   const searchInputRef = useRef(null);
   const inputRefs = useRef({});
@@ -99,23 +132,38 @@ const PurchaseOrdersTab = ({
     return () => clearTimeout(searchTimer.current);
   }, [searchTerm, searchProducts]);
 
-  const fetchSheets = useCallback(async () => {
-    setLoadingSheets(true);
+  const fetchDrafts = useCallback(async () => {
+    setLoadingDrafts(true);
     try {
       const resp = await api.get('/business-operations/purchase-orders', {
         params: { status: 'draft', page: 1, pageSize: 50, ...scopeParams },
       });
-      setSheets(resp.data?.data || []);
+      setDrafts(Array.isArray(resp.data?.data) ? resp.data.data : []);
     } catch (err) {
-      setSheets([]);
+      setDrafts([]);
     } finally {
-      setLoadingSheets(false);
+      setLoadingDrafts(false);
+    }
+  }, [scopeParams]);
+
+  const fetchPrintedOrders = useCallback(async () => {
+    setLoadingPrintedOrders(true);
+    try {
+      const resp = await api.get('/business-operations/purchase-orders', {
+        params: { status: 'printed', page: 1, pageSize: 50, ...scopeParams },
+      });
+      setPrintedOrders(Array.isArray(resp.data?.data) ? resp.data.data : []);
+    } catch (err) {
+      setPrintedOrders([]);
+    } finally {
+      setLoadingPrintedOrders(false);
     }
   }, [scopeParams]);
 
   useEffect(() => {
-    fetchSheets();
-  }, [fetchSheets]);
+    fetchDrafts();
+    fetchPrintedOrders();
+  }, [fetchDrafts, fetchPrintedOrders]);
 
   useEffect(() => {
     const handleKeydown = (event) => {
@@ -143,12 +191,12 @@ const PurchaseOrdersTab = ({
       const next = [
         ...prev,
         {
-          id: `purchase-order-row-${Date.now()}-${prev.length + 1}`,
+          id: createRowId(),
           productId: product.id || product.productId || null,
           productCode: product.barcode || product.productCode || '',
-          productName: product.name || product.productName || '',
-          shelfBalance: product.shelfBalance ?? product.stock ?? product.availableQuantity ?? '',
-          posBalance: product.posBalance ?? product.availableQuantity ?? '',
+          productName: product.productName || product.name || '',
+          shelfBalance: '',
+          posBalance: product.availableQuantity ?? product.stock ?? product.posBalance ?? '',
           sellingPrice: product.sellingPrice ?? product.price ?? '',
           quantityToOrder: 1,
           notes: '',
@@ -187,6 +235,9 @@ const PurchaseOrdersTab = ({
 
   const clearSheet = () => {
     setOrderItems([emptySheetItem(1)]);
+    setSheetNotes('');
+    setOrderRef('');
+    setCurrentOrderId(null);
     setSavingError('');
   };
 
@@ -198,14 +249,14 @@ const PurchaseOrdersTab = ({
 
       const rows = Array.isArray(sheet.items)
         ? sheet.items.map((item, idx) => ({
-            id: `purchase-order-row-${Date.now()}-${idx + 1}`,
+            id: createRowId(),
             productId: item.productId ?? null,
             productCode: item.barcode || '',
             productName: item.productName || '',
             shelfBalance: item.shelfBalance ?? '',
             posBalance: item.posBalance ?? '',
             sellingPrice: item.sellingPrice ?? '',
-            quantityToOrder: item.quantity ?? 0,
+            quantityToOrder: item.quantity ?? 1,
             notes: item.notes || '',
             manual: !item.productId,
             sortOrder: idx + 1,
@@ -213,12 +264,33 @@ const PurchaseOrdersTab = ({
         : [emptySheetItem(1)];
 
       setOrderItems(rows.length ? rows : [emptySheetItem(1)]);
+      setSheetNotes(sheet.notes || '');
+      setOrderRef(sheet.purchaseOrderRef || '');
+      setCurrentOrderId(sheet.id);
+      setWorkspaceMode('continue');
+      setWorkspaceOpen(true);
+      setWorkspaceMaximized(false);
     } catch (err) {
       await boAlert({
         title: 'Unable to open draft',
         message: err.response?.data?.error || 'Failed to open saved purchase order',
         type: 'error',
       });
+    }
+  };
+
+  const openNewSheet = () => {
+    clearSheet();
+    setWorkspaceMode('new');
+    setWorkspaceOpen(true);
+    setWorkspaceMaximized(false);
+  };
+
+  const openContinueDraft = () => {
+    if (drafts.length > 0) {
+      openSheet(drafts[0].id);
+    } else {
+      openNewSheet();
     }
   };
 
@@ -244,9 +316,6 @@ const PurchaseOrdersTab = ({
       event.preventDefault();
       if (searchResults.length > 0) {
         selectSearchResult(searchResults[selectedSearchIndex]);
-      } else {
-        addManualRow();
-        setSearchModalOpen(false);
       }
     }
   };
@@ -271,22 +340,31 @@ const PurchaseOrdersTab = ({
     setSavingError('');
 
     const payload = {
-      purchaseOrderRef: undefined,
+      purchaseOrderRef: orderRef || undefined,
       branchCode: branch || undefined,
       locationId: selectedLocationId || undefined,
       locationCode: location || undefined,
       locationName: selectedLocationName || undefined,
       status: 'draft',
-      notes: undefined,
+      notes: sheetNotes || undefined,
       items: buildSaveItems(),
     };
 
     try {
-      await api.post('/business-operations/purchase-orders', payload);
-      await fetchSheets();
+      const resp = currentOrderId
+        ? await api.put(`/business-operations/purchase-orders/${currentOrderId}`, payload)
+        : await api.post('/business-operations/purchase-orders', payload);
+
+      const saved = resp.data?.data;
+      setCurrentOrderId(saved?.id || currentOrderId);
+      setOrderRef(saved?.purchaseOrderRef || orderRef);
+      await fetchDrafts();
       await boAlert({ title: 'Draft saved', message: 'Purchase order draft was saved successfully.', type: 'info' });
     } catch (err) {
-      setSavingError(err.response?.data?.error || 'Failed to save draft');
+      console.error('[PURCHASE_ORDER_SAVE_ERROR] saveDraft payload:', payload, err);
+      const backendMessage = err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to save draft';
+      setSavingError(backendMessage);
+      await boAlert({ title: 'Save failed', message: backendMessage, type: 'error' });
     } finally {
       setSaving(false);
     }
@@ -295,48 +373,66 @@ const PurchaseOrdersTab = ({
   const exportToPdf = () => {
     const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
     const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 12;
+    const margin = 14;
     const now = new Date();
     const preparedBy = tokenStorage.getUser()?.name || tokenStorage.getUser()?.email || '-';
-    const title = 'Purchase Order / Replenishment Request';
-    const headerText = `Branch: ${selectedBranchCode || '-'}    Location: ${selectedLocationName || selectedLocationCode || '-'}`;
-    const footerText = `Prepared by: ${preparedBy}    Date: ${now.toLocaleDateString('en-GB')} ${now.toLocaleTimeString('en-GB')}`;
+    const orderReference = orderRef || 'Draft';
+    const branchLabel = selectedBranchCode || '-';
+    const locationLabel = selectedLocationName || selectedLocationCode || '-';
+    const dateLabel = now.toLocaleDateString('en-GB');
+    const timeLabel = now.toLocaleTimeString('en-GB');
+    const totalQuantity = orderItems.reduce((sum, item) => sum + Number(item.quantityToOrder || 0), 0);
 
-    try {
-      doc.addImage(logo, 'PNG', margin, 8, 24, 16);
-    } catch (error) {
-      // logo may fail in some environments, continue without it
-    }
+    const pageHeader = () => {
+      if (logo) {
+        try {
+          doc.addImage(logo, 'PNG', margin, 10, 30, 18);
+        } catch (error) {
+          // ignore logo failure
+        }
+      }
 
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('CITI-NATI SUPERMARKET', pageWidth / 2, 18, { align: 'center' });
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text(title, pageWidth / 2, 28, { align: 'center' });
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('CITI-NATI SUPERMARKET', margin + 35, 16);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Purchase Order / Replenishment Request', margin + 35, 24);
 
-    doc.setFontSize(10);
-    doc.setTextColor('#334155');
-    doc.text(headerText, margin, 34);
-    doc.text(footerText, pageWidth - margin, 34, { align: 'right' });
+      doc.setFontSize(10);
+      doc.setTextColor('#334155');
+      doc.text(`Branch: ${branchLabel}`, margin, 34);
+      doc.text(`Location: ${locationLabel}`, margin + 90, 34);
+      doc.text(`Reference: ${orderReference}`, margin + 220, 34);
+      doc.text(`Prepared by: ${preparedBy}`, margin, 40);
+      doc.text(`Date: ${dateLabel}`, margin + 90, 40);
+      doc.text(`Time: ${timeLabel}`, margin + 220, 40);
+
+      doc.setFontSize(9);
+      doc.setTextColor('#64748b');
+      doc.text(`Page ${doc.internal.getNumberOfPages()}`, pageWidth - margin, 14, { align: 'right' });
+    };
 
     const rows = orderItems.map((item, index) => [
       String(index + 1),
-      String(item.productCode || '-'),
-      String(item.productName || '-'),
+      item.productCode || '-',
+      item.productName || '-',
       item.shelfBalance === '' ? '-' : String(item.shelfBalance),
       item.posBalance === '' ? '-' : String(item.posBalance),
       item.sellingPrice === '' ? '-' : Number(item.sellingPrice).toFixed(2),
       String(item.quantityToOrder || 0),
-      String(item.notes || '-'),
+      item.notes || '-',
     ]);
 
     autoTable(doc, {
-      startY: 40,
-      margin: { left: margin, right: margin },
+      startY: 46,
+      margin: { left: margin, right: margin, top: 46 },
+      styles: { fontSize: 9, cellPadding: 3, overflow: 'linebreak', halign: 'left', valign: 'middle' },
+      headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [245, 246, 255] },
       head: [[
         'No.',
-        'Barcode',
+        'Product code',
         'Product name',
         'Shelf balance',
         'POS balance',
@@ -345,308 +441,466 @@ const PurchaseOrdersTab = ({
         'Notes',
       ]],
       body: rows,
-      styles: { fontSize: 9, cellPadding: 3, overflow: 'linebreak' },
-      headStyles: { fillColor: [15, 23, 42], textColor: 255 },
-      alternateRowStyles: { fillColor: [249, 250, 251] },
       columnStyles: {
         0: { cellWidth: 10, halign: 'center' },
         1: { cellWidth: 30 },
-        2: { cellWidth: 90 },
+        2: { cellWidth: 75 },
         3: { cellWidth: 24, halign: 'right' },
         4: { cellWidth: 24, halign: 'right' },
         5: { cellWidth: 28, halign: 'right' },
-        6: { cellWidth: 24, halign: 'right' },
-        7: { cellWidth: 50 },
+        6: { cellWidth: 22, halign: 'right' },
+        7: { cellWidth: 66 },
       },
+      didDrawPage: pageHeader,
+      showHead: 'everyPage',
+      pageBreak: 'auto',
     });
 
-    const finalY = doc.lastAutoTable?.finalY || 150;
+    const finalY = doc.lastAutoTable?.finalY || 160;
+    const lineY = finalY + 12;
     doc.setFontSize(10);
-    doc.text(`Total rows: ${orderItems.length}`, margin, finalY + 10);
-    doc.text(`Total quantity requested: ${orderItems.reduce((sum, item) => sum + Number(item.quantityToOrder || 0), 0)}`, margin + 90, finalY + 10);
+    doc.setTextColor('#111827');
+    doc.text(`Total rows: ${orderItems.length}`, margin, finalY + 8);
+    doc.text(`Total quantity requested: ${totalQuantity}`, margin + 90, finalY + 8);
 
-    const lineY = finalY + 24;
-    const columnWidth = 60;
+    const signY = lineY + 20;
+    const signWidth = 70;
+    const signGap = 24;
+    const signX1 = margin;
+    const signX2 = margin + signWidth + signGap;
+    const signX3 = margin + (signWidth + signGap) * 2;
     doc.setDrawColor(148, 163, 184);
-    doc.line(margin, lineY, margin + columnWidth, lineY);
-    doc.line(margin + 90, lineY, margin + 90 + columnWidth, lineY);
-    doc.line(margin + 180, lineY, margin + 180 + columnWidth, lineY);
+    doc.setLineWidth(0.35);
+    doc.line(signX1, signY, signX1 + signWidth, signY);
+    doc.line(signX2, signY, signX2 + signWidth, signY);
+    doc.line(signX3, signY, signX3 + signWidth, signY);
     doc.setFontSize(9);
-    doc.text('Prepared by', margin + columnWidth / 2, lineY + 6, { align: 'center' });
-    doc.text('Checked by', margin + 90 + columnWidth / 2, lineY + 6, { align: 'center' });
-    doc.text('Approved by', margin + 180 + columnWidth / 2, lineY + 6, { align: 'center' });
+    doc.text('Prepared by', signX1 + signWidth / 2, signY + 6, { align: 'center' });
+    doc.text('Checked by', signX2 + signWidth / 2, signY + 6, { align: 'center' });
+    doc.text('Approved by', signX3 + signWidth / 2, signY + 6, { align: 'center' });
 
     doc.save(`purchase-order-sheet-${now.toISOString().slice(0, 10)}.pdf`);
   };
 
+  const openHistoryModal = () => {
+    setHistoryModalOpen(true);
+  };
+
+  const closeWorkspace = () => {
+    setWorkspaceOpen(false);
+    setSearchModalOpen(false);
+    setWorkspaceMaximized(false);
+  };
+
+  const actionCardStyle = {
+    textAlign: 'left',
+    borderRadius: 18,
+    border: '1px solid #e0e7ff',
+    background: '#eef2ff',
+    padding: '1.2rem 1rem',
+    cursor: 'pointer',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    minHeight: 160,
+  };
+
+  const buttonStyle = {
+    border: 'none',
+    borderRadius: 12,
+    padding: '0.85rem 1rem',
+    backgroundColor: '#7c3aed',
+    color: '#fff',
+    cursor: 'pointer',
+    fontWeight: 700,
+  };
+
+  const renderOrderTable = () => (
+    <div style={{ overflowX: 'auto' }}>
+      <div style={{ minWidth: 1000, borderRadius: 16, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '40px 120px 240px 100px 100px 100px 110px 220px 90px', gap: '1px', backgroundColor: '#eef2ff', padding: '0.85rem 0.65rem', fontSize: '0.84rem', fontWeight: 700, color: '#1e293b' }}>
+          <div style={{ textAlign: 'center' }}>#</div>
+          <div>Product code</div>
+          <div>Product name</div>
+          <div>Shelf balance</div>
+          <div>POS balance</div>
+          <div>Selling price</div>
+          <div>Qty to order</div>
+          <div>Notes</div>
+          <div>Action</div>
+        </div>
+        {orderItems.map((item, index) => (
+          <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '40px 120px 240px 100px 100px 100px 110px 220px 90px', gap: '1px', backgroundColor: '#fff', alignItems: 'stretch' }}>
+            <div style={{ padding: '0.75rem 0.65rem', backgroundColor: '#f8fafc', color: '#475569', textAlign: 'center' }}>{index + 1}</div>
+            <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff' }}>
+              <input
+                ref={(el) => { inputRefs.current[`${item.id}-productCode`] = el; }}
+                type="text"
+                value={item.productCode}
+                onChange={(e) => updateItem(item.id, 'productCode', e.target.value)}
+                onFocus={(event) => event.target.select()}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    const next = getNextField(item.manual, 'productCode');
+                    if (next === 'addRow') addManualRow(); else focusField(item.id, next);
+                  }
+                }}
+                placeholder="Product code"
+                readOnly={!item.manual}
+                style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.55rem', backgroundColor: item.manual ? '#fff' : '#f8fafc', color: '#0f172a' }}
+              />
+            </div>
+            <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff' }}>
+              <input
+                ref={(el) => { inputRefs.current[`${item.id}-productName`] = el; }}
+                type="text"
+                value={item.productName}
+                onChange={(e) => updateItem(item.id, 'productName', e.target.value)}
+                onFocus={(event) => event.target.select()}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    const next = getNextField(item.manual, 'productName');
+                    if (next === 'addRow') addManualRow(); else focusField(item.id, next);
+                  }
+                }}
+                placeholder="Product name"
+                readOnly={!item.manual}
+                style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.55rem', backgroundColor: item.manual ? '#fff' : '#f8fafc', color: '#0f172a' }}
+              />
+            </div>
+            <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff' }}>
+              <input
+                ref={(el) => { inputRefs.current[`${item.id}-shelfBalance`] = el; }}
+                type="number"
+                value={item.shelfBalance}
+                onChange={(e) => updateItem(item.id, 'shelfBalance', e.target.value)}
+                onFocus={(event) => event.target.select()}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    const next = getNextField(item.manual, 'shelfBalance');
+                    if (next === 'addRow') addManualRow(); else focusField(item.id, next);
+                  }
+                }}
+                placeholder="Shelf balance"
+                style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.55rem', color: '#0f172a' }}
+              />
+            </div>
+            <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff' }}>
+              <input
+                ref={(el) => { inputRefs.current[`${item.id}-posBalance`] = el; }}
+                type="number"
+                value={item.posBalance}
+                onChange={(e) => updateItem(item.id, 'posBalance', e.target.value)}
+                onFocus={(event) => event.target.select()}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    const next = getNextField(item.manual, 'posBalance');
+                    if (next === 'addRow') addManualRow(); else focusField(item.id, next);
+                  }
+                }}
+                placeholder="POS balance"
+                readOnly={!item.manual}
+                style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.55rem', backgroundColor: item.manual ? '#fff' : '#f8fafc', color: '#0f172a' }}
+              />
+            </div>
+            <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff' }}>
+              <input
+                ref={(el) => { inputRefs.current[`${item.id}-sellingPrice`] = el; }}
+                type="number"
+                value={item.sellingPrice}
+                onChange={(e) => updateItem(item.id, 'sellingPrice', e.target.value)}
+                onFocus={(event) => event.target.select()}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    const next = getNextField(item.manual, 'sellingPrice');
+                    if (next === 'addRow') addManualRow(); else focusField(item.id, next);
+                  }
+                }}
+                placeholder="Selling price"
+                readOnly={!item.manual}
+                style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.55rem', backgroundColor: item.manual ? '#fff' : '#f8fafc', color: '#0f172a' }}
+              />
+            </div>
+            <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff' }}>
+              <input
+                ref={(el) => { inputRefs.current[`${item.id}-quantityToOrder`] = el; }}
+                type="number"
+                value={item.quantityToOrder}
+                onChange={(e) => updateItem(item.id, 'quantityToOrder', e.target.value)}
+                onFocus={(event) => event.target.select()}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    const next = getNextField(item.manual, 'quantityToOrder');
+                    if (next === 'addRow') addManualRow(); else focusField(item.id, next);
+                  }
+                }}
+                placeholder="Qty to order"
+                style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.55rem', color: '#0f172a' }}
+              />
+            </div>
+            <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff' }}>
+              <input
+                ref={(el) => { inputRefs.current[`${item.id}-notes`] = el; }}
+                type="text"
+                value={item.notes}
+                onChange={(e) => updateItem(item.id, 'notes', e.target.value)}
+                onFocus={(event) => event.target.select()}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    setSearchModalOpen(true);
+                  }
+                }}
+                placeholder="Notes"
+                style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.55rem', color: '#0f172a' }}
+              />
+            </div>
+            <div style={{ padding: '0.45rem 0.65rem', backgroundColor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <button
+                type="button"
+                onClick={() => removeItem(item.id)}
+                style={{ border: 'none', backgroundColor: '#f8fafc', color: '#0f172a', borderRadius: 10, padding: '0.6rem 0.85rem', cursor: 'pointer' }}
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const visibleBranch = selectedBranchCode || '—';
+  const visibleLocation = selectedLocationName || selectedLocationCode || '—';
+
   return (
-    <div style={{ display: 'grid', gap: '1rem' }}>
-      <section style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: '1.3rem', color: '#0f172a' }}>Purchase Order Sheet</h2>
-          <p style={{ margin: '0.55rem 0 0', color: '#475569', maxWidth: 640 }}>
-            Prepare and save replenishment drafts, then export a clean printable request for procurement and branch operations.
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <button onClick={saveDraft} disabled={saving} style={{ border: 'none', borderRadius: 10, padding: '0.85rem 1rem', backgroundColor: '#2563eb', color: '#fff', cursor: 'pointer' }}>{saving ? 'Saving…' : 'Save Draft'}</button>
-          <button onClick={exportToPdf} type="button" style={{ border: 'none', borderRadius: 10, padding: '0.85rem 1rem', backgroundColor: '#0f172a', color: '#fff', cursor: 'pointer' }}>Export PDF</button>
-          <button onClick={clearSheet} type="button" style={{ border: '1px solid #cbd5e1', borderRadius: 10, padding: '0.85rem 1rem', backgroundColor: '#fff', color: '#0f172a', cursor: 'pointer' }}>Clear sheet</button>
-        </div>
-      </section>
-
-      <section style={{ display: 'grid', gap: '0.75rem' }}>
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <button type="button" onClick={() => setSearchModalOpen(true)} style={{ border: '1px solid #cbd5e1', borderRadius: 10, padding: '0.75rem 1rem', backgroundColor: '#fff', color: '#0f172a', cursor: 'pointer' }}>Search products</button>
-          <button type="button" onClick={addManualRow} style={{ border: '1px solid #cbd5e1', borderRadius: 10, padding: '0.75rem 1rem', backgroundColor: '#fff', color: '#0f172a', cursor: 'pointer' }}>Add manual row</button>
-          <span style={{ color: '#475569', fontSize: '0.9rem' }}>Open search with <strong>F1</strong></span>
-        </div>
-
-        {searchModalOpen && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 1200, backgroundColor: 'rgba(15, 23, 42, 0.45)', padding: '1.5rem', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <div style={{ width: '100%', maxWidth: 860, backgroundColor: '#fff', borderRadius: 16, boxShadow: '0 18px 40px rgba(15, 23, 42, 0.18)', overflow: 'hidden' }}>
-              <div style={{ padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0' }}>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#0f172a' }}>Search products</h3>
-                  <p style={{ margin: '0.35rem 0 0', color: '#475569', fontSize: '0.92rem' }}>Type and use arrow keys + Enter to add items quickly.</p>
-                </div>
-                <button type="button" onClick={() => setSearchModalOpen(false)} style={{ border: 'none', background: 'transparent', fontSize: '1.1rem', color: '#475569', cursor: 'pointer' }}>×</button>
-              </div>
-
-              <div style={{ padding: '1rem 1.25rem', display: 'grid', gap: '0.75rem' }}>
-                <input
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyDown={handleSearchKeyDown}
-                  ref={searchInputRef}
-                  placeholder="Search products by name, barcode or code..."
-                  style={{ width: '100%', padding: '0.85rem 1rem', borderRadius: 10, border: '1px solid #cbd5e1', color: '#0f172a' }}
-                />
-                <div style={{ maxHeight: 320, overflowY: 'auto' }}>
-                  {searchLoading && <div style={{ padding: '1rem', color: '#475569' }}>Searching...</div>}
-                  {!searchLoading && searchResults.length === 0 && <div style={{ padding: '1rem', color: '#475569' }}>No results found.</div>}
-                  {!searchLoading && searchResults.length > 0 && (
-                    <div style={{ display: 'grid', gap: '0.3rem' }}>
-                      {searchResults.map((product, index) => {
-                        const active = index === selectedSearchIndex;
-                        return (
-                          <button
-                            key={product.id || product.barcode || product.productName || index}
-                            type="button"
-                            onClick={() => selectSearchResult(product)}
-                            onMouseEnter={() => setSelectedSearchIndex(index)}
-                            style={{
-                              width: '100%', textAlign: 'left', padding: '0.85rem 0.95rem', borderRadius: 10,
-                              border: active ? '1px solid #2563eb' : '1px solid #e2e8f0',
-                              backgroundColor: active ? '#eff6ff' : '#fff',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
-                              <div>
-                                <div style={{ color: '#0f172a', fontWeight: 700 }}>{product.productName || product.name || 'Unnamed product'}</div>
-                                <div style={{ color: '#64748b', fontSize: '0.88rem' }}>{product.barcode || product.productCode || 'No barcode'}</div>
-                              </div>
-                              <div style={{ color: '#0f172a', fontWeight: 700 }}>{product.sellingPrice != null ? Number(product.sellingPrice).toFixed(2) : product.price != null ? Number(product.price).toFixed(2) : '-'}</div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+    <div style={{ display: 'grid', gap: '1rem', width: '100%' }}>
+      {!workspaceOpen && (
+        <section style={{ borderRadius: 20, border: '1px solid #e2e8f0', background: '#fff', padding: '1.2rem', display: 'grid', gap: '0.85rem' }}>
+          <div>
+            <h2 style={{ margin: 0, color: '#0f172a', fontSize: '1.35rem' }}>Purchase Orders</h2>
+            <p style={{ margin: '0.65rem 0 0', color: '#475569', maxWidth: 680, lineHeight: 1.6 }}>
+              Use the Purchase Orders workspace to prepare printable replenishment requests without opening the full editor on the tab. Start a new sheet, resume drafts, review history, or inspect printed orders.
+            </p>
           </div>
-        )}
-
-        {savingError && <div style={{ color: '#b91c1c', fontSize: '0.95rem' }}>{savingError}</div>}
-      </section>
-
-      <section style={{ overflowX: 'auto', backgroundColor: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', padding: '1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div style={{ color: '#0f172a', fontWeight: 700 }}>Stock order rows</div>
-          <div style={{ color: '#475569', fontSize: '0.95rem' }}>{sheets.length} saved drafts available</div>
-        </div>
-
-        <div style={{ minWidth: 960, borderRadius: 12, overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '40px 120px 240px 100px 100px 100px 90px 180px 90px', gap: '1px', backgroundColor: '#e2e8f0', padding: '0.7rem 0.55rem', fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>
-            <div>#</div>
-            <div>Barcode</div>
-            <div>Product name</div>
-            <div>Shelf balance</div>
-            <div>POS balance</div>
-            <div>Selling price</div>
-            <div>Quantity to order</div>
-            <div>Notes</div>
-            <div>Action</div>
-          </div>
-          {orderItems.map((item, index) => (
-            <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '40px 120px 240px 100px 100px 100px 90px 180px 90px', gap: '1px', backgroundColor: '#fff' }}>
-              <div style={{ padding: '0.7rem 0.55rem', backgroundColor: '#f8fafc', color: '#475569', textAlign: 'center' }}>{index + 1}</div>
-              <div style={{ padding: '0.45rem 0.55rem', backgroundColor: '#fff' }}>
-                <input
-                  ref={(el) => { inputRefs.current[`${item.id}-productCode`] = el; }}
-                  type="text"
-                  value={item.productCode}
-                  onChange={(e) => updateItem(item.id, 'productCode', e.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault();
-                      focusField(item.id, 'productName');
-                    }
-                  }}
-                  placeholder="Barcode"
-                  readOnly={!item.manual}
-                  style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.5rem', backgroundColor: item.manual ? '#fff' : '#f8fafc', color: '#0f172a' }}
-                />
-              </div>
-              <div style={{ padding: '0.45rem 0.55rem', backgroundColor: '#fff' }}>
-                <input
-                  ref={(el) => { inputRefs.current[`${item.id}-productName`] = el; }}
-                  type="text"
-                  value={item.productName}
-                  onChange={(e) => updateItem(item.id, 'productName', e.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault();
-                      focusField(item.id, 'shelfBalance');
-                    }
-                  }}
-                  placeholder="Product name"
-                  readOnly={!item.manual}
-                  style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.5rem', backgroundColor: item.manual ? '#fff' : '#f8fafc', color: '#0f172a' }}
-                />
-              </div>
-              <div style={{ padding: '0.45rem 0.55rem', backgroundColor: '#fff' }}>
-                <input
-                  ref={(el) => { inputRefs.current[`${item.id}-shelfBalance`] = el; }}
-                  type="number"
-                  value={item.shelfBalance}
-                  onChange={(e) => updateItem(item.id, 'shelfBalance', e.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault();
-                      focusField(item.id, 'posBalance');
-                    }
-                  }}
-                  placeholder="Shelf balance"
-                  style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.5rem', color: '#0f172a' }}
-                />
-              </div>
-              <div style={{ padding: '0.45rem 0.55rem', backgroundColor: '#fff' }}>
-                <input
-                  ref={(el) => { inputRefs.current[`${item.id}-posBalance`] = el; }}
-                  type="number"
-                  value={item.posBalance}
-                  onChange={(e) => updateItem(item.id, 'posBalance', e.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault();
-                      focusField(item.id, 'sellingPrice');
-                    }
-                  }}
-                  placeholder="POS balance"
-                  style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.5rem', color: '#0f172a' }}
-                />
-              </div>
-              <div style={{ padding: '0.45rem 0.55rem', backgroundColor: '#fff' }}>
-                <input
-                  ref={(el) => { inputRefs.current[`${item.id}-sellingPrice`] = el; }}
-                  type="number"
-                  value={item.sellingPrice}
-                  onChange={(e) => updateItem(item.id, 'sellingPrice', e.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault();
-                      focusField(item.id, 'quantityToOrder');
-                    }
-                  }}
-                  placeholder="Selling price"
-                  style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.5rem', color: '#0f172a' }}
-                />
-              </div>
-              <div style={{ padding: '0.45rem 0.55rem', backgroundColor: '#fff' }}>
-                <input
-                  ref={(el) => { inputRefs.current[`${item.id}-quantityToOrder`] = el; }}
-                  type="number"
-                  value={item.quantityToOrder}
-                  onChange={(e) => updateItem(item.id, 'quantityToOrder', e.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault();
-                      focusField(item.id, 'notes');
-                    }
-                  }}
-                  placeholder="Quantity to order"
-                  style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.5rem', color: '#0f172a' }}
-                />
-              </div>
-              <div style={{ padding: '0.45rem 0.55rem', backgroundColor: '#fff' }}>
-                <input
-                  ref={(el) => { inputRefs.current[`${item.id}-notes`] = el; }}
-                  type="text"
-                  value={item.notes}
-                  onChange={(e) => updateItem(item.id, 'notes', e.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault();
-                      setSearchModalOpen(true);
-                    }
-                  }}
-                  placeholder="Notes"
-                  style={{ width: '100%', borderRadius: 10, border: '1px solid #cbd5e1', padding: '0.5rem', color: '#0f172a' }}
-                />
-              </div>
-              <div style={{ padding: '0.45rem 0.55rem', backgroundColor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <button
-                  type="button"
-                  onClick={() => removeItem(item.id)}
-                  style={{ border: 'none', backgroundColor: '#f8fafc', color: '#0f172a', borderRadius: 8, padding: '0.55rem 0.75rem', cursor: 'pointer' }}
-                >
-                  Remove
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section style={{ display: 'grid', gap: '0.8rem', padding: '1rem', borderRadius: 16, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div style={{ color: '#0f172a', fontWeight: 700 }}>Draft summary</div>
-          <div style={{ color: '#475569', fontSize: '0.95rem' }}>
-            {orderItems.length} rows · {orderItems.reduce((sum, item) => sum + Number(item.quantityToOrder || 0), 0)} units requested
-          </div>
-        </div>
-        <div style={{ display: 'grid', gap: '0.55rem', color: '#475569' }}>
-          <div>Branch: <strong style={{ color: '#0f172a' }}>{selectedBranchCode || '—'}</strong></div>
-          <div>Location: <strong style={{ color: '#0f172a' }}>{selectedLocationName || selectedLocationCode || '—'}</strong></div>
-          <div>Saved drafts: <strong style={{ color: '#0f172a' }}>{loadingSheets ? 'Loading…' : sheets.length}</strong></div>
-        </div>
-      </section>
-
-      <section style={{ display: 'grid', gap: '0.75rem' }}>
-        <h3 style={{ margin: 0, color: '#0f172a' }}>Open saved drafts</h3>
-        <div style={{ display: 'grid', gap: '0.65rem' }}>
-          {loadingSheets && <div style={{ color: '#475569' }}>Loading drafts…</div>}
-          {!loadingSheets && sheets.length === 0 && <div style={{ color: '#475569' }}>No saved drafts found.</div>}
-          {!loadingSheets && sheets.map((sheet) => (
-            <button
-              key={sheet.id}
-              type="button"
-              onClick={() => openSheet(sheet.id)}
-              style={{ width: '100%', textAlign: 'left', borderRadius: 12, border: '1px solid #e2e8f0', backgroundColor: '#fff', padding: '0.9rem 1rem', cursor: 'pointer', color: '#0f172a' }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
-                <span style={{ fontWeight: 700 }}>{sheet.purchaseOrderRef || `Draft #${sheet.id}`}</span>
-                <span style={{ color: '#64748b' }}>{sheet.purchaseDate ? new Date(sheet.purchaseDate).toLocaleDateString('en-GB') : 'No date'}</span>
-              </div>
-              <div style={{ color: '#475569', marginTop: '0.35rem' }}>{sheet.notes || 'No notes'}</div>
+          <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
+            <button type="button" onClick={openNewSheet} style={{ ...actionCardStyle, background: '#eef2ff' }}>
+              <div style={{ color: '#7c3aed', fontWeight: 800, marginBottom: '0.45rem', fontSize: '0.78rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Create</div>
+              <div style={{ fontSize: '1rem', color: '#1e293b', fontWeight: 800 }}>Create New Purchase Order Sheet</div>
+              <div style={{ marginTop: '0.55rem', color: '#475569', fontSize: '0.92rem' }}>Open a clean workspace with a fresh printable purchase order sheet.</div>
             </button>
-          ))}
+            <button type="button" onClick={openContinueDraft} style={{ ...actionCardStyle, background: '#f5f3ff', border: '1px solid #ddd6fe' }}>
+              <div style={{ color: '#7c3aed', fontWeight: 800, marginBottom: '0.45rem', fontSize: '0.78rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Continue</div>
+              <div style={{ fontSize: '1rem', color: '#1e293b', fontWeight: 800 }}>Continue Current Draft / Auto-Saved Sheet</div>
+              <div style={{ marginTop: '0.55rem', color: '#475569', fontSize: '0.92rem' }}>
+                {drafts.length > 0 ? `Resume the latest draft: ${drafts[0].purchaseOrderRef || 'Untitled draft'}` : 'No active drafts found. Start a new sheet.'}
+              </div>
+            </button>
+            <button type="button" onClick={openHistoryModal} style={{ ...actionCardStyle, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+              <div style={{ color: '#7c3aed', fontWeight: 800, marginBottom: '0.45rem', fontSize: '0.78rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>History</div>
+              <div style={{ fontSize: '1rem', color: '#1e293b', fontWeight: 800 }}>Saved Drafts / Order History</div>
+              <div style={{ marginTop: '0.55rem', color: '#475569', fontSize: '0.92rem' }}>Browse saved drafts and previously printed purchase order sheets.</div>
+            </button>
+            <button type="button" onClick={openHistoryModal} style={{ ...actionCardStyle, background: '#fdf2f8', border: '1px solid #fbcfe8' }}>
+              <div style={{ color: '#9d174d', fontWeight: 800, marginBottom: '0.45rem', fontSize: '0.78rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Export</div>
+              <div style={{ fontSize: '1rem', color: '#1e293b', fontWeight: 800 }}>Exported / Printed Orders</div>
+              <div style={{ marginTop: '0.55rem', color: '#475569', fontSize: '0.92rem' }}>Review orders that were finalized for printing or distribution.</div>
+            </button>
+          </div>
+        </section>
+      )}
+
+      {workspaceOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1200, backgroundColor: 'rgba(15, 23, 42, 0.5)', padding: workspaceMaximized ? '0' : '1.5rem', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <div style={{ width: workspaceMaximized ? '100%' : '92%', maxWidth: workspaceMaximized ? '100%' : 1360, maxHeight: '100%', backgroundColor: '#ffffff', borderRadius: workspaceMaximized ? '0' : 22, boxShadow: workspaceMaximized ? 'none' : '0 30px 80px rgba(15, 23, 42, 0.2)', overflow: 'hidden', display: 'grid', gridTemplateRows: 'auto 1fr', minHeight: workspaceMaximized ? '100%' : 'unset' }}>
+            <div style={{ padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+              <div>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <h2 style={{ margin: 0, fontSize: '1.1rem', color: '#111827' }}>{workspaceMode === 'new' ? 'New Purchase Order Sheet' : 'Purchase Order Workspace'}</h2>
+                  <span style={{ fontSize: '0.82rem', color: '#6b7280' }}>{orderRef ? orderRef : 'Draft'}</span>
+                </div>
+                <div style={{ marginTop: '0.55rem', color: '#475569', fontSize: '0.9rem' }}>
+                  Branch: <strong style={{ color: '#111827' }}>{visibleBranch}</strong> · Location: <strong style={{ color: '#111827' }}>{visibleLocation}</strong>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <button type="button" onClick={() => setWorkspaceMaximized((prev) => !prev)} style={{ border: '1px solid #c7d2fe', background: '#eef2ff', color: '#3730a3', borderRadius: 10, padding: '0.75rem 0.9rem', cursor: 'pointer' }}>{workspaceMaximized ? 'Restore' : 'Maximize'}</button>
+                <button type="button" onClick={clearSheet} style={{ border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 10, padding: '0.75rem 0.9rem', cursor: 'pointer' }}>Clear sheet</button>
+                <button type="button" onClick={saveDraft} disabled={saving} style={{ ...buttonStyle, backgroundColor: '#7c3aed' }}>{saving ? 'Saving…' : 'Save Draft'}</button>
+                <button type="button" onClick={exportToPdf} style={{ ...buttonStyle, backgroundColor: '#4338ca' }}>Export PDF</button>
+                <button type="button" onClick={closeWorkspace} style={{ border: 'none', background: 'transparent', color: '#475569', fontSize: '1.25rem', lineHeight: 1, cursor: 'pointer' }}>×</button>
+              </div>
+            </div>
+            <div style={{ padding: '1.25rem', overflowY: 'auto' }}>
+              <div style={{ display: 'grid', gap: '1rem', marginBottom: '1rem' }}>
+                <div style={{ display: 'grid', gap: '0.75rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+                  <div style={{ borderRadius: 16, border: '1px solid #e2e8f0', background: '#f8fafc', padding: '1rem' }}>
+                    <div style={{ fontSize: '0.76rem', color: '#6b7280', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Drafts</div>
+                    <div style={{ marginTop: '0.55rem', fontSize: '1.2rem', fontWeight: 800, color: '#111827' }}>{drafts.length}</div>
+                    <div style={{ marginTop: '0.5rem', color: '#475569', fontSize: '0.92rem' }}>Saved drafts available for this branch/location.</div>
+                  </div>
+                  <div style={{ borderRadius: 16, border: '1px solid #e2e8f0', background: '#f8fafc', padding: '1rem' }}>
+                    <div style={{ fontSize: '0.76rem', color: '#6b7280', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Printed</div>
+                    <div style={{ marginTop: '0.55rem', fontSize: '1.2rem', fontWeight: 800, color: '#111827' }}>{printedOrders.length}</div>
+                    <div style={{ marginTop: '0.5rem', color: '#475569', fontSize: '0.92rem' }}>Previously printed or exported purchase orders.</div>
+                  </div>
+                  <div style={{ borderRadius: 16, border: '1px solid #e2e8f0', background: '#f8fafc', padding: '1rem' }}>
+                    <div style={{ fontSize: '0.76rem', color: '#6b7280', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Scope</div>
+                    <div style={{ marginTop: '0.55rem', fontSize: '1.2rem', fontWeight: 800, color: '#111827' }}>{visibleBranch} / {visibleLocation}</div>
+                    <div style={{ marginTop: '0.5rem', color: '#475569', fontSize: '0.92rem' }}>Branch and location used for sheet metadata and history queries.</div>
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gap: '0.85rem', gridTemplateColumns: '1fr auto', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0f172a' }}>Order details</div>
+                    <div style={{ marginTop: '0.35rem', fontSize: '0.9rem', color: '#475569' }}>Use the product search modal or manual rows to build the sheet.</div>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <button type="button" onClick={() => setSearchModalOpen(true)} style={{ border: '1px solid #c7d2fe', borderRadius: 10, padding: '0.75rem 0.95rem', background: '#eef2ff', color: '#3730a3', cursor: 'pointer' }}>Search product (F1)</button>
+                    <button type="button" onClick={addManualRow} style={{ border: '1px solid #cbd5e1', borderRadius: 10, padding: '0.75rem 0.95rem', background: '#fff', color: '#0f172a', cursor: 'pointer' }}>Add manual row</button>
+                  </div>
+                </div>
+              </div>
+
+              {savingError && <div style={{ marginBottom: '1rem', color: '#b91c1c', fontWeight: 700 }}>{savingError}</div>}
+
+              <div style={{ display: 'grid', gap: '1rem' }}>
+                {renderOrderTable()}
+                <div style={{ borderRadius: 16, background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1rem', display: 'grid', gap: '0.7rem' }}>
+                  <div style={{ fontWeight: 700, color: '#0f172a' }}>Draft summary</div>
+                  <div style={{ display: 'grid', gap: '0.5rem', color: '#475569' }}>
+                    <div>Branch: <strong style={{ color: '#111827' }}>{visibleBranch}</strong></div>
+                    <div>Location: <strong style={{ color: '#111827' }}>{visibleLocation}</strong></div>
+                    <div>Reference: <strong style={{ color: '#111827' }}>{orderRef || 'Draft'}</strong></div>
+                    <div>Rows: <strong style={{ color: '#111827' }}>{orderItems.length}</strong></div>
+                    <div>Quantity requested: <strong style={{ color: '#111827' }}>{orderItems.reduce((sum, item) => sum + Number(item.quantityToOrder || 0), 0)}</strong></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </section>
+      )}
+
+      {searchModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1300, backgroundColor: 'rgba(15, 23, 42, 0.5)', padding: '1.5rem', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <div style={{ width: '100%', maxWidth: 860, backgroundColor: '#fff', borderRadius: 18, boxShadow: '0 18px 40px rgba(15, 23, 42, 0.18)', overflow: 'hidden' }}>
+            <div style={{ padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#0f172a' }}>Search products</h3>
+                <p style={{ margin: '0.35rem 0 0', color: '#475569', fontSize: '0.92rem' }}>Search by barcode, code, or product name. Arrow keys navigate, Enter selects.</p>
+              </div>
+              <button type="button" onClick={() => setSearchModalOpen(false)} style={{ border: 'none', background: 'transparent', fontSize: '1.2rem', color: '#475569', cursor: 'pointer' }}>×</button>
+            </div>
+            <div style={{ padding: '1rem 1.25rem', display: 'grid', gap: '0.85rem' }}>
+              <input
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                ref={searchInputRef}
+                placeholder="Search products by barcode, code or name..."
+                style={{ width: '100%', padding: '0.95rem 1rem', borderRadius: 12, border: '1px solid #cbd5e1', color: '#0f172a', fontSize: '0.95rem' }}
+              />
+              <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+                {searchLoading && <div style={{ padding: '1rem', color: '#475569' }}>Searching...</div>}
+                {!searchLoading && searchResults.length === 0 && <div style={{ padding: '1rem', color: '#475569' }}>No results found. Use the manual row button to add a non-system item.</div>}
+                {!searchLoading && searchResults.length > 0 && (
+                  <div style={{ display: 'grid', gap: '0.35rem' }}>
+                    {searchResults.map((product, index) => {
+                      const active = index === selectedSearchIndex;
+                      return (
+                        <button
+                          key={product.id || product.barcode || product.productName || index}
+                          type="button"
+                          onClick={() => selectSearchResult(product)}
+                          onMouseEnter={() => setSelectedSearchIndex(index)}
+                          style={{
+                            width: '100%', textAlign: 'left', padding: '0.95rem 1rem', borderRadius: 14,
+                            border: active ? '1px solid #7c3aed' : '1px solid #e2e8f0',
+                            backgroundColor: active ? '#f5f3ff' : '#fff',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center' }}>
+                            <div>
+                              <div style={{ color: '#0f172a', fontWeight: 700 }}>{product.productName || product.name || 'Unnamed product'}</div>
+                              <div style={{ color: '#64748b', fontSize: '0.88rem' }}>{product.barcode || product.productCode || 'No barcode'}</div>
+                            </div>
+                            <div style={{ color: '#111827', fontWeight: 700 }}>{product.sellingPrice != null ? Number(product.sellingPrice).toFixed(2) : product.price != null ? Number(product.price).toFixed(2) : '-'}</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {historyModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1300, backgroundColor: 'rgba(15, 23, 42, 0.45)', padding: '1.5rem', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <div style={{ width: '100%', maxWidth: 980, backgroundColor: '#fff', borderRadius: 18, boxShadow: '0 18px 40px rgba(15, 23, 42, 0.2)', overflow: 'hidden' }}>
+            <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#0f172a' }}>Purchase Order History</h3>
+                <p style={{ margin: '0.35rem 0 0', color: '#475569', fontSize: '0.92rem' }}>Review saved drafts and exported orders for this branch / location.</p>
+              </div>
+              <button type="button" onClick={() => setHistoryModalOpen(false)} style={{ border: 'none', background: 'transparent', fontSize: '1.2rem', color: '#475569', cursor: 'pointer' }}>×</button>
+            </div>
+            <div style={{ display: 'grid', gap: '1rem', padding: '1rem 1.25rem', maxHeight: '75vh', overflowY: 'auto' }}>
+              <section style={{ borderRadius: 16, border: '1px solid #e2e8f0', background: '#f8fafc', padding: '1rem' }}>
+                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.75rem' }}>Saved Drafts</div>
+                {loadingDrafts && <div style={{ color: '#475569' }}>Loading drafts…</div>}
+                {!loadingDrafts && drafts.length === 0 && <div style={{ color: '#475569' }}>No saved drafts found for this location.</div>}
+                {!loadingDrafts && drafts.length > 0 && (
+                  <div style={{ display: 'grid', gap: '0.75rem' }}>
+                    {drafts.map((sheet) => (
+                      <button
+                        key={sheet.id}
+                        type="button"
+                        onClick={() => { openSheet(sheet.id); setHistoryModalOpen(false); }}
+                        style={{ width: '100%', textAlign: 'left', borderRadius: 14, border: '1px solid #e2e8f0', backgroundColor: '#fff', padding: '0.95rem 1rem', cursor: 'pointer' }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+                          <span style={{ fontWeight: 700, color: '#0f172a' }}>{sheet.purchaseOrderRef || `Draft #${sheet.id}`}</span>
+                          <span style={{ color: '#64748b', fontSize: '0.88rem' }}>{sheet.purchaseDate ? new Date(sheet.purchaseDate).toLocaleDateString('en-GB') : 'No date'}</span>
+                        </div>
+                        <div style={{ marginTop: '0.35rem', color: '#475569' }}>{sheet.notes || 'No notes'}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </section>
+              <section style={{ borderRadius: 16, border: '1px solid #e2e8f0', background: '#f8fafc', padding: '1rem' }}>
+                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.75rem' }}>Exported / Printed Orders</div>
+                {loadingPrintedOrders && <div style={{ color: '#475569' }}>Loading exported orders…</div>}
+                {!loadingPrintedOrders && printedOrders.length === 0 && <div style={{ color: '#475569' }}>No printed purchase orders found for this location.</div>}
+                {!loadingPrintedOrders && printedOrders.length > 0 && (
+                  <div style={{ display: 'grid', gap: '0.75rem' }}>
+                    {printedOrders.map((sheet) => (
+                      <div key={sheet.id} style={{ width: '100%', borderRadius: 14, border: '1px solid #e2e8f0', backgroundColor: '#fff', padding: '0.95rem 1rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+                          <span style={{ fontWeight: 700, color: '#0f172a' }}>{sheet.purchaseOrderRef || `Order #${sheet.id}`}</span>
+                          <span style={{ color: '#64748b', fontSize: '0.88rem' }}>{sheet.purchaseDate ? new Date(sheet.purchaseDate).toLocaleDateString('en-GB') : 'No date'}</span>
+                        </div>
+                        <div style={{ marginTop: '0.35rem', color: '#475569' }}>{sheet.notes || 'No notes'}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
