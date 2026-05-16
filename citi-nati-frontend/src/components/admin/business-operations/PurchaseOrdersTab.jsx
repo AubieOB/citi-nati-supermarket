@@ -7,6 +7,13 @@ import logo from '../../../assets/citi-nati-logo.png.png';
 
 const normalizeCode = (value) => String(value || '').trim().toUpperCase();
 
+const escapeHtml = (value = '') => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
 const buildScopeParams = ({ branchCode, locationCode, locationId, isAggregate }) => {
   if (isAggregate) return {};
   const params = {};
