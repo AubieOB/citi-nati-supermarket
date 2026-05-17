@@ -39,18 +39,49 @@ const { getPublicPromotions } = require('./controllers/promotion.controller');
 
 const prisma = new PrismaClient();
 
+const DEFAULT_ALLOWED_ORIGINS = [
+  'https://www.citinati.com',
+  'https://citinati.com',
+  'http://www.citinati.com',
+  'http://citinati.com',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173',
+];
+
 function parseAllowedOrigins() {
   const configured = String(process.env.CORS_ALLOWED_ORIGINS || '')
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
 
+  const frontendUrl = process.env.FRONTEND_URL ? String(process.env.FRONTEND_URL).trim() : null;
+
   return Array.from(new Set([
-    'http://localhost:3000',
-    'http://localhost:5173',
-    process.env.FRONTEND_URL || 'http://localhost:3000',
+    ...DEFAULT_ALLOWED_ORIGINS,
+    ...(frontendUrl ? [frontendUrl] : []),
     ...configured,
-  ].filter(Boolean)));
+  ]));
+}
+
+function createCorsOriginValidator(allowedOrigins, sourceName) {
+  return (origin, callback) => {
+    const requestOrigin = origin || null;
+    const isAllowed = !requestOrigin || allowedOrigins.includes(requestOrigin);
+
+    if (isAllowed) {
+      if (requestOrigin) {
+        logger.info('[CORS] Origin allowed', { origin: requestOrigin, source: sourceName });
+      }
+      return callback(null, true);
+    }
+
+    logger.warn('[CORS] Rejected origin', { origin: requestOrigin, source: sourceName, allowedOrigins });
+    const error = new Error('Not allowed by CORS');
+    error.status = 403;
+    return callback(error);
+  };
 }
 
 async function connectPrismaWithRetry(options = {}) {
@@ -135,15 +166,9 @@ async function start() {
     
     const io = new Server(server, {
       cors: {
-        origin: (origin, callback) => {
-          if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
-          } else {
-            callback(new Error('Not allowed by CORS'));
-          }
-        },
+        origin: createCorsOriginValidator(allowedOrigins, 'socket.io'),
         methods: ['GET', 'POST'],
-        credentials: true
+        credentials: true,
       },
     });
 
@@ -451,17 +476,10 @@ async function start() {
     
     // CORS configuration for Express
     const corsOptions = {
-      origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) {
-          callback(null, true);
-        } else {
-          logger.warn('[CORS] Rejected origin', { origin });
-          callback(new Error('Not allowed by CORS'));
-        }
-      },
+      origin: createCorsOriginValidator(allowedOrigins, 'express'),
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-      allowedHeaders: ['Content-Type', 'Authorization']
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     };
     
     logger.info('[CORS] Allowed origins configured', { allowedOrigins });
@@ -554,6 +572,30 @@ async function start() {
 
       return res.status(404).json({
         error: 'API route not found',
+        requestId,
+      });
+    });
+
+    // CORS rejection handler so blocked origins return 403 instead of 500
+    app.use((err, req, res, next) => {
+      if (err?.message !== 'Not allowed by CORS') {
+        return next(err);
+      }
+
+      const requestId = `cors_block_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      logger.warn('[CORS] Express request blocked by CORS', {
+        requestId,
+        origin: req.headers.origin || null,
+        path: req.originalUrl,
+        method: req.method,
+      });
+
+      if (res.headersSent) {
+        return next(err);
+      }
+
+      return res.status(403).json({
+        error: 'CORS origin blocked',
         requestId,
       });
     });
