@@ -4,6 +4,8 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
+const logger = require('../../utils/logger');
+
 function modelHasField(modelName, fieldName) {
   try {
     const model = prisma?._runtimeDataModel?.models?.[modelName];

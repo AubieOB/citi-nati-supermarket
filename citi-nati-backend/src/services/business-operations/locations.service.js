@@ -4,6 +4,8 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
+const logger = require('../../utils/logger');
+
 const DEFAULT_LOCATIONS = [
   { id: 1, code: 'BT', name: 'Blantyre' },
   { id: 2, code: 'ZA', name: 'Zomba' },
