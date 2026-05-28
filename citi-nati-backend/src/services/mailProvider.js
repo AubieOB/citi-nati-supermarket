@@ -75,10 +75,10 @@ class SmtpProvider {
 
       // Verify connection
       await this.transporter.verify();
-      logger.info('SMTP connection verified successfully');
+      logger.infoLog('SMTP connection verified successfully');
       this.initialized = true;
     } catch (error) {
-      logger.error('Failed to initialize SMTP provider:', {
+      logger.errorLog('Failed to initialize SMTP provider:', {
         error: error.message,
         host: this.config.smtp.host,
         port: this.config.smtp.port,
@@ -105,7 +105,7 @@ class SmtpProvider {
 
     try {
       const info = await this.transporter.sendMail(mailOptions);
-      logger.info('Email sent via SMTP', {
+      logger.infoLog('Email sent via SMTP', {
         to: options.to,
         subject: options.subject,
         messageId: info.messageId,
@@ -115,7 +115,7 @@ class SmtpProvider {
         messageId: info.messageId,
       };
     } catch (error) {
-      logger.error('SMTP email send failed', {
+      logger.errorLog('SMTP email send failed', {
         to: options.to,
         subject: options.subject,
         error: error.message,
@@ -164,9 +164,9 @@ class SendgridProvider {
       sgMail.setApiKey(this.config.sendgrid.apiKey);
       this.sgMail = sgMail;
       this.initialized = true;
-      logger.info('SendGrid provider initialized');
+      logger.infoLog('SendGrid provider initialized');
     } catch (error) {
-      logger.error('Failed to initialize SendGrid provider:', {
+      logger.errorLog('Failed to initialize SendGrid provider:', {
         error: error.message,
       });
       throw error;
@@ -190,7 +190,7 @@ class SendgridProvider {
 
     try {
       const [response] = await this.sgMail.send(mailOptions);
-      logger.info('Email sent via SendGrid', {
+      logger.infoLog('Email sent via SendGrid', {
         to: options.to,
         subject: options.subject,
         statusCode: response.statusCode,
@@ -200,7 +200,7 @@ class SendgridProvider {
         messageId: response.headers['x-message-id'],
       };
     } catch (error) {
-      logger.error('SendGrid email send failed', {
+      logger.errorLog('SendGrid email send failed', {
         to: options.to,
         subject: options.subject,
         error: error.message,
@@ -255,7 +255,7 @@ function getMailProvider() {
   const validation = mailConfig.validateMailConfig();
 
   if (!validation.isValid) {
-    logger.warn('Mail provider validation failed:', validation.errors);
+    logger.warnLog('Mail provider validation failed:', validation.errors);
   }
 
   if (config.provider === 'smtp') {
@@ -266,7 +266,7 @@ function getMailProvider() {
     throw new Error(`Unknown mail provider: ${config.provider}`);
   }
 
-  logger.info(`Mail provider created: ${config.provider}`);
+  logger.infoLog(`Mail provider created: ${config.provider}`);
   return mailProvider;
 }
 

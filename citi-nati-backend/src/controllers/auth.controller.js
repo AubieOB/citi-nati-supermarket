@@ -221,7 +221,7 @@ const login = async (req, res) => {
       user: authUser,
     });
   } catch (err) {
-    logger.error('[AUTH] Login error', err);
+    logger.errorLog('[AUTH] Login error', err);
     return res.status(500).json({ error: 'Something went wrong' });
   }
 };
@@ -268,7 +268,7 @@ const register = async (req, res) => {
     const emailResult = await sendVerificationEmail(normalizedEmail, verificationCode);
 
     if (!emailResult.success) {
-      logger.error('[AUTH] Failed to send verification email', { email: normalizedEmail, code: emailResult?.errorCode });
+      logger.errorLog('[AUTH] Failed to send verification email', { email: normalizedEmail, code: emailResult?.errorCode });
       const emailFailure = getEmailFailureResponse(
         emailResult,
         'Failed to send verification email. Please try again.',
@@ -298,7 +298,7 @@ const register = async (req, res) => {
       requiresVerification: true,
     });
   } catch (err) {
-    logger.error('[AUTH] Registration error', err);
+    logger.errorLog('[AUTH] Registration error', err);
     return res.status(500).json({
       error: 'Something went wrong',
     });
@@ -366,7 +366,7 @@ const verifyEmail = async (req, res) => {
       requiresLogin: true,
     });
   } catch (err) {
-    logger.error('[AUTH] Email verification error', err);
+    logger.errorLog('[AUTH] Email verification error', err);
     return res.status(500).json({ error: 'Something went wrong' });
   }
 };
@@ -402,7 +402,7 @@ const resendVerificationCode = async (req, res) => {
     const emailResult = await sendVerificationEmail(normalizedEmail, newCode);
 
     if (!emailResult.success) {
-      logger.error('[AUTH] Failed to resend verification email', { email: normalizedEmail, code: emailResult?.errorCode });
+      logger.errorLog('[AUTH] Failed to resend verification email', { email: normalizedEmail, code: emailResult?.errorCode });
       const emailFailure = getEmailFailureResponse(
         emailResult,
         'Failed to send verification email. Please try again.',
@@ -426,7 +426,7 @@ const resendVerificationCode = async (req, res) => {
       message: 'A new verification code has been sent to your email',
     });
   } catch (err) {
-    logger.error('[AUTH] Resend verification code error', err);
+    logger.errorLog('[AUTH] Resend verification code error', err);
     return res.status(500).json({ error: 'Something went wrong' });
   }
 };
@@ -476,7 +476,7 @@ const forgotPassword = async (req, res) => {
     if (!emailResult.success) {
       // Delete the reset record if email fails
       await prisma.passwordReset.delete({ where: { id: resetRecord.id } });
-      logger.error('[AUTH] Failed to send password reset email', { email: normalizedEmail, code: emailResult?.errorCode });
+      logger.errorLog('[AUTH] Failed to send password reset email', { email: normalizedEmail, code: emailResult?.errorCode });
       const emailFailure = getEmailFailureResponse(
         emailResult,
         'Failed to send reset email. Please try again.',
@@ -491,7 +491,7 @@ const forgotPassword = async (req, res) => {
       message: 'Password reset code sent to your email',
     });
   } catch (err) {
-    logger.error('[AUTH] Forgot password error', err);
+    logger.errorLog('[AUTH] Forgot password error', err);
     return res.status(500).json({ error: 'Something went wrong' });
   }
 };
@@ -589,7 +589,7 @@ const resetPassword = async (req, res) => {
       user: authUser,
     });
   } catch (err) {
-    logger.error('[AUTH] Reset password error', err);
+    logger.errorLog('[AUTH] Reset password error', err);
     return res.status(500).json({ error: 'Something went wrong' });
   }
 };
@@ -679,7 +679,7 @@ const googleAuth = async (req, res) => {
       isNewUser: true,
     });
   } catch (err) {
-    logger.error('[AUTH] Google auth error', err.response?.data || err.message);
+    logger.errorLog('[AUTH] Google auth error', err.response?.data || err.message);
     return res.status(401).json({
       error: 'Invalid token or authentication failed',
     });
@@ -696,7 +696,7 @@ const logout = async (req, res) => {
     clearAuthCookies(res);
     return res.json({ success: true, message: 'Logged out successfully' });
   } catch (err) {
-    logger.error('[AUTH] Logout error', err);
+    logger.errorLog('[AUTH] Logout error', err);
     return res.status(500).json({ error: 'Something went wrong' });
   }
 };
@@ -724,7 +724,7 @@ const refreshSession = async (req, res) => {
 
     return res.json({ token: accessToken, user: authUser });
   } catch (err) {
-    logger.error('[AUTH] Refresh session error', err);
+    logger.errorLog('[AUTH] Refresh session error', err);
     clearAuthCookies(res);
     return res.status(500).json({ error: 'Something went wrong' });
   }
@@ -756,7 +756,7 @@ const getSession = async (req, res) => {
     const accessToken = issueAccessTokenCookie(res, user);
     return res.json({ user: authUser, token: accessToken });
   } catch (err) {
-    logger.error('[AUTH] Session fetch error', err);
+    logger.errorLog('[AUTH] Session fetch error', err);
     return res.status(500).json({ error: 'Something went wrong' });
   }
 };

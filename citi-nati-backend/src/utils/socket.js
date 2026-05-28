@@ -35,7 +35,7 @@ const emitNewOrder = (order) => {
       logger.debugLog(`[Socket.io] New order ${order.id} emitted to admin_room`);
     }
   } catch (err) {
-    logger.error('Error emitting newOrder event:', err.message);
+    logger.errorLog('Error emitting newOrder event:', err.message);
   }
 };
 
@@ -62,7 +62,7 @@ const emitOrderAssigned = (driverId, order) => {
       logger.debugLog(`[Socket.io] Order ${order.id} assigned to driver_${driverId}`);
     }
   } catch (err) {
-    logger.error('Error emitting orderAssigned event:', err.message);
+    logger.errorLog('Error emitting orderAssigned event:', err.message);
   }
 };
 
@@ -102,7 +102,7 @@ const emitOrderUpdatedToAdminAndCustomer = (order) => {
       logger.debugLog(`[Socket.io] Order ${order.id} assigned (no driver update)`);
     }
   } catch (err) {
-    logger.error('Error emitting orderUpdatedToAdminAndCustomer event:', err.message);
+    logger.errorLog('Error emitting orderUpdatedToAdminAndCustomer event:', err.message);
   }
 };
 
@@ -149,13 +149,13 @@ const emitOrderUpdated = (order) => {
         global.io.to(`user_${order.userId}`).emit('orderUpdated', eventData);
         logger.debugLog(`[Socket.io] Order ${order.id} emitted to user_${order.userId}`);
       } else {
-        logger.warn(`[Socket.io] Order ${order.id} has no userId - cannot notify customer`);
+        logger.warnLog(`[Socket.io] Order ${order.id} has no userId - cannot notify customer`);
       }
 
       logger.debugLog(`[Socket.io] Order ${order.id} status: ${order.status}`);
     }
   } catch (err) {
-    logger.error('Error emitting orderUpdated event:', err.message);
+    logger.errorLog('Error emitting orderUpdated event:', err.message);
   }
 };
 
@@ -220,7 +220,7 @@ const emitProductUpdate = (product) => {
       });
     }
   } catch (err) {
-    logger.error('Error emitting product_updated event:', err.message);
+    logger.errorLog('Error emitting product_updated event:', err.message);
   }
 };
 
@@ -247,7 +247,7 @@ const emitStockUpdate = (productId, newStock, newPrice = null) => {
       logger.debugLog(`[Socket.io] Stock update emitted:`, stockUpdateData);
     }
   } catch (err) {
-    logger.error('Error emitting stock_update event:', err.message);
+    logger.errorLog('Error emitting stock_update event:', err.message);
   }
 };
 
@@ -268,7 +268,7 @@ const emitMultipleStockUpdates = (products) => {
       logger.debugLog(`[Socket.io] ${products.length} stock updates emitted`);
     }
   } catch (err) {
-    logger.error('Error emitting multiple stock_update events:', err.message);
+    logger.errorLog('Error emitting multiple stock_update events:', err.message);
   }
 };
 
@@ -286,7 +286,7 @@ const emitPosSyncEvent = (event) => {
       });
     }
   } catch (err) {
-    logger.error('Error emitting posSyncEvent event:', err.message);
+    logger.errorLog('Error emitting posSyncEvent event:', err.message);
   }
 };
 

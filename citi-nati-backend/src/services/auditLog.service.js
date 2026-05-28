@@ -31,7 +31,7 @@ async function recordAuditLog({
       },
     });
   } catch (error) {
-    logger.error('[AUDIT] Failed to persist audit log', error);
+    logger.errorLog('[AUDIT] Failed to persist audit log', error);
   }
 }
 

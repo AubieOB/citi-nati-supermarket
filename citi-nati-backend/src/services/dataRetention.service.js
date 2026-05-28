@@ -44,7 +44,7 @@ async function runDataRetention(prisma, logger = console) {
       summary[name] = result?.count || 0;
     } catch (error) {
       summary[name] = `error: ${error.message}`;
-      logger.warn('[DB RETENTION] step failed', { name, message: error.message });
+      logger.warnLog('[DB RETENTION] step failed', { name, message: error.message });
     }
   };
 
@@ -100,14 +100,14 @@ async function runDataRetention(prisma, logger = console) {
     },
   }));
 
-  logger.info('[DB RETENTION] completed', { summary, policy });
+  logger.infoLog('[DB RETENTION] completed', { summary, policy });
   return summary;
 }
 
 function startDataRetentionScheduler({ prisma, logger = console }) {
   const enabled = String(process.env.DB_RETENTION_ENABLED || 'true').toLowerCase() !== 'false';
   if (!enabled) {
-    logger.info('[DB RETENTION] scheduler disabled via DB_RETENTION_ENABLED=false');
+    logger.infoLog('[DB RETENTION] scheduler disabled via DB_RETENTION_ENABLED=false');
     return;
   }
 
@@ -116,7 +116,7 @@ function startDataRetentionScheduler({ prisma, logger = console }) {
   const intervalMs = intervalHours * 60 * 60 * 1000;
 
   const run = () => runDataRetention(prisma, logger).catch((error) => {
-    logger.warn('[DB RETENTION] run failed', { message: error.message });
+    logger.warnLog('[DB RETENTION] run failed', { message: error.message });
   });
 
   const initialTimer = setTimeout(run, initialDelayMs);
@@ -129,7 +129,7 @@ function startDataRetentionScheduler({ prisma, logger = console }) {
     recurringTimer.unref();
   }
 
-  logger.info('[DB RETENTION] scheduler started', {
+  logger.infoLog('[DB RETENTION] scheduler started', {
     intervalHours,
     initialDelayMs,
   });

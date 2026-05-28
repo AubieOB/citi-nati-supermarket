@@ -38,11 +38,11 @@ const { startDataRetentionScheduler } = require('./services/dataRetention.servic
 const { ensureProductPerformanceIndexes } = require('./controllers/product.controller');
 
 process.on('unhandledRejection', (reason) => {
-  logger.error('[PROCESS][UNHANDLED_REJECTION]', reason);
+  logger.errorLog('[PROCESS][UNHANDLED_REJECTION]', reason);
 });
 
 process.on('uncaughtException', (error) => {
-  logger.error('[PROCESS][UNCAUGHT_EXCEPTION]', error);
+  logger.errorLog('[PROCESS][UNCAUGHT_EXCEPTION]', error);
 });
 const { getPublicPromotions } = require('./controllers/promotion.controller');
 
@@ -84,7 +84,7 @@ function createCorsOriginValidator(allowedOrigins, sourceName) {
       return callback(null, true);
     }
 
-    logger.warn('[CORS] Rejected origin', { origin: requestOrigin, source: sourceName, allowedOrigins });
+    logger.warnLog('[CORS] Rejected origin', { origin: requestOrigin, source: sourceName, allowedOrigins });
     const error = new Error('Not allowed by CORS');
     error.status = 403;
     return callback(error);
@@ -116,7 +116,7 @@ async function connectPrismaWithRetry(options = {}) {
       }
 
       const delayMs = baseDelayMs * attempt;
-      logger.warn('[DB INIT] prisma connect failed, retrying', {
+      logger.warnLog('[DB INIT] prisma connect failed, retrying', {
         attempt,
         maxAttempts,
         delayMs,
@@ -140,7 +140,7 @@ async function start() {
     uploadDirs.forEach(dir => {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
-        logger.info('[STARTUP] Created upload directory', { dir });
+        logger.infoLog('[STARTUP] Created upload directory', { dir });
       }
     });
 
@@ -152,7 +152,7 @@ async function start() {
     try {
       await ensureProductPerformanceIndexes();
     } catch (error) {
-      logger.warn('[DB INIT] product index setup skipped', {
+      logger.warnLog('[DB INIT] product index setup skipped', {
         code: error?.code,
         message: String(error?.message || error),
       });
@@ -248,7 +248,7 @@ async function start() {
               logger.debugLog(`[Socket] ${socket.id} joined user_${userId} (from identify)`);
             }
           } catch (err) {
-            logger.error(`[Socket] Error in identify event:`, err);
+            logger.errorLog(`[Socket] Error in identify event:`, err);
           }
         } else {
           logger.debugLog(`[Socket] Invalid identify data for ${socket.id}:`, { userId, role, email });
@@ -261,7 +261,7 @@ async function start() {
           const userId = socket.userId;
           
           if (!userId) {
-            logger.warn(`[Socket] Receipt request from unauthenticated socket ${socket.id}`);
+            logger.warnLog(`[Socket] Receipt request from unauthenticated socket ${socket.id}`);
             return callback({ error: 'Not authenticated' });
           }
 
@@ -369,7 +369,7 @@ async function start() {
 
           doc.end();
         } catch (err) {
-          logger.error('[Socket] Error generating receipt:', err);
+          logger.errorLog('[Socket] Error generating receipt:', err);
           callback({ error: 'Failed to generate receipt' });
         }
       });
@@ -393,7 +393,7 @@ async function start() {
             role: socket.role
           });
         } catch (err) {
-          logger.error(`[Socket] Error joining ticket room:`, err);
+          logger.errorLog(`[Socket] Error joining ticket room:`, err);
         }
       });
 
@@ -403,7 +403,7 @@ async function start() {
           const roomName = `ticket_${ticketId}`;
           socket.to(roomName).emit('ticketTyping', { userId });
         } catch (err) {
-          logger.error(`[Socket] Error in ticketTyping:`, err);
+          logger.errorLog(`[Socket] Error in ticketTyping:`, err);
         }
       });
 
@@ -440,7 +440,7 @@ async function start() {
           global.io.to(`ticket_${ticketId}`).emit('ticketMessage', reply);
           logger.debugLog(`[Socket] New message in ticket_${ticketId}: ${message.substring(0, 50)}...`);
         } catch (err) {
-          logger.error(`[Socket] Error saving ticket message:`, err);
+          logger.errorLog(`[Socket] Error saving ticket message:`, err);
           socket.emit('ticketMessageError', { error: 'Failed to send message' });
         }
       });
@@ -452,7 +452,7 @@ async function start() {
           socket.leave(roomName);
           logger.debugLog(`[Socket] ${socket.id} left ${roomName}`);
         } catch (err) {
-          logger.error(`[Socket] Error leaving ticket room:`, err);
+          logger.errorLog(`[Socket] Error leaving ticket room:`, err);
         }
       });
     });
@@ -597,7 +597,7 @@ async function start() {
       }
 
       const requestId = `cors_block_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      logger.warn('[CORS] Express request blocked by CORS', {
+      logger.warnLog('[CORS] Express request blocked by CORS', {
         requestId,
         origin: req.headers.origin || null,
         path: req.originalUrl,
@@ -621,7 +621,7 @@ async function start() {
       }
 
       const requestId = `api_err_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      logger.error('[API ERROR] Unhandled API exception', {
+      logger.errorLog('[API ERROR] Unhandled API exception', {
         requestId,
         method: req.method,
         path: req.originalUrl,
