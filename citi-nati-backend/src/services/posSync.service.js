@@ -12,6 +12,7 @@
 
 const axios = require('axios');
 const { PrismaClient } = require('@prisma/client');
+const logger = require('../utils/logger');
 const { notifyLowStock } = require('../utils/messageService');
 const { enrichProductStock } = require('../utils/stockResolver');
 const { emitProductUpdate } = require('../utils/socket');
@@ -129,7 +130,7 @@ async function getPosSyncEnabled(forceRefresh = false) {
     cachedPosSyncEnabled = setting ? setting.value === 'true' : ENABLE_POS_SYNC;
     posSyncSettingsLoadedAt = Date.now();
   } catch (error) {
-    console.warn('[POS Sync] Failed to load persisted POS sync setting:', error.message);
+    logger.warnLog('[POS Sync] Failed to load persisted POS sync setting:', error.message);
   }
 
   return cachedPosSyncEnabled;
@@ -155,16 +156,16 @@ async function setPosSyncEnabled(enabled) {
  */
 async function checkPOSHealth() {
   if (!(await getPosSyncEnabled())) {
-    console.log('[POS Sync] POS Sync is disabled');
+    logger.infoLog('[POS Sync] POS Sync is disabled');
     return false;
   }
 
   try {
     const response = await posAgent.get('/health');
-    console.log('[POS Sync] ✅ POS Agent is healthy');
+    logger.infoLog('[POS Sync] ✅ POS Agent is healthy');
     return response.data.success === true;
   } catch (error) {
-    console.warn('[POS Sync] ⚠️ POS Agent health check failed:', formatPosAgentError(error, '/health'));
+    logger.warnLog('[POS Sync] ⚠️ POS Agent health check failed:', formatPosAgentError(error, '/health'));
     return false;
   }
 }
@@ -188,7 +189,7 @@ async function syncProductsFromPOS() {
   const startedAt = Date.now();
 
   try {
-    console.log('[POS Sync] Starting product sync from POS Agent...');
+    logger.infoLog('[POS Sync] Starting product sync from POS Agent...');
 
     // Fetch products from POS agent
     const response = await posAgent.get('/pos-sync/products');
@@ -198,10 +199,10 @@ async function syncProductsFromPOS() {
     }
 
     const posProducts = response.data.data || [];
-    console.log(`[POS Sync] Received ${posProducts.length} products from POS Agent`);
+    logger.infoLog(`[POS Sync] Received ${posProducts.length} products from POS Agent`);
 
     if (posProducts.length === 0) {
-      console.warn('[POS Sync] No products received from POS Agent');
+      logger.warnLog('[POS Sync] No products received from POS Agent');
       return { success: true, synced: 0, skipped: 0, message: 'No products to sync' };
     }
 
@@ -230,7 +231,7 @@ async function syncProductsFromPOS() {
           skipped++;
           const rejection = `[ZOMBA STOCK][REJECTED][MANUAL_SYNC] product=${productCode || 'UNKNOWN'} stockDate=${stockDate || 'NULL'} source=${stockSource} location=${productLocationCode} stock=${Number(posProduct.QuantityAvailable || 0)} reason=UNSUPPORTED_LOCATION_CODE`;
           errors.push({ code: productCode || null, error: rejection });
-          console.warn(rejection);
+          logger.warnLog(rejection);
           continue;
         }
 
@@ -254,9 +255,9 @@ async function syncProductsFromPOS() {
         };
 
         if (DEFAULT_POS_BRANCH_CODE === 'ZOMBA') {
-          console.log(`[ZOMBA STOCK] product=${productCode || 'UNKNOWN'} stockDate=${stockDate || 'NULL'} source=${stockSource || 'Unknown'} location=${productLocationCode || 'SH'} stock=${Number(productData.stock || 0)}`);
+          logger.debugLog(`[ZOMBA STOCK] product=${productCode || 'UNKNOWN'} stockDate=${stockDate || 'NULL'} source=${stockSource || 'Unknown'} location=${productLocationCode || 'SH'} stock=${Number(productData.stock || 0)}`);
           if (productCode === '9501100002174') {
-            console.log(`[ZOMBA STOCK][VERIFY] product=9501100002174 stockDate=${stockDate || 'NULL'} source=${stockSource || 'Unknown'} location=${productLocationCode || 'SH'} stock=${Number(productData.stock || 0)}`);
+            logger.debugLog(`[ZOMBA STOCK][VERIFY] product=9501100002174 stockDate=${stockDate || 'NULL'} source=${stockSource || 'Unknown'} location=${productLocationCode || 'SH'} stock=${Number(productData.stock || 0)}`);
           }
         }
 
@@ -295,10 +296,10 @@ async function syncProductsFromPOS() {
           // Ensure mapping reattachment also runs on updates (covers legacy null-image rows).
           const reattached = await productImageMappingService.reattachImageByProductCode(posProduct.ProductCode);
           if (reattached) {
-            console.log(`[POS Sync] Image restored for ${posProduct.ProductCode}: ${reattached}`);
+            logger.debugLog(`[POS Sync] Image restored for ${posProduct.ProductCode}: ${reattached}`);
           }
 
-          console.log(`[POS Sync] Updated: ${productData.name} (${posProduct.ProductCode})`);
+          logger.debugLog(`[POS Sync] Updated: ${productData.name} (${posProduct.ProductCode})`);
         } else {
           // Create new product
           const createdProduct = await prisma.product.create({
@@ -313,12 +314,12 @@ async function syncProductsFromPOS() {
           // Batch POS sync should not emit per-product real-time events.
           // Frontend will use the aggregated pos-products-synced event.
 
-          console.log(`[POS Sync] Created: ${productData.name} (${posProduct.ProductCode})`);
+          logger.debugLog(`[POS Sync] Created: ${productData.name} (${posProduct.ProductCode})`);
 
           // Restore image from persistent mapping if one exists for this ProductCode
           const reattached = await productImageMappingService.reattachImageByProductCode(posProduct.ProductCode);
           if (reattached) {
-            console.log(`[POS Sync] Image restored for ${posProduct.ProductCode}: ${reattached}`);
+            logger.debugLog(`[POS Sync] Image restored for ${posProduct.ProductCode}: ${reattached}`);
           }
         }
 
@@ -333,7 +334,7 @@ async function syncProductsFromPOS() {
       }
     }
 
-    console.log(`[POS Sync] ✅ Sync complete: ${synced} synced, ${skipped} skipped`);
+    logger.productionSummaryLog(`[POS Sync] ✅ Sync complete: ${synced} synced, ${skipped} skipped`);
 
     await recordMonitorEvent({
       eventType: 'manual-product-sync',
@@ -398,14 +399,14 @@ async function getCategoriesFromPOS() {
   }
 
   try {
-    console.log('[POS Sync] Fetching categories from POS Agent...');
+    logger.debugLog('[POS Sync] Fetching categories from POS Agent...');
     const response = await posAgent.get('/pos-sync/categories');
 
     if (!response.data.success) {
       throw new Error(response.data.error);
     }
 
-    console.log(`[POS Sync] Fetched ${response.data.count} categories`);
+    logger.infoLog(`[POS Sync] Fetched ${response.data.count} categories`);
     return response.data.data || [];
   } catch (error) {
     console.error('[POS Sync] Error fetching categories:', formatPosAgentError(error, '/pos-sync/categories'));
@@ -424,14 +425,14 @@ async function getStockFromPOS() {
   }
 
   try {
-    console.log('[POS Sync] Fetching stock from POS Agent...');
+    logger.debugLog('[POS Sync] Fetching stock from POS Agent...');
     const response = await posAgent.get('/pos-sync/stock-by-location');
 
     if (!response.data.success) {
       throw new Error(response.data.error);
     }
 
-    console.log(`[POS Sync] Fetched stock for ${response.data.count} products`);
+    logger.infoLog(`[POS Sync] Fetched stock for ${response.data.count} products`);
     return response.data.data || [];
   } catch (error) {
     console.error('[POS Sync] Error fetching stock:', formatPosAgentError(error, '/pos-sync/stock-by-location'));
@@ -461,7 +462,7 @@ async function getPriceFromPOS(productCode) {
     const product = response.data.data?.find(p => p.ProductCode === productCode);
     return product?.SellingPrice || null;
   } catch (error) {
-    console.warn(`[POS Sync] Error fetching price for ${productCode}:`, formatPosAgentError(error, '/pos-sync/products'));
+    logger.warnLog(`[POS Sync] Error fetching price for ${productCode}:`, formatPosAgentError(error, '/pos-sync/products'));
     return null;
   }
 }
@@ -487,7 +488,7 @@ async function getStockFromPOSByCode(productCode) {
     const stock = response.data.data?.find(s => s.ProductCode === productCode);
     return stock?.AvailableStock || null;
   } catch (error) {
-    console.warn(`[POS Sync] Error fetching stock for ${productCode}:`, formatPosAgentError(error, '/pos-sync/stock-by-location'));
+    logger.warnLog(`[POS Sync] Error fetching stock for ${productCode}:`, formatPosAgentError(error, '/pos-sync/stock-by-location'));
     return null;
   }
 }
@@ -558,10 +559,10 @@ async function getExpiryProductsFromPOS({ days = 14, locationCode = 'SH', includ
 
   try {
     if (!POS_SECRET) {
-      console.warn('[BACKEND -> AGENT][EXPIRY] POS_SECRET is empty. Agent will likely return 401 before route-level [EXPIRY] logs.');
+      logger.warnLog('[BACKEND -> AGENT][EXPIRY] POS_SECRET is empty. Agent will likely return 401 before route-level [EXPIRY] logs.');
     }
 
-    console.log('[BACKEND -> AGENT][EXPIRY] requesting expiry candidates', {
+    logger.debugLog('[BACKEND -> AGENT][EXPIRY] requesting expiry candidates', {
       endpoint,
       targetUrl,
       agentUrlSource: POS_AGENT_URL_SOURCE,
@@ -585,7 +586,7 @@ async function getExpiryProductsFromPOS({ days = 14, locationCode = 'SH', includ
       timeout: effectiveTimeoutMs,
     });
 
-    console.log('[BACKEND -> AGENT][EXPIRY] success', {
+    logger.debugLog('[BACKEND -> AGENT][EXPIRY] success', {
       endpoint,
       targetUrl,
       status: response.status,

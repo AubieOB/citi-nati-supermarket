@@ -1,6 +1,7 @@
 'use strict';
 
 const { PrismaClient } = require('@prisma/client');
+const logger = require('../utils/logger');
 const { resolvePeriod, formatDateRange } = require('../utils/reportingPeriod');
 const {
   extractFilters,
@@ -52,7 +53,7 @@ function logReportScope(endpoint, req, whereClause, extra = {}) {
       syncSourceCode: req.query.syncSourceCode || null,
     };
 
-    console.log('[BO REPORTING][SCOPE]', {
+    logger.debugLog('[BO REPORTING][SCOPE]', {
       endpoint,
       scope,
       effectiveBranchCode: whereClause?.branchCode || null,
@@ -83,7 +84,7 @@ function logLocationHistoryParity(endpoint, req, filters, whereClause, rowsFetch
       endDate: req.query.endDate || null,
     };
 
-    console.log('[BO_LOCATION_HISTORY_PARITY]', {
+    logger.debugLog('[BO_LOCATION_HISTORY_PARITY]', {
       module: endpoint,
       selectedBranchCode: scope.selectedBranchCode,
       selectedLocationCode: scope.selectedLocationCode,
@@ -153,12 +154,12 @@ async function _probeBranchDataAsync(branchCode, invoiceWhere) {
         by: ['branchCode', 'syncSourceCode'],
         _count: { id: true },
       });
-      console.log('[BO REPORTING][ZERO-DATA PROBE] No invoices found for branch even without date filter.', {
+      logger.debugLog('[BO REPORTING][ZERO-DATA PROBE] No invoices found for branch even without date filter.', {
         queriedBranchCode: branchCode,
         allBranchesInDB: allBranches,
       });
     } else {
-      console.log('[BO REPORTING][ZERO-DATA PROBE] Invoices exist for branch outside current date range!', {
+      logger.debugLog('[BO REPORTING][ZERO-DATA PROBE] Invoices exist for branch outside current date range!', {
         queriedBranchCode: branchCode,
         totalWithoutDateFilter: totalCount,
         breakdown: groupBy.map((g) => ({
@@ -171,7 +172,7 @@ async function _probeBranchDataAsync(branchCode, invoiceWhere) {
       });
     }
   } catch (probeErr) {
-    console.warn('[BO REPORTING][ZERO-DATA PROBE] Probe query failed:', {
+    logger.warnLog('[BO REPORTING][ZERO-DATA PROBE] Probe query failed:', {
       message: probeErr?.message || null,
       code: probeErr?.code || null,
       name: probeErr?.name || null,
@@ -219,7 +220,7 @@ async function getSalesSummary(req, res) {
     });
   } catch (err) {
     if (handleReportingValidationError(err, res)) return;
-    console.error('[REPORTING] getSalesSummary error:', err);
+    logger.errorLog('[REPORTING] getSalesSummary error:', { error: err });
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 }
@@ -269,7 +270,7 @@ async function getSalesInvoices(req, res) {
     });
   } catch (err) {
     if (handleReportingValidationError(err, res)) return;
-    console.error('[REPORTING] getSalesInvoices error:', err);
+    logger.errorLog('[REPORTING] getSalesInvoices error:', { error: err });
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 }
@@ -320,7 +321,7 @@ async function getSalesProducts(req, res) {
     });
   } catch (err) {
     if (handleReportingValidationError(err, res)) return;
-    console.error('[REPORTING] getSalesProducts error:', err);
+    logger.errorLog('[REPORTING] getSalesProducts error:', { error: err });
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 }
@@ -368,7 +369,7 @@ async function getSalesUsers(req, res) {
     });
   } catch (err) {
     if (handleReportingValidationError(err, res)) return;
-    console.error('[REPORTING] getSalesUsers error:', err);
+    logger.errorLog('[REPORTING] getSalesUsers error:', { error: err });
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 }
@@ -418,7 +419,7 @@ async function getSalesPayments(req, res) {
     });
   } catch (err) {
     if (handleReportingValidationError(err, res)) return;
-    console.error('[REPORTING] getSalesPayments error:', err);
+    logger.errorLog('[REPORTING] getSalesPayments error:', { error: err });
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 }
@@ -454,7 +455,7 @@ async function getSalesProfitLatestCost(req, res) {
       data,
     });
   } catch (err) {
-    console.error('[REPORTING] getSalesProfitLatestCost error:', err);
+    logger.errorLog('[REPORTING] getSalesProfitLatestCost error:', { error: err });
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 }

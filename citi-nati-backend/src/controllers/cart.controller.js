@@ -1,6 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const { splitInclusiveVat } = require('../utils/vat');
 const { getMinimumOrderValue } = require('../utils/checkoutRules');
+const logger = require('../utils/logger');
 
 const prisma = new PrismaClient();
 
@@ -85,7 +86,7 @@ const addToCart = async (req, res) => {
       message: 'Product added to cart successfully',
     });
   } catch (err) {
-    console.error('Error adding product to cart:', err);
+    logger.errorLog('Error adding product to cart:', { message: err && err.message ? err.message : String(err) });
     return res.status(500).json({
       error: 'Server error while adding product to cart',
     });
@@ -152,7 +153,7 @@ const getCart = async (req, res) => {
       minimumOrderValue,
     });
   } catch (err) {
-    console.error('Error fetching cart:', err);
+    logger.errorLog('Error fetching cart:', { message: err && err.message ? err.message : String(err) });
     return res.status(500).json({
       error: 'Server error while fetching cart',
     });
@@ -247,7 +248,7 @@ const updateCartItem = async (req, res) => {
       item: formattedItem,
     });
   } catch (err) {
-    console.error('Error updating cart item:', err);
+    logger.errorLog('Error updating cart item:', { message: err && err.message ? err.message : String(err) });
     return res.status(500).json({
       error: 'Server error while updating cart item',
     });

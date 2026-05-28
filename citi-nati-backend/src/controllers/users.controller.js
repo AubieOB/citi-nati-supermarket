@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const logger = require('../utils/logger');
 
 const prisma = new PrismaClient();
 
@@ -25,7 +26,7 @@ const getAllUsers = async (req, res) => {
       users,
     });
   } catch (err) {
-    console.error('Error fetching all users:', err);
+    logger.errorLog('Error fetching all users:', { message: err && err.message ? err.message : String(err) });
     return res.status(500).json({ error: 'Server error while fetching users' });
   }
 };
@@ -39,7 +40,7 @@ const updateUserRole = async (req, res) => {
     const { id } = req.params;
     const { role } = req.body;
 
-    console.log('[DEBUG ROLE UPDATE] Received:', { id, role, body: req.body });
+    logger.debugLog('[DEBUG ROLE UPDATE] Received:', { id, role, body: req.body });
 
     // Validate role parameter
     if (!role) {
@@ -49,7 +50,7 @@ const updateUserRole = async (req, res) => {
     // Ensure role is one of allowed values
     const allowedRoles = ['user', 'admin', 'driver'];
     const normalizedRole = role.toLowerCase();
-    console.log('[DEBUG ROLE UPDATE] Normalizing:', { received: role, normalized: normalizedRole, allowed: allowedRoles });
+    logger.debugLog('[DEBUG ROLE UPDATE] Normalizing:', { received: role, normalized: normalizedRole, allowed: allowedRoles });
     
     if (!allowedRoles.includes(normalizedRole)) {
       return res.status(400).json({
@@ -90,7 +91,7 @@ const updateUserRole = async (req, res) => {
           email: existingUser.email,
         },
       });
-      console.log('[DEBUG ROLE UPDATE] Deleted Driver record for user:', existingUser.email);
+      logger.debugLog('[DEBUG ROLE UPDATE] Deleted Driver record for user:', existingUser.email);
     }
 
     // If role changed TO "driver", ensure a Driver record exists
@@ -110,18 +111,18 @@ const updateUserRole = async (req, res) => {
             email: existingUser.email,
           },
         });
-        console.log('[DEBUG ROLE UPDATE] Created Driver record for user:', existingUser.email);
+        logger.debugLog('[DEBUG ROLE UPDATE] Created Driver record for user:', existingUser.email);
       }
     }
 
-    console.log('[DEBUG ROLE UPDATE] User role updated:', { userId: id, newRole: normalizedRole });
+    logger.debugLog('[DEBUG ROLE UPDATE] User role updated:', { userId: id, newRole: normalizedRole });
 
     return res.status(200).json({
       message: 'User role updated successfully',
       user: updatedUser,
     });
   } catch (err) {
-    console.error('Error updating user role:', err);
+    logger.errorLog('Error updating user role:', { message: err && err.message ? err.message : String(err) });
     return res.status(500).json({ error: 'Server error while updating user role' });
   }
 };
@@ -148,7 +149,7 @@ const deleteUser = async (req, res) => {
       await prisma.driver.deleteMany({
         where: { email: existingUser.email },
       });
-      console.log('[DEBUG USER DELETE] Deleted associated Driver record for:', existingUser.email);
+      logger.debugLog('[DEBUG USER DELETE] Deleted associated Driver record for:', existingUser.email);
     }
 
     // Delete user (CASCADE will handle cart and orders)
@@ -160,7 +161,7 @@ const deleteUser = async (req, res) => {
       message: 'User deleted successfully',
     });
   } catch (err) {
-    console.error('Error deleting user:', err);
+    logger.errorLog('Error deleting user:', { message: err && err.message ? err.message : String(err) });
     return res.status(500).json({ error: 'Server error while deleting user' });
   }
 };

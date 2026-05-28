@@ -50,14 +50,14 @@ function memorySnapshot() {
 }
 
 function logExportProgress(logLabel, message, extra = {}) {
-  console.log(`[FULL-WORKBOOK] ${logLabel} ${message}`, {
+  logger.debugLog(`[FULL-WORKBOOK] ${logLabel} ${message}`, {
     ...extra,
     memory: memorySnapshot(),
   });
 }
 
 function logImportProgress(message, extra = {}) {
-  console.log('[FULL-WORKBOOK][IMPORT]', {
+  logger.debugLog('[FULL-WORKBOOK][IMPORT]', {
     message,
     ...extra,
     memory: memorySnapshot(),

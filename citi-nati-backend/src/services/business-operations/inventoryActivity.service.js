@@ -3,6 +3,7 @@
 const { PrismaClient } = require('@prisma/client');
 const { resolveEffectiveStock } = require('../../utils/stockResolver');
 const { buildInvoiceWhere, buildItemWhere } = require('../../utils/reportingFilters');
+const logger = require('../../utils/logger');
 
 const prisma = new PrismaClient();
 
@@ -106,7 +107,7 @@ function buildLocationFilter(filters = {}) {
   }
 
   if (filters.locationId && !filters.locationCode) {
-    console.warn('[INVENTORY LEDGER] Legacy locationId ignored for canonical reporting scope', {
+    logger.warnLog('[INVENTORY LEDGER] Legacy locationId ignored for canonical reporting scope', {
       branchCode: filters.branchCode || null,
       locationCode: filters.locationCode || null,
       locationId: filters.locationId,
@@ -214,7 +215,7 @@ async function getSaleMovements(period, filters = {}) {
 async function getIntakeMovements(period, filters = {}) {
   // Treat POS-approved GRN / POS stock intake as the single source of truth for stock intake movements.
   const movements = await getPOSGRNMovements(period, filters);
-  console.log('[LEDGER STOCK_IN MOVEMENTS] getIntakeMovements returning POS GRN intake rows:', movements.length);
+  logger.debugLog('[LEDGER STOCK_IN MOVEMENTS] getIntakeMovements returning POS GRN intake rows:', movements.length);
   return movements;
 }
 
@@ -309,7 +310,7 @@ async function getPOSGRNMovements(period, filters = {}) {
     ].filter(Boolean),
   } : {};
 
-  console.log('[INVENTORY_ACTIVITY_SERVICE] getPOSGRNMovements requested:', {
+  logger.debugLog('[INVENTORY_ACTIVITY_SERVICE] getPOSGRNMovements requested:', {
     period: { start: period.startDate.toISOString(), end: period.endDate.toISOString() },
     locationFilter,
     productFilter: filters.productCode || filters.productName ? { productCode: filters.productCode, productName: filters.productName } : null,
@@ -347,7 +348,7 @@ async function getPOSGRNMovements(period, filters = {}) {
       ],
     };
 
-    console.log('[LEDGER POS_GRN QUERY FILTERS]', {
+    logger.debugLog('[LEDGER POS_GRN QUERY FILTERS]', {
       table: 'posStockIntakeItem',
       relation: 'posStockIntake',
       movementType: 'STOCK_IN',
@@ -427,13 +428,13 @@ async function getPOSGRNMovements(period, filters = {}) {
       orderBy: { createdAt: 'asc' },
     });
 
-    console.log('[LEDGER POS_GRN COUNT NO DATE]', countNoDateWithLocation);
-    console.log('[LEDGER POS_GRN COUNT WITH DATE]', countWithDate);
-    console.log('[LEDGER POS_GRN COUNT DATE_ONLY]', countDateOnly);
-    console.log('[LEDGER POS_GRN SAMPLE ROW]', sampleRow || null);
+    logger.debugLog('[LEDGER POS_GRN COUNT NO DATE]', countNoDateWithLocation);
+    logger.debugLog('[LEDGER POS_GRN COUNT WITH DATE]', countWithDate);
+    logger.debugLog('[LEDGER POS_GRN COUNT DATE_ONLY]', countDateOnly);
+    logger.debugLog('[LEDGER POS_GRN SAMPLE ROW]', sampleRow || null);
 
     // RUNTIME VERIFICATION: Log Prisma field selection
-    console.log('[PRISMA SELECT VERIFICATION] posStockIntakeItem.findMany() will select:', {
+    logger.debugLog('[PRISMA SELECT VERIFICATION] posStockIntakeItem.findMany() will select:', {
       requiredFields: [
         'id',
         'productCode',
@@ -504,14 +505,14 @@ async function getPOSGRNMovements(period, filters = {}) {
       ],
     });
 
-    console.log('[LEDGER POS_GRN QUERY] count', grnItems.length, {
+    logger.debugLog('[LEDGER POS_GRN QUERY] count', grnItems.length, {
       periodStart: period.startDate.toISOString(),
       periodEnd: period.endDate.toISOString(),
       branchCode: locationFilter.branchCode || null,
       locationCode: locationFilter.locationCode || null,
     });
 
-    console.log(`[INVENTORY_ACTIVITY_SERVICE] Found ${grnItems.length} POS GRN item records`);
+    logger.debugLog(`[INVENTORY_ACTIVITY_SERVICE] Found ${grnItems.length} POS GRN item records`);
 
     // Transform to movement format expected by ledger
     const movements = grnItems.map((item) => {
@@ -585,7 +586,7 @@ async function getPOSGRNMovements(period, filters = {}) {
         userName: selectedUser,
       };
 
-      console.log('[LEDGER STOCK_IN METADATA] Historical GRN detection:', {
+      logger.debugLog('[LEDGER STOCK_IN METADATA] Historical GRN detection:', {
         grnNo: item.posStockIntake.grnNo,
         grnDate: item.posStockIntake.grnDate,
         grnObservedAt: item.posStockIntake.grnObservedAt,
@@ -596,12 +597,12 @@ async function getPOSGRNMovements(period, filters = {}) {
         selectedMovementDate: movementDate.toISOString(),
         selectedUser,
       });
-      console.log('[POS GRN MAPPED ROW]', mappedRow);
+      logger.debugLog('[POS GRN MAPPED ROW]', mappedRow);
       return mappedRow;
     });
 
-    console.log('[INVENTORY_ACTIVITY_SERVICE][LEDGER GRN NORMALIZATION] POS GRN movement sample:', movements[0] || null);
-    console.log(`[INVENTORY_ACTIVITY_SERVICE] Returning ${movements.length} POS GRN movements`);
+    logger.debugLog('[INVENTORY_ACTIVITY_SERVICE][LEDGER GRN NORMALIZATION] POS GRN movement sample:', movements[0] || null);
+    logger.debugLog(`[INVENTORY_ACTIVITY_SERVICE] Returning ${movements.length} POS GRN movements`);
     return movements;
   } catch (error) {
     console.error('[INVENTORY_ACTIVITY_SERVICE] Error fetching POS GRN movements:', error);
@@ -621,7 +622,7 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
   const normalizedBranchCode = locationFilter.branchCode ? normalizeUpper(locationFilter.branchCode) : null;
   const normalizedLocationCode = locationFilter.locationCode ? normalizeUpper(locationFilter.locationCode) : null;
 
-  console.log('[OPENING_BALANCE_DEBUG] Input:', {
+  logger.debugLog('[OPENING_BALANCE_DEBUG] Input:', {
     productCode: normalizedProductCode,
     productName,
     branchCode: normalizedBranchCode,
@@ -631,7 +632,7 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
   });
 
   if (!normalizedProductCode) {
-    console.warn('[OPENING BALANCE] Missing productCode - cannot compute exact opening balance', {
+    logger.warnLog('[OPENING BALANCE] Missing productCode - cannot compute exact opening balance', {
       productName,
       branchCode: normalizedBranchCode,
       locationCode: normalizedLocationCode,
@@ -640,7 +641,7 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
   }
 
   if (!normalizedBranchCode || !normalizedLocationCode) {
-    console.warn('[OPENING BALANCE] branchCode+locationCode required for exact stock lookup', {
+    logger.warnLog('[OPENING BALANCE] branchCode+locationCode required for exact stock lookup', {
       productCode: normalizedProductCode,
       branchCode: normalizedBranchCode,
       locationCode: normalizedLocationCode,
@@ -660,7 +661,7 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
     const latestStockBalance = currentSyncedStock ? toNum(resolveEffectiveStock(currentSyncedStock)) : null;
     const stockSource = currentSyncedStock ? 'PersistedProduct.stock' : 'PersistedProduct.not_found';
 
-    console.log('[OPENING_BALANCE_DEBUG] Exact stock query:', {
+    logger.debugLog('[OPENING_BALANCE_DEBUG] Exact stock query:', {
       productCode: normalizedProductCode,
       branchCode: normalizedBranchCode,
       locationCode: normalizedLocationCode,
@@ -707,7 +708,7 @@ async function getOpeningBalance(productCode, productName, locationCode, periodS
       ? toNum(latestStockBalance + totalQtyOutInSelectedPeriod - totalQtyInInSelectedPeriod)
       : 0;
 
-    console.log('[OPENING BALANCE] Product:', {
+    logger.debugLog('[OPENING BALANCE] Product:', {
       productCode: normalizedProductCode,
       productName,
       branchCode: normalizedBranchCode,
@@ -898,7 +899,7 @@ async function getCurrentProductStock(productCode, locationCode, branchCode) {
  */
 async function getInventoryActivityLedgerData({ period: periodParams, filters = {} }) {
   try {
-    console.log('[INVENTORY_LEDGER_SERVICE] Active implementation loaded');
+    logger.debugLog('[INVENTORY_LEDGER_SERVICE] Active implementation loaded');
     const period = buildPeriod(filters);
     const hasProductFilter = Boolean(normalize(filters.productCode) || normalize(filters.productName));
     const isAllLocations = !filters.locationCode;
@@ -910,9 +911,9 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
     const today = new Date(Date.UTC(localNow.getUTCFullYear(), localNow.getUTCMonth(), localNow.getUTCDate()));
     const isPeriodToday = periodStartDay.getTime() === today.getTime();
 
-    console.log('[INVENTORY LEDGER] Period is today:', isPeriodToday, 'startDate:', period.startDate.toISOString(), 'today:', today.toISOString());
-    console.log('[INVENTORY LEDGER] Product filter:', { hasProductFilter, productCode: filters.productCode, productName: filters.productName });
-    console.log('[INVENTORY LEDGER] Location filter:', {
+    logger.debugLog('[INVENTORY LEDGER] Period is today:', isPeriodToday, 'startDate:', period.startDate.toISOString(), 'today:', today.toISOString());
+    logger.debugLog('[INVENTORY LEDGER] Product filter:', { hasProductFilter, productCode: filters.productCode, productName: filters.productName });
+    logger.debugLog('[INVENTORY LEDGER] Location filter:', {
       isAllLocations,
       branchCode: filters.branchCode,
       locationCode: filters.locationCode,
@@ -920,7 +921,7 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
     });
 
     if ((filters.locationId || filters.branchCode || filters.locationCode) && (!filters.branchCode || !filters.locationCode)) {
-      console.warn('[INVENTORY LEDGER] Incomplete canonical location scope. Exact opening balance requires branchCode + locationCode.', {
+      logger.warnLog('[INVENTORY LEDGER] Incomplete canonical location scope. Exact opening balance requires branchCode + locationCode.', {
         branchCode: filters.branchCode,
         locationCode: filters.locationCode,
         locationId: filters.locationId,
@@ -935,20 +936,20 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       getAdjustmentMovements(period, filters),
     ]);
 
-    console.log('[INVENTORY LEDGER] Movements fetched:', { sales: saleMovements.length, intakes: intakeMovements.length, emergencySales: emergencySalesMovements.length, adjustments: adjustmentMovements.length });
-    console.log('[LEDGER STOCK_IN MOVEMENTS] count', intakeMovements.length);
+    logger.debugLog('[INVENTORY LEDGER] Movements fetched:', { sales: saleMovements.length, intakes: intakeMovements.length, emergencySales: emergencySalesMovements.length, adjustments: adjustmentMovements.length });
+    logger.debugLog('[LEDGER STOCK_IN MOVEMENTS] count', intakeMovements.length);
 
     // Log intake movement quality check
     if (intakeMovements.length > 0) {
-      console.log('[INVENTORY LEDGER] Intake movements summary:');
+      logger.debugLog('[INVENTORY LEDGER] Intake movements summary:');
       const intakeSummary = {};
       intakeMovements.forEach(m => {
         const key = `${m.branchCode || '?'}/${m.locationCode || '?'}`;
         intakeSummary[key] = (intakeSummary[key] || 0) + 1;
       });
-      console.log('[INVENTORY LEDGER] Intakes by location:', intakeSummary);
+      logger.debugLog('[INVENTORY LEDGER] Intakes by location:', intakeSummary);
     } else {
-      console.warn('[INVENTORY LEDGER] ⚠️ NO INTAKE MOVEMENTS FOUND', {
+      logger.warnLog('[INVENTORY LEDGER] ⚠️ NO INTAKE MOVEMENTS FOUND', {
         period: { start: period.startDate.toISOString(), end: period.endDate.toISOString() },
         filters: { branchCode: filters.branchCode, locationCode: filters.locationCode, locationId: filters.locationId },
         advice: 'Check that POS GRN / stock intake sync records exist in the backend for the selected period and location',
@@ -976,8 +977,8 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       else postCounts.other += 1;
     });
 
-    console.log('[LEDGER ALL MOVEMENTS] sales count:', rawCounts.sales, 'stockIn count:', rawCounts.stockIn, 'total count:', preFilterCount);
-    console.log('[LEDGER FILTER]', {
+    logger.debugLog('[LEDGER ALL MOVEMENTS] sales count:', rawCounts.sales, 'stockIn count:', rawCounts.stockIn, 'total count:', preFilterCount);
+    logger.debugLog('[LEDGER FILTER]', {
       requestedMovementType,
       beforeCount: preFilterCount,
       afterCount: allMovements.length,
@@ -1008,7 +1009,7 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
     const productCurrentBalances = {};
     const productDiagnostics = new Map();
 
-    console.log('[INVENTORY LEDGER] Processing opening balances for', uniqueProductKeys.length, 'unique products');
+    logger.debugLog('[INVENTORY LEDGER] Processing opening balances for', uniqueProductKeys.length, 'unique products');
 
     let diagnosticCounter = 0;
     let stockInDiagnostics = 0;
@@ -1025,7 +1026,7 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       productOpeningBalances[productKey] = toNum(openingBal);
       productCurrentBalances[productKey] = toNum(openingBal);
 
-      console.log('[INVENTORY LEDGER] Opening balance set for', { productCode, productName }, 'value:', openingBal);
+      logger.debugLog('[INVENTORY LEDGER] Opening balance set for', { productCode, productName }, 'value:', openingBal);
 
       if (diagnosticCounter < 10) {
         let currentStock = null;
@@ -1096,7 +1097,7 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
           stockSource,
         });
 
-        console.log(`[LEDGER DIAGNOSTIC ${diagnosticCounter + 1}/10]`, {
+        logger.debugLog(`[LEDGER DIAGNOSTIC ${diagnosticCounter + 1}/10]`, {
           productCode,
           productName,
           branchCode: filters.branchCode || null,
@@ -1156,7 +1157,7 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
         movement.balanceAfterTransaction = nextBalance;
 
         if (movement.movementType === 'STOCK_IN' && stockInDiagnostics < 10) {
-          console.log('[LEDGER STOCK_IN FLOW]', {
+          logger.debugLog('[LEDGER STOCK_IN FLOW]', {
             productCode: movement.productCode,
             GRNNo: movement.referenceNo,
             transactionTime: movement.transactionTime,
@@ -1175,11 +1176,11 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
         if (productDiagnostics.has(productKey) && !firstBalanceLogged.has(productKey)) {
           const diag = productDiagnostics.get(productKey);
           diag.firstBalanceAfterTransaction = movement.balanceAfterTransaction;
-          console.log(`[LEDGER DIAGNOSTIC UPDATE] First balance after transaction for ${movement.productCode || movement.productName}: ${movement.balanceAfterTransaction}`);
+          logger.debugLog(`[LEDGER DIAGNOSTIC UPDATE] First balance after transaction for ${movement.productCode || movement.productName}: ${movement.balanceAfterTransaction}`);
           firstBalanceLogged.add(productKey);
         }
 
-        console.log('[LEDGER BALANCE] Movement:', {
+        logger.debugLog('[LEDGER BALANCE] Movement:', {
           productCode: movement.productCode,
           branchCode: movementBranchCode,
           locationCode: movementLocationCode,
@@ -1199,7 +1200,7 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
         productCurrentBalances[productKey] ??
         productOpeningBalances[productKey] ??
         null;
-        console.warn('[LEDGER BALANCE] No balance tracking for productKey:', productKey, {
+        logger.warnLog('[LEDGER BALANCE] No balance tracking for productKey:', productKey, {
           branchCode: movementBranchCode,
           locationCode: movementLocationCode,
           matched: Boolean(resolvedProduct),
@@ -1241,7 +1242,7 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       
       // Log summary per product
       const { productCode, productName } = productKeyLookup.get(productKey) || {};
-      console.log('[LEDGER SUMMARY PER PRODUCT]', {
+      logger.debugLog('[LEDGER SUMMARY PER PRODUCT]', {
         productCode,
         productName,
         openingBalance: productOpeningBalances[productKey],
@@ -1251,7 +1252,7 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
     });
 
     for (const [productKey, diag] of productDiagnostics.entries()) {
-      console.log('[LEDGER DIAGNOSTIC SUMMARY]', {
+      logger.debugLog('[LEDGER DIAGNOSTIC SUMMARY]', {
         productCode: diag.productCode,
         latestStockBalance: diag.latestStockBalance,
         totalQtyOutInSelectedPeriod: diag.totalQtyOutInSelectedPeriod,
@@ -1294,7 +1295,7 @@ async function getInventoryActivityLedgerData({ period: periodParams, filters = 
       const timestampValue = movement.movementDate instanceof Date ? movement.movementDate.toISOString() : movement.movementDate;
 
       // Diagnostic log for each ledger row
-      console.log('[LEDGER ROW]', {
+      logger.debugLog('[LEDGER ROW]', {
         productCode: movement.productCode,
         branchCode: filters.branchCode,
         locationCode: movement.locationCode,

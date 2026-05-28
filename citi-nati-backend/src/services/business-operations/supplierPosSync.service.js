@@ -1,6 +1,7 @@
 'use strict';
 
 const { PrismaClient } = require('@prisma/client');
+const logger = require('../../utils/logger');
 const posCommandQueueService = require('../posCommandQueue.service');
 
 const prisma = new PrismaClient();
@@ -152,7 +153,7 @@ async function ingestSuppliersFromPos(payload) {
         });
         result.createdSuppliers += 1;
         if (verboseLogsEnabled) {
-          console.log('[BO][SUPPLIER_SYNC][PULL] created website supplier', {
+          logger.debugLog('[BO][SUPPLIER_SYNC][PULL] created website supplier', {
             supplierId: supplier.id,
             branchCode,
             posSupplierCode,
@@ -195,7 +196,7 @@ async function ingestSuppliersFromPos(payload) {
           },
         });
 
-        console.warn('[BO][SUPPLIER_SYNC][PULL] reassigned conflicting POS supplier code', {
+        logger.warnLog('[BO][SUPPLIER_SYNC][PULL] reassigned conflicting POS supplier code', {
           branchCode,
           posSupplierCode,
           fromSupplierId: conflictingLink.supplierId,
@@ -237,7 +238,7 @@ async function ingestSuppliersFromPos(payload) {
       );
 
       if (verboseLogsEnabled) {
-        console.log('[BO][SUPPLIER_SYNC][PULL] linked supplier', {
+        logger.debugLog('[BO][SUPPLIER_SYNC][PULL] linked supplier', {
           supplierId: supplier.id,
           branchCode,
           posSupplierCode,
@@ -251,7 +252,7 @@ async function ingestSuppliersFromPos(payload) {
     .filter((entry) => Number(entry[1] || 0) > 1)
     .sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0));
 
-  console.log('[BO][SUPPLIER_SYNC][PULL][SUMMARY]', {
+  logger.debugLog('[BO][SUPPLIER_SYNC][PULL][SUMMARY]', {
     inputBranchCode: rawBranchCode || null,
     inputSyncSourceCode: rawSyncSourceCode || null,
     inputLocationCode: rawLocationCode || null,
@@ -299,7 +300,7 @@ async function ingestSuppliersFromPos(payload) {
         where: { id: { in: staleSupplierIds } },
         data: { status: 'inactive' },
       });
-      console.log('[BO][SUPPLIER_SYNC][PULL][POS_DELETE_DETECTED]', {
+      logger.warnLog('[BO][SUPPLIER_SYNC][PULL][POS_DELETE_DETECTED]', {
         branchCode,
         staleLinksRemoved: staleLinkIds.length,
         suppliersDeactivated: staleSupplierIds.length,
@@ -402,7 +403,7 @@ async function queueSupplierPushToPos(supplierId, branchCodeInput, createdBy) {
     });
   }
 
-  console.log('[BO][SUPPLIER_SYNC][PUSH] queued supplier push command', {
+  logger.debugLog('[BO][SUPPLIER_SYNC][PUSH] queued supplier push command', {
     commandId: queued.id,
     supplierId: supplier.id,
     branchCode,
@@ -453,7 +454,7 @@ async function queueSupplierDeleteFromPos(supplierId) {
       }
     );
 
-    console.log('[BO][SUPPLIER_SYNC][DELETE] queued DELETE_SUPPLIER command', {
+    logger.debugLog('[BO][SUPPLIER_SYNC][DELETE] queued DELETE_SUPPLIER command', {
       commandId: command.id,
       supplierId: supplier.id,
       branchCode,

@@ -32,14 +32,14 @@ async function getInventoryActivityLedger(req, res) {
       movementType: normalizeQueryValue(req.query.movementType),
     };
 
-    console.log('[INVENTORY ACTIVITY] getInventoryActivityLedger filters:', filters);
+    logger.debugLog('[INVENTORY ACTIVITY] getInventoryActivityLedger filters:', { filters });
 
     const data = await getInventoryActivityLedgerData({
       filters,
     });
 
     // Add diagnostic logging for historical backfill visibility
-    console.log('[INVENTORY_HISTORY_SALES_TRACE]', {
+    logger.debugLog('[INVENTORY_HISTORY_SALES_TRACE]', {
       selectedBranchCode: filters.branchCode,
       selectedLocationCode: filters.locationCode,
       periodStart: filters.startDate || filters.date,

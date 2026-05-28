@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const dataSnapshotService = require('../services/business-operations/dataSnapshot.service');
+const logger = require('../utils/logger');
 
 const prisma = new PrismaClient();
 
@@ -15,7 +16,7 @@ const startSalesDay = async (req, res) => {
     });
 
     if (existingOpenDay) {
-      console.log('[SALES] Sales day already open:', existingOpenDay.id);
+      logger.infoLog('[SALES] Sales day already open:', { salesDayId: existingOpenDay.id });
       return res.status(400).json({
         message: 'Sales day already open',
         openedAt: existingOpenDay.openedAt,
@@ -32,13 +33,13 @@ const startSalesDay = async (req, res) => {
       }
     });
 
-    console.log('[SALES] New sales day started:', { id: newDay.id, openedAt: newDay.openedAt });
+    logger.infoLog('[SALES] New sales day started:', { id: newDay.id, openedAt: newDay.openedAt });
     res.json({
       message: 'Sales day started',
       salesDay: newDay
     });
   } catch (err) {
-    console.error('[SALES] Error starting sales day:', err);
+    logger.errorLog('[SALES] Error starting sales day:', err);
     res.status(500).json({ message: 'Failed to start sales day', error: err.message });
   }
 };
@@ -79,13 +80,13 @@ const endSalesDay = async (req, res) => {
       include: { orders: true }
     });
 
-    console.log('[SALES] Sales day closed:', closedDay.id, 'Total:', totalSales);
+    logger.infoLog('[SALES] Sales day closed:', { salesDayId: closedDay.id, totalSales });
     res.json({
       message: 'Sales day closed successfully',
       salesDay: closedDay
     });
   } catch (err) {
-    console.error('[SALES] Error ending sales day:', err);
+    logger.errorLog('[SALES] Error ending sales day:', err);
     res.status(500).json({ message: 'Failed to end sales day' });
   }
 };
@@ -107,7 +108,7 @@ const getCurrentSalesDay = async (req, res) => {
 
     res.json({ salesDay: currentDay });
   } catch (err) {
-    console.error('[SALES] Error fetching current sales day:', err);
+    logger.errorLog('[SALES] Error fetching current sales day:', err);
     res.status(500).json({ message: 'Failed to fetch current sales day' });
   }
 };
@@ -140,7 +141,7 @@ const getSalesDayById = async (req, res) => {
 
     res.json({ salesDay });
   } catch (err) {
-    console.error('[SALES] Error fetching sales day:', err);
+    logger.errorLog('[SALES] Error fetching sales day:', err);
     res.status(500).json({ message: 'Failed to fetch sales day' });
   }
 };
@@ -185,7 +186,7 @@ const getSalesDayHistory = async (req, res) => {
 
     res.json({ salesDays });
   } catch (err) {
-    console.error('[SALES] Error fetching sales history:', err);
+    logger.errorLog('[SALES] Error fetching sales history:', err);
     res.status(500).json({ message: 'Failed to fetch sales history' });
   }
 };
@@ -249,7 +250,7 @@ const exportSaleDayCSV = async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="sales-report-${id}.csv"`);
     res.send(csvString);
   } catch (err) {
-    console.error('[SALES] Error exporting CSV:', err);
+    logger.errorLog('[SALES] Error exporting CSV:', err);
     res.status(500).json({ message: 'Failed to export CSV' });
   }
 };
@@ -265,13 +266,13 @@ const clearSalesHistory = async (req, res) => {
       where: { status: 'CLOSED' }
     });
 
-    console.log('[SALES] Sales history cleared:', { deleted: result.count });
+    logger.infoLog('[SALES] Sales history cleared:', { deleted: result.count });
     res.json({
       message: 'Sales history cleared successfully',
       deletedCount: result.count
     });
   } catch (err) {
-    console.error('[SALES] Error clearing sales history:', err);
+    logger.errorLog('[SALES] Error clearing sales history:', err);
     res.status(500).json({ message: 'Failed to clear sales history' });
   }
 };
@@ -295,7 +296,7 @@ const exportSalesSnapshot = async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="sales-snapshot-${new Date().toISOString().split('T')[0]}.json"`);
     return res.json(snapshot);
   } catch (err) {
-    console.error('[SALES] exportSalesSnapshot error:', err);
+    logger.errorLog('[SALES] exportSalesSnapshot error:', err);
     return res.status(500).json({ success: false, error: err.message || 'Failed to export sales snapshot' });
   }
 };
@@ -316,7 +317,7 @@ const importSalesSnapshot = async (req, res) => {
 
     const results = await dataSnapshotService.importSalesSnapshot(req.body, options);
 
-    console.log('[SALES] importSalesSnapshot completed:', results.imported);
+    logger.infoLog('[SALES] importSalesSnapshot completed:', { imported: results.imported });
     return res.json({
       success: true,
       message: 'Sales data imported successfully',
@@ -324,7 +325,7 @@ const importSalesSnapshot = async (req, res) => {
       errors: results.errors,
     });
   } catch (err) {
-    console.error('[SALES] importSalesSnapshot error:', err);
+    logger.errorLog('[SALES] importSalesSnapshot error:', err);
     return res.status(500).json({ success: false, error: err.message || 'Failed to import sales snapshot' });
   }
 };

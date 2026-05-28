@@ -5,6 +5,8 @@
  * before relying on database updates
  */
 
+const logger = require('./logger');
+
 // In-memory cache of recent webhook events
 const webhookCache = new Map();
 const CACHE_TTL = 120000; // Keep events for 2 minutes
@@ -20,12 +22,12 @@ const cacheWebhookEvent = (reference, status, data = {}) => {
     data
   });
   
-  console.log(`[WEBHOOK_CACHE] Cached event: ${reference} = ${status}`);
+  logger.debugLog(`[WEBHOOK_CACHE] Cached event: ${reference} = ${status}`);
   
   // Auto-cleanup after TTL
   setTimeout(() => {
     webhookCache.delete(reference);
-    console.log(`[WEBHOOK_CACHE] Cleared cached event: ${reference}`);
+    logger.debugLog(`[WEBHOOK_CACHE] Cleared cached event: ${reference}`);
   }, CACHE_TTL);
 };
 
@@ -39,7 +41,7 @@ const isPaymentConfirmedInCache = (reference) => {
   }
   
   const cached = webhookCache.get(reference);
-  console.log(`[WEBHOOK_CACHE] Cache hit: ${reference} = ${cached.status}`);
+  logger.debugLog(`[WEBHOOK_CACHE] Cache hit: ${reference} = ${cached.status}`);
   return cached.status;
 };
 
@@ -48,7 +50,7 @@ const isPaymentConfirmedInCache = (reference) => {
  */
 const clearCacheEntry = (reference) => {
   webhookCache.delete(reference);
-  console.log(`[WEBHOOK_CACHE] Manually cleared: ${reference}`);
+  logger.debugLog(`[WEBHOOK_CACHE] Manually cleared: ${reference}`);
 };
 
 module.exports = {

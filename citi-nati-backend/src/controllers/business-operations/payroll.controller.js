@@ -970,7 +970,7 @@ async function deleteIncrementPolicy(req, res) {
 async function purgeAllPayrollData(req, res) {
   try {
     const counts = await payrollService.purgeAllPayrollData();
-    console.warn('[BO][PAYROLL] purgeAllPayrollData executed by admin – tables cleared:', counts);
+    logger.productionSummaryLog('[BO][PAYROLL] purgeAllPayrollData executed by admin -- tables cleared', { counts });
     return res.json({ success: true, message: 'All payroll data purged', counts });
   } catch (err) {
     console.error('[BO][PAYROLL] purgeAllPayrollData error:', err);
@@ -1009,7 +1009,7 @@ async function importPayrollSnapshot(req, res) {
 
     const results = await dataSnapshotService.importPayrollSnapshot(req.body, options);
 
-    console.log('[BO][PAYROLL] importPayrollSnapshot completed:', results.imported);
+    logger.productionSummaryLog('[BO][PAYROLL] importPayrollSnapshot completed', { imported: results.imported });
     return res.json({
       success: true,
       message: 'Payroll data imported successfully',

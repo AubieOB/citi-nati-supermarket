@@ -13,6 +13,7 @@
  */
 
 const { PrismaClient } = require('@prisma/client');
+const logger = require('../utils/logger');
 const cloudinary = require('cloudinary').v2;
 
 const prisma = new PrismaClient();
@@ -67,7 +68,7 @@ async function saveImageMapping({ productCode, cloudinaryPublicId, secureUrl, or
     },
   });
 
-  console.log('[ProductImageMapping] ✅ Mapping saved for productCode:', code, '→', secureUrl);
+  logger.debugLog('[ProductImageMapping] ✅ Mapping saved for productCode:', code, '→', secureUrl);
   return record;
 }
 
@@ -122,11 +123,11 @@ async function reattachImageByProductCode(productCodeOrSourceCode) {
       where: { sourceCode: code },
       data: { image: mapping.secureUrl },
     });
-    console.log('[ProductImageMapping] 🔄 Image reattached for productCode:', code);
+    logger.debugLog('[ProductImageMapping] 🔄 Image reattached for productCode:', code);
     return mapping.secureUrl;
   } catch (err) {
     // Product row may not exist yet during sync; that is expected.
-    console.warn('[ProductImageMapping] Could not reattach image for', code, ':', err.message);
+    logger.warnLog('[ProductImageMapping] Could not reattach image for', code, ':', err.message);
     return null;
   }
 }
@@ -167,7 +168,7 @@ async function bulkReattachImages(productCodes) {
     })
   );
 
-  console.log(`[ProductImageMapping] Bulk reattach complete: ${matched} matched, ${unmatched} unmatched`);
+  logger.debugLog(`[ProductImageMapping] Bulk reattach complete: ${matched} matched, ${unmatched} unmatched`);
   return { matched, unmatched, errors };
 }
 
@@ -189,9 +190,9 @@ async function permanentlyDeleteImageMapping(productCode) {
   let cloudinaryResult = null;
   try {
     cloudinaryResult = await cloudinary.uploader.destroy(mapping.cloudinaryPublicId);
-    console.log('[ProductImageMapping] Cloudinary asset deleted:', mapping.cloudinaryPublicId, cloudinaryResult);
+    logger.debugLog('[ProductImageMapping] Cloudinary asset deleted:', mapping.cloudinaryPublicId, cloudinaryResult);
   } catch (cloudErr) {
-    console.error('[ProductImageMapping] Cloudinary delete failed:', cloudErr.message);
+    logger.errorLog('[ProductImageMapping] Cloudinary delete failed:', { message: cloudErr && cloudErr.message ? cloudErr.message : String(cloudErr) });
     // Continue: still remove the DB mapping even if Cloudinary call fails
   }
 
@@ -208,7 +209,7 @@ async function permanentlyDeleteImageMapping(productCode) {
     // Product row may not exist; fine.
   }
 
-  console.log('[ProductImageMapping] 🗑️ Permanently deleted mapping for productCode:', code);
+  logger.debugLog('[ProductImageMapping] 🗑️ Permanently deleted mapping for productCode:', code);
   return { success: true, cloudinaryResult };
 }
 
@@ -234,7 +235,7 @@ async function reconcileAllProductImages() {
   const { matched, unmatched, errors } = await bulkReattachImages(codes);
 
   if (errors.length) {
-    console.warn('[ProductImageMapping] Reconcile errors:', errors);
+    logger.warnLog('[ProductImageMapping] Reconcile errors:', errors);
   }
 
   return { processed: products.length, matched, unmatched };

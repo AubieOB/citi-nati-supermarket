@@ -15,6 +15,7 @@ const {
 
 const router = express.Router();
 const prisma = new PrismaClient();
+const logger = require('../utils/logger');
 
 // ─── Cashier Security PIN (self-service) ────────────────────────────────────
 
@@ -34,7 +35,7 @@ router.get('/security-key/status', verifyTokenMiddleware, verifyCashier, async (
       hasSecurityKey: Boolean(cashierUser?.cashierSecurityKeyHash),
     });
   } catch (err) {
-    console.error('[CASHIER SECURITY] Status check failed:', err.message);
+    logger.errorLog('[CASHIER SECURITY] Status check failed:', { message: err.message });
     return res.status(500).json({ success: false, error: 'Failed to check cashier security key status' });
   }
 });
@@ -67,7 +68,7 @@ router.post('/security-key/verify', verifyTokenMiddleware, verifyCashier, async 
 
     return res.json({ success: true, verified: true });
   } catch (err) {
-    console.error('[CASHIER SECURITY] Verification failed:', err.message);
+    logger.errorLog('[CASHIER SECURITY] Verification failed:', { message: err.message });
     return res.status(500).json({ success: false, error: 'Failed to verify cashier security key' });
   }
 });
@@ -90,7 +91,7 @@ async function requireEmergencySalesDayOpen(req, res, next) {
 
     return next();
   } catch (err) {
-    console.error('[CASHIER EMERGENCY SALES] Failed to verify day status:', err.message);
+    logger.errorLog('[CASHIER EMERGENCY SALES] Failed to verify day status:', { message: err.message });
     return res.status(500).json({ success: false, error: 'Failed to verify emergency sales availability' });
   }
 }
@@ -140,7 +141,7 @@ router.get('/emergency-sales/:id', requireEmergencySalesDayOpen, async (req, res
 
     return res.status(200).json({ success: true, sale });
   } catch (err) {
-    console.error('[CASHIER] get sale by id failed:', err.message);
+    logger.errorLog('[CASHIER] get sale by id failed:', { message: err.message });
     return res.status(500).json({ success: false, error: 'Failed to fetch emergency sale' });
   }
 });

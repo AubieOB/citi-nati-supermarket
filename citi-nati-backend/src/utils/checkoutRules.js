@@ -22,6 +22,8 @@ function clearCheckoutRulesCache() {
   minimumOrderLoadedAt = 0;
 }
 
+const logger = require('./logger');
+
 async function getMinimumOrderValue(prismaClient = prisma, forceRefresh = false) {
   const now = Date.now();
   if (!forceRefresh && cachedMinimumOrderValue != null && (now - minimumOrderLoadedAt) < CHECKOUT_RULES_CACHE_MS) {
@@ -36,7 +38,7 @@ async function getMinimumOrderValue(prismaClient = prisma, forceRefresh = false)
       minimumOrderValue = normalizeMinimumOrderValue(setting.value, DEFAULT_MINIMUM_ORDER_VALUE);
     }
   } catch (error) {
-    console.warn('[CheckoutRules] Failed to load minimum order setting:', error.message);
+    logger.warnLog('[CheckoutRules] Failed to load minimum order setting:', { message: error.message });
     if (!forceRefresh && cachedMinimumOrderValue != null) {
       return cachedMinimumOrderValue;
     }

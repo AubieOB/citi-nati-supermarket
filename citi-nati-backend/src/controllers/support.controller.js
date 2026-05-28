@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const logger = require('../utils/logger');
 const { notifySupportTicketCreated } = require('../utils/messageService.js');
 
 const prisma = new PrismaClient();
@@ -91,7 +92,7 @@ const createTicket = async (req, res) => {
         createdAt: ticket.createdAt,
         status: ticket.status
       });
-      console.log('[Socket.io] New ticket created - emitted to admin:', ticket.subject);
+      logger.debugLog('[Socket.io] New ticket created - emitted to admin:', ticket.subject);
     }
 
     res.status(201).json({
@@ -99,7 +100,7 @@ const createTicket = async (req, res) => {
       ticket
     });
   } catch (error) {
-    console.error('Error creating ticket:', error);
+    logger.errorLog('Error creating ticket:', { message: error && error.message ? error.message : String(error) });
     res.status(500).json({
       error: 'Failed to create support ticket'
     });
@@ -133,7 +134,7 @@ const getMyTickets = async (req, res) => {
       tickets
     });
   } catch (error) {
-    console.error('Error fetching user tickets:', error);
+    logger.errorLog('Error fetching user tickets:', { message: error && error.message ? error.message : String(error) });
     res.status(500).json({
       error: 'Failed to fetch support tickets'
     });
@@ -186,7 +187,7 @@ const getTicketById = async (req, res) => {
       ticket
     });
   } catch (error) {
-    console.error('Error fetching ticket:', error);
+    logger.errorLog('Error fetching ticket:', { message: error && error.message ? error.message : String(error) });
     res.status(500).json({
       error: 'Failed to fetch support ticket'
     });
@@ -239,7 +240,7 @@ const getAllTickets = async (req, res) => {
       tickets
     });
   } catch (error) {
-    console.error('Error fetching all tickets:', error);
+    logger.errorLog('Error fetching all tickets:', { message: error && error.message ? error.message : String(error) });
     res.status(500).json({
       error: 'Failed to fetch support tickets'
     });
@@ -310,7 +311,7 @@ const replyToTicket = async (req, res) => {
 
     if (global.io) {
       global.io.to(`ticket_${ticketId}`).emit('ticketMessage', reply);
-      console.log(`[Socket.io] Ticket ${ticketId} reply broadcast`);
+      logger.debugLog(`[Socket.io] Ticket ${ticketId} reply broadcast`);
     }
 
     res.status(201).json({
@@ -318,7 +319,7 @@ const replyToTicket = async (req, res) => {
       reply
     });
   } catch (error) {
-    console.error('Error creating reply:', error);
+    logger.errorLog('Error creating reply:', { message: error && error.message ? error.message : String(error) });
     res.status(500).json({
       error: 'Failed to create reply'
     });
@@ -375,7 +376,7 @@ const updateTicketStatus = async (req, res) => {
         status: ticket.status,
         userId: ticket.userId
       });
-      console.log(`[Socket.io] Ticket ${ticket.id} status changed to ${status}`);
+      logger.debugLog(`[Socket.io] Ticket ${ticket.id} status changed to ${status}`);
     }
 
     res.json({
@@ -388,7 +389,7 @@ const updateTicketStatus = async (req, res) => {
         error: 'Support ticket not found'
       });
     }
-    console.error('Error updating ticket status:', error);
+    logger.errorLog('Error updating ticket status:', { message: error && error.message ? error.message : String(error) });
     res.status(500).json({
       error: 'Failed to update ticket status'
     });
@@ -438,7 +439,7 @@ const updateTicketPriority = async (req, res) => {
         priority: ticket.priority,
         userId: ticket.userId
       });
-      console.log(`[Socket.io] Ticket ${ticket.id} priority changed to ${priority}`);
+      logger.debugLog(`[Socket.io] Ticket ${ticket.id} priority changed to ${priority}`);
     }
 
     res.json({
@@ -451,7 +452,7 @@ const updateTicketPriority = async (req, res) => {
         error: 'Support ticket not found'
       });
     }
-    console.error('Error updating ticket priority:', error);
+    logger.errorLog('Error updating ticket priority:', { message: error && error.message ? error.message : String(error) });
     res.status(500).json({
       error: 'Failed to update ticket priority'
     });
@@ -496,7 +497,7 @@ const deleteTicket = async (req, res) => {
         ticketId: ticketId,
         userId: ticket.userId
       });
-      console.log(`[Socket.io] Ticket ${ticketId} deleted`);
+      logger.debugLog(`[Socket.io] Ticket ${ticketId} deleted`);
     }
 
     res.json({
@@ -509,7 +510,7 @@ const deleteTicket = async (req, res) => {
         error: 'Support ticket not found'
       });
     }
-    console.error('Error deleting ticket:', error);
+    logger.errorLog('Error deleting ticket:', { message: error && error.message ? error.message : String(error) });
     res.status(500).json({
       error: 'Failed to delete support ticket'
     });

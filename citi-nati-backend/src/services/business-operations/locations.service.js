@@ -62,7 +62,7 @@ async function getBusinessLocations() {
       code: normalizeLocationCode(row.name, row.code),
     })).filter((row) => row.name);
   } catch (error) {
-    console.warn('[BO][LOCATIONS] Falling back to defaults:', error.message);
+    logger.warnLog('[BO][LOCATIONS] Falling back to defaults:', { message: error.message });
     return DEFAULT_LOCATIONS;
   }
 }

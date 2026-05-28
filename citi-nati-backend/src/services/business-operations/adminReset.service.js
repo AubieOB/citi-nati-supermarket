@@ -177,7 +177,7 @@ async function wipeAllBusinessOperationsData(options = {}) {
     beforeCounts[table.key] = delegate ? await delegate.count() : 0;
   }
 
-  console.warn('[BO][WIPE] Request received', {
+  logger.productionSummaryLog('[BO][WIPE] Request received', {
     actor,
     beforeCounts,
     preservedTables: PRESERVED_TABLES,
@@ -202,7 +202,7 @@ async function wipeAllBusinessOperationsData(options = {}) {
     afterCounts[table.key] = delegate ? await delegate.count() : 0;
   }
 
-  console.warn('[BO][WIPE] Completed', {
+  logger.productionSummaryLog('[BO][WIPE] Completed', {
     actor,
     deletedCounts,
     afterCounts,

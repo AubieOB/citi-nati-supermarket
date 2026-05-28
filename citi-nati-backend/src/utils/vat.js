@@ -1,6 +1,7 @@
 'use strict';
 
 const { PrismaClient } = require('@prisma/client');
+const logger = require('./logger');
 
 const prisma = new PrismaClient();
 const VAT_ENABLED_KEY = 'vat_enabled';
@@ -47,7 +48,7 @@ async function getVatSettings(forceRefresh = false) {
       enabled = String(setting.value).trim().toLowerCase() === 'true';
     }
   } catch (error) {
-    console.warn('[VAT] Failed to load VAT setting, using cached/default value:', error.message);
+    logger.warnLog('[VAT] Failed to load VAT setting, using cached/default value:', { message: error.message });
     if (cachedVatSettings) {
       return cachedVatSettings;
     }

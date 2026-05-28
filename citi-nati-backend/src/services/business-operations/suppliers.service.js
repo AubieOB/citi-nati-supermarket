@@ -247,7 +247,7 @@ async function listSuppliers({ search, status, locationId, branchCode, requirePo
       });
     }
 
-    console.warn('[BO][SUPPLIERS][LIST][ZERO_RESULTS]', {
+    logger.debugLog('[BO][SUPPLIERS][LIST][ZERO_RESULTS]', {
       branchCode: String(branchCode || '').trim().toUpperCase(),
       requirePosLinked: Boolean(requirePosLinked),
       search: search || null,

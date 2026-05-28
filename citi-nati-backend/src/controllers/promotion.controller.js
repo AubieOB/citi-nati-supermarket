@@ -8,6 +8,7 @@
 
 const { PrismaClient } = require('@prisma/client');
 const posCommandQueueService = require('../services/posCommandQueue.service');
+const logger = require('../utils/logger');
 const {
   normalizeScopeCode,
   expandOperationalLocationScopeCodes,
@@ -345,7 +346,7 @@ async function assessPromotionEligibilityForSelectedProducts(parsedSelectedProdu
       reason = 'NO_LOCATION_PRICE_ROW';
     }
 
-    console.log(
+    logger.debugLog(
       `[PROMOTION ELIGIBILITY] product=${productCode || `ID:${productId}`} location=${scope.locationCode}` +
       ` masterExists=${masterExists} locationPriceExists=${locationPriceExists}` +
       ` eligible=${eligible}${eligible ? '' : ` reason=${reason}`}`
@@ -559,18 +560,18 @@ async function queuePosPromotionCommands({
   });
 
   if (products.length === 0) {
-    console.log(`[PROMO][QUEUE] ${type} resolved product count = 0`);
+    logger.debugLog(`[PROMO][QUEUE] ${type} resolved product count = 0`);
     return { enqueued: 0, skippedNoSourceCode: 0, skippedInvalidPrice: 0, targetCount: 0, commandType: enabled ? 'APPLY_PROMOTION' : 'REVERT_PROMOTION' };
   }
 
   const commandType = enabled ? 'APPLY_PROMOTION' : 'REVERT_PROMOTION';
 
-  console.log(`[PROMO][QUEUE] ${type} resolved product count = ${products.length}`);
-  console.log(`[PROMO][QUEUE] ${type} resolved source codes (sample):`, products.slice(0, 10).map((p) => ({
+  logger.debugLog(`[PROMO][QUEUE] ${type} resolved product count = ${products.length}`);
+  logger.debugLog(`[PROMO][QUEUE] ${type} resolved source codes (sample):`, products.slice(0, 10).map((p) => ({
     id: p.id,
     sourceCode: p.sourceCode || null,
   })));
-  console.log(`[PROMO][QUEUE] ${type} location mapping:`, {
+  logger.debugLog(`[PROMO][QUEUE] ${type} location mapping:`, {
     branchCode: scope?.branchCode || null,
     requestedLocationCode: scope?.locationCode || null,
     posLocationCodeUsedForWriteback: scope?.posLocationCode || POS_DEFAULT_LOCATION_CODE,
@@ -598,7 +599,7 @@ async function queuePosPromotionCommands({
     const locationPriceExists = Number(product.price || 0) > 0;
     const promotionLocationCode = scope?.locationCode || null;
     if (promotionLocationCode) {
-      console.log(
+      logger.debugLog(
         `[LOCATION AVAILABILITY] product=${product.sourceCode} location=${promotionLocationCode}` +
         ` masterExists=true locationPriceExists=${locationPriceExists}` +
         ` availability=${locationPriceExists} action=${commandType}` +
@@ -634,7 +635,7 @@ async function queuePosPromotionCommands({
       };
 
       if (enqueued === 0) {
-        console.log(`[PROMO][QUEUE] ${type} commandType=${commandType} sample payload:`, payload);
+        logger.debugLog(`[PROMO][QUEUE] ${type} commandType=${commandType} sample payload:`, payload);
       }
 
       await posCommandQueueService.enqueueCommand(commandType, payload, {
@@ -671,7 +672,7 @@ async function queuePosPromotionCommands({
       };
 
       if (enqueued === 0) {
-        console.log(`[PROMO][QUEUE] ${type} commandType=${commandType} sample payload:`, payload);
+        logger.debugLog(`[PROMO][QUEUE] ${type} commandType=${commandType} sample payload:`, payload);
       }
 
       await posCommandQueueService.enqueueCommand(commandType, payload, {
@@ -696,16 +697,16 @@ async function queuePosPromotionCommands({
     skippedInvalidPriceSamples,
   };
 
-  console.log(
+  logger.debugLog(
     `[PROMO][QUEUE] ${type} summary target=${summary.targetCount} enqueued=${summary.enqueued} skippedNoSourceCode=${summary.skippedNoSourceCode} skippedInvalidPrice=${summary.skippedInvalidPrice}`
   );
 
   if (summary.skippedNoSourceCode > 0) {
-    console.warn('[PROMO][POS QUEUE] skipped products missing sourceCode (sample):', summary.skippedNoSourceCodeSamples);
+    logger.warnLog('[PROMO][POS QUEUE] skipped products missing sourceCode (sample):', summary.skippedNoSourceCodeSamples);
   }
 
   if (summary.skippedInvalidPrice > 0) {
-    console.warn('[PROMO][POS QUEUE] skipped products with invalid computed price (sample):', summary.skippedInvalidPriceSamples);
+    logger.warnLog('[PROMO][POS QUEUE] skipped products with invalid computed price (sample):', summary.skippedInvalidPriceSamples);
   }
 
   return summary;
@@ -724,7 +725,7 @@ const emitPromotionUpdate = (promotion, scope = null) => {
       };
       // Broadcast to everyone - both admins and users seeing products page need to know
       global.io.emit('promotionUpdated', scopedPromotion);
-      console.log(`[Socket.io] Promotion updated: ${promotion.type} - emitted to all clients for ${scopedPromotion.locationCode || scopedPromotion.branchCode || 'unknown-scope'}`);
+      logger.debugLog(`[Socket.io] Promotion updated: ${promotion.type} - emitted to all clients for ${scopedPromotion.locationCode || scopedPromotion.branchCode || 'unknown-scope'}`);
     }
   } catch (err) {
     console.error('Error emitting promotion:', err);
@@ -991,7 +992,7 @@ const updatePromotion = async (req, res) => {
       promotionData.selectedProductIds = parsedSelectedProducts;
     }
 
-    console.log('[Promotions] Upserting promotion:', {
+    logger.debugLog('[Promotions] Upserting promotion:', {
       type,
       enabled,
       percentage,
@@ -1016,7 +1017,7 @@ const updatePromotion = async (req, res) => {
       create: promotionData,
     });
 
-    console.log('[Promotions] Promotion upserted:', promotion);
+    logger.debugLog('[Promotions] Promotion upserted:', promotion);
 
     let productsToUpdate = [];
 
@@ -1058,9 +1059,9 @@ const updatePromotion = async (req, res) => {
         });
       }
 
-      console.log(`[Promotions] ${type} promotion activated - applied to ${productsToUpdate.length} products at ${percentage}% off`);
+      logger.debugLog(`[Promotions] ${type} promotion activated - applied to ${productsToUpdate.length} products at ${percentage}% off`);
     } else {
-      console.log(`[Promotions] ${type} promotion deactivated`);
+      logger.debugLog(`[Promotions] ${type} promotion deactivated`);
     }
 
     // Emit real-time update to all clients
@@ -1085,7 +1086,7 @@ const updatePromotion = async (req, res) => {
         scope: effectiveScope,
       });
 
-      console.log(`[PROMO][QUEUE] ${type} bridge summary:`, posQueueSummary);
+      logger.debugLog(`[PROMO][QUEUE] ${type} bridge summary:`, posQueueSummary);
     }
     
     try {
@@ -1267,7 +1268,7 @@ const applyPromotion = async (req, res) => {
       }
     }
 
-    console.log(`[Promotions] Applied to ${updatedCount} products`);
+    logger.debugLog(`[Promotions] Applied to ${updatedCount} products`);
 
     return res.json({
       success: true,

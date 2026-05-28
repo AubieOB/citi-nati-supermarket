@@ -12,6 +12,7 @@
  */
 
 const { PrismaClient } = require('@prisma/client');
+const logger = require('../utils/logger');
 
 const prisma = new PrismaClient();
 
@@ -48,7 +49,7 @@ async function upsertProductCache(product) {
 
     return cached;
   } catch (error) {
-    console.error(`[CACHE] Error upserting product ${product.ProductCode}:`, error.message);
+    logger.errorLog(`[CACHE] Error upserting product ${product.ProductCode}:`, { message: error && error.message ? error.message : String(error) });
     throw error;
   }
 }
@@ -62,7 +63,7 @@ async function upsertProductCache(product) {
  */
 async function upsertProductsCacheBatch(products) {
   try {
-    console.log(`[CACHE] Upserting ${products.length} products into cache...`);
+    logger.debugLog(`[CACHE] Upserting ${products.length} products into cache...`);
 
     let synced = 0;
     let failed = 0;
@@ -78,7 +79,7 @@ async function upsertProductsCacheBatch(products) {
       }
     }
 
-    console.log(`[CACHE] Batch upsert complete - Synced: ${synced}, Failed: ${failed}`);
+    logger.productionSummaryLog(`[CACHE] Batch upsert complete - Synced: ${synced}, Failed: ${failed}`);
 
     return {
       success: true,
@@ -88,7 +89,7 @@ async function upsertProductsCacheBatch(products) {
       errors: errors.length > 0 ? errors : undefined,
     };
   } catch (error) {
-    console.error('[CACHE] Batch upsert error:', error.message);
+    logger.errorLog('[CACHE] Batch upsert error:', { message: error && error.message ? error.message : String(error) });
     throw error;
   }
 }
@@ -113,7 +114,7 @@ async function updateProductStock(productCode, stock) {
 
     return updated;
   } catch (error) {
-    console.error(`[CACHE] Error updating stock for ${productCode}:`, error.message);
+    logger.errorLog(`[CACHE] Error updating stock for ${productCode}:`, { message: error && error.message ? error.message : String(error) });
     throw error;
   }
 }
@@ -138,7 +139,7 @@ async function updateProductPrice(productCode, price) {
 
     return updated;
   } catch (error) {
-    console.error(`[CACHE] Error updating price for ${productCode}:`, error.message);
+    logger.errorLog(`[CACHE] Error updating price for ${productCode}:`, { message: error && error.message ? error.message : String(error) });
     throw error;
   }
 }
@@ -161,10 +162,10 @@ async function setProductVisibility(productCode, enabled) {
       },
     });
 
-    console.log(`[CACHE] Product ${productCode} visibility set to ${enabled}`);
+    logger.infoLog(`[CACHE] Product ${productCode} visibility set to ${enabled}`);
     return updated;
   } catch (error) {
-    console.error(`[CACHE] Error setting visibility for ${productCode}:`, error.message);
+    logger.errorLog(`[CACHE] Error setting visibility for ${productCode}:`, { message: error && error.message ? error.message : String(error) });
     throw error;
   }
 }
@@ -223,7 +224,7 @@ async function getPaginatedProducts(page = 1, limit = 50, category = null) {
       },
     };
   } catch (error) {
-    console.error('[CACHE] Error fetching paginated products:', error.message);
+    logger.errorLog('[CACHE] Error fetching paginated products:', { message: error && error.message ? error.message : String(error) });
     throw error;
   }
 }
@@ -256,10 +257,10 @@ async function getCategories() {
       .map(r => r.Category)
       .filter(c => c && c.trim() !== '');
 
-    console.log(`[CACHE] Retrieved ${categories.length} unique categories`);
+    logger.debugLog(`[CACHE] Retrieved ${categories.length} unique categories`);
     return categories;
   } catch (error) {
-    console.error('[CACHE] Error fetching categories:', error.message);
+    logger.errorLog('[CACHE] Error fetching categories:', { message: error && error.message ? error.message : String(error) });
     throw error;
   }
 }
@@ -278,7 +279,7 @@ async function getProductByCode(productCode) {
 
     return product;
   } catch (error) {
-    console.error(`[CACHE] Error fetching product ${productCode}:`, error.message);
+    logger.errorLog(`[CACHE] Error fetching product ${productCode}:`, { message: error && error.message ? error.message : String(error) });
     throw error;
   }
 }
@@ -291,10 +292,10 @@ async function getProductByCode(productCode) {
 async function clearCache() {
   try {
     const result = await prisma.websiteProductsCache.deleteMany({});
-    console.log(`[CACHE] Cleared ${result.count} entries from cache`);
+    logger.debugLog(`[CACHE] Cleared ${result.count} entries from cache`);
     return { success: true, deletedCount: result.count };
   } catch (error) {
-    console.error('[CACHE] Error clearing cache:', error.message);
+    logger.errorLog('[CACHE] Error clearing cache:', { message: error && error.message ? error.message : String(error) });
     throw error;
   }
 }
@@ -326,7 +327,7 @@ async function getCacheStats() {
       lastUpdated: new Date(),
     };
   } catch (error) {
-    console.error('[CACHE] Error getting stats:', error.message);
+    logger.errorLog('[CACHE] Error getting stats:', { message: error && error.message ? error.message : String(error) });
     throw error;
   }
 }

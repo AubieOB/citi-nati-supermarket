@@ -1,5 +1,7 @@
 'use strict';
 
+const logger = require('./logger');
+
 // ---------------------------------------------------------------------------
 // Allowed filter field sets — controls what can be sorted or filtered.
 // ---------------------------------------------------------------------------
@@ -157,7 +159,7 @@ function buildInvoiceWhere(dateRange, filters = {}) {
   }
 
   if (filters.locationId !== null && filters.locationId !== undefined) {
-    console.warn('[REPORTING SCOPE] Legacy locationId ignored for canonical reporting scope', {
+    logger.warnLog('[REPORTING SCOPE] Legacy locationId ignored for canonical reporting scope', {
       branchCode: filters.branchCode || null,
       locationCode: filters.locationCode || null,
       locationId: filters.locationId,
@@ -184,7 +186,7 @@ function buildInvoiceWhere(dateRange, filters = {}) {
     where.AND = andConditions;
   }
 
-  console.log('[REPORTING SCOPE]', {
+  logger.debugLog('[REPORTING SCOPE]', {
     aggregate: filters.aggregate || false,
     branchCode: filters.branchCode || null,
     locationCode: filters.locationCode || null,
