@@ -18,7 +18,6 @@ const {
   CORE_ZOMBA_LOCATION_CODES,
 } = require('../utils/operationalScope');
 
-const prisma = new PrismaClient();
 const MIN_VALID_EXPIRY_DATE = new Date('2000-01-01T00:00:00.000Z');
 const POS_DEFAULT_LOCATION_CODE = normalizeOperationalScopeCode(process.env.POS_LOCATION_CODE) || 'BT';
 const POS_DEFAULT_PRICE_TYPE_CODE = process.env.POS_PRICE_TYPE_CODE || 'RT';
