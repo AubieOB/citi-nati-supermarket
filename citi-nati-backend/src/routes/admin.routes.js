@@ -708,6 +708,170 @@ router.put('/security-key', verifyTokenMiddleware, verifyAdmin, async (req, res)
   }
 });
 
+// ─── ADMIN ACCOUNT MANAGEMENT ────────────────────────────────────────────────
+
+router.get('/security/admin-accounts', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const admins = await prisma.user.findMany({
+      where: {
+        role: { in: ['admin', 'super_admin'] },
+        isActive: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        adminSecurityKeyHash: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    return res.json({
+      success: true,
+      admins: admins.map(({ adminSecurityKeyHash, ...admin }) => ({
+        ...admin,
+        hasSecurityKey: Boolean(adminSecurityKeyHash),
+      })),
+    });
+  } catch (err) {
+    logger.errorLog('[ADMIN ACCOUNTS] List failed:', { message: err.message });
+    return res.status(500).json({ success: false, error: 'Failed to list administrator accounts' });
+  }
+});
+
+router.post('/security/admin-accounts', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const { name, email, password, securityKey, confirmSecurityKey } = req.body;
+
+    if (!name || !email || !password || !securityKey || !confirmSecurityKey) {
+      return res.status(400).json({
+        success: false,
+        error: 'Name, email, password, security key, and security key confirmation are required',
+      });
+    }
+    if (securityKey !== confirmSecurityKey) {
+      return res.status(400).json({ success: false, error: 'Administrator security key confirmation does not match' });
+    }
+    if (securityKey.trim().length < 4) {
+      return res.status(400).json({ success: false, error: 'Administrator security key must be at least 4 characters' });
+    }
+
+    const passwordValidation = validateStrongPassword(password);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ success: false, error: passwordValidation.errors[0] });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+    if (existing) {
+      return res.status(409).json({ success: false, error: 'A user with that email already exists' });
+    }
+
+    const [passwordHash, adminSecurityKeyHash] = await Promise.all([
+      bcrypt.hash(password, 10),
+      bcrypt.hash(securityKey, 10),
+    ]);
+
+    const admin = await prisma.user.create({
+      data: {
+        name: name.trim(),
+        email: normalizedEmail,
+        passwordHash,
+        adminSecurityKeyHash,
+        role: 'admin',
+        emailVerified: true,
+        isActive: true,
+      },
+      select: { id: true, name: true, email: true, role: true, createdAt: true },
+    });
+
+    await recordAuditLog({
+      req,
+      actorUserId: req.user?.userId,
+      action: 'ADMIN_ACCOUNT_CREATED',
+      resourceType: 'USER',
+      resourceId: admin.id,
+      status: 'SUCCESS',
+      metadata: { role: admin.role, email: admin.email },
+    });
+
+    return res.status(201).json({ success: true, admin: { ...admin, hasSecurityKey: true } });
+  } catch (err) {
+    logger.errorLog('[ADMIN ACCOUNTS] Create failed:', { message: err.message });
+    return res.status(500).json({ success: false, error: 'Failed to create administrator account' });
+  }
+});
+
+router.put('/security/admin-accounts/:userId/security-key', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const { securityKey, confirmSecurityKey } = req.body;
+    if (!securityKey || !confirmSecurityKey) {
+      return res.status(400).json({ success: false, error: 'Enter and confirm administrator security key are required' });
+    }
+    if (securityKey !== confirmSecurityKey) {
+      return res.status(400).json({ success: false, error: 'Administrator security key confirmation does not match' });
+    }
+    if (securityKey.trim().length < 4) {
+      return res.status(400).json({ success: false, error: 'Administrator security key must be at least 4 characters' });
+    }
+
+    const target = await prisma.user.findUnique({
+      where: { id: req.params.userId },
+      select: { id: true, role: true },
+    });
+    if (!target || !['admin', 'super_admin'].includes(target.role)) {
+      return res.status(404).json({ success: false, error: 'Administrator account not found' });
+    }
+
+    await prisma.user.update({
+      where: { id: target.id },
+      data: { adminSecurityKeyHash: await bcrypt.hash(securityKey, 10) },
+    });
+
+    return res.json({ success: true, message: 'Administrator security key updated successfully' });
+  } catch (err) {
+    logger.errorLog('[ADMIN ACCOUNTS] Key update failed:', { message: err.message });
+    return res.status(500).json({ success: false, error: 'Failed to update administrator security key' });
+  }
+});
+
+router.put('/security/admin-accounts/:userId/password', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const { password, confirmPassword } = req.body;
+    if (!password || !confirmPassword) {
+      return res.status(400).json({ success: false, error: 'Enter and confirm administrator password are required' });
+    }
+    if (password !== confirmPassword) {
+      return res.status(400).json({ success: false, error: 'Administrator password confirmation does not match' });
+    }
+
+    const passwordValidation = validateStrongPassword(password);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ success: false, error: passwordValidation.errors[0] });
+    }
+
+    const target = await prisma.user.findUnique({
+      where: { id: req.params.userId },
+      select: { id: true, role: true },
+    });
+    if (!target || !['admin', 'super_admin'].includes(target.role)) {
+      return res.status(404).json({ success: false, error: 'Administrator account not found' });
+    }
+
+    await prisma.user.update({
+      where: { id: target.id },
+      data: { passwordHash: await bcrypt.hash(password, 10) },
+    });
+
+    return res.json({ success: true, message: 'Administrator password updated successfully' });
+  } catch (err) {
+    logger.errorLog('[ADMIN ACCOUNTS] Password update failed:', { message: err.message });
+    return res.status(500).json({ success: false, error: 'Failed to update administrator password' });
+  }
+});
+
 /**
  * GET /api/admin/security-key/driver/:userId/status
  * Returns whether the selected driver account has configured a security key

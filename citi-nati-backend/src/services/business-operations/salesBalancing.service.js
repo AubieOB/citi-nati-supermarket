@@ -65,13 +65,14 @@ function computeTotals(payload = {}) {
   };
 }
 
-async function getExpectedSystemSales({ balancingDate, locationId, locationCode }) {
+async function getExpectedSystemSales({ balancingDate, locationId, branchCode, locationCode }) {
   const start = startOfDay(balancingDate);
   const end = endOfDay(balancingDate);
 
   const dateRange = { startDate: start, endDate: end };
   const filters = {};
   if (locationId) filters.locationId = locationId;
+  if (branchCode) filters.branchCode = branchCode;
   if (locationCode) filters.locationCode = locationCode;
 
   const where = buildInvoiceWhere(dateRange, filters);
@@ -108,13 +109,12 @@ async function ensureNoFinalizedDuplicate({ balancingDate, locationId, excludeId
 
 async function createSalesBalancingRecord(payload) {
   const totals = computeTotals(payload);
-  const expectedSystemSales = payload.expectedSystemSales != null
-    ? normalizeAmount(payload.expectedSystemSales)
-    : await getExpectedSystemSales({
-        balancingDate: payload.balancingDate,
-        locationId: payload.locationId,
-        locationCode: payload.locationCode,
-      });
+  const expectedSystemSales = await getExpectedSystemSales({
+    balancingDate: payload.balancingDate,
+    locationId: payload.locationId,
+    branchCode: payload.branchCode,
+    locationCode: payload.locationCode,
+  });
 
   const differenceAmount = roundMoney(totals.totalActualAmount - expectedSystemSales);
   const status = String(payload.status || 'draft').toLowerCase() === 'finalized' ? 'finalized' : 'draft';
@@ -173,13 +173,12 @@ async function updateSalesBalancingRecord(id, payload) {
     otherAmount: payload.otherAmount != null ? payload.otherAmount : existing.otherAmount,
   });
 
-  const expectedSystemSales = payload.expectedSystemSales != null
-    ? normalizeAmount(payload.expectedSystemSales)
-    : await getExpectedSystemSales({
-        balancingDate: nextBalancingDate,
-        locationId: nextLocationId,
-        locationCode: nextLocationCode,
-      });
+  const expectedSystemSales = await getExpectedSystemSales({
+    balancingDate: nextBalancingDate,
+    locationId: nextLocationId,
+    branchCode: payload.branchCode,
+    locationCode: nextLocationCode,
+  });
 
   const differenceAmount = roundMoney(totals.totalActualAmount - expectedSystemSales);
   const nextStatus = payload.status

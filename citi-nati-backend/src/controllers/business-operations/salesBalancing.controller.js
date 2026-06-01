@@ -34,16 +34,28 @@ function validatePaymentFields(payload = {}) {
   return null;
 }
 
-async function resolveLocationMeta(locationId) {
+function normalizeCode(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  return normalized || null;
+}
+
+async function resolveLocationMeta(locationId, overrides = {}) {
+  const branchCode = normalizeCode(overrides.branchCode);
+  const locationCode = normalizeCode(overrides.locationCode);
   const locations = await locationsService.getBusinessLocations();
   const target = locations.find((row) => Number(row.id) === Number(locationId));
   if (!target) {
-    return { locationCode: null, locationName: null };
+    return {
+      branchCode,
+      locationCode,
+      locationName: overrides.locationName || null,
+    };
   }
 
   return {
-    locationCode: target.code || null,
-    locationName: target.name || null,
+    branchCode: branchCode || normalizeCode(target.branchCode),
+    locationCode: locationCode || normalizeCode(target.locationCode || target.code),
+    locationName: overrides.locationName || target.name || null,
   };
 }
 
@@ -65,10 +77,11 @@ async function getExpectedSales(req, res) {
       return res.status(400).json({ success: false, error: 'balancingDate is required and must be valid' });
     }
 
-    const { locationCode, locationName } = await resolveLocationMeta(locationId);
+    const { branchCode, locationCode, locationName } = await resolveLocationMeta(locationId, req.query);
     const expectedSystemSales = await salesBalancingService.getExpectedSystemSales({
       balancingDate,
       locationId,
+      branchCode,
       locationCode,
     });
 
@@ -77,6 +90,7 @@ async function getExpectedSales(req, res) {
       data: {
         balancingDate,
         locationId,
+        branchCode,
         locationCode,
         locationName,
         expectedSystemSales,
@@ -105,19 +119,19 @@ async function createSalesBalancingRecord(req, res) {
       return res.status(400).json({ success: false, error: paymentError });
     }
 
-    const { locationCode, locationName } = await resolveLocationMeta(locationId);
+    const { branchCode, locationCode, locationName } = await resolveLocationMeta(locationId, req.body);
 
     const data = await salesBalancingService.createSalesBalancingRecord({
       balancingDate,
       locationId,
-      locationCode: req.body.locationCode || locationCode,
-      locationName: req.body.locationName || locationName,
+      branchCode,
+      locationCode,
+      locationName,
       referenceTitle: req.body.referenceTitle,
       cashierReference: req.body.cashierReference,
       shiftReference: req.body.shiftReference,
       preparedBy: req.body.preparedBy || req.user?.name || req.user?.email || null,
       notes: req.body.notes,
-      expectedSystemSales: req.body.expectedSystemSales,
       cashAmount: req.body.cashAmount,
       airtelMoneyAmount: req.body.airtelMoneyAmount,
       tnmMpambaAmount: req.body.tnmMpambaAmount,
@@ -160,11 +174,18 @@ async function updateSalesBalancingRecord(req, res) {
       return res.status(400).json({ success: false, error: paymentError });
     }
 
-    const locationMeta = locationId ? await resolveLocationMeta(locationId) : { locationCode: undefined, locationName: undefined };
+    const locationMeta = locationId
+      ? await resolveLocationMeta(locationId, req.body)
+      : {
+          branchCode: normalizeCode(req.body.branchCode),
+          locationCode: normalizeCode(req.body.locationCode),
+          locationName: req.body.locationName,
+        };
 
     const data = await salesBalancingService.updateSalesBalancingRecord(id, {
       balancingDate,
       locationId,
+      branchCode: locationMeta.branchCode,
       locationCode: req.body.locationCode !== undefined ? req.body.locationCode : locationMeta.locationCode,
       locationName: req.body.locationName !== undefined ? req.body.locationName : locationMeta.locationName,
       referenceTitle: req.body.referenceTitle,
@@ -172,7 +193,6 @@ async function updateSalesBalancingRecord(req, res) {
       shiftReference: req.body.shiftReference,
       preparedBy: req.body.preparedBy,
       notes: req.body.notes,
-      expectedSystemSales: req.body.expectedSystemSales,
       cashAmount: req.body.cashAmount,
       airtelMoneyAmount: req.body.airtelMoneyAmount,
       tnmMpambaAmount: req.body.tnmMpambaAmount,
