@@ -44,6 +44,70 @@ function formatBlantyreDateTimeParts(dateValue) {
   };
 }
 
+/**
+ * Format movement date/time for Inventory Activity
+ * - Online order sales (identified by RefNo starting with ORDER_ or userName === 'online')
+ *   are stored by WRITE_INVOICE as UTC and must be displayed in Africa/Blantyre (UTC+2).
+ * - Other movements (normal POS sales, GRN, transfers) must not be shifted here.
+ * - Avoid double-adjust by setting a _blantyreNormalized flag on the movement.
+ */
+function formatInventoryMovementDateTime(movement) {
+  try {
+    if (!movement) return { transactionDate: null, transactionTime: null };
+
+    const refNo = String(movement.referenceNo || movement.reference || movement.refNo || '').trim();
+    const userName = String(movement.userName || movement.cashierName || '').trim();
+    const source = String(movement.source || '').toLowerCase();
+
+    const looksLikeOnline = (
+      (refNo && refNo.startsWith('ORDER_')) ||
+      userName === 'online' ||
+      (source && source.includes('online'))
+    );
+
+    const raw = movement.movementDate instanceof Date ? movement.movementDate : new Date(movement.movementDate || Date.now());
+    if (Number.isNaN(raw.getTime())) return { transactionDate: null, transactionTime: null };
+
+    if (!looksLikeOnline) {
+      // Do not change normal POS movements. If the movement already has explicit transactionDate/time, leave it.
+      if (movement.transactionDate || movement.transactionTime) {
+        return { transactionDate: movement.transactionDate || null, transactionTime: movement.transactionTime || null };
+      }
+      // Fallback: use ISO-local parts (no timezone shift)
+      const dt = new Date(raw.getTime());
+      const parts = {
+        transactionDate: `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`,
+        transactionTime: `${pad(dt.getUTCHours())}:${pad(dt.getUTCMinutes())}:${pad(dt.getUTCSeconds())}`,
+      };
+      return parts;
+    }
+
+    // Online order: convert UTC -> Africa/Blantyre (add 2 hours) unless already normalized
+    if (movement._blantyreNormalized) {
+      return { transactionDate: movement.transactionDate || null, transactionTime: movement.transactionTime || null };
+    }
+
+    const shifted = new Date(raw.getTime() + BLANTYRE_TZ_OFFSET_MS);
+    const parts = {
+      transactionDate: `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())}`,
+      transactionTime: `${pad(shifted.getUTCHours())}:${pad(shifted.getUTCMinutes())}:${pad(shifted.getUTCSeconds())}`,
+    };
+
+    movement._blantyreNormalized = true;
+    console.log('[INVENTORY_ACTIVITY][DATE][DIAG] Online order timestamp normalized to Blantyre', {
+      refNo: refNo || null,
+      userName: userName || null,
+      original: raw.toISOString(),
+      normalized: `${parts.transactionDate} ${parts.transactionTime}`,
+    });
+
+    return parts;
+  } catch (err) {
+    console.error('[INVENTORY_ACTIVITY][DATE] Error formatting movement date/time:', err.message);
+    return { transactionDate: null, transactionTime: null };
+  }
+}
+
 function buildPeriod(filters = {}) {
   const now = new Date();
   let startDate, endDate;
@@ -191,20 +255,34 @@ async function getSaleMovements(period, filters = {}) {
     take: 5000,
   });
 
-  return rows.map((row) => ({
-    movementDate: row.salesInvoice?.invoiceTime || row.salesInvoice?.invoiceDate || row.createdAt,
-    movementType: 'SALE',
-    referenceNo: row.salesInvoice?.refNo || String(row.salesInvoice?.sourceInvoiceNo || ''),
-    cashierName: row.salesInvoice?.userName || null,
-    productCode: row.productCode,
-    productName: row.productName,
-    qtyIn: 0,
-    qtyOut: toNum(row.qty),
-    runningBalance: null,
-    unitPrice: roundMoney(row.unitPrice),
-    lineAmount: roundMoney(row.amount),
-    locationCode: row.salesInvoice?.locationCode || row.locationCode || null,
-  }));
+  return rows.map((row) => {
+    const movementDate = row.salesInvoice?.invoiceTime || row.salesInvoice?.invoiceDate || row.createdAt;
+    const movement = {
+      movementDate,
+      referenceNo: row.salesInvoice?.refNo || String(row.salesInvoice?.sourceInvoiceNo || ''),
+      userName: row.salesInvoice?.userName || null,
+      source: 'POS_SALE',
+    };
+
+    const { transactionDate, transactionTime } = formatInventoryMovementDateTime(movement);
+
+    return {
+      movementDate,
+      movementType: 'SALE',
+      referenceNo: movement.referenceNo,
+      cashierName: movement.userName,
+      productCode: row.productCode,
+      productName: row.productName,
+      qtyIn: 0,
+      qtyOut: toNum(row.qty),
+      runningBalance: null,
+      unitPrice: roundMoney(row.unitPrice),
+      lineAmount: roundMoney(row.amount),
+      locationCode: row.salesInvoice?.locationCode || row.locationCode || null,
+      transactionDate,
+      transactionTime,
+    };
+  });
 }
 
 /**
