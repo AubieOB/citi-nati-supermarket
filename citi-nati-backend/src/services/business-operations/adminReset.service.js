@@ -1,6 +1,7 @@
 'use strict';
 
 const { PrismaClient } = require('@prisma/client');
+const logger = require('../../utils/logger');
 
 const prisma = new PrismaClient();
 
