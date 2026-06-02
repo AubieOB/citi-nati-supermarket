@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const logger = require('../utils/logger');
 const prisma = new PrismaClient();
 
 const MESSAGE_STATES = {
@@ -191,8 +192,7 @@ const getMessages = async (req, res) => {
       offset: Number.isInteger(parsedOffset) && parsedOffset > 0 ? parsedOffset : 0,
     });
   } catch (error) {
-    console.error('[ERROR] Get admin messages:', error);
-    return res.status(500).json({ error: 'Failed to fetch messages' });
+    logger.errorLog('[ERROR] Get admin messages:', error);
   }
 };
 
@@ -216,7 +216,7 @@ const markAsRead = async (req, res) => {
 
     return res.json(message);
   } catch (error) {
-    console.error('[ERROR] Mark message as read:', error);
+    logger.errorLog('[ERROR] Mark message as read:', error);
     return res.status(500).json({ error: 'Failed to update message' });
   }
 };
@@ -249,7 +249,7 @@ const markAsUnread = async (req, res) => {
 
     return res.json(message);
   } catch (error) {
-    console.error('[ERROR] Mark message as unread:', error);
+    logger.errorLog('[ERROR] Mark message as unread:', error);
     return res.status(500).json({ error: 'Failed to update message' });
   }
 };
@@ -267,7 +267,7 @@ const deleteMessage = async (req, res) => {
 
     return res.json({ success: true });
   } catch (error) {
-    console.error('[ERROR] Delete message:', error);
+    logger.errorLog('[ERROR] Delete message:', error);
     return res.status(500).json({ error: 'Failed to delete message' });
   }
 };
@@ -283,7 +283,7 @@ const deleteAllMessages = async (req, res) => {
 
     return res.json({ success: true, deleted: result.count });
   } catch (error) {
-    console.error('[ERROR] Delete all messages:', error);
+    logger.errorLog('[ERROR] Delete all messages:', error);
     return res.status(500).json({ error: 'Failed to delete messages' });
   }
 };
@@ -321,10 +321,10 @@ const markAllAsRead = async (req, res) => {
       },
     });
 
-    console.log(`[ADMIN_MSG] Marked ${result.count} messages as read`);
+    logger.infoLog(`[ADMIN_MSG] Marked ${result.count} messages as read`);
     return res.json({ success: true, updated: result.count });
   } catch (error) {
-    console.error('[ERROR] Mark all messages as read:', error);
+    logger.errorLog('[ERROR] Mark all messages as read:', error);
     return res.status(500).json({ error: 'Failed to mark all messages as read' });
   }
 };
@@ -348,8 +348,7 @@ const resolveMessage = async (req, res) => {
     emitAdminMessage('adminMessageUpdated', toSocketPayload(message));
     return res.json(message);
   } catch (error) {
-    console.error('[ERROR] Resolve message:', error);
-    return res.status(500).json({ error: 'Failed to resolve message' });
+    logger.errorLog('[ERROR] Resolve message:', error);
   }
 };
 
@@ -417,7 +416,7 @@ const createMessage = async (type, title, message, referenceOrOptions = null, ma
       });
 
       emitAdminMessage('newAdminMessage', toSocketPayload(created));
-      console.log('[ADMIN_MSG] Created new deduped message:', created.id, dedupeKey);
+      logger.infoLog('[ADMIN_MSG] Created new deduped message:', created.id, dedupeKey);
       return created;
     }
 
@@ -455,7 +454,7 @@ const createMessage = async (type, title, message, referenceOrOptions = null, ma
         emitAdminMessage('adminMessageUpdated', toSocketPayload(updated));
       }
 
-      console.log('[ADMIN_MSG] Updated recurring message:', updated.id, dedupeKey, 'occurrence', updated.occurrenceCount);
+      logger.infoLog('[ADMIN_MSG] Updated recurring message:', updated.id, dedupeKey, 'occurrence', updated.occurrenceCount);
       return updated;
     }
 
@@ -477,7 +476,7 @@ const createMessage = async (type, title, message, referenceOrOptions = null, ma
       });
 
       emitAdminMessage('adminMessageUpdated', toSocketPayload(reopened));
-      console.log('[ADMIN_MSG] Reopened resolved message:', reopened.id, dedupeKey);
+      logger.infoLog('[ADMIN_MSG] Reopened resolved message:', reopened.id, dedupeKey);
       return reopened;
     }
 
@@ -494,10 +493,10 @@ const createMessage = async (type, title, message, referenceOrOptions = null, ma
     });
 
     emitAdminMessage('newAdminMessage', toSocketPayload(created));
-    console.log('[ADMIN_MSG] Created new message after resolved cooldown:', created.id, dedupeKey);
+    logger.infoLog('[ADMIN_MSG] Created new message after resolved cooldown:', created.id, dedupeKey);
     return created;
   } catch (error) {
-    console.error('[ERROR] Create admin message:', error);
+    logger.errorLog('[ERROR] Create admin message:', error);
     return null;
   }
 };

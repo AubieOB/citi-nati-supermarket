@@ -3,6 +3,7 @@
 const { PrismaClient } = require('@prisma/client');
 const posCommandQueueService = require('../posCommandQueue.service');
 const { updateProductPrice: updateCachedProductPrice } = require('../cache.service');
+const logger = require('../../utils/logger');
 const {
   normalizeScopeCode,
 } = require('../../utils/operationalScope');
@@ -628,14 +629,14 @@ async function syncGoodsIntakeSellingPrices({ goodsIntakeId, items = [], locatio
     candidateMap.set(productId, sellingPrice);
   }
 
-  console.log('[GOODS INTAKE PRICE SYNC] syncGoodsIntakeSellingPrices called:', {
+  logger.debugLog('[GOODS INTAKE PRICE SYNC] syncGoodsIntakeSellingPrices called', {
     goodsIntakeId,
     locationCode,
     candidateCount: candidateMap.size,
   });
 
   if (candidateMap.size === 0) {
-    console.log('[GOODS INTAKE PRICE SYNC] No candidates to sync');
+    logger.debugLog('[GOODS INTAKE PRICE SYNC] No candidates to sync');
     return { attempted: 0, updated: 0, queued: 0, failed: 0 };
   }
 
@@ -652,7 +653,7 @@ async function syncGoodsIntakeSellingPrices({ goodsIntakeId, items = [], locatio
     },
   });
 
-  console.log('[GOODS INTAKE PRICE SYNC] Found products:', {
+  logger.debugLog('[GOODS INTAKE PRICE SYNC] Found products', {
     count: products.length,
     products: products.map(p => ({ id: p.id, code: p.sourceCode, price: p.price })),
   });
@@ -666,7 +667,7 @@ async function syncGoodsIntakeSellingPrices({ goodsIntakeId, items = [], locatio
     const oldPrice = roundMoney(product.price);
     const resolvedPosCode = resolveGoodsIntakePosProductCode(product);
 
-    console.log('[GOODS INTAKE PRICE SYNC] Processing product:', {
+    logger.debugLog('[GOODS INTAKE PRICE SYNC] Processing product', {
       productId: product.id,
       sourceCode: product.sourceCode,
       barcode: product.barcode,
@@ -677,7 +678,7 @@ async function syncGoodsIntakeSellingPrices({ goodsIntakeId, items = [], locatio
     });
 
     if (!Number.isFinite(newPrice) || newPrice <= 0 || newPrice === oldPrice) {
-      console.log('[GOODS INTAKE PRICE SYNC] Skipping product (no valid price change):', {
+      logger.debugLog('[GOODS INTAKE PRICE SYNC] Skipping product (no valid price change)', {
         productId: product.id,
       });
       continue;
@@ -688,13 +689,13 @@ async function syncGoodsIntakeSellingPrices({ goodsIntakeId, items = [], locatio
       data: { price: newPrice },
     });
     updated += 1;
-    console.log('[GOODS INTAKE PRICE SYNC] Updated product price in DB:', {
+    logger.debugLog('[GOODS INTAKE PRICE SYNC] Updated product price in DB', {
       productId: product.id,
       newPrice,
     });
 
     if (!resolvedPosCode) {
-      console.log('[GOODS INTAKE PRICE SYNC] Skipping POS sync (no POS product code):', {
+      logger.warnLog('[GOODS INTAKE PRICE SYNC] Skipping POS sync (no POS product code)', {
         productId: product.id,
       });
       continue;
@@ -703,20 +704,20 @@ async function syncGoodsIntakeSellingPrices({ goodsIntakeId, items = [], locatio
     try {
       await updateCachedProductPrice(resolvedPosCode, newPrice);
     } catch (cacheError) {
-      console.warn('[GOODS INTAKE PRICE SYNC] Cache update failed (non-fatal):', {
+      logger.warnLog('[GOODS INTAKE PRICE SYNC] Cache update failed (non-fatal)', {
         productCode: resolvedPosCode,
         error: cacheError.message,
       });
     }
 
     const scope = buildGoodsIntakePriceWritebackScope(product, locationCode);
-    console.log('[GOODS INTAKE PRICE SYNC] Built writeback scope:', {
+    logger.debugLog('[GOODS INTAKE PRICE SYNC] Built writeback scope', {
       productId: product.id,
       scope,
     });
 
     try {
-      console.log('[POS COMMAND QUEUE] enqueue UPDATE_PRICE start (from goods intake)');
+      logger.debugLog('[POS COMMAND QUEUE] enqueue UPDATE_PRICE start (from goods intake)');
       const payload = {
         productId: String(product.id),
         productCode: resolvedPosCode,
@@ -728,7 +729,13 @@ async function syncGoodsIntakeSellingPrices({ goodsIntakeId, items = [], locatio
         branchCode: scope.branchCode,
         priceTypeCode: scope.priceTypeCode,
       };
-      console.log('[POS COMMAND QUEUE] enqueue payload:', payload);
+      logger.debugLog('[POS COMMAND QUEUE] enqueue payload', {
+        productId: payload.productId,
+        productCode: payload.productCode,
+        locationCode: payload.locationCode,
+        branchCode: payload.branchCode,
+        priceTypeCode: payload.priceTypeCode,
+      });
 
       const queuedCommand = await posCommandQueueService.enqueueCommand('UPDATE_PRICE', payload, {
         source,
@@ -738,7 +745,7 @@ async function syncGoodsIntakeSellingPrices({ goodsIntakeId, items = [], locatio
       });
 
       queued += 1;
-      console.log('[POS COMMAND QUEUE] UPDATE_PRICE queued (goods intake):', {
+      logger.debugLog('[POS COMMAND QUEUE] UPDATE_PRICE queued (goods intake)', {
         commandId: queuedCommand.id,
         productCode: payload.productCode,
         locationCode: payload.locationCode,
@@ -746,7 +753,7 @@ async function syncGoodsIntakeSellingPrices({ goodsIntakeId, items = [], locatio
       });
     } catch (queueErr) {
       failed += 1;
-      console.error('[POS COMMAND QUEUE ERROR] enqueue UPDATE_PRICE failed (goods intake):', {
+      logger.errorLog('[POS COMMAND QUEUE ERROR] enqueue UPDATE_PRICE failed (goods intake)', {
         productId: product.id,
         productCode: resolvedPosCode,
         error: queueErr.message,
@@ -755,7 +762,7 @@ async function syncGoodsIntakeSellingPrices({ goodsIntakeId, items = [], locatio
     }
   }
 
-  console.log('[GOODS INTAKE PRICE SYNC] Completed:', {
+  logger.debugLog('[GOODS INTAKE PRICE SYNC] Completed', {
     attempted: candidateMap.size,
     updated,
     queued,

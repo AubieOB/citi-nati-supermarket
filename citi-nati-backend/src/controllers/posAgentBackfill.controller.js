@@ -1,5 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../config/prisma');
+const logger = require('../utils/logger');
 
 function normalizeBackfillLocationId(locationId) {
   const rawLocationId = locationId;
@@ -13,7 +13,7 @@ function normalizeBackfillLocationId(locationId) {
     ? normalizedLocationId
     : null;
 
-  console.log('[BACKFILL LOCATION NORMALIZATION]', {
+  logger.debugLog('[BACKFILL LOCATION NORMALIZATION]', {
     rawLocationId,
     normalizedLocationId,
     typeofRawLocationId: typeof rawLocationId,
@@ -37,7 +37,7 @@ exports.backfillSales = async (req, res) => {
       });
     }
 
-    console.log('[SALES BACKFILL] Starting batch processing', {
+    logger.debugLog('[SALES BACKFILL] Starting batch processing', {
       invoiceCount: invoices.length,
       branchCode: metadata.branchCode,
       syncSourceCode: metadata.syncSourceCode,
@@ -52,7 +52,7 @@ exports.backfillSales = async (req, res) => {
     // Process invoices in batches
     for (let i = 0; i < invoices.length; i += batchSize) {
       const batch = invoices.slice(i, i + batchSize);
-      console.log(`[SALES BACKFILL] Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(invoices.length / batchSize)} (${batch.length} invoices)`);
+      logger.debugLog(`[SALES BACKFILL] Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(invoices.length / batchSize)} (${batch.length} invoices)`);
 
       for (const invoice of batch) {
       try {
@@ -225,7 +225,7 @@ exports.backfillSales = async (req, res) => {
     }
     }
 
-    console.log('[SALES BACKFILL] Batch processing completed', {
+    logger.debugLog('[SALES BACKFILL] Batch processing completed', {
       totalInvoices: invoices.length,
       synced,
       skipped,

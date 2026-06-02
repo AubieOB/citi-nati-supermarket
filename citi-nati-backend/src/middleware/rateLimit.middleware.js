@@ -53,11 +53,11 @@ function getSharedStore() {
   try {
     redisClient = createClient({ url: redisUrl });
     redisClient.on('error', (error) => {
-      logger.error('[RATE_LIMIT] Redis client error', error);
+      logger.errorLog('[RATE_LIMIT] Redis client error', error);
     });
 
     redisClient.connect().catch((error) => {
-      logger.error('[RATE_LIMIT] Failed to connect Redis rate limit store', error);
+      logger.errorLog('[RATE_LIMIT] Failed to connect Redis rate limit store', error);
     });
 
     sharedStore = new RedisStore({
@@ -65,10 +65,10 @@ function getSharedStore() {
       prefix: 'rate-limit:',
     });
 
-    logger.info('[RATE_LIMIT] Using Redis-backed store');
+    logger.infoLog('[RATE_LIMIT] Using Redis-backed store');
     return sharedStore;
   } catch (error) {
-    logger.error('[RATE_LIMIT] Failed to initialize Redis-backed store', error);
+    logger.errorLog('[RATE_LIMIT] Failed to initialize Redis-backed store', error);
     sharedStore = null;
     return null;
   }
@@ -98,7 +98,7 @@ function buildRateLimiter({
         ? Math.max(1, Math.ceil(retryAfterSeconds / 60))
         : null;
 
-      logger.warn('[RATE_LIMIT] Request blocked', {
+      logger.warnLog('[RATE_LIMIT] Request blocked', {
         limiter: name || 'unknown',
         method: req.method,
         path: req.originalUrl,

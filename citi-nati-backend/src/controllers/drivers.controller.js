@@ -2,6 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const { emitOrderStatusUpdated, emitOrderUpdated } = require('../utils/socket');
 const { validateStrongPassword } = require('../utils/passwordPolicy');
+const logger = require('../utils/logger');
 
 const prisma = new PrismaClient();
 
@@ -64,7 +65,7 @@ const createDriverWithAccount = async (req, res) => {
       return { user, driver };
     });
 
-    console.log('[DEBUG DRIVER CREATE] Created driver user account:', email);
+    logger.debugLog('[DEBUG DRIVER CREATE] Created driver user account:', email);
 
     return res.status(201).json({
       message: 'Driver account created successfully',
@@ -77,7 +78,7 @@ const createDriverWithAccount = async (req, res) => {
       driver: result.driver,
     });
   } catch (err) {
-    console.error('Error creating driver account:', err);
+    logger.errorLog('Error creating driver account:', err);
     
     // Handle duplicate email
     if (err.code === 'P2002') {
@@ -128,7 +129,7 @@ const createDriver = async (req, res) => {
       });
     }
 
-    console.error('Error creating driver:', err);
+    logger.errorLog('Error creating driver:', err);
     return res.status(500).json({
       error: 'Server error while creating driver',
     });
@@ -148,7 +149,7 @@ const getDrivers = async (req, res) => {
       drivers,
     });
   } catch (err) {
-    console.error('Error fetching drivers:', err);
+    logger.errorLog('Error fetching drivers:', err);
     return res.status(500).json({
       error: 'Server error while fetching drivers',
     });
@@ -209,7 +210,7 @@ const updateDriver = async (req, res) => {
       });
     }
 
-    console.error('Error updating driver:', err);
+    logger.errorLog('Error updating driver:', err);
     return res.status(500).json({
       error: 'Server error while updating driver',
     });
@@ -250,7 +251,7 @@ const deleteDriver = async (req, res) => {
           where: { id: driverUser.id },
           data: { role: 'user' },
         });
-        console.log('[DEBUG DELETE DRIVER] Changed user role to user for email:', driver.email);
+        logger.debugLog('[DEBUG DELETE DRIVER] Changed user role to user for email:', driver.email);
       }
     }
 
@@ -259,7 +260,7 @@ const deleteDriver = async (req, res) => {
       where: { id },
     });
 
-    console.log('[DEBUG DELETE DRIVER] Deleted driver:', driver.email);
+    logger.debugLog('[DEBUG DELETE DRIVER] Deleted driver:', driver.email);
 
     return res.status(200).json({
       message: 'Driver deleted successfully',
@@ -272,7 +273,7 @@ const deleteDriver = async (req, res) => {
       });
     }
 
-    console.error('Error deleting driver:', err);
+    logger.errorLog('Error deleting driver:', err);
     return res.status(500).json({
       error: 'Server error while deleting driver',
     });
@@ -329,7 +330,7 @@ const getDriverOrders = async (req, res) => {
       orders,
     });
   } catch (err) {
-    console.error('Error fetching driver orders:', err);
+    logger.errorLog('Error fetching driver orders:', err);
     return res.status(500).json({
       error: 'Server error while fetching driver orders',
     });
@@ -417,7 +418,7 @@ const updateDriverOrderStatus = async (req, res) => {
       order: updatedOrder,
     });
   } catch (err) {
-    console.error('Error updating driver order status:', err);
+    logger.errorLog('Error updating driver order status:', err);
     return res.status(500).json({
       error: 'Server error while updating order status',
     });
@@ -469,7 +470,7 @@ const getDriverPerformance = async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('[DRIVER_PERF] Error fetching driver performance:', err);
+    logger.errorLog('[DRIVER_PERF] Error fetching driver performance:', err);
     res.status(500).json({ message: 'Failed to fetch driver performance' });
   }
 };
@@ -526,7 +527,7 @@ const getDriverPerformanceByDay = async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('[DRIVER_PERF] Error fetching driver performance by day:', err);
+    logger.errorLog('[DRIVER_PERF] Error fetching driver performance by day:', err);
     res.status(500).json({ message: 'Failed to fetch driver performance' });
   }
 };
@@ -557,13 +558,13 @@ const clearDriverPerformance = async (req, res) => {
       }
     });
 
-    console.log('[DRIVER_PERF] Driver performance cleared:', { updated: result.count, salesDayId: openSalesDay.id });
+    logger.debugLog('[DRIVER_PERF] Driver performance cleared:', { updated: result.count, salesDayId: openSalesDay.id });
     res.json({
       message: 'Driver performance cleared successfully',
       updatedCount: result.count
     });
   } catch (err) {
-    console.error('[DRIVER_PERF] Error clearing driver performance:', err);
+    logger.errorLog('[DRIVER_PERF] Error clearing driver performance:', err);
     res.status(500).json({ message: 'Failed to clear driver performance' });
   }
 };

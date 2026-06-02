@@ -9,6 +9,7 @@ const { splitInclusiveVat } = require('../utils/vat');
 const { formatBusinessDateTimeLabel } = require('../utils/businessTime');
 const { validateDeliveryLocation } = require('../services/deliveryCoverage.service');
 const { getMinimumOrderValue } = require('../utils/checkoutRules');
+const logger = require('../utils/logger');
 
 const prisma = new PrismaClient();
 
@@ -233,7 +234,7 @@ const createOrder = async (req, res) => {
       });
     }
 
-    console.error('Error creating order:', err);
+    logger.errorLog('Error creating order:', err);
     return res.status(500).json({
       error: 'Server error while creating order',
     });
@@ -324,9 +325,9 @@ const updateOrderStatus = async (req, res) => {
           status
         );
 
-        console.log(`[Email] ✅ Delivery status email sent for order ${updatedOrder.id} (${status})`);
+        logger.debugLog(`[Email] Delivery status email sent for order ${updatedOrder.id} (${status})`);
       } catch (emailErr) {
-        console.error(`[Email] ❌ Failed to send delivery status email:`, emailErr.message);
+        logger.errorLog(`[Email] ❌ Failed to send delivery status email:`, emailErr.message);
         // Don't fail the status update if email fails
       }
     }
@@ -350,7 +351,7 @@ const updateOrderStatus = async (req, res) => {
     if (err.code === 'P2025') {
       return res.status(404).json({ error: 'Order not found' });
     }
-    console.error('Error updating order status:', err);
+    logger.errorLog('Error updating order status:', err);
     return res.status(500).json({ error: 'Server error while updating order status' });
   }
 };
@@ -425,9 +426,9 @@ const assignDriverToOrder = async (req, res) => {
         orderDetails
       );
 
-      console.log(`[Email] ✅ Driver assigned email sent to ${updatedOrder.user.email}`);
+      logger.debugLog(`[Email] Driver assigned email sent to ${updatedOrder.user.email}`);
     } catch (emailErr) {
-      console.error(`[Email] ❌ Failed to send driver assigned email:`, emailErr.message);
+      logger.errorLog(`[Email] ❌ Failed to send driver assigned email:`, emailErr.message);
       // Don't fail the assignment if email fails
     }
 
@@ -439,7 +440,7 @@ const assignDriverToOrder = async (req, res) => {
     if (err.code === 'P2025') {
       return res.status(404).json({ error: 'Order not found' });
     }
-    console.error('Error assigning driver to order:', err);
+    logger.errorLog('Error assigning driver to order:', err);
     return res.status(500).json({ error: 'Server error while assigning driver to order' });
   }
 };
@@ -473,7 +474,7 @@ const getUserOrders = async (req, res) => {
       orders,
     });
   } catch (err) {
-    console.error('Error fetching user orders:', err);
+    logger.errorLog('Error fetching user orders:', err);
     return res.status(500).json({ error: 'Server error while fetching orders' });
   }
 };
@@ -515,7 +516,7 @@ const getAllOrders = async (req, res) => {
       orders,
     });
   } catch (err) {
-    console.error('Error fetching all orders:', err);
+    logger.errorLog('Error fetching all orders:', err);
     return res.status(500).json({ error: 'Server error while fetching orders' });
   }
 };
@@ -615,7 +616,7 @@ const getOrderById = async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
   } catch (err) {
-    console.error('Error fetching order by ID:', err);
+    logger.errorLog('Error fetching order by ID:', err);
     return res.status(500).json({ error: 'Server error while fetching order' });
   }
 };
@@ -679,7 +680,7 @@ const getOrderByReference = async (req, res) => {
       order,
     });
   } catch (err) {
-    console.error('Error fetching order by reference:', err);
+    logger.errorLog('Error fetching order by reference:', err);
     return res.status(500).json({ error: 'Server error while fetching order' });
   }
 };
@@ -717,7 +718,7 @@ const checkPaymentStatus = async (req, res) => {
     const dbQueryTime = Date.now() - startTime;
 
     if (!order) {
-      console.log(`[PAYMENT CHECK] Reference not found: ${reference}`);
+      logger.warnLog('[PAYMENT CHECK] Reference not found:', { reference });
       return res.status(404).json({
         error: 'Order not found',
       });
@@ -735,7 +736,7 @@ const checkPaymentStatus = async (req, res) => {
     // If status is PAID, webhook already decremented stock atomically
     
     const totalTime = Date.now() - startTime;
-    console.log(`[PAYMENT CHECK] Reference: ${reference}, Status: ${order.paymentStatus}, Time: ${totalTime}ms`);
+    logger.debugLog(`[PAYMENT CHECK] Reference: ${reference}, Status: ${order.paymentStatus}, Time: ${totalTime}ms`);
 
     return res.status(200).json({
       order: {
@@ -746,7 +747,7 @@ const checkPaymentStatus = async (req, res) => {
       responseTime: totalTime,
     });
   } catch (err) {
-    console.error('[PAYMENT CHECK ERROR]:', err);
+    logger.errorLog('[PAYMENT CHECK ERROR]:', err);
     return res.status(500).json({ error: 'Failed to check payment status' });
   }
 };
@@ -883,7 +884,7 @@ const getReceipt = async (req, res) => {
     doc.end();
 
   } catch (err) {
-    console.error('Error fetching receipt:', err);
+    logger.errorLog('Error fetching receipt:', err);
     return res.status(500).json({ error: 'Server error while fetching receipt' });
   }
 };
@@ -936,7 +937,7 @@ const getRefundPendingOrders = async (req, res) => {
       })
     });
   } catch (err) {
-    console.error('Error fetching refund pending orders:', err);
+    logger.errorLog('Error fetching refund pending orders:', err);
     return res.status(500).json({ error: 'Server error while fetching refunds' });
   }
 };
@@ -1000,13 +1001,13 @@ const markOrderAsRefunded = async (req, res) => {
           timestamp: new Date().toISOString()
         }
       );
-      console.log(`[ORDER] Refund notification email sent to ${updatedOrder.user.email}`);
+      logger.debugLog(`[ORDER] Refund notification email sent to ${updatedOrder.user.email}`);
     } catch (emailErr) {
-      console.error('[ORDER] Error sending refund email:', emailErr.message);
+      logger.errorLog('[ORDER] Error sending refund email:', emailErr.message);
       // Don't fail the refund if email fails
     }
 
-    console.log(`[Admin] Order ${orderId} marked as REFUNDED by admin ${req.user.userId}`);
+    logger.debugLog(`[Admin] Order ${orderId} marked as REFUNDED by admin ${req.user.userId}`);
 
     return res.status(200).json({
       message: 'Order marked as refunded successfully',
@@ -1019,7 +1020,7 @@ const markOrderAsRefunded = async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('Error marking order as refunded:', err);
+    logger.errorLog('Error marking order as refunded:', err);
     return res.status(500).json({ error: 'Server error while marking order as refunded' });
   }
 };

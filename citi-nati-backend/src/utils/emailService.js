@@ -22,7 +22,7 @@ const sendEmail = async (to, subject, html) => {
       html,
     });
 
-    logger.info(`Email sent successfully to: ${to}`, {
+    logger.infoLog(`Email sent successfully to: ${to}`, {
       subject,
       messageId: result.messageId,
     });
@@ -32,7 +32,7 @@ const sendEmail = async (to, subject, html) => {
       messageId: result.messageId,
     };
   } catch (err) {
-    logger.error(`Error sending email to ${to}`, {
+    logger.errorLog(`Error sending email to ${to}`, {
       subject,
       error: err.message || err.code,
     });
@@ -54,7 +54,7 @@ const sendEmail = async (to, subject, html) => {
  */
 const sendVerificationEmail = async (email, code) => {
   try {
-    logger.debug('Sending verification email', { email });
+    logger.debugLog('Sending verification email', { email });
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -84,7 +84,7 @@ const sendVerificationEmail = async (email, code) => {
 
     return await sendEmail(email, 'Verify Your Citi-Nati Account', html);
   } catch (err) {
-    logger.error('Error in sendVerificationEmail', { error: err.message, email });
+    logger.errorLog('Error in sendVerificationEmail', { error: err.message, email });
     return { success: false, error: err.message };
   }
 };
@@ -95,7 +95,7 @@ const sendVerificationEmail = async (email, code) => {
  */
 const sendPasswordResetEmail = async (email, code) => {
   try {
-    logger.debug('Sending password reset email', { email });
+    logger.debugLog('Sending password reset email', { email });
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -125,7 +125,7 @@ const sendPasswordResetEmail = async (email, code) => {
 
     return await sendEmail(email, 'Reset Your Citi-Nati Password', html);
   } catch (err) {
-    logger.error('Error in sendPasswordResetEmail', { error: err.message, email });
+    logger.errorLog('Error in sendPasswordResetEmail', { error: err.message, email });
     return { success: false, error: err.message };
   }
 };
@@ -136,7 +136,7 @@ const sendPasswordResetEmail = async (email, code) => {
  */
 const sendOrderConfirmationEmail = async (email, userName, order, products) => {
   try {
-    logger.debug('Sending order confirmation email', { email, orderId: order.id });
+    logger.debugLog('Sending order confirmation email', { email, orderId: order.id });
 
     const productRows = products
       .map(
@@ -193,7 +193,7 @@ const sendOrderConfirmationEmail = async (email, userName, order, products) => {
 
     return await sendEmail(email, `Order Confirmation - #${order.id}`, html);
   } catch (err) {
-    logger.error('Error in sendOrderConfirmationEmail', { error: err.message, email, orderId: order.id });
+    logger.errorLog('Error in sendOrderConfirmationEmail', { error: err.message, email, orderId: order.id });
     return { success: false, error: err.message };
   }
 };
@@ -204,7 +204,7 @@ const sendOrderConfirmationEmail = async (email, userName, order, products) => {
  */
 const sendPaymentConfirmationEmail = async (email, userName, paymentDetails) => {
   try {
-    logger.debug('Sending payment confirmation email', { email, orderId: paymentDetails.orderId });
+    logger.debugLog('Sending payment confirmation email', { email, orderId: paymentDetails.orderId });
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -267,7 +267,7 @@ const sendPaymentConfirmationEmail = async (email, userName, paymentDetails) => 
 
     return await sendEmail(email, 'Payment Confirmation', html);
   } catch (err) {
-    logger.error('Error in sendPaymentConfirmationEmail', { error: err.message, email });
+    logger.errorLog('Error in sendPaymentConfirmationEmail', { error: err.message, email });
     return { success: false, error: err.message };
   }
 };
@@ -278,7 +278,7 @@ const sendPaymentConfirmationEmail = async (email, userName, paymentDetails) => 
  */
 const sendDriverAssignedEmail = async (email, userName, driverInfo, orderDetails) => {
   try {
-    logger.debug('Sending driver assigned email', { email, orderId: orderDetails.id });
+    logger.debugLog('Sending driver assigned email', { email, orderId: orderDetails.id });
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -308,7 +308,7 @@ const sendDriverAssignedEmail = async (email, userName, driverInfo, orderDetails
 
     return await sendEmail(email, 'Your Order is On The Way!', html);
   } catch (err) {
-    logger.error('Error in sendDriverAssignedEmail', { error: err.message, email });
+    logger.errorLog('Error in sendDriverAssignedEmail', { error: err.message, email });
     return { success: false, error: err.message };
   }
 };
@@ -319,7 +319,7 @@ const sendDriverAssignedEmail = async (email, userName, driverInfo, orderDetails
  */
 const sendDeliveryStatusEmail = async (email, userName, orderDetails, status) => {
   try {
-    logger.debug('Sending delivery status email', { email, orderId: orderDetails.id, status });
+    logger.debugLog('Sending delivery status email', { email, orderId: orderDetails.id, status });
 
     const statusMessages = {
       delivered: 'Your Order Has Been Delivered',
@@ -370,7 +370,7 @@ const sendDeliveryStatusEmail = async (email, userName, orderDetails, status) =>
 
     return await sendEmail(email, subject, html);
   } catch (err) {
-    logger.error('Error in sendDeliveryStatusEmail', { error: err.message, email, orderId: orderDetails.id, status });
+    logger.errorLog('Error in sendDeliveryStatusEmail', { error: err.message, email, orderId: orderDetails.id, status });
     return { success: false, error: err.message };
   }
 };
@@ -381,7 +381,7 @@ const sendDeliveryStatusEmail = async (email, userName, orderDetails, status) =>
  */
 const sendRefundNotificationEmail = async (email, userName, refundDetails) => {
   try {
-    logger.debug('Sending refund notification email', { email, orderId: refundDetails.orderId });
+    logger.debugLog('Sending refund notification email', { email, orderId: refundDetails.orderId });
 
     const formattedAmount = refundDetails.amount ? `MWK ${refundDetails.amount.toLocaleString()}` : 'N/A';
     const refundId = refundDetails.refundId || 'Processing';
@@ -439,7 +439,7 @@ const sendRefundNotificationEmail = async (email, userName, refundDetails) => {
 
     return await sendEmail(email, 'Payment Refunded - Order #' + refundDetails.orderId, html);
   } catch (err) {
-    logger.error('Error in sendRefundNotificationEmail', { error: err.message, email, orderId: refundDetails.orderId });
+    logger.errorLog('Error in sendRefundNotificationEmail', { error: err.message, email, orderId: refundDetails.orderId });
     return { success: false, error: err.message };
   }
 };

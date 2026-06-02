@@ -2,6 +2,7 @@
 
 const { PrismaClient } = require('@prisma/client');
 const posCommandQueueService = require('../posCommandQueue.service');
+const logger = require('../../utils/logger');
 
 const prisma = new PrismaClient();
 
@@ -265,11 +266,15 @@ async function transferGoodsIntakeToBlantyrePosPending(intakeId, options = {}) {
     expiryDate:  item.expiryDate ? new Date(item.expiryDate).toISOString() : null,
   }));
 
-  console.log(
-    `[BO][GOODS_INTAKE][TRANSFER] intakeId=${intakeId} ref=${intake.intakeRef}` +
-    ` requestedGrn=${requestedGrnValidation.requestedGrn || 'AUTO'} supplier=${supplierCode} location=${locationCode}` +
-    ` lines=${detailItems.length} fallbackSupplier=${supplierResolution.usedFallback ? 'yes' : 'no'}`
-  );
+  logger.debugLog('[BO][GOODS_INTAKE][TRANSFER] transfer queued', {
+    intakeId,
+    intakeRef: intake.intakeRef,
+    requestedGrn: requestedGrnValidation.requestedGrn || 'AUTO',
+    supplierCode,
+    locationCode,
+    lines: detailItems.length,
+    fallbackSupplier: supplierResolution.usedFallback ? 'yes' : 'no',
+  });
 
   // --- Enqueue command for Blantyre POS agent (polling model — no direct LAN call) ---
   const posLocationCode = mapToPostLocationCode(locationCode); // BT → SH
@@ -308,10 +313,13 @@ async function transferGoodsIntakeToBlantyrePosPending(intakeId, options = {}) {
     },
   });
 
-  console.log(
-    `[BO][GOODS_INTAKE][TRANSFER] QUEUED intakeId=${intakeId} requestedGrn=${requestedGrnValidation.requestedGrn || 'AUTO'}` +
-    ` commandId=${queued.id} supplier=${supplierCode} lines=${detailItems.length}`
-  );
+  logger.debugLog('[BO][GOODS_INTAKE][TRANSFER] queued', {
+    intakeId,
+    requestedGrn: requestedGrnValidation.requestedGrn || 'AUTO',
+    commandId: queued.id,
+    supplierCode,
+    lines: detailItems.length,
+  });
 
   return {
     success:    true,
@@ -471,12 +479,15 @@ async function transferGoodsIntakeToZombaPosPending(intakeId, options) {
     expiryDate: itm.expiryDate ? new Date(itm.expiryDate).toISOString() : null,
   }));
 
-  console.log(
-    '[BO][GOODS_INTAKE][ZOMBA_TRANSFER] intakeId=' + intakeId + ' ref=' + intake.intakeRef +
-    ' requestedGrn=' + (requestedGrnValidation.requestedGrn || 'AUTO') +
-    ' supplier=' + supplierCode + ' locationCode=' + posLocationCode +
-    ' lines=' + detailItems.length + ' fallbackSupplier=' + (supplierResolution.usedFallback ? 'yes' : 'no')
-  );
+  logger.debugLog('[BO][GOODS_INTAKE][ZOMBA_TRANSFER] transfer queued', {
+    intakeId,
+    intakeRef: intake.intakeRef,
+    requestedGrn: requestedGrnValidation.requestedGrn || 'AUTO',
+    supplierCode,
+    locationCode: posLocationCode,
+    lines: detailItems.length,
+    fallbackSupplier: supplierResolution.usedFallback ? 'yes' : 'no',
+  });
 
   const queued = await posCommandQueueService.enqueueCommand(
     'CREATE_PENDING_STOCK_INTAKE',
@@ -511,11 +522,13 @@ async function transferGoodsIntakeToZombaPosPending(intakeId, options) {
     },
   });
 
-  console.log(
-    '[BO][GOODS_INTAKE][ZOMBA_TRANSFER] QUEUED intakeId=' + intakeId +
-    ' requestedGrn=' + (requestedGrnValidation.requestedGrn || 'AUTO') +
-    ' commandId=' + queued.id + ' supplier=' + supplierCode + ' lines=' + detailItems.length
-  );
+  logger.debugLog('[BO][GOODS_INTAKE][ZOMBA_TRANSFER] queued', {
+    intakeId,
+    requestedGrn: requestedGrnValidation.requestedGrn || 'AUTO',
+    commandId: queued.id,
+    supplierCode,
+    lines: detailItems.length,
+  });
 
   return {
     success: true,

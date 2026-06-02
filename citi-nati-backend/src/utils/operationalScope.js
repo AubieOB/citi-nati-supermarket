@@ -1,5 +1,7 @@
 'use strict';
 
+const logger = require('./logger');
+
 const LOCATION_ALIASES = {
   BLANTYRE_SH: 'SH',
   BT: 'BT',
@@ -114,7 +116,7 @@ function resolveOperationalScope(req) {
     throw new Error('Invalid locationCode provided');
   }
 
-  console.log('[SCOPE]', { branchCode: branchCode || null, locationCode: locationCode || null });
+  logger.debugLog('[SCOPE]', { branchCode: branchCode || null, locationCode: locationCode || null });
 
   return {
     branchCode: branchCode || null,

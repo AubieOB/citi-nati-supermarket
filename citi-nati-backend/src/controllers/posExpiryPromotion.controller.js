@@ -1,5 +1,6 @@
 const posSyncService = require('../services/posSync.service');
 const posCommandQueueService = require('../services/posCommandQueue.service');
+const logger = require('../utils/logger');
 
 const VALID_EXPIRY_SOURCES = new Set(['view', 'stockdetails']);
 const DEFAULT_EXPIRY_DAYS = 14;
@@ -44,7 +45,7 @@ function getPreviewFailureStatus(errorMessage) {
 
 async function getExpiryCandidates(req, res) {
   try {
-    console.log('[ADMIN EXPIRY] request start', {
+    logger.debugLog('[ADMIN EXPIRY] request start', {
       endpoint: '/api/admin/pos-expiry',
       query: req.query,
     });
@@ -54,7 +55,7 @@ async function getExpiryCandidates(req, res) {
     const includeExpired = normalizeIncludeExpired(req.query.includeExpired, req.query.filter);
     const source = normalizeExpirySource(req.query.source);
 
-    console.log('[ADMIN EXPIRY] agent call', {
+    logger.debugLog('[ADMIN EXPIRY] agent call', {
       endpoint: '/api/admin/pos-expiry',
       days,
       locationCode,
@@ -72,7 +73,7 @@ async function getExpiryCandidates(req, res) {
     }
 
     const payload = result.data || {};
-    console.log('[ADMIN EXPIRY] response count', {
+    logger.debugLog('[ADMIN EXPIRY] response count', {
       count: payload.count || 0,
       days,
       locationCode,
@@ -90,7 +91,7 @@ async function getExpiryCandidates(req, res) {
       data: payload.data || [],
     });
   } catch (error) {
-    console.error('[EXPIRY] backend fetch failed:', error.message);
+    logger.errorLog('[EXPIRY] backend fetch failed:', { message: error.message });
     return res.status(500).json({
       success: false,
       error: 'Failed to fetch expiry candidates',
@@ -124,7 +125,10 @@ async function previewPromotion(req, res) {
     }
 
     const payload = result.data || {};
-    console.log(`[PROMO] current latest price = ${payload.latestPriceRow ? payload.latestPriceRow.price : 'N/A'}`);
+    logger.debugLog('[PROMO] current latest price', {
+      latestPrice: payload.latestPriceRow ? payload.latestPriceRow.price : null,
+      currency: payload.latestPriceRow ? payload.latestPriceRow.currency : null,
+    });
 
     return res.json({
       success: true,
@@ -134,7 +138,7 @@ async function previewPromotion(req, res) {
       latestPriceRow: payload.latestPriceRow || null,
     });
   } catch (error) {
-    console.error('[PROMO] backend preview failed:', error.message);
+    logger.errorLog('[PROMO] backend preview failed:', { message: error.message });
     return res.status(500).json({
       success: false,
       error: 'Failed to preview promotion price',
@@ -159,7 +163,7 @@ async function applyPromotion(req, res) {
       return res.status(400).json({ success: false, error: 'promotionalPrice must be greater than 0' });
     }
 
-    console.log(`[PROMO] applying promotion for ProductCode ${productCode}`);
+    logger.debugLog('[PROMO] applying promotion', { productCode });
 
     const previewResult = await posSyncService.previewPromotionPriceFromPOS(productCode, {
       locationCode,
@@ -173,8 +177,8 @@ async function applyPromotion(req, res) {
     const latestPriceRow = previewResult.data?.latestPriceRow || null;
     const currentLatestPrice = latestPriceRow ? Number(latestPriceRow.price) : null;
 
-    console.log(`[PROMO] current latest price = ${currentLatestPrice == null ? 'N/A' : currentLatestPrice}`);
-    console.log(`[PROMO] new promo price = ${promotionalPrice}`);
+    logger.debugLog('[PROMO] current latest price', { currentLatestPrice });
+    logger.debugLog('[PROMO] new promo price', { promotionalPrice });
 
     if (currentLatestPrice != null && currentLatestPrice === promotionalPrice) {
       return res.status(400).json({
@@ -192,7 +196,7 @@ async function applyPromotion(req, res) {
       updatePromotionalFlag,
     };
 
-    console.log('[PROMO][BACKEND] queue APPLY_PROMOTION', {
+    logger.debugLog('[PROMO][BACKEND] queue APPLY_PROMOTION', {
       productCode,
       locationCode,
       priceTypeCode,
@@ -221,7 +225,7 @@ async function applyPromotion(req, res) {
       updatePromotionalFlag,
     });
   } catch (error) {
-    console.error('[PROMO] backend apply failed:', error.message);
+    logger.errorLog('[PROMO] backend apply failed:', { message: error.message });
     return res.status(500).json({
       success: false,
       error: 'Failed to queue promotion write-back',
@@ -258,8 +262,8 @@ async function revertPromotion(req, res) {
     const latestPriceRow = previewResult.data?.latestPriceRow || null;
     const currentLatestPrice = latestPriceRow ? Number(latestPriceRow.price) : null;
 
-    console.log(`[PROMO] applying revert for ProductCode ${productCode}`);
-    console.log(`[PROMO] current latest price = ${currentLatestPrice == null ? 'N/A' : currentLatestPrice}`);
+    logger.debugLog('[PROMO] applying revert', { productCode });
+    logger.debugLog('[PROMO] current latest price', { currentLatestPrice });
 
     if (restorePrice != null && currentLatestPrice != null && restorePrice === currentLatestPrice) {
       return res.status(400).json({
@@ -277,7 +281,7 @@ async function revertPromotion(req, res) {
       updatePromotionalFlag,
     };
 
-    console.log('[PROMO][BACKEND] queue REVERT_PROMOTION', {
+    logger.debugLog('[PROMO][BACKEND] queue REVERT_PROMOTION', {
       productCode,
       locationCode,
       priceTypeCode,
@@ -306,7 +310,7 @@ async function revertPromotion(req, res) {
       updatePromotionalFlag,
     });
   } catch (error) {
-    console.error('[PROMO] backend revert failed:', error.message);
+    logger.errorLog('[PROMO] backend revert failed:', { message: error.message });
     return res.status(500).json({
       success: false,
       error: 'Failed to queue promotion revert',

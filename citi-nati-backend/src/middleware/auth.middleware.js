@@ -35,7 +35,7 @@ const verifyTokenMiddleware = (req, res, next) => {
   }
 
   req.user = verification.payload;
-  logger.debug('[AUTH] Token verified', { userId: req.user.userId, role: req.user.role });
+  logger.debugLog('[AUTH] Token verified', { userId: req.user.userId, role: req.user.role });
   next();
 };
 

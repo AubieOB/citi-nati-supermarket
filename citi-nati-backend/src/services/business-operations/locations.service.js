@@ -4,6 +4,8 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
+const logger = require('../../utils/logger');
+
 const DEFAULT_LOCATIONS = [
   { id: 1, code: 'BT', name: 'Blantyre' },
   { id: 2, code: 'ZA', name: 'Zomba' },
@@ -62,7 +64,7 @@ async function getBusinessLocations() {
       code: normalizeLocationCode(row.name, row.code),
     })).filter((row) => row.name);
   } catch (error) {
-    console.warn('[BO][LOCATIONS] Falling back to defaults:', error.message);
+    logger.warnLog('[BO][LOCATIONS] Falling back to defaults:', { message: error.message });
     return DEFAULT_LOCATIONS;
   }
 }

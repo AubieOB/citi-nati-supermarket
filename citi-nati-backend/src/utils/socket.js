@@ -9,6 +9,7 @@
  */
 
 const { computeExpiryStatus } = require('./expiryStatus');
+const logger = require('./logger');
 
 /**
  * Emit new order event to all admin clients
@@ -31,10 +32,10 @@ const emitNewOrder = (order) => {
         items: order.items || [],
         createdAt: order.createdAt,
       });
-      console.log(`[Socket.io] New order ${order.id} emitted to admin_room`);
+      logger.debugLog(`[Socket.io] New order ${order.id} emitted to admin_room`);
     }
   } catch (err) {
-    console.error('Error emitting newOrder event:', err.message);
+    logger.errorLog('Error emitting newOrder event:', err.message);
   }
 };
 
@@ -58,10 +59,10 @@ const emitOrderAssigned = (driverId, order) => {
         phone: order.phone,
         createdAt: order.createdAt,
       });
-      console.log(`[Socket.io] Order ${order.id} assigned to driver_${driverId}`);
+      logger.debugLog(`[Socket.io] Order ${order.id} assigned to driver_${driverId}`);
     }
   } catch (err) {
-    console.error('Error emitting orderAssigned event:', err.message);
+    logger.errorLog('Error emitting orderAssigned event:', err.message);
   }
 };
 
@@ -90,18 +91,18 @@ const emitOrderUpdatedToAdminAndCustomer = (order) => {
 
       // Emit to admin room
       global.io.to('admin_room').emit('orderUpdated', eventData);
-      console.log(`[Socket.io] Order ${order.id} emitted to admin_room (assignment)`);
+      logger.debugLog(`[Socket.io] Order ${order.id} emitted to admin_room (assignment)`);
 
       // Emit to customer only
       if (order.userId) {
         global.io.to(`user_${order.userId}`).emit('orderUpdated', eventData);
-        console.log(`[Socket.io] Order ${order.id} emitted to user_${order.userId} (assignment)`);
+        logger.debugLog(`[Socket.io] Order ${order.id} emitted to user_${order.userId} (assignment)`);
       }
 
-      console.log(`[Socket.io] Order ${order.id} assigned (no driver update)`);
+      logger.debugLog(`[Socket.io] Order ${order.id} assigned (no driver update)`);
     }
   } catch (err) {
-    console.error('Error emitting orderUpdatedToAdminAndCustomer event:', err.message);
+    logger.errorLog('Error emitting orderUpdatedToAdminAndCustomer event:', err.message);
   }
 };
 
@@ -130,31 +131,31 @@ const emitOrderUpdated = (order) => {
 
       // Emit to admin room (all admins get all order updates)
       global.io.to('admin_room').emit('orderUpdated', eventData);
-      console.log(`[Socket.io] Order ${order.id} emitted to admin_room`);
+      logger.debugLog(`[Socket.io] Order ${order.id} emitted to admin_room`);
 
       // Emit to assigned driver (if order has a driver assigned)
       if (order.driverId) {
         global.io.to(`driver_${order.driverId}`).emit('orderUpdated', eventData);
-        console.log(`[Socket.io] Order ${order.id} emitted to driver_${order.driverId}`);
+        logger.debugLog(`[Socket.io] Order ${order.id} emitted to driver_${order.driverId}`);
       }
 
       // Emit to customer (user who placed the order)
       if (order.userId) {
-        console.log(`[Socket.io] Emitting orderUpdated to user_${order.userId}:`, {
+        logger.debugLog(`[Socket.io] Emitting orderUpdated to user_${order.userId}:`, {
           orderId: order.id,
           userId: order.userId,
           status: order.status,
         });
         global.io.to(`user_${order.userId}`).emit('orderUpdated', eventData);
-        console.log(`[Socket.io] Order ${order.id} emitted to user_${order.userId}`);
+        logger.debugLog(`[Socket.io] Order ${order.id} emitted to user_${order.userId}`);
       } else {
-        console.warn(`[Socket.io] Order ${order.id} has no userId - cannot notify customer`);
+        logger.warnLog(`[Socket.io] Order ${order.id} has no userId - cannot notify customer`);
       }
 
-      console.log(`[Socket.io] Order ${order.id} status: ${order.status}`);
+      logger.debugLog(`[Socket.io] Order ${order.id} status: ${order.status}`);
     }
   } catch (err) {
-    console.error('Error emitting orderUpdated event:', err.message);
+    logger.errorLog('Error emitting orderUpdated event:', err.message);
   }
 };
 
@@ -207,7 +208,7 @@ const emitProductUpdate = (product) => {
 
       // Broadcast to all connected clients
       global.io.emit('product_updated', productUpdateData);
-      console.log(`[Socket.io] Product update emitted for product ${product.id}:`, {
+      logger.debugLog(`[Socket.io] Product update emitted for product ${product.id}:`, {
         name: product.name,
         price: product.price,
         finalPrice: finalPrice,
@@ -219,7 +220,7 @@ const emitProductUpdate = (product) => {
       });
     }
   } catch (err) {
-    console.error('Error emitting product_updated event:', err.message);
+    logger.errorLog('Error emitting product_updated event:', err.message);
   }
 };
 
@@ -243,10 +244,10 @@ const emitStockUpdate = (productId, newStock, newPrice = null) => {
 
       // Broadcast to all connected clients
       global.io.emit('stock_update', stockUpdateData);
-      console.log(`[Socket.io] Stock update emitted:`, stockUpdateData);
+      logger.debugLog(`[Socket.io] Stock update emitted:`, stockUpdateData);
     }
   } catch (err) {
-    console.error('Error emitting stock_update event:', err.message);
+    logger.errorLog('Error emitting stock_update event:', err.message);
   }
 };
 
@@ -264,10 +265,10 @@ const emitMultipleStockUpdates = (products) => {
           newPrice: product.price || null,
         });
       }
-      console.log(`[Socket.io] ${products.length} stock updates emitted`);
+      logger.debugLog(`[Socket.io] ${products.length} stock updates emitted`);
     }
   } catch (err) {
-    console.error('Error emitting multiple stock_update events:', err.message);
+    logger.errorLog('Error emitting multiple stock_update events:', err.message);
   }
 };
 
@@ -278,14 +279,14 @@ const emitPosSyncEvent = (event) => {
   try {
     if (global.io && event) {
       global.io.to('admin_room').emit('posSyncEvent', event);
-      console.log('[Socket.io] POS sync event emitted to admin_room:', {
+      logger.debugLog('[Socket.io] POS sync event emitted to admin_room:', {
         eventType: event.eventType,
         status: event.status,
         source: event.source,
       });
     }
   } catch (err) {
-    console.error('Error emitting posSyncEvent event:', err.message);
+    logger.errorLog('Error emitting posSyncEvent event:', err.message);
   }
 };
 

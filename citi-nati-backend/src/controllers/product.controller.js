@@ -1,6 +1,7 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../config/prisma');
 const { computeExpiryStatus, suggestDiscount } = require('../utils/expiryStatus');
 const { notifyLowStock } = require('../utils/messageService');
+const logger = require('../utils/logger');
 const posCommandQueueService = require('../services/posCommandQueue.service');
 const posSyncService = require('../services/posSync.service');
 const { recordPosSyncEvent } = require('../services/posSyncMonitor.service');
@@ -17,7 +18,6 @@ const {
   CORE_ZOMBA_LOCATION_CODES,
 } = require('../utils/operationalScope');
 
-const prisma = new PrismaClient();
 const MIN_VALID_EXPIRY_DATE = new Date('2000-01-01T00:00:00.000Z');
 const POS_DEFAULT_LOCATION_CODE = normalizeOperationalScopeCode(process.env.POS_LOCATION_CODE) || 'BT';
 const POS_DEFAULT_PRICE_TYPE_CODE = process.env.POS_PRICE_TYPE_CODE || 'RT';
@@ -234,7 +234,7 @@ const ensureProductPerformanceIndexes = async () => {
       await prisma.$executeRawUnsafe('CREATE EXTENSION IF NOT EXISTS pg_trgm');
       trigramReady = true;
     } catch (err) {
-      console.warn('[DB INIT] pg_trgm extension unavailable; product name trigram index skipped:', err.message);
+      logger.warnLog('[DB INIT] pg_trgm extension unavailable; product name trigram index skipped:', err.message);
     }
 
     if (trigramReady) {
@@ -268,7 +268,7 @@ const ensureProductPerformanceIndexes = async () => {
       ON "Product"("isOnSale");
     `);
     
-    console.log('[DB INIT] ensured all performance indexes on Product table');
+    logger.debugLog('[DB INIT] ensured all performance indexes on Product table');
   } catch (err) {
     console.error('[DB INIT] failed to create indexes:', err.message);
   }
@@ -304,10 +304,10 @@ const formatProduct = (product, req, includeDiscountSuggestion = false) => {
       imageUrl = `${req.protocol}://${req.get('host')}/${product.image}`; // Local path - construct URL
     }
     if (!imageUrl) {
-      console.warn(`[PRODUCT FORMAT] ⚠️ Image URL could not be generated for product ${product.id}`);
+      logger.warnLog(`[PRODUCT FORMAT] ⚠️ Image URL could not be generated for product ${product.id}`);
     }
   } else {
-    console.warn(`[PRODUCT FORMAT] ⚠️ Product ${product.id} (${product.name}) has no image`);
+    logger.warnLog(`[PRODUCT FORMAT] ⚠️ Product ${product.id} (${product.name}) has no image`);
   }
 
   const stockEnriched = enrichProductStock(product);
@@ -423,7 +423,7 @@ async function fetchLiveExpiryBatchesByCode(sourceCodes) {
 
   batchesByCode.forEach((batches, code) => {
     batches.sort((left, right) => new Date(left.expiryDate) - new Date(right.expiryDate));
-    console.log('[ADMIN PRODUCTS] live expiry batches attached', {
+    logger.debugLog('[ADMIN PRODUCTS] live expiry batches attached', {
       productCode: code,
       batchCount: batches.length,
       sample: batches[0] || null,
@@ -463,7 +463,7 @@ async function attachExpiryBatchesToProducts(products, options = {}) {
         expiryBatches: liveBatchesByCode.get(normalizeProductCode(product.sourceCode)) || [],
       }));
     } catch (error) {
-      console.warn('[ADMIN PRODUCTS] live expiry batch fetch failed, falling back to stored batches', error.message);
+      logger.warnLog('[ADMIN PRODUCTS] live expiry batch fetch failed, falling back to stored batches', error.message);
     }
   }
 
@@ -601,7 +601,7 @@ async function resolveLocationScopedProductCodesFromSales(branchCode, locationCo
     throw new Error('Both branchCode and locationCode are required for product code resolution');
   }
 
-  console.log('[PRODUCT SCOPE]', { branchCode, locationCode });
+  logger.debugLog('[PRODUCT SCOPE]', { branchCode, locationCode });
 
   const salesRows = await prisma.salesInvoiceItem.findMany({
     where: {
@@ -627,7 +627,7 @@ async function resolveLocationScopedProductCodesFromLatestCosts(branchCode, loca
     throw new Error('Both branchCode and locationCode are required for product code resolution');
   }
 
-  console.log('[PRODUCT SCOPE]', { branchCode, locationCode });
+  logger.debugLog('[PRODUCT SCOPE]', { branchCode, locationCode });
 
   const rows = await prisma.posLatestProductCost.findMany({
     where: {
@@ -657,7 +657,7 @@ async function resolveLocationScopedProductCodes(branchCode, locationCode) {
     throw new Error('Invalid branchCode or locationCode for product code resolution');
   }
 
-  console.log('[PRODUCT SCOPE][RESOLVE]', { branchCode: normalizedBranchCode, locationCode: normalizedLocationCode });
+  logger.debugLog('[PRODUCT SCOPE][RESOLVE]', { branchCode: normalizedBranchCode, locationCode: normalizedLocationCode });
 
   const scopedCodes = new Set();
 
@@ -667,7 +667,7 @@ async function resolveLocationScopedProductCodes(branchCode, locationCode) {
   const salesCodes = await resolveLocationScopedProductCodesFromSales(normalizedBranchCode, normalizedLocationCode);
   salesCodes.forEach((code) => scopedCodes.add(code));
 
-  console.log('[PRODUCT SCOPE][RESOLVE] codes from costs/sales', {
+  logger.debugLog('[PRODUCT SCOPE][RESOLVE] codes from costs/sales', {
     costCount: costCodes.length,
     salesCount: salesCodes.length,
     combinedCount: scopedCodes.size,
@@ -686,7 +686,7 @@ async function resolveLocationScopedProductCodes(branchCode, locationCode) {
     distinct: ['sourceCode'],
   });
 
-  console.log('[PRODUCT SCOPE][RESOLVE] products from Product table', {
+  logger.debugLog('[PRODUCT SCOPE][RESOLVE] products from Product table', {
     branchCode: normalizedBranchCode,
     locationCode: normalizedLocationCode,
     productCount: productRows.length,
@@ -702,7 +702,7 @@ async function resolveLocationScopedProductCodes(branchCode, locationCode) {
   const isBlantyreScope = normalizedBranchCode === 'BLANTYRE';
 
   if (isZombaScope) {
-    console.log('[PRODUCTS][SCOPE][ZOMBA] code-source diagnostics', {
+    logger.debugLog('[PRODUCTS][SCOPE][ZOMBA] code-source diagnostics', {
       branchCode: normalizedBranchCode,
       locationCode: normalizedLocationCode,
       costDistinctCount: costCodes.length,
@@ -724,7 +724,7 @@ async function resolveLocationScopedProductCodes(branchCode, locationCode) {
       .filter(Boolean)
       .forEach((code) => scopedCodes.add(code));
 
-    console.log('[PRODUCT SCOPE][RESOLVE] BLANTYRE fallback used', {
+    logger.debugLog('[PRODUCT SCOPE][RESOLVE] BLANTYRE fallback used', {
       fallbackCodeCount: scopedCodes.size,
     });
   }
@@ -748,13 +748,13 @@ async function resolveLocationScopedProductCodes(branchCode, locationCode) {
       .filter(Boolean)
       .forEach((code) => scopedCodes.add(code));
 
-    console.log('[PRODUCTS][ZOMBA_SCOPE][FALLBACK] fell back to Product table branchCode=ZOMBA + locationCode', {
+    logger.debugLog('[PRODUCTS][ZOMBA_SCOPE][FALLBACK] fell back to Product table branchCode=ZOMBA + locationCode', {
       locationCode: normalizedLocationCode,
       fallbackCodeCount: scopedCodes.size,
     });
   }
 
-  console.log('[PRODUCT SCOPE][RESOLVE] final result', {
+  logger.debugLog('[PRODUCT SCOPE][RESOLVE] final result', {
     branchCode: normalizedBranchCode,
     locationCode: normalizedLocationCode,
     finalCodeCount: scopedCodes.size,
@@ -883,14 +883,14 @@ function pickPreferredExpiryRow(rows) {
 }
 
 async function fetchPosExpiryMap(products) {
-  console.log('[ADMIN PRODUCTS] expiry enrichment start');
+  logger.debugLog('[ADMIN PRODUCTS] expiry enrichment start');
   const productCodeSet = new Set(
     products
       .map((product) => normalizeProductCode(product.sourceCode))
       .filter(Boolean)
   );
 
-  console.log('[ADMIN PRODUCTS] merge key used', 'String(product.sourceCode).trim() === String(expiry.ProductCode).trim()');
+  logger.debugLog('[ADMIN PRODUCTS] merge key used', 'String(product.sourceCode).trim() === String(expiry.ProductCode).trim()');
 
   const now = Date.now();
   const hasFreshCache = adminExpiryFetchState.fetchedAt > 0 && (now - adminExpiryFetchState.fetchedAt) < ADMIN_EXPIRY_CACHE_TTL_MS;
@@ -901,14 +901,14 @@ async function fetchPosExpiryMap(products) {
   if (posExpiryPushCache.rows.length > 0) {
     expiryRows = posExpiryPushCache.rows;
     const ageSecs = Math.round((Date.now() - posExpiryPushCache.pushedAt) / 1000);
-    console.log('[ADMIN PRODUCTS] using POS-pushed expiry cache:', expiryRows.length, 'rows, age:', ageSecs + 's');
+    logger.debugLog('[ADMIN PRODUCTS] using POS-pushed expiry cache:', expiryRows.length, 'rows, age:', ageSecs + 's');
   } else {
     const posConfig = posSyncService.getConfig();
     const targetUrl = `${posConfig.agentUrl}/pos-sync/expiry-products`;
     const productCodes = Array.from(productCodeSet.values());
 
-    console.log(`[ADMIN PRODUCTS] calling POS expiry endpoint: ${targetUrl}`);
-    console.log('[ADMIN PRODUCTS] POS expiry request params', {
+    logger.debugLog(`[ADMIN PRODUCTS] calling POS expiry endpoint: ${targetUrl}`);
+    logger.debugLog('[ADMIN PRODUCTS] POS expiry request params', {
       source: 'view',
       includeExpired: true,
       productCodesCount: productCodes.length,
@@ -925,7 +925,7 @@ async function fetchPosExpiryMap(products) {
     });
 
     if (!expiryResult.success) {
-      console.warn('[ADMIN PRODUCTS] retrying POS expiry fetch with stockdetails source');
+      logger.warnLog('[ADMIN PRODUCTS] retrying POS expiry fetch with stockdetails source');
       expiryResult = await posSyncService.getExpiryProductsFromPOS({
         days: 3650,
         locationCode: process.env.POS_LOCATION_CODE || 'SH',
@@ -937,7 +937,7 @@ async function fetchPosExpiryMap(products) {
     }
 
     if (!expiryResult.success) {
-      console.warn('[ADMIN PRODUCTS] expiry fetch failed', {
+      logger.warnLog('[ADMIN PRODUCTS] expiry fetch failed', {
         error: expiryResult.error,
         status: expiryResult.meta?.status || null,
         rawBody: expiryResult.meta?.rawBody || null,
@@ -945,20 +945,20 @@ async function fetchPosExpiryMap(products) {
       });
       if (hasFreshCache || adminExpiryFetchState.rows.length > 0) {
         expiryRows = adminExpiryFetchState.rows;
-        console.log('[ADMIN PRODUCTS] using pull-cached expiry rows', expiryRows.length);
+        logger.debugLog('[ADMIN PRODUCTS] using pull-cached expiry rows', expiryRows.length);
       }
     } else {
       expiryRows = Array.isArray(expiryResult.data?.data) ? expiryResult.data.data : [];
-      console.log('[ADMIN PRODUCTS] expiry response status', expiryResult.meta?.status || 200);
-      console.log('[ADMIN PRODUCTS] expiry rows count', expiryRows.length);
-      console.log('[ADMIN PRODUCTS] first expiry row', expiryRows[0] || null);
+      logger.debugLog('[ADMIN PRODUCTS] expiry response status', expiryResult.meta?.status || 200);
+      logger.debugLog('[ADMIN PRODUCTS] expiry rows count', expiryRows.length);
+      logger.debugLog('[ADMIN PRODUCTS] first expiry row', expiryRows[0] || null);
       adminExpiryFetchState.rows = expiryRows;
       adminExpiryFetchState.fetchedAt = Date.now();
     }
   }
 
-  console.log('[ADMIN PRODUCTS] expiry rows fetched count', expiryRows.length);
-  console.log('[ADMIN PRODUCTS] first expiry row', expiryRows[0] || null);
+  logger.debugLog('[ADMIN PRODUCTS] expiry rows fetched count', expiryRows.length);
+  logger.debugLog('[ADMIN PRODUCTS] first expiry row', expiryRows[0] || null);
 
   const first5ProductSourceCodeValues = products
     .map((product) => String(product.sourceCode || '').trim())
@@ -968,8 +968,8 @@ async function fetchPosExpiryMap(products) {
     .map((row) => String(row.ProductCode || row.productCode || '').trim())
     .filter(Boolean)
     .slice(0, 5);
-  console.log('[ADMIN PRODUCTS] first 5 product sourceCode values', first5ProductSourceCodeValues);
-  console.log('[ADMIN PRODUCTS] first 5 expiry ProductCode values', first5ExpiryProductCodeValues);
+  logger.debugLog('[ADMIN PRODUCTS] first 5 product sourceCode values', first5ProductSourceCodeValues);
+  logger.debugLog('[ADMIN PRODUCTS] first 5 expiry ProductCode values', first5ExpiryProductCodeValues);
 
   const groupedRows = new Map();
 
@@ -997,17 +997,17 @@ async function fetchPosExpiryMap(products) {
     }
   }
 
-  console.log('[ADMIN PRODUCTS] expiry map size', expiryMap.size);
+  logger.debugLog('[ADMIN PRODUCTS] expiry map size', expiryMap.size);
 
   return expiryMap;
 }
 
 async function enrichProductsWithExpiry(products) {
-  console.log('[ADMIN PRODUCTS] products fetched count', products.length);
-  console.log('[ADMIN PRODUCTS] first product keys', products[0] ? Object.keys(products[0]) : []);
-  console.log('[ADMIN PRODUCTS] first product sourceCode', products[0]?.sourceCode || null);
-  console.log('[ADMIN PRODUCTS] sample raw product row', products[0] || null);
-  console.log('[ADMIN PRODUCTS] current expiry fields source', 'Product table expiryDate + POS expiry merge by sourceCode/ProductCode');
+  logger.debugLog('[ADMIN PRODUCTS] products fetched count', products.length);
+  logger.debugLog('[ADMIN PRODUCTS] first product keys', products[0] ? Object.keys(products[0]) : []);
+  logger.debugLog('[ADMIN PRODUCTS] first product sourceCode', products[0]?.sourceCode || null);
+  logger.debugLog('[ADMIN PRODUCTS] sample raw product row', products[0] || null);
+  logger.debugLog('[ADMIN PRODUCTS] current expiry fields source', 'Product table expiryDate + POS expiry merge by sourceCode/ProductCode');
 
   const expiryMap = await fetchPosExpiryMap(products);
 
@@ -1039,10 +1039,10 @@ async function enrichProductsWithExpiry(products) {
   const mergedWithExpiryCount = mergedProducts.filter((product) => Boolean(product.expiryDate)).length;
   const sample6009603060415 = mergedProducts.find((product) => normalizeProductCode(product.sourceCode) === '6009603060415') || null;
   const sample988251372310 = mergedProducts.find((product) => normalizeProductCode(product.sourceCode) === '988251372310') || null;
-  console.log('[ADMIN PRODUCTS] merged products with expiry count', mergedWithExpiryCount);
-  console.log('[ADMIN PRODUCTS] sample merged row with expiry', mergedProducts[0] || null);
-  console.log('[ADMIN PRODUCTS] sample merged row for sourceCode 6009603060415', sample6009603060415);
-  console.log('[ADMIN PRODUCTS] sample merged row for sourceCode 988251372310', sample988251372310);
+  logger.debugLog('[ADMIN PRODUCTS] merged products with expiry count', mergedWithExpiryCount);
+  logger.debugLog('[ADMIN PRODUCTS] sample merged row with expiry', mergedProducts[0] || null);
+  logger.debugLog('[ADMIN PRODUCTS] sample merged row for sourceCode 6009603060415', sample6009603060415);
+  logger.debugLog('[ADMIN PRODUCTS] sample merged row for sourceCode 988251372310', sample988251372310);
 
   return mergedProducts;
 }
@@ -1076,14 +1076,14 @@ const createProduct = async (req, res) => {
 
     // Debug: Log file upload info
     if (req.file) {
-      console.log('[PRODUCT CREATE] Image uploaded to Cloudinary:', {
+      logger.debugLog('[PRODUCT CREATE] Image uploaded to Cloudinary:', {
         secure_url: req.file.secure_url,
         public_id: req.file.public_id,
         size: req.file.size,
         format: req.file.format
       });
     } else {
-      console.log('[PRODUCT CREATE] ⚠️ No image file provided');
+      logger.debugLog('[PRODUCT CREATE] ⚠️ No image file provided');
     }
 
     // Prepare product data
@@ -1097,7 +1097,7 @@ const createProduct = async (req, res) => {
       expiryDate: expiryDate ? new Date(expiryDate) : null
     };
 
-    console.log('[PRODUCT CREATE] Product data prepared:', {
+    logger.debugLog('[PRODUCT CREATE] Product data prepared:', {
       name: productData.name,
       image: productData.image ? 'URL set' : 'No image',
       price: productData.price
@@ -1127,7 +1127,7 @@ const createProduct = async (req, res) => {
       data: productData,
     });
 
-    console.log('[PRODUCT CREATE] ✅ Product created in database:', {
+    logger.debugLog('[PRODUCT CREATE] ✅ Product created in database:', {
       id: product.id,
       name: product.name,
       hasImage: !!product.image,
@@ -1146,7 +1146,7 @@ const createProduct = async (req, res) => {
           uploadedBy: String(req.user?.email || req.user?.id || 'admin'),
         });
       } catch (imgErr) {
-        console.warn('[PRODUCT CREATE] Image mapping save failed (non-fatal):', imgErr.message);
+        logger.warnLog('[PRODUCT CREATE] Image mapping save failed (non-fatal):', imgErr.message);
       }
     }
 
@@ -1186,7 +1186,7 @@ const createProduct = async (req, res) => {
 
 const getProducts = async (req, res) => {
   try {
-    console.log('[ADMIN PRODUCTS] route hit', {
+    logger.debugLog('[ADMIN PRODUCTS] route hit', {
       endpoint: '/api/products',
       includePosExpiry: req.query.includePosExpiry,
       page: req.query.page,
@@ -1203,7 +1203,7 @@ const getProducts = async (req, res) => {
     const requestedLocationCode = normalizeScopeCode(locationCode);
     const normalizedLocationCode = requestedLocationCode || (!isAdminRequest(req) ? getStorefrontLocationCode() : null);
 
-    console.log('[ADMIN PRODUCTS] expiry enrichment decision', {
+    logger.debugLog('[ADMIN PRODUCTS] expiry enrichment decision', {
       includePosExpiryQuery: includePosExpiry,
       requestedPosExpiry,
       forceAdminPosExpiry,
@@ -1219,14 +1219,14 @@ const getProducts = async (req, res) => {
       const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
       skip = offsetNum;
       take = limitNum;
-      console.log(`[PRODUCTS] Offset-based: offset=${offsetNum}, limit=${limitNum}`);
+      logger.debugLog(`[PRODUCTS] Offset-based: offset=${offsetNum}, limit=${limitNum}`);
     } else {
       // Page-based pagination (legacy format - backwards compatibility)
       const pageNum = Math.max(1, parseInt(page) || 1);
       const pageSizeNum = Math.min(5000, Math.max(1, parseInt(pageSize) || 50));
       skip = (pageNum - 1) * pageSizeNum;
       take = pageSizeNum;
-      console.log(`[PRODUCTS] Page-based: page=${pageNum}, pageSize=${pageSizeNum}`);
+      logger.debugLog(`[PRODUCTS] Page-based: page=${pageNum}, pageSize=${pageSizeNum}`);
     }
 
     // Build where clause for filtering - single source of truth (Product table)
@@ -1276,7 +1276,7 @@ const getProducts = async (req, res) => {
       if (derivedBranchCode === 'ZOMBA') {
         const resolvedLocationCode = normalizedLocationCode;
         if (!isConcreteZombaOperationalLocationCode(resolvedLocationCode)) {
-          console.warn('[PRODUCT QUERY][INVALID_ZOMBA_SCOPE]', {
+          logger.warnLog('[PRODUCT QUERY][INVALID_ZOMBA_SCOPE]', {
             view: 'Products panel / stock panel',
             selectedLocation: locationCode || '(none)',
             normalizedLocation: normalizedLocationCode,
@@ -1294,7 +1294,7 @@ const getProducts = async (req, res) => {
         };
         where.sourceCode = { not: null };
 
-        console.log('[PRODUCT QUERY]', {
+        logger.debugLog('[PRODUCT QUERY]', {
           view: 'Products panel / stock panel',
           uiLocation: locationCode || '(none)',
           selectedLocation: normalizedLocationCode,
@@ -1307,14 +1307,14 @@ const getProducts = async (req, res) => {
       } else {
         // For Blantyre, use BLANTYRE as branchCode since that's the legacy behavior
         const scopedProductCodes = await resolveLocationScopedProductCodes('BLANTYRE', normalizedLocationCode);
-        console.log('[PRODUCT QUERY]', {
+        logger.debugLog('[PRODUCT QUERY]', {
           uiLocation: locationCode || '(none)',
           branchCode: 'BLANTYRE',
           locationCode: normalizedLocationCode,
           scopedCodeCount: scopedProductCodes ? scopedProductCodes.length : 0,
         });
         if (!scopedProductCodes || scopedProductCodes.length === 0) {
-          console.warn('[PRODUCT QUERY] no scoped product codes found - returning empty result', {
+          logger.warnLog('[PRODUCT QUERY] no scoped product codes found - returning empty result', {
             normalizedLocationCode,
             branchCode: 'BLANTYRE',
           });
@@ -1380,23 +1380,23 @@ const getProducts = async (req, res) => {
     });
 
     // Debug logging
-    console.log(`[PRODUCTS] Retrieved: ${products.length}, Total: ${total}, Category: ${category || 'all'}, Search: ${search || 'none'}`);
-    console.log('[PRODUCT RESULT COUNT]', products.length);
+    logger.debugLog(`[PRODUCTS] Retrieved: ${products.length}, Total: ${total}, Category: ${category || 'all'}, Search: ${search || 'none'}`);
+    logger.debugLog('[PRODUCT RESULT COUNT]', products.length);
     if (normalizedLocationCode) {
       const sampleRow = products[0];
-      console.log(`[PRODUCT QUERY] uiLocation=${locationCode || '(none)'} branchCode=${where.branchCode || '(any)'} locationCode=${normalizedLocationCode} matchedRows=${total} pageRows=${products.length}${sampleRow ? ` sample=${sampleRow.sourceCode || sampleRow.name}` : ''}`);
+      logger.debugLog(`[PRODUCT QUERY] uiLocation=${locationCode || '(none)'} branchCode=${where.branchCode || '(any)'} locationCode=${normalizedLocationCode} matchedRows=${total} pageRows=${products.length}${sampleRow ? ` sample=${sampleRow.sourceCode || sampleRow.name}` : ''}`);
     }
     const isZombaOperationalScope = normalizedLocationCode && ZOMBA_LOCATION_CODES.includes(normalizedLocationCode);
     if (isZombaOperationalScope && products.length > 0) {
       const sample = products[0];
-      console.log(`[ZOMBA STOCK][PRODUCTS_PANEL] selectedLocation=${locationCode || '(none)'} resolvedStockLocation=${normalizedLocationCode} querySource=PersistedProduct.stock product=${sample.sourceCode || 'UNKNOWN'} stock=${Number(sample.stock || 0)}`);
+      logger.debugLog(`[ZOMBA STOCK][PRODUCTS_PANEL] selectedLocation=${locationCode || '(none)'} resolvedStockLocation=${normalizedLocationCode} querySource=PersistedProduct.stock product=${sample.sourceCode || 'UNKNOWN'} stock=${Number(sample.stock || 0)}`);
       const verifyProduct = products.find((row) => String(row.sourceCode || '').trim() === '9501100002174');
       if (verifyProduct) {
-        console.log(`[ZOMBA STOCK][VERIFY][PRODUCTS_PANEL] selectedLocation=${locationCode || '(none)'} resolvedStockLocation=${normalizedLocationCode} querySource=PersistedProduct.stock product=9501100002174 stock=${Number(verifyProduct.stock || 0)}`);
+        logger.debugLog(`[ZOMBA STOCK][VERIFY][PRODUCTS_PANEL] selectedLocation=${locationCode || '(none)'} resolvedStockLocation=${normalizedLocationCode} querySource=PersistedProduct.stock product=9501100002174 stock=${Number(verifyProduct.stock || 0)}`);
       }
     }
     if (normalizedLocationCode && ZOMBA_LOCATION_CODES.includes(normalizedLocationCode)) {
-      console.log('[PRODUCTS][ZOMBA_SCOPE] response diagnostics', {
+      logger.debugLog('[PRODUCTS][ZOMBA_SCOPE] response diagnostics', {
         requestedLocationCode: normalizedLocationCode,
         totalCount: total,
         pageRowCount: products.length,
@@ -1420,7 +1420,7 @@ const getProducts = async (req, res) => {
     const servedAtIso = new Date().toISOString();
     res.set('x-stock-data-source', 'db-live');
     res.set('x-stock-served-at', servedAtIso);
-    console.log('[PRODUCTS][FRESHNESS]', {
+    logger.debugLog('[PRODUCTS][FRESHNESS]', {
       endpoint: '/api/products',
       locationCode: normalizedLocationCode || null,
       source: 'db-live',
@@ -1508,10 +1508,10 @@ const getProductById = async (req, res) => {
 
 const updateProduct = async (req, res) => {
   try {
-    console.log('[BACKEND PRODUCT EDIT] updateProduct hit');
-    console.log('[BACKEND PRODUCT EDIT] req.body:', req.body);
-    console.log('[BACKEND PRODUCT EDIT] req.query:', req.query);
-    console.log('[BACKEND PRODUCT EDIT] Scope resolution inputs:', {
+    logger.debugLog('[BACKEND PRODUCT EDIT] updateProduct hit');
+    logger.debugLog('[BACKEND PRODUCT EDIT] req.body:', req.body);
+    logger.debugLog('[BACKEND PRODUCT EDIT] req.query:', req.query);
+    logger.debugLog('[BACKEND PRODUCT EDIT] Scope resolution inputs:', {
       queryLocationCode: req.query?.locationCode,
       bodyLocationCode: req.body?.locationCode,
       queryBranchCode: req.query?.branchCode,
@@ -1521,14 +1521,14 @@ const updateProduct = async (req, res) => {
 
     // Extract and convert id to integer
     const id = parseInt(req.params.id);
-    console.log('[BACKEND PRODUCT EDIT] Product ID:', id);
+    logger.debugLog('[BACKEND PRODUCT EDIT] Product ID:', id);
 
     // Check if product exists
     const existingProduct = await prisma.product.findUnique({
       where: { id },
     });
 
-    console.log('[BACKEND PRODUCT EDIT] Existing product found:', {
+    logger.debugLog('[BACKEND PRODUCT EDIT] Existing product found:', {
       id: existingProduct?.id,
       name: existingProduct?.name,
       price: existingProduct?.price,
@@ -1610,7 +1610,7 @@ const updateProduct = async (req, res) => {
     
     // Debug: Log file info before processing
     if (req.file) {
-      console.log('[PRODUCT UPDATE] 📸 Image file received:', {
+      logger.debugLog('[PRODUCT UPDATE] 📸 Image file received:', {
         originalname: req.file.originalname,
         secure_url: req.file.secure_url,
         public_id: req.file.public_id,
@@ -1618,12 +1618,12 @@ const updateProduct = async (req, res) => {
         format: req.file.format
       });
       updateData.image = req.file.secure_url; // Cloudinary URL
-      console.log('[PRODUCT UPDATE] ✅ Image URL set to:', updateData.image);
+      logger.debugLog('[PRODUCT UPDATE] ✅ Image URL set to:', updateData.image);
       if (updateData.image !== existingProduct.image) {
         changedFields.push('image');
       }
     } else {
-      console.log('[PRODUCT UPDATE] ⚠️ No image file in request (optional)');
+      logger.debugLog('[PRODUCT UPDATE] ⚠️ No image file in request (optional)');
     }
 
     // Handle expiryDate
@@ -1690,13 +1690,13 @@ const updateProduct = async (req, res) => {
       }
     }
 
-    console.log('[BACKEND PRODUCT EDIT] changedFields:', [...new Set(changedFields)]);
+    logger.debugLog('[BACKEND PRODUCT EDIT] changedFields:', [...new Set(changedFields)]);
 
     // Resolve writeback scope early with detailed logging
     let writebackScope;
     try {
       writebackScope = resolveProductWritebackScope(req, existingProduct);
-      console.log('[BACKEND PRODUCT EDIT] ✅ Writeback scope resolved:', {
+      logger.debugLog('[BACKEND PRODUCT EDIT] ✅ Writeback scope resolved:', {
         locationCode: writebackScope.locationCode,
         posLocationCode: writebackScope.posLocationCode,
         branchCode: writebackScope.branchCode,
@@ -1718,7 +1718,7 @@ const updateProduct = async (req, res) => {
       data: updateData,
     });
 
-    console.log('[BACKEND PRODUCT EDIT] Updated product:', {
+    logger.debugLog('[BACKEND PRODUCT EDIT] Updated product:', {
       id: updatedProduct.id,
       name: updatedProduct.name,
       price: updatedProduct.price,
@@ -1736,7 +1736,7 @@ const updateProduct = async (req, res) => {
           uploadedBy: String(req.user?.email || req.user?.id || 'admin'),
         });
       } catch (imgErr) {
-        console.warn('[PRODUCT UPDATE] Image mapping save failed (non-fatal):', imgErr.message);
+        logger.warnLog('[PRODUCT UPDATE] Image mapping save failed (non-fatal):', imgErr.message);
       }
     }
 
@@ -1768,7 +1768,7 @@ const updateProduct = async (req, res) => {
 
     // Phase 1: enqueue UPDATE_PRICE command for products with actual price changes.
     // Product code resolution mirrors promotion sync behavior by requiring a valid POS product code.
-    console.log('[UPDATE_PRICE CHECK] Conditions:', {
+    logger.debugLog('[UPDATE_PRICE CHECK] Conditions:', {
       hasSourceCode: Boolean(updatedProduct.sourceCode),
       hasBarcode: Boolean(updatedProduct.barcode || existingProduct.barcode),
       sourceCode: updatedProduct.sourceCode || null,
@@ -1797,8 +1797,8 @@ const updateProduct = async (req, res) => {
       posCommand.commandType = 'UPDATE_PRICE';
       posCommand.payload = payload;
 
-      console.log('[POS COMMAND QUEUE] enqueue UPDATE_PRICE start');
-      console.log('[POS COMMAND QUEUE] enqueue payload:', payload);
+      logger.debugLog('[POS COMMAND QUEUE] enqueue UPDATE_PRICE start');
+      logger.debugLog('[POS COMMAND QUEUE] enqueue payload:', payload);
 
       try {
         const queued = await posCommandQueueService.enqueueCommand('UPDATE_PRICE', payload, {
@@ -1810,7 +1810,7 @@ const updateProduct = async (req, res) => {
         posCommand.success = true;
         posCommand.commandId = queued.id;
         posCommand.queueStatus = 'PENDING';
-        console.log('[POS COMMAND QUEUE] UPDATE_PRICE queued:', {
+        logger.debugLog('[POS COMMAND QUEUE] UPDATE_PRICE queued:', {
           commandId: queued.id,
           productCode: payload.productCode,
           requestedLocationCode: payload.requestedLocationCode,
@@ -1849,7 +1849,7 @@ const updateProduct = async (req, res) => {
         commandType: 'UPDATE_PRODUCT_NAME',
       };
 
-      console.log('[POS COMMAND QUEUE] enqueue UPDATE_PRODUCT_NAME start', {
+      logger.debugLog('[POS COMMAND QUEUE] enqueue UPDATE_PRODUCT_NAME start', {
         productId: updatedProduct.id,
         productCode: updatedProduct.sourceCode,
         oldName: existingProduct.name,
@@ -1901,14 +1901,14 @@ const updateProduct = async (req, res) => {
 
       posCommands.push(namePosCommand);
     } else if (normalizedIncomingName && nameChanged && !updatedProduct.sourceCode) {
-      console.log('[BACKEND POS WRITE SKIP] product name change skipped for non-POS product', {
+      logger.debugLog('[BACKEND POS WRITE SKIP] product name change skipped for non-POS product', {
         productId: updatedProduct.id,
         productName: updatedProduct.name,
       });
     }
 
     if (updatedProduct.sourceCode && incomingStockProvided && stockChanged) {
-      console.log('[BACKEND PRODUCT EDIT] stockChanged detected', {
+      logger.debugLog('[BACKEND PRODUCT EDIT] stockChanged detected', {
         productId: updatedProduct.id,
         sourceCode: updatedProduct.sourceCode,
         oldStock,
@@ -1930,12 +1930,12 @@ const updateProduct = async (req, res) => {
           reason: 'manual_admin_adjustment',
         };
 
-        console.log('[POS COMMAND QUEUE] enqueue UPDATE_STOCK start', {
+        logger.debugLog('[POS COMMAND QUEUE] enqueue UPDATE_STOCK start', {
           oldStock,
           newStock,
           qtyReduction,
         });
-        console.log('[POS COMMAND QUEUE] enqueue payload:', stockPayload);
+        logger.debugLog('[POS COMMAND QUEUE] enqueue payload:', stockPayload);
 
         const stockPosCommand = {
           attempted: true,
@@ -1956,7 +1956,7 @@ const updateProduct = async (req, res) => {
           stockPosCommand.success = true;
           stockPosCommand.commandId = queuedStock.id;
           stockPosCommand.queueStatus = 'PENDING';
-          console.log('[POS COMMAND QUEUE] UPDATE_STOCK queued:', {
+          logger.debugLog('[POS COMMAND QUEUE] UPDATE_STOCK queued:', {
             commandId: queuedStock.id,
             productCode: stockPayload.productCode,
             requestedLocationCode: stockPayload.requestedLocationCode,
@@ -1972,13 +1972,13 @@ const updateProduct = async (req, res) => {
 
         posCommands.push(stockPosCommand);
       } else if (newStock > oldStock) {
-        console.log('[BACKEND POS WRITE SKIP] stock increase detected; UPDATE_STOCK is decrease-only for Phase 2', {
+        logger.debugLog('[BACKEND POS WRITE SKIP] stock increase detected; UPDATE_STOCK is decrease-only for Phase 2', {
           oldStock,
           newStock,
         });
       }
     } else if (incomingStockProvided && stockChanged && !updatedProduct.sourceCode) {
-      console.log('[BACKEND POS WRITE SKIP] non-POS product stock change skipped', {
+      logger.debugLog('[BACKEND POS WRITE SKIP] non-POS product stock change skipped', {
         productId: updatedProduct.id,
         oldStock,
         newStock,
@@ -1986,7 +1986,7 @@ const updateProduct = async (req, res) => {
     }
 
     // Debug: Log what was actually saved to database
-    console.log('[PRODUCT UPDATE] ✅ Product updated in database:', {
+    logger.debugLog('[PRODUCT UPDATE] ✅ Product updated in database:', {
       id: updatedProduct.id,
       name: updatedProduct.name,
       imageSavedToDB: updatedProduct.image,
@@ -2030,9 +2030,9 @@ const updateProduct = async (req, res) => {
     try {
       const { emitProductUpdate } = require('../utils/socket');
       emitProductUpdate(updatedProduct);
-      console.log(`[PRODUCT UPDATE] 🔄 Product update emitted for product ${updatedProduct.id}`);
+      logger.debugLog(`[PRODUCT UPDATE] 🔄 Product update emitted for product ${updatedProduct.id}`);
     } catch (socketErr) {
-      console.warn('[PRODUCT UPDATE] Could not emit socket event:', socketErr.message);
+      logger.warnLog('[PRODUCT UPDATE] Could not emit socket event:', socketErr.message);
     }
 
     await recordAuditLog({
@@ -2127,7 +2127,7 @@ const setStockOverride = async (req, res) => {
 
     // Logging
     if (overrideActive && !previousOverrideActive) {
-      console.log('[STOCK OVERRIDE] Override ENABLED:', {
+      logger.debugLog('[STOCK OVERRIDE] Override ENABLED:', {
         productId,
         productName: product.name,
         posStock: product.stock,
@@ -2136,14 +2136,14 @@ const setStockOverride = async (req, res) => {
         performedBy,
       });
     } else if (!overrideActive && previousOverrideActive) {
-      console.log('[STOCK OVERRIDE] Override DISABLED — storefront reverts to POS stock:', {
+      logger.debugLog('[STOCK OVERRIDE] Override DISABLED — storefront reverts to POS stock:', {
         productId,
         productName: product.name,
         posStock: product.stock,
         performedBy,
       });
     } else if (overrideActive && previousOverrideStock !== overrideStockValue) {
-      console.log('[STOCK OVERRIDE] Override QUANTITY CHANGED:', {
+      logger.debugLog('[STOCK OVERRIDE] Override QUANTITY CHANGED:', {
         productId,
         productName: product.name,
         from: previousOverrideStock,
@@ -2156,7 +2156,7 @@ const setStockOverride = async (req, res) => {
       const { emitProductUpdate } = require('../utils/socket');
       emitProductUpdate(updatedProduct);
     } catch (socketErr) {
-      console.warn('[STOCK OVERRIDE] Socket emit failed:', socketErr.message);
+      logger.warnLog('[STOCK OVERRIDE] Socket emit failed:', socketErr.message);
     }
 
     await recordAuditLog({
@@ -2224,7 +2224,7 @@ const updateProductStockThreshold = async (req, res) => {
 
     const enriched = formatProduct(updated, req, true);
 
-    console.log('[STOCK THRESHOLD] Updated per-product low stock threshold:', {
+    logger.debugLog('[STOCK THRESHOLD] Updated per-product low stock threshold:', {
       productId: id,
       productName: updated.name,
       low_stock_threshold: enriched.low_stock_threshold,
@@ -2237,7 +2237,7 @@ const updateProductStockThreshold = async (req, res) => {
       const { emitProductUpdate } = require('../utils/socket');
       emitProductUpdate(updated);
     } catch (socketErr) {
-      console.warn('[STOCK THRESHOLD] Socket emit failed:', socketErr.message);
+      logger.warnLog('[STOCK THRESHOLD] Socket emit failed:', socketErr.message);
     }
 
     await recordAuditLog({
@@ -2268,7 +2268,7 @@ const deleteProduct = async (req, res) => {
     // Extract and convert id to integer
     const id = parseInt(req.params.id);
 
-    console.log('[DEBUG DELETE] Attempting to delete product:', id);
+    logger.debugLog('[DEBUG DELETE] Attempting to delete product:', id);
 
     // Check if product exists
     const existingProduct = await prisma.product.findUnique({
@@ -2300,7 +2300,7 @@ const deleteProduct = async (req, res) => {
       },
     });
 
-    console.log('[DEBUG DELETE] Product deleted successfully:', id);
+    logger.debugLog('[DEBUG DELETE] Product deleted successfully:', id);
 
     return res.status(200).json({
       message: 'Product deleted successfully',
@@ -2321,7 +2321,7 @@ const syncFromPOS = async (req, res) => {
   try {
     const { syncProductsFromPOS } = require('../services/posSync.service');
 
-    console.log('[POS SYNC ENDPOINT] Starting manual sync...');
+    logger.debugLog('[POS SYNC ENDPOINT] Starting manual sync...');
     const result = await syncProductsFromPOS();
 
     if (!result.success) {
@@ -2395,7 +2395,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
       });
     }
 
-    console.log(`${syncLogPrefix} Received ${products.length} products from POS Agent`);
+    logger.debugLog(`${syncLogPrefix} Received ${products.length} products from POS Agent`);
 
     let synced = 0;
     let skipped = 0;
@@ -2429,7 +2429,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
         }
 
         if (branchCode === 'ZOMBA' && zombaIngestSamplesLogged < 20) {
-          console.log('[POS PRODUCT INGEST][INCOMING]', {
+          logger.debugLog('[POS PRODUCT INGEST][INCOMING]', {
             productCode: sourceCode,
             productName: String(product.name || ''),
             incomingBranchCode: String(req.headers['x-branch-code'] || metadata.branchCode || req.body.branchCode || '').trim() || null,
@@ -2445,7 +2445,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
           skipped++;
           const rejection = `[ZOMBA STOCK][REJECTED] product=${sourceCode || 'UNKNOWN'} stockDate=${stockDateRaw || 'NULL'} source=${stockSourceRaw || 'Unknown'} location=NULL stock=${Number(product.stock || 0)} reason=MISSING_LOCATION_CODE`;
           errors.push(rejection);
-          console.warn(rejection);
+          logger.warnLog(rejection);
           continue;
         }
 
@@ -2454,7 +2454,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
           skipped++;
           const rejection = `[ZOMBA STOCK][REJECTED] product=${sourceCode} stockDate=${stockDateRaw || 'NULL'} source=${stockSourceRaw || 'Unknown'} location=${productLocationCode || 'NULL'} stock=${Number(product.stock || 0)} reason=UNSUPPORTED_LOCATION_CODE`;
           errors.push(rejection);
-          console.warn(rejection);
+          logger.warnLog(rejection);
           continue;
         }
 
@@ -2462,7 +2462,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
           skipped++;
           const rejection = `[POS PRODUCT INGEST][REJECTED] product=${sourceCode} branch=${branchCode} location=${productLocationCode} reason=BRANCH_LOCATION_MISMATCH`;
           errors.push(rejection);
-          console.warn(rejection);
+          logger.warnLog(rejection);
           continue;
         }
 
@@ -2470,7 +2470,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
           skipped++;
           const rejection = `[POS PRODUCT INGEST][REJECTED] product=${sourceCode} branch=${branchCode} location=${productLocationCode} reason=BRANCH_LOCATION_MISMATCH`;
           errors.push(rejection);
-          console.warn(rejection);
+          logger.warnLog(rejection);
           continue;
         }
 
@@ -2486,13 +2486,13 @@ const syncProductsFromPOSAgent = async (req, res) => {
             skipped++;
             const rejection = `[ZOMBA STOCK][REJECTED] product=${sourceCode} stockDate=${stockDateRaw || 'NULL'} source=${stockSourceRaw} location=${productLocationCode || 'NULL'} stock=${Number(product.stock || 0)} reason=UNSUPPORTED_STOCK_SOURCE`;
             errors.push(rejection);
-            console.warn(rejection);
+            logger.warnLog(rejection);
             continue;
           }
         }
 
         if (branchCode === 'ZOMBA' && zombaResolvedSamplesLogged < 20) {
-          console.log('[POS PRODUCT INGEST][RESOLVED]', {
+          logger.debugLog('[POS PRODUCT INGEST][RESOLVED]', {
             productCode: sourceCode,
             resolvedBranchCode: branchCode,
             resolvedLocationCode: productLocationCode,
@@ -2521,7 +2521,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
         });
 
         if (upsertKeySamplesLogged < 40) {
-          console.log('[POS PRODUCT INGEST][UPSERT_KEY]', {
+          logger.debugLog('[POS PRODUCT INGEST][UPSERT_KEY]', {
             branchCode,
             locationCode: productLocationCode,
             productCode: sourceCode,
@@ -2601,7 +2601,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
         try {
           await productImageMappingService.reattachImageByProductCode(sourceCode);
         } catch (imgErr) {
-          console.warn(`[POS AGENT PUSH] Image reattach skipped for ${sourceCode}:`, imgErr.message);
+          logger.warnLog(`[POS AGENT PUSH] Image reattach skipped for ${sourceCode}:`, imgErr.message);
         }
 
         await prisma.productExpiryBatch.deleteMany({
@@ -2643,9 +2643,9 @@ const syncProductsFromPOSAgent = async (req, res) => {
           if (branchCode === 'ZOMBA') {
             const stockSourceLabel = stockSourceRaw || 'UnknownPayloadSource';
             const isVerificationProduct = sourceCode === '9501100002174';
-            console.log(`[ZOMBA STOCK] product=${sourceCode} stockDate=${stockDateRaw || 'NULL'} source=${stockSourceLabel} location=${productLocationCode || payloadLocationCode || 'SH'} stock=${Number(completeProduct.stock || 0)}`);
+            logger.debugLog(`[ZOMBA STOCK] product=${sourceCode} stockDate=${stockDateRaw || 'NULL'} source=${stockSourceLabel} location=${productLocationCode || payloadLocationCode || 'SH'} stock=${Number(completeProduct.stock || 0)}`);
             if (isVerificationProduct) {
-              console.log(`[ZOMBA STOCK][VERIFY] product=9501100002174 stockDate=${stockDateRaw || 'NULL'} source=${stockSourceLabel} location=${productLocationCode || payloadLocationCode || 'SH'} stock=${Number(completeProduct.stock || 0)}`);
+              logger.debugLog(`[ZOMBA STOCK][VERIFY] product=9501100002174 stockDate=${stockDateRaw || 'NULL'} source=${stockSourceLabel} location=${productLocationCode || payloadLocationCode || 'SH'} stock=${Number(completeProduct.stock || 0)}`);
             }
           }
 
@@ -2658,7 +2658,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
 
 
         
-        console.log(`${syncLogPrefix} products synced: ${product.name} (${product.sourceCode})`);
+        logger.debugLog(`${syncLogPrefix} products synced: ${product.name} (${product.sourceCode})`);
       } catch (error) {
         skipped++;
         const errorMsg = `Failed to sync product ${product.sourceCode}: ${error.message}`;
@@ -2668,7 +2668,7 @@ const syncProductsFromPOSAgent = async (req, res) => {
     }
 
     if (branchCode === 'ZOMBA') {
-      console.log('[POS PRODUCT INGEST][SUMMARY]', {
+      logger.productionSummaryLog('[POS PRODUCT INGEST][SUMMARY]', {
         persistedByLocation: zombaPersistedByLocation,
         synced,
         skipped,
@@ -2696,19 +2696,19 @@ affectedScopes: affectedLocationsList.map(loc => ({
 })),
           timestamp: new Date().toISOString(),
         });
-        console.log(`${syncLogPrefix} emitted realtime update for ${synced} synced products`, {
+        logger.debugLog(`${syncLogPrefix} emitted realtime update for ${synced} synced products`, {
           stockChangedCount,
           priceChangedCount,
           affectedLocations: affectedLocationsList,
           affectedProductCodes: affectedProductCodeSample.length,
         });
       } catch (ioErr) {
-        console.warn(`${syncLogPrefix} realtime emit warning:`, ioErr.message);
+        logger.warnLog(`${syncLogPrefix} realtime emit warning:`, ioErr.message);
       }
     }
 
     if (synced > 0) {
-      console.log('[POS AGENT PUSH][FRESHNESS]', {
+      logger.debugLog('[POS AGENT PUSH][FRESHNESS]', {
         branchCode,
         locationCode: payloadLocationCode || null,
         synced,
@@ -2719,7 +2719,7 @@ affectedScopes: affectedLocationsList.map(loc => ({
       });
     }
 
-    console.log(`${syncLogPrefix} Sync complete - Synced: ${synced}, Skipped: ${skipped}`);
+    logger.productionSummaryLog(`${syncLogPrefix} Sync complete - Synced: ${synced}, Skipped: ${skipped}`);
 
     await recordPosSyncEvent({
       eventType: 'agent-push-products',
@@ -2785,7 +2785,7 @@ const deletePOSProducts = async (req, res) => {
       }
     });
 
-    console.log(`[DELETE POS] Deleted ${deleted.count} POS products`);
+    logger.debugLog(`[DELETE POS] Deleted ${deleted.count} POS products`);
 
     return res.status(200).json({
       success: true,
@@ -2854,7 +2854,7 @@ const getCategories = async (req, res) => {
       .map((c) => c.category)
       .filter((c) => c && c.trim() !== '');
 
-    console.log(`[CATEGORIES] Retrieved ${categoryList.length} unique categories from Product table`);
+    logger.debugLog(`[CATEGORIES] Retrieved ${categoryList.length} unique categories from Product table`);
 
     return res.status(200).json({
       categories: categoryList,
@@ -2899,7 +2899,7 @@ const toggleProductVisibility = async (req, res) => {
       data: { enabled }
     });
 
-    console.log(`[VISIBILITY] Product ${id} (${updatedProduct.name}) toggled to ${enabled ? 'visible' : 'hidden'}`);
+    logger.debugLog(`[VISIBILITY] Product ${id} (${updatedProduct.name}) toggled to ${enabled ? 'visible' : 'hidden'}`);
 
     return res.status(200).json({
       success: true,
@@ -2955,7 +2955,7 @@ const getExpiryBatchAlerts = async (req, res) => {
     const cacheMatchesLocation = !_allProductsExpiryCache.locationCode || _allProductsExpiryCache.locationCode === locationCode;
 
     if (isCacheFresh && hasCachedRows && cacheMatchesLocation) {
-      console.log('[EXPIRY ALERTS] using cached all-products expiry rows (age: %dms)', now - _allProductsExpiryCache.ts);
+      logger.debugLog('[EXPIRY ALERTS] using cached all-products expiry rows (age: %dms)', now - _allProductsExpiryCache.ts);
       rawRows = _allProductsExpiryCache.rows;
     } else {
       if (hasCachedRows && cacheMatchesLocation) {
@@ -2966,10 +2966,10 @@ const getExpiryBatchAlerts = async (req, res) => {
           _allProductsExpiryCache.refreshing = true;
           refreshAllProductsExpiryCache(locationCode)
             .then((rows) => {
-              console.log('[EXPIRY ALERTS] background cache refresh complete:', rows.length, 'rows');
+              logger.debugLog('[EXPIRY ALERTS] background cache refresh complete:', rows.length, 'rows');
             })
             .catch((refreshError) => {
-              console.warn('[EXPIRY ALERTS] background cache refresh failed', refreshError.message);
+              logger.warnLog('[EXPIRY ALERTS] background cache refresh failed', refreshError.message);
             })
             .finally(() => {
               _allProductsExpiryCache.refreshing = false;
@@ -2979,7 +2979,7 @@ const getExpiryBatchAlerts = async (req, res) => {
         try {
           rawRows = await refreshAllProductsExpiryCache(locationCode);
         } catch (liveError) {
-          console.warn('[EXPIRY ALERTS] live POS fetch failed, falling back to stored batches', liveError.message);
+          logger.warnLog('[EXPIRY ALERTS] live POS fetch failed, falling back to stored batches', liveError.message);
           rawRows = await prisma.productExpiryBatch.findMany({
             where: {
               OR: [
@@ -3037,10 +3037,10 @@ const getExpiryBatchAlerts = async (req, res) => {
 
     const expiredCount = alerts.filter((row) => row.status === 'expired').length;
     const nearExpiryCount = alerts.filter((row) => row.status === 'expiring_soon' || row.status === 'near_expiry').length;
-    console.log('[EXPIRY ALERTS] products evaluated count', productCodes.length);
-    console.log('[EXPIRY ALERTS] expired count', expiredCount);
-    console.log('[EXPIRY ALERTS] near expiry count', nearExpiryCount);
-    console.log('[EXPIRY ALERTS] sample alert row', alerts[0] || null);
+    logger.debugLog('[EXPIRY ALERTS] products evaluated count', productCodes.length);
+    logger.debugLog('[EXPIRY ALERTS] expired count', expiredCount);
+    logger.debugLog('[EXPIRY ALERTS] near expiry count', nearExpiryCount);
+    logger.debugLog('[EXPIRY ALERTS] sample alert row', alerts[0] || null);
 
     return res.status(200).json({
       success: true,

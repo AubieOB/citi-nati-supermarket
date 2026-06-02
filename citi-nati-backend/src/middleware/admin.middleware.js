@@ -5,6 +5,7 @@
 
 const { PERMISSIONS } = require('../security/permissions');
 const { getEffectivePermissionsForUser } = require('../security/userPermissions.service');
+const logger = require('../utils/logger');
 
 const isWriteMethod = (method) => ['POST', 'PUT', 'PATCH', 'DELETE'].includes(String(method || '').toUpperCase());
 
@@ -171,7 +172,7 @@ const verifyAdmin = async (req, res, next) => {
     const permissionSet = new Set(effectivePermissions);
 
     if (!permissionSet.has(PERMISSIONS.ADMIN_DASHBOARD_ACCESS)) {
-      console.warn('[ADMIN_AUTH] Access denied - missing dashboard access permission', {
+      logger.warnLog('[ADMIN_AUTH] Access denied - missing dashboard access permission', {
         userId,
         email: req.user.email,
         role: userRole,
@@ -181,7 +182,7 @@ const verifyAdmin = async (req, res, next) => {
 
     const requiredPermission = resolveRequiredPermission(req);
     if (requiredPermission && !permissionSet.has(requiredPermission)) {
-      console.warn('[ADMIN_AUTH] Access denied - missing required permission', {
+      logger.warnLog('[ADMIN_AUTH] Access denied - missing required permission', {
         userId,
         email: req.user.email,
         role: userRole,
@@ -196,7 +197,7 @@ const verifyAdmin = async (req, res, next) => {
     req.userPermissions = effectivePermissions;
     req.requiredPermission = requiredPermission;
 
-    console.log('[ADMIN_AUTH] Access granted:', {
+    logger.debugLog('[ADMIN_AUTH] Access granted:', {
       userId,
       email: req.user.email,
       role: userRole,
@@ -204,7 +205,7 @@ const verifyAdmin = async (req, res, next) => {
     });
     return next();
   } catch (error) {
-    console.error('[ADMIN_AUTH] Permission evaluation failed:', error);
+    logger.errorLog('[ADMIN_AUTH] Permission evaluation failed:', { message: error && error.message ? error.message : String(error) });
     return res.status(500).json({ message: 'Failed to evaluate permissions' });
   }
 };

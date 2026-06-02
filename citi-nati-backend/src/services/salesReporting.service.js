@@ -9,6 +9,7 @@ const {
 const { formatBusinessDateKey } = require('../utils/businessTime');
 
 const prisma = new PrismaClient();
+const logger = require('../utils/logger');
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -72,7 +73,7 @@ function buildExpenseWhere(itemWhere, filters = {}) {
   if (Object.keys(scope).length > 0) {
     expenseWhere.AND = [scope];
   } else if (filters.locationId) {
-    console.warn('[REPORTING] Legacy locationId ignored for expense scope; canonical reporting scope uses branchCode+locationCode only', {
+    logger.warnLog('[REPORTING] Legacy locationId ignored for expense scope; canonical reporting scope uses branchCode+locationCode only', {
       branchCode: filters.branchCode || null,
       locationCode: filters.locationCode || null,
       locationId: filters.locationId,
@@ -783,7 +784,7 @@ try {
   }
 
 } catch (err) {
-  console.warn('[REPORTING] Failed to fetch expense/payroll data:', err.message);
+  logger.warnLog('[REPORTING] Failed to fetch expense/payroll data:', { message: err && err.message ? err.message : String(err) });
 }
 
 // FINAL TOTAL EXPENSES

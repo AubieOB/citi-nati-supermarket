@@ -1,6 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+const prisma = require('../config/prisma');
+const logger = require('../utils/logger');
 
 function toInt(value, fallback = null) {
   const parsed = Number.parseInt(value, 10);
@@ -24,7 +23,7 @@ function normalizeLocationId(value) {
     ? normalizedLocationId
     : null;
 
-  console.log('[BACKFILL LOCATION NORMALIZATION]', {
+  logger.debugLog('[BACKFILL LOCATION NORMALIZATION]', {
     rawLocationId,
     normalizedLocationId,
     typeofRawLocationId: typeof rawLocationId,
@@ -207,7 +206,7 @@ async function processInvoice(tx, invoice, batchMeta) {
         });
         inserted = 1;
       } catch (createErr) {
-        console.error('[REPORTING SYNC][CREATE INVOICE] Creation failed:', {
+        logger.errorLog('[REPORTING SYNC][CREATE INVOICE] Creation failed:', {
           invoiceNo: invoice.invoiceNo,
           syncSourceCode: batchMeta.syncSourceCode,
           sourceInvoiceNo: invoiceData.sourceInvoiceNo,
@@ -225,7 +224,7 @@ async function processInvoice(tx, invoice, batchMeta) {
         });
         updated = 1;
       } catch (updateErr) {
-        console.error('[REPORTING SYNC][UPDATE INVOICE] Update failed:', {
+        logger.errorLog('[REPORTING SYNC][UPDATE INVOICE] Update failed:', {
           invoiceNo: invoice.invoiceNo,
           syncSourceCode: batchMeta.syncSourceCode,
           sourceInvoiceNo: invoiceData.sourceInvoiceNo,
@@ -246,7 +245,7 @@ async function processInvoice(tx, invoice, batchMeta) {
       
       // Pre-validation for detail items
       if (!sourceInvDetailId || sourceInvDetailId <= 0) {
-        console.error('[REPORTING SYNC][DETAIL] Skipping detail with invalid sourceInvDetailId:', {
+        logger.errorLog('[REPORTING SYNC][DETAIL] Skipping detail with invalid sourceInvDetailId:', {
           invoiceNo: invoice.invoiceNo,
           detailIndex: idx,
           invDetailId: item.invDetailId,
@@ -282,7 +281,7 @@ async function processInvoice(tx, invoice, batchMeta) {
           detailsUpdated += 1;
         }
       } catch (itemErr) {
-        console.error('[REPORTING SYNC][DETAIL] Item operation failed:', {
+        logger.errorLog('[REPORTING SYNC][DETAIL] Item operation failed:', {
           invoiceNo: invoice.invoiceNo,
           detailIndex: idx,
           invDetailId: item.invDetailId,
@@ -303,7 +302,7 @@ async function processInvoice(tx, invoice, batchMeta) {
       detailCount: details.length,
     };
   } catch (err) {
-    console.error('[REPORTING SYNC][PROCESS INVOICE] Overall invoice processing failed:', {
+    logger.errorLog('[REPORTING SYNC][PROCESS INVOICE] Overall invoice processing failed:', {
       invoiceNo: invoice.invoiceNo,
       message: err && err.message ? err.message : String(err),
     });
@@ -350,7 +349,7 @@ async function ingestReportingBatch(payload) {
       result.updatedDetails += processed.detailsUpdated;
     } catch (invoiceErr) {
       result.skippedInvoices += 1;
-      console.error('[REPORTING SYNC][INGEST] Error processing invoice (skipped):', {
+      logger.errorLog('[REPORTING SYNC][INGEST] Error processing invoice (skipped):', {
         syncSourceCode: batchMeta.syncSourceCode,
         invoiceNo: invoice && invoice.invoiceNo ? invoice.invoiceNo : null,
         message: invoiceErr && invoiceErr.message ? invoiceErr.message : String(invoiceErr),
@@ -492,7 +491,7 @@ async function ingestPosStockIntakes(payload) {
     let grnRecord;
 
     // RUNTIME VERIFICATION: Log ingest input & normalization
-    console.log('[POS GRN INGEST ENRICHMENT] Received payload:', {
+    logger.debugLog('[POS GRN INGEST ENRICHMENT] Received payload:', {
       grnNo,
       payloadGrnDate: grn.grnDate,
       payloadGrnObservedAt: grn.grnObservedAt,
@@ -523,7 +522,7 @@ async function ingestPosStockIntakes(payload) {
           firstReceivedAt: new Date(),
         },
       });
-      console.log('[POS GRN INGEST] Created new GRN record:', {
+      logger.debugLog('[POS GRN INGEST] Created new GRN record:', {
         grnNo,
         storedGrnObservedAt: grnRecord.grnObservedAt,
         storedGrnUserName: grnRecord.grnUserName,
@@ -539,7 +538,7 @@ async function ingestPosStockIntakes(payload) {
       }
 
       // RUNTIME VERIFICATION: Log preserved metadata
-      console.log('[POS GRN INGEST] Updating existing GRN record:', {
+      logger.debugLog('[POS GRN INGEST] Updating existing GRN record:', {
         grnNo,
         existingGrnObservedAt: existingGrn.grnObservedAt,
         preservingGrnObservedAt: !!existingGrn.grnObservedAt,

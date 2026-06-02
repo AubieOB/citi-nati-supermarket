@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const crypto = require('crypto');
+const logger = require('../utils/logger');
 
 const prisma = new PrismaClient();
 
@@ -26,7 +27,7 @@ async function recordMonitorEvent(payload) {
     const { recordPosSyncEvent } = require('./posSyncMonitor.service');
     await recordPosSyncEvent(payload);
   } catch (error) {
-    console.error('[POS COMMAND QUEUE] Failed to record monitor event:', error.message);
+    logger.errorLog('[POS COMMAND QUEUE] Failed to record monitor event:', { message: error.message });
   }
 }
 
@@ -48,7 +49,7 @@ async function enqueueCommand(commandType, payload, meta = {}) {
       },
     });
 
-    console.log('[POS COMMAND QUEUE] enqueued command:', {
+    logger.debugLog('[POS COMMAND QUEUE] enqueued command', {
       id: command.id,
       commandType: command.commandType,
       source: command.source,
@@ -86,7 +87,7 @@ async function enqueueCommand(commandType, payload, meta = {}) {
 
     return command;
   } catch (error) {
-    console.error('[POS COMMAND QUEUE ERROR] failed to enqueue command:', error.message);
+    logger.errorLog('[POS COMMAND QUEUE ERROR] failed to enqueue command:', { message: error.message });
     throw error;
   }
 }
@@ -203,7 +204,7 @@ async function claimPendingCommands(limit = 10, agentId = 'unknown-agent', targe
         },
       });
 
-      console.log('[POS COMMAND QUEUE] claimed commands:', {
+      logger.debugLog('[POS COMMAND QUEUE] claimed commands', {
       agentId,
       count: claimed.length,
       ids: claimed.map((item) => item.id),
@@ -231,7 +232,7 @@ async function claimPendingCommands(limit = 10, agentId = 'unknown-agent', targe
       return claimed;
     });
   } catch (error) {
-    console.error('[POS COMMAND QUEUE ERROR] failed to claim commands:', error.message);
+    logger.errorLog('[POS COMMAND QUEUE ERROR] failed to claim commands:', { message: error.message });
     throw error;
   }
 }
@@ -258,7 +259,7 @@ async function markCommandCompleted(id, resultSummary = {}, agentId = null) {
       throw new Error(`Command ${id} is not in PROCESSING state`);
     }
 
-    console.log('[POS COMMAND QUEUE] command completed:', { id, agentId });
+    logger.debugLog('[POS COMMAND QUEUE] command completed', { id, agentId });
 
     await recordMonitorEvent({
       eventType: 'command-completed',
@@ -274,7 +275,7 @@ async function markCommandCompleted(id, resultSummary = {}, agentId = null) {
       metadata: resultSummary,
     });
   } catch (error) {
-    console.error('[POS COMMAND QUEUE ERROR] failed to complete command:', error.message);
+    logger.errorLog('[POS COMMAND QUEUE ERROR] failed to complete command:', { message: error.message });
     throw error;
   }
 }
@@ -324,7 +325,7 @@ async function markCommandFailed(id, errorMessage, retryable = true, agentId = n
       data,
     });
 
-    console.log('[POS COMMAND QUEUE] command failed:', {
+    logger.debugLog('[POS COMMAND QUEUE] command failed', {
       id,
       retryable,
       canRetry,
@@ -363,7 +364,7 @@ async function markCommandFailed(id, errorMessage, retryable = true, agentId = n
       },
     });
   } catch (error) {
-    console.error('[POS COMMAND QUEUE ERROR] failed to mark command failed:', error.message);
+    logger.errorLog('[POS COMMAND QUEUE ERROR] failed to mark command failed:', { message: error.message });
     throw error;
   }
 }

@@ -100,12 +100,12 @@ function initializeMailConfig() {
   const validation = validateMailConfig();
   const config = getMailConfig();
 
-  logger.info(`Mail service initialized with provider: ${config.provider}`);
+  logger.infoLog(`Mail service initialized with provider: ${config.provider}`);
 
   if (!validation.isValid) {
-    logger.warn('Mail configuration incomplete:');
-    validation.errors.forEach(error => logger.warn(`  - ${error}`));
-    logger.warn('Some email functionality may not work correctly');
+    logger.warnLog('Mail configuration incomplete:');
+    validation.errors.forEach(error => logger.warnLog(`  - ${error}`));
+    logger.warnLog('Some email functionality may not work correctly');
   }
 
   return config;

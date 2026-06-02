@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const logger = require('../utils/logger');
 
 /**
  * Upload file for support ticket attachment
@@ -42,14 +43,14 @@ const uploadTicketAttachment = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error uploading file:', error);
+    logger.errorLog('Error uploading file:', { message: error && error.message ? error.message : String(error) });
     
     // Clean up uploaded file
     if (req.file && req.file.path) {
       try {
         fs.unlinkSync(req.file.path);
       } catch (e) {
-        console.error('Error deleting uploaded file:', e);
+        logger.errorLog('Error deleting uploaded file:', { message: e && e.message ? e.message : String(e) });
       }
     }
 
@@ -93,11 +94,11 @@ const downloadTicketAttachment = async (req, res) => {
     stream.pipe(res);
 
     stream.on('error', (err) => {
-      console.error('Error streaming file:', err);
+      logger.errorLog('Error streaming file:', { message: err && err.message ? err.message : String(err) });
       res.status(500).json({ error: 'Failed to download file' });
     });
   } catch (error) {
-    console.error('Error downloading file:', error);
+    logger.errorLog('Error downloading file:', { message: error && error.message ? error.message : String(error) });
     res.status(500).json({ error: 'Failed to download file' });
   }
 };

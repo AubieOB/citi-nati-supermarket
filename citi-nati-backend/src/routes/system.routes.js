@@ -6,6 +6,7 @@ const { getMinimumOrderValue } = require('../utils/checkoutRules');
 
 const router = express.Router();
 const prisma = new PrismaClient();
+const logger = require('../utils/logger');
 
 const MAINTENANCE_MODE_KEY = 'maintenance_mode_enabled';
 const MAINTENANCE_MESSAGE_KEY = 'maintenance_mode_message';
@@ -37,7 +38,7 @@ router.get('/status', async (req, res) => {
       emergencySalesDayOpen,
     });
   } catch (err) {
-    console.error('[SYSTEM] Failed to fetch public status:', err.message);
+    logger.errorLog('[SYSTEM] Failed to fetch public status:', { message: err.message });
     return res.status(500).json({ success: false, error: 'Failed to fetch system status' });
   }
 });

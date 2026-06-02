@@ -32,7 +32,7 @@ router.get('/setup', async (req, res) => {
     });
 
     if (adminExists) {
-      logger.warn('[SETUP] Admin already exists');
+      logger.warnLog('[SETUP] Admin already exists');
       return res.status(409).json({ 
         error: 'Admin already exists',
         email: adminExists.email
@@ -65,7 +65,7 @@ router.get('/setup', async (req, res) => {
       }
     });
 
-    logger.warn('[SETUP] Hardcoded admin created', { email: admin.email });
+    logger.warnLog('[SETUP] Hardcoded admin created', { email: admin.email });
 
     return res.status(201).json({
       success: true,
@@ -78,7 +78,7 @@ router.get('/setup', async (req, res) => {
     });
 
   } catch (err) {
-    logger.error('[SETUP] Error', err);
+    logger.errorLog('[SETUP] Error', err);
     res.status(500).json({ error: 'Setup failed' });
   }
 });
@@ -92,7 +92,7 @@ router.post('/bootstrap', async (req, res) => {
     // Check if bootstrap is enabled
     const bootstrapSecret = process.env.ADMIN_BOOTSTRAP_SECRET;
     if (!bootstrapSecret) {
-      logger.warn('[BOOTSTRAP] Endpoint disabled: ADMIN_BOOTSTRAP_SECRET not set');
+      logger.warnLog('[BOOTSTRAP] Endpoint disabled: ADMIN_BOOTSTRAP_SECRET not set');
       return res.status(404).json({ error: 'Not found' });
     }
 
@@ -101,7 +101,7 @@ router.post('/bootstrap', async (req, res) => {
     const providedSecret = authHeader?.replace('Bearer ', '');
 
     if (!providedSecret || providedSecret !== bootstrapSecret) {
-      logger.warn('[BOOTSTRAP] Unauthorized attempt - invalid or missing secret');
+      logger.warnLog('[BOOTSTRAP] Unauthorized attempt - invalid or missing secret');
       return res.status(401).json({ error: 'Unauthorized - invalid secret' });
     }
 
@@ -111,7 +111,7 @@ router.post('/bootstrap', async (req, res) => {
     });
 
     if (adminExists) {
-      logger.warn('[BOOTSTRAP] Attempt denied - admin already exists', { email: adminExists.email });
+      logger.warnLog('[BOOTSTRAP] Attempt denied - admin already exists', { email: adminExists.email });
       return res.status(409).json({ 
         error: 'Admin already exists',
         message: 'Bootstrap can only be used once',
@@ -123,13 +123,13 @@ router.post('/bootstrap', async (req, res) => {
     const { email, password, name } = req.body;
 
     if (!email || !password) {
-      logger.warn('[BOOTSTRAP] Missing required fields');
+      logger.warnLog('[BOOTSTRAP] Missing required fields');
       return res.status(400).json({ error: 'Missing email or password' });
     }
 
     const passwordValidation = validateStrongPassword(password);
     if (!passwordValidation.valid) {
-      logger.warn('[BOOTSTRAP] Weak password rejected');
+      logger.warnLog('[BOOTSTRAP] Weak password rejected');
       return res.status(400).json({ error: passwordValidation.errors[0] });
     }
 
@@ -139,7 +139,7 @@ router.post('/bootstrap', async (req, res) => {
     });
 
     if (emailExists) {
-      logger.warn('[BOOTSTRAP] Email already in use', { email });
+      logger.warnLog('[BOOTSTRAP] Email already in use', { email });
       return res.status(400).json({ error: 'Email already exists in system' });
     }
 
@@ -165,7 +165,7 @@ router.post('/bootstrap', async (req, res) => {
       }
     });
 
-    logger.info('[BOOTSTRAP] Admin account created', { email: adminUser.email });
+    logger.infoLog('[BOOTSTRAP] Admin account created', { email: adminUser.email });
 
     return res.status(201).json({
       success: true,
@@ -175,7 +175,7 @@ router.post('/bootstrap', async (req, res) => {
     });
 
   } catch (err) {
-    logger.error('[BOOTSTRAP] Error', err);
+    logger.errorLog('[BOOTSTRAP] Error', err);
     
     if (err.code === 'P2002') {
       return res.status(400).json({ 

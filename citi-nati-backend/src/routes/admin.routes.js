@@ -33,6 +33,7 @@ const {
 const { getExpiryBatchAlerts, setStockOverride } = require('../controllers/product.controller');
 const { emitProductUpdate } = require('../utils/socket');
 const { VAT_ENABLED_KEY, clearVatSettingsCache, getVatSettings } = require('../utils/vat');
+const logger = require('../utils/logger');
 const {
   getBusinessOffsetMinutes,
   formatUtcOffsetLabel,
@@ -203,7 +204,7 @@ async function resolveLocationScopedProductCodes(locationCode) {
 
   const isZombaScope = scopeCodes.some((code) => ZOMBA_LOCATION_CODES.includes(code));
   if (isZombaScope) {
-    console.log('[ADMIN POS][SCOPE][ZOMBA] code-source diagnostics', {
+    logger.debugLog('[ADMIN POS][SCOPE][ZOMBA] code-source diagnostics', {
       scopeCodes,
       expiryDistinctCount: expiryRows.length,
       latestCostDistinctCount: costCodes.length,
@@ -243,7 +244,7 @@ async function resolveLocationScopedProductCodes(locationCode) {
       .map((row) => String(row.sourceCode || '').trim())
       .filter(Boolean)
       .forEach((code) => scopedCodes.add(code));
-    console.log('[ADMIN POS][ZOMBA_SCOPE][FALLBACK] fell back to Product table branchCode=ZOMBA + locationCodes', {
+    logger.debugLog('[ADMIN POS][ZOMBA_SCOPE][FALLBACK] fell back to Product table branchCode=ZOMBA + locationCodes', {
       scopeCodes,
       fallbackCodeCount: scopedCodes.size,
     });
@@ -390,7 +391,7 @@ router.get('/zomba-stock-trace', verifyTokenMiddleware, verifyAdmin, async (req,
       },
     };
 
-    console.log('[ZOMBA STOCK][TRACE ENDPOINT]', {
+    logger.debugLog('[ZOMBA STOCK][TRACE ENDPOINT]', {
       productCode,
       selectedLocation: req.query.locationCode || '(none)',
       resolvedStockLocation: selectedLocationCode,
@@ -406,7 +407,7 @@ router.get('/zomba-stock-trace', verifyTokenMiddleware, verifyAdmin, async (req,
       ...payload,
     });
   } catch (error) {
-    console.error('[ZOMBA STOCK][TRACE ENDPOINT] error:', error.message);
+    logger.errorLog('[ZOMBA STOCK][TRACE ENDPOINT] error:', { message: error.message });
     return res.status(500).json({ success: false, error: 'Failed to load Zomba stock trace' });
   }
 });
@@ -429,7 +430,7 @@ router.get('/dashboard', verifyTokenMiddleware, verifyAdmin, async (req, res) =>
       }
     });
   } catch (err) {
-    console.error('Dashboard error:', err);
+    logger.errorLog('Dashboard error:', err);
     res.status(500).json({ error: 'Failed to fetch dashboard data' });
   }
 });
@@ -468,7 +469,7 @@ router.get('/system/settings', verifyTokenMiddleware, verifyAdmin, async (req, r
       },
     });
   } catch (err) {
-    console.error('[ADMIN SYSTEM] Failed to fetch settings:', err.message);
+    logger.errorLog('[ADMIN SYSTEM] Failed to fetch settings:', { message: err.message });
     return res.status(500).json({ success: false, error: 'Failed to fetch system settings' });
   }
 });
@@ -538,7 +539,7 @@ router.put('/system/maintenance', verifyTokenMiddleware, verifyAdmin, async (req
       },
     });
   } catch (err) {
-    console.error('[ADMIN SYSTEM] Failed to update maintenance mode:', err.message);
+    logger.errorLog('[ADMIN SYSTEM] Failed to update maintenance mode:', { message: err.message });
     return res.status(500).json({ success: false, error: 'Failed to update maintenance mode' });
   }
 });
@@ -574,7 +575,7 @@ router.put('/system/emergency-sales-day', verifyTokenMiddleware, verifyAdmin, as
       },
     });
   } catch (err) {
-    console.error('[ADMIN SYSTEM] Failed to update emergency sales day:', err.message);
+    logger.errorLog('[ADMIN SYSTEM] Failed to update emergency sales day:', { message: err.message });
     return res.status(500).json({ success: false, error: 'Failed to update emergency sales day state' });
   }
 });
@@ -607,7 +608,7 @@ router.get('/security-key/status', verifyTokenMiddleware, verifyAdminRole, async
       hasSecurityKey: Boolean(adminUser.adminSecurityKeyHash),
     });
   } catch (err) {
-    console.error('[ADMIN SECURITY] Status check failed:', err.message);
+    logger.errorLog('[ADMIN SECURITY] Status check failed:', { message: err.message });
     return res.status(500).json({ success: false, error: 'Failed to check security key status' });
   }
 });
@@ -645,7 +646,7 @@ router.post('/security-key/verify', verifyTokenMiddleware, verifyAdminRole, asyn
 
     return res.json({ success: true, verified: true });
   } catch (err) {
-    console.error('[ADMIN SECURITY] Verification failed:', err.message);
+    logger.errorLog('[ADMIN SECURITY] Verification failed:', { message: err.message });
     return res.status(500).json({ success: false, error: 'Failed to verify security key' });
   }
 });
@@ -702,8 +703,172 @@ router.put('/security-key', verifyTokenMiddleware, verifyAdmin, async (req, res)
       message: adminUser.adminSecurityKeyHash ? 'Security key changed successfully' : 'Security key set successfully',
     });
   } catch (err) {
-    console.error('[ADMIN SECURITY] Set/change key failed:', err.message);
+    logger.errorLog('[ADMIN SECURITY] Set/change key failed:', { message: err.message });
     return res.status(500).json({ success: false, error: 'Failed to save security key' });
+  }
+});
+
+// ─── ADMIN ACCOUNT MANAGEMENT ────────────────────────────────────────────────
+
+router.get('/security/admin-accounts', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const admins = await prisma.user.findMany({
+      where: {
+        role: { in: ['admin', 'super_admin'] },
+        isActive: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        adminSecurityKeyHash: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    return res.json({
+      success: true,
+      admins: admins.map(({ adminSecurityKeyHash, ...admin }) => ({
+        ...admin,
+        hasSecurityKey: Boolean(adminSecurityKeyHash),
+      })),
+    });
+  } catch (err) {
+    logger.errorLog('[ADMIN ACCOUNTS] List failed:', { message: err.message });
+    return res.status(500).json({ success: false, error: 'Failed to list administrator accounts' });
+  }
+});
+
+router.post('/security/admin-accounts', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const { name, email, password, securityKey, confirmSecurityKey } = req.body;
+
+    if (!name || !email || !password || !securityKey || !confirmSecurityKey) {
+      return res.status(400).json({
+        success: false,
+        error: 'Name, email, password, security key, and security key confirmation are required',
+      });
+    }
+    if (securityKey !== confirmSecurityKey) {
+      return res.status(400).json({ success: false, error: 'Administrator security key confirmation does not match' });
+    }
+    if (securityKey.trim().length < 4) {
+      return res.status(400).json({ success: false, error: 'Administrator security key must be at least 4 characters' });
+    }
+
+    const passwordValidation = validateStrongPassword(password);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ success: false, error: passwordValidation.errors[0] });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+    if (existing) {
+      return res.status(409).json({ success: false, error: 'A user with that email already exists' });
+    }
+
+    const [passwordHash, adminSecurityKeyHash] = await Promise.all([
+      bcrypt.hash(password, 10),
+      bcrypt.hash(securityKey, 10),
+    ]);
+
+    const admin = await prisma.user.create({
+      data: {
+        name: name.trim(),
+        email: normalizedEmail,
+        passwordHash,
+        adminSecurityKeyHash,
+        role: 'admin',
+        emailVerified: true,
+        isActive: true,
+      },
+      select: { id: true, name: true, email: true, role: true, createdAt: true },
+    });
+
+    await recordAuditLog({
+      req,
+      actorUserId: req.user?.userId,
+      action: 'ADMIN_ACCOUNT_CREATED',
+      resourceType: 'USER',
+      resourceId: admin.id,
+      status: 'SUCCESS',
+      metadata: { role: admin.role, email: admin.email },
+    });
+
+    return res.status(201).json({ success: true, admin: { ...admin, hasSecurityKey: true } });
+  } catch (err) {
+    logger.errorLog('[ADMIN ACCOUNTS] Create failed:', { message: err.message });
+    return res.status(500).json({ success: false, error: 'Failed to create administrator account' });
+  }
+});
+
+router.put('/security/admin-accounts/:userId/security-key', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const { securityKey, confirmSecurityKey } = req.body;
+    if (!securityKey || !confirmSecurityKey) {
+      return res.status(400).json({ success: false, error: 'Enter and confirm administrator security key are required' });
+    }
+    if (securityKey !== confirmSecurityKey) {
+      return res.status(400).json({ success: false, error: 'Administrator security key confirmation does not match' });
+    }
+    if (securityKey.trim().length < 4) {
+      return res.status(400).json({ success: false, error: 'Administrator security key must be at least 4 characters' });
+    }
+
+    const target = await prisma.user.findUnique({
+      where: { id: req.params.userId },
+      select: { id: true, role: true },
+    });
+    if (!target || !['admin', 'super_admin'].includes(target.role)) {
+      return res.status(404).json({ success: false, error: 'Administrator account not found' });
+    }
+
+    await prisma.user.update({
+      where: { id: target.id },
+      data: { adminSecurityKeyHash: await bcrypt.hash(securityKey, 10) },
+    });
+
+    return res.json({ success: true, message: 'Administrator security key updated successfully' });
+  } catch (err) {
+    logger.errorLog('[ADMIN ACCOUNTS] Key update failed:', { message: err.message });
+    return res.status(500).json({ success: false, error: 'Failed to update administrator security key' });
+  }
+});
+
+router.put('/security/admin-accounts/:userId/password', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
+  try {
+    const { password, confirmPassword } = req.body;
+    if (!password || !confirmPassword) {
+      return res.status(400).json({ success: false, error: 'Enter and confirm administrator password are required' });
+    }
+    if (password !== confirmPassword) {
+      return res.status(400).json({ success: false, error: 'Administrator password confirmation does not match' });
+    }
+
+    const passwordValidation = validateStrongPassword(password);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ success: false, error: passwordValidation.errors[0] });
+    }
+
+    const target = await prisma.user.findUnique({
+      where: { id: req.params.userId },
+      select: { id: true, role: true },
+    });
+    if (!target || !['admin', 'super_admin'].includes(target.role)) {
+      return res.status(404).json({ success: false, error: 'Administrator account not found' });
+    }
+
+    await prisma.user.update({
+      where: { id: target.id },
+      data: { passwordHash: await bcrypt.hash(password, 10) },
+    });
+
+    return res.json({ success: true, message: 'Administrator password updated successfully' });
+  } catch (err) {
+    logger.errorLog('[ADMIN ACCOUNTS] Password update failed:', { message: err.message });
+    return res.status(500).json({ success: false, error: 'Failed to update administrator password' });
   }
 });
 
@@ -731,7 +896,7 @@ router.get('/security-key/driver/:userId/status', verifyTokenMiddleware, verifyA
       },
     });
   } catch (err) {
-    console.error('[DRIVER SECURITY] Admin status check failed:', err.message);
+    logger.errorLog('[DRIVER SECURITY] Admin status check failed:', { message: err.message });
     return res.status(500).json({ success: false, error: 'Failed to check driver security key status' });
   }
 });
@@ -788,7 +953,7 @@ router.put('/security-key/driver/:userId', verifyTokenMiddleware, verifyAdmin, a
       message: driverUser.driverSecurityKeyHash ? 'Driver security key changed successfully' : 'Driver security key set successfully',
     });
   } catch (err) {
-    console.error('[DRIVER SECURITY] Admin set/change key failed:', err.message);
+    logger.errorLog('[DRIVER SECURITY] Admin set/change key failed:', { message: err.message });
     return res.status(500).json({ success: false, error: 'Failed to save driver security key' });
   }
 });
@@ -821,7 +986,7 @@ router.get('/users', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
       total: users.length
     });
   } catch (err) {
-    console.error('Get users error:', err);
+    logger.errorLog('Get users error:', err);
     res.status(500).json({ error: 'Failed to fetch users' });
   }
 });
@@ -844,7 +1009,7 @@ router.get(
         roleDefaults: ROLE_DEFAULT_PERMISSIONS,
       });
     } catch (err) {
-      console.error('[ADMIN PERMISSIONS] Failed to load catalog:', err);
+      logger.errorLog('[ADMIN PERMISSIONS] Failed to load catalog:', err);
       return res.status(500).json({ error: 'Failed to load permissions catalog' });
     }
   }
@@ -878,7 +1043,7 @@ router.get(
         ...snapshot,
       });
     } catch (err) {
-      console.error('[ADMIN PERMISSIONS] Failed to fetch user permissions:', err);
+      logger.errorLog('[ADMIN PERMISSIONS] Failed to fetch user permissions:', err);
       return res.status(500).json({ error: 'Failed to fetch user permissions' });
     }
   }
@@ -1002,7 +1167,7 @@ router.put(
         ...snapshot,
       });
     } catch (err) {
-      console.error('[ADMIN PERMISSIONS] Failed to update user permissions:', err);
+      logger.errorLog('[ADMIN PERMISSIONS] Failed to update user permissions:', err);
       return res.status(500).json({ error: 'Failed to update user permissions' });
     }
   }
@@ -1076,18 +1241,18 @@ router.put('/users/:userId/role', verifyTokenMiddleware, verifyAdmin, async (req
             phone: null // Can be updated later
           }
         });
-        console.log('[ADMIN] Created Driver record for user:', { userId, email: user.email });
+        logger.infoLog('[ADMIN] Created Driver record for user:', { userId, email: user.email });
       }
     }
 
-    console.log('[ADMIN] User role updated:', { userId, newRole: role, admin: req.user.email });
+    logger.infoLog('[ADMIN] User role updated:', { userId, newRole: role, admin: req.user.email });
     res.json({ 
       success: true, 
       user,
       message: `User role updated to ${role}`
     });
   } catch (err) {
-    console.error('Update user role error:', err);
+    logger.errorLog('Update user role error:', err);
     if (err.code === 'P2025') {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -1125,7 +1290,7 @@ router.delete('/users/:userId', verifyTokenMiddleware, verifyAdmin, async (req, 
       await prisma.driver.deleteMany({
         where: { email: existingUser.email },
       });
-      console.log('[ADMIN DELETE USER] Deleted associated Driver record for:', existingUser.email);
+      logger.infoLog('[ADMIN DELETE USER] Deleted associated Driver record for:', existingUser.email);
     }
 
     // Hard delete user - CASCADE DELETE automatically removes:
@@ -1149,7 +1314,7 @@ router.delete('/users/:userId', verifyTokenMiddleware, verifyAdmin, async (req, 
       },
     });
 
-    console.log('[ADMIN] User permanently deleted:', { 
+    logger.infoLog('[ADMIN] User permanently deleted:', { 
       userId, 
       email: existingUser.email, 
       name: existingUser.name,
@@ -1161,7 +1326,7 @@ router.delete('/users/:userId', verifyTokenMiddleware, verifyAdmin, async (req, 
       message: 'User account permanently deleted. All associated data (cart, orders) has been removed.'
     });
   } catch (err) {
-    console.error('Delete user error:', err);
+    logger.errorLog('Delete user error:', err);
     if (err.code === 'P2025') {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -1194,7 +1359,7 @@ router.get('/orders', verifyTokenMiddleware, verifyAdmin, async (req, res) => {
       total: orders.length
     });
   } catch (err) {
-    console.error('Get orders error:', err);
+    logger.errorLog('Get orders error:', err);
     res.status(500).json({ error: 'Failed to fetch orders' });
   }
 });
@@ -1223,7 +1388,7 @@ router.get('/orders/:orderId', verifyTokenMiddleware, verifyAdmin, async (req, r
 
     res.json({ success: true, order });
   } catch (err) {
-    console.error('Get order error:', err);
+    logger.errorLog('Get order error:', err);
     res.status(500).json({ error: 'Failed to fetch order' });
   }
 });
@@ -1361,7 +1526,7 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
         const requiresExplicitBranch = isAmbiguousSH && !normalizedBranchCode;
         
         if (requiresExplicitBranch) {
-          console.warn('[PRODUCT QUERY][POS_MANAGEMENT][AMBIGUOUS_ZOMBA_SCOPE]', {
+          logger.warnLog('[PRODUCT QUERY][POS_MANAGEMENT][AMBIGUOUS_ZOMBA_SCOPE]', {
             view: 'POS Management / Stock panel',
             selectedLocation: locationCode || '(none)',
             normalizedLocation: normalizedLocationCode,
@@ -1375,7 +1540,7 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
         }
 
         if (!isConcreteZombaOperationalLocationCode(resolvedLocationCode)) {
-          console.warn('[PRODUCT QUERY][POS_MANAGEMENT][INVALID_ZOMBA_SCOPE]', {
+          logger.warnLog('[PRODUCT QUERY][POS_MANAGEMENT][INVALID_ZOMBA_SCOPE]', {
             view: 'POS Management / Stock panel',
             selectedLocation: locationCode || '(none)',
             normalizedLocation: normalizedLocationCode,
@@ -1395,7 +1560,7 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
         };
         where.sourceCode = { not: null };
 
-        console.log('[PRODUCT QUERY][POS_MANAGEMENT]', {
+        logger.debugLog('[PRODUCT QUERY][POS_MANAGEMENT]', {
           view: 'POS Management / Stock panel',
           uiLocation: locationCode || '(none)',
           selectedLocation: normalizedLocationCode,
@@ -1412,7 +1577,7 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
               : normalizedLocationCode
           );
         const explicitBranchCode = normalizedBranchCode || derivedBranchCode;
-        console.log('[PRODUCT QUERY][POS_MANAGEMENT]', {
+        logger.debugLog('[PRODUCT QUERY][POS_MANAGEMENT]', {
           uiLocation: locationCode || '(none)',
           branchCode: explicitBranchCode || '(any)',
           locationCode: normalizedLocationCode,
@@ -1468,22 +1633,22 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
       orderBy: { createdAt: 'desc' },
     });
 
-    console.log('[PRODUCT RESULT COUNT]', products.length);
+    logger.debugLog('[PRODUCT RESULT COUNT]', products.length);
 
     const isZombaScope = normalizedLocationCode && ZOMBA_LOCATION_CODES.includes(normalizedLocationCode);
     if (isZombaScope && products.length > 0) {
       const sample = products[0];
-      console.log(`[ZOMBA STOCK][POS_MANAGEMENT] selectedLocation=${locationCode || '(none)'} resolvedStockLocation=${normalizedLocationCode} querySource=PersistedProduct.stock product=${sample.sourceCode || 'UNKNOWN'} stock=${Number(sample.stock || 0)}`);
+      logger.debugLog(`[ZOMBA STOCK][POS_MANAGEMENT] selectedLocation=${locationCode || '(none)'} resolvedStockLocation=${normalizedLocationCode} querySource=PersistedProduct.stock product=${sample.sourceCode || 'UNKNOWN'} stock=${Number(sample.stock || 0)}`);
       const verifyProduct = products.find((row) => String(row.sourceCode || '').trim() === '9501100002174');
       if (verifyProduct) {
-        console.log(`[ZOMBA STOCK][VERIFY][POS_MANAGEMENT] selectedLocation=${locationCode || '(none)'} resolvedStockLocation=${normalizedLocationCode} querySource=PersistedProduct.stock product=9501100002174 stock=${Number(verifyProduct.stock || 0)}`);
+        logger.debugLog(`[ZOMBA STOCK][VERIFY][POS_MANAGEMENT] selectedLocation=${locationCode || '(none)'} resolvedStockLocation=${normalizedLocationCode} querySource=PersistedProduct.stock product=9501100002174 stock=${Number(verifyProduct.stock || 0)}`);
       }
     }
 
     const servedAtIso = new Date().toISOString();
     res.set('x-stock-data-source', 'db-live');
     res.set('x-stock-served-at', servedAtIso);
-    console.log('[ADMIN POS][FRESHNESS]', {
+    logger.debugLog('[ADMIN POS][FRESHNESS]', {
       endpoint: '/api/admin/pos-products',
       locationCode: normalizedLocationCode || null,
       source: 'db-live',
@@ -1501,7 +1666,7 @@ router.get('/pos-products', verifyTokenMiddleware, verifyAdmin, async (req, res)
       totalPages: Math.ceil(total / limit),
     });
   } catch (err) {
-    console.error('[ADMIN POS] Get products error:', err.message);
+    logger.errorLog('[ADMIN POS] Get products error:', { message: err.message });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch POS products',
@@ -1581,7 +1746,7 @@ router.put('/pos-products/:id/visibility', verifyTokenMiddleware, verifyAdmin, a
       },
     });
 
-    console.log(`[ADMIN POS] Product ${id} visibility updated: ${product.hideFromProductsPage ? 'HIDDEN' : 'VISIBLE'}`);
+    logger.infoLog(`[ADMIN POS] Product ${id} visibility updated: ${product.hideFromProductsPage ? 'HIDDEN' : 'VISIBLE'}`);
 
     // Broadcast visibility change to all connected clients
     emitProductUpdate(product);
@@ -1592,7 +1757,7 @@ router.put('/pos-products/:id/visibility', verifyTokenMiddleware, verifyAdmin, a
       product,
     });
   } catch (err) {
-    console.error('[ADMIN POS] Update visibility error:', err.message);
+    logger.errorLog('[ADMIN POS] Update visibility error:', { message: err.message });
     res.status(500).json({
       success: false,
       error: 'Failed to update product visibility',
@@ -1622,7 +1787,7 @@ router.put('/pos-products/:id/enabled', verifyTokenMiddleware, verifyAdmin, asyn
       },
     });
 
-    console.log(`[ADMIN POS] Product ${id} enabled status updated: ${product.enabled ? 'ENABLED' : 'DISABLED'}`);
+    logger.infoLog(`[ADMIN POS] Product ${id} enabled status updated: ${product.enabled ? 'ENABLED' : 'DISABLED'}`);
 
     res.json({
       success: true,
@@ -1630,7 +1795,7 @@ router.put('/pos-products/:id/enabled', verifyTokenMiddleware, verifyAdmin, asyn
       product,
     });
   } catch (err) {
-    console.error('[ADMIN POS] Update enabled error:', err.message);
+    logger.errorLog('[ADMIN POS] Update enabled error:', { message: err.message });
     res.status(500).json({
       success: false,
       error: 'Failed to update product status',
@@ -1700,7 +1865,7 @@ router.delete('/pos-products/delete-selected', verifyTokenMiddleware, verifyAdmi
 
     const deleted = await prisma.product.deleteMany({ where });
 
-    console.log(`[ADMIN POS] Deleted ${deleted.count} selected products`);
+    logger.infoLog(`[ADMIN POS] Deleted ${deleted.count} selected products`);
 
     res.json({
       success: true,
@@ -1708,7 +1873,7 @@ router.delete('/pos-products/delete-selected', verifyTokenMiddleware, verifyAdmi
       deletedCount: deleted.count,
     });
   } catch (err) {
-    console.error('[ADMIN POS] Delete selected error:', err.message);
+    logger.errorLog('[ADMIN POS] Delete selected error:', { message: err.message });
     res.status(500).json({
       success: false,
       error: 'Failed to delete selected products',
@@ -1767,7 +1932,7 @@ router.delete('/pos-products/delete-all', verifyTokenMiddleware, verifyAdmin, as
 
     const deleted = await prisma.product.deleteMany({ where });
 
-    console.log(`[ADMIN POS] Deleted ALL ${deleted.count} POS products`);
+    logger.infoLog(`[ADMIN POS] Deleted ALL ${deleted.count} POS products`);
 
     res.json({
       success: true,
@@ -1775,7 +1940,7 @@ router.delete('/pos-products/delete-all', verifyTokenMiddleware, verifyAdmin, as
       deletedCount: deleted.count,
     });
   } catch (err) {
-    console.error('[ADMIN POS] Delete all error:', err.message);
+    logger.errorLog('[ADMIN POS] Delete all error:', { message: err.message });
     res.status(500).json({
       success: false,
       error: 'Failed to delete all POS products',
@@ -1799,7 +1964,7 @@ router.get('/cashiers', verifyTokenMiddleware, verifyAdmin, async (req, res) => 
     });
     return res.json({ success: true, cashiers });
   } catch (err) {
-    console.error('[ADMIN CASHIERS] List failed:', err.message);
+    logger.errorLog('[ADMIN CASHIERS] List failed:', { message: err.message });
     return res.status(500).json({ success: false, error: 'Failed to list cashier accounts' });
   }
 });
@@ -1853,7 +2018,7 @@ router.post('/cashiers', verifyTokenMiddleware, verifyAdmin, async (req, res) =>
 
     return res.status(201).json({ success: true, cashier });
   } catch (err) {
-    console.error('[ADMIN CASHIERS] Create failed:', err.message);
+    logger.errorLog('[ADMIN CASHIERS] Create failed:', { message: err.message });
     return res.status(500).json({ success: false, error: 'Failed to create cashier account' });
   }
 });
@@ -1920,7 +2085,7 @@ router.put('/cashiers/:userId', verifyTokenMiddleware, verifyAdmin, async (req, 
 
     return res.json({ success: true, cashier: updated });
   } catch (err) {
-    console.error('[ADMIN CASHIERS] Update failed:', err.message);
+    logger.errorLog('[ADMIN CASHIERS] Update failed:', { message: err.message });
     return res.status(500).json({ success: false, error: 'Failed to update cashier account' });
   }
 });
@@ -1954,7 +2119,7 @@ router.delete('/cashiers/:userId', verifyTokenMiddleware, verifyAdmin, async (re
 
     return res.json({ success: true, message: `Cashier account "${cashier.name}" deleted successfully` });
   } catch (err) {
-    console.error('[ADMIN CASHIERS] Delete failed:', err.message);
+    logger.errorLog('[ADMIN CASHIERS] Delete failed:', { message: err.message });
     return res.status(500).json({ success: false, error: 'Failed to delete cashier account' });
   }
 });
@@ -1982,7 +2147,7 @@ router.get('/security-key/cashier/:userId/status', verifyTokenMiddleware, verify
       cashier: { id: cashierUser.id, name: cashierUser.name },
     });
   } catch (err) {
-    console.error('[CASHIER SECURITY] Admin status check failed:', err.message);
+    logger.errorLog('[CASHIER SECURITY] Admin status check failed:', { message: err.message });
     return res.status(500).json({ success: false, error: 'Failed to check cashier security key status' });
   }
 });
@@ -2031,7 +2196,7 @@ router.put('/security-key/cashier/:userId', verifyTokenMiddleware, verifyAdmin, 
         : 'Cashier security key set successfully',
     });
   } catch (err) {
-    console.error('[CASHIER SECURITY] Admin set/change key failed:', err.message);
+    logger.errorLog('[CASHIER SECURITY] Admin set/change key failed:', { message: err.message });
     return res.status(500).json({ success: false, error: 'Failed to save cashier security key' });
   }
 });

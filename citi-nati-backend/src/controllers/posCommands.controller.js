@@ -1,4 +1,5 @@
 const queueService = require('../services/posCommandQueue.service');
+const logger = require('../utils/logger');
 const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
@@ -52,7 +53,7 @@ async function pollCommands(req, res) {
       })),
     });
   } catch (error) {
-    console.error('[POS COMMAND QUEUE ERROR] poll failed:', error.message);
+    logger.errorLog('[POS COMMAND QUEUE ERROR] poll failed:', { message: error.message });
     return res.status(500).json({ success: false, error: 'Failed to poll commands' });
   }
 }
@@ -85,11 +86,17 @@ async function completeCommand(req, res) {
               ...(finalGrn ? { posTransferGrn: String(finalGrn) } : {}),
             },
           });
-          console.log(`[POS COMMAND QUEUE] GoodsIntake ${intakeId} marked as transferred after command ${id} completed`);
+          logger.debugLog('[POS COMMAND QUEUE] GoodsIntake marked as transferred', {
+            intakeId,
+            commandId: id,
+          });
         }
       } catch (sideEffectError) {
         // Non-fatal — log but don't fail the command complete response
-        console.error(`[POS COMMAND QUEUE] Failed to update GoodsIntake status after command ${id}:`, sideEffectError.message);
+        logger.errorLog('[POS COMMAND QUEUE] Failed to update GoodsIntake status after command completed', {
+          commandId: id,
+          message: sideEffectError.message,
+        });
       }
     }
 
@@ -124,9 +131,12 @@ async function completeCommand(req, res) {
                 },
               });
 
-              console.warn(
-                `[POS COMMAND QUEUE] Reassigned POS supplier code ${posSupplierCode} in branch ${payloadBranchCode} from supplier ${conflictingLink.supplierId} to ${supplierId}`
-              );
+              logger.warnLog('[POS COMMAND QUEUE] Reassigned POS supplier code', {
+                branchCode: payloadBranchCode,
+                posSupplierCode,
+                fromSupplierId: conflictingLink.supplierId,
+                toSupplierId: supplierId,
+              });
             }
 
             await tx.supplierPosLink.upsert({
@@ -155,17 +165,24 @@ async function completeCommand(req, res) {
             });
           });
 
-          console.log(`[POS COMMAND QUEUE] Supplier ${supplierId} linked to POS branch ${payloadBranchCode} code ${posSupplierCode} after command ${id} completed`);
+          logger.debugLog('[POS COMMAND QUEUE] Supplier linked to POS branch after command completed', {
+            supplierId,
+            payloadBranchCode,
+            posSupplierCode,
+            commandId: id,
+          });
         }
       } catch (sideEffectError) {
-        console.error(`[POS COMMAND QUEUE] Failed to update supplier POS link after command ${id}:`, sideEffectError.message);
+        logger.errorLog('[POS COMMAND QUEUE] Failed to update supplier POS link after command completed', {
+          commandId: id,
+          message: sideEffectError.message,
+        });
       }
     }
 
     return res.json({ success: true, id, status: 'COMPLETED' });
   } catch (error) {
-    console.error('[POS COMMAND QUEUE ERROR] complete failed:', error.message);
-    return res.status(500).json({ success: false, error: error.message });
+    logger.errorLog('[POS COMMAND QUEUE ERROR] complete failed:', { message: error.message });
   }
 }
 
@@ -198,10 +215,16 @@ async function failCommand(req, res) {
             where: { id: intakeId },
             data: { posTransferStatus: 'failed' },
           });
-          console.log(`[POS COMMAND QUEUE] GoodsIntake ${intakeId} marked as failed after command ${id} non-retryable failure`);
+          logger.warnLog('[POS COMMAND QUEUE] GoodsIntake transfer failed non-retryable', {
+            intakeId,
+            commandId: id,
+          });
         }
       } catch (sideEffectError) {
-        console.error(`[POS COMMAND QUEUE] Failed to update GoodsIntake status after command ${id} failure:`, sideEffectError.message);
+        logger.errorLog('[POS COMMAND QUEUE] Failed to update GoodsIntake status after non-retryable failure', {
+          commandId: id,
+          message: sideEffectError.message,
+        });
       }
     }
 
@@ -233,16 +256,23 @@ async function failCommand(req, res) {
             },
           });
 
-          console.log(`[POS COMMAND QUEUE] Supplier ${supplierId} marked failed for POS branch ${payloadBranchCode} after command ${id} non-retryable failure`);
+          logger.warnLog('[POS COMMAND QUEUE] Supplier POS link marked failed non-retryable', {
+            supplierId,
+            payloadBranchCode,
+            commandId: id,
+          });
         }
       } catch (sideEffectError) {
-        console.error(`[POS COMMAND QUEUE] Failed to update supplier POS link failure status after command ${id}:`, sideEffectError.message);
+        logger.errorLog('[POS COMMAND QUEUE] Failed to update supplier POS link failure status after non-retryable failure', {
+          commandId: id,
+          message: sideEffectError.message,
+        });
       }
     }
 
     return res.json({ success: true, id });
   } catch (error) {
-    console.error('[POS COMMAND QUEUE ERROR] fail failed:', error.message);
+    logger.errorLog('[POS COMMAND QUEUE ERROR] fail failed:', { message: error.message });
     return res.status(500).json({ success: false, error: error.message });
   }
 }
@@ -261,7 +291,7 @@ async function getCommand(req, res) {
 
     return res.json({ success: true, command });
   } catch (error) {
-    console.error('[POS COMMAND QUEUE ERROR] get command failed:', error.message);
+    logger.errorLog('[POS COMMAND QUEUE ERROR] get command failed:', { message: error.message });
     return res.status(500).json({ success: false, error: 'Failed to fetch command' });
   }
 }
@@ -280,7 +310,7 @@ async function listCommands(req, res) {
 
     return res.json({ success: true, commands });
   } catch (error) {
-    console.error('[POS COMMAND QUEUE ERROR] list failed:', error.message);
+    logger.errorLog('[POS COMMAND QUEUE ERROR] list failed:', { message: error.message });
     return res.status(500).json({ success: false, error: 'Failed to list commands' });
   }
 }
@@ -294,7 +324,7 @@ async function getCommandStats(req, res) {
     const stats = await queueService.getStats();
     return res.json({ success: true, stats });
   } catch (error) {
-    console.error('[POS COMMAND QUEUE ERROR] stats failed:', error.message);
+    logger.errorLog('[POS COMMAND QUEUE ERROR] stats failed:', { message: error.message });
     return res.status(500).json({ success: false, error: 'Failed to fetch stats' });
   }
 }

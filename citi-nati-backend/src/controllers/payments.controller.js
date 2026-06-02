@@ -7,6 +7,7 @@ const { notifyPaymentSuccess, notifyOrderPlaced, notifyRefundRequired } = requir
 const { sendOrderConfirmationEmail, sendPaymentConfirmationEmail, sendRefundNotificationEmail } = require('../utils/emailService');
 const { cacheWebhookEvent } = require('../utils/webhookCache');
 const posCommandQueueService = require('../services/posCommandQueue.service');
+const logger = require('../utils/logger');
 const { splitInclusiveVatAtRate, getVatRatePercent, normalizeVatRatePercent, roundMoney } = require('../utils/vat');
 const { formatBusinessDateKey, formatBusinessTimeKey } = require('../utils/businessTime');
 const { recordAuditLog } = require('../services/auditLog.service');
@@ -37,7 +38,7 @@ async function buildWriteInvoicePayload(order, paymentReference) {
     const sourceCode = item.product && item.product.sourceCode;
 
     if (!sourceCode) {
-      console.log('[BACKEND POS WRITE SKIP] skipped item missing sourceCode:', {
+      logger.debugLog('[BACKEND POS WRITE SKIP] skipped item missing sourceCode:', {
         orderId: order.id,
         orderItemId: item.id,
         productId: item.productId,
@@ -50,7 +51,7 @@ async function buildWriteInvoicePayload(order, paymentReference) {
     const unitPrice = Number(item.price);
 
     if (!Number.isFinite(qty) || qty <= 0 || !Number.isFinite(unitPrice) || unitPrice < 0) {
-      console.log('[BACKEND POS WRITE SKIP] skipped invalid POS item values:', {
+      logger.debugLog('[BACKEND POS WRITE SKIP] skipped invalid POS item values:', {
         orderId: order.id,
         orderItemId: item.id,
         sourceCode,
@@ -121,54 +122,54 @@ const verifyPaychanguPayment = async (transactionReference, transactionId) => {
       throw new Error('Transaction reference or transaction ID is required');
     }
 
-    console.log('[Payment Verification] ⏱️ Starting verification for ref:', transactionReference);
+    logger.debugLog('[Payment Verification] ⏱️ Starting verification for ref:', transactionReference);
     
     let orderId = null;
 
     // PRIORITY 1: Extract orderId from our tx_ref format: ORDER_{orderId}_{timestamp}
     if (transactionReference && transactionReference.startsWith('ORDER_')) {
-      console.log('[Payment Verification] Attempting to parse tx_ref format...');
+      logger.debugLog('[Payment Verification] Attempting to parse tx_ref format...');
       const parts = transactionReference.split('_');
       if (parts.length >= 2) {
         const parsed = parseInt(parts[1]);
         if (!isNaN(parsed) && parsed > 0) {
           orderId = parsed;
-          console.log('[Payment Verification] ✅ Parsed orderId from tx_ref:', orderId);
+          logger.debugLog('[Payment Verification] ✅ Parsed orderId from tx_ref:', orderId);
         }
       }
     }
 
     // If we successfully extracted orderId, verify it exists
     if (orderId) {
-      console.log('[Payment Verification] 🔍 Looking up order ID:', orderId);
+      logger.debugLog('[Payment Verification] 🔍 Looking up order ID:', orderId);
       const order = await prisma.order.findUnique({
         where: { id: orderId },
         select: { id: true, total: true }
       });
 
       if (order) {
-        console.log('[Payment Verification] ✅ Order found:', orderId, 'amount:', order.total);
+        logger.debugLog('[Payment Verification] ✅ Order found:', orderId, 'amount:', order.total);
         return {
           success: true,
           orderId: orderId,
           amount: order.total
         };
       } else {
-        console.warn('[Payment Verification] ⚠️ Order ID', orderId, 'not found in database');
+        logger.warnLog('[Payment Verification] ⚠️ Order ID', orderId, 'not found in database');
       }
     }
 
     // PRIORITY 2: If parsing failed, try to extract from transactionId
     // (Paychangu might send this instead)
     if (!orderId && transactionId) {
-      console.log('[Payment Verification] Attempting to extract orderId from transactionId...');
+      logger.debugLog('[Payment Verification] Attempting to extract orderId from transactionId...');
       // Check if transactionId contains order info
       if (transactionId.includes('_')) {
         const parts = transactionId.split('_');
         const parsed = parseInt(parts[parts.length - 1]);
         if (!isNaN(parsed) && parsed > 0) {
           orderId = parsed;
-          console.log('[Payment Verification] ✅ Extracted orderId from transactionId:', orderId);
+          logger.debugLog('[Payment Verification] ✅ Extracted orderId from transactionId:', orderId);
         }
       }
     }
@@ -181,7 +182,7 @@ const verifyPaychanguPayment = async (transactionReference, transactionId) => {
       });
 
       if (order) {
-        console.log('[Payment Verification] ✅ Order verified:', orderId);
+        logger.debugLog('[Payment Verification] ✅ Order verified:', orderId);
         return {
           success: true,
           orderId: orderId,
@@ -193,7 +194,7 @@ const verifyPaychanguPayment = async (transactionReference, transactionId) => {
     // PRIORITY 3: Last resort - query by reference (but with timeout)
     // Only do this if parsing entirely failed
     if (transactionReference && !orderId) {
-      console.log('[Payment Verification] Trying database lookup for reference:', transactionReference);
+      logger.debugLog('[Payment Verification] Trying database lookup for reference:', transactionReference);
       
       const order = await Promise.race([
         prisma.order.findFirst({
@@ -206,7 +207,7 @@ const verifyPaychanguPayment = async (transactionReference, transactionId) => {
       ]);
 
       if (order) {
-        console.log('[Payment Verification] ✅ Found by paymentReference:', order.id);
+        logger.debugLog('[Payment Verification] ✅ Found by paymentReference:', order.id);
         return {
           success: true,
           orderId: order.id,
@@ -236,10 +237,10 @@ const refundPaychanguPayment = async ({ transactionId, amount, reason }) => {
       throw new Error('Transaction ID and amount are required for refund');
     }
 
-    console.log(`[Refund] Initiating refund: transaction=${transactionId}, amount=${amount}, reason=${reason}`);
+    logger.debugLog(`[Refund] Initiating refund: transaction=${transactionId}, amount=${amount}, reason=${reason}`);
 
     // Call Paychangu refund API
-    console.log('[Refund] Initiating Paychangu refund for amount:', amount);
+    logger.debugLog('[Refund] Initiating Paychangu refund for amount:', amount);
     
     // Paychangu refund endpoint uses GET (not POST)
     // Note: endpoint is /refunds (plural), not /refund
@@ -258,12 +259,12 @@ const refundPaychanguPayment = async ({ transactionId, amount, reason }) => {
       }
     );
 
-    console.log('[Refund] Paychangu response:', JSON.stringify(response.data, null, 2));
+    logger.debugLog('[Refund] Paychangu response:', JSON.stringify(response.data, null, 2));
 
     const refundSuccess = response.data?.status === 'success' || response.data?.success === true;
     
     if (refundSuccess) {
-      console.log(`[Refund] ✅ Refund successful: ${response.data?.refund_id || 'ID not provided'}`);
+      logger.debugLog(`[Refund] ✅ Refund successful: ${response.data?.refund_id || 'ID not provided'}`);
       return {
         success: true,
         refundId: response.data?.refund_id,
@@ -271,7 +272,7 @@ const refundPaychanguPayment = async ({ transactionId, amount, reason }) => {
         message: 'Refund processed successfully'
       };
     } else {
-      console.warn('[Refund] ⚠️ Refund API returned non-success status:', response.data?.status);
+      logger.warnLog('[Refund] ⚠️ Refund API returned non-success status:', response.data?.status);
       return {
         success: false,
         message: response.data?.message || 'Refund status unknown',
@@ -292,7 +293,7 @@ const initializePayment = async (req, res) => {
   try {
     const paymentInitRequestId = `pay_init_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-    console.log('[PaymentInit] Entry', {
+    logger.debugLog('[PaymentInit] Entry', {
       paymentInitRequestId,
       method: req.method,
       path: req.originalUrl,
@@ -408,7 +409,7 @@ const initializePayment = async (req, res) => {
       API_BASE_URL: Boolean(process.env.API_BASE_URL),
     };
 
-    console.log('[PaymentInit] Diagnostics', {
+    logger.debugLog('[PaymentInit] Diagnostics', {
       paymentInitRequestId,
       orderId: order.id,
       userId,
@@ -457,7 +458,7 @@ const initializePayment = async (req, res) => {
         description: `Order #${order.id} - Citi-Nati Supermarket`
       };
 
-      console.log('[PaymentInit] PayChangu request body', {
+      logger.debugLog('[PaymentInit] PayChangu request body', {
         paymentInitRequestId,
         payload: paychanguPayload,
       });
@@ -481,7 +482,7 @@ const initializePayment = async (req, res) => {
         ? response.data
         : JSON.stringify(response.data);
 
-      console.log('[PaymentInit] PayChangu response received', {
+      logger.debugLog('[PaymentInit] PayChangu response received', {
         paymentInitRequestId,
         status: response.status,
         rawBody: rawResponseBody,
@@ -515,7 +516,7 @@ const initializePayment = async (req, res) => {
         });
       }
 
-      console.log('[Payment] FULL PAYCHANGU RESPONSE:', JSON.stringify(parsedResponse, null, 2));
+      logger.debugLog('[Payment] FULL PAYCHANGU RESPONSE:', JSON.stringify(parsedResponse, null, 2));
 
       // Safely extract checkout URL from possible structures
       const checkoutUrl =
@@ -538,7 +539,7 @@ const initializePayment = async (req, res) => {
         });
       }
 
-      console.log('[Payment] Checkout URL extracted:', checkoutUrl);
+      logger.debugLog('[Payment] Checkout URL extracted:', checkoutUrl);
 
       // Store payment reference in order
       await prisma.order.update({
@@ -596,9 +597,9 @@ const handleWebhook = async (req, res) => {
   let orderId = null;
 
   try {
-    console.log('[Webhook] Received webhook request');
-    console.log('[Webhook] Headers:', JSON.stringify(req.headers, null, 2));
-    console.log('[Webhook] Body:', JSON.stringify(req.body, null, 2));
+    logger.debugLog('[Webhook] Received webhook request');
+    logger.debugLog('[Webhook] Headers:', JSON.stringify(req.headers, null, 2));
+    logger.debugLog('[Webhook] Body:', JSON.stringify(req.body, null, 2));
 
     // Read signature from headers - try multiple header names
     const signature = req.headers['x-paychangu-signature'] || req.headers['x-signature'] || req.headers['signature'];
@@ -606,7 +607,7 @@ const handleWebhook = async (req, res) => {
     // If signature missing or invalid, log it but continue processing for now
     // Paychangu signature verification might use different secret or algorithm
     if (signature) {
-      console.log('[Webhook] Signature found:', signature.substring(0, 20) + '...');
+      logger.debugLog('[Webhook] Signature found:', signature.substring(0, 20) + '...');
       
       // Try to verify signature but DON'T reject if it fails
       try {
@@ -616,17 +617,17 @@ const handleWebhook = async (req, res) => {
           .digest('hex');
 
         if (generatedSignature !== signature) {
-          console.warn('[Webhook] ⚠️ Signature mismatch (continuing anyway):');
-          console.warn('[Webhook]   Generated: ', generatedSignature.substring(0, 40));
-          console.warn('[Webhook]   Provided:  ', signature.substring(0, 40));
+          logger.warnLog('[Webhook] ⚠️ Signature mismatch (continuing anyway):');
+          logger.warnLog('[Webhook]   Generated: ', generatedSignature.substring(0, 40));
+          logger.warnLog('[Webhook]   Provided:  ', signature.substring(0, 40));
         } else {
-          console.log('[Webhook] ✅ Signature verified');
+          logger.debugLog('[Webhook] ✅ Signature verified');
         }
       } catch (sigErr) {
-        console.warn('[Webhook] ⚠️ Error verifying signature:', sigErr.message);
+        logger.warnLog('[Webhook] ⚠️ Error verifying signature:', sigErr.message);
       }
     } else {
-      console.warn('[Webhook] ⚠️ No signature found in headers');
+      logger.warnLog('[Webhook] ⚠️ No signature found in headers');
     }
 
     // Read event details from request body - handle multiple possible field names
@@ -637,17 +638,17 @@ const handleWebhook = async (req, res) => {
     const reference = req.body?.tx_ref || req.body?.reference || req.body?.transactionRef;
     const transactionId = req.body?.transaction_id || req.body?.transactionId;
 
-    console.log('[Webhook] Parsed data:', { status, reference, paychanguReference: req.body?.reference, transactionId });
+    logger.debugLog('[Webhook] Parsed data:', { status, reference, paychanguReference: req.body?.reference, transactionId });
 
     // Only process successful payments - check multiple possible status values
     const successStatuses = ['success', 'completed', 'COMPLETED', 'SUCCESS', 'paid', 'PAID'];
     if (!successStatuses.includes(status)) {
-      console.log(`[Webhook] ⚠️ Payment status not success: ${status} (ignoring)`);
+      logger.debugLog(`[Webhook] ⚠️ Payment status not success: ${status} (ignoring)`);
       clearTimeout(timeoutHandle);
       return res.sendStatus(200);
     }
 
-    console.log(`[Webhook] ✅ Payment status is successful: ${status}`);
+    logger.debugLog(`[Webhook] ✅ Payment status is successful: ${status}`);
 
     // 1️⃣ Verify payment (pass both reference and transactionId)
     const verification = await verifyPaychanguPayment(reference, transactionId);
@@ -676,7 +677,7 @@ const handleWebhook = async (req, res) => {
 
       // 3️⃣ Idempotency protection - if already PAID, return existing order
       if (order.paymentStatus === 'PAID') {
-        console.log(`[Webhook] ⚠️ Order ${orderId} already marked as PAID - idempotent return`);
+        logger.debugLog(`[Webhook] ⚠️ Order ${orderId} already marked as PAID - idempotent return`);
         return order;
       }
 
@@ -705,7 +706,7 @@ const handleWebhook = async (req, res) => {
           );
         }
         const stockSource = (product.overrideActive && product.overrideStock != null) ? 'override' : 'posStock';
-        console.log(`[Webhook] ✅ Stock validated for product ${item.productId}: effectiveStock=${effectiveStock} (${stockSource}) >= ${item.quantity}`);
+        logger.debugLog(`[Webhook] ✅ Stock validated for product ${item.productId}: effectiveStock=${effectiveStock} (${stockSource}) >= ${item.quantity}`);
       }
 
       // 6️⃣ Decrement ALL stock atomically
@@ -725,7 +726,7 @@ const handleWebhook = async (req, res) => {
           select: { id: true, stock: true, overrideActive: true, overrideStock: true, price: true }
         });
         updatedProducts.push(updated);
-        console.log(`[Webhook] 📦 Stock decremented for product ${item.productId}: posStock=${updated.stock}${
+        logger.debugLog(`[Webhook] 📦 Stock decremented for product ${item.productId}: posStock=${updated.stock}${
           updated.overrideActive ? `, overrideStock=${updated.overrideStock}` : ''
         }`);
       }
@@ -744,17 +745,17 @@ const handleWebhook = async (req, res) => {
         }
       });
 
-      console.log(`[Webhook] ✅ Atomic transaction completed: Order ${orderId} PAID, ${updatedProducts.length} products decremented`);
+      logger.debugLog(`[Webhook] ✅ Atomic transaction completed: Order ${orderId} PAID, ${updatedProducts.length} products decremented`);
       return updatedOrder;
     });
 
-    console.log('[BACKEND PAYMENT FLOW] payment confirmed:', {
+    logger.debugLog('[BACKEND PAYMENT FLOW] payment confirmed:', {
       orderId: result.id,
       reference,
       paymentStatus: result.paymentStatus,
     });
 
-    console.log('[BACKEND ORDER FLOW] order finalized:', {
+    logger.debugLog('[BACKEND ORDER FLOW] order finalized:', {
       orderId: result.id,
       status: result.status,
       totalItems: (result.items || []).length,
@@ -764,11 +765,11 @@ const handleWebhook = async (req, res) => {
       const writeInvoicePayload = await buildWriteInvoicePayload(result, reference);
 
       if (!writeInvoicePayload) {
-        console.log('[BACKEND POS WRITE SKIP] no POS-linked items, WRITE_INVOICE not queued:', {
+        logger.debugLog('[BACKEND POS WRITE SKIP] no POS-linked items, WRITE_INVOICE not queued:', {
           orderId: result.id,
         });
       } else {
-        console.log('[POS COMMAND QUEUE] enqueue WRITE_INVOICE start:', {
+        logger.debugLog('[POS COMMAND QUEUE] enqueue WRITE_INVOICE start:', {
           orderId: result.id,
           reference,
           itemCount: writeInvoicePayload.items.length,
@@ -786,7 +787,7 @@ const handleWebhook = async (req, res) => {
           }
         );
 
-        console.log('[POS COMMAND QUEUE] WRITE_INVOICE queued:', {
+        logger.debugLog('[POS COMMAND QUEUE] WRITE_INVOICE queued:', {
           commandId: queuedWriteInvoice.id,
           orderId: result.id,
           itemCount: writeInvoicePayload.items.length,
@@ -827,13 +828,13 @@ const handleWebhook = async (req, res) => {
       amount: result.total,
       timestamp: new Date()
     });
-    console.log(`[Webhook] ✅ Webhook event cached for faster polling`);
+    logger.debugLog(`[Webhook] ✅ Webhook event cached for faster polling`);
 
     // Emit real-time socket events AFTER transaction commits
     try {
       // Emit new order to admins
       emitNewOrder(result);
-      console.log(`[Webhook] ✅ New order emitted to admins`);
+      logger.debugLog(`[Webhook] ✅ New order emitted to admins`);
 
       // Emit real-time stock updates to all clients
       const updatedProducts = result.items.map(item => ({
@@ -842,9 +843,9 @@ const handleWebhook = async (req, res) => {
         price: item.product.price
       }));
       emitMultipleStockUpdates(updatedProducts);
-      console.log(`[Webhook] 📊 Stock updates emitted for ${updatedProducts.length} products`);
+      logger.debugLog(`[Webhook] 📊 Stock updates emitted for ${updatedProducts.length} products`);
     } catch (socketErr) {
-      console.warn('[Webhook] Could not emit socket events:', socketErr.message);
+      logger.warnLog('[Webhook] Could not emit socket events:', socketErr.message);
     }
 
     // Create admin notifications
@@ -855,7 +856,7 @@ const handleWebhook = async (req, res) => {
     // Return 200 immediately to Paychangu - don't wait for emails
     res.sendStatus(200);
     clearTimeout(timeoutHandle);
-    console.log(`[Webhook] ✅ Response sent to Paychangu (200 OK)`);
+    logger.debugLog(`[Webhook] ✅ Response sent to Paychangu (200 OK)`);
 
     // Send emails asynchronously in background (don't block the response)
     setImmediate(async () => {
@@ -897,7 +898,7 @@ const handleWebhook = async (req, res) => {
           }
         );
 
-        console.log(`[Email] ✅ Background: Order and payment confirmation emails sent to ${result.user.email}`);
+        logger.debugLog(`[Email] ✅ Background: Order and payment confirmation emails sent to ${result.user.email}`);
       } catch (emailErr) {
         console.error(`[Email] ❌ Background: Failed to send emails for order ${result.id}:`, emailErr.message);
       }
@@ -920,7 +921,7 @@ const handleWebhook = async (req, res) => {
       });
 
       if (order && (txErr.message.includes('Insufficient stock') || txErr.message.includes('Products'))) {
-        console.log(`[Webhook] 💰 Processing refund for order ${order.id}...`);
+        logger.debugLog(`[Webhook] 💰 Processing refund for order ${order.id}...`);
         
         // Mark order as REFUND_PENDING for manual processing
         await prisma.order.update({
@@ -932,13 +933,13 @@ const handleWebhook = async (req, res) => {
           }
         });
 
-        console.log(`[Webhook] ⚠️ Order ${order.id} marked as REFUND_PENDING`);
-        console.log(`[Alert] 🚨 MANUAL REFUND REQUIRED FOR ORDER ${order.id}`);
-        console.log(`[Alert] Customer: ${order.user.email}`);
-        console.log(`[Alert] Amount: ${order.total} MWK`);
-        console.log(`[Alert] Reason: ${txErr.message}`);
-        console.log(`[Alert] Transaction ID: ${req.body.reference || 'unknown'}`);
-        console.log(`[Alert] Action: Process refund via Paychangu dashboard or use Mobile Money Payout API`);
+        logger.debugLog(`[Webhook] ⚠️ Order ${order.id} marked as REFUND_PENDING`);
+        logger.debugLog(`[Alert] 🚨 MANUAL REFUND REQUIRED FOR ORDER ${order.id}`);
+        logger.debugLog(`[Alert] Customer: ${order.user.email}`);
+        logger.debugLog(`[Alert] Amount: ${order.total} MWK`);
+        logger.debugLog(`[Alert] Reason: ${txErr.message}`);
+        logger.debugLog(`[Alert] Transaction ID: ${req.body.reference || 'unknown'}`);
+        logger.debugLog(`[Alert] Action: Process refund via Paychangu dashboard or use Mobile Money Payout API`);
         
         // Emit refund alert event to admin room (real-time notification)
         try {
@@ -954,7 +955,7 @@ const handleWebhook = async (req, res) => {
               timestamp: new Date(),
               message: `🚨 REFUND REQUIRED - Order #${order.id} (MWK ${order.total}) - ${txErr.message}`
             });
-            console.log(`[Socket.io] Refund alert emitted to admin_room for order ${order.id}`);
+            logger.debugLog(`[Socket.io] Refund alert emitted to admin_room for order ${order.id}`);
           }
         } catch (socketErr) {
           console.error(`[Socket] Failed to emit refund alert:`, socketErr.message);
@@ -964,7 +965,7 @@ const handleWebhook = async (req, res) => {
         setImmediate(async () => {
           try {
             await notifyRefundRequired(order, txErr.message);
-            console.log(`[Alert] ✅ Admin refund notification sent`);
+            logger.debugLog(`[Alert] ✅ Admin refund notification sent`);
           } catch (msgErr) {
             console.error(`[Alert] Failed to create admin message:`, msgErr.message);
           }
@@ -985,13 +986,13 @@ const handleWebhook = async (req, res) => {
                 status: 'pending_processing'
               }
             );
-            console.log(`[Email] ✅ Background: Refund notification sent to ${order.user.email}`);
+            logger.debugLog(`[Email] ✅ Background: Refund notification sent to ${order.user.email}`);
           } catch (emailErr) {
             console.error(`[Email] ❌ Failed to send refund email:`, emailErr.message);
           }
         });
       } else {
-        console.warn('[Webhook] Not processing refund - order not found or error type not refundable');
+        logger.warnLog('[Webhook] Not processing refund - order not found or error type not refundable');
       }
     } catch (refundErr) {
       console.error('[Webhook] 🚨 Error in refund workflow:', refundErr.message);
@@ -1006,7 +1007,7 @@ const handleWebhook = async (req, res) => {
               notes: `Refund workflow error: ${refundErr.message}`
             }
           });
-          console.log(`[Webhook] ⚠️ Order ${orderId} marked as REFUND_PENDING for manual review`);
+          logger.debugLog(`[Webhook] ⚠️ Order ${orderId} marked as REFUND_PENDING for manual review`);
         } catch (updateErr) {
           console.error(`[Webhook] ⚠️ Could not mark order as REFUND_PENDING: ${updateErr.message}`);
         }

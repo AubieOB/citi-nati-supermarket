@@ -43,7 +43,7 @@ async function testMailConfig(testEmail) {
 
     const config = mailConfig.getMailConfig();
     
-    logger.info('Mail config test started', { provider: config.provider, testEmail });
+    logger.infoLog('Mail config test started', { provider: config.provider, testEmail });
 
     // Get the provider and send test email
     const provider = mailProvider.getMailProvider();
@@ -82,7 +82,7 @@ async function testMailConfig(testEmail) {
       html: testContent,
     });
 
-    logger.info('Mail config test succeeded', { 
+    logger.infoLog('Mail config test succeeded', { 
       provider: config.provider, 
       testEmail,
       messageId: result.messageId 
@@ -101,7 +101,7 @@ async function testMailConfig(testEmail) {
       },
     };
   } catch (err) {
-    logger.error('Mail config test failed', {
+    logger.errorLog('Mail config test failed', {
       provider: mailConfig.getMailConfig().provider,
       error: err.message || err.code,
       testEmail,

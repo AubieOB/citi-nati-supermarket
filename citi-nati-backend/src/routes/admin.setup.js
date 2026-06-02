@@ -72,7 +72,7 @@ router.get('/create-admin', async (req, res) => {
       }
     });
 
-    logger.warn('[SETUP] Hardcoded admin account created', { email: adminUser.email });
+    logger.warnLog('[SETUP] Hardcoded admin account created', { email: adminUser.email });
 
     return res.status(201).json({
       success: true,
@@ -86,7 +86,7 @@ router.get('/create-admin', async (req, res) => {
     });
 
   } catch (err) {
-    logger.error('[SETUP] Error', err);
+    logger.errorLog('[SETUP] Error', err);
     
     if (err.code === 'P2002') {
       return res.status(400).json({

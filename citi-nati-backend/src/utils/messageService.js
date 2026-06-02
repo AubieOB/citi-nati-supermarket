@@ -1,4 +1,5 @@
 const { createMessage } = require('../controllers/admin-messages.controller.js');
+const logger = require('./logger');
 const { enrichProductStock, DEFAULT_LOW_STOCK_THRESHOLD } = require('./stockResolver');
 
 const DEFAULT_SYSTEM_ALERT_RECURRENCE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -23,7 +24,7 @@ const notifyNewUserRegistration = async (user) => {
       `User "${user.name}" (${user.email}) has registered successfully.`
     );
   } catch (error) {
-    console.error('[MESSAGE SERVICE] Error notifying new user:', error);
+    logger.errorLog('[MESSAGE SERVICE] Error notifying new user:', error);
   }
 };
 
@@ -47,7 +48,7 @@ const notifyPaymentSuccess = async (order, paymentDetails) => {
       }
     );
   } catch (error) {
-    console.error('[MESSAGE SERVICE] Error notifying payment success:', error);
+    logger.errorLog('[MESSAGE SERVICE] Error notifying payment success:', error);
   }
 };
 
@@ -70,7 +71,7 @@ const notifyOrderPlaced = async (order, itemCount) => {
       }
     );
   } catch (error) {
-    console.error('[MESSAGE SERVICE] Error notifying order placed:', error);
+    logger.errorLog('[MESSAGE SERVICE] Error notifying order placed:', error);
   }
 };
 
@@ -98,7 +99,7 @@ const notifyDriverAssigned = async (order, driver) => {
       }
     );
   } catch (error) {
-    console.error('[MESSAGE SERVICE] Error notifying driver assigned:', error);
+    logger.errorLog('[MESSAGE SERVICE] Error notifying driver assigned:', error);
   }
 };
 
@@ -119,7 +120,7 @@ const notifyOrderCompleted = async (order) => {
       }
     );
   } catch (error) {
-    console.error('[MESSAGE SERVICE] Error notifying order completed:', error);
+    logger.errorLog('[MESSAGE SERVICE] Error notifying order completed:', error);
   }
 };
 
@@ -142,7 +143,7 @@ const notifyPaymentFailed = async (order, reason) => {
       }
     );
   } catch (error) {
-    console.error('[MESSAGE SERVICE] Error notifying payment failed:', error);
+    logger.errorLog('[MESSAGE SERVICE] Error notifying payment failed:', error);
   }
 };
 
@@ -157,7 +158,7 @@ const createSystemAlert = async (title, message, options = {}) => {
       ...options,
     });
   } catch (error) {
-    console.error('[MESSAGE SERVICE] Error creating system alert:', error);
+    logger.errorLog('[MESSAGE SERVICE] Error creating system alert:', error);
   }
 };
 
@@ -217,7 +218,7 @@ const notifyLowStock = async (product) => {
       );
     }
   } catch (error) {
-    console.error('[MESSAGE SERVICE] Error notifying low stock:', error);
+      logger.errorLog('[MESSAGE SERVICE] Error notifying low stock:', error);
   }
 };
 
@@ -246,7 +247,7 @@ const notifyRefundRequired = async (order, reason) => {
       }
     );
   } catch (error) {
-    console.error('[MESSAGE SERVICE] Error notifying refund required:', error);
+      logger.errorLog('[MESSAGE SERVICE] Error notifying refund required:', error);
   }
 };
 
@@ -276,7 +277,7 @@ const notifySupportTicketCreated = async (ticket) => {
       }
     );
   } catch (error) {
-    console.error('[MESSAGE SERVICE] Error notifying support ticket created:', error);
+      logger.errorLog('[MESSAGE SERVICE] Error notifying support ticket created:', error);
   }
 };
 

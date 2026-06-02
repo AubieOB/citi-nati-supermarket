@@ -9,6 +9,8 @@ const dataSnapshotService = require('./dataSnapshot.service');
 const { readWorkbookFromBuffer, getSheetRows } = require('./parsers/commonWorkbook.utils');
 const prisma = new PrismaClient();
 
+const logger = require('../../utils/logger');
+
 const MAX_CELL_CHARS = 30000;
 const MAX_EXCEL_CELL_TEXT = 32767;
 const PAYROLL_JSON_SHEET = '__PAYROLL_SNAPSHOT_JSON';
@@ -50,14 +52,14 @@ function memorySnapshot() {
 }
 
 function logExportProgress(logLabel, message, extra = {}) {
-  console.log(`[FULL-WORKBOOK] ${logLabel} ${message}`, {
+  logger.debugLog(`[FULL-WORKBOOK] ${logLabel} ${message}`, {
     ...extra,
     memory: memorySnapshot(),
   });
 }
 
 function logImportProgress(message, extra = {}) {
-  console.log('[FULL-WORKBOOK][IMPORT]', {
+  logger.debugLog('[FULL-WORKBOOK][IMPORT]', {
     message,
     ...extra,
     memory: memorySnapshot(),

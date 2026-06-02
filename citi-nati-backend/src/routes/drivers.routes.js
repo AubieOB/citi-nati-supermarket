@@ -8,6 +8,7 @@ const { verifyDriver } = require('../middleware/driver.middleware');
 
 const router = express.Router();
 const prisma = new PrismaClient();
+const logger = require('../utils/logger');
 
 // GET /api/drivers/security-key/status - Check if current driver account has a security key (DRIVER only)
 router.get('/security-key/status', verifyTokenMiddleware, verifyDriver, async (req, res) => {
@@ -22,7 +23,7 @@ router.get('/security-key/status', verifyTokenMiddleware, verifyDriver, async (r
 			hasSecurityKey: Boolean(driverUser?.driverSecurityKeyHash),
 		});
 	} catch (err) {
-		console.error('[DRIVER SECURITY] Status check failed:', err.message);
+		logger.errorLog('[DRIVER SECURITY] Status check failed:', { message: err.message });
 		return res.status(500).json({ success: false, error: 'Failed to check driver security key status' });
 	}
 });
@@ -52,7 +53,7 @@ router.post('/security-key/verify', verifyTokenMiddleware, verifyDriver, async (
 
 		return res.json({ success: true, verified: true });
 	} catch (err) {
-		console.error('[DRIVER SECURITY] Verification failed:', err.message);
+		logger.errorLog('[DRIVER SECURITY] Verification failed:', { message: err.message });
 		return res.status(500).json({ success: false, error: 'Failed to verify driver security key' });
 	}
 });

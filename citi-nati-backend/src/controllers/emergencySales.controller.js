@@ -14,6 +14,7 @@ const {
 } = require('../utils/operationalScope');
 
 const prisma = new PrismaClient();
+const logger = require('../utils/logger');
 const EMERGENCY_SALE_MAX_RETRIES = Number.parseInt(process.env.EMERGENCY_SALE_MAX_RETRIES || '10', 10);
 
 const SYNC_STATUS = {
@@ -135,7 +136,7 @@ function invalidateLookupCacheForLocation(locationCode, branchCode = null, reaso
   }
 
   if (deleted > 0) {
-    console.log('[EMERGENCY SALES][LOOKUP CACHE][INVALIDATE]', {
+    logger.debugLog('[EMERGENCY SALES][LOOKUP CACHE][INVALIDATE]', {
       locationCode,
       reason,
       deletedEntries: deleted,
@@ -178,7 +179,7 @@ async function readLookupCache(locationCode, branchCode, query) {
   const changedSinceCache = await hasLocationLookupStockChangedSince(locationCode, entry.cachedAt);
   if (changedSinceCache) {
     emergencyLookupCache.delete(key);
-    console.log('[EMERGENCY SALES][LOOKUP CACHE][REVALIDATE]', {
+    logger.debugLog('[EMERGENCY SALES][LOOKUP CACHE][REVALIDATE]', {
       locationCode,
       query,
       action: 'evicted_after_stock_change',
@@ -329,7 +330,7 @@ async function resolveLocationScopedProductCodes(locationCode) {
 
   const isZombaScope = scopeCodes.some((code) => CORE_ZOMBA_LOCATION_CODES.includes(code));
   if (isZombaScope) {
-    console.log('[EMERGENCY SALES][SCOPE][ZOMBA] code-source diagnostics', {
+    logger.debugLog('[EMERGENCY SALES][SCOPE][ZOMBA] code-source diagnostics', {
       scopeCodes,
       expiryDistinctCount: expiryRows.length,
       latestCostDistinctCount: costCodes.length,
@@ -369,7 +370,7 @@ async function resolveLocationScopedProductCodes(locationCode) {
       .map((row) => String(row.sourceCode || '').trim())
       .filter(Boolean)
       .forEach((code) => scopedCodes.add(code));
-    console.log('[EMERGENCY SALES][ZOMBA_SCOPE][FALLBACK] fell back to Product table branchCode=ZOMBA + locationCodes', {
+    logger.debugLog('[EMERGENCY SALES][ZOMBA_SCOPE][FALLBACK] fell back to Product table branchCode=ZOMBA + locationCodes', {
       scopeCodes,
       fallbackCodeCount: scopedCodes.size,
     });
@@ -679,29 +680,29 @@ async function lookupEmergencyProducts(req, res) {
 
     const cachedProducts = bypassCache ? null : await readLookupCache(locationCode, branchCode, query);
     if (cachedProducts) {
-      console.log('[EMERGENCY SALES][LOOKUP] cache-hit', {
-        selectedLocation: req.query.locationCode || req.query.branchCode || '(none)',
-        resolvedStockLocation: locationCode,
-        locationCode,
-        query,
-        stockSource: cachedProducts[0]?.stockSource || 'LocationSpecificPersistedProductStock',
-        sampleProductCode: cachedProducts[0]?.sourceCode || cachedProducts[0]?.productCode || null,
-        sampleStock: cachedProducts[0] ? Number(cachedProducts[0].stock || 0) : null,
-        resultCount: cachedProducts.length,
-        durationMs: Date.now() - startedAt,
-      });
+        logger.debugLog('[EMERGENCY SALES][LOOKUP] cache-hit', {
+          selectedLocation: req.query.locationCode || req.query.branchCode || '(none)',
+          resolvedStockLocation: locationCode,
+          locationCode,
+          query,
+          stockSource: cachedProducts[0]?.stockSource || 'LocationSpecificPersistedProductStock',
+          sampleProductCode: cachedProducts[0]?.sourceCode || cachedProducts[0]?.productCode || null,
+          sampleStock: cachedProducts[0] ? Number(cachedProducts[0].stock || 0) : null,
+          resultCount: cachedProducts.length,
+          durationMs: Date.now() - startedAt,
+        });
       return res.status(200).json({ success: true, products: cachedProducts });
     }
 
-    console.log('[PRODUCT QUERY]', {
-      view: 'Emergency sale product search',
-      uiLocation: req.query.locationCode || req.query.branchCode || '(none)',
-      selectedLocation: locationCode,
-      resolvedStockLocation: locationCode,
-      branchCode,
-      locationCode,
-      querySource: 'LocationSpecificPersistedProductStock',
-    });
+      logger.debugLog('[PRODUCT QUERY]', {
+        view: 'Emergency sale product search',
+        uiLocation: req.query.locationCode || req.query.branchCode || '(none)',
+        selectedLocation: locationCode,
+        resolvedStockLocation: locationCode,
+        branchCode,
+        locationCode,
+        querySource: 'LocationSpecificPersistedProductStock',
+      });
 
    const baseWhere = {
       enabled: true,
@@ -747,7 +748,7 @@ async function lookupEmergencyProducts(req, res) {
       ],
     });
 
-    console.log('[PRODUCT RESULT COUNT]', products.length);
+    logger.debugLog('[PRODUCT RESULT COUNT]', products.length);
 
     const resolvedLocationStockBySourceCode = await resolveLocationSpecificStockBySourceCode(
       prisma,
@@ -797,14 +798,28 @@ async function lookupEmergencyProducts(req, res) {
 
     if (isZombaLocationCode(locationCode) && safeProducts.length > 0) {
       const sample = safeProducts[0];
-      console.log(`[ZOMBA STOCK][EMERGENCY_LOOKUP] selectedLocation=${req.query.locationCode || req.query.branchCode || '(none)'} resolvedStockLocation=${locationCode} querySource=${sample.stockSource || 'LocationSpecificPersistedProductStock'} product=${sample.sourceCode || sample.productCode || 'UNKNOWN'} stock=${Number(sample.stock || 0)} cache=miss`);
+      logger.debugLog('[ZOMBA STOCK][EMERGENCY_LOOKUP]', {
+        selectedLocation: req.query.locationCode || req.query.branchCode || '(none)',
+        resolvedStockLocation: locationCode,
+        querySource: sample.stockSource || 'LocationSpecificPersistedProductStock',
+        product: sample.sourceCode || sample.productCode || 'UNKNOWN',
+        stock: Number(sample.stock || 0),
+        cache: 'miss',
+      });
       const verifyProduct = safeProducts.find((row) => String(row.sourceCode || row.productCode || '').trim() === '9501100002174');
       if (verifyProduct) {
-        console.log(`[ZOMBA STOCK][VERIFY][EMERGENCY_LOOKUP] selectedLocation=${req.query.locationCode || req.query.branchCode || '(none)'} resolvedStockLocation=${locationCode} querySource=${verifyProduct.stockSource || 'LocationSpecificPersistedProductStock'} product=9501100002174 stock=${Number(verifyProduct.stock || 0)} cache=miss`);
+        logger.debugLog('[ZOMBA STOCK][VERIFY][EMERGENCY_LOOKUP]', {
+          selectedLocation: req.query.locationCode || req.query.branchCode || '(none)',
+          resolvedStockLocation: locationCode,
+          querySource: verifyProduct.stockSource || 'LocationSpecificPersistedProductStock',
+          product: '9501100002174',
+          stock: Number(verifyProduct.stock || 0),
+          cache: 'miss',
+        });
       }
     }
 
-    console.log('[EMERGENCY SALES][LOOKUP] performance', {
+    logger.debugLog('[EMERGENCY SALES][LOOKUP] performance', {
       locationCode,
       mode: 'DIRECT_BRANCH_LOCATION_PATH',
       query,
@@ -918,7 +933,7 @@ async function createEmergencySale(req, res) {
           const found = productMap.get(productId);
           const masterExists = !!found;
           const locationPriceExists = masterExists && Number(found.price || 0) > 0;
-          console.log(
+          logger.debugLog(
             `[LOCATION AVAILABILITY] product=${found?.sourceCode || productId} location=${posLocationCode}` +
             ` masterExists=${masterExists} locationPriceExists=${locationPriceExists}` +
             ` availability=${locationPriceExists}` +
@@ -1107,7 +1122,7 @@ async function createEmergencySale(req, res) {
       try {
         await notifyLowStock(product);
       } catch (notifyErr) {
-        console.warn('[EMERGENCY SALES] low stock notification failed:', notifyErr.message);
+        logger.warnLog('[EMERGENCY SALES] low stock notification failed:', { message: notifyErr.message });
       }
     }
 
@@ -1116,7 +1131,7 @@ async function createEmergencySale(req, res) {
 
     invalidateLookupCacheForLocation(locationCode, branchCode, 'emergency_sale_stock_update');
 
-    console.log('[EMERGENCY SALES][CREATE] created sale', {
+    logger.productionSummaryLog('[EMERGENCY SALES][CREATE] created sale', {
       saleRef: formattedSale.sale_ref,
       locationCode,
       posLocationCode,
@@ -1154,14 +1169,14 @@ async function createEmergencySale(req, res) {
       pos_write_payload: posWritePayload,
     });
   } catch (error) {
-    console.error('[EMERGENCY SALES] create failed:', error.message);
+    logger.errorLog('[EMERGENCY SALES] create failed:', { message: error.message });
     return res.status(400).json({ success: false, error: error.message || 'Failed to create emergency sale' });
   }
 }
 
 async function listEmergencySales(req, res) {
   try {
-    console.log('[EMERGENCY SALES][LIST] Request params:', {
+    logger.debugLog('[EMERGENCY SALES][LIST] Request params:', {
       branchCode: req.query.branchCode,
       locationCode: req.query.locationCode,
       status: req.query.status,
@@ -1185,7 +1200,7 @@ async function listEmergencySales(req, res) {
     const requesterRole = String(req.user?.role || '').trim().toLowerCase();
     const requesterUserId = String(req.user?.userId || '').trim();
 
-    console.log('[EMERGENCY SALES][LIST] Normalized params:', {
+    logger.debugLog('[EMERGENCY SALES][LIST] Normalized params:', {
       locationCode,
       branchCode,
       status,
@@ -1276,12 +1291,12 @@ async function listEmergencySales(req, res) {
       if (locationScopeFilters.length > 0) {
         andClauses.push({ OR: locationScopeFilters });
       }
-      console.log('[EMERGENCY SALES][LIST] Location scope filters:', locationScopeFilters);
+      logger.debugLog('[EMERGENCY SALES][LIST] Location scope filters:', locationScopeFilters);
     }
 
     const where = andClauses.length > 0 ? { AND: andClauses } : {};
 
-    console.log('[EMERGENCY SALES][LIST] Final where clause:', JSON.stringify(where, null, 2));
+    logger.debugLog('[EMERGENCY SALES][LIST] Final where clause:', JSON.stringify(where, null, 2));
 
     const [total, sales] = await Promise.all([
       prisma.emergencySale.count({ where }),
@@ -1323,7 +1338,7 @@ async function listEmergencySales(req, res) {
       summary,
     });
   } catch (error) {
-    console.error('[EMERGENCY SALES][LIST] Error:', {
+    logger.errorLog('[EMERGENCY SALES][LIST] Error:', {
       message: error.message,
       stack: error.stack,
       branchCode: req.query?.branchCode,
@@ -1356,7 +1371,7 @@ async function getEmergencySaleById(req, res) {
     const [resolvedSale] = await resolveCashierNamesForSales([sale]);
     return res.status(200).json({ success: true, sale: formatEmergencySale(resolvedSale || sale) });
   } catch (error) {
-    console.error('[EMERGENCY SALES] get by id failed:', error.message);
+    logger.errorLog('[EMERGENCY SALES] get by id failed:', { message: error.message });
     return res.status(500).json({ success: false, error: 'Failed to fetch emergency sale' });
   }
 }
@@ -1388,7 +1403,7 @@ async function retryEmergencySaleSync(req, res) {
 
     return res.status(200).json({ success: true, sale: formatEmergencySale(updated) });
   } catch (error) {
-    console.error('[EMERGENCY SALES] retry failed:', error.message);
+    logger.errorLog('[EMERGENCY SALES] retry failed:', { message: error.message });
     return res.status(500).json({ success: false, error: 'Failed to retry emergency sale sync' });
   }
 }
@@ -1472,7 +1487,7 @@ async function getPendingEmergencySalesForPosSync(req, res) {
       });
     }
 
-    console.log('[EMERGENCY SALES][POLL] scope', {
+    logger.debugLog('[EMERGENCY SALES][POLL] scope', {
       agentBranchCode: branchCode,
       locationCodes,
       claimedCount: sales.length,
@@ -1490,7 +1505,7 @@ async function getPendingEmergencySalesForPosSync(req, res) {
       })),
     });
   } catch (error) {
-    console.error('[EMERGENCY SALES] pending sync fetch failed:', error.message);
+    logger.errorLog('[EMERGENCY SALES] pending sync fetch failed:', { message: error.message });
     return res.status(500).json({ success: false, error: 'Failed to fetch pending emergency sales' });
   }
 }
@@ -1578,7 +1593,7 @@ const agentBranchCode = normalizeBranchCode(req.headers['x-branch-code'] || req.
       pos_invoice_no: updated.posInvoiceNo,
     });
   } catch (error) {
-    console.error('[EMERGENCY SALES] ack synced failed:', error.message);
+    logger.errorLog('[EMERGENCY SALES] ack synced failed:', { message: error.message });
     return res.status(500).json({ success: false, error: 'Failed to acknowledge synced emergency sale' });
   }
 }
@@ -1657,7 +1672,7 @@ const agentBranchCode = normalizeBranchCode(req.headers['x-branch-code'] || req.
       retry_count: updated.retryCount,
     });
   } catch (error) {
-    console.error('[EMERGENCY SALES] ack failed failed:', error.message);
+    logger.errorLog('[EMERGENCY SALES] ack failed failed:', { message: error.message });
     return res.status(500).json({ success: false, error: 'Failed to acknowledge failed emergency sale sync' });
   }
 }

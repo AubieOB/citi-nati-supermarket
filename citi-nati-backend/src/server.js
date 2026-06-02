@@ -6,6 +6,7 @@ const cookieParser = require('cookie-parser');
 const http = require('http');
 const { Server } = require('socket.io');
 const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 const fs = require('fs');
 const path = require('path');
 const authRoutes = require('./routes/auth.routes');
@@ -35,9 +36,15 @@ const { adminRateLimiter, posAgentRateLimiter } = require('./middleware/rateLimi
 const mailConfig = require('./config/mailConfig');
 const { startDataRetentionScheduler } = require('./services/dataRetention.service');
 const { ensureProductPerformanceIndexes } = require('./controllers/product.controller');
-const { getPublicPromotions } = require('./controllers/promotion.controller');
 
-const prisma = new PrismaClient();
+process.on('unhandledRejection', (reason) => {
+  logger.errorLog('[PROCESS][UNHANDLED_REJECTION]', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  logger.errorLog('[PROCESS][UNCAUGHT_EXCEPTION]', error);
+});
+const { getPublicPromotions } = require('./controllers/promotion.controller');
 
 const DEFAULT_ALLOWED_ORIGINS = [
   'https://www.citinati.com',
@@ -72,12 +79,12 @@ function createCorsOriginValidator(allowedOrigins, sourceName) {
 
     if (isAllowed) {
       if (requestOrigin) {
-        logger.info('[CORS] Origin allowed', { origin: requestOrigin, source: sourceName });
+        logger.debugLog('[CORS] Origin allowed', { origin: requestOrigin, source: sourceName });
       }
       return callback(null, true);
     }
 
-    logger.warn('[CORS] Rejected origin', { origin: requestOrigin, source: sourceName, allowedOrigins });
+    logger.warnLog('[CORS] Rejected origin', { origin: requestOrigin, source: sourceName, allowedOrigins });
     const error = new Error('Not allowed by CORS');
     error.status = 403;
     return callback(error);
@@ -91,7 +98,7 @@ async function connectPrismaWithRetry(options = {}) {
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       await prisma.$connect();
-      logger.info('Connected to the database via Prisma');
+      logger.productionSummaryLog('[DB INIT] Connected to the database via Prisma');
       return;
     } catch (error) {
       const message = String(error?.message || '');
@@ -109,7 +116,7 @@ async function connectPrismaWithRetry(options = {}) {
       }
 
       const delayMs = baseDelayMs * attempt;
-      logger.warn('[DB INIT] prisma connect failed, retrying', {
+      logger.warnLog('[DB INIT] prisma connect failed, retrying', {
         attempt,
         maxAttempts,
         delayMs,
@@ -133,7 +140,7 @@ async function start() {
     uploadDirs.forEach(dir => {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
-        logger.info('[STARTUP] Created upload directory', { dir });
+        logger.infoLog('[STARTUP] Created upload directory', { dir });
       }
     });
 
@@ -145,7 +152,7 @@ async function start() {
     try {
       await ensureProductPerformanceIndexes();
     } catch (error) {
-      logger.warn('[DB INIT] product index setup skipped', {
+      logger.warnLog('[DB INIT] product index setup skipped', {
         code: error?.code,
         message: String(error?.message || error),
       });
@@ -177,7 +184,7 @@ async function start() {
 
     // Socket.io connection handling
     io.on('connection', (socket) => {
-      console.log('[Socket] New client connected:', socket.id);
+      logger.debugLog('[Socket] New client connected:', socket.id);
 
       // Get user info from socket auth (passed during connection)
       const { userId, role } = socket.handshake.auth || {};
@@ -190,20 +197,20 @@ async function start() {
         // Join role-based rooms
         if (role === 'admin') {
           socket.join('admin_room');
-          console.log(`[Socket] ${socket.id} joined admin_room (from auth)`);
+          logger.debugLog(`[Socket] ${socket.id} joined admin_room (from auth)`);
         } else if (role === 'driver') {
           socket.join(`driver_${userId}`);
-          console.log(`[Socket] ${socket.id} joined driver_${userId} (from auth)`);
+          logger.debugLog(`[Socket] ${socket.id} joined driver_${userId} (from auth)`);
         } else if (role === 'user') {
           socket.join(`user_${userId}`);
-          console.log(`[Socket] ${socket.id} joined user_${userId} (from auth)`);
+          logger.debugLog(`[Socket] ${socket.id} joined user_${userId} (from auth)`);
         }
       }
 
       // Listen for identify event (for backward compatibility or real-time role assignment)
       socket.on('identify', async (data) => {
         const { userId, role, email } = data;
-        console.log(`[Socket] ${socket.id} identify event received:`, { userId, role, email });
+        logger.debugLog(`[Socket] ${socket.id} identify event received:`, { userId, role, email });
         
         if (userId && role) {
           socket.userId = userId;
@@ -213,7 +220,7 @@ async function start() {
             // Join role-based rooms
             if (role === 'admin') {
               socket.join('admin_room');
-              console.log(`[Socket] ${socket.id} joined admin_room (from identify)`);
+              logger.debugLog(`[Socket] ${socket.id} joined admin_room (from identify)`);
             } else if (role === 'driver') {
               // For drivers, look up their driver ID by email
               let driverId = userId;
@@ -226,25 +233,25 @@ async function start() {
                   });
                   if (driver) {
                     driverId = driver.id;
-                    console.log(`[Socket] Found driver record for ${email}: ${driverId}`);
+                    logger.debugLog(`[Socket] Found driver record for ${email}: ${driverId}`);
                   }
                 } catch (err) {
-                  console.log(`[Socket] Could not find driver by email: ${err.message}`);
+                  logger.debugLog(`[Socket] Could not find driver by email: ${err.message}`);
                 }
               }
               
               socket.driverId = driverId;
               socket.join(`driver_${driverId}`);
-              console.log(`[Socket] ${socket.id} joined driver_${driverId} (from identify)`);
+              logger.debugLog(`[Socket] ${socket.id} joined driver_${driverId} (from identify)`);
             } else if (role === 'user') {
               socket.join(`user_${userId}`);
-              console.log(`[Socket] ${socket.id} joined user_${userId} (from identify)`);
+              logger.debugLog(`[Socket] ${socket.id} joined user_${userId} (from identify)`);
             }
           } catch (err) {
-            console.error(`[Socket] Error in identify event:`, err);
+            logger.errorLog(`[Socket] Error in identify event:`, err);
           }
         } else {
-          console.log(`[Socket] Invalid identify data for ${socket.id}:`, { userId, role, email });
+          logger.debugLog(`[Socket] Invalid identify data for ${socket.id}:`, { userId, role, email });
         }
       });
 
@@ -254,7 +261,7 @@ async function start() {
           const userId = socket.userId;
           
           if (!userId) {
-            console.warn(`[Socket] Receipt request from unauthenticated socket ${socket.id}`);
+            logger.warnLog(`[Socket] Receipt request from unauthenticated socket ${socket.id}`);
             return callback({ error: 'Not authenticated' });
           }
 
@@ -281,7 +288,7 @@ async function start() {
             return callback({ error: 'Access denied' });
           }
 
-          console.log(`[Socket] Generating receipt for order ${orderId}`);
+          logger.debugLog(`[Socket] Generating receipt for order ${orderId}`);
           
           // Generate receipt PDF as base64
           const PDFDocument = require('pdfkit');
@@ -299,7 +306,7 @@ async function start() {
               filename: `receipt-${order.id}.pdf`
             });
             
-            console.log(`[Socket] Receipt sent for order ${orderId}`);
+            logger.debugLog(`[Socket] Receipt sent for order ${orderId}`);
           });
 
           // Build PDF content
@@ -362,13 +369,13 @@ async function start() {
 
           doc.end();
         } catch (err) {
-          console.error('[Socket] Error generating receipt:', err);
+          logger.errorLog('[Socket] Error generating receipt:', err);
           callback({ error: 'Failed to generate receipt' });
         }
       });
 
       socket.on('disconnect', () => {
-        console.log(`[Socket] ${socket.id} disconnected`);
+        logger.debugLog(`[Socket] ${socket.id} disconnected`);
       });
 
       // =====================================================
@@ -380,15 +387,13 @@ async function start() {
         try {
           const roomName = `ticket_${ticketId}`;
           socket.join(roomName);
-          console.log(`[Socket] ${socket.id} joined ${roomName}`);
-          
-          // Notify others in the room
+          logger.debugLog(`[Socket] ${socket.id} joined ${roomName}`);
           socket.to(roomName).emit('userJoined', {
             userId: socket.userId,
             role: socket.role
           });
         } catch (err) {
-          console.error(`[Socket] Error joining ticket room:`, err);
+          logger.errorLog(`[Socket] Error joining ticket room:`, err);
         }
       });
 
@@ -398,7 +403,7 @@ async function start() {
           const roomName = `ticket_${ticketId}`;
           socket.to(roomName).emit('ticketTyping', { userId });
         } catch (err) {
-          console.error(`[Socket] Error in ticketTyping:`, err);
+          logger.errorLog(`[Socket] Error in ticketTyping:`, err);
         }
       });
 
@@ -433,9 +438,9 @@ async function start() {
 
           // Broadcast to all users in that ticket room
           global.io.to(`ticket_${ticketId}`).emit('ticketMessage', reply);
-          console.log(`[Socket] New message in ticket_${ticketId}: ${message.substring(0, 50)}...`);
+          logger.debugLog(`[Socket] New message in ticket_${ticketId}: ${message.substring(0, 50)}...`);
         } catch (err) {
-          console.error(`[Socket] Error saving ticket message:`, err);
+          logger.errorLog(`[Socket] Error saving ticket message:`, err);
           socket.emit('ticketMessageError', { error: 'Failed to send message' });
         }
       });
@@ -445,9 +450,9 @@ async function start() {
         try {
           const roomName = `ticket_${ticketId}`;
           socket.leave(roomName);
-          console.log(`[Socket] ${socket.id} left ${roomName}`);
+          logger.debugLog(`[Socket] ${socket.id} left ${roomName}`);
         } catch (err) {
-          console.error(`[Socket] Error leaving ticket room:`, err);
+          logger.errorLog(`[Socket] Error leaving ticket room:`, err);
         }
       });
     });
@@ -482,11 +487,20 @@ async function start() {
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     };
     
-    logger.info('[CORS] Allowed origins configured', { allowedOrigins });
+    logger.productionSummaryLog('[STARTUP] CORS allowed origins configured', { allowedOrigins });
     app.use(cors(corsOptions));
     app.use('/uploads', express.static('uploads'));
 
-    // Health route
+    // Health route (unprotected)
+    app.get('/health', (req, res) => {
+      return res.json({
+        ok: true,
+        service: 'citi-nati-backend',
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString(),
+      });
+    });
+
     app.get('/api/health', (req, res) => {
       return res.json({ status: 'OK', bootstrap: 'enabled' });
     });
@@ -562,7 +576,7 @@ async function start() {
     // Ensure unknown API routes never return HTML to API clients
     app.use('/api', (req, res) => {
       const requestId = `api_404_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      console.warn('[API 404] Unknown API route hit', {
+      logger.warnLog('[API 404] Unknown API route hit', {
         requestId,
         method: req.method,
         path: req.originalUrl,
@@ -583,7 +597,7 @@ async function start() {
       }
 
       const requestId = `cors_block_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      logger.warn('[CORS] Express request blocked by CORS', {
+      logger.warnLog('[CORS] Express request blocked by CORS', {
         requestId,
         origin: req.headers.origin || null,
         path: req.originalUrl,
@@ -607,7 +621,7 @@ async function start() {
       }
 
       const requestId = `api_err_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      console.error('[API ERROR] Unhandled API exception', {
+      logger.errorLog('[API ERROR] Unhandled API exception', {
         requestId,
         method: req.method,
         path: req.originalUrl,
@@ -627,11 +641,10 @@ async function start() {
 
     const PORT = process.env.PORT || 5000;
     server.listen(PORT, () => {
-      console.log(`Server listening on port ${PORT}`);
+      logger.productionSummaryLog(`Server listening on port ${PORT}`);
     });
   } catch (err) {
-    console.error('Unable to start server');
-    console.error(err);
+    logger.errorLog('Unable to start server', { message: err && err.message ? err.message : String(err), stack: err && err.stack ? err.stack : null });
     process.exit(1);
   }
 }

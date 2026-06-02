@@ -1,5 +1,6 @@
 const { ingestReportingBatch, ingestLatestProductCosts, ingestPosStockIntakes } = require('../services/reportingSyncIngest.service');
 const { recordPosSyncEvent } = require('../services/posSyncMonitor.service');
+const logger = require('../utils/logger');
 
 function deriveAgentLocationCode(branchCode, payloadLocationCode) {
   const normalizedBranchCode = String(branchCode || '').trim().toUpperCase();
@@ -24,7 +25,7 @@ async function recordReportingMonitorEvent(payload = {}) {
   try {
     await recordPosSyncEvent(payload);
   } catch (eventErr) {
-    console.warn('[REPORTING SYNC] monitor event record failed:', eventErr.message);
+    logger.warnLog('[REPORTING SYNC] monitor event record failed:', { message: eventErr.message });
   }
 }
 
@@ -218,7 +219,7 @@ async function receiveReportingInvoices(req, res) {
     const validationErrors = validateReportingPayload(payload);
 
     if (validationErrors.length > 0) {
-      console.error('[REPORTING SYNC] Validation failed:', {
+      logger.warnLog('[REPORTING SYNC] Validation failed:', {
         syncSourceCode: payload.syncSourceCode,
         branchCode: payload.branchCode,
         errors: validationErrors,
@@ -235,7 +236,7 @@ async function receiveReportingInvoices(req, res) {
       return sum + details;
     }, 0);
 
-    console.log('[REPORTING SYNC] Received reporting batch', {
+    logger.debugLog('[REPORTING SYNC] Received reporting batch', {
       branchCode: payload.branchCode,
       branchName: payload.branchName,
       syncSourceCode: payload.syncSourceCode,
@@ -264,7 +265,7 @@ async function receiveReportingInvoices(req, res) {
       },
     });
 
-    console.log('[REPORTING SYNC] Batch persisted', {
+    logger.debugLog('[REPORTING SYNC] Batch persisted', {
       branchCode: payload.branchCode,
       syncSourceCode: payload.syncSourceCode,
       receivedInvoices: result.receivedInvoices,
@@ -286,7 +287,7 @@ async function receiveReportingInvoices(req, res) {
       syncSourceCode: result.syncSourceCode,
     });
   } catch (error) {
-    console.error('[REPORTING SYNC] Processing failed:', {
+    logger.errorLog('[REPORTING SYNC] Processing failed:', {
       message: error && error.message ? error.message : String(error),
       code: error && error.code ? error.code : null,
       statusCode: error && error.statusCode ? error.statusCode : null,
@@ -331,7 +332,7 @@ async function receiveLatestProductCosts(req, res) {
     const validationErrors = validateLatestProductCostsPayload(payload);
 
     if (validationErrors.length > 0) {
-      console.error('[REPORTING SYNC][LATEST COSTS] Validation failed:', {
+      logger.warnLog('[REPORTING SYNC][LATEST COSTS] Validation failed:', {
         syncSourceCode: payload.syncSourceCode,
         branchCode: payload.branchCode,
         errors: validationErrors,
@@ -343,7 +344,7 @@ async function receiveLatestProductCosts(req, res) {
       });
     }
 
-    console.log('[REPORTING SYNC][LATEST COSTS] Received latest product costs batch', {
+    logger.debugLog('[REPORTING SYNC][LATEST COSTS] Received latest product costs batch', {
       branchCode: payload.branchCode,
       branchName: payload.branchName,
       syncSourceCode: payload.syncSourceCode,
@@ -379,7 +380,7 @@ async function receiveLatestProductCosts(req, res) {
       syncSourceCode: result.syncSourceCode,
     });
   } catch (error) {
-    console.error('[REPORTING SYNC][LATEST COSTS] Processing failed:', error.message);
+    logger.errorLog('[REPORTING SYNC][LATEST COSTS] Processing failed:', { message: error.message });
 
     await recordReportingMonitorEvent({
       eventType: 'agent-reporting-latest-costs',
@@ -417,7 +418,7 @@ async function receivePosStockIntakes(req, res) {
     const validationErrors = validatePosStockIntakesPayload(payload);
 
     if (validationErrors.length > 0) {
-      console.error('[REPORTING SYNC][POS GRNS] Validation failed:', {
+      logger.warnLog('[REPORTING SYNC][POS GRNS] Validation failed:', {
         syncSourceCode: payload.syncSourceCode,
         branchCode: payload.branchCode,
         errors: validationErrors,
@@ -434,7 +435,7 @@ async function receivePosStockIntakes(req, res) {
       return sum + items;
     }, 0);
 
-    console.log('[REPORTING SYNC][POS GRNS] Received POS stock intakes batch', {
+    logger.debugLog('[REPORTING SYNC][POS GRNS] Received POS stock intakes batch', {
       branchCode: payload.branchCode,
       branchName: payload.branchName,
       syncSourceCode: payload.syncSourceCode,
@@ -463,7 +464,7 @@ async function receivePosStockIntakes(req, res) {
       },
     });
 
-    console.log('[REPORTING SYNC][POS GRNS] Batch persisted', {
+    logger.debugLog('[REPORTING SYNC][POS GRNS] Batch persisted', {
       branchCode: payload.branchCode,
       syncSourceCode: payload.syncSourceCode,
       receivedGrns: result.receivedGrns,
@@ -485,7 +486,7 @@ async function receivePosStockIntakes(req, res) {
       syncSourceCode: result.syncSourceCode,
     });
   } catch (error) {
-    console.error('[REPORTING SYNC][POS GRNS] Processing failed:', error.message);
+    logger.errorLog('[REPORTING SYNC][POS GRNS] Processing failed:', { message: error.message });
 
     await recordReportingMonitorEvent({
       eventType: 'agent-reporting-pos-grns',
