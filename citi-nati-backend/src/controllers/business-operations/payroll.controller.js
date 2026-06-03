@@ -1091,6 +1091,13 @@ async function importFullWorkbook(req, res) {
       return res.status(400).json({ success: false, error: 'Workbook file is required in field "workbook"' });
     }
 
+    console.info('[BO][FULL-WORKBOOK][IMPORT] request received', {
+      originalName: req.file.originalname || null,
+      mimeType: req.file.mimetype || null,
+      fileBytes: req.file.size || req.file.buffer.length,
+      heapUsedMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+    });
+
     const options = {
       upsert: req.body.upsert !== 'false' && req.body.upsert !== false,
       clearExisting: req.body.clearExisting === 'true' || req.body.clearExisting === true,
@@ -1120,9 +1127,23 @@ async function importFullWorkbook(req, res) {
       result,
     });
   } catch (err) {
-    console.error('[BO][PAYROLL] importFullWorkbook error:', err);
+    console.error('[BO][PAYROLL] importFullWorkbook error:', {
+      message: err?.message || String(err),
+      statusCode: err?.statusCode || null,
+      originalName: req.file?.originalname || null,
+      fileBytes: req.file?.size || req.file?.buffer?.length || null,
+      heapUsedMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+      stack: err?.stack || null,
+    });
     const statusCode = err?.statusCode || 500;
-    return res.status(statusCode).json({ success: false, error: err.message || 'Failed to import full workbook' });
+    return res.status(statusCode).json({
+      success: false,
+      error: err.message || 'Failed to import full workbook',
+      details: {
+        fileBytes: req.file?.size || req.file?.buffer?.length || null,
+        heapUsedMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+      },
+    });
   }
 }
 
