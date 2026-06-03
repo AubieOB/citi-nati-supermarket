@@ -4,6 +4,7 @@ const ExcelJS = require('exceljs');
 const { Readable } = require('stream');
 const { PassThrough } = require('stream');
 const { finished } = require('stream/promises');
+const v8 = require('v8');
 const { PrismaClient } = require('@prisma/client');
 const dataSnapshotService = require('./dataSnapshot.service');
 const { readWorkbookFromBuffer, getSheetRows } = require('./parsers/commonWorkbook.utils');
@@ -20,8 +21,8 @@ const MAX_ROWS_PER_SHEET = Math.max(1000, Number(process.env.FULL_WORKBOOK_MAX_R
 const MAX_ROWS_TOTAL = Math.max(5000, Number(process.env.FULL_WORKBOOK_MAX_ROWS_TOTAL || 700000));
 const MAX_SALES_RANGE_DAYS = Math.max(1, Number(process.env.FULL_WORKBOOK_MAX_SALES_RANGE_DAYS || 370));
 const MAX_IMPORT_WORKBOOK_FILE_BYTES = Math.max(1 * 1024 * 1024, Number(process.env.FULL_WORKBOOK_IMPORT_MAX_FILE_BYTES || 20 * 1024 * 1024));
-const MAX_IMPORT_HEAP_SOFT_MB = Math.max(128, Number(process.env.FULL_WORKBOOK_IMPORT_MAX_HEAP_MB || 220));
-const MAX_IMPORT_HEAP_HARD_MB = Math.max(MAX_IMPORT_HEAP_SOFT_MB + 10, Number(process.env.FULL_WORKBOOK_IMPORT_HARD_HEAP_MB || 245));
+const MIN_IMPORT_HEAP_FREE_MB = Math.max(64, Number(process.env.FULL_WORKBOOK_IMPORT_MIN_FREE_HEAP_MB || 96));
+const MAX_IMPORT_HEAP_USED_RATIO = Math.min(0.95, Math.max(0.5, Number(process.env.FULL_WORKBOOK_IMPORT_MAX_HEAP_USED_RATIO || 0.82)));
 const IMPORT_BATCH_SIZE = Math.max(25, Number(process.env.FULL_WORKBOOK_IMPORT_BATCH_SIZE || 100));
 const MAX_IMPORT_ROWS_PER_SHEET = Math.max(1000, Number(process.env.FULL_WORKBOOK_IMPORT_MAX_ROWS_PER_SHEET || 250000));
 const MAX_IMPORT_ROWS_TOTAL = Math.max(5000, Number(process.env.FULL_WORKBOOK_IMPORT_MAX_ROWS_TOTAL || 700000));
@@ -44,10 +45,13 @@ class ImportGuardError extends Error {
 
 function memorySnapshot() {
   const usage = process.memoryUsage();
+  const heapLimitMB = Math.round(v8.getHeapStatistics().heap_size_limit / 1024 / 1024);
   return {
     rssMB: Math.round(usage.rss / 1024 / 1024),
     heapUsedMB: Math.round(usage.heapUsed / 1024 / 1024),
     heapTotalMB: Math.round(usage.heapTotal / 1024 / 1024),
+    heapLimitMB,
+    heapFreeMB: Math.max(0, heapLimitMB - Math.round(usage.heapUsed / 1024 / 1024)),
   };
 }
 
@@ -170,36 +174,32 @@ function assertImportGuards(fileBuffer) {
     );
   }
 
-  const heapUsedMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
-  if (heapUsedMB >= MAX_IMPORT_HEAP_SOFT_MB) {
-    throw new ImportGuardError(
-      `Server memory is currently constrained (${heapUsedMB}MB heap in use). Retry shortly or reduce workbook size.`,
-      503,
-    );
-  }
+  assertImportHeapHeadroom('pre-import');
 }
 
-function assertImportHeapHeadroom() {
-  const beforeGcMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
-  if (beforeGcMB < MAX_IMPORT_HEAP_SOFT_MB) return;
+function assertImportHeapHeadroom(stage = 'import') {
+  const before = memorySnapshot();
+  const usedRatio = before.heapLimitMB > 0 ? before.heapUsedMB / before.heapLimitMB : 0;
+  if (before.heapFreeMB >= MIN_IMPORT_HEAP_FREE_MB && usedRatio < MAX_IMPORT_HEAP_USED_RATIO) return;
 
   maybeRunGc();
-  const afterGcMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+  const after = memorySnapshot();
+  const afterRatio = after.heapLimitMB > 0 ? after.heapUsedMB / after.heapLimitMB : 0;
 
-  if (afterGcMB >= MAX_IMPORT_HEAP_HARD_MB) {
+  if (after.heapFreeMB < MIN_IMPORT_HEAP_FREE_MB || afterRatio >= MAX_IMPORT_HEAP_USED_RATIO) {
     throw new ImportGuardError(
-      `Server memory is critically constrained (${afterGcMB}MB heap in use). Retry shortly or reduce workbook size.`,
+      `Server memory is constrained for workbook import (${after.heapUsedMB}MB heap in use, ${after.heapFreeMB}MB free). Retry shortly, reduce workbook scope, or restart the backend if memory does not recover.`,
       503,
     );
   }
 
-  if (afterGcMB >= MAX_IMPORT_HEAP_SOFT_MB) {
-    logImportProgress('continuing import under memory pressure', {
-      heapUsedMB: afterGcMB,
-      softLimitMB: MAX_IMPORT_HEAP_SOFT_MB,
-      hardLimitMB: MAX_IMPORT_HEAP_HARD_MB,
-    });
-  }
+  logImportProgress('continuing import after garbage collection', {
+    stage,
+    before,
+    after,
+    minFreeHeapMB: MIN_IMPORT_HEAP_FREE_MB,
+    maxHeapUsedRatio: MAX_IMPORT_HEAP_USED_RATIO,
+  });
 }
 
 async function streamModelSheet({
@@ -1529,6 +1529,15 @@ async function importWorkbookByStreamingTabularSheets(fileBuffer, options = {}) 
     expenseCategoryIdMap: new Map(),
     supplierIdMap: new Map(),
   };
+  const metrics = {
+    parser: 'exceljs-stream',
+    sheetsSeen: 0,
+    sheetsImported: 0,
+    totalRows: 0,
+    sheetRows: {},
+    startedMemory: memorySnapshot(),
+    completedMemory: null,
+  };
 
   // Use a single-chunk stream. Readable.from(buffer) yields per-byte chunks and can break XLSX parsing.
   const workbookReader = new ExcelJS.stream.xlsx.WorkbookReader(Readable.from([fileBuffer]), {
@@ -1545,11 +1554,13 @@ async function importWorkbookByStreamingTabularSheets(fileBuffer, options = {}) 
 
   for await (const worksheetReader of workbookReader) {
     if (worksheetReader.type !== 'worksheet') continue;
+    metrics.sheetsSeen += 1;
     const sheetTitle = safeWorksheetName(worksheetReader.name || '');
     const target = FULL_WORKBOOK_IMPORT_SHEET_MAP[sheetTitle];
     if (!target) {
       continue;
     }
+    metrics.sheetsImported += 1;
 
     let headers = null;
     let rowsInSheet = 0;
@@ -1587,6 +1598,8 @@ async function importWorkbookByStreamingTabularSheets(fileBuffer, options = {}) 
       sawAnyImportableRows = true;
       rowsInSheet += 1;
       totalRows += 1;
+      metrics.totalRows = totalRows;
+      metrics.sheetRows[sheetTitle] = rowsInSheet;
 
       if (rowsInSheet > MAX_IMPORT_ROWS_PER_SHEET) {
         throw new ImportGuardError(
@@ -1612,6 +1625,7 @@ async function importWorkbookByStreamingTabularSheets(fileBuffer, options = {}) 
       sheet: sheetTitle,
       rowsInSheet,
       importBatchSize: IMPORT_BATCH_SIZE,
+      totalRows,
     });
   }
 
@@ -1619,11 +1633,23 @@ async function importWorkbookByStreamingTabularSheets(fileBuffer, options = {}) 
     throw new ImportGuardError('Workbook was parsed but no importable rows were detected. Ensure this is a full workbook export and not a damaged file.', 400);
   }
 
+  metrics.completedMemory = memorySnapshot();
+  result.importMetrics = metrics;
+  logImportProgress('completed full workbook streaming import', metrics);
   return result;
 }
 
 async function importWorkbookByBufferedTabularSheets(fileBuffer, options = {}) {
   const result = emptyImportSummary();
+  const metrics = {
+    parser: 'xlsx-buffered-fallback',
+    sheetsSeen: 0,
+    sheetsImported: 0,
+    totalRows: 0,
+    sheetRows: {},
+    startedMemory: memorySnapshot(),
+    completedMemory: null,
+  };
   const importContext = {
     expenseCategoryIdMap: new Map(),
     supplierIdMap: new Map(),
@@ -1646,8 +1672,10 @@ async function importWorkbookByBufferedTabularSheets(fileBuffer, options = {}) {
 
   for (const [sheetTitle, target] of Object.entries(FULL_WORKBOOK_IMPORT_SHEET_MAP)) {
     const normalizedSheetName = safeWorksheetName(sheetTitle);
+    metrics.sheetsSeen += 1;
     const rows = getSheetRows(workbook, normalizedSheetName);
     if (!rows || rows.length < 2) continue;
+    metrics.sheetsImported += 1;
 
     const headers = (rows[0] || []).map((header) => String(normalizeReadCellValue(header) || '').trim());
     let rowsInSheet = 0;
@@ -1679,6 +1707,8 @@ async function importWorkbookByBufferedTabularSheets(fileBuffer, options = {}) {
       sawAnyImportableRows = true;
       rowsInSheet += 1;
       totalRows += 1;
+      metrics.totalRows = totalRows;
+      metrics.sheetRows[sheetTitle] = rowsInSheet;
 
       if (rowsInSheet > MAX_IMPORT_ROWS_PER_SHEET) {
         throw new ImportGuardError(
@@ -1704,6 +1734,7 @@ async function importWorkbookByBufferedTabularSheets(fileBuffer, options = {}) {
       sheet: sheetTitle,
       rowsInSheet,
       importBatchSize: IMPORT_BATCH_SIZE,
+      totalRows,
     });
 
     // Free processed sheet memory before moving to the next heavy sheet.
@@ -1720,6 +1751,9 @@ async function importWorkbookByBufferedTabularSheets(fileBuffer, options = {}) {
     throw new ImportGuardError('Workbook was parsed but no importable rows were detected. Ensure this is a full workbook export and not a damaged file.', 400);
   }
 
+  metrics.completedMemory = memorySnapshot();
+  result.importMetrics = metrics;
+  logImportProgress('completed full workbook buffered import fallback', metrics);
   return result;
 }
 
@@ -1877,17 +1911,35 @@ async function importFullWorkbook(fileBuffer, options = {}) {
 
   logImportProgress('loading workbook buffer for full import', {
     fileBytes: fileBuffer.length,
+    fileMB: Math.round((fileBuffer.length / 1024 / 1024) * 10) / 10,
     upsert: options.upsert !== false,
     clearExisting: options.clearExisting === true,
     locationId: options.locationId || null,
+    memoryBeforeImport: memorySnapshot(),
   });
 
   try {
-    return await importWorkbookByStreamingTabularSheets(fileBuffer, options);
+    const result = await importWorkbookByStreamingTabularSheets(fileBuffer, options);
+    logImportProgress('full workbook import finished', {
+      fileBytes: fileBuffer.length,
+      parser: result?.importMetrics?.parser || null,
+      sheetsImported: result?.importMetrics?.sheetsImported || 0,
+      totalRows: result?.importMetrics?.totalRows || 0,
+      memoryAfterImport: memorySnapshot(),
+    });
+    return result;
   } catch (error) {
     if (error instanceof ImportGuardError && error.statusCode === 400) {
       logImportProgress('streaming import detected no rows; retrying via buffered parser fallback');
-      return importWorkbookByBufferedTabularSheets(fileBuffer, options);
+      const fallbackResult = await importWorkbookByBufferedTabularSheets(fileBuffer, options);
+      logImportProgress('full workbook import fallback finished', {
+        fileBytes: fileBuffer.length,
+        parser: fallbackResult?.importMetrics?.parser || null,
+        sheetsImported: fallbackResult?.importMetrics?.sheetsImported || 0,
+        totalRows: fallbackResult?.importMetrics?.totalRows || 0,
+        memoryAfterImport: memorySnapshot(),
+      });
+      return fallbackResult;
     }
 
     const message = String(error?.message || '').toLowerCase();
