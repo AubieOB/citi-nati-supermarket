@@ -156,7 +156,7 @@ const PaymentSuccess = () => {
   }, [authLoading, user, navigate, reference]);
 
   return (
-    <div className="page" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div className="page payment-status-page" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <Container>
         <div style={{
           maxWidth: '500px',
@@ -353,7 +353,7 @@ const PaymentSuccess = () => {
 
               <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
                 <button
-                  onClick={() => navigate('/shop')}
+                onClick={() => navigate('/products')}
                   style={{
                     padding: '0.75rem 1.5rem',
                     backgroundColor: '#2D8659',

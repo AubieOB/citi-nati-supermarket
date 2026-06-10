@@ -4,7 +4,7 @@ import '../../styles/global.css';
 
 const Terms = () => {
   return (
-    <div className="page">
+    <div className="page public-info-page terms-page">
       <Container>
         <div style={{ marginTop: '2rem', marginBottom: '2rem' }}>
           <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>Terms & Conditions</h1>
@@ -97,7 +97,7 @@ const Terms = () => {
             <p style={{ marginTop: '1rem' }}>
               Email: info@citinati.com<br />
               Phone: (265) 888857188<br />
-              Address: Citi Nati Supermarket, PO Box 32334, Chichiri, Blantyre 3
+              Address: Citi Nati Supermarket, PO Box 32334, Chinyonga, Blantyre 3
             </p>
           </section>
         </div>

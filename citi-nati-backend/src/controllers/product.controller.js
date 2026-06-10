@@ -1445,6 +1445,177 @@ const getProducts = async (req, res) => {
   }
 };
 
+async function buildPublicStorefrontProductWhere(req) {
+  const requestedBranchCode = normalizeBranchCode(req.query.branchCode);
+  const requestedLocationCode = normalizeScopeCode(req.query.locationCode);
+  const normalizedLocationCode = requestedLocationCode || getStorefrontLocationCode();
+  const where = {
+    isActive: true,
+    enabled: true,
+    hideFromProductsPage: false,
+    price: { gt: 0 },
+  };
+
+  if (normalizedLocationCode) {
+    const derivedBranchCode = requestedBranchCode || 'BLANTYRE';
+
+    if (derivedBranchCode === 'ZOMBA') {
+      where.branchCode = 'ZOMBA';
+      where.locationCode = {
+        equals: normalizedLocationCode,
+        mode: 'insensitive',
+      };
+      where.sourceCode = { not: null };
+    } else {
+      const scopedProductCodes = await resolveLocationScopedProductCodes('BLANTYRE', normalizedLocationCode);
+      if (!scopedProductCodes || scopedProductCodes.length === 0) {
+        return null;
+      }
+
+      where.sourceCode = { in: scopedProductCodes };
+      where.branchCode = requestedBranchCode || 'BLANTYRE';
+    }
+  }
+
+  return where;
+}
+
+const recordProductInteraction = async (req, res) => {
+  try {
+    const action = String(req.body?.action || '').trim().toLowerCase();
+    const productId = req.body?.productId != null ? Number(req.body.productId) : null;
+    const query = String(req.body?.query || '').trim().slice(0, 120);
+    const allowedActions = new Set(['search', 'view', 'add_to_cart']);
+
+    if (!allowedActions.has(action)) {
+      return res.status(400).json({ error: 'Invalid product interaction action' });
+    }
+
+    if (productId != null && (!Number.isInteger(productId) || productId <= 0)) {
+      return res.status(400).json({ error: 'Invalid product id' });
+    }
+
+    await recordAuditLog({
+      req,
+      action: `PRODUCT_${action.toUpperCase()}`,
+      resourceType: productId ? 'PRODUCT' : 'PRODUCT_SEARCH',
+      resourceId: productId || null,
+      metadata: {
+        query: query || null,
+        branchCode: normalizeBranchCode(req.body?.branchCode || req.query.branchCode) || 'BLANTYRE',
+        locationCode: normalizeScopeCode(req.body?.locationCode || req.query.locationCode) || getStorefrontLocationCode(),
+      },
+    });
+
+    return res.status(204).send();
+  } catch (err) {
+    logger.warnLog('[PRODUCT INTERACTION] tracking skipped:', err.message);
+    return res.status(204).send();
+  }
+};
+
+const getPopularProducts = async (req, res) => {
+  try {
+    const requestedLimit = Math.min(12, Math.max(1, Number(req.query.limit || 8)));
+    const baseWhere = await buildPublicStorefrontProductWhere(req);
+
+    if (!baseWhere) {
+      return res.status(200).json({ products: [] });
+    }
+
+    const since = new Date(Date.now() - (30 * 24 * 60 * 60 * 1000));
+    const promotedProducts = await prisma.product.findMany({
+      where: {
+        ...baseWhere,
+        isOnSale: true,
+      },
+      take: requestedLimit,
+      orderBy: [
+        { updatedAt: 'desc' },
+        { id: 'desc' },
+      ],
+    });
+
+    const auditGroups = await prisma.securityAuditLog.groupBy({
+      by: ['resourceId'],
+      where: {
+        resourceType: 'PRODUCT',
+        action: { in: ['PRODUCT_VIEW', 'PRODUCT_ADD_TO_CART'] },
+        createdAt: { gte: since },
+        resourceId: { not: null },
+      },
+      _count: { _all: true },
+    });
+
+    const orderGroups = await prisma.orderItem.groupBy({
+      by: ['productId'],
+      where: {
+        createdAt: { gte: since },
+      },
+      _sum: { quantity: true },
+    });
+
+    const scores = new Map();
+    promotedProducts.forEach((product, index) => {
+      scores.set(product.id, (scores.get(product.id) || 0) + 10000 - index);
+    });
+
+    auditGroups.forEach((row) => {
+      const id = Number(row.resourceId);
+      if (Number.isInteger(id)) {
+        scores.set(id, (scores.get(id) || 0) + Number(row._count?._all || 0) * 3);
+      }
+    });
+
+    orderGroups.forEach((row) => {
+      const id = Number(row.productId);
+      if (Number.isInteger(id)) {
+        scores.set(id, (scores.get(id) || 0) + Number(row._sum?.quantity || 0) * 5);
+      }
+    });
+
+    const scoredIds = Array.from(scores.keys());
+    const scoredProducts = scoredIds.length > 0
+      ? await prisma.product.findMany({
+          where: {
+            ...baseWhere,
+            id: { in: scoredIds },
+          },
+        })
+      : [];
+
+    const rankedProducts = scoredProducts
+      .sort((a, b) => (scores.get(b.id) || 0) - (scores.get(a.id) || 0))
+      .slice(0, requestedLimit);
+
+    if (rankedProducts.length < requestedLimit) {
+      const existingIds = new Set(rankedProducts.map((product) => product.id));
+      const fallbackProducts = await prisma.product.findMany({
+        where: {
+          ...baseWhere,
+          id: { notIn: Array.from(existingIds) },
+        },
+        take: requestedLimit - rankedProducts.length,
+        orderBy: [
+          { createdAt: 'desc' },
+          { id: 'desc' },
+        ],
+      });
+      rankedProducts.push(...fallbackProducts);
+    }
+
+    const productsWithFormatted = rankedProducts.map((product) => ({
+      ...formatProduct(product, req, false),
+      popularityLabel: product.isOnSale ? 'Promotion' : 'Popular',
+    }));
+
+    return res.status(200).json({ products: productsWithFormatted });
+  } catch (err) {
+    logger.errorLog('[PRODUCTS POPULAR] Error:', err.message);
+    return res.status(500).json({ error: 'Failed to fetch popular products' });
+  }
+};
+
 const getProductById = async (req, res) => {
   try {
     // Extract and convert id to integer
@@ -3124,6 +3295,8 @@ module.exports = {
   ensureProductPerformanceIndexes,
   createProduct,
   getProducts,
+  getPopularProducts,
+  recordProductInteraction,
   getProductById,
   updateProductStockThreshold,
   updateProduct,

@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useCart } from '../../context/CartContext.jsx';
 import { getDashboardPathForUser } from '../../utils/permissions.js';
-import logo from '../../assets/citi-nati-logo.png.png';
+import logo from '../../assets/citi-nati-full-logo.png';
 
 const DesktopNavbar = ({ onCartClick, onAccountClick, navigate }) => {
   const location = useLocation();

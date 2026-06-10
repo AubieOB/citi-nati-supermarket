@@ -92,10 +92,12 @@ const Products = () => {
   const offsetRef = useRef(0); // Keep pagination offset current for background refreshes
   const selectedCategorySearchRef = useRef(''); // Keep category for search callback
   const onSaleOnlyRef = useRef(false); // Keep sale filter for search callback
+  const searchQueryRef = useRef('');
 
   // Filter state from URL params (category and promotion only, not search)
   const selectedCategory = searchParams.get('category') || '';
   const onSaleOnly = searchParams.get('onSale') === 'true';
+  const searchQueryParam = searchParams.get('search') || '';
 
   /**
    * Predictive search like Amazon/Alibaba
@@ -143,7 +145,7 @@ const Products = () => {
             // If the user types more characters before this response arrives the ID
             // will have been incremented and we silently discard the stale result.
             const requestId = ++searchRequestIdRef.current;
-            const pageSize = 200; // Large enough to cover all matching products
+            const pageSize = 500; // Large enough to behave like a full search results page
           const params = new URLSearchParams();
           params.append('page', '1');
           params.append('pageSize', pageSize);
@@ -205,6 +207,9 @@ const Products = () => {
     const effectiveOnSaleOnly = options?.onSaleOverride !== undefined
       ? Boolean(options.onSaleOverride)
       : Boolean(onSaleOnlyRef.current);
+    const effectiveSearch = options?.searchOverride !== undefined
+      ? String(options.searchOverride || '').trim()
+      : String(searchQueryRef.current || '').trim();
 
     try {
       // Show loading state
@@ -227,7 +232,7 @@ const Products = () => {
       const currentOffset = isLoadMore ? currentOffsetBase + limit : 0;
       
       // Create cache key
-      const cacheKey = `offset_${currentOffset}_limit_${requestLimit}_category_${effectiveCategory || 'all'}_sale_${effectiveOnSaleOnly}`;
+      const cacheKey = `offset_${currentOffset}_limit_${requestLimit}_category_${effectiveCategory || 'all'}_sale_${effectiveOnSaleOnly}_search_${effectiveSearch || 'none'}`;
 
       // Check cache (only for initial loads, not Load More to ensure fresh data)
       if (!isLoadMore && !bypassCache && productsCacheRef.current.has(cacheKey)) {
@@ -254,10 +259,11 @@ const Products = () => {
       params.append('offset', currentOffset);
       params.append('branchCode', STOREFRONT_BRANCH_CODE);
       params.append('locationCode', STOREFRONT_LOCATION_CODE);
+      if (effectiveSearch) params.append('search', effectiveSearch);
       if (effectiveCategory) params.append('category', effectiveCategory);
       if (effectiveOnSaleOnly) params.append('onSale', 'true');
 
-      console.log(`[PRODUCTS FETCH] ${isLoadMore ? 'Load More' : silent ? 'Background Refresh' : 'Initial'} | Offset: ${currentOffset} | Limit: ${requestLimit} | Category: ${effectiveCategory || 'all'} | OnSale: ${effectiveOnSaleOnly}`);
+      console.log(`[PRODUCTS FETCH] ${isLoadMore ? 'Load More' : silent ? 'Background Refresh' : 'Initial'} | Offset: ${currentOffset} | Limit: ${requestLimit} | Category: ${effectiveCategory || 'all'} | OnSale: ${effectiveOnSaleOnly} | Search: ${effectiveSearch || 'none'}`);
       
       const response = await api.get(`/products?${params.toString()}`);
       const data = response.data;
@@ -300,9 +306,9 @@ const Products = () => {
       setHasMoreProducts(hasMore);
       setOffset(currentOffset);
 
-      // Clear search when browsing
+      // Clear local search only when the current route is not a search results route.
       if (!isLoadMore && !silent) {
-        setSearchInput('');
+        setSearchInput(effectiveSearch);
         searchCacheRef.current.clear();
       }
       
@@ -392,16 +398,21 @@ const Products = () => {
     onSaleOnlyRef.current = onSaleOnly;
   }, [onSaleOnly]);
 
+  useEffect(() => {
+    searchQueryRef.current = searchQueryParam.trim();
+  }, [searchQueryParam]);
+
   // Initial product load on category/filter change
   useEffect(() => {
     // Reset to initial state when filters change
     setProducts([]);
     setOffset(0);
     setHasMoreProducts(true);
+    setSearchInput(searchQueryParam.trim());
     
     // Load initial products with new filters
-    fetchProducts(false); // isLoadMore = false to replace products
-  }, [selectedCategory, onSaleOnly]);
+    fetchProducts(false, { searchOverride: searchQueryParam.trim() }); // isLoadMore = false to replace products
+  }, [selectedCategory, onSaleOnly, searchQueryParam]);
 
   // Scroll event listener for back-to-top button
   useEffect(() => {
@@ -686,6 +697,7 @@ const Products = () => {
   const handleSearchChange = (e) => {
     const value = e.target.value;
     setSearchInput(value);
+    searchQueryRef.current = '';
     handlePredictiveSearch(value);
     console.log(`[PRODUCTS SEARCH] User typing: "${value}"`);
   };
@@ -700,6 +712,10 @@ const Products = () => {
     }
 
     setSearchInput('');
+    searchQueryRef.current = '';
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('search');
+    setSearchParams(newParams);
     handlePredictiveSearch('');
   };
 
@@ -794,6 +810,14 @@ const Products = () => {
         quantity: 1
       });
 
+      api.post('/products/interactions', {
+        productId: product.id,
+        action: 'add_to_cart',
+        query: searchInput || searchQueryParam || '',
+        branchCode: STOREFRONT_BRANCH_CODE,
+        locationCode: STOREFRONT_LOCATION_CODE,
+      }).catch(() => {});
+
       showSuccess('Added to Cart', `${product.name} added to cart!`);
       await updateCartCount();
     } catch (err) {
@@ -879,27 +903,27 @@ const Products = () => {
 
   return (
     <div className="page products-page">
-      {/* FIXED FILTER BAR - Single tier with filters left, buttons right */}
-      <div style={{
-        position: 'fixed',
+      {/* Sticky shopping controls */}
+      <div className="products-toolbar" style={{
+        position: 'sticky',
         top: 0,
         left: 0,
         right: 0,
-        zIndex: 1000,
+        zIndex: 100,
         backgroundColor: 'white',
         borderBottom: '1px solid #eee',
         boxShadow: scrollY > 0 ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
         transition: 'box-shadow 0.3s ease',
         display: 'flex',
         justifyContent: 'flex-start',
-        paddingTop: window.innerWidth <= 480 ? '0.75rem' : '0.75rem',
-        paddingBottom: window.innerWidth <= 480 ? '0.75rem' : '0.75rem'
+        paddingTop: 0,
+        paddingBottom: 0
       }}>
-        <div style={{
+        <div className="products-toolbar__inner" style={{
           maxWidth: '100%',
           width: '100%',
           display: 'flex',
-          gap: '0.75rem',
+          gap: '0.5rem',
           alignItems: 'center',
           justifyContent: window.innerWidth > 768 ? 'space-between' : 'flex-start',
           flexWrap: 'nowrap',
@@ -907,19 +931,19 @@ const Products = () => {
           paddingRight: window.innerWidth <= 480 ? '0.75rem' : '1.5rem'
         }}>
           {/* LEFT SECTION - Filters */}
-          <div style={{
+          <div className="products-toolbar__filters" style={{
             display: 'flex',
-            gap: '0.75rem',
+            gap: '0.5rem',
             alignItems: 'center',
             flex: window.innerWidth > 768 ? '1 1 auto' : '1 1 0',
             minWidth: 0
           }}>
             {/* SEARCH BAR */}
-            <div style={{
+            <div className="products-search-control" style={{
               position: 'relative',
-              flex: '1 1 auto',
-              minWidth: window.innerWidth <= 768 ? '120px' : '180px',
-              maxWidth: window.innerWidth > 768 ? '450px' : '600px',
+              flex: window.innerWidth > 768 ? '0 1 360px' : '1 1 auto',
+              minWidth: window.innerWidth <= 768 ? '120px' : '170px',
+              maxWidth: window.innerWidth > 768 ? '360px' : '100%',
             }}>
               <input
                 type="text"
@@ -928,7 +952,7 @@ const Products = () => {
                 onChange={handleSearchChange}
                 style={{
                   width: '100%',
-                  padding: '0.5rem 2.1rem 0.5rem 0.9rem',
+                  padding: '0.3rem 1.85rem 0.3rem 0.78rem',
                   border: '1px solid #d0d0d0',
                   borderRadius: '6px',
                   fontSize: window.innerWidth <= 480 ? '0.85rem' : '0.95rem',
@@ -977,12 +1001,13 @@ const Products = () => {
 
             {/* CATEGORY FILTER */}
             <select
+              className="products-category-select"
               value={selectedCategory}
               onChange={handleCategoryChange}
               style={{
                 flex: '0 1 auto',
                 minWidth: window.innerWidth <= 480 ? '130px' : '160px',
-                padding: '0.5rem 0.65rem',
+                padding: '0.3rem 0.58rem',
                 border: '1px solid #d0d0d0',
                 borderRadius: '6px',
                 fontSize: window.innerWidth <= 480 ? '0.85rem' : '0.95rem',
@@ -1007,16 +1032,15 @@ const Products = () => {
             </select>
           </div>
 
-          {/* RIGHT SECTION - Home and Cart buttons (desktop only) */}
+          {/* RIGHT SECTION - Home and cart buttons (desktop only) */}
           {window.innerWidth > 768 && (
-            <div style={{
+            <div className="products-toolbar__links" style={{
               display: 'flex',
-              gap: '0.5rem',
+              gap: '0.35rem',
               alignItems: 'center',
               flex: '0 1 auto',
               marginLeft: 'auto'
             }}>
-              {/* Home Button */}
               <button
                 onClick={() => navigate('/')}
                 className="products-top-link"
@@ -1024,13 +1048,13 @@ const Products = () => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  height: '32px',
-                  padding: '0.25rem 0.6rem',
+                  height: '30px',
+                  padding: '0.2rem 0.58rem',
                   borderRadius: '4px',
                   backgroundColor: 'transparent',
                   border: 'none',
                   cursor: 'pointer',
-                  fontSize: '0.95rem',
+                  fontSize: '0.86rem',
                   fontWeight: '500',
                   color: '#666',
                   transition: 'all 0.3s ease',
@@ -1049,13 +1073,13 @@ const Products = () => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  height: '32px',
-                  padding: '0.25rem 0.6rem',
+                  height: '30px',
+                  padding: '0.2rem 0.58rem',
                   borderRadius: '4px',
                   backgroundColor: 'transparent',
                   border: 'none',
                   cursor: 'pointer',
-                  fontSize: '0.95rem',
+                  fontSize: '0.86rem',
                   fontWeight: '500',
                   color: '#666',
                   transition: 'all 0.3s ease',
@@ -1177,7 +1201,7 @@ const Products = () => {
         display: 'flex',
         flexDirection: 'column',
         minHeight: '100vh',
-        marginTop: window.innerWidth > 768 ? '2.25rem' : '2rem',
+        marginTop: window.innerWidth > 768 ? '0.75rem' : '0.5rem',
         paddingBottom: window.innerWidth <= 768 ? '80px' : '0',
         paddingTop: '0'
       }}>
@@ -1187,7 +1211,7 @@ const Products = () => {
           overflowY: 'auto'
         }}>
           {filteredProducts.length === 0 ? (
-            <div style={{
+            <div className="storefront-empty-state" style={{
               textAlign: 'center',
               padding: '2rem',
               backgroundColor: '#f8f9fa',
@@ -1203,7 +1227,7 @@ const Products = () => {
               </p>
             </div>
           ) : (
-            <div className="products-grid" style={{ padding: '1rem', marginTop: '2.5rem' }}>
+            <div className="products-grid" style={{ padding: '1rem', marginTop: '0' }}>
               {filteredProducts.map((product) => {
                 const availableStock = getEffectiveStock(product);
                 const originalPrice = Number(product.originalPrice || 0);
@@ -1217,7 +1241,7 @@ const Products = () => {
                   <div key={product.id} className="product-card" style={{ position: 'relative' }}>
                     {/* Sale Badge */}
                     {hasValidDiscount && (
-                      <div style={{
+                      <div className="product-card__badge" style={{
                         position: 'absolute',
                         top: window.innerWidth <= 480 ? '5px' : '10px',
                         right: window.innerWidth <= 480 ? '5px' : '10px',
@@ -1268,7 +1292,7 @@ const Products = () => {
                       <h3 className="product-card__title">{product.name}</h3>
 
                       {/* Category */}
-                      <p style={{ fontSize: '0.85rem', color: '#999', marginBottom: '0.5rem' }}>
+                      <p className="product-card__category" style={{ fontSize: '0.85rem', color: '#999', marginBottom: '0.5rem' }}>
                         {product.category}
                       </p>
 
@@ -1277,7 +1301,7 @@ const Products = () => {
                         {hasValidDiscount ? (
                           <div>
                             {/* Original Price (Crossed Out) */}
-                            <div style={{
+                            <div className="product-card__old-price" style={{
                               fontSize: window.innerWidth <= 480 ? '0.8rem' : '0.95rem',
                               color: '#666',
                               textDecoration: 'line-through',
@@ -1299,7 +1323,7 @@ const Products = () => {
                       </div>
 
                       {/* Stock Status */}
-                      <div style={{
+                      <div className="product-card__stock" style={{
                         fontSize: '0.85rem',
                         color: availableStock > 0 ? '#28a745' : '#dc3545',
                         marginBottom: '1rem'
@@ -1329,7 +1353,7 @@ const Products = () => {
         
         {/* LOAD MORE BUTTON - Show when there are more products to load */}
         {hasMoreProducts && (
-          <div style={{
+          <div className="products-load-more" style={{
             display: 'flex',
             justifyContent: 'center',
             padding: '2rem 1rem',
@@ -1338,6 +1362,7 @@ const Products = () => {
             <button
               onClick={handleLoadMore}
               disabled={isLoadingMore}
+              className="products-load-more__button"
               style={{
                 padding: '0.75rem 2.5rem',
                 backgroundColor: isLoadingMore ? '#cfcfcf' : '#5B4B8A',
@@ -1377,7 +1402,7 @@ const Products = () => {
 
         {/* "NO MORE PRODUCTS" MESSAGE - Show when all products loaded */}
         {!hasMoreProducts && filteredProducts.length > 0 && (
-          <div style={{
+          <div className="products-end-message" style={{
             textAlign: 'center',
             padding: '2rem 1rem',
             color: '#999',
@@ -1393,6 +1418,7 @@ const Products = () => {
       {scrollY > 600 && (
         <button
           onClick={scrollToTop}
+          className="back-to-top-button"
           style={{
             position: 'fixed',
             bottom: window.innerWidth <= 768 ? '90px' : '20px',

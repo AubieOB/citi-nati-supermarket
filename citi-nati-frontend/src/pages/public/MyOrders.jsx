@@ -8,9 +8,9 @@ import { useCart } from '../../context/CartContext.jsx';
 import { formatMWK } from '../../utils/currency.js';
 import ProtectedRoute from '../../components/ProtectedRoute.jsx';
 import toast from 'react-hot-toast';
-import { generateOrderReceiptPDF } from '../../utils/pdfReports.js';
-import { exportOrderReceiptImage } from '../../utils/orderReceiptImageExport.js';
 import { getSocket } from '../../utils/socket.js';
+import logoUrl from '../../assets/citi-nati-full-logo.png';
+import html2pdf from 'html2pdf.js';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import '../../styles/global.css';
 
@@ -35,9 +35,6 @@ const MyOrdersContent = () => {
   const [retryingOrderId, setRetryingOrderId] = useState(null);
   const [previewReceiptOrder, setPreviewReceiptOrder] = useState(null);
   const [previewLoadingOrderId, setPreviewLoadingOrderId] = useState(null);
-  const [isMobileView, setIsMobileView] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth <= 640 : false
-  );
   // Tracks order IDs that just received a live status patch (for subtle flash indicator)
   const [updatedOrderIds, setUpdatedOrderIds] = useState(new Set());
 
@@ -72,23 +69,6 @@ const MyOrdersContent = () => {
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const mediaQuery = window.matchMedia('(max-width: 640px)');
-    const updateMobileState = (event) => setIsMobileView(event.matches);
-
-    setIsMobileView(mediaQuery.matches);
-
-    if (typeof mediaQuery.addEventListener === 'function') {
-      mediaQuery.addEventListener('change', updateMobileState);
-      return () => mediaQuery.removeEventListener('change', updateMobileState);
-    }
-
-    mediaQuery.addListener(updateMobileState);
-    return () => mediaQuery.removeListener(updateMobileState);
-  }, []);
 
   // Live silent auto-refresh: patch a single order in-state when the backend emits orderUpdated
   useEffect(() => {
@@ -347,22 +327,356 @@ const MyOrdersContent = () => {
     }
   }, [getOrderItems]);
 
-  const openReceiptPreview = useCallback(async (orderData) => {
+  const escapeReceiptText = (value) => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+  const openReceiptPage = useCallback(async (orderData) => {
+    let receiptWindow = null;
+
     try {
       setPreviewLoadingOrderId(orderData.id);
-      const enrichedOrder = await getOrderWithItems(orderData);
-      setPreviewReceiptOrder(enrichedOrder);
+      receiptWindow = window.open('', '_blank');
 
-      if (!enrichedOrder.items || enrichedOrder.items.length === 0) {
+      if (!receiptWindow) {
+        toast.error('Please allow pop-ups to view the receipt.');
+        return;
+      }
+
+      receiptWindow.opener = null;
+      receiptWindow.document.write('<!doctype html><html><head><title>Preparing receipt...</title></head><body>Preparing receipt...</body></html>');
+
+      const enrichedOrder = await getOrderWithItems(orderData);
+      const receiptItems = getOrderItems(enrichedOrder);
+
+      if (receiptItems.length === 0) {
         toast.error('No order items were found for this receipt.');
       }
+
+      const rows = receiptItems.map((item) => {
+        const name = escapeReceiptText(item.product?.name || item.productName || 'Product');
+        const quantity = Number(item.quantity || 0);
+        const price = Number(item.price || 0);
+        return `
+          <tr>
+            <td>${name}</td>
+            <td class="center">${quantity}</td>
+            <td class="right">${escapeReceiptText(formatMWK(price))}</td>
+            <td class="right strong">${escapeReceiptText(formatMWK(price * quantity))}</td>
+          </tr>`;
+      }).join('');
+      const customerName = escapeReceiptText(user?.name || enrichedOrder.customerName || enrichedOrder.user?.name || 'Customer');
+      const customerEmail = escapeReceiptText(user?.email || enrichedOrder.customerEmail || enrichedOrder.user?.email || '');
+      const deliveryAddress = escapeReceiptText(enrichedOrder.deliveryAddress || 'Not provided');
+      const houseNumber = enrichedOrder.houseNumber ? `<br>${escapeReceiptText(enrichedOrder.houseNumber)}` : '';
+      const paidStamp = String(enrichedOrder.paymentStatus || '').toUpperCase() === 'PAID' ? 'PAID' : escapeReceiptText(enrichedOrder.paymentStatus || 'ORDER');
+      const pdfFileName = `citi-nati-receipt-${escapeReceiptText(enrichedOrder.id)}.pdf`;
+
+      const receiptHtml = `
+        <!doctype html>
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <title>Citi-Nati Receipt #${escapeReceiptText(enrichedOrder.id)}</title>
+            <link rel="stylesheet" href="/node_modules/@fortawesome/fontawesome-free/css/all.min.css" />
+            <style>
+              :root { --green:#2D8659; --purple:#5B4B8A; --ink:#111827; --muted:#4b5563; --line:#d8dee8; --soft:#f3f4f6; --blue:#dff2fb; --blue-text:#1f6688; }
+              * { box-sizing: border-box; }
+              html { background: #e9e9e9; }
+              body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: var(--ink); background: #e9e9e9; }
+              .viewer { min-height: 100vh; padding: 28px 0 42px; }
+              .paper { width: 210mm; min-height: 297mm; max-width: calc(100vw - 40px); margin: 0 auto; padding: 22mm 23mm 17mm; background: #fff; border: 1px solid #c9c9c9; box-shadow: 0 10px 30px rgba(0,0,0,.16); display:flex; flex-direction:column; }
+              .top { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; }
+              .brand { display:flex; align-items:center; }
+              .brand img { width:325px; height:auto; max-height:48px; object-fit:contain; object-position:left center; }
+              .receipt-subtitle { margin: 5px 0 0; color:#334155; font-size: 11px; font-weight:550; letter-spacing:.07em; text-transform:uppercase; }
+              .stamp { margin-top: 8px; color: var(--green); font-size: 27px; line-height: 1; font-family: "Courier New", monospace; font-weight: 650; letter-spacing: .06em; }
+              .receipt-title { margin: 23px 0 26px; padding-bottom: 22px; border-bottom: 1px solid #e5e7eb; font-size: 25px; font-weight: 500; }
+              .info-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 42px; margin-bottom: 20px; }
+              .info-block.right { text-align:right; }
+              .info-heading { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
+              .info-text { margin: 0 0 18px; line-height: 1.35; font-size: 14px; }
+              .panel { margin: 20px 0; border: 1px solid #b9e3f2; border-radius: 4px; overflow: hidden; }
+              .panel-title { margin:0; padding: 8px 12px; background: #d8eef8; color: var(--blue-text); font-size: 16px; font-weight: 600; }
+              .panel-body { padding: 10px 12px; font-size: 13.5px; }
+              .items { margin-top: 20px; border:1px solid #d9d9d9; border-radius:4px; overflow:hidden; }
+              .items-title { margin:0; padding: 10px 14px; background:#f3f3f3; border-bottom:1px solid #d9d9d9; font-size:16px; font-weight:600; }
+              table { width:100%; border-collapse:collapse; }
+              th, td { padding: 8px 10px; border-bottom: 1px solid #d9d9d9; font-size: 13.5px; text-align:left; vertical-align:top; }
+              th { font-size: 14px; font-weight: 600; }
+              tbody tr:last-child td { border-bottom: 0; }
+              .center { text-align:center; }
+              .right { text-align:right; }
+              .strong { font-weight:600; color:var(--green); }
+              .summary-table { margin-top: 10px; }
+              .summary-table td { border-bottom: 1px solid #d9d9d9; background:#f6f6f6; }
+              .summary-table .label-cell { width: 72%; text-align:right; font-weight:600; }
+              .summary-table .total-row td { font-size: 16px; font-weight: 650; background:#f1f1f1; }
+              .transactions { width:100%; margin-top: 8px; }
+              .transactions th, .transactions td { font-size: 13px; }
+              .balance-row td { border-bottom: 0; font-weight: 600; }
+              .receipt-footer { margin-top: 18px; padding-top: 0; }
+              .thanks { margin: 18px 0 12px; text-align:left; font-size:13px; color:#374151; }
+              .receipt-actions { display:flex; justify-content:flex-end; align-items:center; gap:0; }
+              .receipt-actions button,
+              .receipt-actions a { border:1px solid #cbd5e1; background:#fff; color:#111827; min-height:34px; padding:0 12px; border-radius:0; cursor:pointer; font-size:13px; font-weight:500; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
+              .receipt-actions button + button,
+              .receipt-actions button + a { margin-left:-1px; }
+              .receipt-actions button:first-child { border-radius:3px 0 0 3px; }
+              .receipt-actions button:last-child,
+              .receipt-actions a:last-child { border-radius:0 3px 3px 0; }
+              .receipt-actions button:hover,
+              .receipt-actions a:hover { background:#f8fafc; }
+              .back-strip { width:210mm; max-width:calc(100vw - 40px); margin:22px auto 0; padding:0; border:0; background:transparent; text-align:center; box-shadow:none; }
+              .back-strip a { color:#0067a8; font-size:18px; text-decoration:none; }
+              .back-strip a:hover { text-decoration:underline; }
+              .muted { color: var(--muted); }
+              @media screen and (max-width: 760px) {
+                html, body { overflow-x:hidden; }
+                .viewer { padding: 18px 10px 32px; overflow-x:hidden; }
+                .paper {
+                  width: 100%;
+                  min-height: auto;
+                  max-width: 100%;
+                  padding: 28px 22px 24px;
+                  overflow:hidden;
+                }
+                .top { align-items:center; gap:10px; }
+                .brand img { width:min(330px, 68vw); max-height:42px; }
+                .stamp { font-size:22px; white-space:nowrap; }
+                .receipt-title { margin:18px 0 18px; padding-bottom:16px; font-size:24px; }
+                .info-grid { grid-template-columns: minmax(0, 1fr) minmax(0, .82fr); gap:16px; }
+                .info-block.right { text-align:right; }
+                .info-heading { font-size:14px; }
+                .info-text { font-size:13px; overflow-wrap:anywhere; }
+                .panel { margin:16px 0; }
+                .panel-title,
+                .items-title { font-size:15px; }
+                .panel-body { font-size:12.5px; }
+                th, td { padding:7px 8px; font-size:12.5px; overflow-wrap:anywhere; }
+                th { font-size:12.5px; }
+                .summary-table .label-cell { width:62%; }
+                .transactions { table-layout:fixed; }
+                .transactions th,
+                .transactions td { font-size:11.5px; padding:7px 6px; }
+                .receipt-actions { justify-content:center; }
+                .thanks { font-size:12.5px; }
+                .back-strip { width:100%; max-width:100%; margin-top:14px; }
+                .back-strip a { font-size:16px; }
+              }
+              @media screen and (max-width: 430px) {
+                .viewer { padding: 12px 8px 28px; }
+                .paper { padding: 22px 18px; }
+                .brand img { width:min(270px, 64vw); }
+                .stamp { font-size:19px; }
+                .receipt-title { font-size:22px; }
+                .info-grid { grid-template-columns: 1fr; gap:8px; }
+                .info-block.right { text-align:left; }
+                th, td { font-size:12px; padding:7px 5px; }
+                .items table { table-layout:fixed; }
+                .items th:nth-child(1),
+                .items td:nth-child(1) { width:42%; }
+                .items th:nth-child(2),
+                .items td:nth-child(2) { width:12%; }
+                .items th:nth-child(3),
+                .items td:nth-child(3),
+                .items th:nth-child(4),
+                .items td:nth-child(4) { width:23%; }
+                .transactions th,
+                .transactions td { font-size:11px; }
+              }
+              @media print {
+                @page { size: A4; margin: 0; }
+                html, body, .viewer { background:white; padding:0; }
+                .paper { width:210mm; min-height:297mm; max-width:none; margin:0; border:0; box-shadow:none; }
+                .receipt-actions,
+                .back-strip { display:none; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="viewer">
+              <main class="paper">
+                <header class="top">
+                  <div class="brand">
+                    <img src="${logoUrl}" alt="Citi-Nati logo" />
+                  </div>
+                  <div>
+                    <div class="stamp">${paidStamp}</div>
+                  </div>
+                </header>
+
+                <h1 class="receipt-title">Receipt #${escapeReceiptText(enrichedOrder.id)}</h1>
+
+                <section class="info-grid">
+                  <div class="info-block">
+                    <p class="info-heading">Customer:</p>
+                    <p class="info-text">
+                      ${customerName}<br>
+                      ${customerEmail ? `${customerEmail}<br>` : ''}
+                      ${deliveryAddress}${houseNumber}<br>
+                      Blantyre, Malawi
+                    </p>
+                    <p class="info-heading">Order Status:</p>
+                    <p class="info-text">${escapeReceiptText(enrichedOrder.status || 'Order received')}</p>
+                  </div>
+                  <div class="info-block right">
+                    <p class="info-heading">Store:</p>
+                    <p class="info-text">
+                      Citi-Nati Supermarket<br>
+                      Chinyonga, Blantyre<br>
+                      info@citinati.com<br>
+                      (+265) 888857188
+                    </p>
+                    <p class="info-heading">Receipt Date:</p>
+                    <p class="info-text">${escapeReceiptText(formatDate(enrichedOrder.createdAt))}</p>
+                  </div>
+                </section>
+
+                <section class="panel">
+                  <p class="panel-title">Notes</p>
+                  <div class="panel-body">Prices include applicable VAT/taxes where charged. Delivery fees are shown separately when applicable.</div>
+                </section>
+
+                <section class="items">
+                  <p class="items-title">Receipt Items</p>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Description</th>
+                        <th class="center">Qty</th>
+                        <th class="right">Unit Price</th>
+                        <th class="right">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                  </table>
+                  <table class="summary-table">
+                    <tbody>
+                      <tr><td class="label-cell">Sub Total</td><td class="right">${escapeReceiptText(formatMWK(enrichedOrder.subtotalAmount ?? enrichedOrder.total))}</td></tr>
+                      <tr><td class="label-cell">Delivery Fee</td><td class="right">${escapeReceiptText(formatMWK(enrichedOrder.deliveryFeeAmount ?? 0))}</td></tr>
+                      <tr class="total-row"><td class="label-cell">Total</td><td class="right">${escapeReceiptText(formatMWK(enrichedOrder.finalTotalAmount ?? enrichedOrder.total))}</td></tr>
+                    </tbody>
+                  </table>
+                </section>
+
+                <table class="transactions">
+                  <thead>
+                    <tr>
+                      <th>Transaction Date</th>
+                      <th>Transaction ID</th>
+                      <th>Status</th>
+                      <th class="right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>${escapeReceiptText(formatDate(enrichedOrder.updatedAt || enrichedOrder.createdAt))}</td>
+                      <td>${escapeReceiptText(enrichedOrder.paymentReference || `Order #${enrichedOrder.id}`)}</td>
+                      <td>${escapeReceiptText(enrichedOrder.paymentStatus || 'Pending')}</td>
+                      <td class="right">${escapeReceiptText(formatMWK(enrichedOrder.finalTotalAmount ?? enrichedOrder.total))}</td>
+                    </tr>
+                    <tr class="balance-row">
+                      <td colspan="3" class="right">Balance</td>
+                      <td class="right">${String(enrichedOrder.paymentStatus || '').toUpperCase() === 'PAID' ? formatMWK(0) : escapeReceiptText(formatMWK(enrichedOrder.finalTotalAmount ?? enrichedOrder.total))}</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <footer class="receipt-footer">
+                  <div class="receipt-actions">
+                    <button onclick="window.print()" title="Print receipt"><i class="fa-solid fa-print"></i> Print</button>
+                    <a id="receiptDownloadLink" href="#" download="${pdfFileName}" title="Download receipt"><i class="fa-solid fa-download"></i> Download</a>
+                  </div>
+                  <p class="thanks">Thank you for shopping with Citi-Nati Supermarket.</p>
+                </footer>
+              </main>
+              <div class="back-strip">
+                <a href="https://www.citinati.com/" target="_self">&laquo; Back to Citi-Nati Supermarket</a>
+              </div>
+            </div>
+          </body>
+        </html>`;
+      receiptWindow.document.open();
+      receiptWindow.document.write(receiptHtml);
+      receiptWindow.document.close();
+
+      const prepareReceiptPdf = async () => {
+        try {
+          const paper = receiptWindow?.document?.querySelector('.paper');
+          const downloadLink = receiptWindow?.document?.getElementById('receiptDownloadLink');
+          if (!paper || !downloadLink) return;
+
+          downloadLink.addEventListener('click', (event) => {
+            if (downloadLink.getAttribute('href') === '#') {
+              event.preventDefault();
+            }
+          });
+
+          const receiptCss = receiptHtml.match(/<style>([\s\S]*?)<\/style>/)?.[1] || '';
+          const pdfHost = document.createElement('div');
+          pdfHost.style.position = 'fixed';
+          pdfHost.style.left = '-10000px';
+          pdfHost.style.top = '0';
+          pdfHost.style.width = '210mm';
+          pdfHost.style.background = '#ffffff';
+
+          const paperClone = paper.cloneNode(true);
+          paperClone.querySelector('.receipt-actions')?.remove();
+          pdfHost.innerHTML = `
+            <style>
+              ${receiptCss}
+              .paper {
+                width: 210mm !important;
+                min-height: 297mm !important;
+                max-width: none !important;
+                margin: 0 !important;
+                border: 0 !important;
+                box-shadow: none !important;
+              }
+            </style>`;
+          pdfHost.appendChild(paperClone);
+          document.body.appendChild(pdfHost);
+
+          const pdfBlob = await html2pdf()
+            .set({
+              margin: 0,
+              filename: pdfFileName,
+              image: { type: 'jpeg', quality: 0.98 },
+              html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
+              pagebreak: { mode: ['css', 'legacy'] },
+            })
+            .from(paperClone)
+            .outputPdf('blob');
+
+          downloadLink.href = URL.createObjectURL(pdfBlob);
+          downloadLink.download = pdfFileName;
+          pdfHost.remove();
+        } catch (pdfErr) {
+          console.error('Failed to prepare receipt PDF:', pdfErr);
+          const downloadLink = receiptWindow?.document?.getElementById('receiptDownloadLink');
+          if (downloadLink) {
+            downloadLink.textContent = 'Download failed';
+          }
+        }
+      };
+
+      setTimeout(prepareReceiptPdf, 200);
     } catch (err) {
-      console.error('Failed to open receipt preview:', err);
-      toast.error('Failed to open receipt preview. Please try again.');
+      console.error('Failed to open receipt page:', err);
+      toast.error('Failed to open receipt. Please try again.');
+      if (receiptWindow && !receiptWindow.closed) {
+        receiptWindow.close();
+      }
     } finally {
       setPreviewLoadingOrderId(null);
     }
-  }, [getOrderWithItems]);
+  }, [formatDate, getOrderItems, getOrderWithItems]);
 
   // Individual Order Card Component
   const OrderCard = ({ order }) => {
@@ -554,81 +868,31 @@ const MyOrdersContent = () => {
         </div>
       )}
 
-      {/* Receipt Download Button - Only for Delivered Orders */}
+      {/* Receipt Button - Only for Delivered Orders */}
       {order.status === 'DELIVERED' && (
         <div style={{
-          marginTop: '1.5rem',
-          paddingTop: '1rem',
+          marginTop: '1rem',
+          paddingTop: '0.85rem',
           borderTop: '1px solid #eee',
           display: 'flex',
           gap: '0.75rem',
         }}>
-          <button
-            type="button"
-            aria-label={`Quick open receipt image for order ${order.id}`}
-            title="Quick open receipt image"
-            onClick={() => openReceiptPreview(order)}
+          <Button
+            variant="secondary"
+            size="medium"
+            onClick={() => openReceiptPage(order)}
             disabled={previewLoadingOrderId === order.id}
             style={{
-              minWidth: '52px',
-              width: '52px',
-              borderRadius: '8px',
+              backgroundColor: previewLoadingOrderId === order.id ? '#94a3b8' : '#2D8659',
+              color: '#fff',
               border: 'none',
               cursor: previewLoadingOrderId === order.id ? 'not-allowed' : 'pointer',
-              backgroundColor: '#0f172a',
-              color: '#fff',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '1rem',
-              opacity: previewLoadingOrderId === order.id ? 0.65 : 1,
-            }}
-          >
-            <i className={`fas ${previewLoadingOrderId === order.id ? 'fa-spinner fa-spin' : 'fa-eye'}`}></i>
-          </button>
-
-          <Button
-            variant="secondary"
-            size="medium"
-            onClick={() => {
-              generateOrderReceiptPDF(order);
-              toast.success('Receipt PDF downloaded successfully!');
-            }}
-            style={{
-              backgroundColor: '#2D8659',
-              color: '#fff',
-              border: 'none',
-              cursor: 'pointer',
               flex: 1,
+              borderRadius: '999px',
             }}
           >
-            <i className="fas fa-receipt" style={{ marginRight: '0.5rem' }}></i>
-            {isMobileView ? 'PDF' : 'PDF Receipt'}
-          </Button>
-
-          <Button
-            variant="secondary"
-            size="medium"
-            onClick={async () => {
-              try {
-                const enrichedOrder = await getOrderWithItems(order);
-                await exportOrderReceiptImage({ order: enrichedOrder, format: 'png' });
-                toast.success('Receipt image downloaded successfully!');
-              } catch (err) {
-                console.error('Failed to download receipt image:', err);
-                toast.error('Failed to download receipt image. Please try again.');
-              }
-            }}
-            style={{
-              backgroundColor: '#1d4ed8',
-              color: '#fff',
-              border: 'none',
-              cursor: 'pointer',
-              flex: 1,
-            }}
-          >
-            <i className="fas fa-image" style={{ marginRight: '0.5rem' }}></i>
-            {isMobileView ? 'Image' : 'Image Receipt'}
+            <i className={`fas ${previewLoadingOrderId === order.id ? 'fa-spinner fa-spin' : 'fa-receipt'}`} style={{ marginRight: '0.5rem' }}></i>
+            {previewLoadingOrderId === order.id ? 'Opening...' : 'View Receipt'}
           </Button>
         </div>
       )}
@@ -786,7 +1050,7 @@ const MyOrdersContent = () => {
 
   // Orders list
   return (
-    <div className="page">
+    <div className="page my-orders-page">
       <Container>
         <h1 style={{ marginTop: '2rem', marginBottom: '2rem' }}>My Orders</h1>
 

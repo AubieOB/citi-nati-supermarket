@@ -1,5 +1,5 @@
 const express = require('express');
-const { createProduct, getProducts, getProductById, updateProduct, updateProductStockThreshold, deleteProduct, syncFromPOS, syncProductsFromPOSAgent, deletePOSProducts, getCategories, toggleProductVisibility, permanentDeleteProductImage, reconcileProductImages } = require('../controllers/product.controller');
+const { createProduct, getProducts, getProductById, updateProduct, updateProductStockThreshold, deleteProduct, syncFromPOS, syncProductsFromPOSAgent, deletePOSProducts, getCategories, toggleProductVisibility, permanentDeleteProductImage, reconcileProductImages, getPopularProducts, recordProductInteraction } = require('../controllers/product.controller');
 const { verifyTokenMiddleware } = require('../middleware/auth.middleware');
 const { verifyAdmin } = require('../middleware/admin.middleware');
 const { requireTrustedAgent } = require('../middleware/agentAuth.middleware');
@@ -10,6 +10,11 @@ const router = express.Router();
 // GET /api/products/categories - Fetch all distinct categories
 router.get('/categories', getCategories);
 
+// GET /api/products/popular - Fetch promoted and popular storefront products
+router.get('/popular', getPopularProducts);
+
+// POST /api/products/interactions - Track lightweight storefront product interest
+router.post('/interactions', recordProductInteraction);
 
 // GET /api/products - Fetch all products (with pagination, filtering, category)
 router.get('/', getProducts);

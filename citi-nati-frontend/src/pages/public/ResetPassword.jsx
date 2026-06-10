@@ -75,7 +75,7 @@ const ResetPassword = () => {
   };
 
   return (
-    <div className="page">
+    <div className="auth-page auth-page--compact">
       <Container>
         <div style={{ maxWidth: '500px', margin: '3rem auto', padding: '0 1rem' }}>
           <div style={{

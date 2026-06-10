@@ -1,7 +1,7 @@
 import html2pdf from 'html2pdf.js';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import logo from '../assets/citi-nati-logo.png.png';
+import logo from '../assets/citi-nati-full-logo.png';
 
 const BRAND_PURPLE = '#5B4B8A';
 const BRAND_GREEN = '#2D8659';
@@ -50,20 +50,16 @@ const buildBrandedHeader = ({
   accentColor = BRAND_PURPLE,
   compact = false,
 }) => {
-  const logoHeight = compact ? 44 : 58;
-  const brandFontSize = compact ? 22 : 28;
+  const logoWidth = compact ? 285 : 340;
   const titleFontSize = compact ? 14 : 16;
-  const sideSpacer = compact ? 44 : 58;
+  const sideSpacer = compact ? 36 : 48;
 
   return `
     <div style="margin-bottom: 28px; border-bottom: 3px solid ${accentColor}; padding-bottom: 14px;">
       <div style="display: flex; align-items: center; gap: 10px;">
-        <img src="${logo}" alt="Citi-Nati logo" style="height: ${logoHeight}px; width: auto; object-fit: contain; flex: 0 0 auto;" />
+        <img src="${logo}" alt="Citi-Nati logo" style="width: ${logoWidth}px; max-width: 48%; height: auto; object-fit: contain; flex: 0 0 auto;" />
         <div style="flex: 1; text-align: center;">
-          <h1 style="margin: 0; font-size: ${brandFontSize}px; font-weight: 700; line-height: 1.2;">
-            <span style="color: ${BRAND_PURPLE};">Citi-</span><span style="color: ${BRAND_GREEN};">Nati Supermarket</span>
-          </h1>
-          <p style="margin: 6px 0 0 0; color: #111; font-size: ${titleFontSize}px; font-weight: 600;">${reportTitle}</p>
+          <p style="margin: 0; color: #111; font-size: ${titleFontSize}px; font-weight: 600;">${reportTitle}</p>
           ${subText ? `<p style="margin: 4px 0 0 0; color: #666; font-size: 12px;">${subText}</p>` : ''}
           ${periodText ? `<p style="margin: 4px 0 0 0; color: #666; font-size: 12px;">${periodText}</p>` : ''}
           ${generatedText ? `<p style="margin: 4px 0 0 0; color: #777; font-size: 12px;">${generatedText}</p>` : ''}
@@ -1304,15 +1300,15 @@ export const generateExpiryAlertsPDF = (alertCards, options = {}) => {
 
 export const generateQuotationPDF = async (quotation) => {
   // ── Measure logo to preserve aspect ratio ────────────────────────────────
-  let logoW = 18;
-  let logoH = 18;
+  let logoW = 74;
+  let logoH = 9;
   try {
     await new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
-        const targetH = 18; // mm — consistent with other PDFs
-        logoH = targetH;
-        logoW = img.naturalWidth > 0 ? targetH * (img.naturalWidth / img.naturalHeight) : targetH;
+        const targetW = 74;
+        logoW = targetW;
+        logoH = img.naturalWidth > 0 ? targetW * (img.naturalHeight / img.naturalWidth) : 9;
         resolve();
       };
       img.onerror = resolve;
@@ -1341,22 +1337,11 @@ export const generateQuotationPDF = async (quotation) => {
     doc.addImage(logo, 'PNG', margin, logoTopY, logoW, logoH);
   } catch (_) { /* logo load failure is non-fatal */ }
 
-  const textLeft = margin + logoW + 4;
-
-  // ── Company name ──────────────────────────────────────────────────────────
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.setTextColor(91, 75, 138);
-  doc.text('Citi-', textLeft, logoTopY + 7);
-  const citiW = doc.getTextWidth('Citi-');
-  doc.setTextColor(45, 134, 89);
-  doc.text('Nati Supermarket', textLeft + citiW, logoTopY + 7);
-
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(80, 80, 80);
-  doc.text('PO Box 32334, Chichiri, Blantyre 3', textLeft, logoTopY + 12);
-  doc.text('Phone: (+265) 888857188  |  Email: smkulichi@gmail.com', textLeft, logoTopY + 17);
+  doc.text('Chinyonga, Blantyre', margin, logoTopY + logoH + 5);
+  doc.text('Phone: (+265) 888857188  |  Email: info@citinati.com', margin, logoTopY + logoH + 10);
 
   // ── "QUOTATION" badge (right side) ────────────────────────────────────────
   const badgeW = 44;
@@ -1369,7 +1354,7 @@ export const generateQuotationPDF = async (quotation) => {
   doc.text('QUOTATION', badgeX + badgeW / 2, logoTopY + 8.5, { align: 'center' });
 
   // ── Divider ───────────────────────────────────────────────────────────────
-  const dividerY = logoTopY + logoH + 4;
+  const dividerY = logoTopY + logoH + 14;
   doc.setDrawColor(91, 75, 138);
   doc.setLineWidth(0.6);
   doc.line(margin, dividerY, pageWidth - margin, dividerY);

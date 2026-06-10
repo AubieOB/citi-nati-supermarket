@@ -4,7 +4,7 @@ import '../../styles/global.css';
 
 const Returns = () => {
   return (
-    <div className="page">
+    <div className="page public-info-page returns-page">
       <Container>
         <div style={{ marginTop: '2rem', marginBottom: '2rem' }}>
           <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>Returns & Refunds</h1>

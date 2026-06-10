@@ -1158,3 +1158,251 @@
   color: var(--support-text-muted);
   border-color: var(--support-border);
 }
+
+/* Customer Help Center compact workspace */
+.support-public-sealed {
+  --support-bg: #f3f6fa;
+  --support-panel: #ffffff;
+  --support-panel-strong: #ffffff;
+  --support-border: #d9e3ef;
+  --support-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+  min-height: calc(100vh - 214px);
+  padding: 0.85rem clamp(1rem, 2vw, 2rem) 1.25rem !important;
+  background: var(--support-bg);
+}
+
+.support-public-sealed::before {
+  display: none !important;
+}
+
+.support-public-sealed :is(
+  .support-sidebar,
+  .support-conversation-panel,
+  .support-ticket-card,
+  .support-empty-card,
+  .support-empty-state,
+  .support-compose-surface,
+  .support-select,
+  .support-search-input,
+  .support-input,
+  .support-textarea,
+  .support-chip,
+  .support-badge,
+  .support-primary-button,
+  .support-secondary-button,
+  .support-ghost-button,
+  .support-danger-button,
+  .support-icon-button,
+  .support-attachment-link,
+  .support-attachment-chip,
+  .support-alert,
+  .support-message-bubble,
+  .support-ticket-creator
+) {
+  border-radius: 8px !important;
+}
+
+.help-center-top-bar,
+.support-public-sealed .support-messenger-layout {
+  width: min(100%, 1680px) !important;
+}
+
+.help-center-top-bar {
+  padding: 0.8rem 1rem !important;
+  margin: 0 auto 0.75rem !important;
+  border: 1px solid var(--support-border) !important;
+  border-radius: 8px !important;
+  background: #fff !important;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.help-center-top-row {
+  align-items: center !important;
+  margin: 0 !important;
+}
+
+.help-center-heading {
+  font-size: 1.28rem !important;
+  font-weight: 800 !important;
+  color: #061833 !important;
+}
+
+.help-center-subtitle {
+  margin-top: 0.2rem !important;
+  color: #64748b !important;
+  font-size: 0.9rem !important;
+}
+
+.help-center-new-ticket-button,
+.support-public-sealed .support-primary-button {
+  min-height: 38px !important;
+  padding: 0.5rem 0.95rem !important;
+  background: #2D8659 !important;
+  border: 0 !important;
+  color: #fff !important;
+  font-size: 0.9rem !important;
+  font-weight: 800 !important;
+  box-shadow: none !important;
+}
+
+.support-public-sealed .support-ticket-creator {
+  margin-top: 0.75rem !important;
+  padding: 0.9rem !important;
+  border: 1px solid var(--support-border) !important;
+  background: #f8fafc !important;
+}
+
+.support-public-sealed .support-messenger-layout {
+  grid-template-columns: minmax(300px, 430px) minmax(0, 1fr) !important;
+  gap: 0.8rem !important;
+  min-height: 31rem !important;
+  overflow: visible !important;
+}
+
+.support-public-sealed .support-sidebar,
+.support-public-sealed .support-conversation-panel,
+.support-public-sealed .support-empty-state {
+  border: 1px solid var(--support-border) !important;
+  background: #fff !important;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06) !important;
+}
+
+.support-public-sealed .support-sidebar {
+  overflow: hidden !important;
+}
+
+.support-public-sealed .support-ticket-list {
+  padding: 0.65rem !important;
+  background: #fff !important;
+}
+
+.support-public-sealed .support-ticket-card {
+  width: 100%;
+  margin: 0 0 0.55rem !important;
+  padding: 0 !important;
+  border: 1px solid #e2eaf4 !important;
+  border-left: 4px solid var(--ticket-accent, #2D8659) !important;
+  background: #fbfcfe !important;
+  box-shadow: none !important;
+  transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+}
+
+.support-public-sealed .support-ticket-card:hover {
+  background: #fff !important;
+  border-color: #cbd8e8 !important;
+  transform: translateY(-1px);
+}
+
+.support-public-sealed .support-ticket-card.is-active {
+  background: #f0f7f3 !important;
+  border-color: #b8d9c7 !important;
+}
+
+.support-public-sealed .support-ticket-card::before {
+  display: none !important;
+}
+
+.support-public-sealed .support-ticket-card-content {
+  padding: 0.82rem 0.85rem !important;
+}
+
+.support-ticket-title {
+  margin: 0 !important;
+  font-size: 0.94rem !important;
+  color: #172033 !important;
+  line-height: 1.35 !important;
+}
+
+.support-ticket-preview,
+.support-empty-copy {
+  color: #64748b !important;
+  font-size: 0.9rem !important;
+  line-height: 1.45 !important;
+}
+
+.support-public-sealed .support-badge {
+  padding: 0.26rem 0.5rem !important;
+  font-size: 0.72rem !important;
+}
+
+.support-public-sealed .support-icon-button {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  border: 1px solid #e2eaf4 !important;
+  background: #f8fafc !important;
+  color: #334155 !important;
+}
+
+.support-public-sealed .support-conversation-header {
+  min-height: 58px !important;
+  padding: 0.75rem 0.9rem !important;
+  border-bottom: 1px solid var(--support-border) !important;
+  background: #fff !important;
+}
+
+.support-conversation-title {
+  font-size: 1.05rem !important;
+  color: #061833 !important;
+}
+
+.support-public-sealed .support-conversation-body {
+  background: #f8fafc !important;
+  padding: 0.85rem !important;
+}
+
+.support-public-sealed .support-message-stack {
+  gap: 0.65rem !important;
+}
+
+.support-public-sealed .support-message-bubble {
+  max-width: min(74%, 680px) !important;
+  padding: 0.72rem 0.85rem !important;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08) !important;
+}
+
+.support-public-sealed .support-composer {
+  padding: 0.7rem !important;
+  border-top: 1px solid var(--support-border) !important;
+  background: #fff !important;
+}
+
+.support-public-sealed .support-compose-surface {
+  padding: 0.5rem !important;
+  border: 1px solid var(--support-border) !important;
+  background: #f8fafc !important;
+  box-shadow: none !important;
+}
+
+.support-public-sealed .support-textarea,
+.support-public-sealed .support-input,
+.support-public-sealed .support-select {
+  min-height: 38px !important;
+  padding: 0.55rem 0.65rem !important;
+  border-radius: 7px !important;
+  font-size: 0.9rem !important;
+}
+
+.support-public-sealed .hc-compose-textarea {
+  min-height: 44px !important;
+}
+
+.support-public-sealed .support-empty-state {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 1rem !important;
+}
+
+.support-public-sealed .support-empty-card {
+  width: min(100%, 440px) !important;
+  padding: 1.6rem !important;
+  border: 1px solid var(--support-border) !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+.help-center-empty-title {
+  font-size: 1.45rem !important;
+  color: #061833 !important;
+}

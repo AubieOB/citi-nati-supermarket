@@ -76,7 +76,7 @@ const Contact = () => {
   };
 
   return (
-    <div className="page">
+    <div className="page public-info-page contact-page">
       <Container>
         <div style={{ marginTop: '2rem', marginBottom: '2rem' }}>
           <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>Contact Us</h1>
@@ -100,7 +100,7 @@ const Contact = () => {
 
             <div style={{ marginBottom: '2rem' }}>
               <h3 style={{ color: '#333', marginBottom: '0.5rem' }}>Address</h3>
-              <p style={{ color: '#666' }}>Citi-Nati Supermarket<br />PO Box 32334 Chichiri, Blantyre 3<br />Malawi</p>
+              <p style={{ color: '#666' }}>Citi-Nati Supermarket<br />PO Box 32334 Chinyonga, Blantyre 3<br />Malawi</p>
             </div>
 
             <div style={{ marginBottom: '2rem' }}>

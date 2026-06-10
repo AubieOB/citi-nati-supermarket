@@ -1,5 +1,5 @@
 import html2canvas from 'html2canvas';
-import logo from '../assets/citi-nati-logo.png.png';
+import logo from '../assets/citi-nati-full-logo.png';
 
 const BRAND = {
   purple: '#5B4B8A',
@@ -50,15 +50,12 @@ export async function exportQuotationReportImage({
 
   const logoImg = document.createElement('img');
   logoImg.src = logo;
-  logoImg.style.cssText = 'height: 74px; width: auto;';
+  logoImg.style.cssText = 'width: 410px; height: auto; object-fit: contain;';
   header.appendChild(logoImg);
 
   const headerTitle = document.createElement('div');
   headerTitle.style.cssText = 'flex: 1; min-width: 0;';
   headerTitle.innerHTML = `
-    <div style="font-size: 35px; font-weight: bold; margin-bottom: 4px; white-space: nowrap; line-height: 1.1;">
-      <span style="color: ${BRAND.purple};">Citi-</span><span style="color: ${BRAND.green};">Nati Supermarket</span>
-    </div>
     <div style="font-size: 25px; font-weight: bold; color: ${BRAND.text}; margin-top: 4px; white-space: nowrap; line-height: 1.15;">${title}</div>
     <div style="font-size: 15px; color: ${BRAND.muted}; margin-top: 6px;">Generated on: ${generated}</div>
   `;

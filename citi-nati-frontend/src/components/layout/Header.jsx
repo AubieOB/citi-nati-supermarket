@@ -1,27 +1,44 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useCart } from '../../context/CartContext.jsx';
 import Modal from '../common/Modal.jsx';
 import { useModal } from '../../hooks/useModal.js';
-import logo from '../../assets/citi-nati-logo.png.png';
+import api from '../../utils/api.js';
+import { formatMWK } from '../../utils/currency.js';
+import { cartValidation } from '../../utils/backendAlignment.js';
+import { resolveEffectiveStock } from '../../utils/stockResolver.js';
+import logo from '../../assets/citi-nati-full-logo.png';
 import { getDashboardPathForUser } from '../../utils/permissions.js';
 import '../../styles/global.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 
+const STOREFRONT_LOCATION_CODE = String(import.meta.env.VITE_STOREFRONT_LOCATION_CODE || 'SH').trim().toUpperCase();
+const STOREFRONT_BRANCH_CODE = String(import.meta.env.VITE_STOREFRONT_BRANCH_CODE || 'BLANTYRE').trim().toUpperCase();
+const SEARCH_SUGGESTION_LIMIT = 6;
+
 const Header = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showEmailPopup, setShowEmailPopup] = useState(false);
-  const [showAccountLabel, setShowAccountLabel] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchTouched, setSearchTouched] = useState(false);
+  const [addingProductId, setAddingProductId] = useState(null);
   const popupRef = useRef(null);
   const menuRef = useRef(null);
+  const searchDebounceRef = useRef(null);
+  const searchAbortRef = useRef(null);
+  const searchRequestIdRef = useRef(0);
   const { user, isAuthenticated, logout, isLoading: authLoading } = useAuth();
-  const { cartCount, fetchCartCount, resetCart } = useCart();
+  const { cartCount, fetchCartCount, updateCartCount, resetCart } = useCart();
   const navigate = useNavigate();
-  const { modal, closeModal, showConfirm } = useModal();
+  const location = useLocation();
+  const { modal, closeModal, showConfirm, showError, showSuccess } = useModal();
+  const isOrderFlowHeader = location.pathname === '/cart' || location.pathname === '/checkout';
 
-  // Scroll detection for header elevation
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 10);
     handleScroll();
@@ -29,55 +46,42 @@ const Header = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Fetch cart count on mount and when auth is ready (only if authenticated)
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
       fetchCartCount();
     }
   }, [authLoading, isAuthenticated, fetchCartCount]);
 
-  // Close account popup when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      // Check if click is inside the popup
-      const isInsidePopup = popupRef.current && popupRef.current.contains(event.target);
-      
-      // Only close if clicking outside the popup
-      if (!isInsidePopup) {
+      if (popupRef.current && !popupRef.current.contains(event.target)) {
         setShowEmailPopup(false);
+      }
+
+      if (!event.target.closest('.header__search-area')) {
+        setSearchTouched(false);
       }
     };
 
-    if (showEmailPopup) {
-      // Add small delay to ensure popup is rendered before listener activates
-      const timerId = setTimeout(() => {
-        document.addEventListener('click', handleClickOutside);
-      }, 0);
-      
+    if (showEmailPopup || searchTouched) {
+      const timerId = setTimeout(() => document.addEventListener('click', handleClickOutside), 0);
       return () => {
         clearTimeout(timerId);
         document.removeEventListener('click', handleClickOutside);
       };
     }
-  }, [showEmailPopup]);
+  }, [showEmailPopup, searchTouched]);
 
-  // Close mobile menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
-        // Don't close if clicking the hamburger button itself
-        const hamburger = document.querySelector('.header__hamburger');
-        if (hamburger && !hamburger.contains(event.target)) {
-          setMenuOpen(false);
-        }
+      const hamburger = document.querySelector('.header__hamburger');
+      if (menuRef.current && !menuRef.current.contains(event.target) && !hamburger?.contains(event.target)) {
+        setMenuOpen(false);
       }
     };
 
     if (menuOpen) {
-      // Add menu-open class to body to prevent scrolling
       document.body.classList.add('menu-open');
-      
-      // Use both touchstart and click to handle mobile and desktop
       document.addEventListener('touchstart', handleClickOutside, true);
       document.addEventListener('click', handleClickOutside, true);
       return () => {
@@ -85,23 +89,149 @@ const Header = () => {
         document.removeEventListener('touchstart', handleClickOutside, true);
         document.removeEventListener('click', handleClickOutside, true);
       };
-    } else {
-      // Ensure menu-open class is removed when menu closes
-      document.body.classList.remove('menu-open');
     }
+
+    document.body.classList.remove('menu-open');
   }, [menuOpen]);
 
-  const toggleMenu = (e) => {
-    // Prevent event bubbling when opening menu
-    if (e) {
-      e.stopPropagation();
-      e.preventDefault();
+  useEffect(() => {
+    const query = searchTerm.trim();
+
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
     }
-    setMenuOpen(!menuOpen);
+
+    if (!searchOpen || query.length < 2) {
+      setSearchSuggestions([]);
+      setSearchLoading(false);
+      if (searchAbortRef.current) {
+        searchAbortRef.current.abort();
+      }
+      return;
+    }
+
+    setSearchLoading(true);
+    searchDebounceRef.current = setTimeout(() => {
+      if (searchAbortRef.current) {
+        searchAbortRef.current.abort();
+      }
+
+      const requestId = ++searchRequestIdRef.current;
+      searchAbortRef.current = new AbortController();
+
+      const params = new URLSearchParams();
+      params.append('page', '1');
+      params.append('pageSize', SEARCH_SUGGESTION_LIMIT);
+      params.append('search', query);
+      params.append('branchCode', STOREFRONT_BRANCH_CODE);
+      params.append('locationCode', STOREFRONT_LOCATION_CODE);
+
+      api.get(`/products?${params.toString()}`, { signal: searchAbortRef.current.signal })
+        .then((response) => {
+          if (requestId !== searchRequestIdRef.current) return;
+          const products = Array.isArray(response.data?.products) ? response.data.products : [];
+          setSearchSuggestions(products.filter((product) => !product.hideFromProductsPage).slice(0, SEARCH_SUGGESTION_LIMIT));
+        })
+        .catch((err) => {
+          if (err.name !== 'CanceledError' && err.name !== 'AbortError') {
+            console.warn('[HEADER SEARCH] Product suggestions failed:', err.message);
+          }
+          if (requestId === searchRequestIdRef.current) {
+            setSearchSuggestions([]);
+          }
+        })
+        .finally(() => {
+          if (requestId === searchRequestIdRef.current) {
+            setSearchLoading(false);
+          }
+        });
+    }, 220);
+
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+    };
+  }, [searchTerm, searchOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+      if (searchAbortRef.current) {
+        searchAbortRef.current.abort();
+      }
+    };
+  }, []);
+
+  const closeMenu = () => setMenuOpen(false);
+
+  const trackProductInteraction = (product, action, query = '') => {
+    if (!product?.id) return;
+    api.post('/products/interactions', {
+      productId: product.id,
+      action,
+      query,
+      branchCode: STOREFRONT_BRANCH_CODE,
+      locationCode: STOREFRONT_LOCATION_CODE,
+    }).catch(() => {});
   };
 
-  const closeMenu = () => {
-    setMenuOpen(false);
+  const handleSearchSubmit = (event) => {
+    event.preventDefault();
+    const query = searchTerm.trim();
+    navigate(query ? `/products?search=${encodeURIComponent(query)}` : '/products');
+    setSearchOpen(false);
+    setSearchTouched(false);
+    closeMenu();
+  };
+
+  const handleQuickAddToCart = async (product) => {
+    if (!isAuthenticated) {
+      showError('Authentication Required', 'Please log in to add items to your cart');
+      return;
+    }
+
+    const availableStock = resolveEffectiveStock(product);
+    if (availableStock <= 0) {
+      showError('Out of Stock', `${product.name} is out of stock`);
+      return;
+    }
+
+    const validation = cartValidation.validateAddToCart({
+      productId: product.id,
+      quantity: 1,
+    });
+
+    if (!validation.isValid) {
+      showError('Invalid Request', 'Invalid cart request:\n' + validation.errors.join('\n'));
+      return;
+    }
+
+    try {
+      setAddingProductId(product.id);
+      await api.post('/cart', {
+        productId: product.id,
+        quantity: 1,
+      });
+      trackProductInteraction(product, 'add_to_cart', searchTerm.trim());
+      showSuccess('Added to Cart', `${product.name} added to cart!`);
+      await updateCartCount();
+    } catch (err) {
+      if (err.response?.status === 401) {
+        showError('Session Expired', 'Session expired. Please log in again.');
+        logout();
+        resetCart();
+        navigate('/login');
+        return;
+      }
+
+      const errorMsg = err.response?.data?.error;
+      showError('Error', `Error adding to cart: ${errorMsg || 'Unknown error'}`);
+    } finally {
+      setAddingProductId(null);
+    }
   };
 
   const handleLogout = () => {
@@ -118,490 +248,306 @@ const Header = () => {
     );
   };
 
-  /**
-   * Get dashboard link based on user role
-   * Roles: admin, driver, cashier, user
-   */
   const getDashboardLink = () => {
     if (!user) return null;
-
-    // Debug: Log auth state
-    console.log("Auth state:", { isAuthenticated, role: user?.role });
 
     const dashboardPath = getDashboardPathForUser(user);
     if (!dashboardPath) return null;
 
-    if (dashboardPath === '/admin') {
-      return { path: '/admin', label: 'Admin Dashboard' };
-    }
-
-    if (dashboardPath === '/driver') {
-      return { path: '/driver', label: 'Driver Dashboard' };
-    }
-
+    if (dashboardPath === '/admin') return { path: '/admin', label: 'Admin Dashboard' };
+    if (dashboardPath === '/driver') return { path: '/driver', label: 'Driver Dashboard' };
     return { path: '/cashier', label: 'Cashier Dashboard' };
   };
 
-  // Get initials from user name (first letter of first name + first letter of last name)
-  const getInitials = () => {
-    if (!user || !user.name) return '?';
-    const parts = user.name.trim().split(' ');
-    if (parts.length > 1) {
-      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-    }
-    return parts[0][0].toUpperCase();
+  const getInitial = () => {
+    const name = user?.name?.trim();
+    return name ? name[0].toUpperCase() : '?';
   };
 
   const dashboardLink = getDashboardLink();
+  const showSearchPanel = searchOpen && searchTouched && searchTerm.trim().length > 0;
+
+  const renderSearchSuggestions = () => {
+    if (!showSearchPanel) return null;
+
+    const query = searchTerm.trim();
+
+    return (
+      <div className="header__search-results" role="listbox" aria-label="Product search suggestions">
+        {query.length < 2 && (
+          <div className="header__search-state">Type at least 2 characters to search products.</div>
+        )}
+
+        {query.length >= 2 && searchLoading && (
+          <div className="header__search-skeletons" aria-label="Loading product suggestions">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        )}
+
+        {query.length >= 2 && !searchLoading && searchSuggestions.length === 0 && (
+          <div className="header__search-state">No products found for "{query}".</div>
+        )}
+
+        {query.length >= 2 && searchSuggestions.map((product) => {
+          const availableStock = resolveEffectiveStock(product);
+          const price = Number(product.finalPrice || product.price || 0);
+          const isAdding = addingProductId === product.id;
+
+          return (
+            <div className="header__search-product" key={product.id} role="option" aria-selected="false">
+              <Link
+                to={`/products?search=${encodeURIComponent(query)}`}
+                className="header__search-product-link"
+                onClick={() => {
+                  trackProductInteraction(product, 'view', query);
+                  setSearchTouched(false);
+                  setSearchOpen(false);
+                  closeMenu();
+                }}
+              >
+                <span className="header__search-product-image">
+                  {product.imageUrl ? (
+                    <img src={product.imageUrl} alt="" crossOrigin="anonymous" />
+                  ) : (
+                    <i className="fas fa-basket-shopping" aria-hidden="true"></i>
+                  )}
+                </span>
+                <span className="header__search-product-copy">
+                  <strong>{product.name}</strong>
+                  <small>
+                    {product.category || 'Product'} · {availableStock > 0 ? `In stock (${availableStock})` : 'Out of stock'}
+                  </small>
+                  <em>{formatMWK(price)}</em>
+                </span>
+              </Link>
+
+              <button
+                type="button"
+                className="header__search-cart-button"
+                onClick={() => handleQuickAddToCart(product)}
+                disabled={availableStock <= 0 || isAdding}
+                aria-label={`Add ${product.name} to cart`}
+                title={availableStock > 0 ? 'Add to cart' : 'Out of stock'}
+              >
+                <i className={`fas ${isAdding ? 'fa-spinner fa-spin' : 'fa-cart-plus'}`} aria-hidden="true"></i>
+              </button>
+            </div>
+          );
+        })}
+
+        {query.length >= 2 && (
+          <button type="submit" className="header__search-view-all">
+            View all results for "{query}"
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  const navLinks = (
+    <>
+      <NavLink to="/" end className={({ isActive }) => `header__link ${isActive ? 'header__link--active' : ''}`} onClick={closeMenu}>
+        Home
+      </NavLink>
+      <NavLink to="/products" className={({ isActive }) => `header__link ${isActive ? 'header__link--active' : ''}`} onClick={closeMenu}>
+        Products
+      </NavLink>
+      <NavLink to="/about" className={({ isActive }) => `header__link ${isActive ? 'header__link--active' : ''}`} onClick={closeMenu}>
+        About
+      </NavLink>
+      {isAuthenticated && user?.role === 'user' && (
+        <NavLink to="/my-orders" className={({ isActive }) => `header__link ${isActive ? 'header__link--active' : ''}`} onClick={closeMenu}>
+          Orders
+        </NavLink>
+      )}
+      {dashboardLink && (
+        <Link to={dashboardLink.path} className="header__link" onClick={closeMenu}>
+          {dashboardLink.label}
+        </Link>
+      )}
+    </>
+  );
 
   return (
-    <header className={`header${isScrolled ? ' header--scrolled' : ''}`}>
-      <Link to="/" className="header__logo" onClick={closeMenu} style={{ marginLeft: '-2rem', paddingLeft: '2rem' }}>
-        <img 
-          src={logo} 
-          alt="Citi-Nati Logo" 
-          style={{ height: 'clamp(40px, 8vw, 60px)', marginLeft: '0', marginRight: '0.1rem', verticalAlign: 'middle' }}
-        />
-        <span style={{ display: 'flex', alignItems: 'center', gap: '0', fontSize: 'clamp(14px, 3vw, 20px)', whiteSpace: 'nowrap' }}>
-          <span style={{ color: '#5B4B8A', fontWeight: '700' }}>Citi</span>
-          <span style={{ color: '#2D8659', fontWeight: '700' }}>-Nati Supermarket</span>
-        </span>
-      </Link>
+    <header className={`header${isScrolled ? ' header--scrolled' : ''}${isOrderFlowHeader ? ' header--order-flow' : ''}`}>
+      <div className="header__top">
+        <div className="header__top-inner">
+          <Link to="/" className="header__logo" onClick={closeMenu} aria-label="Citi-Nati Supermarket home">
+            <img src={logo} alt="Citi-Nati Logo" />
+          </Link>
 
-      {/* Desktop Navigation */}
-      <nav className="header__nav">
-       <NavLink 
-          to="/" 
-          end
-          className={({ isActive }) => 
-            `header__link ${isActive ? 'header__link--active' : ''}`
-          }
-        >
-          Home
-        </NavLink>
-        <NavLink 
-          to="/products"
-          className={({ isActive }) => 
-            `header__link ${isActive ? 'header__link--active' : ''}`
-          }
-        >
-          Products
-        </NavLink>
-        <NavLink 
-          to="/about" 
-          className={({ isActive }) => 
-            `header__link ${isActive ? 'header__link--active' : ''}`
-          }
-        >
-          About Us
-        </NavLink>
-        <NavLink 
-        to="/cart"
-        className={({ isActive }) => 
-          `header__link ${isActive ? 'header__link--active' : ''}`
-        }
-      >
-        <i className="fas fa-shopping-cart" style={{ marginRight: '0.5rem' }}></i>
-      Cart
-          {cartCount > 0 && (
-            <span
-              style={{
-                marginLeft: '0.5rem',
-                backgroundColor: '#ff3860',
-                color: 'white',
-                borderRadius: '50%',
-                width: '20px',
-                height: '20px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '12px',
-                fontWeight: 'bold',
-                minWidth: '20px',
-              }}
-            >
-              {cartCount}
-            </span>
-          )}
-        </NavLink>
-
-        {isAuthenticated ? (
-          <>
-            {/* Show role-based dashboard link */}
-            {dashboardLink && (
-              <Link to={dashboardLink.path} className="header__link">
-                {dashboardLink.label}
-              </Link>
-            )}
-
-            {/* Show My Orders link for users */}
-            {user?.role === 'user' && (
-              <NavLink to="/my-orders" className={({ isActive }) => 
-                `header__link ${isActive ? 'header__link--active' : ''}`
-              }>
-                <i className="fas fa-box" style={{ marginRight: '0.5rem' }}></i>
-                My Orders
-              </NavLink>
-            )}
-
-            {/* Avatar Circle with Email and Logout Popup */}
-            <div
-              ref={popupRef}
-              style={{ position: 'relative', display: 'inline-block' }}
-              onMouseEnter={() => setShowAccountLabel(true)}
-              onMouseLeave={() => setShowAccountLabel(false)}
-            >
-              <div
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowEmailPopup(!showEmailPopup);
-                }}
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '50%',
-                  backgroundColor: '#ff3860',
-                  color: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  fontSize: '18px',
-                  fontWeight: 'bold',
-                  position: 'relative',
-                  transition: 'transform 0.2s ease',
-                  pointerEvents: 'auto',
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.transform = 'scale(1.1)';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.transform = 'scale(1)';
-                }}
-              >
-                {/* Initial Letter Only */}
-                {getInitials()[0]}
-              </div>
-
-              {/* Account Label - Shows on hover */}
-              {showAccountLabel && !showEmailPopup && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '50px',
-                    right: '0',
-                    backgroundColor: '#333',
-                    color: 'white',
-                    padding: '4px 8px',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    whiteSpace: 'nowrap',
-                    zIndex: 999,
-                  }}
-                >
-                  Account
-                </div>
-              )}
-
-              {/* Email Popup with Logout - Shows on click only */}
-              {showEmailPopup && (
-                <div
-                  onClick={(e) => e.stopPropagation()}
-                  style={{
-                    position: 'absolute',
-                    top: '50px',
-                    right: '0',
-                    backgroundColor: 'white',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px',
-                    padding: '12px',
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                    zIndex: 1000,
-                    minWidth: '220px',
-                    pointerEvents: 'auto',
-                  }}
-                >
-                  {/* User Name */}
-                  <div
-                    style={{
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      color: '#333',
-                      marginBottom: '6px',
-                    }}
-                  >
-                    {user.name}
-                  </div>
-
-                  {/* Email */}
-                  <div
-                    style={{
-                      fontSize: '13px',
-                      color: '#666',
-                      marginBottom: '10px',
-                      wordBreak: 'break-word',
-                    }}
-                  >
-                    {user.email}
-                  </div>
-
-                  {/* Logout Button in Popup */}
-                  <button
-                    data-logout="true"
-                    onClick={handleLogout}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      backgroundColor: '#ff3860',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: '500',
-                      transition: 'background-color 0.2s ease',
-                      pointerEvents: 'auto',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#e82860';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = '#ff3860';
-                    }}
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
+          {!isOrderFlowHeader && (
+            <div className="header__top-nav" aria-label="Scrolled navigation">
+              {navLinks}
             </div>
-          </>
-        ) : (
-          <>
-            <NavLink 
-            to="/login"
-            className={({ isActive }) => 
-              `header__link ${isActive ? 'header__link--active' : ''}`
-            }
-          >
-            Login
-          </NavLink>
-            <NavLink 
-              to="/register"
-              className={({ isActive }) => 
-                `header__link ${isActive ? 'header__link--active' : ''}`
-              }
-            >
-              Register
-            </NavLink>
-          </>
-        )}
-      </nav>
+          )}
 
-      {/* Mobile Hamburger */}
-      <div 
-        className={`header__hamburger ${menuOpen ? 'header__hamburger--open' : ''}`} 
-        onClick={toggleMenu}
-        role="button"
-        tabIndex="0"
-        aria-label="Toggle menu"
-        aria-expanded={menuOpen}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            toggleMenu(e);
-          }
-        }}
-      >
-        <span></span>
-        <span></span>
-        <span></span>
+          <div className="header__info" aria-label="Store information">
+            <div className="header__info-item">
+              <i className="fas fa-location-dot" aria-hidden="true"></i>
+              <span>
+                <strong>Address</strong>
+                Chinyonga, Blantyre
+              </span>
+            </div>
+            <div className="header__info-item">
+              <i className="fas fa-envelope" aria-hidden="true"></i>
+              <span>
+                <strong>Email</strong>
+                info@citinati.com
+              </span>
+            </div>
+            <div className="header__info-item">
+              <i className="fas fa-phone" aria-hidden="true"></i>
+              <span>
+                <strong>Phone</strong>
+                (+265) 888857188
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Mobile Menu */}
-      <nav ref={menuRef} className={`header__mobile-menu ${menuOpen ? 'header__mobile-menu--open' : ''}`}>
-        <NavLink to="/" 
-         onClick={closeMenu}
-         className={({ isActive }) => 
-            `header__link ${isActive ? 'header__link--active' : ''}`
-          }
-        >
-          Home
-        </NavLink>
-        <NavLink 
-          to="/products"
-          onClick={closeMenu}
-          className={({ isActive }) => 
-            `header__link ${isActive ? 'header__link--active' : ''}`
-          }
-        >
-          Products
-        </NavLink>
-        <NavLink 
-          to="/about" 
-          onClick={closeMenu}
-          className={({ isActive }) => 
-            `header__link ${isActive ? 'header__link--active' : ''}`
-          }
-        >
-          About Us
-        </NavLink>
-        <NavLink 
-  to="/cart"
-  onClick={closeMenu}
-  className={({ isActive }) => 
-    `header__link ${isActive ? 'header__link--active' : ''}`
-  }
->
-  <i className="fas fa-shopping-cart" style={{ marginRight: '0.5rem' }}></i>
-  Cart
+      {!isOrderFlowHeader && (
+      <div className={`header__market-bar${isScrolled ? ' header__market-bar--hidden' : ''}`}>
+        <div className="header__market-inner">
+          <nav className="header__nav" aria-label="Primary navigation">
+            {navLinks}
+          </nav>
 
-  {cartCount > 0 && (
-    <span
-      style={{
-        marginLeft: '0.5rem',
-        backgroundColor: '#ff3860',
-        color: 'white',
-        borderRadius: '50%',
-        width: '20px',
-        height: '20px',
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: '12px',
-        fontWeight: 'bold',
-        minWidth: '20px',
-      }}
-    >
-      {cartCount}
-    </span>
-  )}
-</NavLink>
-
-        {isAuthenticated ? (
-          <>
-            {/* Show role-based dashboard link */}
-            {dashboardLink && (
-              <Link to={dashboardLink.path} className="header__link" onClick={closeMenu}>
-                {dashboardLink.label}
-              </Link>
-            )}
-
-            {/* Show My Orders link for users */}
-            {user?.role === 'user' && (
-              <NavLink to="/my-orders" className={({ isActive }) => 
-                `header__link ${isActive ? 'header__link--active' : ''}`
-              } onClick={closeMenu}>
-                <i className="fas fa-box" style={{ marginRight: '0.5rem' }}></i>
-                My Orders
-              </NavLink>
-            )}
-
-            {/* Avatar + Email Popup for mobile */}
-            <div ref={popupRef} style={{ padding: '1rem', position: 'relative' }}>
-              <div
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowEmailPopup(!showEmailPopup);
-                }}
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '50%',
-                  backgroundColor: '#ff3860',
-                  color: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  fontSize: '18px',
-                  fontWeight: 'bold',
-                  margin: '0 auto',
-                  transition: 'transform 0.2s ease',
-                }}
-              >
-                {getInitials()[0]}
-              </div>
-
-              {/* Email and Logout in Popup for mobile */}
-              {showEmailPopup && (
-                <div
-                  style={{
-                    backgroundColor: '#f5f5f5',
-                    padding: '12px',
-                    borderRadius: '4px',
-                    marginTop: '10px',
-                    textAlign: 'center',
-                    zIndex: 1001,
-                    position: 'relative',
+          <div className="header__actions">
+            <div className="header__search-area">
+              <form className={`header__search-drawer${searchOpen ? ' header__search-drawer--open' : ''}`} onSubmit={handleSearchSubmit} role="search">
+                <button
+                  type="button"
+                  className="header__icon-button"
+                  onClick={() => {
+                    setSearchOpen((value) => !value);
+                    setSearchTouched(true);
                   }}
+                  aria-label={searchOpen ? 'Close search' : 'Open search'}
+                  aria-expanded={searchOpen}
                 >
-                  {/* User Name */}
-                  <div
-                    style={{
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      color: '#333',
-                      marginBottom: '6px',
-                      wordBreak: 'break-word',
-                    }}
-                  >
-                    {user.name}
-                  </div>
-
-                  {/* Email */}
-                  <div
-                    style={{
-                      fontSize: '13px',
-                      color: '#666',
-                      marginBottom: '10px',
-                      wordBreak: 'break-word',
-                    }}
-                  >
-                    {user.email}
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleLogout();
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      backgroundColor: '#ff3860',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: '500',
-                      pointerEvents: 'auto',
-                      WebkitTouchCallout: 'auto',
-                    }}
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
+                  <i className={`fas ${searchOpen ? 'fa-times' : 'fa-search'}`} aria-hidden="true"></i>
+                </button>
+                <input
+                  type="search"
+                  value={searchTerm}
+                  onChange={(event) => {
+                    setSearchTerm(event.target.value);
+                    setSearchTouched(true);
+                  }}
+                  onFocus={() => setSearchTouched(true)}
+                  placeholder="Search groceries..."
+                  aria-label="Search products"
+                />
+                <button type="submit" className="header__search-submit">
+                  Search
+                </button>
+                {renderSearchSuggestions()}
+              </form>
             </div>
-          </>
-        ) : (
-          <>
-            <NavLink to="/login" className={({ isActive }) => 
-            `header__link ${isActive ? 'header__link--active' : ''}`
-          }
-           onClick={closeMenu}>
+
+            <Link to="/cart" className="header__cart" onClick={closeMenu} aria-label={`Cart with ${cartCount} items`}>
+              <i className="fas fa-shopping-cart" aria-hidden="true"></i>
+              <span>Cart</span>
+              {cartCount > 0 && <span className="header__badge">{cartCount > 99 ? '99+' : cartCount}</span>}
+            </Link>
+
+            {isAuthenticated ? (
+              <div className="header__account" ref={popupRef}>
+                <button
+                  type="button"
+                  className="header__avatar"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setShowEmailPopup((value) => !value);
+                  }}
+                  aria-label="Open account menu"
+                  aria-expanded={showEmailPopup}
+                >
+                  {getInitial()}
+                </button>
+
+                {showEmailPopup && (
+                  <div className="header__account-menu" onClick={(event) => event.stopPropagation()}>
+                    <strong>{user.name}</strong>
+                    <span>{user.email}</span>
+                    <button type="button" onClick={handleLogout}>
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="header__auth">
+                <NavLink to="/login" className="header__login">
+                  Login
+                </NavLink>
+                <NavLink to="/register" className="header__register">
+                  Register
+                </NavLink>
+              </div>
+            )}
+
+            <button
+              type="button"
+              className={`header__hamburger ${menuOpen ? ' header__hamburger--open' : ''}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                setMenuOpen((value) => !value);
+              }}
+              aria-label="Toggle menu"
+              aria-expanded={menuOpen}
+            >
+              <span></span>
+              <span></span>
+              <span></span>
+            </button>
+          </div>
+        </div>
+      </div>
+      )}
+
+      <nav ref={menuRef} className={`header__mobile-menu ${menuOpen ? 'header__mobile-menu--open' : ''}`} aria-label="Mobile navigation">
+        <div className="header__search-area header__search-area--mobile">
+          <form className="header__mobile-search" onSubmit={handleSearchSubmit} role="search">
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(event) => {
+                setSearchTerm(event.target.value);
+                setSearchOpen(true);
+                setSearchTouched(true);
+              }}
+              onFocus={() => {
+                setSearchOpen(true);
+                setSearchTouched(true);
+              }}
+              placeholder="Search products"
+              aria-label="Search products"
+            />
+            <button type="submit">
+              <i className="fas fa-search" aria-hidden="true"></i>
+            </button>
+            {renderSearchSuggestions()}
+          </form>
+        </div>
+        {navLinks}
+        {!isAuthenticated && (
+          <div className="header__mobile-auth">
+            <NavLink to="/login" className="header__login" onClick={closeMenu}>
               Login
             </NavLink>
-            <NavLink to="/register" className={({ isActive }) => 
-            `header__link ${isActive ? 'header__link--active' : ''}`
-          }
-           onClick={closeMenu}>
+            <NavLink to="/register" className="header__register" onClick={closeMenu}>
               Register
             </NavLink>
-          </>
+          </div>
         )}
       </nav>
+
       <Modal
         isOpen={modal.isOpen}
         title={modal.title}
@@ -618,4 +564,3 @@ const Header = () => {
 };
 
 export default Header;
-

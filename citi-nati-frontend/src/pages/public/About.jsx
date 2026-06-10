@@ -6,15 +6,15 @@ import '../../styles/global.css';
 
 const About = () => {
   return (
-    <div className="page">
+    <div className="page public-info-page about-page">
       {/* Page Header */}
       <section className="page__section">
         <Container>
           <h1 style={{ marginTop: '2rem', marginBottom: '1rem', color: '#5B4B8A', fontSize: '2.5rem' }}>
-            About Citi-Nati Supermarket
+            Who We Are
           </h1>
           <p style={{ fontSize: '1.1rem', color: '#666', marginBottom: '2rem' }}>
-            Your trusted partner for quality groceries and convenient shopping experience
+            Citi-Nati Supermarket helps households shop groceries, essentials, and everyday items with clear prices and reliable service.
           </p>
         </Container>
       </section>

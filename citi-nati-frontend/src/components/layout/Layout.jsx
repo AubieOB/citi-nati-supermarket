@@ -8,22 +8,32 @@ import '../../styles/global.css';
 const Layout = ({ children }) => {
   const location = useLocation();
   
-  // Hide header only on products page and admin/driver dashboards
+  const authOnlyPaths = [
+    '/login',
+    '/register',
+    '/forgot-password',
+    '/reset-password',
+    '/verify-email',
+  ];
+
+  // Hide header only on standalone/auth pages, products page, and dashboards.
   const hideHeader = location.pathname.startsWith('/admin') || 
                    location.pathname.startsWith('/driver') ||
                    location.pathname.startsWith('/cashier') ||
                    location.pathname === '/products' ||
                    location.pathname === '/maintenance' ||
                    location.pathname === '/admin-login' ||
-                   location.pathname === '/login' ||
-                   location.pathname === '/register';
-  const hideFooter = location.pathname.startsWith('/admin') ||
+                   authOnlyPaths.includes(location.pathname);
+const hideFooter = location.pathname.startsWith('/admin') ||
                    location.pathname.startsWith('/driver') ||
                    location.pathname.startsWith('/cashier') ||
+                   location.pathname === '/products' ||
+                   location.pathname === '/cart' ||
+                   location.pathname === '/checkout' ||
+                   location.pathname === '/payment-success' ||
                    location.pathname === '/maintenance' ||
                    location.pathname === '/admin-login' ||
-                   location.pathname === '/login' ||
-                   location.pathname === '/register';
+                   authOnlyPaths.includes(location.pathname);
   return (
     <div className={`layout${hideHeader ? ' layout--no-header' : ''}`}>
       {!hideHeader && (

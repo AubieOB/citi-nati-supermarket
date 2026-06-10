@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import Container from '../../components/ui/Container.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -36,6 +36,9 @@ const Cart = () => {
   const [cart, setCart] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [summaryOffset, setSummaryOffset] = useState(0);
+  const cartGuideRef = useRef(null);
+  const summaryRef = useRef(null);
   const { isAuthenticated, isLoading: authLoading, logout } = useAuth();
   const { updateCartCount } = useCart();
   const { modal, closeModal, showError } = useModal();
@@ -224,13 +227,52 @@ const Cart = () => {
     handleQuantityChange(productId, 0);
   };
 
+  useEffect(() => {
+    const updateSummaryPosition = () => {
+      if (!cartGuideRef.current || !summaryRef.current || window.innerWidth <= 1020) {
+        setSummaryOffset(0);
+        return;
+      }
+
+      const guideRect = cartGuideRef.current.getBoundingClientRect();
+      const summaryHeight = summaryRef.current.offsetHeight;
+      const guideHeight = cartGuideRef.current.offsetHeight;
+      const headerOffset = 122;
+      const maxOffset = Math.max(0, guideHeight - summaryHeight - 8);
+      const nextOffset = Math.round(Math.min(maxOffset, Math.max(0, headerOffset - guideRect.top)));
+
+      setSummaryOffset(nextOffset);
+    };
+
+    let frameId = null;
+    const handleScroll = () => {
+      if (frameId) return;
+      frameId = window.requestAnimationFrame(() => {
+        updateSummaryPosition();
+        frameId = null;
+      });
+    };
+
+    updateSummaryPosition();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', handleScroll);
+
+    return () => {
+      if (frameId) window.cancelAnimationFrame(frameId);
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleScroll);
+    };
+  }, [cart?.items?.length]);
+
   // 8️⃣ AUTH INITIALIZATION STATE
   if (authLoading) {
     return (
       <div className="page cart-page">
-        <Container>
-          <h1 style={{ marginTop: '2rem', marginBottom: '2rem' }}>Shopping Cart</h1>
-          <p className="storefront-loading-state" style={{ textAlign: 'center', color: '#666', padding: '2rem' }}>
+        <Container className="cart-shell">
+          <div className="cart-guide-header">
+            <h1>Your cart</h1>
+          </div>
+          <p className="storefront-loading-state cart-state">
             Verifying your session...
           </p>
         </Container>
@@ -242,9 +284,11 @@ const Cart = () => {
   if (loading) {
     return (
       <div className="page cart-page">
-        <Container>
-          <h1 style={{ marginTop: '2rem', marginBottom: '2rem' }}>Shopping Cart</h1>
-          <p className="storefront-loading-state" style={{ textAlign: 'center', color: '#666', padding: '2rem' }}>
+        <Container className="cart-shell">
+          <div className="cart-guide-header">
+            <h1>Your cart</h1>
+          </div>
+          <p className="storefront-loading-state cart-state">
             Loading your cart...
           </p>
         </Container>
@@ -256,20 +300,16 @@ const Cart = () => {
   if (error) {
     return (
       <div className="page cart-page">
-        <Container>
-          <h1 style={{ marginTop: '2rem', marginBottom: '2rem' }}>Shopping Cart</h1>
-          <div style={{
-            backgroundColor: '#f8d7da',
-            color: '#721c24',
-            padding: '1.5rem',
-            borderRadius: '4px',
-            marginBottom: '2rem'
-          }}>
+        <Container className="cart-shell">
+          <div className="cart-guide-header">
+            <h1>Your cart</h1>
+          </div>
+          <div className="cart-message cart-message--error">
             <h3>Error</h3>
             <p>{error}</p>
           </div>
           <Link to="/products">
-            <Button variant="primary" size="large">
+            <Button variant="primary" size="small">
               Continue Shopping
             </Button>
           </Link>
@@ -282,21 +322,17 @@ const Cart = () => {
   if (!cart || cart.items.length === 0) {
     return (
       <div className="page cart-page">
-        <Container>
-          <h1 style={{ marginTop: '2rem', marginBottom: '2rem' }}>Shopping Cart</h1>
-          <div style={{
-            textAlign: 'center',
-            padding: '3rem',
-            backgroundColor: '#f8f9fa',
-            borderRadius: '8px',
-            marginBottom: '2rem'
-          }}>
+        <Container className="cart-shell">
+          <div className="cart-guide-header">
+            <h1>Your cart</h1>
+          </div>
+          <div className="cart-message cart-message--empty">
             <h2>Your cart is empty</h2>
-            <p style={{ color: '#666', marginBottom: '1.5rem' }}>
+            <p>
               Start shopping to add items to your cart
             </p>
             <Link to="/products">
-              <Button variant="primary" size="large">
+              <Button variant="primary" size="small">
                 Continue Shopping
               </Button>
             </Link>
@@ -321,11 +357,20 @@ const Cart = () => {
 
   return (
     <div className="page cart-page">
-      <Container>
-        <h1 style={{ marginTop: '2rem', marginBottom: '2rem' }}>Shopping Cart</h1>
+      <Container className="cart-shell">
+        <div className="cart-guide-header">
+          <div>
+            <h1>Your cart</h1>
+          </div>
+          <Link to="/products" className="cart-continue-link">
+            <i className="fas fa-arrow-left"></i>
+            Continue shopping
+          </Link>
+        </div>
 
-        <div className="cart-layout">
+        <div className="cart-layout cart-guide-layout" ref={cartGuideRef}>
           {/* CART TABLE: Display items with backend prices */}
+          <div className="cart-items-panel">
           <table className="cart-table">
             <thead>
               <tr>
@@ -340,14 +385,14 @@ const Cart = () => {
               {cart.items.map((item) => (
                 <tr key={item.productId}>
                   {/* FIELD: name (from backend cart response) */}
-                  <td>{item.name}</td>
+                  <td data-label="Product">{item.name}</td>
 
                   {/* FIELD: price (LOCKED at time of add - never manipulate) */}
                   {/* ✅ Trust backend price, not product price from Products page */}
-                  <td>{formatMWK(item.price)}</td>
+                  <td data-label="Unit Price">{formatMWK(item.price)}</td>
 
                   {/* FIELD: quantity (editable via handleQuantityChange) */}
-                  <td>
+                  <td data-label="Quantity">
                     <input
                       type="number"
                       min="0"
@@ -355,24 +400,24 @@ const Cart = () => {
                       onChange={(e) => handleQuantityChange(item.productId, e.target.value)}
                       className="cart-quantity-input"
                       style={{
-                        width: '70px',
-                        padding: '0.5rem 0.25rem',
-                        border: '2px solid #e0e0e0',
-                        borderRadius: '4px',
-                        backgroundColor: '#f5f5f5',
-                        transition: 'box-shadow 0.3s ease, background-color 0.3s ease, border-color 0.3s ease',
+                        width: '58px',
+                        padding: '0.32rem 0.2rem',
+                        border: '1px solid #d6dee9',
+                        borderRadius: '6px',
+                        backgroundColor: '#fff',
+                        transition: 'box-shadow 0.2s ease, background-color 0.2s ease, border-color 0.2s ease',
                         cursor: 'text',
-                        fontSize: '1rem',
+                        fontSize: '0.88rem',
                         textAlign: 'center'
                       }}
                       onFocus={(e) => {
                         e.target.style.backgroundColor = '#fff';
                         e.target.style.borderColor = '#5b4b8a';
-                        e.target.style.boxShadow = '0 4px 12px rgba(91, 75, 138, 0.2)';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(91, 75, 138, 0.12)';
                       }}
                       onBlur={(e) => {
-                        e.target.style.backgroundColor = '#f5f5f5';
-                        e.target.style.borderColor = '#e0e0e0';
+                        e.target.style.backgroundColor = '#fff';
+                        e.target.style.borderColor = '#d6dee9';
                         e.target.style.boxShadow = 'none';
                       }}
                     />
@@ -380,10 +425,10 @@ const Cart = () => {
 
                   {/* FIELD: subtotal (from backend - NEVER calculate on frontend) */}
                   {/* ✅ This is item.quantity * item.price, calculated by backend */}
-                  <td>{formatMWK(item.subtotal)}</td>
+                  <td data-label="Subtotal">{formatMWK(item.subtotal)}</td>
 
                   {/* ACTION: Remove button */}
-                  <td>
+                  <td data-label="Action">
                     <Button
                       size="small"
                       variant="outline"
@@ -396,17 +441,15 @@ const Cart = () => {
               ))}
             </tbody>
           </table>
+          </div>
 
           {/* ORDER SUMMARY: Backend totals (NOT calculated) */}
-          <div className="cart-summary-grid" style={{
-            marginTop: '2rem'
-          }}>
-            <div></div>
-            <div style={{
+          <aside className="cart-summary-card" ref={summaryRef} style={{
               backgroundColor: '#fff',
               padding: '1.5rem',
               borderRadius: '8px',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+              '--cart-summary-offset': `${summaryOffset}px`
             }}>
               <h3 style={{ marginBottom: '1rem' }}>Order Summary</h3>
 
@@ -466,8 +509,7 @@ const Cart = () => {
                   {isBelowMinimumOrderValue ? 'Add Items to Meet Minimum' : 'Proceed to Checkout'}
                 </Button>
               </Link>
-            </div>
-          </div>
+          </aside>
         </div>
       </Container>
       <Modal

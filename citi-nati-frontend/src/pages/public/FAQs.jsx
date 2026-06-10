@@ -19,7 +19,7 @@ const FAQs = () => {
   };
 
   return (
-    <div className="page">
+    <div className="page public-info-page faqs-page">
       <Container>
         <div style={{ marginTop: '2rem', marginBottom: '3rem' }}>
           <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>Frequently Asked Questions</h1>
