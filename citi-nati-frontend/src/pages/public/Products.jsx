@@ -239,6 +239,9 @@ const Products = () => {
         console.log(`[CACHE HIT] Loading from cache (offset: ${currentOffset})`);
         const cachedData = productsCacheRef.current.get(cacheKey);
         setProducts(cachedData.products);
+        if (effectiveSearch) {
+          setFilteredProducts(cachedData.products);
+        }
         setHasMoreProducts(cachedData.hasMore);
         setOffset(currentOffset);
         setLoading(false);
@@ -298,9 +301,18 @@ const Products = () => {
 
       // If Load More, append; otherwise replace
       if (isLoadMore) {
-        setProducts((prev) => mergeUniqueProducts(prev, visibleProducts));
+        setProducts((prev) => {
+          const merged = mergeUniqueProducts(prev, visibleProducts);
+          if (effectiveSearch) {
+            setFilteredProducts(merged);
+          }
+          return merged;
+        });
       } else {
         setProducts(mergeUniqueProducts([], visibleProducts));
+        if (effectiveSearch) {
+          setFilteredProducts(visibleProducts);
+        }
       }
       
       setHasMoreProducts(hasMore);
@@ -1331,17 +1343,19 @@ const Products = () => {
                         {availableStock > 0 ? `In Stock (${availableStock})` : 'Out of Stock'}
                       </div>
 
-                      {/* Add to Cart Button */}
+                      {/* Add to Cart */}
                       <button
-                        className="product-card__button"
+                        className="product-card__button product-card__button--icon"
                         onClick={() => handleAddToCart(product)}
                         disabled={availableStock <= 0}
+                        aria-label={availableStock > 0 ? `Add ${product.name} to cart` : `${product.name} is out of stock`}
+                        title={availableStock > 0 ? 'Add to cart' : 'Out of stock'}
                         style={{
                           opacity: availableStock <= 0 ? 0.6 : 1,
                           cursor: availableStock <= 0 ? 'not-allowed' : 'pointer'
                         }}
                       >
-                        {availableStock > 0 ? 'Add to Cart' : 'Out of Stock'}
+                        <i className={`fas ${availableStock > 0 ? 'fa-cart-plus' : 'fa-ban'}`} aria-hidden="true"></i>
                       </button>
                     </div>
                   </div>

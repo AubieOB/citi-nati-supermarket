@@ -512,29 +512,6 @@ const Header = () => {
       )}
 
       <nav ref={menuRef} className={`header__mobile-menu ${menuOpen ? 'header__mobile-menu--open' : ''}`} aria-label="Mobile navigation">
-        <div className="header__search-area header__search-area--mobile">
-          <form className="header__mobile-search" onSubmit={handleSearchSubmit} role="search">
-            <input
-              type="search"
-              value={searchTerm}
-              onChange={(event) => {
-                setSearchTerm(event.target.value);
-                setSearchOpen(true);
-                setSearchTouched(true);
-              }}
-              onFocus={() => {
-                setSearchOpen(true);
-                setSearchTouched(true);
-              }}
-              placeholder="Search products"
-              aria-label="Search products"
-            />
-            <button type="submit">
-              <i className="fas fa-search" aria-hidden="true"></i>
-            </button>
-            {renderSearchSuggestions()}
-          </form>
-        </div>
         {navLinks}
         {!isAuthenticated && (
           <div className="header__mobile-auth">
