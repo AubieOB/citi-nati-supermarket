@@ -437,16 +437,26 @@ const MyOrdersContent = () => {
               .muted { color: var(--muted); }
               @media screen and (max-width: 760px) {
                 html, body { overflow-x:hidden; }
-                .viewer { padding: 18px 10px 32px; overflow-x:hidden; }
+                .viewer { padding: 14px 0 28px; overflow-x:hidden; }
+                .paper-frame {
+                  width: 210mm;
+                  min-height: calc(297mm * var(--receipt-scale, 1));
+                  margin: 0 auto;
+                  display:flex;
+                  justify-content:center;
+                  align-items:flex-start;
+                }
                 .paper {
-                  width: 100%;
-                  min-height: auto;
-                  max-width: 100%;
-                  padding: 28px 22px 24px;
+                  width: 210mm;
+                  min-height: 297mm;
+                  max-width: none;
+                  padding: 22mm 23mm 17mm;
                   overflow:hidden;
+                  transform: scale(var(--receipt-scale, 1));
+                  transform-origin: top center;
                 }
                 .top { align-items:center; gap:10px; }
-                .brand img { width:min(330px, 68vw); max-height:42px; }
+                .brand img { width:325px; max-height:48px; }
                 .stamp { font-size:22px; white-space:nowrap; }
                 .receipt-title { margin:18px 0 18px; padding-bottom:16px; font-size:24px; }
                 .info-grid { grid-template-columns: minmax(0, 1fr) minmax(0, .82fr); gap:16px; }
@@ -469,25 +479,7 @@ const MyOrdersContent = () => {
                 .back-strip a { font-size:16px; }
               }
               @media screen and (max-width: 430px) {
-                .viewer { padding: 12px 8px 28px; }
-                .paper { padding: 22px 18px; }
-                .brand img { width:min(270px, 64vw); }
-                .stamp { font-size:19px; }
-                .receipt-title { font-size:22px; }
-                .info-grid { grid-template-columns: 1fr; gap:8px; }
-                .info-block.right { text-align:left; }
-                th, td { font-size:12px; padding:7px 5px; }
-                .items table { table-layout:fixed; }
-                .items th:nth-child(1),
-                .items td:nth-child(1) { width:42%; }
-                .items th:nth-child(2),
-                .items td:nth-child(2) { width:12%; }
-                .items th:nth-child(3),
-                .items td:nth-child(3),
-                .items th:nth-child(4),
-                .items td:nth-child(4) { width:23%; }
-                .transactions th,
-                .transactions td { font-size:11px; }
+                .viewer { padding: 10px 0 26px; }
               }
               @media print {
                 @page { size: A4; margin: 0; }
@@ -500,6 +492,7 @@ const MyOrdersContent = () => {
           </head>
           <body>
             <div class="viewer">
+              <div class="paper-frame">
               <main class="paper">
                 <header class="top">
                   <div class="brand">
@@ -595,10 +588,27 @@ const MyOrdersContent = () => {
                   <p class="thanks">Thank you for shopping with Citi-Nati Supermarket.</p>
                 </footer>
               </main>
+              </div>
               <div class="back-strip">
                 <a href="https://www.citinati.com/" target="_self">&laquo; Back to Citi-Nati Supermarket</a>
               </div>
             </div>
+            <script>
+              (function () {
+                function fitReceiptPaper() {
+                  var frame = document.querySelector('.paper-frame');
+                  var paper = document.querySelector('.paper');
+                  if (!frame || !paper) return;
+                  var availableWidth = Math.max(300, window.innerWidth - 18);
+                  var paperWidth = paper.offsetWidth || 794;
+                  var scale = Math.min(1, availableWidth / paperWidth);
+                  document.documentElement.style.setProperty('--receipt-scale', String(scale));
+                }
+                window.addEventListener('resize', fitReceiptPaper);
+                window.addEventListener('load', fitReceiptPaper);
+                fitReceiptPaper();
+              })();
+            </script>
           </body>
         </html>`;
       receiptWindow.document.open();
