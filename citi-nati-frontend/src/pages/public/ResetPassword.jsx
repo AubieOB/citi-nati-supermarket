@@ -85,8 +85,8 @@ const ResetPassword = () => {
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
           }}>
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-              <i className="fas fa-key" style={{ fontSize: '3rem', color: '#5B4B8A', marginBottom: '1rem' }}></i>
-              <h1 style={{ color: '#5B4B8A', marginBottom: '0.5rem' }}>Reset Password</h1>
+              <i className="fas fa-key" style={{ fontSize: '3rem', color: '#0638dc', marginBottom: '1rem' }}></i>
+              <h1 style={{ color: '#0638dc', marginBottom: '0.5rem' }}>Reset Password</h1>
               <p style={{ color: '#666', marginBottom: 0 }}>
                 Enter your reset code and new password
               </p>
@@ -213,7 +213,7 @@ const ResetPassword = () => {
                       top: '50%',
                       transform: 'translateY(-50%)',
                       cursor: 'pointer',
-                      color: '#5B4B8A',
+                      color: '#0638dc',
                       fontSize: '18px',
                       padding: '6px',
                       userSelect: 'none',
@@ -266,7 +266,7 @@ const ResetPassword = () => {
                       top: '50%',
                       transform: 'translateY(-50%)',
                       cursor: 'pointer',
-                      color: '#5B4B8A',
+                      color: '#0638dc',
                       fontSize: '18px',
                       padding: '6px',
                       userSelect: 'none',
@@ -300,7 +300,7 @@ const ResetPassword = () => {
               textAlign: 'center',
             }}>
               <p style={{ color: '#666', fontSize: '0.9rem', margin: 0 }}>
-                Ready to login? <Link to="/login" style={{ color: '#5B4B8A', textDecoration: 'none', fontWeight: '500' }}>Go to login</Link>
+                Ready to login? <Link to="/login" style={{ color: '#12b600', textDecoration: 'none', fontWeight: '700' }}>Go to login</Link>
               </p>
             </div>
           </div>

@@ -647,12 +647,20 @@ const HelpCenter = () => {
               </div>
             ) : (
               filteredTickets.map((ticket) => (
-                <button
+                <div
                   key={ticket.id}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   className={`support-ticket-card${selectedTicket?.id === ticket.id ? ' is-active' : ''}`}
                   style={{ '--ticket-accent': statusColor(ticket.status) }}
                   onClick={() => {
+                    setSelectedTicket(ticket);
+                    setReplyMessage('');
+                    setAttachedFiles([]);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return;
+                    event.preventDefault();
                     setSelectedTicket(ticket);
                     setReplyMessage('');
                     setAttachedFiles([]);
@@ -687,7 +695,7 @@ const HelpCenter = () => {
                       <span className="support-inline-copy">{formatSupportTime(ticket.updatedAt || ticket.createdAt)}</span>
                     </div>
                   </div>
-                </button>
+                </div>
               ))
             )}
           </div>

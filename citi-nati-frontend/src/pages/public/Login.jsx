@@ -190,11 +190,11 @@ const Login = () => {
               </div>
               <Link to="/forgot-password" style={{
                 fontSize: '0.85rem',
-                color: '#5B4B8A',
+                color: '#0638dc',
                 textDecoration: 'none',
                 display: 'inline-block',
                 marginTop: '0.5rem',
-                fontWeight: '500',
+                fontWeight: '700',
               }}>
                 Forgot password?
               </Link>

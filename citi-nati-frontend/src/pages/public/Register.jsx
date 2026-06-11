@@ -301,13 +301,13 @@ const Register = () => {
                   height: '18px',
                   minWidth: '18px',
                   minHeight: '18px',
-                  accentColor: '#5B4B8A',
+                  accentColor: '#0638dc',
                   flexShrink: 0
                 }}
               />
               <label htmlFor="agreedToTerms" style={{ fontSize: '0.9rem', color: '#555', cursor: 'pointer', margin: 0 }}>
                 I agree to the{' '}
-                <Link to="/terms" style={{ color: '#5B4B8A', textDecoration: 'none', fontWeight: '500' }}>
+                <Link to="/terms" style={{ color: '#0638dc', textDecoration: 'none', fontWeight: '600' }}>
                   terms and conditions
                 </Link>
               </label>

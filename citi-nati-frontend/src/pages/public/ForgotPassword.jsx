@@ -55,8 +55,8 @@ const ForgotPassword = () => {
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
           }}>
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-              <i className="fas fa-lock" style={{ fontSize: '3rem', color: '#5B4B8A', marginBottom: '1rem' }}></i>
-              <h1 style={{ color: '#5B4B8A', marginBottom: '0.5rem' }}>Forgot Password?</h1>
+              <i className="fas fa-lock" style={{ fontSize: '3rem', color: '#0638dc', marginBottom: '1rem' }}></i>
+              <h1 style={{ color: '#0638dc', marginBottom: '0.5rem' }}>Forgot Password?</h1>
               <p style={{ color: '#666', marginBottom: 0 }}>
                 Enter your email address and we'll send you a code to reset your password
               </p>
@@ -132,7 +132,7 @@ const ForgotPassword = () => {
               textAlign: 'center',
             }}>
               <p style={{ color: '#666', fontSize: '0.9rem', margin: 0 }}>
-                Remember your password? <Link to="/login" style={{ color: '#5B4B8A', textDecoration: 'none', fontWeight: '500' }}>Login here</Link>
+                Remember your password? <Link to="/login" style={{ color: '#12b600', textDecoration: 'none', fontWeight: '700' }}>Login here</Link>
               </p>
             </div>
           </div>

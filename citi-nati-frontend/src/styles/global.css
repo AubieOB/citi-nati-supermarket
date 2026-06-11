@@ -2647,10 +2647,20 @@ body.menu-open {
 }
 
 /* 1) Keyboard accessibility and clear focus states */
-:where(a, button, input, select, textarea, [role='button']):focus-visible {
+:where(a, button, [role='button']):focus-visible {
   outline: 3px solid var(--sf-focus);
   outline-offset: 2px;
   border-radius: 8px;
+}
+
+input:focus,
+input:focus-visible,
+select:focus,
+select:focus-visible,
+textarea:focus,
+textarea:focus-visible {
+  outline: none !important;
+  outline-offset: 0 !important;
 }
 
 /* 2) Unified interaction tiers */
@@ -3649,6 +3659,11 @@ h6 {
 .form__textarea:focus {
   border-color: rgba(91, 75, 138, 0.55) !important;
   box-shadow: 0 0 0 3px rgba(91, 75, 138, 0.12) !important;
+}
+
+.form__textarea:focus {
+  border-color: var(--store-purple) !important;
+  box-shadow: none !important;
 }
 
 .products-top-link {
@@ -10794,5 +10809,107 @@ a {
 @media (max-width: 480px) {
   :root {
     --storefront-mobile-gutter: 8px;
+  }
+}
+
+/* Help Center is its own full-width workspace; do not inherit old route gutters. */
+.support-messenger-shell.support-public-sealed {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+  box-sizing: border-box !important;
+}
+
+.support-messenger-shell.support-public-sealed .help-center-top-bar,
+.support-messenger-shell.support-public-sealed .support-messenger-layout {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  box-sizing: border-box !important;
+}
+
+/* Form fields use only the thin active border, without the thick outer focus halo. */
+input:focus,
+input:focus-visible,
+select:focus,
+select:focus-visible,
+textarea:focus,
+textarea:focus-visible,
+.form__input:focus,
+.form__textarea:focus,
+.checkout-grid .form__input:focus,
+.checkout-grid .form__textarea:focus,
+ .public-info-page input:focus,
+ .public-info-page select:focus,
+.public-info-page textarea:focus,
+.support-input:focus,
+.support-select:focus,
+.support-textarea:focus,
+.support-public-sealed .support-input:focus,
+.support-public-sealed .support-select:focus,
+.support-public-sealed .support-textarea:focus {
+  outline: none !important;
+  outline-offset: 0 !important;
+  border-color: var(--store-purple, #0638dc) !important;
+  box-shadow: none !important;
+}
+
+/* Auth pages: replace legacy purple/teal accents with current Citi-Nati colors. */
+.auth-page input[type='checkbox'] {
+  accent-color: var(--store-purple, #0638dc) !important;
+}
+
+.auth-page .form__link a,
+.auth-page__footer-link a,
+.auth-page__back-link,
+.auth-page a[style*='#2D8659'],
+.auth-page a[style*='#007a32'] {
+  color: var(--store-green, #12b600) !important;
+  font-weight: 700 !important;
+  text-decoration: none !important;
+}
+
+.auth-page label a,
+.auth-page a[href='/terms'],
+.auth-page a[href='/forgot-password'],
+.auth-page a[style*='#5B4B8A'] {
+  color: var(--store-purple, #0638dc) !important;
+  font-weight: 700 !important;
+  text-decoration: none !important;
+}
+
+.auth-page i[style*='#5B4B8A'],
+.auth-page h1[style*='#5B4B8A'],
+.auth-page span[style*='#5B4B8A'],
+.auth-page button[style*='#5B4B8A'] {
+  color: var(--store-purple, #0638dc) !important;
+}
+
+.auth-page button[style*='#5B4B8A'] {
+  border-color: var(--store-purple, #0638dc) !important;
+}
+
+.auth-page .form__link a:hover,
+.auth-page__footer-link a:hover,
+.auth-page__back-link:hover,
+.auth-page label a:hover {
+  text-decoration: underline !important;
+}
+
+@media (max-width: 980px) {
+  .support-messenger-shell.support-public-sealed {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .support-messenger-shell.support-public-sealed {
+    padding-left: 6px !important;
+    padding-right: 6px !important;
   }
 }

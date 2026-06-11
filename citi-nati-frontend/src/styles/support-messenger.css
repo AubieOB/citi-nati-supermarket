@@ -1406,3 +1406,483 @@
   font-size: 1.45rem !important;
   color: #061833 !important;
 }
+
+/* Help Center responsive repair: no fixed side margins on any viewport. */
+.support-public-sealed {
+  padding: 0.75rem 12px 1.25rem !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.help-center-top-bar,
+.support-public-sealed .support-messenger-layout {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.support-public-sealed .support-messenger-layout {
+  grid-template-columns: minmax(300px, 30vw) minmax(0, 1fr) !important;
+  align-items: stretch !important;
+  gap: 0.75rem !important;
+  height: min(68vh, 640px) !important;
+  min-height: 30rem !important;
+}
+
+.support-public-sealed .support-sidebar,
+.support-public-sealed .support-conversation-panel,
+.support-public-sealed .support-empty-state {
+  min-width: 0 !important;
+}
+
+.support-public-sealed .support-conversation-panel,
+.support-public-sealed .support-empty-state {
+  min-height: 0 !important;
+}
+
+.support-public-sealed .support-empty-state {
+  height: 100% !important;
+}
+
+.support-public-sealed .support-empty-card {
+  width: min(100%, 360px) !important;
+}
+
+@media (min-width: 1280px) {
+  .help-center-no-selection.support-messenger-layout,
+  .support-public-sealed .support-messenger-layout.help-center-no-selection {
+    grid-template-columns: minmax(300px, 30vw) minmax(0, 1fr) !important;
+    justify-content: stretch !important;
+  }
+}
+
+@media (max-width: 980px) {
+  .support-public-sealed {
+    padding: 0.35rem 8px 1rem !important;
+    min-height: auto !important;
+  }
+
+  .help-center-top-bar,
+  .support-public-sealed .support-messenger-layout {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  .help-center-top-bar {
+    margin-bottom: 0.55rem !important;
+    padding: 0.9rem !important;
+  }
+
+  .support-public-sealed .support-messenger-layout {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 0.65rem !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  .support-public-sealed .support-sidebar,
+  .support-public-sealed .support-conversation-panel,
+  .support-public-sealed .support-empty-state {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  .support-public-sealed .support-ticket-list {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .support-public-sealed .support-conversation-body {
+    max-height: 58vh !important;
+  }
+
+  .help-center-no-selection .support-empty-state {
+    min-height: 12rem !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .support-public-sealed {
+    padding-left: 6px !important;
+    padding-right: 6px !important;
+  }
+
+  .help-center-top-row {
+    align-items: stretch !important;
+  }
+
+  .help-center-new-ticket-button {
+    width: fit-content !important;
+  }
+
+  .support-public-sealed .support-ticket-list {
+    padding: 0.55rem !important;
+  }
+
+  .support-public-sealed .support-ticket-card-content {
+    padding: 0.72rem 0.75rem !important;
+  }
+}
+
+/* Citi-Nati branded compact Help Center */
+.support-public-sealed {
+  --support-brand-blue: #0638dc;
+  --support-brand-blue-dark: #0628a8;
+  --support-brand-green: #12b600;
+  --support-brand-green-dark: #0a7f12;
+  --support-ink-strong: #07162e;
+  --support-ink: #1f2d44;
+  --support-muted-compact: #5b6b82;
+  --support-border: #d7e2ef;
+  --support-bg: #f4f8fd;
+  --support-shadow: 0 8px 20px rgba(6, 56, 220, 0.08);
+  color: var(--support-ink) !important;
+  font-size: 14px !important;
+}
+
+.support-public-sealed .help-center-top-bar {
+  padding: 0.62rem 0.8rem !important;
+  border-top: 3px solid var(--support-brand-green) !important;
+  border-color: #d8e4f2 !important;
+  background: linear-gradient(90deg, #ffffff 0%, #f8fbff 100%) !important;
+  box-shadow: var(--support-shadow) !important;
+}
+
+.support-public-sealed .help-center-top-row {
+  gap: 0.7rem !important;
+}
+
+.support-public-sealed .help-center-heading {
+  color: var(--support-brand-blue) !important;
+  font-size: 1.08rem !important;
+  font-weight: 900 !important;
+  line-height: 1.05 !important;
+}
+
+.support-public-sealed .help-center-subtitle {
+  margin-top: 0.18rem !important;
+  color: var(--support-muted-compact) !important;
+  font-size: 0.78rem !important;
+  line-height: 1.25 !important;
+}
+
+.support-public-sealed .support-messenger-layout {
+  gap: 0.55rem !important;
+}
+
+.support-public-sealed .support-sidebar,
+.support-public-sealed .support-conversation-panel,
+.support-public-sealed .support-empty-state {
+  border-color: #d8e4f2 !important;
+  box-shadow: var(--support-shadow) !important;
+}
+
+.support-public-sealed .support-ticket-list {
+  padding: 0.45rem !important;
+}
+
+.support-public-sealed .support-ticket-card {
+  margin-bottom: 0.38rem !important;
+  border-color: #e0e9f5 !important;
+  border-left-color: var(--ticket-accent, var(--support-brand-green)) !important;
+  background: #fff !important;
+}
+
+.support-public-sealed .support-ticket-card:hover,
+.support-public-sealed .support-ticket-card:focus-visible {
+  border-color: rgba(6, 56, 220, 0.28) !important;
+  background: #f8fbff !important;
+  outline: 2px solid rgba(6, 56, 220, 0.18) !important;
+  outline-offset: 1px !important;
+}
+
+.support-public-sealed .support-ticket-card.is-active {
+  border-color: rgba(18, 182, 0, 0.34) !important;
+  border-left-color: var(--support-brand-green) !important;
+  background: linear-gradient(90deg, rgba(6, 56, 220, 0.05), #fff 42%) !important;
+}
+
+.support-public-sealed .support-ticket-card-content {
+  padding: 0.62rem 0.7rem !important;
+}
+
+.support-public-sealed .support-ticket-top {
+  gap: 0.55rem !important;
+}
+
+.support-public-sealed .support-ticket-title {
+  color: var(--support-ink-strong) !important;
+  font-size: 0.84rem !important;
+  line-height: 1.22 !important;
+  font-weight: 900 !important;
+}
+
+.support-public-sealed .support-ticket-preview {
+  margin: 0.48rem 0 0.55rem !important;
+  color: var(--support-muted-compact) !important;
+  font-size: 0.8rem !important;
+  line-height: 1.32 !important;
+}
+
+.support-public-sealed .support-ticket-bottom,
+.support-public-sealed .support-inline-copy {
+  color: var(--support-muted-compact) !important;
+  font-size: 0.76rem !important;
+  line-height: 1.2 !important;
+}
+
+.support-public-sealed .support-badge-row {
+  gap: 0.34rem !important;
+}
+
+.support-public-sealed .support-badge,
+.support-public-sealed .support-chip {
+  min-height: 22px !important;
+  padding: 0.18rem 0.44rem !important;
+  border-radius: 999px !important;
+  font-size: 0.66rem !important;
+  line-height: 1 !important;
+  font-weight: 900 !important;
+  letter-spacing: 0 !important;
+}
+
+.support-public-sealed .support-chip {
+  border-color: rgba(6, 56, 220, 0.18) !important;
+  background: #f4f8ff !important;
+  color: var(--support-brand-blue) !important;
+}
+
+.support-public-sealed .support-primary-button,
+.support-public-sealed .help-center-new-ticket-button,
+.support-public-sealed .support-ghost-button,
+.support-public-sealed .support-icon-button {
+  min-height: 32px !important;
+  border-radius: 7px !important;
+  font-size: 0.78rem !important;
+  font-weight: 900 !important;
+}
+
+.support-public-sealed .support-primary-button,
+.support-public-sealed .help-center-new-ticket-button {
+  padding: 0.38rem 0.76rem !important;
+  background: var(--support-brand-green) !important;
+  color: #fff !important;
+}
+
+.support-public-sealed .support-primary-button:hover,
+.support-public-sealed .help-center-new-ticket-button:hover {
+  background: var(--support-brand-green-dark) !important;
+}
+
+.support-public-sealed .support-ghost-button {
+  padding: 0.38rem 0.76rem !important;
+  border: 1px solid rgba(6, 56, 220, 0.2) !important;
+  background: #eef5ff !important;
+  color: var(--support-brand-blue) !important;
+}
+
+.support-public-sealed .support-icon-button {
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  border-color: #dbe7f5 !important;
+  background: #f8fbff !important;
+  color: var(--support-brand-blue) !important;
+  box-shadow: none !important;
+}
+
+.support-public-sealed .support-icon-button:hover {
+  border-color: rgba(6, 56, 220, 0.28) !important;
+  background: #eef5ff !important;
+}
+
+.support-public-sealed .support-conversation-header {
+  min-height: 46px !important;
+  padding: 0.55rem 0.7rem !important;
+  border-bottom-color: #dbe7f5 !important;
+  background: linear-gradient(90deg, #ffffff 0%, #f4f8ff 100%) !important;
+}
+
+.support-public-sealed .support-conversation-title {
+  color: var(--support-brand-blue) !important;
+  font-size: 0.92rem !important;
+  line-height: 1.15 !important;
+  font-weight: 900 !important;
+}
+
+.support-public-sealed .support-conversation-meta {
+  margin-top: 0.24rem !important;
+  gap: 0.32rem !important;
+}
+
+.support-public-sealed .support-conversation-body {
+  padding: 0.62rem !important;
+  background: #f4f8fd !important;
+}
+
+.support-public-sealed .support-message-stack {
+  gap: 0.48rem !important;
+}
+
+.support-public-sealed .support-message-bubble {
+  max-width: min(70%, 620px) !important;
+  padding: 0.52rem 0.64rem !important;
+  border-radius: 8px !important;
+  box-shadow: 0 6px 14px rgba(7, 22, 46, 0.07) !important;
+}
+
+.support-public-sealed .support-message-row.is-self .support-message-bubble {
+  background: var(--support-brand-green) !important;
+  color: #fff !important;
+}
+
+.support-public-sealed .support-message-row.is-other .support-message-bubble {
+  border-color: #dbe7f5 !important;
+  background: #fff !important;
+}
+
+.support-public-sealed .support-message-author,
+.support-public-sealed .support-message-time {
+  font-size: 0.64rem !important;
+  font-weight: 900 !important;
+  line-height: 1.1 !important;
+}
+
+.support-public-sealed .support-message-text {
+  margin-top: 0.28rem !important;
+  font-size: 0.82rem !important;
+  line-height: 1.34 !important;
+}
+
+.support-public-sealed .support-composer {
+  padding: 0.48rem !important;
+}
+
+.support-public-sealed .support-compose-surface {
+  padding: 0.38rem !important;
+  border-color: #dbe7f5 !important;
+  background: #fff !important;
+}
+
+.support-public-sealed .support-textarea,
+.support-public-sealed .support-input,
+.support-public-sealed .support-select {
+  min-height: 34px !important;
+  padding: 0.42rem 0.56rem !important;
+  border-radius: 7px !important;
+  border-color: #d7e2ef !important;
+  color: var(--support-ink) !important;
+  font-size: 0.82rem !important;
+  line-height: 1.3 !important;
+}
+
+.support-public-sealed .support-textarea:focus,
+.support-public-sealed .support-input:focus,
+.support-public-sealed .support-select:focus {
+  border-color: rgba(6, 56, 220, 0.45) !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.support-public-sealed .hc-compose-textarea {
+  min-height: 38px !important;
+}
+
+.support-public-sealed .support-field-label {
+  margin-bottom: 0.24rem !important;
+  color: var(--support-brand-blue) !important;
+  font-size: 0.72rem !important;
+  line-height: 1.15 !important;
+  font-weight: 900 !important;
+}
+
+.support-public-sealed .support-ticket-creator {
+  margin-top: 0.55rem !important;
+  padding: 0.65rem !important;
+  border-color: rgba(6, 56, 220, 0.16) !important;
+  background: #f8fbff !important;
+}
+
+.support-public-sealed .support-section-title {
+  color: var(--support-brand-blue) !important;
+  font-size: 0.98rem !important;
+  line-height: 1.16 !important;
+  font-weight: 900 !important;
+}
+
+.support-public-sealed .support-form-grid {
+  gap: 0.55rem !important;
+}
+
+.support-public-sealed .support-form-stack {
+  gap: 0.55rem !important;
+}
+
+.support-public-sealed .support-form-actions {
+  gap: 0.45rem !important;
+}
+
+.support-public-sealed .support-empty-card {
+  padding: 1rem !important;
+}
+
+.support-public-sealed .help-center-empty-title {
+  margin: 0.48rem 0 0.32rem !important;
+  color: var(--support-brand-blue) !important;
+  font-size: 1.02rem !important;
+  line-height: 1.15 !important;
+  font-weight: 900 !important;
+}
+
+.support-public-sealed .support-empty-card > i {
+  color: var(--support-brand-green) !important;
+  font-size: 1.55rem !important;
+}
+
+.support-public-sealed .support-alert {
+  min-height: 34px !important;
+  padding: 0.46rem 0.65rem !important;
+  border-radius: 7px !important;
+  font-size: 0.8rem !important;
+  line-height: 1.25 !important;
+}
+
+.support-public-sealed .support-attachment-link,
+.support-public-sealed .support-attachment-chip {
+  min-height: 30px !important;
+  padding: 0.34rem 0.48rem !important;
+  font-size: 0.76rem !important;
+  border-color: #dbe7f5 !important;
+}
+
+@media (max-width: 980px) {
+  .support-public-sealed {
+    font-size: 13.5px !important;
+  }
+
+  .support-public-sealed .support-message-bubble {
+    max-width: 88% !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .support-public-sealed .help-center-top-bar {
+    padding: 0.58rem 0.65rem !important;
+  }
+
+  .support-public-sealed .help-center-heading {
+    font-size: 1rem !important;
+  }
+
+  .support-public-sealed .support-message-bubble {
+    max-width: 94% !important;
+  }
+}
