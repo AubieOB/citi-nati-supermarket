@@ -10714,3 +10714,85 @@ a {
     animation: none !important;
   }
 }
+
+/* Mobile storefront pages should use the full phone width with only normal gutters. */
+:root {
+  --storefront-mobile-gutter: 10px;
+}
+
+@media (max-width: 768px) {
+  .page > .container,
+  .page .container:not(.auth-page .container) {
+    width: 100% !important;
+    max-width: none !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: var(--storefront-mobile-gutter) !important;
+    padding-right: var(--storefront-mobile-gutter) !important;
+  }
+
+  .page__section > .container {
+    max-width: none !important;
+  }
+
+  .page .container > div[style*="max-width"],
+  .page .container > section[style*="max-width"],
+  .page .container > article[style*="max-width"] {
+    width: 100% !important;
+    max-width: none !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  .page .container [style*="margin: 0 auto"],
+  .page .container [style*="margin:0 auto"] {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  .cart-page,
+  .checkout-page {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .cart-page .cart-layout,
+  .cart-page .cart-summary-grid,
+  .checkout-page .checkout-grid {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  .products-grid-wrapper,
+  .products-header,
+  .products-grid,
+  .home-featured-section .container {
+    padding-left: var(--storefront-mobile-gutter) !important;
+    padding-right: var(--storefront-mobile-gutter) !important;
+  }
+
+  .home-featured-product__cart,
+  .product-card__button--icon {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    justify-self: center !important;
+    padding: 0 !important;
+    text-align: center !important;
+  }
+
+  .home-featured-product__cart i,
+  .product-card__button--icon i {
+    display: block !important;
+    width: auto !important;
+    margin: 0 !important;
+    line-height: 1 !important;
+    transform: none !important;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --storefront-mobile-gutter: 8px;
+  }
+}
